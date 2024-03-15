@@ -20,8 +20,8 @@ use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_conductor_api::ZomeCall;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::ChcImpl;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
+use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDna;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
@@ -29,30 +29,30 @@ use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::db_cache::DhtDbQueryCache;
 
-use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::cell::error::CellResult;
+use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueTriggers;
-use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::call_zome_workflow;
-use crate::core::workflow::CallZomeWorkflowArgs;
 use crate::core::workflow::countersigning_workflow::countersigning_success;
 use crate::core::workflow::countersigning_workflow::incoming_countersigning;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
+use crate::core::workflow::initialize_zomes_workflow;
+use crate::core::workflow::CallZomeWorkflowArgs;
 use crate::core::workflow::GenesisWorkflowArgs;
 use crate::core::workflow::GenesisWorkspace;
-use crate::core::workflow::initialize_zomes_workflow;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
+use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
 
 use super::api::CellConductorHandle;
-use super::ConductorHandle;
 use super::interface::SignalBroadcaster;
 use super::space::Space;
+use super::ConductorHandle;
 
 pub const INIT_MUTEX_TIMEOUT_SECS: u64 = 30;
 
@@ -69,8 +69,8 @@ mod test;
 
 impl Hash for Cell {
     fn hash<H>(&self, state: &mut H)
-        where
-            H: Hasher,
+    where
+        H: Hasher,
     {
         self.id.hash(state);
     }
@@ -141,7 +141,7 @@ impl Cell {
                 &space,
                 conductor_handle.clone(),
             )
-                .await?;
+            .await?;
 
             Ok((
                 Self {
@@ -174,8 +174,8 @@ impl Cell {
         membrane_proof: Option<MembraneProof>,
         chc: Option<ChcImpl>,
     ) -> CellResult<()>
-        where
-            Ribosome: RibosomeT + 'static,
+    where
+        Ribosome: RibosomeT + 'static,
     {
         // get the dna
         let dna_file = conductor_handle
@@ -247,25 +247,28 @@ impl Cell {
         let authored_db = match self.get_or_create_authored_db() {
             Ok(db) => db,
             Err(e) => {
-                error!("error getting authored db, cannot dispatch scheduled functions: {:?}", e);
+                error!(
+                    "error getting authored db, cannot dispatch scheduled functions: {:?}",
+                    e
+                );
                 return;
             }
         };
 
         let author = self.id.agent_pubkey().clone();
         let live_fns = authored_db
-        .write_async(move |txn: &mut Transaction| {
-            // Rescheduling should not fail as the data in the database
-            // should be valid schedules only.
-            reschedule_expired(txn, now, &author)?;
-            let lives = live_scheduled_fns(txn, now, &author);
-            // We know what to run so we can delete the ephemerals.
-            if lives.is_ok() {
-                // Failing to delete should rollback this attempt.
-                delete_live_ephemeral_scheduled_fns(txn, now, &author)?;
-            }
-            lives
-        })
+            .write_async(move |txn: &mut Transaction| {
+                // Rescheduling should not fail as the data in the database
+                // should be valid schedules only.
+                reschedule_expired(txn, now, &author)?;
+                let lives = live_scheduled_fns(txn, now, &author);
+                // We know what to run so we can delete the ephemerals.
+                if lives.is_ok() {
+                    // Failing to delete should rollback this attempt.
+                    delete_live_ephemeral_scheduled_fns(txn, now, &author)?;
+                }
+                lives
+            })
             .await;
 
         match live_fns {
@@ -420,8 +423,8 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                    .instrument(debug_span!("call_remote"))
-                    .await;
+                .instrument(debug_span!("call_remote"))
+                .await;
             }
 
             Get {
@@ -438,8 +441,8 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                    .instrument(debug_span!("cell_handle_get"))
-                    .await;
+                .instrument(debug_span!("cell_handle_get"))
+                .await;
             }
 
             GetMeta {
@@ -456,8 +459,8 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                    .instrument(debug_span!("cell_handle_get_meta"))
-                    .await;
+                .instrument(debug_span!("cell_handle_get_meta"))
+                .await;
             }
 
             GetLinks {
@@ -474,8 +477,8 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                    .instrument(debug_span!("cell_handle_get_links"))
-                    .await;
+                .instrument(debug_span!("cell_handle_get_links"))
+                .await;
             }
 
             CountLinks {
@@ -491,8 +494,8 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                    .instrument(debug_span!("cell_handle_count_links"))
-                    .await;
+                .instrument(debug_span!("cell_handle_count_links"))
+                .await;
             }
 
             GetAgentActivity {
@@ -510,8 +513,8 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                    .instrument(debug_span!("cell_handle_get_agent_activity"))
-                    .await;
+                .instrument(debug_span!("cell_handle_get_agent_activity"))
+                .await;
             }
 
             MustGetAgentActivity {
@@ -528,8 +531,8 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                    .instrument(debug_span!("cell_handle_must_get_agent_activity"))
-                    .await;
+                .instrument(debug_span!("cell_handle_must_get_agent_activity"))
+                .await;
             }
 
             ValidationReceiptsReceived {
@@ -545,8 +548,8 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                    .instrument(debug_span!("cell_handle_validation_receipt_received"))
-                    .await;
+                .instrument(debug_span!("cell_handle_validation_receipt_received"))
+                .await;
                 // We got a receipt so we must be connected to the network
                 // and should reset the publish back off loop to its minimum.
                 self.queue_triggers.publish_dht_ops.reset_back_off();
@@ -564,8 +567,8 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                    .instrument(debug_span!("cell_handle_sign_network_data"))
-                    .await;
+                .instrument(debug_span!("cell_handle_sign_network_data"))
+                .await;
             }
 
             CountersigningSessionNegotiation {
@@ -578,8 +581,8 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                    .instrument(debug_span!("cell_handle_countersigning_response"))
-                    .await;
+                .instrument(debug_span!("cell_handle_countersigning_response"))
+                .await;
             }
         }
         Ok(())
@@ -605,7 +608,7 @@ impl Cell {
                     &self.space.countersigning_workspace,
                     self.queue_triggers.countersigning.clone(),
                 )
-                    .map_err(Box::new)?;
+                .map_err(Box::new)?;
                 Ok(())
             }
             CountersigningSessionNegotiationMessage::AuthorityResponse(signed_actions) => {
@@ -617,8 +620,8 @@ impl Cell {
                     self.queue_triggers.clone(),
                     self.conductor_api.signal_broadcaster(),
                 )
-                    .await
-                    .map_err(Box::new)?)
+                .await
+                .map_err(Box::new)?)
             }
         }
     }
@@ -777,10 +780,10 @@ impl Cell {
             // from the conductor.
             let required_receipt_count = match action.as_ref().and_then(|h| h.0.entry_type()) {
                 Some(EntryType::App(AppEntryDef {
-                                        zome_index,
-                                        entry_index,
-                                        ..
-                                    })) => {
+                    zome_index,
+                    entry_index,
+                    ..
+                })) => {
                     let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
                     let zome = ribosome.get_integrity_zome(zome_index);
                     match zome {
@@ -924,7 +927,7 @@ impl Cell {
                     self.id.agent_pubkey().clone(),
                     Arc::new(dna_def),
                 )
-                    .await?
+                .await?
             }
         };
 
@@ -944,8 +947,8 @@ impl Cell {
             self.queue_triggers.publish_dht_ops.clone(),
             self.queue_triggers.integrate_dht_ops.clone(),
         )
-            .await
-            .map_err(Box::new)?)
+        .await
+        .map_err(Box::new)?)
     }
 
     /// Check if each Zome's init callback has been run, and if not, run it.
@@ -956,8 +959,8 @@ impl Cell {
             std::time::Duration::from_secs(INIT_MUTEX_TIMEOUT_SECS),
             self.init_mutex.lock(),
         )
-            .await
-            .map_err(|_| CellError::InitTimeout)?;
+        .await
+        .map_err(|_| CellError::InitTimeout)?;
 
         // If not run it
         let keystore = self.conductor_api.keystore().clone();
@@ -979,7 +982,7 @@ impl Cell {
             id.agent_pubkey().clone(),
             Arc::new(dna_def.into_content()),
         )
-            .await?;
+        .await?;
 
         // Check if initialization has run
         if workspace.source_chain().zomes_initialized().await? {
@@ -1043,7 +1046,9 @@ impl Cell {
 
     /// Accessor for the authored database backing this Cell
     pub(crate) fn get_or_create_authored_db(&self) -> CellResult<DbWrite<DbKindAuthored>> {
-        Ok(self.space.get_or_create_authored_db(self.id.agent_pubkey().clone())?)
+        Ok(self
+            .space
+            .get_or_create_authored_db(self.id.agent_pubkey().clone())?)
     }
 
     /// Accessor for the authored database backing this Cell

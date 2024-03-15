@@ -79,7 +79,10 @@ pub fn test_authored_db() -> TestDb<DbKindAuthored> {
 }
 
 pub fn test_authored_db_with_id(id: u8) -> TestDb<DbKindAuthored> {
-    test_db(DbKindAuthored(Arc::new(CellId::new(fake_dna_hash(id), fake_agent_pub_key(id)))))
+    test_db(DbKindAuthored(Arc::new(CellId::new(
+        fake_dna_hash(id),
+        fake_agent_pub_key(id),
+    ))))
 }
 
 /// Create a [`TestDb`] of [`DbKindDht`], backed by a temp directory.

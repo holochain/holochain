@@ -55,8 +55,8 @@ use crate::conductor::ConductorHandle;
 use crate::conductor::{error::ConductorError, manager::ManagedTaskResult};
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::*;
-use publish_dht_ops_consumer::*;
 use holochain_sqlite::prelude::DatabaseResult;
+use publish_dht_ops_consumer::*;
 
 mod countersigning_consumer;
 use countersigning_consumer::*;
@@ -94,8 +94,12 @@ pub async fn spawn_queue_consumer_tasks(
     let authored_db = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
 
     // Publish
-    let tx_publish =
-        spawn_publish_dht_ops_consumer(cell_id, authored_db.clone(), conductor.clone(), network.clone());
+    let tx_publish = spawn_publish_dht_ops_consumer(
+        cell_id,
+        authored_db.clone(),
+        conductor.clone(),
+        network.clone(),
+    );
 
     // Validation Receipt
     // One per space.

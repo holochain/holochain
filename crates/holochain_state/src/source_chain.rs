@@ -1076,8 +1076,13 @@ pub async fn genesis(
             SourceChainResult::Ok(ops_to_integrate)
         })
         .await?;
-    authored_ops_to_dht_db_without_check(ops_to_integrate, authored.clone().into_read(), dht_db, dht_db_cache)
-        .await?;
+    authored_ops_to_dht_db_without_check(
+        ops_to_integrate,
+        authored.clone().into_read(),
+        dht_db,
+        dht_db_cache,
+    )
+    .await?;
     Ok(())
 }
 

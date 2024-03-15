@@ -348,7 +348,9 @@ impl Spaces {
         dna_hash: &DnaHash,
         author: AgentPubKey,
     ) -> DatabaseResult<DbWrite<DbKindAuthored>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.get_or_create_authored_db(author.clone()))?
+        self.get_or_create_space_ref(dna_hash, |space| {
+            space.get_or_create_authored_db(author.clone())
+        })?
     }
 
     /// Get all the authored databases for this space (this will create the space if it doesn't already exist).
@@ -793,11 +795,7 @@ impl Space {
 
     /// Gets authored databases for this space, for every author.
     pub fn get_all_authored_dbs(&self) -> Vec<DbWrite<DbKindAuthored>> {
-        self.authored_dbs
-            .lock()
-            .values()
-            .cloned()
-            .collect()
+        self.authored_dbs.lock().values().cloned().collect()
     }
 }
 
