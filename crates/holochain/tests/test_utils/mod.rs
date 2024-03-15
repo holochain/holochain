@@ -200,6 +200,7 @@ pub async fn generate_agent_pubkey(client: &mut WebsocketSender, timeout: u64) -
     unwrap_to::unwrap_to!(response => AdminResponse::AgentPubKeyGenerated).clone()
 }
 
+/// Returns the hash of the DNA installed, after modifiers have been applied
 pub async fn register_and_install_dna(
     client: &mut WebsocketSender,
     agent_key: AgentPubKey,
@@ -220,6 +221,7 @@ pub async fn register_and_install_dna(
     .await
 }
 
+/// Returns the hash of the DNA installed, after modifiers have been applied
 pub async fn register_and_install_dna_named(
     client: &mut WebsocketSender,
     agent_key: AgentPubKey,
@@ -236,10 +238,11 @@ pub async fn register_and_install_dna_named(
 
     let dna_bundle1 = DnaBundle::read_from_file(&dna_path).await.unwrap();
     let dna_bundle = DnaBundle::read_from_file(&dna_path).await.unwrap();
-    let (_dna, dna_hash) = dna_bundle1
+    let (dna, _) = dna_bundle1
         .into_dna_file(mods.clone().serialized().unwrap())
         .await
         .unwrap();
+    let dna_hash = dna.dna_hash().clone();
 
     let roles = vec![AppRoleManifest {
         name: role_name,

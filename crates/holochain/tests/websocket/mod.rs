@@ -88,6 +88,8 @@ how_many: 42
         .unwrap(),
     );
 
+    let original_dna_hash = dna.dna_hash().clone();
+
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
 
@@ -100,6 +102,8 @@ how_many: 42
         10000,
     )
     .await;
+
+    assert_ne!(installed_dna_hash, original_dna_hash);
 
     // List Dnas
     let request = AdminRequest::ListDnas;
