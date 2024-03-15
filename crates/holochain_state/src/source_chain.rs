@@ -510,11 +510,8 @@ where
         self.author.clone()
     }
 
-    pub fn cell_id(&self) -> CellId {
-        CellId::new(
-            self.vault.kind().dna_hash().clone(),
-            self.agent_pubkey().clone(),
-        )
+    pub fn cell_id(&self) -> Arc<CellId> {
+        self.vault.kind().0.clone()
     }
 
     /// This has to clone all the data because we can't return
