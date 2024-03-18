@@ -35,6 +35,7 @@ use crate::run::run_async;
 use crate::CmdRunner;
 use clap::Parser;
 use holochain_trace::Output;
+use holochain_types::websocket::AllowedOrigin;
 
 #[doc(hidden)]
 #[derive(Debug, Parser)]
@@ -402,7 +403,7 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
     let resp = cmd
         .command(AdminRequest::AddAdminInterfaces(vec![
             AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port },
+                driver: InterfaceDriver::Websocket { port, allowed_origin: AllowedOrigin::Any },
             },
         ]))
         .await?;

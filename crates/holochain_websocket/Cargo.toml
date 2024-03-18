@@ -11,6 +11,7 @@ edition = "2021"
 [dependencies]
 futures = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
+holochain_types = { version = "0.3.0-beta-dev.36", path = "../holochain_types" }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 tokio = { workspace = true }

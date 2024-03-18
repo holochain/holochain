@@ -9,6 +9,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
+use holochain_types::websocket::AllowedOrigin;
 
 use super::error::{ConductorError, ConductorResult};
 
@@ -239,7 +240,12 @@ impl AppInterfaceConfig {
     pub fn websocket(port: u16) -> Self {
         Self {
             signal_subscriptions: HashMap::new(),
-            driver: InterfaceDriver::Websocket { port },
+            driver: InterfaceDriver::Websocket {
+                port,
+                // No origin restrictions for app interfaces for now. Zome calls are protected by signing
+                // and no requirement for other protection on the app websocket has been raised.
+                allowed_origin: AllowedOrigin::Any
+            },
         }
     }
 }

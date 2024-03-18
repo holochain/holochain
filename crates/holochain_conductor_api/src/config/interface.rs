@@ -7,9 +7,6 @@ pub struct AdminInterfaceConfig {
     /// By what means the interface will be exposed.
     /// Currently the only option is a local websocket running on a configurable port.
     pub driver: InterfaceDriver,
-    // How long will this interface be accessible between authentications?
-    // TODO: implement once we have authentication
-    // _session_duration_seconds: Option<u32>,
 }
 
 /// Configuration for interfaces, specifying the means by which an interface
@@ -28,6 +25,8 @@ pub enum InterfaceDriver {
     Websocket {
         /// The port on which to establish the WebsocketListener
         port: u16,
+
+        allowed_origin: holochain_types::websocket::AllowedOrigin
     },
 }
 
@@ -35,7 +34,7 @@ impl InterfaceDriver {
     /// Get the port for this driver.
     pub fn port(&self) -> u16 {
         match self {
-            InterfaceDriver::Websocket { port } => *port,
+            InterfaceDriver::Websocket { port, .. } => *port,
         }
     }
 }

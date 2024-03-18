@@ -16,6 +16,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::*;
+use holochain_types::websocket::AllowedOrigin;
 
 /// Concurrency count for websocket message processing.
 /// This could represent a significant memory investment for
@@ -34,10 +35,14 @@ pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
 pub const MAX_CONNECTIONS: usize = 400;
 
 /// Create a WebsocketListener to be used in interfaces
-pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
+pub async fn spawn_websocket_listener(port: u16, allowed_origin: AllowedOrigin) -> InterfaceResult<WebsocketListener> {
     trace!("Initializing Admin interface");
+
+    let mut config = WebsocketConfig::LISTENER_DEFAULT;
+    config.allowed_origin = Some(allowed_origin);
+
     let listener = WebsocketListener::bind(
-        Arc::new(WebsocketConfig::default()),
+        Arc::new(config),
         format!("127.0.0.1:{}", port),
     )
     .await?;
@@ -112,7 +117,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
 ) -> InterfaceResult<u16> {
     trace!("Initializing App interface");
     let listener = WebsocketListener::bind(
-        Arc::new(WebsocketConfig::default()),
+        Arc::new(WebsocketConfig::LISTENER_DEFAULT),
         format!("127.0.0.1:{}", port),
     )
     .await?;

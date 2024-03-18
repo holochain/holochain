@@ -411,8 +411,8 @@ mod interface_impls {
                 let tm = tm.clone();
                 async move {
                     match driver {
-                        InterfaceDriver::Websocket { port } => {
-                            let listener = spawn_websocket_listener(port).await?;
+                        InterfaceDriver::Websocket { port, allowed_origin } => {
+                            let listener = spawn_websocket_listener(port, allowed_origin).await?;
                             let port = listener.local_addr()?.port();
                             spawn_admin_interface_tasks(
                                 tm.clone(),
