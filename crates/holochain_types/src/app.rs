@@ -483,14 +483,13 @@ impl InstalledAppCommon {
         &self,
         role_name: &RoleName,
     ) -> Option<impl Iterator<Item = (&CloneId, CellId)>> {
-        match self.role_assignments.get(role_name) {
-            None => None,
-            Some(role_assignments) => {
-                Some(role_assignments.clones.iter().map(|(id, dna_hash)| {
+        self.role_assignments
+            .get(role_name)
+            .map(|role_assignments| {
+                role_assignments.clones.iter().map(|(id, dna_hash)| {
                     (id, CellId::new(dna_hash.clone(), self.agent_key.clone()))
-                }))
-            }
-        }
+                })
+            })
     }
 
     /// Accessor
@@ -498,17 +497,12 @@ impl InstalledAppCommon {
         &self,
         role_name: &RoleName,
     ) -> Option<impl Iterator<Item = (&CloneId, CellId)>> {
-        match self.role_assignments.get(role_name) {
-            None => None,
-            Some(role_assignment) => Some(
-                role_assignment
-                    .disabled_clones
-                    .iter()
-                    .map(|(id, dna_hash)| {
-                        (id, CellId::new(dna_hash.clone(), self.agent_key.clone()))
-                    }),
-            ),
-        }
+        self.role_assignments.get(role_name).map(|role_assignment| {
+            role_assignment
+                .disabled_clones
+                .iter()
+                .map(|(id, dna_hash)| (id, CellId::new(dna_hash.clone(), self.agent_key.clone())))
+        })
     }
 
     /// Accessor

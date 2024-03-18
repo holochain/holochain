@@ -142,10 +142,11 @@ async fn app_ids_are_unique() {
 /// App can't be installed if it contains duplicate RoleNames
 #[tokio::test(flavor = "multi_thread")]
 async fn role_names_are_unique() {
+    let agent = fixt!(AgentPubKey);
     let cells = vec![
-        InstalledCell::new(fixt!(CellId), "1".into()),
-        InstalledCell::new(fixt!(CellId), "1".into()),
-        InstalledCell::new(fixt!(CellId), "2".into()),
+        InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "1".into()),
+        InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "1".into()),
+        InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "2".into()),
     ];
     let result = InstalledAppCommon::new_legacy("id", cells.into_iter());
     matches::assert_matches!(
