@@ -998,8 +998,8 @@ mod network_impls {
             let all_dna = state.installed_apps_and_services().iter().fold(
                 all_dna,
                 |mut acc, (installed_app_id, app)| {
-                    for dna_hash in app.all_cells().map(|cell_id| cell_id.dna_hash()) {
-                        acc.entry(dna_hash.clone())
+                    for cell_id in app.all_cells() {
+                        acc.entry(cell_id.dna_hash().clone())
                             .or_default()
                             .push(installed_app_id.clone());
                     }
@@ -1341,20 +1341,19 @@ mod app_impls {
                 .iter()
                 .map(|(dr, mp)| {
                     let dna = dr.dna().clone();
-                    let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
+                    let dna_hash = dna.dna_hash().clone();
                     let dnas_to_register = (dna, mp.clone());
-                    let role_assignments = (dr.role(), AppRoleAssignment::new(cell_id, true, 255));
+                    let role_assignments = (dr.role(), AppRoleAssignment::new(dna_hash, true, 255));
                     (dnas_to_register, role_assignments)
                 })
                 .unzip();
 
             let ops = AppRoleResolution {
-                agent: agent.clone(),
                 dnas_to_register,
                 role_assignments,
             };
 
-            self.install_app_common(installed_app_id, manifest, ops, false)
+            self.install_app_common(installed_app_id, manifest, agent.clone(), ops, false)
                 .await?;
 
             Ok(agent)
@@ -1389,10 +1388,11 @@ mod app_impls {
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
             manifest: AppManifest,
+            agent_key: AgentPubKey,
             ops: AppRoleResolution,
             ignore_genesis_failure: bool,
         ) -> ConductorResult<StoppedApp> {
-            let cells_to_create = ops.cells_to_create();
+            let cells_to_create = ops.cells_to_create(agent_key.clone());
 
             // check if cells_to_create contains a cell identical to an existing one
             let state = self.get_state().await?;
@@ -1423,7 +1423,6 @@ mod app_impls {
                 crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
 
             if genesis_result.is_ok() || ignore_genesis_failure {
-                let agent_key = ops.agent;
                 let roles = ops.role_assignments;
                 let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
 
@@ -1487,12 +1486,16 @@ mod app_impls {
                 .resolve_agent(installed_app_id.clone(), agent_key)
                 .await?;
 
-            let ops = bundle
-                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
-                .await?;
+            let ops = bundle.resolve_cells(&local_dnas, membrane_proofs).await?;
 
             self.clone()
-                .install_app_common(installed_app_id, manifest, ops, ignore_genesis_failure)
+                .install_app_common(
+                    installed_app_id,
+                    manifest,
+                    agent_key,
+                    ops,
+                    ignore_genesis_failure,
+                )
                 .await
         }
 
@@ -1584,7 +1587,7 @@ mod app_impls {
                 .get_state()
                 .await?
                 .running_apps_and_services()
-                .filter(|(_, v)| v.all_cells().any(|i| i == cell_id))
+                .filter(|(_, v)| v.all_cells().any(|i| i == *cell_id))
                 .map(|(k, _)| k)
                 .cloned()
                 .collect())
@@ -1600,14 +1603,16 @@ mod app_impls {
                 .get_state()
                 .await?
                 .running_apps_and_services()
-                .find(|(_, running_app)| running_app.all_cells().any(|i| i == cell_id))
+                .find(|(_, running_app)| running_app.all_cells().any(|i| i == *cell_id))
                 .and_then(|(_, running_app)| {
                     running_app
+                        .clone()
                         .into_common()
                         .role(role_name)
                         .ok()
-                        .map(|role| role.cell_id())
-                        .cloned()
+                        .map(|role| {
+                            CellId::new(role.dna_hash().clone(), running_app.agent_key().clone())
+                        })
                 }))
         }
 
@@ -1670,7 +1675,7 @@ mod cell_impls {
                     .installed_apps_and_services()
                     .values()
                     .flat_map(|app| app.all_cells())
-                    .any(|id| id == cell_id);
+                    .any(|id| id == *cell_id);
                 if present {
                     Err(ConductorError::CellDisabled(cell_id.clone()))
                 } else {
@@ -1754,8 +1759,9 @@ mod clone_cell_impls {
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
                         let clone_id = app.get_clone_id(&clone_cell_id)?;
-                        let cell_id = app.get_clone_cell_id(&clone_cell_id)?;
+                        let dna_hash = app.get_clone_dna_hash(&clone_cell_id)?;
                         app.disable_clone_cell(&clone_id)?;
+                        let cell_id = CellId::new(dna_hash, app.agent_key().clone());
                         Ok((state, cell_id))
                     }
                 })
@@ -2082,7 +2088,7 @@ mod app_status_impls {
                                 }
                                 Paused(_) => {
                                     // If all required cells are now running, restart the app
-                                    if app.required_cells().all(|id| cell_ids.contains(id)) {
+                                    if app.required_cells().all(|id| cell_ids.contains(&id)) {
                                         app.status.transition(Start)
                                     } else {
                                         AppStatusFx::NoChange
@@ -2710,12 +2716,12 @@ impl Conductor {
     async fn remove_dangling_cells(&self) -> ConductorResult<()> {
         let state = self.get_state().await?;
 
-        let keepers: HashSet<&CellId> = state
+        let keepers: HashSet<CellId> = state
             .enabled_apps_and_services()
             .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
 
-        let all_cells: HashSet<&CellId> = state
+        let all_cells: HashSet<CellId> = state
             .installed_apps_and_services()
             .iter()
             .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
@@ -2746,7 +2752,7 @@ impl Conductor {
         // in any app. In other words, find the DNAs which are *only* represented in uninstalled apps.
         let all_dnas: HashSet<_> = all_cells
             .into_iter()
-            .map(|cell_id| cell_id.dna_hash())
+            .map(|cell_id| cell_id.dna_hash().clone())
             .collect();
         let dnas_to_cleanup = cells_to_cleanup
             .iter()
@@ -2821,7 +2827,7 @@ impl Conductor {
             Some(app_id) => {
                 let app = state.get_app(app_id)?;
                 if app.status().is_running() {
-                    app.all_enabled_cells().cloned().collect()
+                    app.all_enabled_cells().collect()
                 } else {
                     HashSet::new()
                 }
@@ -2833,8 +2839,7 @@ impl Conductor {
                     .installed_apps_and_services()
                     .iter()
                     .filter(|(_, app)| app.status().is_running())
-                    .flat_map(|(_id, app)| app.all_enabled_cells().collect::<Vec<&CellId>>())
-                    .cloned()
+                    .flat_map(|(_id, app)| app.all_enabled_cells())
                     .collect()
             }
         };
@@ -2965,7 +2970,7 @@ impl Conductor {
             .update_state_prime(move |mut state| {
                 let state_copy = state.clone();
                 let app = state.get_app_mut(&app_id)?;
-                let agent_key = app.role(&role_name)?.agent_key().to_owned();
+                let agent_key = app.agent_key().to_owned();
                 let clone_cell_id = CellId::new(clone_dna_hash, agent_key);
 
                 // if cell id of new clone cell already exists, reject as duplicate
@@ -2973,14 +2978,14 @@ impl Conductor {
                     .installed_apps_and_services()
                     .iter()
                     .flat_map(|(_, app)| app.all_cells())
-                    .any(|cell_id| *cell_id == clone_cell_id)
+                    .any(|cell_id| cell_id == clone_cell_id)
                 {
                     return Err(ConductorError::AppError(AppError::DuplicateCellId(
                         clone_cell_id,
                     )));
                 }
 
-                let clone_id = app.add_clone(&role_name, &clone_cell_id)?;
+                let clone_id = app.add_clone(&role_name, clone_cell_id.dna_hash())?;
                 let installed_clone_cell = ClonedCell {
                     cell_id: clone_cell_id,
                     clone_id,

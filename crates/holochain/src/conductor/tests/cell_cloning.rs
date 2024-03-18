@@ -181,7 +181,7 @@ async fn create_identical_clone_cell_twice_fails() {
         .clone()
         .disable_clone_cell(&DisableCloneCellPayload {
             app_id: alice_app.installed_app_id().clone(),
-            clone_cell_id: CloneCellId::CellId(alice_clone_cell.cell_id.clone()),
+            clone_cell_id: CloneCellId::DnaHash(alice_clone_cell.cell_id.dna_hash().clone()),
         })
         .await
         .unwrap();
@@ -305,7 +305,7 @@ async fn clone_cell_deletion() {
         .raw_handle()
         .enable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.into(),
-            clone_cell_id: CloneCellId::CellId(clone_cell.cell_id.clone()),
+            clone_cell_id: CloneCellId::DnaHash(clone_cell.cell_id.dna_hash().clone()),
         })
         .await
         .unwrap();
@@ -326,7 +326,7 @@ async fn clone_cell_deletion() {
         .raw_handle()
         .delete_clone_cell(&DeleteCloneCellPayload {
             app_id: app_id.into(),
-            clone_cell_id: CloneCellId::CellId(clone_cell.cell_id.clone()),
+            clone_cell_id: CloneCellId::DnaHash(clone_cell.cell_id.dna_hash().clone()),
         })
         .await
         .unwrap();
@@ -391,7 +391,7 @@ async fn conductor_can_startup_with_cloned_cell() {
         .clone()
         .disable_clone_cell(&DisableCloneCellPayload {
             app_id: app.installed_app_id().clone(),
-            clone_cell_id: CloneCellId::CellId(clone_cell.cell_id.clone()),
+            clone_cell_id: CloneCellId::DnaHash(clone_cell.cell_id.dna_hash().clone()),
         })
         .await
         .unwrap();

@@ -859,7 +859,6 @@ pub mod test {
             })
             .unwrap()
             .all_cells()
-            .cloned()
             .collect();
 
         // Collect the expected result
@@ -910,7 +909,6 @@ pub mod test {
             })
             .unwrap()
             .all_cells()
-            .cloned()
             .collect();
 
         assert_eq!(expected, cell_ids);

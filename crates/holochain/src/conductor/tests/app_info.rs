@@ -60,7 +60,7 @@ async fn app_info_returns_all_cells_with_info() {
     conductor
         .disable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.clone(),
-            clone_cell_id: CloneCellId::CellId(clone_cell_2.cell_id.clone()),
+            clone_cell_id: CloneCellId::DnaHash(clone_cell_2.cell_id.dna_hash().clone()),
         })
         .await
         .unwrap();
@@ -118,7 +118,7 @@ async fn app_info_returns_all_cells_with_info() {
         .clone()
         .enable_clone_cell(&EnableCloneCellPayload {
             app_id: app_id.clone(),
-            clone_cell_id: CloneCellId::CellId(clone_cell_2.cell_id.clone()),
+            clone_cell_id: CloneCellId::DnaHash(clone_cell_2.cell_id.dna_hash().clone()),
         })
         .await
         .unwrap();

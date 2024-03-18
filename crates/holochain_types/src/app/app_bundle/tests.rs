@@ -38,7 +38,6 @@ async fn app_bundle_fixture(modifiers: DnaModifiersOpt<YamlProperties>) -> (AppB
 #[tokio::test]
 async fn provisioning_1_create() {
     holochain_trace::test_run().ok();
-    let agent = fixt!(AgentPubKey);
     let modifiers = DnaModifiersOpt {
         properties: Some(app_manifest_properties_fixture()),
         network_seed: Some("network_seed".into()),
@@ -54,23 +53,16 @@ async fn provisioning_1_create() {
         .with_properties(SerializedBytes::try_from(app_manifest_properties_fixture()).unwrap())
         .await;
 
-    let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
-
     let resolution = bundle
-        .resolve_cells(
-            &std::collections::HashMap::new(),
-            agent.clone(),
-            Default::default(),
-        )
+        .resolve_cells(&std::collections::HashMap::new(), Default::default())
         .await
         .unwrap();
 
     // Build the expected output.
     // NB: this relies heavily on the particulars of the `app_manifest_fixture`
-    let role = AppRoleAssignment::new(cell_id, true, 50);
+    let role = AppRoleAssignment::new(dna.dna_hash().to_owned(), true, 50);
 
     let expected = AppRoleResolution {
-        agent,
         dnas_to_register: vec![(dna, None)],
         role_assignments: vec![("role_name".into(), role)],
     };

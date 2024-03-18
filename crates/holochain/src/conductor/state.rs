@@ -239,7 +239,7 @@ impl ConductorState {
     pub fn find_app_containing_cell(&self, cell_id: &CellId) -> Option<&InstalledApp> {
         self.installed_apps_and_services
             .values()
-            .find(|app| app.all_cells().any(|id| id == cell_id))
+            .find(|app| app.all_cells().any(|id| id == *cell_id))
     }
 
     /// Get network compability params

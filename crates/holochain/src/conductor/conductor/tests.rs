@@ -77,7 +77,7 @@ async fn can_update_state() {
             .all_cells()
             .collect::<Vec<_>>()
             .as_slice(),
-        &[&cell_id]
+        &[cell_id]
     );
 }
 
