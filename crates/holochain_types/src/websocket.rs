@@ -72,3 +72,73 @@ impl AllowedOrigins {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::AllowedOrigins;
+
+    #[test]
+    fn any_origin_to_and_from_string() {
+        let allowed_origins = AllowedOrigins::Any;
+        let str: String = allowed_origins.clone().into();
+        let allowed_origins_2 = str.clone().into();
+
+        assert_eq!("*".to_string(), str);
+        assert_eq!(allowed_origins, allowed_origins_2);
+    }
+
+    #[test]
+    fn single_origin_to_and_from_string() {
+        let allowed_origins = AllowedOrigins::Origins(["http://example.com".to_string()].iter().cloned().collect());
+        let str: String = allowed_origins.clone().into();
+        let allowed_origins_2 = str.clone().into();
+
+        assert_eq!("http://example.com".to_string(), str);
+        assert_eq!(allowed_origins, allowed_origins_2);
+    }
+
+    #[test]
+    fn multiple_origins_to_and_from_string() {
+        let allowed_origins = AllowedOrigins::Origins(["http://example1.com".to_string(), "http://example2.com".to_string()].iter().cloned().collect());
+        let str: String = allowed_origins.clone().into();
+        let allowed_origins_2 = str.into();
+
+        assert_eq!(allowed_origins, allowed_origins_2);
+    }
+
+    #[test]
+    fn any_origin_is_allowed() {
+        let allowed_origins = AllowedOrigins::Any;
+        assert!(allowed_origins.is_allowed("http://example.com"));
+    }
+
+    #[test]
+    fn specific_origin_is_allowed() {
+        let allowed_origins = AllowedOrigins::Origins(["http://example.com".to_string()].iter().cloned().collect());
+        assert!(allowed_origins.is_allowed("http://example.com"));
+    }
+
+    #[test]
+    fn other_origin_is_not_allowed() {
+        let allowed_origins = AllowedOrigins::Origins(["http://example.com".to_string()].iter().cloned().collect());
+        assert!(!allowed_origins.is_allowed("http://example2.com"));
+    }
+
+    #[test]
+    fn multiple_origins_ignores_whitespace() {
+        let str = " http://example1.com , http://example2.com,\thttp://example3.com\n";
+
+        let origins = AllowedOrigins::from(str.to_string());
+        assert!(origins.is_allowed("http://example1.com"));
+        assert!(origins.is_allowed("http://example2.com"));
+        assert!(origins.is_allowed("http://example3.com"));
+    }
+
+    #[test]
+    fn serialize_deserialize() {
+        let allowed_origins = AllowedOrigins::Origins(["http://example1.com".to_string(), "http://example2.com".to_string()].iter().cloned().collect());
+        let serialized = serde_json::to_string(&allowed_origins).unwrap();
+        let deserialized: AllowedOrigins = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(allowed_origins, deserialized);
+    }
+}

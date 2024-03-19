@@ -11,7 +11,7 @@ use tokio_tungstenite::tungstenite::handshake::client::Request;
 use tokio_tungstenite::tungstenite::handshake::server::{
     Callback, ErrorResponse, Response,
 };
-use tokio_tungstenite::tungstenite::http::{HeaderMap, HeaderValue};
+use tokio_tungstenite::tungstenite::http::{HeaderMap, HeaderValue, StatusCode};
 use tokio_tungstenite::tungstenite::protocol::Message;
 use holochain_types::websocket::AllowedOrigins;
 
@@ -646,6 +646,13 @@ impl ConnectRequest {
         }
         Ok(req)
     }
+
+    #[cfg(test)]
+    pub(crate) fn clear_headers(mut self) -> Self {
+        self.headers.clear();
+
+        self
+    }
 }
 
 /// A Holochain websocket listener.
@@ -709,7 +716,7 @@ impl Callback for ConnectCallback {
         request: &Request,
         response: Response,
     ) -> std::result::Result<Response, ErrorResponse> {
-        tracing::debug!("Checking incoming websocket connection request with allowed origin {:?}: {:?}", self.allowed_origin, request.headers());
+        tracing::trace!("Checking incoming websocket connection request with allowed origin {:?}: {:?}", self.allowed_origin, request.headers());
         match request.headers().get("Origin").and_then(|v| v.to_str().ok()) {
             Some(origin) => {
                 if self.allowed_origin.is_allowed(origin) {
@@ -719,14 +726,24 @@ impl Callback for ConnectCallback {
                     match HeaderValue::from_str(&allowed_origin) {
                         Ok(allowed_origin) => {
                             let mut err_response = ErrorResponse::new(None);
+                            *err_response.status_mut() = StatusCode::BAD_REQUEST;
                             err_response.headers_mut().insert("Access-Control-Allow-Origin", allowed_origin);
-                            Err(ErrorResponse::from(err_response))
+                            Err(err_response)
                         }
-                        Err(_) => Err(ErrorResponse::new(Some("Invalid listener configuration for `Origin`".to_string()))),
+                        Err(_) => {
+                            // Shouldn't be possible to get here, the listener should be configured to require an origin
+                            let mut err_response = ErrorResponse::new(Some("Invalid listener configuration for `Origin`".to_string()));
+                            *err_response.status_mut() = StatusCode::BAD_REQUEST;
+                            Err(err_response)
+                        },
                     }
                 }
             }
-            None => Err(ErrorResponse::new(Some("Missing `Origin` header".to_string()))),
+            None => {
+                let mut err_response = ErrorResponse::new(Some("Missing `Origin` header".to_string()));
+                *err_response.status_mut() = StatusCode::BAD_REQUEST;
+                Err(err_response)
+            },
         }
     }
 }
