@@ -187,7 +187,7 @@ impl ArqSet {
                 a
             })
             .collect::<Vec<_>>();
-        (Self::new(arqs), rounded)
+        (Self::new(dbg!(arqs)), dbg!(rounded))
     }
 }
 
@@ -322,8 +322,6 @@ mod tests {
 
     /// Test that arqs maintain their resolution when the power factor is lost
     #[test]
-    #[ignore = "we KNOW this test doesn't pass, but it's a useful one to illustrate the problem
-                with using rounding for converting from DhtArcSet to ArqSet"]
     fn rounded_arcset(
         p1 in 12u8..17, s1: u32, c1: u32,
         p2 in 12u8..17, s2: u32, c2: u32,
@@ -342,10 +340,15 @@ mod tests {
         let arq2 = Arq::new(p2, Loc::from(s2), c2.into());
         // let arq3 = Arq::new(p3, Loc::from(s3), c3.into());
 
-        println!("...");
+        println!("");
+        println!("......................................................................................");
+        println!("......................................................................................");
+        println!("......................................................................................");
+        println!("");
+
         println!("### arqs ###");
-        println!("     |{}| {} {}", arq1.to_ascii(&topo, 64), arq1.power, *arq1.count);
-        println!("     |{}| {} {}", arq2.to_ascii(&topo, 64), arq2.power, *arq2.count);
+        println!("     |{}| p{} #{}", arq1.to_ascii(&topo, 64), arq1.power, *arq1.count);
+        println!("     |{}| p{} #{}", arq2.to_ascii(&topo, 64), arq2.power, *arq2.count);
 
         let arc1 = arq1.to_dht_arc_range(&topo);
         let arc2 = arq2.to_dht_arc_range(&topo);
@@ -375,8 +378,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "we KNOW this test doesn't pass, but it's a useful one to illustrate the problem
-                with using rounding for converting from DhtArcSet to ArqSet"]
     fn rounded_arcset_intersections(
         p1 in 12u8..17, s1: u32, c1: u32,
         p2 in 12u8..17, s2: u32, c2: u32,

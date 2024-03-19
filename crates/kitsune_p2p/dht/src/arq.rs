@@ -418,7 +418,7 @@ impl ArqBounds {
                 // should be 1 less, but we'll accept if it bleeds over by 1 too.
                 let rem = len % s;
                 let diff = rem.min(s - rem);
-                let lossless = lo == offset * s && (diff <= 1);
+                let lossless = dbg!(lo == offset * s) && (dbg!(diff) <= 1);
                 if always_round || lossless {
                     Some((
                         Self {
@@ -495,9 +495,12 @@ pub fn power_and_count_from_length_exact(
 ) -> Option<(u8, u32)> {
     assert!(len <= U32_LEN);
 
+    dbg!(len);
+    dbg!(format!("{len:b}"));
     let z = len.trailing_zeros();
 
     if z < dim.quantum_power.into() {
+        dbg!(z);
         return None;
     }
     let mut power = z as u8 - dim.quantum_power;
