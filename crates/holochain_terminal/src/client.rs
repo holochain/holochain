@@ -21,7 +21,11 @@ impl Drop for AppClient {
 impl AppClient {
     /// Creates a App websocket client which can send messages but ignores any incoming messages
     async fn connect(addr: std::net::SocketAddr) -> anyhow::Result<Self> {
-        let (tx, mut rx) = connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), ConnectRequest::new(addr).try_set_header("origin", "hc_term")?).await?;
+        let (tx, mut rx) = connect(
+            Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+            ConnectRequest::new(addr).try_set_header("origin", "hcterm")?,
+        )
+        .await?;
 
         let rx = tokio::task::spawn(async move { while rx.recv::<AppResponse>().await.is_ok() {} });
 
@@ -139,7 +143,10 @@ impl AdminClient {
     }
 
     async fn attach_app_interface(&mut self, port: u16) -> anyhow::Result<u16> {
-        let msg = AdminRequest::AttachAppInterface { port: Some(port), allowed_origins: "hc_term".to_string().into() };
+        let msg = AdminRequest::AttachAppInterface {
+            port: Some(port),
+            allowed_origins: "hcterm".to_string().into(),
+        };
         let response = self.send(msg).await?;
         match response {
             AdminResponse::AppInterfaceAttached { port } => Ok(port),
