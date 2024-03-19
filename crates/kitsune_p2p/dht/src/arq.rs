@@ -738,22 +738,26 @@ mod tests {
             let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
             let strat = ArqStrat::default();
             let arq = approximate_arq(&topo, &strat, center.into(), length);
-            let dht_arc = arq.to_dht_arc(&topo);
-            assert_eq!(arq.absolute_length(&topo), dht_arc.length());
-            let arq2 = Arq::from_dht_arc_approximate(&topo, &strat, &dht_arc);
+            let arc = arq.to_dht_arc(&topo);
+            assert_eq!(arq.absolute_length(&topo), arc.length());
+            let arq2 = Arq::from_dht_arc_approximate(&topo, &strat, &arc);
             assert_eq!(arq, arq2);
+            let arc2 = arq2.to_dht_arc(&topo);
+            assert_eq!(arc.range(), arc2.range());
         }
 
         #[test]
-        fn dht_arc_roundtrip_standard_topo(center: u32, pow in 0..16u8, count in 0..8u32) {
+        fn dht_arc_roundtrip_standard_topo(center: u32, pow in 0..16u8, count in 0..16u32) {
             let topo = Topology::standard_epoch_full();
             let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
             let strat = ArqStrat::default();
             let arq = approximate_arq(&topo, &strat, center.into(), length);
-            let dht_arc = arq.to_dht_arc(&topo);
-            assert_eq!(arq.absolute_length(&topo), dht_arc.length());
-            let arq2 = Arq::from_dht_arc_approximate(&topo, &strat, &dht_arc);
+            let arc = arq.to_dht_arc(&topo);
+            assert_eq!(arq.absolute_length(&topo), arc.length());
+            let arq2 = Arq::from_dht_arc_approximate(&topo, &strat, &arc);
             assert!(Arq::<Loc>::equivalent(&topo, &arq, &arq2));
+            let arc2 = arq2.to_dht_arc(&topo);
+            assert_eq!(arc.range(), arc2.range());
         }
 
         #[test]

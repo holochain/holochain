@@ -51,12 +51,24 @@ pub async fn query_region_set(
                     })
                     .is_ok();
                 if it_is_time {
+                    let diff = dht_arc_set
+                        .intervals()
+                        .into_iter()
+                        .map(|i| i.length() as i64)
+                        .sum::<i64>()
+                        - arq_set
+                            .to_dht_arc_set(&topology)
+                            .intervals()
+                            .into_iter()
+                            .map(|i| i.length() as i64)
+                            .sum::<i64>();
+                    let diff = diff.abs();
                     tracing::warn!(
                         "A continuous arc set could not be properly quantized.
-            Original:  {:?}
-            Quantized: {:?}",
-                        dht_arc_set,
-                        arq_set
+    Original:    {dht_arc_set:?}
+    Quantized:   {arq_set:?}
+    Difference:  {diff} (total length of all arcs)
+"
                     );
                 }
             }
