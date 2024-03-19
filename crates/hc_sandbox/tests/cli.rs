@@ -2,7 +2,9 @@ use assert_cmd::prelude::*;
 use holochain_cli_sandbox::cli::LaunchInfo;
 use holochain_conductor_api::AppRequest;
 use holochain_conductor_api::AppResponse;
-use holochain_websocket::{self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketSender};
+use holochain_websocket::{
+    self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketSender,
+};
 use matches::assert_matches;
 use once_cell::sync::Lazy;
 use std::future::Future;
