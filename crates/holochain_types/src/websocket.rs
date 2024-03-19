@@ -1,5 +1,7 @@
 //! Common types for WebSocket connections.
 
+use std::collections::HashSet;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 /// Access control for controlling WebSocket connections from browsers.
@@ -11,7 +13,7 @@ pub enum AllowedOrigin {
     /// Allow access from any origin.
     Any,
     /// Allow access from a specific origin.
-    Origin(String)
+    Origins(HashSet<String>)
 }
 
 impl Serialize for AllowedOrigin {
@@ -38,7 +40,7 @@ impl From<AllowedOrigin> for String {
     fn from(value: AllowedOrigin) -> String {
         match value {
             AllowedOrigin::Any => "*".to_string(),
-            AllowedOrigin::Origin(origin) => origin.to_string(),
+            AllowedOrigin::Origins(origin) => origin.into_iter().join(","),
         }
     }
 }
@@ -47,7 +49,9 @@ impl From<String> for AllowedOrigin {
     fn from(value: String) -> AllowedOrigin {
         match value.as_str() {
             "*" => AllowedOrigin::Any,
-            _ => AllowedOrigin::Origin(value),
+            _ => {
+                AllowedOrigin::Origins(value.split(",").map(|s| s.trim().to_string()).collect())
+            },
         }
     }
 }
@@ -57,7 +61,7 @@ impl AllowedOrigin {
     pub fn is_allowed(&self, origin: &str) -> bool {
         match self {
             AllowedOrigin::Any => true,
-            AllowedOrigin::Origin(allowed) => origin == *allowed,
+            AllowedOrigin::Origins(allowed) => allowed.contains(origin),
         }
     }
 }
