@@ -174,11 +174,11 @@ impl Default for ConductorTuningParams {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use holochain_types::websocket::AllowedOrigins;
     use kitsune_p2p_types::config::TransportConfig;
     use matches::assert_matches;
     use std::path::Path;
     use std::path::PathBuf;
-    use holochain_types::websocket::AllowedOrigins;
 
     #[test]
     fn test_config_load_yaml() {
@@ -297,7 +297,10 @@ mod tests {
                 }),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
-                    driver: InterfaceDriver::Websocket { port: 1234, allowed_origins: AllowedOrigins::Any }
+                    driver: InterfaceDriver::Websocket {
+                        port: 1234,
+                        allowed_origins: AllowedOrigins::Any
+                    }
                 }]),
                 network: network_config,
                 db_sync_strategy: DbSyncStrategy::Fast,
