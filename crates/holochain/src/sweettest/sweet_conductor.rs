@@ -18,6 +18,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::*;
 use nanoid::nanoid;
 use rand::Rng;
@@ -25,7 +26,6 @@ use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use holochain_types::websocket::AllowedOrigins;
 
 /// Standin until std::io::Error::other is stablized.
 pub fn err_other<E>(error: E) -> std::io::Error
@@ -736,9 +736,7 @@ impl SweetConductor {
 }
 
 /// Get a websocket client on localhost at the specified port
-pub async fn websocket_client_by_port(
-    port: u16,
-) -> Result<(WebsocketSender, WebsocketReceiver)> {
+pub async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, WebsocketReceiver)> {
     connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
         ConnectRequest::new(([127, 0, 0, 1], port).into()),

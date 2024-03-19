@@ -5,11 +5,11 @@ use holochain_conductor_api::config::InterfaceDriver;
 use holochain_conductor_api::signal_subscription::SignalSubscription;
 use holochain_p2p::NetworkCompatParams;
 use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
-use holochain_types::websocket::AllowedOrigins;
 
 use super::error::{ConductorError, ConductorResult};
 

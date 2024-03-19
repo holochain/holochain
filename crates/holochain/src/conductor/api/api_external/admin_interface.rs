@@ -219,7 +219,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AppDisabled)
             }
-            AttachAppInterface { port, allowed_origins } => {
+            AttachAppInterface {
+                port,
+                allowed_origins,
+            } => {
                 let port = port.unwrap_or(0);
                 let port = self
                     .conductor_handle

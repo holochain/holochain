@@ -393,16 +393,16 @@ mod startup_shutdown_impls {
 
 /// Methods related to conductor interfaces
 mod interface_impls {
-    use holochain_types::websocket::AllowedOrigins;
     use super::*;
+    use holochain_types::websocket::AllowedOrigins;
 
     impl Conductor {
         /// Spawn all admin interface tasks, register them with the TaskManager,
         /// and modify the conductor accordingly, based on the config passed in
-        pub(crate) async fn add_admin_interfaces(
+        pub async fn add_admin_interfaces(
             self: Arc<Self>,
             configs: Vec<AdminInterfaceConfig>,
-        ) -> ConductorResult<()> {
+        ) -> ConductorResult<Vec<u16>> {
             let admin_api = RealAdminInterfaceApi::new(self.clone());
             let tm = self.task_manager();
 
@@ -412,7 +412,10 @@ mod interface_impls {
                 let tm = tm.clone();
                 async move {
                     match driver {
-                        InterfaceDriver::Websocket { port, allowed_origins } => {
+                        InterfaceDriver::Websocket {
+                            port,
+                            allowed_origins,
+                        } => {
                             let listener = spawn_websocket_listener(port, allowed_origins).await?;
                             let port = listener.local_addr()?.port();
                             spawn_admin_interface_tasks(
@@ -438,10 +441,11 @@ mod interface_impls {
             // Exit if the admin interfaces fail to be created
             let ports = ports.map_err(Box::new)?;
 
-            for p in ports {
-                self.add_admin_port(p);
+            for p in &ports {
+                self.add_admin_port(*p);
             }
-            Ok(())
+
+            Ok(ports)
         }
 
         /// Spawn a new app interface task, register it with the TaskManager,
@@ -467,9 +471,15 @@ mod interface_impls {
             let tm = self.task_manager();
 
             // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
-            let port = spawn_app_interface_task(tm.clone(), port, allowed_origins.clone(), app_api, signal_tx.clone())
-                .await
-                .map_err(Box::new)?;
+            let port = spawn_app_interface_task(
+                tm.clone(),
+                port,
+                allowed_origins.clone(),
+                app_api,
+                signal_tx.clone(),
+            )
+            .await
+            .map_err(Box::new)?;
             let interface = AppInterfaceRuntime::Websocket { signal_tx };
 
             self.app_interfaces.share_mut(|app_interfaces| {
@@ -515,7 +525,13 @@ mod interface_impls {
         pub(crate) async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()> {
             for (id, config) in &self.get_state().await?.app_interfaces {
                 debug!("Starting up app interface: {:?}", id);
-                let _ = self.clone().add_app_interface(either::Right(id.clone()), config.driver.allowed_origins().clone()).await?;
+                let _ = self
+                    .clone()
+                    .add_app_interface(
+                        either::Right(id.clone()),
+                        config.driver.allowed_origins().clone(),
+                    )
+                    .await?;
             }
             Ok(())
         }

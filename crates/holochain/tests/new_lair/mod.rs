@@ -3,13 +3,13 @@ use holochain_conductor_api::config::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::InterfaceDriver;
+use holochain_types::websocket::AllowedOrigins;
 use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::dependencies::*;
 use lair_keystore_api::ipc_keystore::*;
 use lair_keystore_api::mem_store::*;
 use lair_keystore_api::prelude::*;
 use std::sync::Arc;
-use holochain_types::websocket::AllowedOrigins;
 
 use super::test_utils::*;
 
@@ -41,7 +41,10 @@ async fn test_new_lair_conductor_integration() {
     // set up conductor config to use the started keystore
     let mut conductor_config = ConductorConfig::default();
     conductor_config.admin_interfaces = Some(vec![AdminInterfaceConfig {
-        driver: InterfaceDriver::Websocket { port: ADMIN_PORT, allowed_origins: AllowedOrigins::Any },
+        driver: InterfaceDriver::Websocket {
+            port: ADMIN_PORT,
+            allowed_origins: AllowedOrigins::Any,
+        },
     }]);
     conductor_config.data_root_path = Some(tmp.path().to_owned().into());
     conductor_config.keystore = KeystoreConfig::LairServer {

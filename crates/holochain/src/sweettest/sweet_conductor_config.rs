@@ -27,7 +27,10 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
         ConductorConfig {
             network,
             admin_interfaces: Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: 0, allowed_origins: AllowedOrigins::Any },
+                driver: InterfaceDriver::Websocket {
+                    port: 0,
+                    allowed_origins: AllowedOrigins::Any,
+                },
             }]),
             tuning_params: Some(ConductorTuningParams {
                 sys_validation_retry_delay: Some(std::time::Duration::from_secs(1)),

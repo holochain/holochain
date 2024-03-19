@@ -444,7 +444,10 @@ pub async fn setup_app_inner(
     let config = ConductorConfig {
         data_root_path: Some(data_root_path.clone()),
         admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port: 0, allowed_origins: AllowedOrigins::Any },
+            driver: InterfaceDriver::Websocket {
+                port: 0,
+                allowed_origins: AllowedOrigins::Any,
+            },
         }]),
         network: network.unwrap_or_default(),
         ..Default::default()

@@ -161,7 +161,10 @@ pub async fn call_zome_fn<S>(
 }
 
 pub async fn attach_app_interface(client: &mut WebsocketSender, port: Option<u16>) -> u16 {
-    let request = AdminRequest::AttachAppInterface { port, allowed_origins: AllowedOrigins::Any };
+    let request = AdminRequest::AttachAppInterface {
+        port,
+        allowed_origins: AllowedOrigins::Any,
+    };
     let response = client.request(request);
     let response = check_timeout(response, 3000).await;
     match response {
@@ -336,7 +339,10 @@ pub async fn check_started(holochain: &mut Child) {
 pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig {
     ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port, allowed_origins: AllowedOrigins::Any },
+            driver: InterfaceDriver::Websocket {
+                port,
+                allowed_origins: AllowedOrigins::Any,
+            },
         }]),
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,

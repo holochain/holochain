@@ -12,11 +12,11 @@ use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 
+use holochain_types::websocket::AllowedOrigins;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::*;
-use holochain_types::websocket::AllowedOrigins;
 
 /// Concurrency count for websocket message processing.
 /// This could represent a significant memory investment for
@@ -35,17 +35,16 @@ pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
 pub const MAX_CONNECTIONS: usize = 400;
 
 /// Create a WebsocketListener to be used in interfaces
-pub async fn spawn_websocket_listener(port: u16, allowed_origins: AllowedOrigins) -> InterfaceResult<WebsocketListener> {
+pub async fn spawn_websocket_listener(
+    port: u16,
+    allowed_origins: AllowedOrigins,
+) -> InterfaceResult<WebsocketListener> {
     trace!("Initializing Admin interface");
 
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::bind(
-        Arc::new(config),
-        format!("127.0.0.1:{}", port),
-    )
-    .await?;
+    let listener = WebsocketListener::bind(Arc::new(config), format!("127.0.0.1:{}", port)).await?;
     trace!("LISTENING AT: {}", listener.local_addr()?);
     Ok(listener)
 }
@@ -121,11 +120,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::bind(
-        Arc::new(config),
-        format!("127.0.0.1:{}", port),
-    )
-    .await?;
+    let listener = WebsocketListener::bind(Arc::new(config), format!("127.0.0.1:{}", port)).await?;
     let addr = listener.local_addr()?;
     trace!("LISTENING AT: {}", addr);
     let port = addr.port();
@@ -388,7 +383,10 @@ pub mod test {
         conductor_handle
             .clone()
             .add_admin_interfaces(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: admin_port, allowed_origins: AllowedOrigins::Any },
+                driver: InterfaceDriver::Websocket {
+                    port: admin_port,
+                    allowed_origins: AllowedOrigins::Any,
+                },
             }])
             .await
             .unwrap();
@@ -436,7 +434,10 @@ pub mod test {
         assert_matches!(response, AdminResponse::AppEnabled { .. });
 
         // Attach App Interface
-        let request = AdminRequest::AttachAppInterface { port: None, allowed_origins: AllowedOrigins::Any };
+        let request = AdminRequest::AttachAppInterface {
+            port: None,
+            allowed_origins: AllowedOrigins::Any,
+        };
         let response: AdminResponse = admin_tx.request(request).await.unwrap();
         let app_port = match response {
             AdminResponse::AppInterfaceAttached { port } => port,
@@ -979,7 +980,10 @@ pub mod test {
         holochain_trace::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
-        let msg = AdminRequest::AttachAppInterface { port: None, allowed_origins: AllowedOrigins::Any };
+        let msg = AdminRequest::AttachAppInterface {
+            port: None,
+            allowed_origins: AllowedOrigins::Any,
+        };
         let msg = msg.try_into().unwrap();
         let respond = |response: AdminResponse| {
             assert_matches!(response, AdminResponse::AppInterfaceAttached { .. });
