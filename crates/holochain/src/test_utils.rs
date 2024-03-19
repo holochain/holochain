@@ -67,6 +67,7 @@ mod big_stack_test;
 
 mod generate_records;
 pub use generate_records::*;
+use holochain_types::websocket::AllowedOrigins;
 
 pub use crate::sweettest::sweet_consistency::*;
 
@@ -443,7 +444,7 @@ pub async fn setup_app_inner(
     let config = ConductorConfig {
         data_root_path: Some(data_root_path.clone()),
         admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port: 0 },
+            driver: InterfaceDriver::Websocket { port: 0, allowed_origins: AllowedOrigins::Any },
         }]),
         network: network.unwrap_or_default(),
         ..Default::default()

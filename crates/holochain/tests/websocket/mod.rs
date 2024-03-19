@@ -514,12 +514,11 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    let (client, rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
-        Arc::new(WebsocketConfig {
-            default_request_timeout: std::time::Duration::from_secs(1),
-            ..Default::default()
-        }),
-        ([127, 0, 0, 1], port).into(),
+    let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
+    ws_config.default_request_timeout = Duration::from_secs(1);
+    let (client, rx): (WebsocketSender, WebsocketReceiver) = connect(
+        Arc::new(ws_config),
+        ConnectRequest::new(([127, 0, 0, 1], port).into()),
     )
     .await?;
     let _rx = PollRecv::new::<AdminResponse>(rx);
@@ -554,12 +553,11 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
+    let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
+    ws_config.default_request_timeout = Duration::from_secs(1);
     let (client, mut rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
-        Arc::new(WebsocketConfig {
-            default_request_timeout: std::time::Duration::from_secs(1),
-            ..Default::default()
-        }),
-        ([127, 0, 0, 1], port).into(),
+        Arc::new(ws_config),
+        ConnectRequest::new(([127, 0, 0, 1], port).into()),
     )
     .await?;
 
@@ -617,7 +615,7 @@ async fn connection_limit_is_respected() {
     let port = admin_port(&conductor_handle).await;
 
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
-    let cfg = Arc::new(WebsocketConfig::default());
+    let cfg = Arc::new(WebsocketConfig::CLIENT_DEFAULT);
 
     // Retain handles so that the test can control when to disconnect clients
     let mut handles = Vec::new();

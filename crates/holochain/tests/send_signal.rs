@@ -5,8 +5,9 @@ use holochain::sweettest::{
 };
 use holochain_conductor_api::AppResponse;
 use holochain_types::signal::Signal;
+use holochain_types::websocket::AllowedOrigins;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_websocket::WebsocketConfig;
+use holochain_websocket::{ConnectRequest, WebsocketConfig};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn send_signal_after_conductor_restart() {
@@ -28,14 +29,14 @@ async fn send_signal_after_conductor_restart() {
     // add app interface
     let app_interface_port_1 = (*conductor)
         .clone()
-        .add_app_interface(either::Either::Left(0), )
+        .add_app_interface(either::Either::Left(0), AllowedOrigins::Any)
         .await
         .unwrap();
 
     // connect app websocket
     let (_, mut app_ws_rx_1) = holochain_websocket::connect(
-        Arc::new(WebsocketConfig::default()),
-        ([127, 0, 0, 1], app_interface_port_1).into(),
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], app_interface_port_1).into()),
     )
     .await
     .unwrap();
@@ -95,8 +96,8 @@ async fn send_signal_after_conductor_restart() {
 
     // reconnect app websocket
     let (_, mut app_ws_rx_1) = holochain_websocket::connect(
-        Arc::new(WebsocketConfig::default()),
-        ([127, 0, 0, 1], app_interface_port_1).into(),
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], app_interface_port_1).into()),
     )
     .await
     .unwrap();
@@ -104,7 +105,7 @@ async fn send_signal_after_conductor_restart() {
     // add a second app interface without websocket connection
     let _ = (*conductor)
         .clone()
-        .add_app_interface(either::Either::Left(0), )
+        .add_app_interface(either::Either::Left(0), AllowedOrigins::Any)
         .await
         .unwrap();
 

@@ -84,7 +84,7 @@ pub(crate) fn random_admin_port(config: &mut ConductorConfig) {
         None => {
             let port = 0;
             config.admin_interfaces = Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port, allowed_origin: AllowedOrigins::Any },
+                driver: InterfaceDriver::Websocket { port, allowed_origins: AllowedOrigins::Any },
             }]);
         }
     }
@@ -93,7 +93,7 @@ pub(crate) fn random_admin_port(config: &mut ConductorConfig) {
 pub(crate) fn set_admin_port(config: &mut ConductorConfig, port: u16) {
     let p = port;
     let port = AdminInterfaceConfig {
-        driver: InterfaceDriver::Websocket { port, allowed_origin: AllowedOrigins::Any },
+        driver: InterfaceDriver::Websocket { port, allowed_origins: AllowedOrigins::Any },
     };
     match config
         .admin_interfaces

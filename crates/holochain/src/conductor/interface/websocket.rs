@@ -388,7 +388,7 @@ pub mod test {
         conductor_handle
             .clone()
             .add_admin_interfaces(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: admin_port },
+                driver: InterfaceDriver::Websocket { port: admin_port, allowed_origins: AllowedOrigins::Any },
             }])
             .await
             .unwrap();
@@ -436,7 +436,7 @@ pub mod test {
         assert_matches!(response, AdminResponse::AppEnabled { .. });
 
         // Attach App Interface
-        let request = AdminRequest::AttachAppInterface { port: None };
+        let request = AdminRequest::AttachAppInterface { port: None, allowed_origins: AllowedOrigins::Any };
         let response: AdminResponse = admin_tx.request(request).await.unwrap();
         let app_port = match response {
             AdminResponse::AppInterfaceAttached { port } => port,
@@ -979,7 +979,7 @@ pub mod test {
         holochain_trace::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
-        let msg = AdminRequest::AttachAppInterface { port: None };
+        let msg = AdminRequest::AttachAppInterface { port: None, allowed_origins: AllowedOrigins::Any };
         let msg = msg.try_into().unwrap();
         let respond = |response: AdminResponse| {
             assert_matches!(response, AdminResponse::AppInterfaceAttached { .. });
