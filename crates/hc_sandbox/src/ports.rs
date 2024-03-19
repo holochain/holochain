@@ -7,7 +7,7 @@ use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::{
     config::conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver,
 };
-use holochain_types::websocket::AllowedOrigin;
+use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::{self as ws, WebsocketConfig, WebsocketSender};
 
 use crate::config::read_config;
@@ -84,7 +84,7 @@ pub(crate) fn random_admin_port(config: &mut ConductorConfig) {
         None => {
             let port = 0;
             config.admin_interfaces = Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port, allowed_origin: AllowedOrigin::Any },
+                driver: InterfaceDriver::Websocket { port, allowed_origin: AllowedOrigins::Any },
             }]);
         }
     }
@@ -93,7 +93,7 @@ pub(crate) fn random_admin_port(config: &mut ConductorConfig) {
 pub(crate) fn set_admin_port(config: &mut ConductorConfig, port: u16) {
     let p = port;
     let port = AdminInterfaceConfig {
-        driver: InterfaceDriver::Websocket { port, allowed_origin: AllowedOrigin::Any },
+        driver: InterfaceDriver::Websocket { port, allowed_origin: AllowedOrigins::Any },
     };
     match config
         .admin_interfaces

@@ -13,7 +13,7 @@ use tokio_tungstenite::tungstenite::handshake::server::{
 };
 use tokio_tungstenite::tungstenite::http::{HeaderMap, HeaderValue};
 use tokio_tungstenite::tungstenite::protocol::Message;
-use holochain_types::websocket::AllowedOrigin;
+use holochain_types::websocket::AllowedOrigins;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case", tag = "type")]
@@ -118,9 +118,9 @@ pub struct WebsocketConfig {
     /// Maximum websocket frame size. [default = 16M]
     pub max_frame_size: usize,
 
-    /// Allowed origin access control for a [WebsocketListener].
+    /// Allowed origins access control for a [WebsocketListener].
     /// Not used by the [WebsocketSender].
-    pub allowed_origin: Option<AllowedOrigin>,
+    pub allowed_origins: Option<AllowedOrigins>,
 }
 
 impl WebsocketConfig {
@@ -129,7 +129,7 @@ impl WebsocketConfig {
         default_request_timeout: std::time::Duration::from_secs(60),
         max_message_size: 64 << 20,
         max_frame_size: 16 << 20,
-        allowed_origin: None,
+        allowed_origins: None,
     };
 
     /// The default listener WebsocketConfig.
@@ -137,7 +137,7 @@ impl WebsocketConfig {
         default_request_timeout: std::time::Duration::from_secs(60),
         max_message_size: 64 << 20,
         max_frame_size: 16 << 20,
-        allowed_origin: Some(AllowedOrigin::Any),
+        allowed_origins: Some(AllowedOrigins::Any),
     };
 
     /// Internal convert to tungstenite config.
@@ -651,7 +651,7 @@ impl ConnectRequest {
 /// A Holochain websocket listener.
 pub struct WebsocketListener {
     config: Arc<WebsocketConfig>,
-    access_control: Arc<AllowedOrigin>,
+    access_control: Arc<AllowedOrigins>,
     listener: tokio::net::TcpListener,
 }
 
@@ -667,7 +667,7 @@ impl WebsocketListener {
         config: Arc<WebsocketConfig>,
         addr: A,
     ) -> Result<Self> {
-        let access_control = Arc::new(config.allowed_origin.clone().ok_or_else(|| {
+        let access_control = Arc::new(config.allowed_origins.clone().ok_or_else(|| {
             Error::other("WebsocketListener requires access control to be set in the config")
         })?);
 
@@ -700,14 +700,14 @@ impl WebsocketListener {
 }
 
 struct ConnectCallback {
-    allowed_origin: Arc<AllowedOrigin>,
+    allowed_origin: Arc<AllowedOrigins>,
 }
 
 impl Callback for ConnectCallback {
     fn on_request(
         self,
         request: &Request,
-        mut response: Response,
+        response: Response,
     ) -> std::result::Result<Response, ErrorResponse> {
         tracing::debug!("Checking incoming websocket connection request with allowed origin {:?}: {:?}", self.allowed_origin, request.headers());
         match request.headers().get("Origin").and_then(|v| v.to_str().ok()) {

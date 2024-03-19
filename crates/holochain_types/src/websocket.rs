@@ -9,14 +9,14 @@ use serde::{Deserialize, Serialize};
 ///
 /// See [MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin) for more information.
 #[derive(Clone, Debug, PartialEq)]
-pub enum AllowedOrigin {
+pub enum AllowedOrigins {
     /// Allow access from any origin.
     Any,
     /// Allow access from a specific origin.
     Origins(HashSet<String>)
 }
 
-impl Serialize for AllowedOrigin {
+impl Serialize for AllowedOrigins {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -26,8 +26,8 @@ impl Serialize for AllowedOrigin {
     }
 }
 
-impl<'de> Deserialize<'de> for AllowedOrigin {
-    fn deserialize<D>(deserializer: D) -> Result<AllowedOrigin, D::Error>
+impl<'de> Deserialize<'de> for AllowedOrigins {
+    fn deserialize<D>(deserializer: D) -> Result<AllowedOrigins, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -36,32 +36,39 @@ impl<'de> Deserialize<'de> for AllowedOrigin {
     }
 }
 
-impl From<AllowedOrigin> for String {
-    fn from(value: AllowedOrigin) -> String {
+impl From<AllowedOrigins> for String {
+    fn from(value: AllowedOrigins) -> String {
         match value {
-            AllowedOrigin::Any => "*".to_string(),
-            AllowedOrigin::Origins(origin) => origin.into_iter().join(","),
+            AllowedOrigins::Any => "*".to_string(),
+            AllowedOrigins::Origins(origin) => origin.into_iter().join(","),
         }
     }
 }
 
-impl From<String> for AllowedOrigin {
-    fn from(value: String) -> AllowedOrigin {
+impl From<String> for AllowedOrigins {
+    fn from(value: String) -> AllowedOrigins {
         match value.as_str() {
-            "*" => AllowedOrigin::Any,
+            "*" => AllowedOrigins::Any,
             _ => {
-                AllowedOrigin::Origins(value.split(",").map(|s| s.trim().to_string()).collect())
+                AllowedOrigins::Origins(value.split(",").map(|s| s.trim().to_string()).collect())
             },
         }
     }
 }
 
-impl AllowedOrigin {
+impl std::fmt::Display for AllowedOrigins {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str: String = self.clone().into();
+        write!(f, "{}", str)
+    }
+}
+
+impl AllowedOrigins {
     /// Check if the `Origin` header value is allowed.
     pub fn is_allowed(&self, origin: &str) -> bool {
         match self {
-            AllowedOrigin::Any => true,
-            AllowedOrigin::Origins(allowed) => allowed.contains(origin),
+            AllowedOrigins::Any => true,
+            AllowedOrigins::Origins(allowed) => allowed.contains(origin),
         }
     }
 }

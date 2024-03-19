@@ -28,7 +28,7 @@ async fn send_signal_after_conductor_restart() {
     // add app interface
     let app_interface_port_1 = (*conductor)
         .clone()
-        .add_app_interface(either::Either::Left(0))
+        .add_app_interface(either::Either::Left(0), )
         .await
         .unwrap();
 
@@ -104,7 +104,7 @@ async fn send_signal_after_conductor_restart() {
     // add a second app interface without websocket connection
     let _ = (*conductor)
         .clone()
-        .add_app_interface(either::Either::Left(0))
+        .add_app_interface(either::Either::Left(0), )
         .await
         .unwrap();
 

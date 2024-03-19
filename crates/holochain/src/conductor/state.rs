@@ -9,7 +9,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
-use holochain_types::websocket::AllowedOrigin;
+use holochain_types::websocket::AllowedOrigins;
 
 use super::error::{ConductorError, ConductorResult};
 
@@ -237,14 +237,12 @@ pub struct AppInterfaceConfig {
 
 impl AppInterfaceConfig {
     /// Create config for a websocket interface
-    pub fn websocket(port: u16) -> Self {
+    pub fn websocket(port: u16, allowed_origins: AllowedOrigins) -> Self {
         Self {
             signal_subscriptions: HashMap::new(),
             driver: InterfaceDriver::Websocket {
                 port,
-                // No origin restrictions for app interfaces for now. Zome calls are protected by signing
-                // and no requirement for other protection on the app websocket has been raised.
-                allowed_origin: AllowedOrigin::Any
+                allowed_origins,
             },
         }
     }

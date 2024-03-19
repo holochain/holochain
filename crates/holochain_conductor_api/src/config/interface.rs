@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use serde::Serialize;
+use holochain_types::websocket::AllowedOrigins;
 
 /// Information neeeded to spawn an admin interface
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
@@ -26,7 +27,15 @@ pub enum InterfaceDriver {
         /// The port on which to establish the WebsocketListener
         port: u16,
 
-        allowed_origin: holochain_types::websocket::AllowedOrigin
+        /// Allowed origins for this interface.
+        ///
+        /// This should be one of:
+        /// - A comma separated list of origins - `http://localhost:3000,http://localhost:3001`,
+        /// - A single origin - `http://localhost:3000`,
+        /// - Any origin - `*`
+        ///
+        /// Connections from any origin which is not permitted by this config will be rejected.
+        allowed_origins: AllowedOrigins,
     },
 }
 
@@ -35,6 +44,13 @@ impl InterfaceDriver {
     pub fn port(&self) -> u16 {
         match self {
             InterfaceDriver::Websocket { port, .. } => *port,
+        }
+    }
+
+    /// Get the allowed origins for this driver.
+    pub fn allowed_origins(&self) -> &AllowedOrigins {
+        match self {
+            InterfaceDriver::Websocket { allowed_origins, .. } => allowed_origins,
         }
     }
 }

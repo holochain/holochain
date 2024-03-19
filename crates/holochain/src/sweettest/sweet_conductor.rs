@@ -530,7 +530,7 @@ impl SweetConductor {
     pub async fn app_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
         let port = self
             .raw_handle()
-            .add_app_interface(either::Either::Left(0))
+            .add_app_interface(either::Either::Left(0), )
             .await
             .expect("Couldn't create app interface");
         websocket_client_by_port(port).await.unwrap()
