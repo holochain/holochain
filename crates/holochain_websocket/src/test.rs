@@ -76,7 +76,9 @@ async fn blocks_connect_with_mismatched_origin() {
 
     let l_task = tokio::task::spawn(async move {
         let mut config = WebsocketConfig::LISTENER_DEFAULT;
-        config.allowed_origins = Some(AllowedOrigins::Origins(["http://example.com".to_string()].into_iter().collect()));
+        config.allowed_origins = Some(AllowedOrigins::Origins(
+            ["http://example.com".to_string()].into_iter().collect(),
+        ));
 
         let l = WebsocketListener::bind(Arc::new(config), "localhost:0")
             .await
@@ -96,13 +98,19 @@ async fn blocks_connect_with_mismatched_origin() {
     let addr = addr_r.await.unwrap();
 
     let r_task = tokio::task::spawn(async move {
-        match connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), ConnectRequest::new(addr).try_set_header("Origin", "http://other.org").unwrap())
-            .await {
-                Ok(_) => panic!("should not have connected"),
-                Err(e) => {
-                    assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
-                }
+        match connect(
+            Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+            ConnectRequest::new(addr)
+                .try_set_header("Origin", "http://other.org")
+                .unwrap(),
+        )
+        .await
+        {
+            Ok(_) => panic!("should not have connected"),
+            Err(e) => {
+                assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
             }
+        }
     });
 
     l_task.await.unwrap();
@@ -117,7 +125,9 @@ async fn blocks_connect_without_origin() {
 
     let l_task = tokio::task::spawn(async move {
         let mut config = WebsocketConfig::LISTENER_DEFAULT;
-        config.allowed_origins = Some(AllowedOrigins::Origins(["http://example.com".to_string()].into_iter().collect()));
+        config.allowed_origins = Some(AllowedOrigins::Origins(
+            ["http://example.com".to_string()].into_iter().collect(),
+        ));
 
         let l = WebsocketListener::bind(Arc::new(config), "localhost:0")
             .await
@@ -137,8 +147,12 @@ async fn blocks_connect_without_origin() {
     let addr = addr_r.await.unwrap();
 
     let r_task = tokio::task::spawn(async move {
-        match connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), ConnectRequest::new(addr).clear_headers())
-            .await {
+        match connect(
+            Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+            ConnectRequest::new(addr).clear_headers(),
+        )
+        .await
+        {
             Ok(_) => panic!("should not have connected"),
             Err(e) => {
                 assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
@@ -157,11 +171,13 @@ async fn origin_is_required_on_listener() {
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = None;
 
-    match WebsocketListener::bind(Arc::new(config), "localhost:0")
-        .await {
+    match WebsocketListener::bind(Arc::new(config), "localhost:0").await {
         Ok(_) => panic!("should have prevented bind"),
         Err(e) => {
-            assert_eq!(e.to_string(), "WebsocketListener requires access control to be set in the config");
+            assert_eq!(
+                e.to_string(),
+                "WebsocketListener requires access control to be set in the config"
+            );
         }
     }
 }

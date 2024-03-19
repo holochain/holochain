@@ -9,11 +9,11 @@ use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::conductor::paths::KeystorePath;
 use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
 use holochain_trace::Output;
+use holochain_types::websocket::AllowedOrigins;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
-use holochain_types::websocket::AllowedOrigins;
 
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
@@ -60,7 +60,7 @@ pub async fn run(
             &mut cmd,
             AddAppWs {
                 port: Some(app_port),
-                allowed_origins: AllowedOrigins::Any
+                allowed_origins: AllowedOrigins::Any,
             },
         )
         .await?;

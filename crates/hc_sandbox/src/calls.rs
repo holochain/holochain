@@ -100,7 +100,7 @@ pub struct AddAdminWs {
     ///
     /// If not provided, defaults to `*` which allows any origin.
     #[arg(long, default_value_t = AllowedOrigins::Any)]
-    pub allowed_origins: AllowedOrigins
+    pub allowed_origins: AllowedOrigins,
 }
 
 /// Calls AdminRequest::AttachAppInterface
@@ -421,7 +421,10 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
     let resp = cmd
         .command(AdminRequest::AddAdminInterfaces(vec![
             AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port, allowed_origin: AllowedOrigins::Any },
+                driver: InterfaceDriver::Websocket {
+                    port,
+                    allowed_origins: AllowedOrigins::Any,
+                },
             },
         ]))
         .await?;
@@ -589,7 +592,10 @@ pub async fn disable_app(cmd: &mut CmdRunner, args: DisableApp) -> anyhow::Resul
 /// Calls [`AdminRequest::AttachAppInterface`] and adds another app interface.
 pub async fn attach_app_interface(cmd: &mut CmdRunner, args: AddAppWs) -> anyhow::Result<u16> {
     let resp = cmd
-        .command(AdminRequest::AttachAppInterface { port: args.port, allowed_origins: args.allowed_origins })
+        .command(AdminRequest::AttachAppInterface {
+            port: args.port,
+            allowed_origins: args.allowed_origins,
+        })
         .await?;
     tracing::debug!(?resp);
     match resp {

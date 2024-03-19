@@ -4,16 +4,14 @@
 //! provides rpc-style request/responses via u64 message ids.
 
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 pub use std::io::{Error, Result};
 use std::sync::Arc;
 use tokio::net::ToSocketAddrs;
 use tokio_tungstenite::tungstenite::handshake::client::Request;
-use tokio_tungstenite::tungstenite::handshake::server::{
-    Callback, ErrorResponse, Response,
-};
+use tokio_tungstenite::tungstenite::handshake::server::{Callback, ErrorResponse, Response};
 use tokio_tungstenite::tungstenite::http::{HeaderMap, HeaderValue, StatusCode};
 use tokio_tungstenite::tungstenite::protocol::Message;
-use holochain_types::websocket::AllowedOrigins;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case", tag = "type")]
@@ -585,15 +583,17 @@ fn split(
 pub async fn connect(
     config: Arc<WebsocketConfig>,
     request: impl Into<ConnectRequest>,
-) -> Result<(WebsocketSender, WebsocketReceiver)>
-{
+) -> Result<(WebsocketSender, WebsocketReceiver)> {
     let request = request.into();
-    let stream = tokio::net::TcpStream::connect(request.addr.clone()).await?;
+    let stream = tokio::net::TcpStream::connect(request.addr).await?;
     let peer_addr = stream.peer_addr()?;
-    let (stream, _addr) =
-        tokio_tungstenite::client_async_with_config(request.into_client_request()?, stream, Some(config.as_tungstenite()))
-            .await
-            .map_err(Error::other)?;
+    let (stream, _addr) = tokio_tungstenite::client_async_with_config(
+        request.into_client_request()?,
+        stream,
+        Some(config.as_tungstenite()),
+    )
+    .await
+    .map_err(Error::other)?;
     split(stream, config.default_request_timeout, peer_addr)
 }
 
@@ -619,7 +619,10 @@ impl ConnectRequest {
 
         // Set a default Origin so that the connection request will be allowed by default when the listener is
         // using `Any` as the allowed origin.
-        cr.headers.insert("Origin", HeaderValue::from_str("holochain_websocket").expect("Invalid Origin value"));
+        cr.headers.insert(
+            "Origin",
+            HeaderValue::from_str("holochain_websocket").expect("Invalid Origin value"),
+        );
 
         cr
     }
@@ -628,7 +631,8 @@ impl ConnectRequest {
     ///
     /// Errors if the value is invalid. See [HeaderValue::from_str].
     pub fn try_set_header(mut self, name: &'static str, value: &str) -> Result<Self> {
-        self.headers.insert(name, HeaderValue::from_str(value).map_err(Error::other)?);
+        self.headers
+            .insert(name, HeaderValue::from_str(value).map_err(Error::other)?);
         Ok(self)
     }
 
@@ -636,7 +640,8 @@ impl ConnectRequest {
         self,
     ) -> Result<impl tokio_tungstenite::tungstenite::client::IntoClientRequest + Unpin> {
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-        let mut req = String::into_client_request(format!("ws://{}", self.addr)).map_err(Error::other)?;
+        let mut req =
+            String::into_client_request(format!("ws://{}", self.addr)).map_err(Error::other)?;
         for (name, value) in self.headers {
             if let Some(name) = name {
                 req.headers_mut().insert(name, value);
@@ -670,10 +675,7 @@ impl Drop for WebsocketListener {
 
 impl WebsocketListener {
     /// Bind a new websocket listener.
-    pub async fn bind<A: ToSocketAddrs>(
-        config: Arc<WebsocketConfig>,
-        addr: A,
-    ) -> Result<Self> {
+    pub async fn bind<A: ToSocketAddrs>(config: Arc<WebsocketConfig>, addr: A) -> Result<Self> {
         let access_control = Arc::new(config.allowed_origins.clone().ok_or_else(|| {
             Error::other("WebsocketListener requires access control to be set in the config")
         })?);
@@ -683,7 +685,11 @@ impl WebsocketListener {
         let addr = listener.local_addr()?;
         tracing::info!(?addr, "WebsocketListener Listening");
 
-        Ok(Self { config, access_control, listener })
+        Ok(Self {
+            config,
+            access_control,
+            listener,
+        })
     }
 
     /// Get the bound local address of this listener.
@@ -697,7 +703,9 @@ impl WebsocketListener {
         tracing::debug!(?addr, "Accept Incoming Websocket Connection");
         let stream = tokio_tungstenite::accept_hdr_async_with_config(
             stream,
-            ConnectCallback { allowed_origin: self.access_control.clone() },
+            ConnectCallback {
+                allowed_origin: self.access_control.clone(),
+            },
             Some(self.config.as_tungstenite()),
         )
         .await
@@ -716,8 +724,16 @@ impl Callback for ConnectCallback {
         request: &Request,
         response: Response,
     ) -> std::result::Result<Response, ErrorResponse> {
-        tracing::trace!("Checking incoming websocket connection request with allowed origin {:?}: {:?}", self.allowed_origin, request.headers());
-        match request.headers().get("Origin").and_then(|v| v.to_str().ok()) {
+        tracing::trace!(
+            "Checking incoming websocket connection request with allowed origin {:?}: {:?}",
+            self.allowed_origin,
+            request.headers()
+        );
+        match request
+            .headers()
+            .get("Origin")
+            .and_then(|v| v.to_str().ok())
+        {
             Some(origin) => {
                 if self.allowed_origin.is_allowed(origin) {
                     Ok(response)
@@ -727,23 +743,28 @@ impl Callback for ConnectCallback {
                         Ok(allowed_origin) => {
                             let mut err_response = ErrorResponse::new(None);
                             *err_response.status_mut() = StatusCode::BAD_REQUEST;
-                            err_response.headers_mut().insert("Access-Control-Allow-Origin", allowed_origin);
+                            err_response
+                                .headers_mut()
+                                .insert("Access-Control-Allow-Origin", allowed_origin);
                             Err(err_response)
                         }
                         Err(_) => {
                             // Shouldn't be possible to get here, the listener should be configured to require an origin
-                            let mut err_response = ErrorResponse::new(Some("Invalid listener configuration for `Origin`".to_string()));
+                            let mut err_response = ErrorResponse::new(Some(
+                                "Invalid listener configuration for `Origin`".to_string(),
+                            ));
                             *err_response.status_mut() = StatusCode::BAD_REQUEST;
                             Err(err_response)
-                        },
+                        }
                     }
                 }
             }
             None => {
-                let mut err_response = ErrorResponse::new(Some("Missing `Origin` header".to_string()));
+                let mut err_response =
+                    ErrorResponse::new(Some("Missing `Origin` header".to_string()));
                 *err_response.status_mut() = StatusCode::BAD_REQUEST;
                 Err(err_response)
-            },
+            }
         }
     }
 }

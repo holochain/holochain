@@ -1,8 +1,8 @@
 //! Common types for WebSocket connections.
 
-use std::collections::HashSet;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// Access control for controlling WebSocket connections from browsers.
 /// Anywhere other than a browser can set the `Origin` header to any value, so this is only relevant for browser connections.
@@ -13,7 +13,7 @@ pub enum AllowedOrigins {
     /// Allow access from any origin.
     Any,
     /// Allow access from a specific origin.
-    Origins(HashSet<String>)
+    Origins(HashSet<String>),
 }
 
 impl Serialize for AllowedOrigins {
@@ -49,9 +49,7 @@ impl From<String> for AllowedOrigins {
     fn from(value: String) -> AllowedOrigins {
         match value.as_str() {
             "*" => AllowedOrigins::Any,
-            _ => {
-                AllowedOrigins::Origins(value.split(",").map(|s| s.trim().to_string()).collect())
-            },
+            _ => AllowedOrigins::Origins(value.split(',').map(|s| s.trim().to_string()).collect()),
         }
     }
 }
@@ -89,7 +87,8 @@ mod tests {
 
     #[test]
     fn single_origin_to_and_from_string() {
-        let allowed_origins = AllowedOrigins::Origins(["http://example.com".to_string()].iter().cloned().collect());
+        let allowed_origins =
+            AllowedOrigins::Origins(["http://example.com".to_string()].iter().cloned().collect());
         let str: String = allowed_origins.clone().into();
         let allowed_origins_2 = str.clone().into();
 
@@ -99,7 +98,15 @@ mod tests {
 
     #[test]
     fn multiple_origins_to_and_from_string() {
-        let allowed_origins = AllowedOrigins::Origins(["http://example1.com".to_string(), "http://example2.com".to_string()].iter().cloned().collect());
+        let allowed_origins = AllowedOrigins::Origins(
+            [
+                "http://example1.com".to_string(),
+                "http://example2.com".to_string(),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
+        );
         let str: String = allowed_origins.clone().into();
         let allowed_origins_2 = str.into();
 
@@ -114,13 +121,15 @@ mod tests {
 
     #[test]
     fn specific_origin_is_allowed() {
-        let allowed_origins = AllowedOrigins::Origins(["http://example.com".to_string()].iter().cloned().collect());
+        let allowed_origins =
+            AllowedOrigins::Origins(["http://example.com".to_string()].iter().cloned().collect());
         assert!(allowed_origins.is_allowed("http://example.com"));
     }
 
     #[test]
     fn other_origin_is_not_allowed() {
-        let allowed_origins = AllowedOrigins::Origins(["http://example.com".to_string()].iter().cloned().collect());
+        let allowed_origins =
+            AllowedOrigins::Origins(["http://example.com".to_string()].iter().cloned().collect());
         assert!(!allowed_origins.is_allowed("http://example2.com"));
     }
 
@@ -136,7 +145,15 @@ mod tests {
 
     #[test]
     fn serialize_deserialize() {
-        let allowed_origins = AllowedOrigins::Origins(["http://example1.com".to_string(), "http://example2.com".to_string()].iter().cloned().collect());
+        let allowed_origins = AllowedOrigins::Origins(
+            [
+                "http://example1.com".to_string(),
+                "http://example2.com".to_string(),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
+        );
         let serialized = serde_json::to_string(&allowed_origins).unwrap();
         let deserialized: AllowedOrigins = serde_json::from_str(&serialized).unwrap();
         assert_eq!(allowed_origins, deserialized);

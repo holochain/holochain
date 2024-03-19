@@ -875,7 +875,10 @@ async fn app_allowed_origins() {
 
     let port = conductor
         .clone()
-        .add_app_interface(either::Either::Left(0), "http://localhost:3000".to_string().into())
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3000".to_string().into(),
+        )
         .await
         .unwrap();
 
@@ -883,8 +886,8 @@ async fn app_allowed_origins() {
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
         ConnectRequest::new(([127, 0, 0, 1], port).into())
     )
-        .await
-        .is_err());
+    .await
+    .is_err());
 
     check_app_port(port, "http://localhost:3000").await;
 }
@@ -897,13 +900,19 @@ async fn app_allowed_origins_independence() {
 
     let port_1 = conductor
         .clone()
-        .add_app_interface(either::Either::Left(0), "http://localhost:3001".to_string().into())
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3001".to_string().into(),
+        )
         .await
         .unwrap();
 
     let port_2 = conductor
         .clone()
-        .add_app_interface(either::Either::Left(0), "http://localhost:3002".to_string().into())
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3002".to_string().into(),
+        )
         .await
         .unwrap();
 
@@ -911,17 +920,21 @@ async fn app_allowed_origins_independence() {
 
     assert!(connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], port_1).into()).try_set_header("origin", "http://localhost:3002").unwrap()
+        ConnectRequest::new(([127, 0, 0, 1], port_1).into())
+            .try_set_header("origin", "http://localhost:3002")
+            .unwrap()
     )
-        .await
-        .is_err());
+    .await
+    .is_err());
 
     assert!(connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], port_2).into()).try_set_header("origin", "http://localhost:3001").unwrap()
+        ConnectRequest::new(([127, 0, 0, 1], port_2).into())
+            .try_set_header("origin", "http://localhost:3001")
+            .unwrap()
     )
-        .await
-        .is_err());
+    .await
+    .is_err());
 
     // Check that correct access is allowed
 
@@ -936,8 +949,8 @@ async fn check_app_port(port: u16, origin: &str) {
             .try_set_header("origin", origin)
             .unwrap(),
     )
-        .await
-        .unwrap();
+    .await
+    .unwrap();
 
     let _rx = PollRecv::new::<AppResponse>(rx);
 

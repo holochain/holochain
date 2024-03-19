@@ -1,6 +1,6 @@
+use holochain_types::websocket::AllowedOrigins;
 use serde::Deserialize;
 use serde::Serialize;
-use holochain_types::websocket::AllowedOrigins;
 
 /// Information neeeded to spawn an admin interface
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
@@ -50,7 +50,9 @@ impl InterfaceDriver {
     /// Get the allowed origins for this driver.
     pub fn allowed_origins(&self) -> &AllowedOrigins {
         match self {
-            InterfaceDriver::Websocket { allowed_origins, .. } => allowed_origins,
+            InterfaceDriver::Websocket {
+                allowed_origins, ..
+            } => allowed_origins,
         }
     }
 }
