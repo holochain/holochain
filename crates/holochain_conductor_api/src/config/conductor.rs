@@ -178,6 +178,7 @@ mod tests {
     use matches::assert_matches;
     use std::path::Path;
     use std::path::PathBuf;
+    use holochain_types::websocket::AllowedOrigins;
 
     #[test]
     fn test_config_load_yaml() {
@@ -244,6 +245,7 @@ mod tests {
       - driver:
           type: websocket
           port: 1234
+          allowed_origins: "*"
 
     network:
       bootstrap_service: https://bootstrap-staging.holo.host
@@ -295,7 +297,7 @@ mod tests {
                 }),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
-                    driver: InterfaceDriver::Websocket { port: 1234 }
+                    driver: InterfaceDriver::Websocket { port: 1234, allowed_origins: AllowedOrigins::Any }
                 }]),
                 network: network_config,
                 db_sync_strategy: DbSyncStrategy::Fast,
