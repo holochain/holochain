@@ -121,7 +121,6 @@ fn get_crate_versions<'a>(
     workspace: &'a ReleaseWorkspace<'a>,
 ) -> Vec<String> {
     expected_crates
-        .clone()
         .iter()
         .map(|name| get_crate_version(name, workspace))
         .collect::<Vec<_>>()

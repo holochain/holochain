@@ -54,8 +54,13 @@ pub fn flatten_forest<'a>(crates: &'a Vec<Crate<'a>>) -> Fallible<Vec<&'a Crate<
         );
     }
 
-    if crates.len() != order.len() {
-        bail!("While attempting to order crates, managed to order {} of {} crates. This likely means there is a cyclic dependency.", order.len(), crates.len());
+    let num_crates = crates.len();
+    let num_order = order.len();
+    if num_crates != num_order {
+        let crates: HashSet<_> = crates.iter().map(|c| c.name()).collect();
+        let order_set: HashSet<_> = order.iter().map(|c| c.name()).collect();
+        let diff = crates.difference(&order_set);
+        bail!("While attempting to order crates, managed to order {num_order} of {num_crates} crates. This likely means there is a cyclic dependency.\n\nOrdered crates: {order:#?}\nMissing crates: {diff:#?}");
     }
 
     Ok(order.into_iter().rev().collect())
