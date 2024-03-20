@@ -93,15 +93,15 @@ how_many: 42
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
 
-    let installed_dna_hash = register_and_install_dna(
+    let installed_cell_id = register_and_install_dna(
         &mut client,
-        fake_agent_pubkey_1(),
         fake_dna_path,
         Some(properties.clone()),
         "role_name".into(),
         10000,
     )
     .await;
+    let installed_dna_hash = installed_cell_id.dna_hash().clone();
 
     assert_ne!(installed_dna_hash, original_dna_hash);
 
@@ -110,8 +110,7 @@ how_many: 42
     let response = client.request(request);
     let response = check_timeout(response, 10000).await;
 
-    let expects = vec![installed_dna_hash];
-    assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
+    assert_matches!(response, AdminResponse::DnasListed(a) if a.contains(&installed_dna_hash));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -143,28 +142,18 @@ async fn call_zome() {
         vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
     );
 
-    let agent_key = fake_agent_pubkey_1();
-
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let installed_dna_hash = register_and_install_dna(
-        &mut admin_tx,
-        agent_key.clone(),
-        fake_dna_path,
-        None,
-        "".into(),
-        10000,
-    )
-    .await;
-    let cell_id = CellId::new(installed_dna_hash.clone(), agent_key.clone());
+    let cell_id =
+        register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000).await;
+    let installed_dna_hash = cell_id.dna_hash().clone();
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
 
-    let expects = vec![installed_dna_hash.clone()];
-    assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
+    assert_matches!(response, AdminResponse::DnasListed(a) if a.contains(&installed_dna_hash));
 
     // Activate cells
     let request = AdminRequest::EnableApp {
@@ -361,19 +350,9 @@ async fn emit_signals() {
     );
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
 
-    let agent_key = fake_agent_pubkey_1();
-
     // Install Dna
-    let installed_dna_hash = register_and_install_dna(
-        &mut admin_tx,
-        agent_key.clone(),
-        fake_dna_path,
-        None,
-        "".into(),
-        10000,
-    )
-    .await;
-    let cell_id = CellId::new(installed_dna_hash.clone(), agent_key.clone());
+    let cell_id =
+        register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000).await;
 
     // Activate cells
     let request = AdminRequest::EnableApp {
@@ -697,12 +676,9 @@ async fn concurrent_install_dna() {
                 zomes.clone(),
             );
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-            let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;
-            // println!("[{}] Agent pub key generated", i);
 
-            let _dna_hash = register_and_install_dna_named(
+            let _cell_id = register_and_install_dna_named(
                 &mut client,
-                agent_key,
                 fake_dna_path.clone(),
                 None,
                 name.clone(),
@@ -712,8 +688,8 @@ async fn concurrent_install_dna() {
             .await;
 
             // println!(
-            //     "[{}] installed dna with hash {} and name {}",
-            //     i, _dna_hash, name
+            //     "[{}] installed app with cell id {} and name {}",
+            //     i, _cell_id, name
             // );
         })
     }))

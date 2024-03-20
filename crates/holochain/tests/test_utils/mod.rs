@@ -203,15 +203,13 @@ pub async fn generate_agent_pubkey(client: &mut WebsocketSender, timeout: u64) -
 /// Returns the hash of the DNA installed, after modifiers have been applied
 pub async fn register_and_install_dna(
     client: &mut WebsocketSender,
-    agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
     role_name: RoleName,
     timeout: u64,
-) -> DnaHash {
+) -> CellId {
     register_and_install_dna_named(
         client,
-        agent_key,
         dna_path,
         properties,
         role_name,
@@ -224,13 +222,12 @@ pub async fn register_and_install_dna(
 /// Returns the hash of the DNA installed, after modifiers have been applied
 pub async fn register_and_install_dna_named(
     client: &mut WebsocketSender,
-    agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
     role_name: RoleName,
     name: String,
     timeout: u64,
-) -> DnaHash {
+) -> CellId {
     let mods = DnaModifiersOpt {
         properties,
         ..Default::default()
@@ -269,7 +266,7 @@ pub async fn register_and_install_dna_named(
         .unwrap();
 
     let payload = InstallAppPayload {
-        agent_key: Some(agent_key),
+        agent_key: None,
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(name),
         network_seed: None,
@@ -280,8 +277,11 @@ pub async fn register_and_install_dna_named(
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
     let response = check_timeout_named("InstallApp", response, timeout).await;
-    assert_matches!(response, AdminResponse::AppInstalled(_));
-    dna_hash
+    if let AdminResponse::AppInstalled(app) = response {
+        CellId::new(dna_hash, app.agent_pub_key)
+    } else {
+        panic!("InstallApp failed: {:?}", response);
+    }
 }
 
 pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16> {

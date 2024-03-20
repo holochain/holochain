@@ -1364,23 +1364,21 @@ mod app_impls {
             installed_app_id: InstalledAppId,
             agent_key: Option<AgentPubKey>,
         ) -> ConductorResult<AgentPubKey> {
-            Ok(if let Some(agent_key) = agent_key {
-                if self.running_services().dpki.is_some() {
-                    // TODO: this ideally would actually modify the registration to include the new app and new DNAs,
-                    //       i.e. if possible, Deepkey would allow multiple apps to share the same agent key.
-                    return Err(ConductorError::Other(
-                        "Cannot install app with provided agent key if DPKI is enabled. Try again with no agent key specified.".into(),
-                    ));
-                } else {
+            Ok(match (agent_key, self.running_services().dpki) {
+                (Some(agent_key), dpki) => {
+                    if dpki.is_some() {
+                        // TODO: allow adding additional apps to an existing DPKI KeyRegistration.
+                        tracing::warn!("Using app with a pre-existing agent key: DPKI will not be used to manage keys for this app.");
+                    }
                     agent_key
                 }
-            } else if let Some(dpki) = self.running_services().dpki {
-                // TODO: record the DNAs installed, important for key restoration.
-                let dnas = vec![];
-                dpki.derive_and_register_new_key(installed_app_id.clone(), dnas)
-                    .await?
-            } else {
-                self.keystore.new_sign_keypair_random().await?
+                (None, Some(dpki)) => {
+                    // TODO: record the DNAs installed, important for key restoration.
+                    let dnas = vec![];
+                    dpki.derive_and_register_new_key(installed_app_id, dnas)
+                        .await?
+                }
+                (None, None) => self.keystore.new_sign_keypair_random().await?,
             })
         }
 
