@@ -1,0 +1,24 @@
+workspace = { members = [ "tests/all", "tests/hdi", "tests/hdk","tests/none"] }
+[package]
+name = "holochain_sdks"
+version = "0.1.0"
+description = "Wrapper crate for all holochain SDKs"
+license = "CAL-1.0"
+homepage = "https://github.com/holochain/holochain/tree/develop/crates/holochain_sdks"
+documentation = "https://docs.rs/holochain_sdks"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "sdk"]
+categories = ["cryptography"]
+edition = "2021"
+
+[dependencies]
+hdi = { version = "^0.4.0-beta-dev.31", path = "../hdi", optional = true }
+hdk = { version = "^0.3.0-beta-dev.35", path = "../hdk", optional = true }
+
+[dev-dependencies]
+cargo = "0.76"
+
+[features]
+default = []
+hdi = ["dep:hdi"]
+hdk = ["dep:hdk"]
