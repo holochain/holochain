@@ -41,12 +41,15 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 #[derive(Clone)]
 pub struct RealAppInterfaceApi {
     conductor_handle: ConductorHandle,
+
+    /// The installed app this interface is for.
+    installed_app_id: InstalledAppId,
 }
 
 impl RealAppInterfaceApi {
     /// Create a new instance from a shared Conductor reference
-    pub fn new(conductor_handle: ConductorHandle) -> Self {
-        Self { conductor_handle }
+    pub fn new(conductor_handle: ConductorHandle, installed_app_id: InstalledAppId) -> Self {
+        Self { conductor_handle, installed_app_id }
     }
 }
 
@@ -58,9 +61,9 @@ impl AppInterfaceApi for RealAppInterfaceApi {
         request: AppRequest,
     ) -> ConductorApiResult<AppResponse> {
         match request {
-            AppRequest::AppInfo { installed_app_id } => Ok(AppResponse::AppInfo(
+            AppRequest::AppInfo => Ok(AppResponse::AppInfo(
                 self.conductor_handle
-                    .get_app_info(&installed_app_id)
+                    .get_app_info(&self.installed_app_id)
                     .await?,
             )),
             AppRequest::CallZome(call) => {
@@ -89,14 +92,14 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 let clone_cell = self
                     .conductor_handle
                     .clone()
-                    .create_clone_cell(*payload)
+                    .create_clone_cell(&self.installed_app_id, *payload)
                     .await?;
                 Ok(AppResponse::CloneCellCreated(clone_cell))
             }
             AppRequest::DisableCloneCell(payload) => {
                 self.conductor_handle
                     .clone()
-                    .disable_clone_cell(&payload)
+                    .disable_clone_cell(&self.installed_app_id, &payload)
                     .await?;
                 Ok(AppResponse::CloneCellDisabled)
             }
@@ -104,7 +107,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 let enabled_cell = self
                     .conductor_handle
                     .clone()
-                    .enable_clone_cell(&payload)
+                    .enable_clone_cell(&self.installed_app_id, &payload)
                     .await?;
                 Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }

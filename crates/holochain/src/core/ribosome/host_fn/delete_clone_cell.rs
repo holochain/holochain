@@ -32,8 +32,9 @@ pub fn delete_clone_cell<'a>(
 
             tokio_helper::block_forever_on(async move {
                 conductor_handle
-                    .delete_clone_cell(DeleteCloneCellPayload {
-                        app_id: installed_app_id,
+                    .delete_clone_cell(
+                                       DeleteCloneCellPayload {
+                                           app_id: installed_app_id,
                         clone_cell_id: input.clone_cell_id,
                     })
                     .await

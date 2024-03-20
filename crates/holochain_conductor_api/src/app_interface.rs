@@ -25,10 +25,7 @@ pub enum AppRequest {
     /// # Returns
     ///
     /// [`AppResponse::AppInfo`]
-    AppInfo {
-        /// The app ID for which to get information
-        installed_app_id: InstalledAppId,
-    },
+    AppInfo,
 
     /// Call a zome function. See [`ZomeCall`]
     /// to understand the data that must be provided.
@@ -443,20 +440,16 @@ fn app_request_serialization() {
     use rmp_serde::Deserializer;
 
     // make sure requests are serialized as expected
-    let request = AppRequest::AppInfo {
-        installed_app_id: "some_id".to_string(),
-    };
+    let request = AppRequest::AppInfo;
     let serialized_request = holochain_serialized_bytes::encode(&request).unwrap();
     assert_eq!(
         serialized_request,
         vec![
-            130, 164, 116, 121, 112, 101, 129, 168, 97, 112, 112, 95, 105, 110, 102, 111, 192, 164,
-            100, 97, 116, 97, 129, 176, 105, 110, 115, 116, 97, 108, 108, 101, 100, 95, 97, 112,
-            112, 95, 105, 100, 167, 115, 111, 109, 101, 95, 105, 100
+            129, 164, 116, 121, 112, 101, 129, 168, 97, 112, 112, 95, 105, 110, 102, 111, 192
         ]
     );
 
-    let json_expected = r#"{"type":{"app_info":null},"data":{"installed_app_id":"some_id"}}"#;
+    let json_expected = r#"{"type":{"app_info":null}}"#;
     let mut deserializer = Deserializer::new(&*serialized_request);
     let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
     let json_actual = serde_json::to_string(&json_value).unwrap();

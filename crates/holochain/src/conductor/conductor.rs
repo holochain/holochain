@@ -53,7 +53,6 @@ use super::ribosome_store::RibosomeStore;
 use super::space::Space;
 use super::space::Spaces;
 use super::state::AppInterfaceConfig;
-use super::state::AppInterfaceId;
 use super::state::ConductorState;
 use super::CellError;
 use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
@@ -212,8 +211,9 @@ pub struct Conductor {
     /// the dynamically allocated port later.
     admin_websocket_ports: RwShare<Vec<u16>>,
 
-    /// Collection app interface data, keyed by id
-    app_interfaces: RwShare<HashMap<AppInterfaceId, AppInterfaceRuntime>>,
+    /// App interfaces, keyed by application id where the value is the interfaces associated with
+    /// that app.
+    app_interfaces: RwShare<HashMap<InstalledAppId, AppInterfaceRuntime>>,
 
     /// The interface to the task manager
     task_manager: TaskManagerClient,
@@ -441,21 +441,22 @@ mod interface_impls {
             Ok(())
         }
 
-        /// Spawn a new app interface task, register it with the TaskManager,
-        /// and modify the conductor accordingly, based on the config passed in
-        /// which is just a networking port number (or 0 to auto-select one).
+        /// Spawn a new app interface task for the specified application.
+        ///
+        /// Creates a handler on the specified port or lets the OS assign a port if 0 is given.
+        ///
+        /// The handler will be registered with the TaskManager and the conductor state will be
+        /// modified accordingly.
+        ///
         /// Returns the given or auto-chosen port number if giving an Ok Result
         pub async fn add_app_interface(
             self: Arc<Self>,
-            port: either::Either<u16, AppInterfaceId>,
+            installed_app_id: InstalledAppId,
+            port: u16,
         ) -> ConductorResult<u16> {
-            let interface_id = match port {
-                either::Either::Left(port) => AppInterfaceId::new(port),
-                either::Either::Right(id) => id,
-            };
-            let port = interface_id.port();
-            tracing::debug!("Attaching interface {}", port);
-            let app_api = RealAppInterfaceApi::new(self.clone());
+            debug!("Attaching interface for app {} on port: {}", installed_app_id, port);
+
+            let app_api = RealAppInterfaceApi::new(self.clone(), installed_app_id.clone());
             // This receiver is thrown away because we can produce infinite new
             // receivers from the Sender
             let (signal_tx, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
@@ -468,23 +469,31 @@ mod interface_impls {
                 .map_err(Box::new)?;
             let interface = AppInterfaceRuntime::Websocket { signal_tx };
 
+            // Store the handle for the app interface so that we can send signals on it later.
             self.app_interfaces.share_mut(|app_interfaces| {
-                if app_interfaces.contains_key(&interface_id) {
+                if app_interfaces.contains_key(&installed_app_id) {
                     return Err(ConductorError::AppInterfaceIdCollision(
-                        interface_id.clone(),
+                        installed_app_id.clone(),
                     ));
                 }
 
-                app_interfaces.insert(interface_id.clone(), interface);
+                app_interfaces.insert(installed_app_id.clone(), interface);
                 Ok(())
             })?;
+
+            // Update the persistent state with the new app interface
             let config = AppInterfaceConfig::websocket(port);
-            self.update_state(|mut state| {
-                state.app_interfaces.insert(interface_id, config);
-                Ok(state)
+            self.update_state({
+                let installed_app_id = installed_app_id.clone();
+                move |mut state| {
+                    state.app_interfaces.insert(installed_app_id, config);
+                    Ok(state)
+                }
             })
             .await?;
-            tracing::debug!("App interface added at port: {}", port);
+
+            debug!("App interface for app {} added at port: {}", installed_app_id, port);
+
             Ok(port)
         }
 
@@ -509,9 +518,9 @@ mod interface_impls {
         /// This should only be run at conductor initialization.
         #[allow(irrefutable_let_patterns)]
         pub(crate) async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()> {
-            for id in self.get_state().await?.app_interfaces.keys().cloned() {
-                tracing::debug!("Starting up app interface: {:?}", id);
-                let _ = self.clone().add_app_interface(either::Right(id)).await?;
+            for (id, config) in self.get_state().await?.app_interfaces {
+                debug!("Starting up app interface: {:?}", id);
+                let _ = self.clone().add_app_interface(id.clone(), config.driver.port()).await?;
             }
             Ok(())
         }
@@ -1628,10 +1637,10 @@ mod clone_cell_impls {
         /// A struct with the created cell's clone id and cell id.
         pub async fn create_clone_cell(
             self: Arc<Self>,
+            installed_app_id: &InstalledAppId,
             payload: CreateCloneCellPayload,
         ) -> ConductorResult<ClonedCell> {
             let CreateCloneCellPayload {
-                app_id,
                 role_name,
                 modifiers,
                 membrane_proof,
@@ -1647,7 +1656,7 @@ mod clone_cell_impls {
             // add cell to app
             let clone_cell = self
                 .add_clone_cell_to_app(
-                    app_id.clone(),
+                    installed_app_id.clone(),
                     role_name.clone(),
                     modifiers.serialized()?,
                     name,
@@ -1656,8 +1665,8 @@ mod clone_cell_impls {
 
             // run genesis on cloned cell
             let cells = vec![(clone_cell.cell_id.clone(), membrane_proof)];
-            crate::conductor::conductor::genesis_cells(self.clone(), cells).await?;
-            self.create_and_add_initialized_cells_for_running_apps(Some(&app_id))
+            genesis_cells(self.clone(), cells).await?;
+            self.create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
                 .await?;
             Ok(clone_cell)
         }
@@ -1665,14 +1674,14 @@ mod clone_cell_impls {
         /// Disable a clone cell.
         pub(crate) async fn disable_clone_cell(
             &self,
+            installed_app_id: &InstalledAppId,
             DisableCloneCellPayload {
-                app_id,
                 clone_cell_id,
             }: &DisableCloneCellPayload,
         ) -> ConductorResult<()> {
             let (_, removed_cell_id) = self
                 .update_state_prime({
-                    let app_id = app_id.to_owned();
+                    let app_id = installed_app_id.to_owned();
                     let clone_cell_id = clone_cell_id.to_owned();
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
@@ -1690,12 +1699,13 @@ mod clone_cell_impls {
         /// Enable a disabled clone cell.
         pub async fn enable_clone_cell(
             self: Arc<Self>,
+            installed_app_id: &InstalledAppId,
             payload: &EnableCloneCellPayload,
         ) -> ConductorResult<ClonedCell> {
             let conductor = self.clone();
             let (_, enabled_cell) = self
                 .update_state_prime({
-                    let app_id = payload.app_id.to_owned();
+                    let app_id = installed_app_id.clone();
                     let clone_cell_id = payload.clone_cell_id.to_owned();
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
@@ -1720,7 +1730,7 @@ mod clone_cell_impls {
                 })
                 .await?;
 
-            self.create_and_add_initialized_cells_for_running_apps(Some(&payload.app_id))
+            self.create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
                 .await?;
             Ok(enabled_cell)
         }
@@ -2201,7 +2211,7 @@ mod misc_impls {
                 running_cells: Vec<(DnaHashB64, AgentPubKeyB64)>,
                 shutting_down: bool,
                 admin_websocket_ports: Vec<u16>,
-                app_interfaces: Vec<AppInterfaceId>,
+                app_interfaces: Vec<InstalledAppId>,
             }
 
             #[derive(Serialize, Debug)]

@@ -40,39 +40,7 @@ pub struct ConductorState {
     installed_apps: InstalledAppMap,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
-    pub(crate) app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
-}
-
-/// A unique identifier used to refer to an App Interface internally.
-#[derive(Clone, Deserialize, Serialize, Debug, Hash, PartialEq, Eq)]
-pub struct AppInterfaceId {
-    /// The port used to create this interface
-    port: u16,
-    /// If the port is 0 then it will be assigned by the OS
-    /// so we need a unique identifier for that case.
-    id: Option<String>,
-}
-
-impl Default for AppInterfaceId {
-    fn default() -> Self {
-        Self::new(0)
-    }
-}
-
-impl AppInterfaceId {
-    /// Create an id from the port
-    pub fn new(port: u16) -> Self {
-        let id = if port == 0 {
-            Some(nanoid::nanoid!())
-        } else {
-            None
-        };
-        Self { port, id }
-    }
-    /// Get the port intended for this interface
-    pub fn port(&self) -> u16 {
-        self.port
-    }
+    pub(crate) app_interfaces: HashMap<InstalledAppId, AppInterfaceConfig>,
 }
 
 impl ConductorState {
@@ -188,11 +156,6 @@ impl ConductorState {
             .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))?;
         let delta = app.status.transition(transition);
         Ok((app, delta))
-    }
-
-    /// Returns the interface configuration with the given ID if present
-    pub fn interface_by_id(&self, id: &AppInterfaceId) -> Option<AppInterfaceConfig> {
-        self.app_interfaces.get(id).cloned()
     }
 
     /// Find the app which contains the given cell by its [CellId].

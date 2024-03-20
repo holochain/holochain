@@ -1,5 +1,5 @@
 use super::interface::error::InterfaceError;
-use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
+use super::entry_def_store::error::EntryDefStoreError;
 use crate::conductor::cell::error::CellError;
 use crate::core::workflow::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
@@ -67,8 +67,8 @@ pub enum ConductorError {
     #[error("Workflow error: {0:?}")]
     WorkflowError(#[from] WorkflowError),
 
-    #[error("Attempted to add two app interfaces with the same id: {0:?}")]
-    AppInterfaceIdCollision(AppInterfaceId),
+    #[error("Attempted to add two app interfaces for the same app: {0:?}")]
+    AppInterfaceIdCollision(InstalledAppId),
 
     // Box is to avoid cycle in error definition
     #[error(transparent)]

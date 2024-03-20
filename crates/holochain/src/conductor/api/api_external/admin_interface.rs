@@ -219,12 +219,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AppDisabled)
             }
-            AttachAppInterface { port } => {
+            AttachAppInterface { installed_app_id, port } => {
                 let port = port.unwrap_or(0);
                 let port = self
                     .conductor_handle
                     .clone()
-                    .add_app_interface(either::Either::Left(port))
+                    .add_app_interface(installed_app_id, port)
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }

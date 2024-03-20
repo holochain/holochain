@@ -166,6 +166,13 @@ pub enum AdminRequest {
     ///
     /// [`AppRequest`]: super::AppRequest
     AttachAppInterface {
+        /// The application that this app websocket is bound to.
+        ///
+        /// It will only be possible to perform actions on this app through this interface.
+        /// Similarly, for signals from this app, they will only be sent back on interfaces with
+        /// a matching [InstalledAppId].
+        installed_app_id: InstalledAppId,
+
         /// Optional port number
         port: Option<u16>,
     },
