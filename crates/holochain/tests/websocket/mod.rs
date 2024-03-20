@@ -77,8 +77,6 @@ async fn call_admin() {
     let (mut client, rx) = websocket_client_by_port(port).await.unwrap();
     let _rx = PollRecv::new::<AdminResponse>(rx);
 
-    let original_dna_hash = dna.dna_hash().clone();
-
     // Make properties
     let properties = holochain_zome_types::properties::YamlProperties::new(
         serde_yaml::from_str(
@@ -93,10 +91,8 @@ how_many: 42
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
 
-    let orig_dna_hash = dna.dna_hash().clone();
-    register_and_install_dna(
+    let installed_dna_hash = register_and_install_dna(
         &mut client,
-        orig_dna_hash,
         fake_agent_pubkey_1(),
         fake_dna_path,
         Some(properties.clone()),
@@ -110,14 +106,9 @@ how_many: 42
     let response = client.request(request);
     let response = check_timeout(response, 10000).await;
 
-    let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
-    let mut tmp_dna = dna.dna_def().clone();
-    tmp_dna.modifiers.properties = properties.try_into().unwrap();
-    let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm).await;
+    assert_ne!(&installed_dna_hash, dna.dna_hash());
 
-    assert_ne!(&original_dna_hash, dna.dna_hash());
-
-    let expects = vec![dna.dna_hash().clone()];
+    let expects = vec![installed_dna_hash];
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 }
 
@@ -149,15 +140,13 @@ async fn call_zome() {
         &uuid.to_string(),
         vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
     );
-    let original_dna_hash = dna.dna_hash().clone();
 
     let agent_key = fake_agent_pubkey_1();
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let dna_hash = register_and_install_dna(
+    let installed_dna_hash = register_and_install_dna(
         &mut admin_tx,
-        original_dna_hash.clone(),
         agent_key.clone(),
         fake_dna_path,
         None,
@@ -165,14 +154,14 @@ async fn call_zome() {
         10000,
     )
     .await;
-    let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
+    let cell_id = CellId::new(installed_dna_hash.clone(), agent_key.clone());
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
 
-    let expects = vec![original_dna_hash.clone()];
+    let expects = vec![installed_dna_hash.clone()];
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 
     // Activate cells
@@ -368,15 +357,13 @@ async fn emit_signals() {
         &uuid.to_string(),
         vec![(TestWasm::EmitSignal.into(), TestWasm::EmitSignal.into())],
     );
-    let orig_dna_hash = dna.dna_hash().clone();
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
 
     let agent_key = fake_agent_pubkey_1();
 
     // Install Dna
-    let dna_hash = register_and_install_dna(
+    let installed_dna_hash = register_and_install_dna(
         &mut admin_tx,
-        orig_dna_hash,
         agent_key.clone(),
         fake_dna_path,
         None,
@@ -384,7 +371,7 @@ async fn emit_signals() {
         10000,
     )
     .await;
-    let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
+    let cell_id = CellId::new(installed_dna_hash.clone(), agent_key.clone());
 
     // Activate cells
     let request = AdminRequest::EnableApp {
@@ -707,14 +694,12 @@ async fn concurrent_install_dna() {
                 &name,
                 zomes.clone(),
             );
-            let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
             let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;
             // println!("[{}] Agent pub key generated", i);
 
             let _dna_hash = register_and_install_dna_named(
                 &mut client,
-                original_dna_hash.clone(),
                 agent_key,
                 fake_dna_path.clone(),
                 None,

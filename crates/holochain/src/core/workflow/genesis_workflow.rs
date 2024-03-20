@@ -112,14 +112,15 @@ where
         return Err(WorkflowError::GenesisFailure(reason));
     }
 
-    // NB: this is just a placeholder for a real DPKI request to show intent
-    if !api
-        .conductor_services()
-        .dpki
-        .is_key_valid(agent_pubkey.clone(), Timestamp::now())
-        .await?
-    {
-        return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
+    // Don't proceed if DPKI is initialized and the agent key is not valid
+    if let Some(dpki) = api.conductor_services().dpki.as_ref() {
+        if !dpki
+            .key_state(agent_pubkey.clone(), Timestamp::now())
+            .await?
+            .is_valid()
+        {
+            return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
+        }
     }
 
     source_chain::genesis(
@@ -208,8 +209,8 @@ mod tests {
             let mut api = MockCellConductorApiT::new();
             api.expect_conductor_services()
                 .return_const(ConductorServices {
-                    dpki: Arc::new(mock_dpki()),
-                    app_store: Arc::new(mock_app_store()),
+                    dpki: Some(Arc::new(mock_dpki())),
+                    app_store: Some(Arc::new(mock_app_store())),
                 });
             api.expect_keystore().return_const(keystore.clone());
             let mut ribosome = MockRibosomeT::new();

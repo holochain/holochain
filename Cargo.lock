@@ -3145,6 +3145,7 @@ name = "holochain_conductor_services"
 version = "0.2.0-beta-dev.11"
 dependencies = [
  "anyhow",
+ "arbitrary",
  "async-trait",
  "derive_more",
  "futures",

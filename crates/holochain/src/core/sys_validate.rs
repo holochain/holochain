@@ -5,6 +5,8 @@ use super::queue_consumer::TriggerSender;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::space::Space;
+use holochain_conductor_services::DpkiService;
+use holochain_conductor_services::KeyState;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -374,6 +376,23 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
         }
         (None, NA) => Ok(()),
         (None, _) => err("Entry must be N/A for action with no entry type"),
+    }
+}
+
+/// Check that the agent was valid at the time of authoring according to the installed DPKI network
+pub async fn check_dpki_agent_validity(
+    op: &DhtOp,
+    dpki: Arc<dyn DpkiService>,
+) -> SysValidationResult<()> {
+    let timestamp = op.action().timestamp();
+    let author = op.action().author().clone();
+
+    match dpki.key_state(author.clone(), timestamp).await? {
+        KeyState::Valid(_) => Ok(()),
+        KeyState::Invalidated(_) => {
+            Err(ValidationOutcome::DpkiAgentInvalid(author.clone(), timestamp).into())
+        }
+        KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(author.clone()).into()),
     }
 }
 
