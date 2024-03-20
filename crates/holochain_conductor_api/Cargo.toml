@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_api"
-version = "0.3.0-beta-dev.39"
+version = "0.3.0-beta-dev.40"
 description = "Message types for Holochain admin and app interface protocols"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -16,7 +16,7 @@ kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.18", path = "../kitsune_p2p/
 holo_hash = { version = "^0.3.0-beta-dev.24", path = "../holo_hash", features = ["full"] }
 holochain_state_types = { version = "^0.3.0-beta-dev.35", path = "../holochain_state_types" }
 holochain_serialized_bytes = { workspace = true }
-holochain_types = { version = "^0.3.0-beta-dev.36", path = "../holochain_types" }
+holochain_types = { version = "^0.3.0-beta-dev.37", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.30", path = "../holochain_zome_types" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_derive = "1.0"
