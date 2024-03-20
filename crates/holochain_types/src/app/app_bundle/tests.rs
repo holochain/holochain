@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use crate::prelude::*;
-use ::fixt::prelude::*;
 use app_manifest_v1::tests::{app_manifest_fixture, app_manifest_properties_fixture};
 
 use super::AppBundle;
