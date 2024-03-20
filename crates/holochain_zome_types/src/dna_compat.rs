@@ -20,7 +20,7 @@ use holochain_serialized_bytes::prelude::*;
 pub struct DnaCompatParams {
     /// A version number which represents network protocol compatibility.
     /// This is set by kitsune and bumped whenever a breaking protocol change is made.
-    pub protocol_version: u32,
+    pub protocol_version: u16,
 
     /// DPKI is fundamental to the workings of agent key management and validation.
     /// Two conductors with different DPKI networks cannot validate each other's agent keys,
