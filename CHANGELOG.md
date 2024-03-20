@@ -14,6 +14,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240320.130406
+
+## [hcterm-0.3.0-beta-dev.17](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.17)
+
+## [holochain\_cli-0.3.0-beta-dev.41](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [holochain-0.3.0-beta-dev.42](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.42)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.41](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [holochain\_cascade-0.3.0-beta-dev.41](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.41](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.39](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.39)
+
+## [holochain\_state-0.3.0-beta-dev.40](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [holochain\_p2p-0.3.0-beta-dev.40](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [hc\_sleuth-0.2.0-beta-dev.11](crates/hc_sleuth/CHANGELOG.md#0.2.0-beta-dev.11)
+
+## [kitsune\_p2p-0.3.0-beta-dev.34](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.34)
+
 # 20240320.003423
 
 ## [hcterm-0.3.0-beta-dev.16](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.16)

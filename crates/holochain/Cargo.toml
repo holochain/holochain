@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.3.0-beta-dev.41"
+version = "0.3.0-beta-dev.42"
 description = "Holochain, a framework for distributed applications"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -25,13 +25,13 @@ getrandom = "0.2.7"
 get_if_addrs = "0.5.3"
 ghost_actor = "0.3.0-alpha.6"
 holo_hash = { version = "^0.3.0-beta-dev.24", path = "../holo_hash", features = ["full"] }
-holochain_cascade = { version = "^0.3.0-beta-dev.40", path = "../holochain_cascade" }
-holochain_conductor_api = { version = "^0.3.0-beta-dev.40", path = "../holochain_conductor_api" }
+holochain_cascade = { version = "^0.3.0-beta-dev.41", path = "../holochain_cascade" }
+holochain_conductor_api = { version = "^0.3.0-beta-dev.41", path = "../holochain_conductor_api" }
 holochain_keystore = { version = "^0.3.0-beta-dev.31", path = "../holochain_keystore", default-features = false }
-holochain_p2p = { version = "^0.3.0-beta-dev.39", path = "../holochain_p2p" }
+holochain_p2p = { version = "^0.3.0-beta-dev.40", path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.3.0-beta-dev.37", path = "../holochain_sqlite" }
 holochain_serialized_bytes = { workspace = true }
-holochain_state = { version = "^0.3.0-beta-dev.39", path = "../holochain_state" }
+holochain_state = { version = "^0.3.0-beta-dev.40", path = "../holochain_state" }
 holochain_types = { version = "^0.3.0-beta-dev.37", path = "../holochain_types" }
 holochain_util = { version = "^0.3.0-beta-dev.5", path = "../holochain_util", features = [ "pw" ] }
 holochain_wasmer_host = { workspace = true }
@@ -42,7 +42,7 @@ holochain_secure_primitive = { version = "^0.3.0-beta-dev.22", path = "../holoch
 holochain_conductor_services = { version = "^0.2.0-beta-dev.11", path = "../holochain_conductor_services" }
 human-panic = "1.0.3"
 itertools = { version = "0.10" }
-kitsune_p2p = { version = "^0.3.0-beta-dev.33", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
+kitsune_p2p = { version = "^0.3.0-beta-dev.34", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
 kitsune_p2p_bootstrap_client = { version = "^0.3.0-beta-dev.29", path = "../kitsune_p2p/bootstrap_client" }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.18", path = "../kitsune_p2p/bin_data" }
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.23", path = "../kitsune_p2p/types" }
@@ -87,7 +87,7 @@ url = "2.4"
 url2 = { workspace = true }
 url_serde = "0.2.0"
 uuid = { workspace = true }
-holochain_wasm_test_utils = { version = "^0.3.0-beta-dev.38", path = "../test_utils/wasm" }
+holochain_wasm_test_utils = { version = "^0.3.0-beta-dev.39", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 async-recursion = "0.3"
 wasmer = { workspace = true }
@@ -112,7 +112,7 @@ reqwest = { version = "0.11.2", features = ["json"], optional = true }
 
 # TODO: make optional?
 aitia = { version = "^0.2.0-beta-dev.6", path = "../aitia" }
-hc_sleuth = { version = "^0.2.0-beta-dev.10", path = "../hc_sleuth" }
+hc_sleuth = { version = "^0.2.0-beta-dev.11", path = "../hc_sleuth" }
 
 # fact deps
 petgraph = { version = "0.6.0", features = ["quickcheck", "stable_graph"] }
