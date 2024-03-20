@@ -6,6 +6,7 @@ use crate::conductor::paths::DataRootPath;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::KeystorePath;
+use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_p2p::NetworkCompatParams;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
@@ -180,9 +181,15 @@ impl ConductorBuilder {
             Some(keystore.lair_client()),
         );
 
-        let dpki_dna_to_install = match &config.dpki {
-            Some(dpki_config) => {
-                let dna = get_dpki_dna(dpki_config.dna_path.as_ref())
+        // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
+        let dpki_config = Some(config.dpki.clone().unwrap_or(DpkiConfig {
+            dna_path: None,
+            device_seed_lair_tag: "UNUSED".to_string(),
+        }));
+
+        let dpki_dna_to_install = match &dpki_config {
+            Some(config) => {
+                let dna = get_dpki_dna(config)
                     .await?
                     .into_dna_file(Default::default())
                     .await?
@@ -190,7 +197,9 @@ impl ConductorBuilder {
 
                 Some(dna)
             }
-            _ => None,
+            _ => unreachable!(
+                "We currently require DPKI to be used, but this may change in the future"
+            ),
         };
 
         let dpki_uuid = dpki_dna_to_install
@@ -427,10 +436,19 @@ impl ConductorBuilder {
             Some(keystore.lair_client()),
         );
 
-        let (dpki_uuid, dpki_dna_to_install) = match (&self.dpki, &config.dpki) {
+        // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
+        let dpki_config = Some(config.dpki.clone().unwrap_or(DpkiConfig {
+            dna_path: None,
+            device_seed_lair_tag: "UNUSED".to_string(),
+        }));
+
+        let (dpki_uuid, dpki_dna_to_install) = match (&self.dpki, &dpki_config) {
+            // If a DPKI impl was provided to the builder, use that
             (Some(dpki_impl), _) => (Some(dpki_impl.uuid()), None),
+
+            // Otherwise load the DNA from config if specified
             (None, Some(dpki_config)) => {
-                let dna = get_dpki_dna(dpki_config.dna_path.as_ref())
+                let dna = get_dpki_dna(dpki_config)
                     .await?
                     .into_dna_file(Default::default())
                     .await?
@@ -440,7 +458,10 @@ impl ConductorBuilder {
                     Some(dna),
                 )
             }
-            _ => (None, None),
+
+            (None, None) => unreachable!(
+                "We currently require DPKI to be used, but this may change in the future"
+            ),
         };
         let network_compat = NetworkCompatParams { dpki_uuid };
 
@@ -470,16 +491,19 @@ impl ConductorBuilder {
 
         // Install DPKI from DNA or mock
         match (self.dpki, dpki_dna_to_install) {
-            (_, Some(dna)) => {
-                handle.clone().install_dpki(dna).await?;
-            }
-            (Some(dpki_impl), None) => {
+            // If an override is specified, use that regardless of config
+            (Some(dpki_impl), _) => {
                 // This is a mock DPKI impl, so inject it into the conductor directly
                 handle.running_services_mutex().share_mut(|s| {
                     s.dpki = Some(dpki_impl);
                 });
             }
-            (None, None) => (),
+            (None, Some(dna)) => {
+                handle.clone().install_dpki(dna).await?;
+            }
+            (None, None) => unreachable!(
+                "We currently require DPKI to be used, but this may change in the future"
+            ),
         }
 
         // Install extra DNAs, in particular:
@@ -505,8 +529,9 @@ impl ConductorBuilder {
     }
 }
 
-async fn get_dpki_dna(dna_path: Option<&std::path::PathBuf>) -> DnaResult<DnaBundle> {
-    if let Some(dna_path) = dna_path {
+/// Get the DPKI DNA from the filesystem or use the built-in one.
+async fn get_dpki_dna(config: &DpkiConfig) -> DnaResult<DnaBundle> {
+    if let Some(dna_path) = config.dna_path.as_ref() {
         DnaBundle::read_from_file(dna_path).await
     } else {
         DnaBundle::decode(holochain_deepkey_dna::DEEPKEY_DNA_BUNDLE_BYTES)

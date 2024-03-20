@@ -47,16 +47,14 @@ pub struct ConductorConfig {
     #[serde(default)]
     pub keystore: KeystoreConfig,
 
-    /// Optional path to a DPKI DNA file. If present, this will enable a DPKI service backed by
-    /// the given DNA.
+    /// DPKI config for this conductor. This setting must not change once the conductor has been
+    /// started for the first time.
+    ///  
+    /// If `dna_path` is present, the DNA file at this path will be used to install the DPKI service upon first conductor startup.
+    /// If not present, the Deepkey DNA specified by the `holochain_deepkey_dna` crate will be used instead.
     ///
-    /// Some implications of providing this config:
-    /// - All new agent keys for all DNAs and hApps will be generated using DPKI's key derivation scheme and
-    ///   registered with DPKI.
-    /// - All DNAs will incorporate DPKI agent validity checks into its system validation rules.
-    /// - All DNAs will only be able to communicate with other nodes using the same DPKI service.
-    /// - The conductor will panic on startup if it was ever started up with a different value for this item,
-    ///   i.e. this value can never change over the lifetime of the conductor.
+    /// `device_seed_lair_tag` is currently unused but may be required in the future.
+    // TODO: once device seed generation is fully hooked up, make this config required.
     #[serde(default)]
     pub dpki: Option<DpkiConfig>,
 
