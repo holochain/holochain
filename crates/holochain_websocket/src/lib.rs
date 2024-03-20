@@ -738,6 +738,7 @@ impl Callback for ConnectCallback {
                 if self.allowed_origin.is_allowed(origin) {
                     Ok(response)
                 } else {
+                    tracing::warn!("Rejecting websocket connection request with disallowed `Origin` header: {:?}", request);
                     let allowed_origin: String = self.allowed_origin.as_ref().clone().into();
                     match HeaderValue::from_str(&allowed_origin) {
                         Ok(allowed_origin) => {
@@ -760,6 +761,7 @@ impl Callback for ConnectCallback {
                 }
             }
             None => {
+                tracing::warn!("Rejecting websocket connection request with missing `Origin` header: {:?}", request);
                 let mut err_response =
                     ErrorResponse::new(Some("Missing `Origin` header".to_string()));
                 *err_response.status_mut() = StatusCode::BAD_REQUEST;
