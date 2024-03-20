@@ -44,7 +44,7 @@ pub mod dependencies {
 
 /// This value determines protocol compatibility.
 /// Any time there is a protocol breaking change, this number must be incremented.
-pub const KITSUNE_PROTOCOL_VERSION: u16 = 0;
+pub use kitsune_p2p_timestamp::KITSUNE_PROTOCOL_VERSION;
 
 pub mod metrics;
 

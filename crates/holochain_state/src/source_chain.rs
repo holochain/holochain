@@ -402,8 +402,8 @@ impl SourceChain {
                 authored_ops_to_dht_db(
                     network,
                     ops_to_integrate,
-                    &self.vault,
-                    &self.dht_db,
+                    self.vault.clone().into(),
+                    self.dht_db.clone(),
                     &self.dht_db_cache,
                 )
                 .await?;
@@ -511,11 +511,8 @@ where
         self.author.clone()
     }
 
-    pub fn cell_id(&self) -> CellId {
-        CellId::new(
-            self.vault.kind().dna_hash().clone(),
-            self.agent_pubkey().clone(),
-        )
+    pub fn cell_id(&self) -> Arc<CellId> {
+        self.vault.kind().0.clone()
     }
 
     /// This has to clone all the data because we can't return
@@ -1081,8 +1078,13 @@ pub async fn genesis(
             SourceChainResult::Ok(ops_to_integrate)
         })
         .await?;
-    authored_ops_to_dht_db_without_check(ops_to_integrate, &authored, &dht_db, dht_db_cache)
-        .await?;
+    authored_ops_to_dht_db_without_check(
+        ops_to_integrate,
+        authored.clone().into(),
+        dht_db,
+        dht_db_cache,
+    )
+    .await?;
     Ok(())
 }
 

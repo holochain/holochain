@@ -33,6 +33,72 @@
 
 pub use self::share::RwShare;
 use super::api::error::ConductorApiError;
+
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+use std::time::Instant;
+
+use futures::future;
+use futures::future::FutureExt;
+use futures::future::TryFutureExt;
+use futures::stream::StreamExt;
+use holochain_wasmer_host::module::ModuleCache;
+use itertools::Itertools;
+use parking_lot::RwLock;
+use rusqlite::Transaction;
+use tokio::sync::mpsc::error::SendError;
+use tokio::task::JoinHandle;
+use tracing::*;
+
+pub use builder::*;
+use holo_hash::DnaHash;
+use holochain_conductor_api::conductor::KeystoreConfig;
+use holochain_conductor_api::AppInfo;
+use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::FullIntegrationStateDump;
+use holochain_conductor_api::FullStateDump;
+use holochain_conductor_api::IntegrationStateDump;
+use holochain_conductor_api::JsonDump;
+pub use holochain_conductor_services::*;
+use holochain_keystore::lair_keystore::spawn_lair_keystore;
+use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
+use holochain_keystore::MetaLairClient;
+use holochain_p2p::actor::HolochainP2pRefToDna;
+use holochain_p2p::event::HolochainP2pEvent;
+use holochain_p2p::DnaHashExt;
+use holochain_p2p::HolochainP2pDnaT;
+use holochain_sqlite::sql::sql_cell::state_dump;
+use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::nonce::witness_nonce;
+use holochain_state::nonce::WitnessNonceResult;
+use holochain_state::prelude::*;
+use holochain_state::source_chain;
+pub use holochain_types::share;
+use holochain_zome_types::prelude::ClonedCell;
+use kitsune_p2p::agent_store::AgentInfoSigned;
+
+use crate::conductor::cell::Cell;
+use crate::conductor::config::ConductorConfig;
+use crate::conductor::error::ConductorResult;
+use crate::conductor::metrics::create_p2p_event_duration_metric;
+use crate::conductor::p2p_agent_store::get_single_agent_info;
+use crate::conductor::p2p_agent_store::list_all_agent_info;
+use crate::conductor::p2p_agent_store::query_peer_density;
+use crate::core::queue_consumer::InitialQueueTriggers;
+use crate::core::queue_consumer::QueueConsumerMap;
+#[cfg(any(test, feature = "test_utils"))]
+use crate::core::queue_consumer::QueueTriggers;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
+use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
+use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
+use crate::core::ribosome::RibosomeT;
+use crate::core::workflow::ZomeCallResult;
+use crate::{
+    conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
+};
+
 use super::api::RealAppInterfaceApi;
 use super::api::ZomeCall;
 use super::cell::error::CellResult;
@@ -59,74 +125,10 @@ use super::state::AppInterfaceId;
 use super::state::ConductorState;
 use super::CellError;
 use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
-use crate::conductor::cell::Cell;
-use crate::conductor::config::ConductorConfig;
-use crate::conductor::error::ConductorResult;
-use crate::conductor::metrics::create_p2p_event_duration_metric;
-use crate::conductor::p2p_agent_store::get_single_agent_info;
-use crate::conductor::p2p_agent_store::list_all_agent_info;
-use crate::conductor::p2p_agent_store::query_peer_density;
-use crate::core::queue_consumer::InitialQueueTriggers;
-use crate::core::queue_consumer::QueueConsumerMap;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
-use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
-use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
-use crate::core::ribosome::RibosomeT;
-use crate::core::workflow::ZomeCallResult;
-use crate::{
-    conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
-};
-pub use builder::*;
-use futures::future;
-use futures::future::FutureExt;
-use futures::future::TryFutureExt;
-use futures::stream::StreamExt;
-use holo_hash::DnaHash;
-use holochain_conductor_api::conductor::KeystoreConfig;
-use holochain_conductor_api::AppInfo;
-use holochain_conductor_api::AppStatusFilter;
-use holochain_conductor_api::FullIntegrationStateDump;
-use holochain_conductor_api::FullStateDump;
-use holochain_conductor_api::IntegrationStateDump;
-use holochain_conductor_api::JsonDump;
-use holochain_keystore::lair_keystore::spawn_lair_keystore;
-use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
-use holochain_keystore::MetaLairClient;
-use holochain_p2p::actor::HolochainP2pRefToDna;
-use holochain_p2p::event::HolochainP2pEvent;
-use holochain_p2p::DnaHashExt;
-use holochain_p2p::HolochainP2pDnaT;
-use holochain_sqlite::sql::sql_cell::state_dump;
-use holochain_state::host_fn_workspace::SourceChainWorkspace;
-use holochain_state::nonce::witness_nonce;
-use holochain_state::nonce::WitnessNonceResult;
-use holochain_state::prelude::*;
-use holochain_state::source_chain;
-use holochain_wasmer_host::module::ModuleCache;
-use holochain_zome_types::prelude::ClonedCell;
-use itertools::Itertools;
-use kitsune_p2p::agent_store::AgentInfoSigned;
-use parking_lot::RwLock;
-use rusqlite::Transaction;
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
-use std::time::Instant;
-use tokio::sync::mpsc::error::SendError;
-use tokio::task::JoinHandle;
-use tracing::*;
-
-#[cfg(any(test, feature = "test_utils"))]
-use crate::core::queue_consumer::QueueTriggers;
-
-pub use holochain_types::share;
 
 mod builder;
 
 mod chc;
-
-pub use holochain_conductor_services::*;
 
 mod graft_records_onto_source_chain;
 
@@ -764,6 +766,11 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
+    use std::time::Duration;
+
+    use futures::future::join_all;
+    use rusqlite::params;
+
     use holochain_conductor_api::{DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo};
     use holochain_p2p::HolochainP2pSender;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
@@ -771,8 +778,6 @@ mod network_impls {
     use holochain_zome_types::block::BlockTargetId;
     use kitsune_p2p::KitsuneAgent;
     use kitsune_p2p::KitsuneBinType;
-    use rusqlite::params;
-    use std::time::Duration;
 
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
@@ -1026,19 +1031,31 @@ mod network_impls {
             dna_hash: &DnaHash,
             used_by: &Vec<InstalledAppId>,
         ) -> ConductorResult<StorageBlob> {
-            let authored_db = self.spaces.authored_db(dna_hash)?;
+            let authored_dbs = self.spaces.get_all_authored_dbs(dna_hash)?;
             let dht_db = self.spaces.dht_db(dna_hash)?;
             let cache_db = self.spaces.cache(dna_hash)?;
 
             Ok(StorageBlob::Dna(DnaStorageInfo {
-                authored_data_size_on_disk: authored_db
-                    .read_async(get_size_on_disk)
-                    .map_err(ConductorError::DatabaseError)
-                    .await?,
-                authored_data_size: authored_db
-                    .read_async(get_used_size)
-                    .map_err(ConductorError::DatabaseError)
-                    .await?,
+                authored_data_size_on_disk: join_all(
+                    authored_dbs
+                        .iter()
+                        .map(|db| db.read_async(get_size_on_disk)),
+                )
+                .await
+                .into_iter()
+                .map(|r| r.map_err(ConductorError::DatabaseError))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .sum(),
+                authored_data_size: join_all(
+                    authored_dbs.iter().map(|db| db.read_async(get_used_size)),
+                )
+                .await
+                .into_iter()
+                .map(|r| r.map_err(ConductorError::DatabaseError))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .sum(),
                 dht_data_size_on_disk: dht_db
                     .read_async(get_size_on_disk)
                     .map_err(ConductorError::DatabaseError)
@@ -1833,8 +1850,9 @@ mod clone_cell_impls {
 
 /// Methods related to management of app and cell status
 mod app_status_impls {
-    use super::*;
     use holochain_p2p::AgentPubKeyExt;
+
+    use super::*;
 
     impl Conductor {
         /// Adjust which cells are present in the Conductor (adding and removing as
@@ -1991,7 +2009,7 @@ mod app_status_impls {
                             maybe_initial_arc,
                         ),
                     )
-                    .await;
+                        .await;
 
                     match res {
                         Ok(r) => {
@@ -2001,7 +2019,7 @@ mod app_status_impls {
                                         node: sleuth_id,
                                         agent: cell_id.agent_pubkey().clone()
                                     });
-                                },
+                                }
                                 Err(e) => {
                                     tracing::error!(
                                         "Network join failed for {cell_id}. This should never happen. Error: {e:?}"
@@ -2017,7 +2035,7 @@ mod app_status_impls {
                     }
                 }
             }))
-            .await;
+                .await;
 
             // Add the newly created cells to the Conductor
             self.add_and_initialize_cells(new_cells);
@@ -2252,13 +2270,23 @@ mod scheduler_impls {
         /// Calling this will:
         /// - Delete/unschedule all ephemeral scheduled functions GLOBALLY
         /// - Add an interval that runs IN ADDITION to previous invocations
-        /// So ideally this would be called ONCE per conductor lifecyle ONLY.
-        pub(crate) async fn start_scheduler(self: Arc<Self>, interval_period: std::time::Duration) {
+        /// So ideally this would be called ONCE per conductor lifecycle ONLY.
+        pub(crate) async fn start_scheduler(
+            self: Arc<Self>,
+            interval_period: std::time::Duration,
+        ) -> StateMutationResult<()> {
             // Clear all ephemeral cruft in all cells before starting a scheduler.
-            let tasks = self.spaces.get_from_spaces(|space| {
-                let db = space.authored_db.clone();
-                async move { db.write_async(delete_all_ephemeral_scheduled_fns).await }
-            });
+            let tasks = self
+                .spaces
+                .get_from_spaces(|space| {
+                    let all_dbs = space.get_all_authored_dbs();
+
+                    all_dbs.into_iter().map(|db| async move {
+                        db.write_async(delete_all_ephemeral_scheduled_fns).await
+                    })
+                })
+                .into_iter()
+                .flatten();
 
             futures::future::join_all(tasks).await;
 
@@ -2273,6 +2301,8 @@ mod scheduler_impls {
                         .await;
                 }
             }));
+
+            Ok(())
         }
 
         /// The scheduler wants to dispatch any functions that are due.
@@ -2316,7 +2346,10 @@ mod misc_impls {
             cell.check_or_run_zome_init().await?;
 
             let source_chain = SourceChain::new(
-                self.get_or_create_authored_db(cell_id.dna_hash())?,
+                self.get_or_create_authored_db(
+                    cell_id.dna_hash(),
+                    cell.id().agent_pubkey().clone(),
+                )?,
                 self.get_or_create_dht_db(cell_id.dna_hash())?,
                 self.get_or_create_space(cell_id.dna_hash())?
                     .dht_query_cache,
@@ -2349,7 +2382,7 @@ mod misc_impls {
         /// Create a JSON dump of the cell's state
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
             let cell = self.cell_by_id(cell_id).await?;
-            let authored_db = cell.authored_db();
+            let authored_db = cell.get_or_create_authored_db()?;
             let dht_db = cell.dht_db();
             let space = cell_id.dna_hash();
             let p2p_agents_db = self.p2p_agents_db(space);
@@ -2422,7 +2455,8 @@ mod misc_impls {
             cell_id: &CellId,
             dht_ops_cursor: Option<u64>,
         ) -> ConductorApiResult<FullStateDump> {
-            let authored_db = self.get_or_create_authored_db(cell_id.dna_hash())?;
+            let authored_db =
+                self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
             let dht_db = self.get_or_create_dht_db(cell_id.dna_hash())?;
             let dna_hash = cell_id.dna_hash();
             let p2p_agents_db = self.spaces.p2p_agents_db(dna_hash)?;
@@ -2575,8 +2609,9 @@ mod accessor_impls {
         pub(crate) fn get_or_create_authored_db(
             &self,
             dna_hash: &DnaHash,
+            author: AgentPubKey,
         ) -> DatabaseResult<DbWrite<DbKindAuthored>> {
-            self.spaces.authored_db(dna_hash)
+            self.spaces.get_or_create_authored_db(dna_hash, author)
         }
 
         pub(crate) fn get_or_create_dht_db(
@@ -2760,14 +2795,23 @@ impl Conductor {
         // For any unrepresented DNAs, clean up those DNA-specific databases
         for dna_hash in dnas_to_cleanup {
             futures::future::join_all(
-                [
-                    self.spaces
-                        .authored_db(dna_hash)
-                        .unwrap()
-                        .write_async(|txn| {
-                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
+                self.spaces
+                    .get_all_authored_dbs(dna_hash)
+                    .unwrap()
+                    .iter()
+                    .map(|db| {
+                        db.write_async(|txn| -> DatabaseResult<usize> {
+                            Ok(txn.execute("DELETE FROM Action", ())?)
                         })
-                        .boxed(),
+                        .boxed()
+                    }),
+            )
+            .await
+            .into_iter()
+            .collect::<Result<Vec<usize>, _>>()?;
+
+            futures::future::join_all(
+                [
                     self.spaces
                         .dht_db(dna_hash)
                         .unwrap()
@@ -3042,13 +3086,6 @@ mod test_utils_impls {
             })
         }
 
-        pub fn get_authored_db(
-            &self,
-            dna_hash: &DnaHash,
-        ) -> ConductorApiResult<DbWrite<DbKindAuthored>> {
-            Ok(self.get_or_create_authored_db(dna_hash)?)
-        }
-
         pub fn get_dht_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>> {
             Ok(self.get_or_create_dht_db(dna_hash)?)
         }
@@ -3106,7 +3143,8 @@ pub(crate) async fn genesis_cells(
                 .get_or_create_space(cell_id_inner.dna_hash())
                 .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))?;
 
-            let authored_db = space.authored_db;
+            let authored_db =
+                space.get_or_create_authored_db(cell_id_inner.agent_pubkey().clone())?;
             let dht_db = space.dht_db;
             let dht_db_cache = space.dht_query_cache;
             let chc = conductor.get_chc(&cell_id_inner);

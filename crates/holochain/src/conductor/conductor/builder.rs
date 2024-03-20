@@ -338,8 +338,8 @@ impl ConductorBuilder {
     ) -> ConductorResult<ConductorHandle> {
         conductor
             .clone()
-            .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL)
-            .await;
+            .start_scheduler(SCHEDULER_INTERVAL)
+            .await?;
 
         info!("Conductor startup: scheduler task started.");
 

@@ -32,7 +32,7 @@ pub(crate) const MM: i64 = 1_000_000;
 ///
 /// If there is a breaking change at any level of the wire protocol, including
 /// changes to serialization, this version should be incremented.
-pub const KITSUNE_PROTOCOL_VERSION: u32 = 0;
+pub const KITSUNE_PROTOCOL_VERSION: u16 = 0;
 
 /// A microsecond-precision UTC timestamp for use in Holochain's actions.
 ///
