@@ -214,9 +214,7 @@ pub struct LaunchInfo {
 
 impl LaunchInfo {
     pub(crate) fn from_admin_port(admin_port: u16) -> Self {
-        LaunchInfo {
-            admin_port,
-        }
+        LaunchInfo { admin_port }
     }
 }
 

@@ -1,7 +1,9 @@
 use assert_cmd::prelude::*;
 use holochain_cli_sandbox::cli::LaunchInfo;
-use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest};
 use holochain_conductor_api::AppResponse;
+use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest};
+use holochain_types::prelude::{SerializedBytes, SerializedBytesError};
+use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketSender,
 };
@@ -15,8 +17,6 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdout, Command};
 use which::which;
-use holochain_types::prelude::{SerializedBytes, SerializedBytesError};
-use holochain_types::websocket::AllowedOrigins;
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -76,16 +76,21 @@ async fn new_websocket_client_for_port(
 }
 
 async fn add_app_port(launch_info: LaunchInfo) -> u16 {
-    let (admin_s, admin_r) = new_websocket_client_for_port(launch_info.admin_port).await.unwrap();
-    let attached: AdminResponse = exchange(admin_s, admin_r, AdminRequest::AttachAppInterface {
-        installed_app_id: "dummy".into(),
-        port: None,
-        allowed_origins: AllowedOrigins::Any,
-    }).await;
+    let (admin_s, admin_r) = new_websocket_client_for_port(launch_info.admin_port)
+        .await
+        .unwrap();
+    let attached: AdminResponse = exchange(
+        admin_s,
+        admin_r,
+        AdminRequest::AttachAppInterface {
+            installed_app_id: "dummy".into(),
+            port: None,
+            allowed_origins: AllowedOrigins::Any,
+        },
+    )
+    .await;
     match attached {
-        AdminResponse::AppInterfaceAttached { port } => {
-            port
-        }
+        AdminResponse::AppInterfaceAttached { port } => port,
         _ => {
             panic!("Failed to attach app interface");
         }
@@ -103,11 +108,16 @@ async fn get_app_info(port: u16) {
     assert_matches!(r, AppResponse::AppInfo(None));
 }
 
-async fn exchange<Req, Res>(sender: WebsocketSender, mut receiver: WebsocketReceiver, req: Req) -> Res
-where Req: std::fmt::Debug,
-      SerializedBytes: TryFrom<Req, Error = SerializedBytesError>,
-      Res: serde::de::DeserializeOwned + std::fmt::Debug,
-      SerializedBytes: TryInto<Res, Error = SerializedBytesError>,
+async fn exchange<Req, Res>(
+    sender: WebsocketSender,
+    mut receiver: WebsocketReceiver,
+    req: Req,
+) -> Res
+where
+    Req: std::fmt::Debug,
+    SerializedBytes: TryFrom<Req, Error = SerializedBytesError>,
+    Res: serde::de::DeserializeOwned + std::fmt::Debug,
+    SerializedBytes: TryInto<Res, Error = SerializedBytesError>,
 {
     struct D(tokio::task::JoinHandle<()>);
     impl Drop for D {
