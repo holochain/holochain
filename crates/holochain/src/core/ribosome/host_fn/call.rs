@@ -320,7 +320,7 @@ pub mod wasm_test {
         // Check alice's source chain contains the new value
         let has_hash: bool = handle
             .get_spaces()
-            .authored_db(alice.dna_hash())
+            .get_or_create_authored_db(alice.dna_hash(), alice.agent_pubkey().clone())
             .unwrap()
             .read_async(move |txn| -> DatabaseResult<bool> {
                 Ok(txn.query_row(

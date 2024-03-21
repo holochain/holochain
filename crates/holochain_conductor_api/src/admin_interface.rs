@@ -1,5 +1,6 @@
 use holo_hash::*;
 use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
@@ -164,6 +165,9 @@ pub enum AdminRequest {
     /// Optionally a `port` parameter can be passed to this request. If it is `None`,
     /// a free port is chosen by the conductor.
     ///
+    /// An `allowed_origins` parameter to control which origins are allowed to connect
+    /// to the app interface.
+    ///
     /// [`AppRequest`]: super::AppRequest
     AttachAppInterface {
         /// The application that this app websocket is bound to.
@@ -175,6 +179,16 @@ pub enum AdminRequest {
 
         /// Optional port number
         port: Option<u16>,
+
+        /// Allowed origins for this app interface.
+        ///
+        /// This should be one of:
+        /// - A comma separated list of origins - `http://localhost:3000,http://localhost:3001`,
+        /// - A single origin - `http://localhost:3000`,
+        /// - Any origin - `*`
+        ///
+        /// Connections from any origin which is not permitted by this config will be rejected.
+        allowed_origins: AllowedOrigins,
     },
 
     /// List all the app interfaces currently attached with [`AttachAppInterface`].

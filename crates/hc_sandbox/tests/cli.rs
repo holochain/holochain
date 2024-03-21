@@ -2,7 +2,9 @@ use assert_cmd::prelude::*;
 use holochain_cli_sandbox::cli::LaunchInfo;
 use holochain_conductor_api::AppRequest;
 use holochain_conductor_api::AppResponse;
-use holochain_websocket::{self as ws, WebsocketConfig, WebsocketReceiver, WebsocketSender};
+use holochain_websocket::{
+    self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketSender,
+};
 use matches::assert_matches;
 use once_cell::sync::Lazy;
 use std::future::Future;
@@ -65,8 +67,8 @@ async fn new_websocket_client_for_port(
     port: u16,
 ) -> anyhow::Result<(WebsocketSender, WebsocketReceiver)> {
     Ok(ws::connect(
-        Arc::new(WebsocketConfig::default()),
-        ([127, 0, 0, 1], port).into(),
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port).into()),
     )
     .await?)
 }
