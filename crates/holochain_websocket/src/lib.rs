@@ -761,7 +761,10 @@ impl Callback for ConnectCallback {
                 }
             }
             None => {
-                tracing::warn!("Rejecting websocket connection request with missing `Origin` header: {:?}", request);
+                tracing::warn!(
+                    "Rejecting websocket connection request with missing `Origin` header: {:?}",
+                    request
+                );
                 let mut err_response =
                     ErrorResponse::new(Some("Missing `Origin` header".to_string()));
                 *err_response.status_mut() = StatusCode::BAD_REQUEST;
