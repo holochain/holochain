@@ -444,9 +444,7 @@ fn app_request_serialization() {
     let serialized_request = holochain_serialized_bytes::encode(&request).unwrap();
     assert_eq!(
         serialized_request,
-        vec![
-            129, 164, 116, 121, 112, 101, 129, 168, 97, 112, 112, 95, 105, 110, 102, 111, 192
-        ]
+        vec![129, 164, 116, 121, 112, 101, 129, 168, 97, 112, 112, 95, 105, 110, 102, 111, 192]
     );
 
     let json_expected = r#"{"type":{"app_info":null}}"#;

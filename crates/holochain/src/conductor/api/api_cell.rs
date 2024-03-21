@@ -232,7 +232,11 @@ pub trait CellConductorReadHandleT: Send + Sync {
     ) -> ConductorResult<ClonedCell>;
 
     /// Expose disable_clone_cell functionality to zomes.
-    async fn disable_clone_cell(&self, installed_app_id: InstalledAppId, payload: DisableCloneCellPayload) -> ConductorResult<()>;
+    async fn disable_clone_cell(
+        &self,
+        installed_app_id: InstalledAppId,
+        payload: DisableCloneCellPayload,
+    ) -> ConductorResult<()>;
 
     /// Expose enable_clone_cell functionality to zomes.
     async fn enable_clone_cell(
@@ -327,7 +331,11 @@ impl CellConductorReadHandleT for CellConductorApi {
             .await
     }
 
-    async fn disable_clone_cell(&self, installed_app_id: InstalledAppId, payload: DisableCloneCellPayload) -> ConductorResult<()> {
+    async fn disable_clone_cell(
+        &self,
+        installed_app_id: InstalledAppId,
+        payload: DisableCloneCellPayload,
+    ) -> ConductorResult<()> {
         self.conductor_handle
             .clone()
             .disable_clone_cell(installed_app_id, &payload)

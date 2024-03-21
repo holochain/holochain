@@ -49,7 +49,10 @@ pub struct RealAppInterfaceApi {
 impl RealAppInterfaceApi {
     /// Create a new instance from a shared Conductor reference
     pub fn new(conductor_handle: ConductorHandle, installed_app_id: InstalledAppId) -> Self {
-        Self { conductor_handle, installed_app_id }
+        Self {
+            conductor_handle,
+            installed_app_id,
+        }
     }
 }
 

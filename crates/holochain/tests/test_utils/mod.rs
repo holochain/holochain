@@ -160,8 +160,14 @@ pub async fn call_zome_fn<S>(
     assert_matches!(call_response, AppResponse::ZomeCalled(_));
 }
 
-pub async fn attach_app_interface(client: &mut WebsocketSender, installed_app_id: InstalledAppId, port: Option<u16>) -> u16 {
-    let request = AdminRequest::AttachAppInterface { installed_app_id, port,
+pub async fn attach_app_interface(
+    client: &mut WebsocketSender,
+    installed_app_id: InstalledAppId,
+    port: Option<u16>,
+) -> u16 {
+    let request = AdminRequest::AttachAppInterface {
+        installed_app_id,
+        port,
         allowed_origins: AllowedOrigins::Any,
     };
     let response = client.request(request);

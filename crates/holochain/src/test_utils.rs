@@ -361,7 +361,13 @@ pub async fn setup_app_in_new_conductor(
         .await
         .unwrap();
 
-    install_app_in_conductor(conductor_handle.clone(), installed_app_id.clone(), agent, &dnas).await;
+    install_app_in_conductor(
+        conductor_handle.clone(),
+        installed_app_id.clone(),
+        agent,
+        &dnas,
+    )
+    .await;
 
     let handle = conductor_handle.clone();
 
@@ -409,7 +415,11 @@ pub async fn install_app_in_conductor(
 pub async fn setup_app_with_names(
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
-) -> (TempDir, ConductorHandle, HashMap<InstalledAppId, RealAppInterfaceApi>) {
+) -> (
+    TempDir,
+    ConductorHandle,
+    HashMap<InstalledAppId, RealAppInterfaceApi>,
+) {
     let dir = test_db_dir();
     let (handle, interfaces) =
         setup_app_inner(dir.path().to_path_buf().into(), agent, apps_data, None).await;
@@ -422,7 +432,11 @@ pub async fn setup_app_with_network(
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
     network: KitsuneP2pConfig,
-) -> (TempDir, ConductorHandle, HashMap<InstalledAppId, RealAppInterfaceApi>) {
+) -> (
+    TempDir,
+    ConductorHandle,
+    HashMap<InstalledAppId, RealAppInterfaceApi>,
+) {
     let dir = test_db_dir();
     let (handle, interfaces) = setup_app_inner(
         dir.path().to_path_buf().into(),
@@ -440,7 +454,10 @@ pub async fn setup_app_inner(
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
     network: Option<KitsuneP2pConfig>,
-) -> (ConductorHandle, HashMap<InstalledAppId, RealAppInterfaceApi>) {
+) -> (
+    ConductorHandle,
+    HashMap<InstalledAppId, RealAppInterfaceApi>,
+) {
     let config = ConductorConfig {
         data_root_path: Some(data_root_path.clone()),
         admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -468,7 +485,10 @@ pub async fn setup_app_inner(
         )
         .await;
 
-        app_interfaces.insert(app_name.to_string(), RealAppInterfaceApi::new(conductor_handle.clone(), app_name.to_string()));
+        app_interfaces.insert(
+            app_name.to_string(),
+            RealAppInterfaceApi::new(conductor_handle.clone(), app_name.to_string()),
+        );
     }
 
     (conductor_handle, app_interfaces)

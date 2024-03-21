@@ -23,7 +23,10 @@ async fn send_signal_after_conductor_restart() {
     )
     .await;
     let installed_app_id = "app_id".to_string();
-    let app = conductor.setup_app(&installed_app_id, &[dna_file]).await.unwrap();
+    let app = conductor
+        .setup_app(&installed_app_id, &[dna_file])
+        .await
+        .unwrap();
     let alice = app.agent();
     let alice_cell_id = app.cells()[0].cell_id().to_owned();
 

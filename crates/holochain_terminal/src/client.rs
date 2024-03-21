@@ -1,6 +1,9 @@
 use anyhow::anyhow;
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_conductor_api::{AdminRequest, AdminResponse, AppInfo, AppInterfaceInfo, AppRequest, AppResponse, CellInfo, NetworkInfo};
+use holochain_conductor_api::{
+    AdminRequest, AdminResponse, AppInfo, AppInterfaceInfo, AppRequest, AppResponse, CellInfo,
+    NetworkInfo,
+};
 use holochain_types::prelude::{InstalledAppId, NetworkInfoRequestPayload};
 use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketSender};
 use std::sync::Arc;
@@ -114,12 +117,18 @@ impl AdminClient {
         Ok(AdminClient { tx, rx, addr })
     }
 
-    pub async fn connect_app_client(&mut self, installed_app_id: InstalledAppId) -> anyhow::Result<AppClient> {
-        let app_port = match self.list_app_interfaces().await?.into_iter().find(|i| i.installed_app_id == installed_app_id) {
+    pub async fn connect_app_client(
+        &mut self,
+        installed_app_id: InstalledAppId,
+    ) -> anyhow::Result<AppClient> {
+        let app_port = match self
+            .list_app_interfaces()
+            .await?
+            .into_iter()
+            .find(|i| i.installed_app_id == installed_app_id)
+        {
             Some(i) => i.port,
-            None => {
-                self.attach_app_interface(installed_app_id, 0).await?
-            }
+            None => self.attach_app_interface(installed_app_id, 0).await?,
         };
 
         let app_addr = (self.addr.ip(), app_port).into();
@@ -136,7 +145,11 @@ impl AdminClient {
         }
     }
 
-    async fn attach_app_interface(&mut self, installed_app_id: InstalledAppId, port: u16) -> anyhow::Result<u16> {
+    async fn attach_app_interface(
+        &mut self,
+        installed_app_id: InstalledAppId,
+        port: u16,
+    ) -> anyhow::Result<u16> {
         let msg = AdminRequest::AttachAppInterface {
             installed_app_id,
             port: Some(port),

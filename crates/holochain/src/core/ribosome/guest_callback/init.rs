@@ -316,12 +316,16 @@ mod slow_tests {
         let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
 
         let cloned = conductor
-            .create_clone_cell(app.installed_app_id().clone(), CreateCloneCellPayload {
-                role_name: dna_file.dna_hash().to_string().clone(),
-                modifiers: DnaModifiersOpt::none().with_network_seed("anything else".to_string()),
-                membrane_proof: None,
-                name: Some("cloned".to_string()),
-            })
+            .create_clone_cell(
+                app.installed_app_id().clone(),
+                CreateCloneCellPayload {
+                    role_name: dna_file.dna_hash().to_string().clone(),
+                    modifiers: DnaModifiersOpt::none()
+                        .with_network_seed("anything else".to_string()),
+                    membrane_proof: None,
+                    name: Some("cloned".to_string()),
+                },
+            )
             .await
             .unwrap();
 
@@ -344,7 +348,10 @@ mod slow_tests {
         tokio::spawn({
             let installed_app_id = app.installed_app_id().clone();
             async move {
-                conductor_handle.enable_clone_cell(installed_app_id, &payload).await.unwrap();
+                conductor_handle
+                    .enable_clone_cell(installed_app_id, &payload)
+                    .await
+                    .unwrap();
             }
         });
 

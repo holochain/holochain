@@ -31,12 +31,15 @@ async fn app_info_returns_all_cells_with_info() {
     // create 1 clone cell for role 1 = clone cell 1
     let clone_cell_1 = conductor
         .clone()
-        .create_clone_cell(app_id.clone(), CreateCloneCellPayload {
-            role_name: role_name_1.clone(),
-            modifiers: DnaModifiersOpt::none().with_network_seed("seed numero uno".to_string()),
-            membrane_proof: None,
-            name: None,
-        })
+        .create_clone_cell(
+            app_id.clone(),
+            CreateCloneCellPayload {
+                role_name: role_name_1.clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("seed numero uno".to_string()),
+                membrane_proof: None,
+                name: None,
+            },
+        )
         .await
         .unwrap();
     assert_eq!(clone_cell_1.original_dna_hash, dna_1.dna_hash().clone());
@@ -44,21 +47,27 @@ async fn app_info_returns_all_cells_with_info() {
     // create 1 clone cell for role 2 = clone cell 2
     let clone_cell_2 = conductor
         .clone()
-        .create_clone_cell(app_id.clone(), CreateCloneCellPayload {
-            role_name: role_name_2.clone(),
-            modifiers: DnaModifiersOpt::none().with_network_seed("seed numero dos".to_string()),
-            membrane_proof: None,
-            name: None,
-        })
+        .create_clone_cell(
+            app_id.clone(),
+            CreateCloneCellPayload {
+                role_name: role_name_2.clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("seed numero dos".to_string()),
+                membrane_proof: None,
+                name: None,
+            },
+        )
         .await
         .unwrap();
     assert_eq!(clone_cell_2.original_dna_hash, dna_2.dna_hash().clone());
 
     // disable clone cell 2
     conductor
-        .disable_clone_cell(app_id.clone(), &DisableCloneCellPayload {
-            clone_cell_id: CloneCellId::CellId(clone_cell_2.cell_id.clone()),
-        })
+        .disable_clone_cell(
+            app_id.clone(),
+            &DisableCloneCellPayload {
+                clone_cell_id: CloneCellId::CellId(clone_cell_2.cell_id.clone()),
+            },
+        )
         .await
         .unwrap();
 
@@ -113,9 +122,12 @@ async fn app_info_returns_all_cells_with_info() {
     // tests that the enable_clone_cell fn returns the right DNA hash
     let reenabled_clone_cell = conductor
         .clone()
-        .enable_clone_cell(app_id.clone(), &EnableCloneCellPayload {
-            clone_cell_id: CloneCellId::CellId(clone_cell_2.cell_id.clone()),
-        })
+        .enable_clone_cell(
+            app_id.clone(),
+            &EnableCloneCellPayload {
+                clone_cell_id: CloneCellId::CellId(clone_cell_2.cell_id.clone()),
+            },
+        )
         .await
         .unwrap();
     assert_eq!(

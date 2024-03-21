@@ -44,7 +44,7 @@ fn main() -> anyhow::Result<()> {
                     Some(app_id) => {
                         let app_client = admin_client.connect_app_client(app_id.clone()).await?;
                         Some(app_client)
-                    },
+                    }
                     None => None,
                 };
 

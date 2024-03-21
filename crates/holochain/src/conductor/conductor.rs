@@ -393,8 +393,8 @@ mod startup_shutdown_impls {
 
 /// Methods related to conductor interfaces
 mod interface_impls {
-    use holochain_conductor_api::AppInterfaceInfo;
     use super::*;
+    use holochain_conductor_api::AppInterfaceInfo;
     use holochain_types::websocket::AllowedOrigins;
 
     impl Conductor {
@@ -463,7 +463,10 @@ mod interface_impls {
             port: u16,
             allowed_origins: AllowedOrigins,
         ) -> ConductorResult<u16> {
-            debug!("Attaching interface for app {} on port: {}", installed_app_id, port);
+            debug!(
+                "Attaching interface for app {} on port: {}",
+                installed_app_id, port
+            );
 
             let app_api = RealAppInterfaceApi::new(self.clone(), installed_app_id.clone());
             // This receiver is thrown away because we can produce infinite new
@@ -507,7 +510,10 @@ mod interface_impls {
             })
             .await?;
 
-            debug!("App interface for app {} added at port: {}", installed_app_id, port);
+            debug!(
+                "App interface for app {} added at port: {}",
+                installed_app_id, port
+            );
 
             Ok(port)
         }
@@ -1716,9 +1722,7 @@ mod clone_cell_impls {
         pub(crate) async fn disable_clone_cell(
             &self,
             installed_app_id: InstalledAppId,
-            DisableCloneCellPayload {
-                clone_cell_id,
-            }: &DisableCloneCellPayload,
+            DisableCloneCellPayload { clone_cell_id }: &DisableCloneCellPayload,
         ) -> ConductorResult<()> {
             let (_, removed_cell_id) = self
                 .update_state_prime({
@@ -2899,9 +2903,14 @@ mod test_utils_impls {
             let (signal_tx, _r) = tokio::sync::broadcast::channel(1000);
             self.app_interfaces.share_mut(|app_interfaces| {
                 if app_interfaces.contains_key(installed_app_id) {
-                    return Err(ConductorError::AppInterfaceIdCollision(installed_app_id.clone()));
+                    return Err(ConductorError::AppInterfaceIdCollision(
+                        installed_app_id.clone(),
+                    ));
                 }
-                let _ = app_interfaces.insert(installed_app_id.clone(), AppInterfaceRuntime::Test { signal_tx });
+                let _ = app_interfaces.insert(
+                    installed_app_id.clone(),
+                    AppInterfaceRuntime::Test { signal_tx },
+                );
                 Ok(())
             })
         }

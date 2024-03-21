@@ -493,7 +493,10 @@ impl SweetConductor {
         installed_app_id: InstalledAppId,
         payload: CreateCloneCellPayload,
     ) -> ConductorApiResult<ClonedCell> {
-        let clone = self.raw_handle().create_clone_cell(installed_app_id, payload).await?;
+        let clone = self
+            .raw_handle()
+            .create_clone_cell(installed_app_id, payload)
+            .await?;
         let dna_file = self.get_dna_file(clone.cell_id.dna_hash()).unwrap();
         self.dnas.push(dna_file);
         Ok(clone)
@@ -522,7 +525,10 @@ impl SweetConductor {
 
     /// Create a new app interface and get a websocket client which can send requests
     /// to it.
-    pub async fn app_ws_client(&self, installed_app_id: InstalledAppId) -> (WebsocketSender, WebsocketReceiver) {
+    pub async fn app_ws_client(
+        &self,
+        installed_app_id: InstalledAppId,
+    ) -> (WebsocketSender, WebsocketReceiver) {
         let port = self
             .raw_handle()
             .add_app_interface(installed_app_id, 0, AllowedOrigins::Any)

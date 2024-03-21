@@ -43,14 +43,13 @@ pub fn render_network_info_widget<B: Backend>(
     };
 
     if NETWORK_INFO_PARAMS.read().unwrap().is_none() {
-        *NETWORK_INFO_PARAMS.write().unwrap() =
-            match get_network_info_params(app_client.clone()) {
-                Ok(p) => Some(p),
-                Err(e) => {
-                    show_message(format!("{:?}", e).as_str(), frame, rect);
-                    return;
-                }
-            };
+        *NETWORK_INFO_PARAMS.write().unwrap() = match get_network_info_params(app_client.clone()) {
+            Ok(p) => Some(p),
+            Err(e) => {
+                show_message(format!("{:?}", e).as_str(), frame, rect);
+                return;
+            }
+        };
     }
 
     let network_infos = match get_network_info(app_client) {
@@ -151,13 +150,7 @@ fn get_network_info_params(
     app_client: Arc<Mutex<AppClient>>,
 ) -> anyhow::Result<(AgentPubKey, Vec<(String, DnaHash)>)> {
     match block_on(
-        async {
-            app_client
-                .lock()
-                .await
-                .discover_network_info_params()
-                .await
-        },
+        async { app_client.lock().await.discover_network_info_params().await },
         Duration::from_secs(10),
     ) {
         Ok(Ok(p)) => Ok(p),

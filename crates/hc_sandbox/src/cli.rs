@@ -235,14 +235,7 @@ pub async fn run_n(
                          index: usize,
                          force_admin_port,
                          structured| async move {
-        crate::run::run(
-            &holochain_path,
-            path,
-            index,
-            force_admin_port,
-            structured,
-        )
-        .await?;
+        crate::run::run(&holochain_path, path, index, force_admin_port, structured).await?;
         Result::<_, anyhow::Error>::Ok(())
     };
     let mut force_admin_ports = force_admin_ports.into_iter();
