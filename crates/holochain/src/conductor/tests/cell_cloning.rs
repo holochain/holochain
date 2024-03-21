@@ -13,8 +13,7 @@ async fn create_clone_cell_without_modifiers_fails() {
     let conductor = SweetConductor::from_standard_config().await;
     let result = conductor
         .clone()
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: "".to_string(),
+        .create_clone_cell("".to_string(), CreateCloneCellPayload {
             role_name: "".to_string(),
             modifiers: DnaModifiersOpt::none(),
             membrane_proof: None,
@@ -37,8 +36,7 @@ async fn create_clone_cell_with_wrong_app_or_role_name_fails() {
 
     let result = conductor
         .clone()
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: "wrong_app_id".to_string(),
+        .create_clone_cell("wrong_app_id".to_string(), CreateCloneCellPayload {
             role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
             membrane_proof: None,
@@ -49,8 +47,7 @@ async fn create_clone_cell_with_wrong_app_or_role_name_fails() {
 
     let result = conductor
         .clone()
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
+        .create_clone_cell(app.installed_app_id().clone(), CreateCloneCellPayload {
             role_name: "wrong_role_name".to_string(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
             membrane_proof: None,
@@ -74,8 +71,7 @@ async fn create_clone_cell_creates_callable_cell() {
     let clone_name = "test_name".to_string();
     let clone_cell = conductor
         .clone()
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
+        .create_clone_cell(app.installed_app_id().clone(), CreateCloneCellPayload {
             role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
             membrane_proof: None,
@@ -109,8 +105,7 @@ async fn create_clone_cell_run_twice_returns_correct_clones() {
 
     let clone_cell_0 = conductor
         .clone()
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
+        .create_clone_cell(app.installed_app_id().clone(), CreateCloneCellPayload {
             role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
             membrane_proof: None,
@@ -123,8 +118,7 @@ async fn create_clone_cell_run_twice_returns_correct_clones() {
 
     let clone_cell_1 = conductor
         .clone()
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
+        .create_clone_cell(app.installed_app_id().clone(), CreateCloneCellPayload {
             role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed_2".to_string()),
             membrane_proof: None,
@@ -153,8 +147,7 @@ async fn create_identical_clone_cell_twice_fails() {
         .into_inner();
     let alice_app = &apps[0];
     let bob_app = &apps[1];
-    let mut clone_cell_payload = CreateCloneCellPayload {
-        app_id: alice_app.installed_app_id().clone(),
+    let clone_cell_payload = CreateCloneCellPayload {
         role_name: role_name.clone(),
         modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
         membrane_proof: None,
@@ -163,13 +156,13 @@ async fn create_identical_clone_cell_twice_fails() {
 
     let alice_clone_cell = conductor
         .clone()
-        .create_clone_cell(clone_cell_payload.clone())
+        .create_clone_cell(alice_app.installed_app_id().clone(), clone_cell_payload.clone())
         .await
         .unwrap();
 
     let identical_clone_cell_err = conductor
         .clone()
-        .create_clone_cell(clone_cell_payload.clone())
+        .create_clone_cell(alice_app.installed_app_id().clone(), clone_cell_payload.clone())
         .await;
     matches!(
         identical_clone_cell_err,
@@ -179,15 +172,14 @@ async fn create_identical_clone_cell_twice_fails() {
     // disable clone cell and try again to create an identical clone
     conductor
         .clone()
-        .disable_clone_cell(&DisableCloneCellPayload {
-            app_id: alice_app.installed_app_id().clone(),
+        .disable_clone_cell(alice_app.installed_app_id().clone(), &DisableCloneCellPayload {
             clone_cell_id: CloneCellId::CellId(alice_clone_cell.cell_id.clone()),
         })
         .await
         .unwrap();
     let identical_clone_cell_err = conductor
         .clone()
-        .create_clone_cell(clone_cell_payload.clone())
+        .create_clone_cell(alice_app.installed_app_id().clone(), clone_cell_payload.clone())
         .await;
     matches!(
         identical_clone_cell_err,
@@ -195,10 +187,9 @@ async fn create_identical_clone_cell_twice_fails() {
     );
 
     // ensure that bob can clone cell with identical hash in same conductor
-    clone_cell_payload.app_id = bob_app.installed_app_id().clone();
     let bob_clone_cell = conductor
         .clone()
-        .create_clone_cell(clone_cell_payload)
+        .create_clone_cell(bob_app.installed_app_id().clone(), clone_cell_payload)
         .await
         .unwrap();
     assert_eq!(
@@ -224,8 +215,7 @@ async fn clone_cell_deletion() {
         .unwrap();
     let clone_cell = conductor
         .clone()
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app_id.to_string(),
+        .create_clone_cell(app_id.to_string(), CreateCloneCellPayload {
             role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
             membrane_proof: None,
@@ -238,8 +228,7 @@ async fn clone_cell_deletion() {
     // disable clone cell
     conductor
         .raw_handle()
-        .disable_clone_cell(&DisableCloneCellPayload {
-            app_id: app_id.to_string(),
+        .disable_clone_cell(app_id.to_string(), &DisableCloneCellPayload {
             clone_cell_id: clone_id.clone(),
         })
         .await
@@ -258,8 +247,7 @@ async fn clone_cell_deletion() {
     // enable the disabled clone cell by clone id
     let enabled_clone_cell = conductor
         .raw_handle()
-        .enable_clone_cell(&DisableCloneCellPayload {
-            app_id: app_id.into(),
+        .enable_clone_cell(app_id.into(), &DisableCloneCellPayload {
             clone_cell_id: clone_id.clone(),
         })
         .await
@@ -293,8 +281,7 @@ async fn clone_cell_deletion() {
     // disable clone cell again
     conductor
         .raw_handle()
-        .disable_clone_cell(&DisableCloneCellPayload {
-            app_id: app_id.to_string(),
+        .disable_clone_cell(app_id.to_string(), &DisableCloneCellPayload {
             clone_cell_id: clone_id.clone(),
         })
         .await
@@ -303,8 +290,7 @@ async fn clone_cell_deletion() {
     // enable clone cell by cell id
     let enabled_clone_cell = conductor
         .raw_handle()
-        .enable_clone_cell(&DisableCloneCellPayload {
-            app_id: app_id.into(),
+        .enable_clone_cell(app_id.into(), &DisableCloneCellPayload {
             clone_cell_id: CloneCellId::CellId(clone_cell.cell_id.clone()),
         })
         .await
@@ -316,8 +302,7 @@ async fn clone_cell_deletion() {
     // disable and delete clone cell
     conductor
         .raw_handle()
-        .disable_clone_cell(&DisableCloneCellPayload {
-            app_id: app_id.to_string(),
+        .disable_clone_cell(app_id.to_string(), &DisableCloneCellPayload {
             clone_cell_id: clone_id.clone(),
         })
         .await
@@ -333,8 +318,7 @@ async fn clone_cell_deletion() {
     // assert the deleted cell cannot be enabled
     let disable_result = conductor
         .raw_handle()
-        .enable_clone_cell(&DisableCloneCellPayload {
-            app_id: app_id.into(),
+        .enable_clone_cell(app_id.into(), &DisableCloneCellPayload {
             clone_cell_id: clone_id.clone(),
         })
         .await;
@@ -354,8 +338,7 @@ async fn conductor_can_startup_with_cloned_cell() {
 
     let clone_cell = conductor
         .clone()
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
+        .create_clone_cell(app.installed_app_id().clone(), CreateCloneCellPayload {
             role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
             membrane_proof: None,
@@ -389,8 +372,7 @@ async fn conductor_can_startup_with_cloned_cell() {
 
     conductor
         .clone()
-        .disable_clone_cell(&DisableCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
+        .disable_clone_cell(app.installed_app_id().clone(), &DisableCloneCellPayload {
             clone_cell_id: CloneCellId::CellId(clone_cell.cell_id.clone()),
         })
         .await

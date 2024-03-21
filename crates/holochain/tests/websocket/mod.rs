@@ -389,8 +389,9 @@ async fn emit_signals() {
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
 
     // Activate cells
+    let installed_app_id = "test".to_string();
     let request = AdminRequest::EnableApp {
-        installed_app_id: "test".to_string(),
+        installed_app_id: installed_app_id.clone(),
     };
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
@@ -414,7 +415,7 @@ async fn emit_signals() {
     .await;
 
     // Attach App Interface
-    let app_port = attach_app_interface(&mut admin_tx, None).await;
+    let app_port = attach_app_interface(&mut admin_tx, installed_app_id, None).await;
 
     ///////////////////////////////////////////////////////
     // Emit signals (the real test!)
@@ -877,7 +878,8 @@ async fn app_allowed_origins() {
     let port = conductor
         .clone()
         .add_app_interface(
-            either::Either::Left(0),
+            "dummy".into(),
+            0,
             "http://localhost:3000".to_string().into(),
         )
         .await
@@ -902,7 +904,8 @@ async fn app_allowed_origins_independence() {
     let port_1 = conductor
         .clone()
         .add_app_interface(
-            either::Either::Left(0),
+            "dummy".into(),
+            0,
             "http://localhost:3001".to_string().into(),
         )
         .await
@@ -911,7 +914,8 @@ async fn app_allowed_origins_independence() {
     let port_2 = conductor
         .clone()
         .add_app_interface(
-            either::Either::Left(0),
+            "dummy".into(),
+            0,
             "http://localhost:3002".to_string().into(),
         )
         .await

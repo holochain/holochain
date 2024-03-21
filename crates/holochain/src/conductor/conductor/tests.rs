@@ -647,8 +647,7 @@ async fn test_enable_disable_enable_clone_cell() {
         let role_name = cell.cell_id().dna_hash().to_string();
 
         let clone = conductor
-            .create_clone_cell(CreateCloneCellPayload {
-                app_id: app_id.clone(),
+            .create_clone_cell(app_id.clone(), CreateCloneCellPayload {
                 role_name: role_name.clone(),
                 modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
                 membrane_proof: None,
@@ -664,8 +663,7 @@ async fn test_enable_disable_enable_clone_cell() {
 
     let clone_cell_id = CloneCellId::CloneId(clone.clone_id);
     conductor
-        .disable_clone_cell(&DisableCloneCellPayload {
-            app_id: app_id.clone(),
+        .disable_clone_cell(app_id.clone(), &DisableCloneCellPayload {
             clone_cell_id: clone_cell_id.clone(),
         })
         .await
@@ -705,8 +703,7 @@ async fn test_enable_disable_enable_clone_cell() {
 
     conductor
         .raw_handle()
-        .enable_clone_cell(&EnableCloneCellPayload {
-            app_id: app_id.clone(),
+        .enable_clone_cell(app_id.clone(), &EnableCloneCellPayload {
             clone_cell_id,
         })
         .await
@@ -746,8 +743,7 @@ async fn name_has_no_effect_on_dna_hash() {
     let role_name3 = cell3.cell_id().dna_hash().to_string();
 
     let clone1 = conductor
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app_id1.clone(),
+        .create_clone_cell(app_id1.clone(), CreateCloneCellPayload {
             role_name: role_name1.clone(),
             modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
             membrane_proof: None,
@@ -757,8 +753,7 @@ async fn name_has_no_effect_on_dna_hash() {
         .unwrap();
 
     let clone2 = conductor
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app_id2.clone(),
+        .create_clone_cell(app_id2.clone(), CreateCloneCellPayload {
             role_name: role_name2.clone(),
             modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
             membrane_proof: None,
@@ -768,8 +763,7 @@ async fn name_has_no_effect_on_dna_hash() {
         .unwrap();
 
     let clone3 = conductor
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app_id3.clone(),
+        .create_clone_cell(app_id3.clone(), CreateCloneCellPayload {
             role_name: role_name3.clone(),
             modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
             membrane_proof: None,

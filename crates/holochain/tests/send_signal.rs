@@ -106,7 +106,7 @@ async fn send_signal_after_conductor_restart() {
     // add a second app interface without websocket connection
     let _ = (*conductor)
         .clone()
-        .add_app_interface(either::Either::Left(0), AllowedOrigins::Any)
+        .add_app_interface("dummy".into(), 0, AllowedOrigins::Any)
         .await
         .unwrap();
 
