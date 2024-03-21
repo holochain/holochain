@@ -99,7 +99,6 @@ async fn get_app_info(port: u16) {
         .unwrap_or_else(|_| panic!("Failed to connect to conductor on port [{}]", port));
 
     let request = AppRequest::AppInfo;
-    println!("Doing app info");
     let r: AppResponse = exchange(app_tx, rx, request).await;
     assert_matches!(r, AppResponse::AppInfo(None));
 }
@@ -118,7 +117,6 @@ where Req: std::fmt::Debug,
     }
     let _d = D(tokio::task::spawn(async move {
         while receiver.recv::<Res>().await.is_ok() {}
-        println!("Task finished");
     }));
     let response = sender.request(req);
     check_timeout(response).await
