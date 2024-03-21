@@ -255,7 +255,14 @@ impl ConductorBuilder {
 
         // Install DPKI from DNA
         if let Some(dna) = dpki_dna_to_install {
-            handle.clone().install_dpki(dna).await?;
+            let dna_hash = dna.dna_hash().clone();
+            match handle.clone().install_dpki(dna).await {
+                Ok(_) => tracing::info!("Installed DPKI from DNA {}", dna_hash),
+                Err(ConductorError::AppAlreadyInstalled(_)) => {
+                    tracing::debug!("DPKI already installed, skipping")
+                }
+                Err(e) => return Err(e),
+            }
         }
 
         {
