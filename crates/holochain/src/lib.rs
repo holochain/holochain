@@ -48,7 +48,7 @@ pub mod prelude {
     #[cfg(not(feature = "fuzzing"))]
     pub use holochain_types::prelude::{fixt, *};
     #[cfg(not(feature = "fuzzing"))]
-    pub use kitsune_p2p::*;
+    pub use kitsune_p2p::{KITSUNE_PROTOCOL_VERSION, *};
 
     #[cfg(feature = "fuzzing")]
     pub use holochain_types::prelude::{fixt, *};
