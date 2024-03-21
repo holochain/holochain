@@ -13,6 +13,7 @@ futures = { workspace = true }
 ghost_actor = "0.4.0-alpha.5"
 nanoid = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
+holochain_types = { version = "0.3.0-beta-dev.36", path = "../holochain_types" }
 net2 = "0.2"
 must_future = "0.1"
 serde = { workspace = true }

@@ -3631,6 +3631,7 @@ dependencies = [
  "ghost_actor 0.4.0-alpha.5",
  "holochain_serialized_bytes",
  "holochain_trace",
+ "holochain_types",
  "must_future",
  "nanoid 0.4.0",
  "net2",

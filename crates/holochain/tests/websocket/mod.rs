@@ -16,6 +16,7 @@ use holochain::{
     fixt::*,
 };
 
+use holochain_conductor_api::{AdminInterfaceConfig, AppRequest, InterfaceDriver};
 use holochain_types::{
     prelude::*,
     test_utils::{fake_dna_zomes, write_fake_dna_file},
@@ -482,12 +483,11 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    let (client, rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
-        Arc::new(WebsocketConfig {
-            default_request_timeout: std::time::Duration::from_secs(1),
-            ..Default::default()
-        }),
-        ([127, 0, 0, 1], port).into(),
+    let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
+    ws_config.default_request_timeout = Duration::from_secs(1);
+    let (client, rx): (WebsocketSender, WebsocketReceiver) = connect(
+        Arc::new(ws_config),
+        ConnectRequest::new(([127, 0, 0, 1], port).into()),
     )
     .await?;
     let _rx = PollRecv::new::<AdminResponse>(rx);
@@ -522,12 +522,11 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
+    let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
+    ws_config.default_request_timeout = Duration::from_secs(1);
     let (client, mut rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
-        Arc::new(WebsocketConfig {
-            default_request_timeout: std::time::Duration::from_secs(1),
-            ..Default::default()
-        }),
-        ([127, 0, 0, 1], port).into(),
+        Arc::new(ws_config),
+        ConnectRequest::new(([127, 0, 0, 1], port).into()),
     )
     .await?;
 
@@ -585,7 +584,7 @@ async fn connection_limit_is_respected() {
     let port = admin_port(&conductor_handle).await;
 
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
-    let cfg = Arc::new(WebsocketConfig::default());
+    let cfg = Arc::new(WebsocketConfig::CLIENT_DEFAULT);
 
     // Retain handles so that the test can control when to disconnect clients
     let mut handles = Vec::new();
@@ -790,4 +789,134 @@ async fn full_state_dump_cursor_works() {
         integrated_ops_count + validation_limbo_ops_count + integration_limbo_ops_count;
 
     assert_eq!(1, new_all_dht_ops_count);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn admin_allowed_origins() {
+    holochain_trace::test_run().ok();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let ports = conductor
+        .clone()
+        .add_admin_interfaces(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket {
+                port: 0,
+                allowed_origins: "http://localhost:3000".to_string().into(),
+            },
+        }])
+        .await
+        .unwrap();
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], *ports.first().unwrap()).into())
+    )
+    .await
+    .is_err());
+
+    let (client, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], *ports.first().unwrap()).into())
+            .try_set_header("origin", "http://localhost:3000")
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let _rx = PollRecv::new::<AdminResponse>(rx);
+
+    let request = AdminRequest::ListAppInterfaces;
+    let _: AdminResponse = client.request(request).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_allowed_origins() {
+    holochain_trace::test_run().ok();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let port = conductor
+        .clone()
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3000".to_string().into(),
+        )
+        .await
+        .unwrap();
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port).into())
+    )
+    .await
+    .is_err());
+
+    check_app_port(port, "http://localhost:3000").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_allowed_origins_independence() {
+    holochain_trace::test_run().ok();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let port_1 = conductor
+        .clone()
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3001".to_string().into(),
+        )
+        .await
+        .unwrap();
+
+    let port_2 = conductor
+        .clone()
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3002".to_string().into(),
+        )
+        .await
+        .unwrap();
+
+    // Check that access to another port's origin is blocked
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port_1).into())
+            .try_set_header("origin", "http://localhost:3002")
+            .unwrap()
+    )
+    .await
+    .is_err());
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port_2).into())
+            .try_set_header("origin", "http://localhost:3001")
+            .unwrap()
+    )
+    .await
+    .is_err());
+
+    // Check that correct access is allowed
+
+    check_app_port(port_1, "http://localhost:3001").await;
+    check_app_port(port_2, "http://localhost:3002").await;
+}
+
+async fn check_app_port(port: u16, origin: &str) {
+    let (client, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port).into())
+            .try_set_header("origin", origin)
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let _rx = PollRecv::new::<AppResponse>(rx);
+
+    let request = AppRequest::ListWasmHostFunctions;
+    let _: AppResponse = client.request(request).await.unwrap();
 }
