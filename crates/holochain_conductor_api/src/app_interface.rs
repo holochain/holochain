@@ -89,7 +89,7 @@ pub enum AppResponse {
     /// There has been an error during the handling of the request.
     Error(ExternalApiWireError),
 
-    /// The succesful response to an [`AppRequest::AppInfo`].
+    /// The successful response to an [`AppRequest::AppInfo`].
     ///
     /// Option will be `None` if there is no installed app with the given `installed_app_id`.
     AppInfo(Option<AppInfo>),

@@ -210,15 +210,12 @@ pub struct LaunchInfo {
     /// The admin port that was bound. This is not known when admin ports are not forced because the
     /// default is 0 so the system will choose a port.
     pub admin_port: u16,
-    /// The app ports that were attached to the conductor.
-    pub app_ports: Vec<u16>,
 }
 
 impl LaunchInfo {
     pub(crate) fn from_admin_port(admin_port: u16) -> Self {
         LaunchInfo {
             admin_port,
-            app_ports: vec![],
         }
     }
 }

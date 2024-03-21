@@ -1,6 +1,6 @@
 use assert_cmd::prelude::*;
 use holochain_cli_sandbox::cli::LaunchInfo;
-use holochain_conductor_api::AppRequest;
+use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest};
 use holochain_conductor_api::AppResponse;
 use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketSender,
@@ -15,6 +15,8 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdout, Command};
 use which::which;
+use holochain_types::prelude::{SerializedBytes, SerializedBytesError};
+use holochain_types::websocket::AllowedOrigins;
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -73,11 +75,41 @@ async fn new_websocket_client_for_port(
     .await?)
 }
 
+async fn add_app_port(launch_info: LaunchInfo) -> u16 {
+    let (admin_s, admin_r) = new_websocket_client_for_port(launch_info.admin_port).await.unwrap();
+    let attached: AdminResponse = exchange(admin_s, admin_r, AdminRequest::AttachAppInterface {
+        installed_app_id: "dummy".into(),
+        port: None,
+        allowed_origins: AllowedOrigins::Any,
+    }).await;
+    match attached {
+        AdminResponse::AppInterfaceAttached { port } => {
+            port
+        }
+        _ => {
+            panic!("Failed to attach app interface");
+        }
+    }
+}
+
 async fn get_app_info(port: u16) {
     tracing::debug!(calling_app_interface = ?port);
-    let (app_tx, mut rx) = new_websocket_client_for_port(port)
+    let (app_tx, rx) = new_websocket_client_for_port(port)
         .await
         .unwrap_or_else(|_| panic!("Failed to connect to conductor on port [{}]", port));
+
+    let request = AppRequest::AppInfo;
+    println!("Doing app info");
+    let r: AppResponse = exchange(app_tx, rx, request).await;
+    assert_matches!(r, AppResponse::AppInfo(None));
+}
+
+async fn exchange<Req, Res>(sender: WebsocketSender, mut receiver: WebsocketReceiver, req: Req) -> Res
+where Req: std::fmt::Debug,
+      SerializedBytes: TryFrom<Req, Error = SerializedBytesError>,
+      Res: serde::de::DeserializeOwned + std::fmt::Debug,
+      SerializedBytes: TryInto<Res, Error = SerializedBytesError>,
+{
     struct D(tokio::task::JoinHandle<()>);
     impl Drop for D {
         fn drop(&mut self) {
@@ -85,14 +117,11 @@ async fn get_app_info(port: u16) {
         }
     }
     let _d = D(tokio::task::spawn(async move {
-        while rx.recv::<AppResponse>().await.is_ok() {}
+        while receiver.recv::<Res>().await.is_ok() {}
+        println!("Task finished");
     }));
-    let request = AppRequest::AppInfo {
-        installed_app_id: "Stub".to_string(),
-    };
-    let response = app_tx.request(request);
-    let r: AppResponse = check_timeout(response).await;
-    assert_matches!(r, AppResponse::AppInfo(None));
+    let response = sender.request(req);
+    check_timeout(response).await
 }
 
 async fn check_timeout<T>(response: impl Future<Output = std::io::Result<T>>) -> T {
@@ -160,7 +189,7 @@ async fn generate_sandbox_and_connect() {
         .arg("--piped")
         .arg("generate")
         .arg("--in-process-lair")
-        .arg("--run=0")
+        .arg("--run")
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -178,8 +207,10 @@ async fn generate_sandbox_and_connect() {
     let mut stdout = hc_admin.stdout.take().unwrap();
     let launch_info = get_launch_info(&mut stdout).await;
 
+    let app_port = add_app_port(launch_info).await;
+
     // - Make a call to list app info to the port
-    get_app_info(*launch_info.app_ports.first().expect("No app ports found")).await;
+    get_app_info(app_port).await;
 }
 
 /// Generates a new sandbox with a single app deployed and tries to list DNA
@@ -198,7 +229,7 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg("--piped")
         .arg("generate")
         .arg("--in-process-lair")
-        .arg("--run=0")
+        .arg("--run")
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -219,7 +250,7 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg(format!("--running={}", launch_info.admin_port))
         .arg("list-dnas")
         .stdin(Stdio::piped())
-        .stdout(Stdio::null())
+        .stdout(Stdio::inherit())
         .stderr(Stdio::inherit());
     let mut hc_call = cmd.spawn().expect("Failed to spawn holochain");
 
