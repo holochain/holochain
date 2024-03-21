@@ -227,17 +227,17 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Expose create_clone_cell functionality to zomes.
     async fn create_clone_cell(
         &self,
-        installed_app_id: &InstalledAppId,
+        installed_app_id: InstalledAppId,
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<ClonedCell>;
 
     /// Expose disable_clone_cell functionality to zomes.
-    async fn disable_clone_cell(&self, installed_app_id: &InstalledAppId, payload: DisableCloneCellPayload) -> ConductorResult<()>;
+    async fn disable_clone_cell(&self, installed_app_id: InstalledAppId, payload: DisableCloneCellPayload) -> ConductorResult<()>;
 
     /// Expose enable_clone_cell functionality to zomes.
     async fn enable_clone_cell(
         &self,
-        installed_app_id: &InstalledAppId,
+        installed_app_id: InstalledAppId,
         payload: EnableCloneCellPayload,
     ) -> ConductorResult<ClonedCell>;
 
@@ -318,7 +318,7 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     async fn create_clone_cell(
         &self,
-        installed_app_id: &InstalledAppId,
+        installed_app_id: InstalledAppId,
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<ClonedCell> {
         self.conductor_handle
@@ -327,7 +327,7 @@ impl CellConductorReadHandleT for CellConductorApi {
             .await
     }
 
-    async fn disable_clone_cell(&self, installed_app_id: &InstalledAppId, payload: DisableCloneCellPayload) -> ConductorResult<()> {
+    async fn disable_clone_cell(&self, installed_app_id: InstalledAppId, payload: DisableCloneCellPayload) -> ConductorResult<()> {
         self.conductor_handle
             .clone()
             .disable_clone_cell(installed_app_id, &payload)
@@ -336,7 +336,7 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     async fn enable_clone_cell(
         &self,
-        installed_app_id: &InstalledAppId,
+        installed_app_id: InstalledAppId,
         payload: EnableCloneCellPayload,
     ) -> ConductorResult<ClonedCell> {
         self.conductor_handle

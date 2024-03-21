@@ -316,8 +316,7 @@ mod slow_tests {
         let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
 
         let cloned = conductor
-            .create_clone_cell(CreateCloneCellPayload {
-                app_id: app.installed_app_id().clone(),
+            .create_clone_cell(app.installed_app_id().clone(), CreateCloneCellPayload {
                 role_name: dna_file.dna_hash().to_string().clone(),
                 modifiers: DnaModifiersOpt::none().with_network_seed("anything else".to_string()),
                 membrane_proof: None,
@@ -327,11 +326,10 @@ mod slow_tests {
             .unwrap();
 
         let enable_or_disable_payload = DisableCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
             clone_cell_id: CloneCellId::CloneId(cloned.clone_id.clone()),
         };
         conductor
-            .disable_clone_cell(&enable_or_disable_payload)
+            .disable_clone_cell(app.installed_app_id().clone(), &enable_or_disable_payload)
             .await
             .unwrap();
 
@@ -343,8 +341,11 @@ mod slow_tests {
         // Run the cell enable in parallel. If we wait for it then we shouldn't see the error we're looking for
         let conductor_handle = conductor.raw_handle().clone();
         let payload = enable_or_disable_payload.clone();
-        tokio::spawn(async move {
-            conductor_handle.enable_clone_cell(&payload).await.unwrap();
+        tokio::spawn({
+            let installed_app_id = app.installed_app_id().clone();
+            async move {
+                conductor_handle.enable_clone_cell(installed_app_id, &payload).await.unwrap();
+            }
         });
 
         let mut had_successful_zome_call = false;

@@ -21,14 +21,15 @@ async fn send_signal_after_conductor_restart() {
         Default::default(),
     )
     .await;
-    let app = conductor.setup_app("app_id", &[dna_file]).await.unwrap();
+    let installed_app_id = "app_id".to_string();
+    let app = conductor.setup_app(&installed_app_id, &[dna_file]).await.unwrap();
     let alice = app.agent();
     let alice_cell_id = app.cells()[0].cell_id().to_owned();
 
     // add app interface
     let app_interface_port_1 = (*conductor)
         .clone()
-        .add_app_interface(either::Either::Left(0))
+        .add_app_interface(installed_app_id, 0)
         .await
         .unwrap();
 

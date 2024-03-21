@@ -88,8 +88,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
     }
     {
         let clone_cell = conductor
-            .create_clone_cell(CreateCloneCellPayload {
-                app_id: "app_1".into(),
+            .create_clone_cell("app_1".into(), CreateCloneCellPayload {
                 role_name: "name".into(),
                 modifiers: DnaModifiersOpt::none()
                     .with_network_seed("1".into())
@@ -110,8 +109,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
     }
     {
         let err = conductor
-            .create_clone_cell(CreateCloneCellPayload {
-                app_id: "app_1".into(),
+            .create_clone_cell("app_1".into(), CreateCloneCellPayload {
                 role_name: "name".into(),
                 modifiers: DnaModifiersOpt::none()
                     .with_network_seed("1".into())

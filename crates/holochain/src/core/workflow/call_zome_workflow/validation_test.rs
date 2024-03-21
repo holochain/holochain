@@ -40,7 +40,7 @@ async fn direct_validation_test() {
     let alice_agent_id = fake_agent_pubkey_1();
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
 
-    let (_tmpdir, _app_api, handle) =
+    let (_tmpdir, handle, _app_interfaces) =
         setup_app_with_names(alice_agent_id, vec![("test_app", vec![(dna_file, None)])]).await;
 
     run_test(alice_cell_id, handle.clone()).await;

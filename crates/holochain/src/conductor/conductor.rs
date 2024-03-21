@@ -1637,7 +1637,7 @@ mod clone_cell_impls {
         /// A struct with the created cell's clone id and cell id.
         pub async fn create_clone_cell(
             self: Arc<Self>,
-            installed_app_id: &InstalledAppId,
+            installed_app_id: InstalledAppId,
             payload: CreateCloneCellPayload,
         ) -> ConductorResult<ClonedCell> {
             let CreateCloneCellPayload {
@@ -1666,7 +1666,7 @@ mod clone_cell_impls {
             // run genesis on cloned cell
             let cells = vec![(clone_cell.cell_id.clone(), membrane_proof)];
             genesis_cells(self.clone(), cells).await?;
-            self.create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
+            self.create_and_add_initialized_cells_for_running_apps(Some(&installed_app_id))
                 .await?;
             Ok(clone_cell)
         }
@@ -1674,7 +1674,7 @@ mod clone_cell_impls {
         /// Disable a clone cell.
         pub(crate) async fn disable_clone_cell(
             &self,
-            installed_app_id: &InstalledAppId,
+            installed_app_id: InstalledAppId,
             DisableCloneCellPayload {
                 clone_cell_id,
             }: &DisableCloneCellPayload,
@@ -1699,7 +1699,7 @@ mod clone_cell_impls {
         /// Enable a disabled clone cell.
         pub async fn enable_clone_cell(
             self: Arc<Self>,
-            installed_app_id: &InstalledAppId,
+            installed_app_id: InstalledAppId,
             payload: &EnableCloneCellPayload,
         ) -> ConductorResult<ClonedCell> {
             let conductor = self.clone();
@@ -1730,7 +1730,7 @@ mod clone_cell_impls {
                 })
                 .await?;
 
-            self.create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
+            self.create_and_add_initialized_cells_for_running_apps(Some(&installed_app_id))
                 .await?;
             Ok(enabled_cell)
         }
@@ -2824,17 +2824,17 @@ mod test_utils_impls {
             self.get_state().await
         }
 
-        pub async fn add_test_app_interface<I: Into<AppInterfaceId>>(
+        pub async fn add_test_app_interface(
             &self,
-            id: I,
+            installed_app_id: &InstalledAppId,
+            port: u16,
         ) -> ConductorResult<()> {
-            let id = id.into();
             let (signal_tx, _r) = tokio::sync::broadcast::channel(1000);
             self.app_interfaces.share_mut(|app_interfaces| {
-                if app_interfaces.contains_key(&id) {
-                    return Err(ConductorError::AppInterfaceIdCollision(id));
+                if app_interfaces.contains_key(installed_app_id) {
+                    return Err(ConductorError::AppInterfaceIdCollision(installed_app_id.clone()));
                 }
-                let _ = app_interfaces.insert(id, AppInterfaceRuntime::Test { signal_tx });
+                let _ = app_interfaces.insert(installed_app_id.clone(), AppInterfaceRuntime::Test { signal_tx });
                 Ok(())
             })
         }

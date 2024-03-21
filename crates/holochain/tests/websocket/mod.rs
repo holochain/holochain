@@ -176,8 +176,9 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 
     // Activate cells
+    let installed_app_id = "test".to_string();
     let request = AdminRequest::EnableApp {
-        installed_app_id: "test".to_string(),
+        installed_app_id: installed_app_id.clone(),
     };
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
@@ -201,7 +202,7 @@ async fn call_zome() {
     .await;
 
     // Attach App Interface
-    let app_port = attach_app_interface(&mut admin_tx, None).await;
+    let app_port = attach_app_interface(&mut admin_tx, installed_app_id, None).await;
 
     let (mut app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
     let _app_rx = PollRecv::new::<AppResponse>(app_rx);

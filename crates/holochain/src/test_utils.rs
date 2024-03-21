@@ -46,7 +46,7 @@ use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -360,13 +360,13 @@ pub async fn setup_app_in_new_conductor(
         .await
         .unwrap();
 
-    install_app_in_conductor(conductor_handle.clone(), installed_app_id, agent, &dnas).await;
+    install_app_in_conductor(conductor_handle.clone(), installed_app_id.clone(), agent, &dnas).await;
 
     let handle = conductor_handle.clone();
 
     (
         Arc::new(db_dir),
-        RealAppInterfaceApi::new(conductor_handle),
+        RealAppInterfaceApi::new(conductor_handle, installed_app_id),
         handle,
     )
 }
@@ -408,11 +408,11 @@ pub async fn install_app_in_conductor(
 pub async fn setup_app_with_names(
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
-) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
+) -> (TempDir, ConductorHandle, HashMap<InstalledAppId, RealAppInterfaceApi>) {
     let dir = test_db_dir();
-    let (iface, handle) =
+    let (handle, interfaces) =
         setup_app_inner(dir.path().to_path_buf().into(), agent, apps_data, None).await;
-    (dir, iface, handle)
+    (dir, handle, interfaces)
 }
 
 /// Setup an app with a custom network config for testing
@@ -421,16 +421,16 @@ pub async fn setup_app_with_network(
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
     network: KitsuneP2pConfig,
-) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
+) -> (TempDir, ConductorHandle, HashMap<InstalledAppId, RealAppInterfaceApi>) {
     let dir = test_db_dir();
-    let (iface, handle) = setup_app_inner(
+    let (handle, interfaces) = setup_app_inner(
         dir.path().to_path_buf().into(),
         agent,
         apps_data,
         Some(network),
     )
     .await;
-    (dir, iface, handle)
+    (dir, handle, interfaces)
 }
 
 /// Setup an app with full configurability
@@ -439,7 +439,7 @@ pub async fn setup_app_inner(
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
     network: Option<KitsuneP2pConfig>,
-) -> (RealAppInterfaceApi, ConductorHandle) {
+) -> (ConductorHandle, HashMap<InstalledAppId, RealAppInterfaceApi>) {
     let config = ConductorConfig {
         data_root_path: Some(data_root_path.clone()),
         admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -454,6 +454,7 @@ pub async fn setup_app_inner(
         .await
         .unwrap();
 
+    let mut app_interfaces = HashMap::new();
     for (app_name, cell_data) in apps_data {
         install_app(
             app_name,
@@ -462,11 +463,11 @@ pub async fn setup_app_inner(
             conductor_handle.clone(),
         )
         .await;
+
+        app_interfaces.insert(app_name.to_string(), RealAppInterfaceApi::new(conductor_handle.clone(), app_name.to_string()));
     }
 
-    let handle = conductor_handle.clone();
-
-    (RealAppInterfaceApi::new(conductor_handle), handle)
+    (conductor_handle, app_interfaces)
 }
 
 /// If HC_WASM_CACHE_PATH is set warm the cache
