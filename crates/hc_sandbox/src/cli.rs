@@ -69,13 +69,8 @@ pub enum HcSandboxSubcommand {
 
         /// Automatically run the sandbox(es) that were created.
         /// This is effectively a combination of `hc sandbox generate` and `hc sandbox run`.
-        /// You may optionally specify app interface ports to bind when running.
-        /// This allows your UI to talk to the conductor.
-        /// For example, `hc sandbox generate -r=0,9000,0` will create three app interfaces.
-        /// Or, use `hc sandbox generate -r` to run without attaching any app interfaces.
-        /// This follows the same structure as `hc sandbox run --ports`.
-        #[arg(short, long, value_delimiter = ',')]
-        run: Option<Vec<u16>>,
+        #[arg(short, long)]
+        run: bool,
 
         /// A hApp bundle to install.
         happ: Option<PathBuf>,
@@ -108,14 +103,6 @@ pub enum HcSandboxSubcommand {
 /// Options for running a sandbox
 #[derive(Debug, Parser)]
 pub struct Run {
-    /// Optionally specifies app interface ports to bind when running.
-    /// This allows your UI to talk to the conductor.
-    /// For example, `hc -p=0,9000,0` will create three app interfaces.
-    /// Important: Interfaces are persistent. If you add an interface
-    /// it will be there next time you run the conductor.
-    #[arg(short, long, value_delimiter = ',')]
-    ports: Vec<u16>,
-
     /// (flattened)
     #[command(flatten)]
     existing: Existing,
@@ -150,20 +137,20 @@ impl HcSandbox {
                 {
                     crate::force_admin_port(path, port)?;
                 }
-                if let Some(ports) = run {
+                if run {
                     let holochain_path = self.holochain_path.clone();
                     let force_admin_ports = self.force_admin_ports.clone();
                     let structured = self.structured.clone();
 
                     let result = tokio::select! {
                         result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
-                        result = run_n(&holochain_path, paths, ports, force_admin_ports, structured) => result,
+                        result = run_n(&holochain_path, paths, force_admin_ports, structured) => result,
                     };
                     crate::save::release_ports(std::env::current_dir()?).await?;
                     return result;
                 }
             }
-            HcSandboxSubcommand::Run(Run { ports, existing }) => {
+            HcSandboxSubcommand::Run(Run { existing }) => {
                 let paths = existing.load()?;
                 if paths.is_empty() {
                     tracing::warn!("no paths available, exiting.");
@@ -174,7 +161,7 @@ impl HcSandbox {
 
                 let result = tokio::select! {
                     result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
-                    result = run_n(&holochain_path, paths.into_iter().map(ConfigRootPath::from).collect(), ports, force_admin_ports, self.structured) => result,
+                    result = run_n(&holochain_path, paths.into_iter().map(ConfigRootPath::from).collect(), force_admin_ports, self.structured) => result,
                 };
                 crate::save::release_ports(std::env::current_dir()?).await?;
                 return result;
@@ -240,21 +227,18 @@ impl LaunchInfo {
 pub async fn run_n(
     holochain_path: &Path,
     paths: Vec<ConfigRootPath>,
-    app_ports: Vec<u16>,
     force_admin_ports: Vec<u16>,
     structured: Output,
 ) -> anyhow::Result<()> {
     let run_holochain = |holochain_path: PathBuf,
                          path: ConfigRootPath,
                          index: usize,
-                         ports,
                          force_admin_port,
                          structured| async move {
         crate::run::run(
             &holochain_path,
             path,
             index,
-            ports,
             force_admin_port,
             structured,
         )
@@ -262,18 +246,15 @@ pub async fn run_n(
         Result::<_, anyhow::Error>::Ok(())
     };
     let mut force_admin_ports = force_admin_ports.into_iter();
-    let mut app_ports = app_ports.into_iter();
     let jhs = paths
         .into_iter()
         .enumerate()
         .zip(std::iter::repeat_with(|| force_admin_ports.next()))
-        .zip(std::iter::repeat_with(|| app_ports.next()))
-        .map(|(((index, path), force_admin_port), app_port)| {
+        .map(|((index, path), force_admin_port)| {
             let f = run_holochain(
                 holochain_path.to_path_buf(),
                 path,
                 index,
-                app_port.map(|p| vec![p]).unwrap_or_default(),
                 force_admin_port,
                 structured.clone(),
             );

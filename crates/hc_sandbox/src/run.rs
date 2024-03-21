@@ -9,13 +9,11 @@ use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::conductor::paths::KeystorePath;
 use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
 use holochain_trace::Output;
-use holochain_types::websocket::AllowedOrigins;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
 
-use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
 use crate::cli::LaunchInfo;
 use crate::config::*;
@@ -42,7 +40,6 @@ pub async fn run(
     holochain_path: &Path,
     sandbox_path: ConfigRootPath,
     conductor_index: usize,
-    app_ports: Vec<u16>,
     force_admin_port: Option<u16>,
     structured: Output,
 ) -> anyhow::Result<()> {
@@ -53,19 +50,7 @@ pub async fn run(
         structured,
     )
     .await?;
-    let mut launch_info = LaunchInfo::from_admin_port(admin_port);
-    for app_port in app_ports {
-        let mut cmd = CmdRunner::try_new(admin_port).await?;
-        let port = attach_app_interface(
-            &mut cmd,
-            AddAppWs {
-                port: Some(app_port),
-                allowed_origins: AllowedOrigins::Any,
-            },
-        )
-        .await?;
-        launch_info.app_ports.push(port);
-    }
+    let launch_info = LaunchInfo::from_admin_port(admin_port);
 
     msg!(
         "Conductor launched #!{} {}",

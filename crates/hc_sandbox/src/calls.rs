@@ -17,7 +17,7 @@ use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
-use holochain_types::prelude::DnaHash;
+use holochain_types::prelude::{DnaHash, InstalledAppId};
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::Timestamp;
@@ -107,6 +107,9 @@ pub struct AddAdminWs {
 /// and adds another app interface.
 #[derive(Debug, Args, Clone)]
 pub struct AddAppWs {
+    /// The app that this interface is for.
+    app_id: InstalledAppId,
+
     /// Optional port number.
     /// Defaults to assigned by OS.
     pub port: Option<u16>,
@@ -593,6 +596,7 @@ pub async fn disable_app(cmd: &mut CmdRunner, args: DisableApp) -> anyhow::Resul
 pub async fn attach_app_interface(cmd: &mut CmdRunner, args: AddAppWs) -> anyhow::Result<u16> {
     let resp = cmd
         .command(AdminRequest::AttachAppInterface {
+            installed_app_id: args.app_id,
             port: args.port,
             allowed_origins: args.allowed_origins,
         })
