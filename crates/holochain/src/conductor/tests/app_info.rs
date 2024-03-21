@@ -3,7 +3,7 @@ use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use matches::matches;
 
-use crate::sweettest::{SweetAgents, SweetConductor, SweetDnaFile};
+use crate::sweettest::{SweetConductor, SweetDnaFile};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_info_returns_all_cells_with_info() {
@@ -15,7 +15,7 @@ async fn app_info_returns_all_cells_with_info() {
     let app_id: InstalledAppId = "app".into();
     let role_name_1: RoleName = "role_1".into();
     let role_name_2: RoleName = "role_2".into();
-    conductor
+    let app = conductor
         .setup_app(
             &app_id,
             [
@@ -25,6 +25,7 @@ async fn app_info_returns_all_cells_with_info() {
         )
         .await
         .unwrap();
+    let agent_pub_key = app.agent().clone();
 
     // create 1 clone cell for role 1 = clone cell 1
     let clone_cell_1 = conductor

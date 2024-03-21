@@ -139,7 +139,7 @@ async fn create_identical_clone_cell_twice_fails() {
     let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let apps = conductor
-        .setup_app_for_agents("app", 2, [&(role_name.clone(), dna.clone())])
+        .setup_apps("app", 2, [&(role_name.clone(), dna.clone())])
         .await
         .unwrap()
         .into_inner();

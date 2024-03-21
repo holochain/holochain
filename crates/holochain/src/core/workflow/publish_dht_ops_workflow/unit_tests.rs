@@ -222,7 +222,7 @@ async fn verify_published_recently(vault: DbWrite<DbKindAuthored>, op_hash: DhtO
 
     assert!(
         publish_timestamp
-            .checked_add_signed(chrono::Duration::seconds(1))
+            .checked_add_signed(chrono::Duration::try_seconds(1).unwrap())
             .unwrap()
             > chrono::DateTime::<Utc>::from(SystemTime::now())
     );

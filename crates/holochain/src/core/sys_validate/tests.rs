@@ -411,8 +411,8 @@ async fn check_valid_if_dna_test() {
 async fn check_previous_timestamp() {
     let mut g = random_generator();
 
-    let before = Timestamp::from(chrono::Utc::now() - chrono::Duration::weeks(1));
-    let after = Timestamp::from(chrono::Utc::now() + chrono::Duration::weeks(1));
+    let before = Timestamp::from(chrono::Utc::now() - chrono::Duration::try_weeks(1).unwrap());
+    let after = Timestamp::from(chrono::Utc::now() + chrono::Duration::try_weeks(1).unwrap());
 
     let keystore = test_keystore();
     let mut action: Action = CreateLink::arbitrary(&mut g).unwrap().into();

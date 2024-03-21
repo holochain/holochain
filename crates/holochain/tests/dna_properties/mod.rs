@@ -1,5 +1,4 @@
 use hdk::prelude::*;
-use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetDnaFile;
 use holochain_conductor_api::conductor::ConductorConfig;

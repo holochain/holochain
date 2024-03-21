@@ -1,6 +1,6 @@
 use holochain_wasm_test_utils::TestWasm;
 
-use crate::sweettest::{SweetAgents, SweetConductor, SweetDnaFile};
+use crate::sweettest::{SweetConductor, SweetDnaFile};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn request_dna_def() {

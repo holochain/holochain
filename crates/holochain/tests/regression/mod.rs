@@ -1,5 +1,5 @@
 use holo_hash::ActionHash;
-use holochain::sweettest::{SweetAgents, SweetConductor, SweetDnaFile};
+use holochain::sweettest::{SweetConductor, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
 
 // Intended to keep https://github.com/holochain/holochain/issues/2868 fixed.
