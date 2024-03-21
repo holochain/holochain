@@ -5,9 +5,13 @@ use std::sync::Arc;
 use holochain::prelude::*;
 use holochain::sweettest::*;
 
+use holochain_conductor_api::conductor::DpkiConfig;
+
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_from_init_across_cells() {
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut config = SweetConductorConfig::standard();
+    config.dpki = Some(DpkiConfig::disabled());
+    let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let inits = Arc::new(AtomicU8::new(0));
     let inits1 = inits.clone();

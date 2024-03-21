@@ -866,11 +866,8 @@ async fn test_dpki_agent_update() {
 
     let dna = SweetDnaFile::unique_empty().await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    let agents = SweetAgents::get(conductor.keystore(), 4).await;
-    conductor
-        .setup_app_for_agent("app", agents[0].clone(), vec![&dna])
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app", vec![&dna]).await.unwrap();
+    let initial_agent = app.agent().clone();
 
     let dna_hash = dna.dna_hash().clone();
     let space = conductor
@@ -881,7 +878,7 @@ async fn test_dpki_agent_update() {
     let workspace = space
         .source_chain_workspace(
             conductor.keystore(),
-            agents[0].clone(),
+            initial_agent.clone(),
             Arc::new(dna.dna_def().clone()),
         )
         .await
@@ -897,8 +894,10 @@ async fn test_dpki_agent_update() {
 
     let head = chain.chain_head().unwrap().unwrap();
 
+    let agents = SweetAgents::get(conductor.keystore(), 3).await;
+
     let a1 = Action::AgentValidationPkg(AgentValidationPkg {
-        author: agents[0].clone(),
+        author: initial_agent.clone(),
         timestamp: (head.timestamp + sec).unwrap(),
         action_seq: head.seq + 1,
         prev_action: head.action.clone(),
@@ -906,19 +905,19 @@ async fn test_dpki_agent_update() {
     });
 
     let a2 = Action::Update(Update {
-        author: agents[0].clone(),
+        author: initial_agent.clone(),
         timestamp: (a1.timestamp() + sec).unwrap(),
         action_seq: a1.action_seq() + 1,
         prev_action: a1.to_hash(),
         entry_type: EntryType::AgentPubKey,
-        entry_hash: agents[1].clone().into(),
+        entry_hash: agents[0].clone().into(),
         original_action_address: head.action,
-        original_entry_address: agents[0].clone().into(),
+        original_entry_address: initial_agent.clone().into(),
         weight: EntryRateWeight::default(),
     });
 
     let a3 = Action::AgentValidationPkg(AgentValidationPkg {
-        author: agents[1].clone(),
+        author: agents[0].clone(),
         timestamp: (a2.timestamp() + sec).unwrap(),
         action_seq: a2.action_seq() + 1,
         prev_action: a2.to_hash(),
@@ -926,26 +925,26 @@ async fn test_dpki_agent_update() {
     });
 
     let a4 = Action::Update(Update {
-        author: agents[1].clone(),
+        author: agents[0].clone(),
         timestamp: (a3.timestamp() + sec).unwrap(),
         action_seq: a3.action_seq() + 1,
         prev_action: a3.to_hash(),
         entry_type: EntryType::AgentPubKey,
-        entry_hash: agents[2].clone().into(),
+        entry_hash: agents[1].clone().into(),
         original_action_address: ActionHash::with_data_sync(&a2),
-        original_entry_address: agents[1].clone().into(),
+        original_entry_address: agents[0].clone().into(),
         weight: EntryRateWeight::default(),
     });
 
     let a5 = Action::Update(Update {
-        author: agents[2].clone(),
+        author: agents[1].clone(),
         timestamp: (a4.timestamp() + sec).unwrap(),
         action_seq: a4.action_seq() + 1,
         prev_action: a4.to_hash(),
         entry_type: EntryType::AgentPubKey,
-        entry_hash: agents[3].clone().into(),
+        entry_hash: agents[2].clone().into(),
         original_action_address: ActionHash::with_data_sync(&a4),
-        original_entry_address: agents[2].clone().into(),
+        original_entry_address: agents[1].clone().into(),
         weight: EntryRateWeight::default(),
     });
 
@@ -956,7 +955,7 @@ async fn test_dpki_agent_update() {
     chain
         .put_with_action(
             a2,
-            Some(Entry::Agent(agents[1].clone())),
+            Some(Entry::Agent(agents[0].clone())),
             ChainTopOrdering::Strict,
         )
         .await
@@ -968,7 +967,7 @@ async fn test_dpki_agent_update() {
     chain
         .put_with_action(
             a4,
-            Some(Entry::Agent(agents[2].clone())),
+            Some(Entry::Agent(agents[1].clone())),
             ChainTopOrdering::Strict,
         )
         .await
@@ -986,7 +985,7 @@ async fn test_dpki_agent_update() {
     chain
         .put_with_action(
             a5,
-            Some(Entry::Agent(agents[3].clone())),
+            Some(Entry::Agent(agents[2].clone())),
             ChainTopOrdering::Strict,
         )
         .await

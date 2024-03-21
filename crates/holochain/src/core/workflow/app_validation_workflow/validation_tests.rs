@@ -380,12 +380,12 @@ async fn app_validation_ops() {
 
     let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes).await;
     let app = conductors[0]
-        .setup_app_for_agent(&"test_app", alice.clone(), &[dna_file_a.clone()])
+        .setup_app(&"test_app", &[dna_file_a.clone()])
         .await
         .unwrap();
     let (alice,) = app.into_tuple();
     let app = conductors[1]
-        .setup_app_for_agent(&"test_app", bob.clone(), &[dna_file_b.clone()])
+        .setup_app(&"test_app", &[dna_file_b.clone()])
         .await
         .unwrap();
     let (bob,) = app.into_tuple();

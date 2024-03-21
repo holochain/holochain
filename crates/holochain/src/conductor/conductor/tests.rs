@@ -399,9 +399,7 @@ async fn test_signing_error_during_genesis() {
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign]).await;
 
-    let result = conductor
-        .setup_app_for_agents(&"app", &[fixt!(AgentPubKey)], [&dna])
-        .await;
+    let result = conductor.setup_app(&"app", [&dna]).await;
 
     // - Assert that we got an error during Genesis. However, this test is
     //   pretty useless. What we really want is to ensure that the system is
@@ -743,12 +741,8 @@ async fn test_enable_disable_enable_clone_cell() {
 async fn name_has_no_effect_on_dna_hash() {
     holochain_trace::test_run().ok();
     let mut conductor = SweetConductor::from_standard_config().await;
-    let (agent1, agent2, agent3) = SweetAgents::three(conductor.keystore()).await;
     let dna = SweetDnaFile::unique_empty().await;
-    let apps = conductor
-        .setup_app_for_agents("app", [&agent1, &agent2, &agent3], [&dna])
-        .await
-        .unwrap();
+    let apps = conductor.setup_apps("app", 3, [&dna]).await.unwrap();
     let app_id1 = apps[0].installed_app_id().clone();
     let app_id2 = apps[1].installed_app_id().clone();
     let app_id3 = apps[2].installed_app_id().clone();

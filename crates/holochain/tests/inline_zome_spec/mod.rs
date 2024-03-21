@@ -366,7 +366,6 @@ async fn can_call_real_zomes_too() {
     holochain_trace::test_run().ok();
 
     let mut conductor = SweetConductor::from_standard_config().await;
-    let agent = SweetAgents::one(conductor.keystore()).await;
     let (mut integrity, mut coordinator) = simple_crud_zome().into_zomes();
     integrity.push(TestWasm::Create.into());
     coordinator.push(TestWasm::Create.into());
@@ -374,10 +373,7 @@ async fn can_call_real_zomes_too() {
     let (dna, _, _) =
         SweetDnaFile::unique_from_zomes(integrity, coordinator, TestWasm::Create.into()).await;
 
-    let app = conductor
-        .setup_app_for_agent("app1", agent.clone(), &[dna.clone()])
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app1", &[dna.clone()]).await.unwrap();
 
     let (cell,) = app.into_tuple();
 
@@ -400,14 +396,8 @@ async fn call_non_existing_zome_fails_gracefully() -> anyhow::Result<()> {
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    // Get two agents
-    let agent = SweetAgents::one(conductor.keystore()).await;
-
     // Install DNA and install and enable apps in conductor
-    let app = conductor
-        .setup_app_for_agent("app1", agent.clone(), [&dna_file])
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app1", [&dna_file]).await.unwrap();
 
     let (alice,) = app.into_tuple();
 

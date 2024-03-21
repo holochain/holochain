@@ -296,10 +296,10 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                dpki: Some(DpkiConfig {
-                    dna_path: Some("path/to/dna.dna".into()),
-                    device_seed_lair_tag: "device-seed".into()
-                }),
+                dpki: Some(DpkiConfig::new(
+                    Some("path/to/dna.dna".into()),
+                    "device-seed".into()
+                )),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }

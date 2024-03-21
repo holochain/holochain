@@ -12,10 +12,9 @@ async fn zome_with_no_entry_types_does_not_prevent_deletes() {
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::ValidateRejectAppTypes, TestWasm::Crd])
             .await;
-    let agent = SweetAgents::alice();
 
     let (cell,) = conductor
-        .setup_app_for_agent("app", agent, &[dna_file])
+        .setup_app("app", &[dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -49,10 +48,9 @@ async fn zome_with_no_link_types_does_not_prevent_delete_links() {
         TestWasm::Link,
     ])
     .await;
-    let agent = SweetAgents::alice();
 
     let (cell,) = conductor
-        .setup_app_for_agent("app", agent, &[dna_file])
+        .setup_app("app", &[dna_file])
         .await
         .unwrap()
         .into_tuple();

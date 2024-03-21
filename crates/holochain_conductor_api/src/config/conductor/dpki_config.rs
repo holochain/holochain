@@ -17,4 +17,26 @@ pub struct DpkiConfig {
     /// The lair tag used to refer to the "device seed" which was used to generate
     /// the AgentPubKey for the DPKI cell
     pub device_seed_lair_tag: String,
+
+    /// For testing only, we can turn off DPKI if needed.
+    /// TODO: this can be removed once DPKI is truly optional again.
+    pub no_dpki: bool,
+}
+
+impl DpkiConfig {
+    pub fn new(dna_path: Option<PathBuf>, device_seed_lair_tag: String) -> Self {
+        Self {
+            dna_path,
+            device_seed_lair_tag,
+            no_dpki: false,
+        }
+    }
+
+    pub fn disabled() -> Self {
+        Self {
+            dna_path: None,
+            device_seed_lair_tag: "disabled".to_string(),
+            no_dpki: true,
+        }
+    }
 }

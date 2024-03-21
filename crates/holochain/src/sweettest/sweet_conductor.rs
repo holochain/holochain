@@ -514,6 +514,27 @@ impl SweetConductor {
         Ok(SweetAppBatch(apps))
     }
 
+    /// Setup N apps with generated agent keys and the same set of DNAs
+    pub async fn setup_apps<'a>(
+        &mut self,
+        app_id_prefix: &str,
+        num: usize,
+        dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)>,
+    ) -> ConductorApiResult<SweetAppBatch> {
+        let dnas_with_roles: Vec<_> = dnas_with_roles.into_iter().cloned().collect();
+
+        let mut apps = vec![];
+
+        for i in 0..num {
+            let app = self
+                .setup_app(&format!("{}{}", app_id_prefix, i), &dnas_with_roles)
+                .await?;
+            apps.push(app);
+        }
+
+        Ok(SweetAppBatch(apps))
+    }
+
     /// Install DPKI a bit more concisely
     pub async fn install_dpki(&self, dna: DnaFile) {
         self.raw_handle().install_dpki(dna).await.unwrap()

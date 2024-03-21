@@ -182,20 +182,26 @@ impl ConductorBuilder {
         );
 
         // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
-        let dpki_config = Some(config.dpki.clone().unwrap_or(DpkiConfig {
-            dna_path: None,
-            device_seed_lair_tag: "UNUSED".to_string(),
-        }));
+        let dpki_config = Some(
+            config
+                .dpki
+                .clone()
+                .unwrap_or(DpkiConfig::new(None, "UNUSED".to_string())),
+        );
 
         let dpki_dna_to_install = match &dpki_config {
             Some(config) => {
-                let dna = get_dpki_dna(config)
-                    .await?
-                    .into_dna_file(Default::default())
-                    .await?
-                    .0;
+                if config.no_dpki {
+                    None
+                } else {
+                    let dna = get_dpki_dna(config)
+                        .await?
+                        .into_dna_file(Default::default())
+                        .await?
+                        .0;
 
-                Some(dna)
+                    Some(dna)
+                }
             }
             _ => unreachable!(
                 "We currently require DPKI to be used, but this may change in the future"
@@ -437,10 +443,12 @@ impl ConductorBuilder {
         );
 
         // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
-        let dpki_config = Some(config.dpki.clone().unwrap_or(DpkiConfig {
-            dna_path: None,
-            device_seed_lair_tag: "UNUSED".to_string(),
-        }));
+        let dpki_config = Some(
+            config
+                .dpki
+                .clone()
+                .unwrap_or(DpkiConfig::new(None, "UNUSED".to_string())),
+        );
 
         let (dpki_uuid, dpki_dna_to_install) = match (&self.dpki, &dpki_config) {
             // If a DPKI impl was provided to the builder, use that
@@ -448,15 +456,19 @@ impl ConductorBuilder {
 
             // Otherwise load the DNA from config if specified
             (None, Some(dpki_config)) => {
-                let dna = get_dpki_dna(dpki_config)
-                    .await?
-                    .into_dna_file(Default::default())
-                    .await?
-                    .0;
-                (
-                    Some(dna.dna_hash().get_raw_32().try_into().expect("32 bytes")),
-                    Some(dna),
-                )
+                if dpki_config.no_dpki {
+                    (None, None)
+                } else {
+                    let dna = get_dpki_dna(dpki_config)
+                        .await?
+                        .into_dna_file(Default::default())
+                        .await?
+                        .0;
+                    (
+                        Some(dna.dna_hash().get_raw_32().try_into().expect("32 bytes")),
+                        Some(dna),
+                    )
+                }
             }
 
             (None, None) => unreachable!(

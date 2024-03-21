@@ -196,12 +196,13 @@ mod tests {
         let (agent, _) = SweetAgents::alice_and_bob();
 
         let (cell,) = conductor
-            .setup_app_for_agent("app", agent.clone(), &[dna_file])
+            .setup_app("app", &[dna_file])
             .await
             .unwrap()
             .into_tuple();
 
         let cell_id = cell.cell_id();
+        let agent = cell_id.agent_pubkey().clone();
 
         let top_hash = {
             let mut dump = conductor
@@ -265,15 +266,15 @@ mod tests {
         let mut conductors = SweetConductorBatch::from_config(4, config).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-        let (agent, _) = SweetAgents::alice_and_bob();
 
         let (c0,) = conductors[0]
-            .setup_app_for_agent("app", agent.clone(), &[dna_file.clone()])
+            .setup_app("app", &[dna_file.clone()])
             .await
             .unwrap()
             .into_tuple();
 
         let cell_id = c0.cell_id();
+        let agent = cell_id.agent_pubkey().clone();
 
         // Install two apps with ignore_genesis_failure and one without
         let mk_payload = |ignore: bool| {
