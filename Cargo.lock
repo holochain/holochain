@@ -3608,6 +3608,7 @@ dependencies = [
  "futures",
  "holochain_serialized_bytes",
  "holochain_trace",
+ "holochain_types",
  "serde",
  "serde_bytes",
  "tokio",
