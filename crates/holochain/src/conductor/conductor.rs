@@ -2444,11 +2444,20 @@ mod accessor_impls {
 
         /// Access to the signal broadcast channel, to create
         /// new subscriptions
-        pub fn signal_broadcaster(&self) -> SignalBroadcaster {
+        pub fn signal_broadcaster_for_cell(&self, cell_id: CellId) -> SignalBroadcaster {
+            let installed_app_id = match self.running_cells.share_ref(move |cells| {
+                cells.get(&cell_id)
+                    .map(|cell| cell.cell.get_belongs_to().clone())
+            }) {
+                Some(id) => id,
+                None => return SignalBroadcaster::new(vec![]),
+            };
+
             let senders = self
                 .app_interfaces
-                .share_ref(|ai| ai.values().map(|i| i.signal_tx()).cloned().collect());
-            SignalBroadcaster::new(senders)
+                .share_ref(|ai| ai.get(&installed_app_id).map(|ai| vec![ai.signal_tx().clone()]));
+
+            SignalBroadcaster::new(senders.unwrap_or_default())
         }
 
         /// Instantiate a Ribosome for use with a DNA
@@ -2708,7 +2717,10 @@ impl Conductor {
         let tasks = app_cells.difference(&on_cells).map(|cell_id| {
             let handle = self.clone();
             let chc = handle.chc(self.keystore().clone(), cell_id);
+            let installed_app_id = state.find_app_containing_cell(cell_id).map(|app| app.id());
             async move {
+                let installed_app_id = installed_app_id.ok_or_else(|| (cell_id.clone(), CellError::OrphanedCell))?;
+
                 let holochain_p2p_cell =
                     handle.holochain_p2p.to_dna(cell_id.dna_hash().clone(), chc);
 
@@ -2717,15 +2729,15 @@ impl Conductor {
                     .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))
                     .map_err(|err| (cell_id.clone(), err))?;
 
-                Cell::create(cell_id.clone(), handle, space, holochain_p2p_cell)
+                Cell::create(cell_id.clone(), handle, space, holochain_p2p_cell, installed_app_id.clone())
                     .await
                     .map_err(|err| (cell_id.clone(), err))
             }
         });
 
         // Join on all apps and return a list of
-        // apps that had succelly created cells
-        // and any apps that encounted errors
+        // apps that had successfully created cells
+        // and any apps that encountered errors
         Ok(futures::future::join_all(tasks).await)
     }
 

@@ -53,7 +53,6 @@ pub struct SweetConductor {
     pub(crate) spaces: Spaces,
     config: Arc<ConductorConfig>,
     dnas: Vec<DnaFile>,
-    signal_stream: Option<SignalStream>,
     rendezvous: Option<DynSweetRendezvous>,
 }
 
@@ -123,9 +122,6 @@ impl SweetConductor {
         config: Arc<ConductorConfig>,
         rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
-        // Get a stream of all signals since conductor startup
-        let signal_stream = handle.signal_broadcaster().subscribe_merged();
-
         // XXX: this is a bit wonky.
         // We create a Spaces instance here purely because it's easier to initialize
         // the per-space databases this way. However, we actually use the TestEnvs
@@ -143,7 +139,6 @@ impl SweetConductor {
             spaces,
             config,
             dnas: Vec::new(),
-            signal_stream: Some(Box::new(signal_stream)),
             rendezvous,
         }
     }

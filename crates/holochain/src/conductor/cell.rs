@@ -106,6 +106,7 @@ pub struct Cell {
     holochain_p2p_cell: HolochainP2pDna,
     queue_triggers: QueueTriggers,
     init_mutex: tokio::sync::Mutex<()>,
+    belongs_to: InstalledAppId,
 }
 
 impl Cell {
@@ -122,6 +123,7 @@ impl Cell {
         conductor_handle: ConductorHandle,
         space: Space,
         holochain_p2p_cell: HolochainP2pDna,
+        belongs_to: InstalledAppId,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
         let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
         let authored_db = space.get_or_create_authored_db(id.agent_pubkey().clone())?;
@@ -152,6 +154,7 @@ impl Cell {
                     holochain_p2p_cell,
                     queue_triggers,
                     init_mutex: Default::default(),
+                    belongs_to,
                 },
                 initial_queue_triggers,
             ))
@@ -239,8 +242,8 @@ impl Cell {
         &self.holochain_p2p_cell
     }
 
-    fn signal_broadcaster(&self) -> SignalBroadcaster {
-        self.conductor_api.signal_broadcaster()
+    fn signal_broadcaster_for_cell(&self, cell_id: CellId) -> SignalBroadcaster {
+        self.conductor_api.signal_broadcaster_for_cell(cell_id)
     }
 
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
@@ -618,7 +621,7 @@ impl Cell {
                     self.id.agent_pubkey().clone(),
                     signed_actions,
                     self.queue_triggers.clone(),
-                    self.conductor_api.signal_broadcaster(),
+                    self.conductor_api.signal_broadcaster_for_cell(self.id.clone()),
                 )
                 .await
                 .map_err(Box::new)?)
@@ -906,7 +909,7 @@ impl Cell {
         let keystore = self.conductor_api.keystore().clone();
 
         let conductor_handle = self.conductor_handle.clone();
-        let signal_tx = self.signal_broadcaster();
+        let signal_tx = self.signal_broadcaster_for_cell(self.id.clone());
         let ribosome = self.get_ribosome()?;
         let invocation =
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
@@ -990,7 +993,7 @@ impl Cell {
         }
         trace!("running init");
 
-        let signal_tx = self.signal_broadcaster();
+        let signal_tx = self.signal_broadcaster_for_cell(id);
 
         // Run the workflow
         let args = InitializeZomesWorkflowArgs {
@@ -1064,6 +1067,10 @@ impl Cell {
         self.queue_triggers
             .integrate_dht_ops
             .trigger(&"notify_authored_ops_moved_to_limbo");
+    }
+
+    pub(crate) fn get_belongs_to(&self) -> &InstalledAppId {
+        &self.belongs_to
     }
 
     #[cfg(any(test, feature = "test_utils"))]

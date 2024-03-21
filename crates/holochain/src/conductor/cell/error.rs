@@ -79,6 +79,8 @@ pub enum CellError {
     StateMutationError(#[from] holochain_state::mutations::StateMutationError),
     #[error(transparent)]
     OneErr(#[from] one_err::OneErr),
+    #[error("The cell is not associated with an application")]
+    OrphanedCell,
 }
 
 pub type CellResult<T> = Result<T, CellError>;

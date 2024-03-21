@@ -103,7 +103,7 @@ pub async fn send_post_commit(
                     workspace: workspace.clone().into(),
                     keystore: keystore.clone(),
                     network: network.clone(),
-                    signal_tx: conductor_handle.signal_broadcaster(),
+                    signal_tx: conductor_handle.signal_broadcaster_for_cell(cell_id.as_ref().clone()),
                 },
                 invocation: PostCommitInvocation::new(zome, actions.clone()),
                 cell_id: cell_id.clone(),
