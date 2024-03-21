@@ -33,7 +33,7 @@ impl<D: RegionDataConstraints, O: OpRegion<D>> OpStore<O, D> {
 
 impl<D: RegionDataConstraints, O: OpRegion<D>> AccessOpStore<O, D> for OpStore<O, D> {
     fn query_op_data(&self, region: &RegionCoords) -> Vec<Arc<O>> {
-        let region = region.to_bounds(self.topo().into());
+        let region = region.to_bounds(self.topo());
         let (x0, x1) = region.x;
         let (t0, t1) = region.t;
         let op0 = O::bound(t0, x0);
