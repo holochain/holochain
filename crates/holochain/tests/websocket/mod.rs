@@ -904,7 +904,7 @@ async fn app_allowed_origins_independence() {
     let port_1 = conductor
         .clone()
         .add_app_interface(
-            "dummy".into(),
+            "dummy1".into(),
             0,
             "http://localhost:3001".to_string().into(),
         )
@@ -914,7 +914,7 @@ async fn app_allowed_origins_independence() {
     let port_2 = conductor
         .clone()
         .add_app_interface(
-            "dummy".into(),
+            "dummy2".into(),
             0,
             "http://localhost:3002".to_string().into(),
         )
