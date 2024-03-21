@@ -431,7 +431,7 @@ pub enum AdminResponse {
     },
 
     /// The list of attached app interfaces.
-    AppInterfacesListed(Vec<u16>),
+    AppInterfacesListed(Vec<AppInterfaceInfo>),
 
     /// The successful response to an [`AdminRequest::EnableApp`].
     ///
@@ -543,6 +543,13 @@ pub enum AppStatusFilter {
     Running,
     Stopped,
     Paused,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
+pub struct AppInterfaceInfo {
+    pub installed_app_id: InstalledAppId,
+    pub port: u16,
+    pub allowed_origins: AllowedOrigins,
 }
 
 #[test]

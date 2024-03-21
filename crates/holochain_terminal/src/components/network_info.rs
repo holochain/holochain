@@ -44,7 +44,7 @@ pub fn render_network_info_widget<B: Backend>(
 
     if NETWORK_INFO_PARAMS.read().unwrap().is_none() {
         *NETWORK_INFO_PARAMS.write().unwrap() =
-            match get_network_info_params(app_client.clone(), app_id.clone()) {
+            match get_network_info_params(app_client.clone()) {
                 Ok(p) => Some(p),
                 Err(e) => {
                     show_message(format!("{:?}", e).as_str(), frame, rect);
@@ -149,14 +149,13 @@ pub fn render_network_info_widget<B: Backend>(
 
 fn get_network_info_params(
     app_client: Arc<Mutex<AppClient>>,
-    app_id: String,
 ) -> anyhow::Result<(AgentPubKey, Vec<(String, DnaHash)>)> {
     match block_on(
         async {
             app_client
                 .lock()
                 .await
-                .discover_network_info_params(app_id)
+                .discover_network_info_params()
                 .await
         },
         Duration::from_secs(10),

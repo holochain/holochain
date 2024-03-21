@@ -1,8 +1,6 @@
 use anyhow::anyhow;
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_conductor_api::{
-    AdminRequest, AdminResponse, AppInfo, AppRequest, AppResponse, CellInfo, NetworkInfo,
-};
+use holochain_conductor_api::{AdminRequest, AdminResponse, AppInfo, AppInterfaceInfo, AppRequest, AppResponse, CellInfo, NetworkInfo};
 use holochain_types::prelude::{InstalledAppId, NetworkInfoRequestPayload};
 use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketSender};
 use std::sync::Arc;
@@ -34,12 +32,11 @@ impl AppClient {
 
     pub async fn discover_network_info_params(
         &mut self,
-        app_id: InstalledAppId,
     ) -> anyhow::Result<(AgentPubKey, Vec<(String, DnaHash)>)> {
         let app_info = self
-            .app_info(app_id.clone())
+            .app_info()
             .await?
-            .ok_or(anyhow!("App not found {}", app_id))?;
+            .ok_or(anyhow!("Could not get app info"))?;
 
         let agent = app_info.agent_pub_key;
         let named_dna_hashes: Vec<(String, DnaHash)> = app_info
@@ -76,11 +73,8 @@ impl AppClient {
         }
     }
 
-    async fn app_info(&mut self, app_id: InstalledAppId) -> anyhow::Result<Option<AppInfo>> {
-        let msg = AppRequest::AppInfo {
-            installed_app_id: app_id,
-        };
-        let response = self.send(msg).await?;
+    async fn app_info(&mut self) -> anyhow::Result<Option<AppInfo>> {
+        let response = self.send(AppRequest::AppInfo).await?;
         match response {
             AppResponse::AppInfo(app_info) => Ok(app_info),
             _ => unreachable!("Unexpected response {:?}", response),
@@ -120,12 +114,12 @@ impl AdminClient {
         Ok(AdminClient { tx, rx, addr })
     }
 
-    pub async fn connect_app_client(&mut self) -> anyhow::Result<AppClient> {
-        let app_interfaces = self.list_app_interfaces().await?;
-        let app_port = if app_interfaces.is_empty() {
-            self.attach_app_interface(0).await?
-        } else {
-            *app_interfaces.first().unwrap()
+    pub async fn connect_app_client(&mut self, installed_app_id: InstalledAppId) -> anyhow::Result<AppClient> {
+        let app_port = match self.list_app_interfaces().await?.into_iter().find(|i| i.installed_app_id == installed_app_id) {
+            Some(i) => i.port,
+            None => {
+                self.attach_app_interface(installed_app_id, 0).await?
+            }
         };
 
         let app_addr = (self.addr.ip(), app_port).into();
@@ -133,17 +127,18 @@ impl AdminClient {
         AppClient::connect(app_addr).await
     }
 
-    async fn list_app_interfaces(&mut self) -> anyhow::Result<Vec<u16>> {
+    async fn list_app_interfaces(&mut self) -> anyhow::Result<Vec<AppInterfaceInfo>> {
         let msg = AdminRequest::ListAppInterfaces;
         let response = self.send(msg).await?;
         match response {
-            AdminResponse::AppInterfacesListed(ports) => Ok(ports),
+            AdminResponse::AppInterfacesListed(interfaces) => Ok(interfaces),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }
 
-    async fn attach_app_interface(&mut self, port: u16) -> anyhow::Result<u16> {
+    async fn attach_app_interface(&mut self, installed_app_id: InstalledAppId, port: u16) -> anyhow::Result<u16> {
         let msg = AdminRequest::AttachAppInterface {
+            installed_app_id,
             port: Some(port),
             allowed_origins: "hcterm".to_string().into(),
         };

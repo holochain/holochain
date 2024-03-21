@@ -393,6 +393,7 @@ mod startup_shutdown_impls {
 
 /// Methods related to conductor interfaces
 mod interface_impls {
+    use holochain_conductor_api::AppInterfaceInfo;
     use super::*;
     use holochain_types::websocket::AllowedOrigins;
 
@@ -518,13 +519,17 @@ mod interface_impls {
         }
 
         /// Give a list of networking ports taken up as running app interface tasks
-        pub async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {
+        pub async fn list_app_interfaces(&self) -> ConductorResult<Vec<AppInterfaceInfo>> {
             Ok(self
                 .get_state()
                 .await?
                 .app_interfaces
-                .values()
-                .map(|config| config.driver.port())
+                .iter()
+                .map(|(id, config)| AppInterfaceInfo {
+                    installed_app_id: id.clone(),
+                    port: config.driver.port(),
+                    allowed_origins: config.driver.allowed_origins().clone(),
+                })
                 .collect())
         }
 
@@ -2890,7 +2895,6 @@ mod test_utils_impls {
         pub async fn add_test_app_interface(
             &self,
             installed_app_id: &InstalledAppId,
-            port: u16,
         ) -> ConductorResult<()> {
             let (signal_tx, _r) = tokio::sync::broadcast::channel(1000);
             self.app_interfaces.share_mut(|app_interfaces| {

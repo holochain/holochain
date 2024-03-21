@@ -39,13 +39,20 @@ fn main() -> anyhow::Result<()> {
                 };
 
                 let mut admin_client = AdminClient::connect(addr).await?;
-                let app_client = admin_client.connect_app_client().await?;
+
+                let app_client = match &args.app_id {
+                    Some(app_id) => {
+                        let app_client = admin_client.connect_app_client(app_id.clone()).await?;
+                        Some(app_client)
+                    },
+                    None => None,
+                };
 
                 Ok((admin_client, app_client))
             },
             Duration::from_secs(10),
         ) {
-            Ok(Ok((admin_client, app_client))) => (Some(admin_client), Some(app_client)),
+            Ok(Ok((admin_client, app_client))) => (Some(admin_client), app_client),
             Ok(Err(e)) => {
                 return Err(e);
             }

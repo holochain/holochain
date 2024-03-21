@@ -250,7 +250,7 @@ async fn call_zome() {
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
     let app_port = match response {
-        AdminResponse::AppInterfacesListed(ports) => *ports.first().unwrap(),
+        AdminResponse::AppInterfacesListed(ports) => ports.first().unwrap().port,
         _ => panic!("Unexpected response"),
     };
 

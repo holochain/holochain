@@ -93,7 +93,7 @@ async fn send_signal_after_conductor_restart() {
         .unwrap();
 
     let app_interfaces = conductor.list_app_interfaces().await.unwrap();
-    let app_interface_port_1 = app_interfaces[0];
+    let app_interface_port_1 = app_interfaces[0].port;
 
     // reconnect app websocket
     let (_, mut app_ws_rx_1) = holochain_websocket::connect(
