@@ -46,9 +46,9 @@ pub(crate) const U32_LEN: u64 = u32::MAX as u64 + 1;
 ///    a (quantized) range.
 pub trait ArqStart: Sized + Copy + std::fmt::Debug {
     /// Get the DhtLocation representation
-    fn to_loc(&self, dim: &impl SpaceDim, power: u8) -> Loc;
+    fn to_loc(&self, dim: impl SpaceDim, power: u8) -> Loc;
     /// Get the exponential SpaceOffset representation
-    fn to_offset(&self, dim: &impl SpaceDim, power: u8) -> SpaceOffset;
+    fn to_offset(&self, dim: impl SpaceDim, power: u8) -> SpaceOffset;
     /// Requantize to a higher power, using the precalculated multiplicative factor.
     fn requantize_up(&self, factor: u32) -> Option<Self>;
     /// Requantize to a lower power, using the precalculated multiplicative factor.
@@ -56,11 +56,11 @@ pub trait ArqStart: Sized + Copy + std::fmt::Debug {
 }
 
 impl ArqStart for Loc {
-    fn to_loc(&self, _dim: &impl SpaceDim, _power: u8) -> Loc {
+    fn to_loc(&self, _dim: impl SpaceDim, _power: u8) -> Loc {
         *self
     }
 
-    fn to_offset(&self, dim: &impl SpaceDim, power: u8) -> SpaceOffset {
+    fn to_offset(&self, dim: impl SpaceDim, power: u8) -> SpaceOffset {
         SpaceOffset::from_absolute_rounded(*self, dim.get(), power)
     }
 
@@ -74,11 +74,11 @@ impl ArqStart for Loc {
 }
 
 impl ArqStart for SpaceOffset {
-    fn to_loc(&self, dim: &impl SpaceDim, power: u8) -> Loc {
+    fn to_loc(&self, dim: impl SpaceDim, power: u8) -> Loc {
         self.to_absolute(dim.get(), power)
     }
 
-    fn to_offset(&self, _dim: &impl SpaceDim, _power: u8) -> SpaceOffset {
+    fn to_offset(&self, _dim: impl SpaceDim, _power: u8) -> SpaceOffset {
         *self
     }
 
@@ -154,7 +154,7 @@ impl<S: ArqStart> Arq<S> {
 
     /// The absolute length of each segment, the "chunk size"
     #[inline]
-    pub(crate) fn absolute_chunk_width(&self, dim: &impl SpaceDim) -> u32 {
+    pub(crate) fn absolute_chunk_width(&self, dim: impl SpaceDim) -> u32 {
         let len = self
             .quantum_chunk_width()
             .saturating_mul(dim.get().quantum)
@@ -169,7 +169,7 @@ impl<S: ArqStart> Arq<S> {
     }
 
     /// The absolute length of the entire arq.
-    pub fn absolute_length(&self, dim: &impl SpaceDim) -> u64 {
+    pub fn absolute_length(&self, dim: impl SpaceDim) -> u64 {
         let len = (self.absolute_chunk_width(dim) as u64 * (*self.count as u64)).min(U32_LEN);
         debug_assert_eq!(
             len,
@@ -181,7 +181,7 @@ impl<S: ArqStart> Arq<S> {
     }
 
     /// Convert to [`DhtArcRange`]
-    pub fn to_dht_arc_range(&self, dim: &impl SpaceDim) -> DhtArcRange {
+    pub fn to_dht_arc_range(&self, dim: impl SpaceDim) -> DhtArcRange {
         if is_full(dim, self.power, *self.count) {
             DhtArcRange::Full
         } else if *self.count == 0 {
@@ -193,7 +193,7 @@ impl<S: ArqStart> Arq<S> {
     }
 
     /// Determine the edges of this Arq in absolute coordinates ([`Loc`])
-    pub fn to_edge_locs(&self, dim: &impl SpaceDim) -> (Loc, Loc) {
+    pub fn to_edge_locs(&self, dim: impl SpaceDim) -> (Loc, Loc) {
         let start = self.start.to_offset(dim, self.power);
         let left = start.to_loc(dim, self.power);
         let right = (start + self.count).to_loc(dim, self.power) - Loc::from(1);
@@ -211,7 +211,7 @@ impl<S: ArqStart> Arq<S> {
     }
 
     /// What portion of the whole circle does this arq cover?
-    pub fn coverage(&self, dim: &impl SpaceDim) -> f64 {
+    pub fn coverage(&self, dim: impl SpaceDim) -> f64 {
         self.absolute_length(dim) as f64 / 2f64.powf(32.0)
     }
 
@@ -244,7 +244,7 @@ impl<S: ArqStart> Arq<S> {
     }
 
     /// This arq has full coverage
-    pub fn is_full(&self, dim: &impl SpaceDim) -> bool {
+    pub fn is_full(&self, dim: impl SpaceDim) -> bool {
         is_full(dim, self.power(), self.count())
     }
 
@@ -257,7 +257,7 @@ impl<S: ArqStart> Arq<S> {
 impl Arq<Loc> {
     /// Construct a full arq at the given power.
     /// The `count` is calculated accordingly.
-    pub fn new_full(dim: &impl SpaceDim, start: Loc, power: u8) -> Self {
+    pub fn new_full(dim: impl SpaceDim, start: Loc, power: u8) -> Self {
         let count = pow2(32u8.saturating_sub(power + dim.get().quantum_power));
         assert!(is_full(dim, power, count));
         Self {
@@ -293,7 +293,7 @@ impl Arq<Loc> {
 
     /// Convert to the [`ArqBounds`] representation, which forgets about the
     /// [`Loc`] associated with this arq.
-    pub fn to_bounds(&self, dim: &impl SpaceDim) -> ArqBounds {
+    pub fn to_bounds(&self, dim: impl SpaceDim) -> ArqBounds {
         ArqBounds {
             start: SpaceOffset::from(self.start.as_u32() / self.absolute_chunk_width(dim)),
             power: self.power,
@@ -312,14 +312,14 @@ impl Arq<Loc> {
     }
 
     /// Convert to [`DhtArc`]
-    pub fn to_dht_arc(&self, dim: &impl SpaceDim) -> DhtArc {
+    pub fn to_dht_arc(&self, dim: impl SpaceDim) -> DhtArc {
         let len = self.absolute_length(dim);
         DhtArc::from_start_and_len(self.start, len)
     }
 
     /// Computes the Arq which most closely matches the given [`DhtArc`]
     pub fn from_dht_arc_approximate(
-        dim: &impl SpaceDim,
+        dim: impl SpaceDim,
         strat: &ArqStrat,
         dht_arc: &DhtArc,
     ) -> Self {
@@ -327,7 +327,7 @@ impl Arq<Loc> {
     }
 
     /// The two arqs represent the same interval despite having potentially different terms
-    pub fn equivalent(dim: &impl SpaceDim, a: &Self, b: &Self) -> bool {
+    pub fn equivalent(dim: impl SpaceDim, a: &Self, b: &Self) -> bool {
         let qa = a.absolute_chunk_width(dim);
         let qb = b.absolute_chunk_width(dim);
         a.start == b.start && (a.count.wrapping_mul(qa) == b.count.wrapping_mul(qb))
@@ -342,7 +342,7 @@ impl From<&ArqBounds> for ArqBounds {
 
 impl ArqBounds {
     /// The two arqs represent the same interval despite having potentially different terms
-    pub fn equivalent(dim: &impl SpaceDim, a: &Self, b: &Self) -> bool {
+    pub fn equivalent(dim: impl SpaceDim, a: &Self, b: &Self) -> bool {
         let qa = a.absolute_chunk_width(dim);
         let qb = b.absolute_chunk_width(dim);
         *a.count == 0 && *b.count == 0
@@ -352,7 +352,7 @@ impl ArqBounds {
 
     /// Return the ArqBounds which most closely matches the given [`DhtArcRange`]
     pub fn from_interval_rounded(
-        dim: &impl SpaceDim,
+        dim: impl SpaceDim,
         power: u8,
         interval: DhtArcRange,
     ) -> (Self, bool) {
@@ -360,13 +360,13 @@ impl ArqBounds {
     }
 
     /// Return the ArqBounds which is equivalent to the given [`DhtArcRange`] if it exists.
-    pub fn from_interval(dim: &impl SpaceDim, power: u8, interval: DhtArcRange) -> Option<Self> {
+    pub fn from_interval(dim: impl SpaceDim, power: u8, interval: DhtArcRange) -> Option<Self> {
         Self::from_interval_inner(dim, power, interval, false).map(|(a, _)| a)
     }
 
     /// Upcast this ArqBounds to an Arq that has knowledge of its [`Loc`]
     #[cfg(any(test, feature = "test_utils"))]
-    pub fn to_arq<F: FnOnce(Loc) -> Loc>(&self, dim: &impl SpaceDim, f: F) -> Arq {
+    pub fn to_arq<F: FnOnce(Loc) -> Loc>(&self, dim: impl SpaceDim, f: F) -> Arq {
         Arq {
             start: f(self.start.to_loc(dim, self.power)),
             power: self.power,
@@ -375,12 +375,12 @@ impl ArqBounds {
     }
 
     /// An arbitrary zero-coverage arq.
-    pub fn empty(dim: &impl SpaceDim, power: u8) -> Self {
+    pub fn empty(dim: impl SpaceDim, power: u8) -> Self {
         Self::from_interval(dim, power, DhtArcRange::Empty).unwrap()
     }
 
     fn from_interval_inner(
-        dim: &impl SpaceDim,
+        dim: impl SpaceDim,
         power: u8,
         interval: DhtArcRange,
         always_round: bool,
@@ -462,7 +462,7 @@ impl ArqBounds {
 /// Any power lower than 24 will result in full coverage with
 /// count >= 2^(32 - 12 - 14) = 2^6 = 64, since it would take 64 chunks of
 /// size 2^(12 + 14) to cover the full space.
-pub fn is_full(dim: &impl SpaceDim, power: u8, count: u32) -> bool {
+pub fn is_full(dim: impl SpaceDim, power: u8, count: u32) -> bool {
     let max = 32u8.saturating_sub(dim.get().quantum_power);
     if power == 0 {
         false
@@ -476,7 +476,7 @@ pub fn is_full(dim: &impl SpaceDim, power: u8, count: u32) -> bool {
 /// Calculate the unique pairing of power and count implied by a given length
 /// and max number of chunks. Gives the nearest value that satisfies the constraints,
 /// but may not be exact.
-pub fn power_and_count_from_length(dim: &impl SpaceDim, len: u64, max_chunks: u32) -> (u8, u32) {
+pub fn power_and_count_from_length(dim: impl SpaceDim, len: u64, max_chunks: u32) -> (u8, u32) {
     let dim = dim.get();
     assert!(len <= U32_LEN);
     let mut power = 0;
@@ -495,7 +495,7 @@ pub fn power_and_count_from_length(dim: &impl SpaceDim, len: u64, max_chunks: u3
 /// represented exactly. If the length is not representable even at the quantum
 /// level (power==0), return None.
 pub fn power_and_count_from_length_exact(
-    dim: &impl SpaceDim,
+    dim: impl SpaceDim,
     len: u64,
     min_chunks: u32,
 ) -> Option<(u8, u32)> {
@@ -518,7 +518,7 @@ pub fn power_and_count_from_length_exact(
 }
 
 /// Given a center and a length, give Arq which matches most closely given the provided strategy
-pub fn approximate_arq(dim: &impl SpaceDim, strat: &ArqStrat, start: Loc, len: u64) -> Arq {
+pub fn approximate_arq(dim: impl SpaceDim, strat: &ArqStrat, start: Loc, len: u64) -> Arq {
     let dim = dim.get();
     if len == 0 {
         Arq::new(dim.min_power(), start, 0.into())
@@ -650,10 +650,10 @@ mod tests {
     #[test_case((128 + 16) * 2u64.pow(24), (16, 9))]
     fn test_power_and_count_from_length(len: u64, expected: (u8, u32)) {
         let topo = Topology::standard_epoch_full();
-        let (p, c) = power_and_count_from_length(dim, len, 16);
+        let (p, c) = power_and_count_from_length(&topo, len, 16);
         assert_eq!((p, c), expected);
         assert_eq!(
-            2u64.pow(p as u32 + dim.quantum_power as u32) * c as u64,
+            2u64.pow(p as u32 + topo.space.quantum_power as u32) * c as u64,
             len
         );
     }
@@ -665,10 +665,10 @@ mod tests {
     #[test_case((128 + 16 + 8 + 4 + 2) * 2u64.pow(24), (13, 79))]
     fn test_power_and_count_from_length_exact(len: u64, expected: (u8, u32)) {
         let topo = Topology::standard_epoch_full();
-        let (p, c) = power_and_count_from_length_exact(dim, len, 8).unwrap();
+        let (p, c) = power_and_count_from_length_exact(&topo, len, 8).unwrap();
         assert_eq!((p, c), expected);
         assert_eq!(
-            2u64.pow(p as u32 + dim.quantum_power as u32) * c as u64,
+            2u64.pow(p as u32 + topo.space.quantum_power as u32) * c as u64,
             len
         );
     }

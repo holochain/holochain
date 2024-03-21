@@ -20,8 +20,8 @@ pub trait Offset: Sized + Copy + Clone + Deref<Target = u32> + From<u32> {
     fn from_absolute_rounded(loc: Loc, dim: QDim<Self>, power: u8) -> Self;
 }
 
-pub type QAbs<O> = <<O as Offset>::Quantum as Quantum>::Absolute;
-pub type QDim<O> = <<O as Offset>::Quantum as Quantum>::Dim;
+pub(crate) type QAbs<O> = <<O as Offset>::Quantum as Quantum>::Absolute;
+pub(crate) type QDim<O> = <<O as Offset>::Quantum as Quantum>::Dim;
 
 /// An Offset in space.
 #[derive(
@@ -188,7 +188,7 @@ impl<O: Offset> Segment<O> {
 
 impl SpaceSegment {
     /// Get the start and end bounds, in absolute Loc coordinates, for this segment
-    pub fn loc_bounds(&self, dim: &impl SpaceDim) -> (Loc, Loc) {
+    pub fn loc_bounds(&self, dim: impl SpaceDim) -> (Loc, Loc) {
         let (a, b): (u32, u32) = bounds(dim.into().into(), self.power, self.offset, 1);
         (Loc::from(a), Loc::from(b))
     }

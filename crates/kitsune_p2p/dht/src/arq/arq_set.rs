@@ -74,7 +74,7 @@ impl<S: ArqStart> ArqSet<S> {
     }
 
     /// Convert to a set of "continuous" arcs
-    pub fn to_dht_arc_set(&self, dim: &impl SpaceDim) -> DhtArcSet {
+    pub fn to_dht_arc_set(&self, dim: impl SpaceDim) -> DhtArcSet {
         DhtArcSet::from(
             self.arqs
                 .iter()
@@ -93,7 +93,7 @@ impl<S: ArqStart> ArqSet<S> {
     }
 
     /// Intersection of all arqs contained within
-    pub fn intersection(&self, dim: &impl SpaceDim, other: &Self) -> ArqSet<SpaceOffset> {
+    pub fn intersection(&self, dim: impl SpaceDim, other: &Self) -> ArqSet<SpaceOffset> {
         let power = self.power.min(other.power());
         let a1 = self.requantize(power).unwrap().to_dht_arc_set(dim);
         let a2 = other.requantize(power).unwrap().to_dht_arc_set(dim);
@@ -111,7 +111,7 @@ impl<S: ArqStart> ArqSet<S> {
 
     /// View ascii for all arq bounds
     #[cfg(feature = "test_utils")]
-    pub fn print_arqs(&self, dim: &impl SpaceDim, len: usize) {
+    pub fn print_arqs(&self, dim: impl SpaceDim, len: usize) {
         println!("{} arqs, power: {}", self.arqs().len(), self.power());
         for (i, arq) in self.arqs().iter().enumerate() {
             println!(
@@ -143,7 +143,7 @@ impl ArqSet {
     //   may need to refactor agent info to include power level so as not to lose
     //   this info.
     pub fn from_dht_arc_set_exact(
-        dim: &impl SpaceDim,
+        dim: impl SpaceDim,
         strat: &ArqStrat,
         dht_arc_set: &DhtArcSet,
     ) -> Option<Self> {
@@ -163,7 +163,7 @@ impl ArqSet {
     /// Convert back from a continuous arc set to a quantized one.
     /// If the match is not exact, return the nearest possible quantized arcs.
     pub fn from_dht_arc_set_rounded(
-        dim: &impl SpaceDim,
+        dim: impl SpaceDim,
         strat: &ArqStrat,
         dht_arc_set: &DhtArcSet,
     ) -> (Self, bool) {
@@ -188,7 +188,7 @@ impl ArqSet {
 
 /// Print ascii for arq bounds
 #[cfg(feature = "test_utils")]
-pub fn print_arq<S: ArqStart>(dim: &impl SpaceDim, arq: &Arq<S>, len: usize) {
+pub fn print_arq<S: ArqStart>(dim: impl SpaceDim, arq: &Arq<S>, len: usize) {
     println!(
         "|{}| {} *2^{}",
         arq.to_ascii(dim, len),
@@ -199,7 +199,7 @@ pub fn print_arq<S: ArqStart>(dim: &impl SpaceDim, arq: &Arq<S>, len: usize) {
 
 /// Print a collection of arqs
 #[cfg(feature = "test_utils")]
-pub fn print_arqs<S: ArqStart>(dim: &impl SpaceDim, arqs: &[Arq<S>], len: usize) {
+pub fn print_arqs<S: ArqStart>(dim: impl SpaceDim, arqs: &[Arq<S>], len: usize) {
     for (i, arq) in arqs.iter().enumerate() {
         println!(
             "|{}| {}:\t{} +{} *2^{}",

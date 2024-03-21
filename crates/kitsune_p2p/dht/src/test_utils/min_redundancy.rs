@@ -26,7 +26,7 @@ pub fn calc_min_redundancy(topo: &Topology, peers: Vec<Arq>) -> u32 {
     // shared by both sides.
     let mut id = 0;
     let mut sides = |arq: &Arq| {
-        let (left, right) = arq.to_edge_locs(topo.space);
+        let (left, right) = arq.to_edge_locs(topo);
         let i = id;
         let l = Arm {
             id: i,

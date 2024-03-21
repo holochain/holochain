@@ -206,6 +206,7 @@ impl SpaceDimension {
         32 - self.quantum_power - strat.max_chunks_log2()
     }
 
+    /// Returns the space quantum which contains this location
     pub fn quantum(&self, x: Loc) -> SpaceQuantum {
         (x.as_u32() / self.quantum).into()
     }
@@ -266,24 +267,30 @@ impl Default for TimeDimension {
     }
 }
 
-pub trait SpaceDim: Into<SpaceDimension> {
+/// Any type which goes Into SpaceDimension.
+/// This mainly covers &Topology and SpaceDimension itself.
+pub trait SpaceDim: Copy + Into<SpaceDimension> {
+    /// Alias for `into`
     fn get(self) -> SpaceDimension;
 }
 impl<T> SpaceDim for T
 where
-    T: Into<SpaceDimension>,
+    T: Copy + Into<SpaceDimension>,
 {
     fn get(self) -> SpaceDimension {
         self.into()
     }
 }
 
-pub trait TimeDim: Into<TimeDimension> {
+/// Any type which goes Into TimeDimension.
+/// This mainly covers &Topology and TimeDimension itself.
+pub trait TimeDim: Copy + Into<TimeDimension> {
+    /// Alias for `into`
     fn get(self) -> TimeDimension;
 }
 impl<T> TimeDim for T
 where
-    T: Into<TimeDimension>,
+    T: Copy + Into<TimeDimension>,
 {
     fn get(self) -> TimeDimension {
         self.into()
