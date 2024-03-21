@@ -20,9 +20,9 @@ pub const STANDARD_QUANTUM_TIME: Duration = Duration::from_secs(60 * 5);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Topology {
     /// The quantization of space
-    pub space: Dimension,
+    pub space: SpaceDimension,
     /// The quantization of time
-    pub time: Dimension,
+    pub time: TimeDimension,
     /// The origin of time, meaning the 0th quantum contains this Timestamp.
     pub time_origin: Timestamp,
     /// Ignore any data which lies after `Timestamp::now() - time_cutoff`.
@@ -36,8 +36,8 @@ impl Topology {
     #[cfg(feature = "test_utils")]
     pub fn unit(time_origin: Timestamp) -> Self {
         Self {
-            space: Dimension::unit(),
-            time: Dimension::unit(),
+            space: Dimension::unit().into(),
+            time: Dimension::unit().into(),
             time_origin,
             time_cutoff: Duration::ZERO,
         }
@@ -47,8 +47,8 @@ impl Topology {
     #[cfg(feature = "test_utils")]
     pub fn unit_zero() -> Self {
         Self {
-            space: Dimension::unit(),
-            time: Dimension::unit(),
+            space: Dimension::unit().into(),
+            time: Dimension::unit().into(),
             time_origin: Timestamp::from_micros(0),
             time_cutoff: Duration::ZERO,
         }
@@ -57,8 +57,8 @@ impl Topology {
     /// Standard dimensions with the given time origin
     pub fn standard(time_origin: Timestamp, time_cutoff: Duration) -> Self {
         Self {
-            space: Dimension::standard_space(),
-            time: Dimension::standard_time(),
+            space: SpaceDimension::standard(),
+            time: TimeDimension::standard(),
             time_origin,
             time_cutoff,
         }
@@ -130,23 +130,19 @@ pub struct Dimension {
     pub(super) bit_depth: u8,
 }
 
-impl Dimension {
-    /// No quantization.
-    /// Used for testing, making it easier to construct values without thinking
-    /// of unit conversions.
-    #[cfg(feature = "test_utils")]
-    pub fn unit() -> Self {
-        Dimension {
-            quantum: 1,
-            quantum_power: 0,
-            bit_depth: 32,
-        }
-    }
+/// Defines the quantization of a spatial dimension.
+#[derive(Clone, Debug, PartialEq, Eq, derive_more::From, derive_more::Into, derive_more::Deref)]
+pub struct SpaceDimension(Dimension);
 
+/// Defines the quantization of a temporal dimension.
+#[derive(Clone, Debug, PartialEq, Eq, derive_more::From, derive_more::Into, derive_more::Deref)]
+pub struct TimeDimension(Dimension);
+
+impl SpaceDimension {
     /// The standard space quantum size is 2^12
-    pub const fn standard_space() -> Self {
+    pub const fn standard() -> Self {
         let quantum_power = 12;
-        Dimension {
+        Self(Dimension {
             // if a network has 1 million peers,
             // the average spacing between them is ~4,300
             // so at a target coverage of 100,
@@ -157,13 +153,21 @@ impl Dimension {
             quantum: 2u32.pow(quantum_power as u32),
             quantum_power,
             bit_depth: 32 - quantum_power,
-        }
+        })
     }
+}
 
+impl Default for SpaceDimension {
+    fn default() -> Self {
+        Self::standard()
+    }
+}
+
+impl TimeDimension {
     /// The standard time quantum size is 5 minutes (300 million microseconds)
-    pub const fn standard_time() -> Self {
+    pub const fn standard() -> Self {
         let quantum = STANDARD_QUANTUM_TIME.as_micros() as u32;
-        Dimension {
+        Self(Dimension {
             // 5 minutes in microseconds = 1mil * 60 * 5 = 300,000,000
             // log2 of this is 28.16, FYI
             quantum,
@@ -177,11 +181,11 @@ impl Dimension {
             //
             // BTW, the log2 of 100 years in microseconds is 54.81
             bit_depth: 24,
-        }
+        })
     }
 
     /// Calculate from a quantum size
-    pub fn time(quantum_dur: Duration) -> Self {
+    pub fn new(quantum_dur: Duration) -> Self {
         let quantum = quantum_dur.as_micros() as u32;
         let quantum_power = ((quantum as f64).log2().ceil() as u32).try_into().unwrap();
         let quanta_per_100_years = 60 * 60 / quantum_dur.as_secs() * 24 * 365 * 100;
@@ -192,6 +196,27 @@ impl Dimension {
             quantum,
             quantum_power,
             bit_depth,
+        }
+        .into()
+    }
+}
+
+impl Default for TimeDimension {
+    fn default() -> Self {
+        Self::standard()
+    }
+}
+
+impl Dimension {
+    /// No quantization.
+    /// Used for testing, making it easier to construct values without thinking
+    /// of unit conversions.
+    #[cfg(feature = "test_utils")]
+    pub fn unit() -> Self {
+        Dimension {
+            quantum: 1,
+            quantum_power: 0,
+            bit_depth: 32,
         }
     }
 }
@@ -239,8 +264,8 @@ mod tests {
     #[test]
     fn custom_quantum_time() {
         assert_eq!(
-            Dimension::standard_time(),
-            Dimension::time(STANDARD_QUANTUM_TIME)
+            TimeDimension::standard(),
+            TimeDimension::new(STANDARD_QUANTUM_TIME)
         );
     }
 }
