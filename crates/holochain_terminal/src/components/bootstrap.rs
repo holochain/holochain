@@ -165,7 +165,13 @@ pub fn render_bootstrap_widget<B: Backend>(
                 "agent       : {:?}",
                 kitsune_agent_to_pub_key(agents[selected].agent.clone())
             )),
-            ListItem::new(format!("storage arc : {:?}", agents[selected].storage_arc)),
+            ListItem::new(format!(
+                "storage arc : {:?}",
+                agents[selected].storage_arc(
+                    // OK to use this because origin time is irrelevant in this case
+                    &kitsune_p2p_types::dht::spacetime::Topology::standard_epoch_full()
+                )
+            )),
             ListItem::new(format!("url list    : {:?}", agents[selected].url_list)),
             ListItem::new(format!(
                 "signed at   : {:?}",

@@ -5,6 +5,8 @@ use crate::dht_arc::DhtArc;
 use crate::tx2::tx2_utils::TxUrl;
 use crate::*;
 use agent_info_helper::*;
+use dht::spacetime::Topology;
+use dht::Arq;
 
 /// A list of Urls.
 pub type UrlList = Vec<TxUrl>;
@@ -14,12 +16,35 @@ pub type AgentArc = (Arc<KitsuneAgent>, DhtArc);
 
 /// agent_info helper types
 pub mod agent_info_helper {
+    use dht::{spacetime::SpaceOffset, Loc};
+
     use super::*;
 
     #[allow(missing_docs)]
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     pub struct AgentMetaInfoEncode {
-        pub dht_storage_arc_half_length: u32,
+        pub dht_storage_arq_count: SpaceOffset,
+        pub dht_storage_arq_power: u8,
+    }
+
+    impl AgentMetaInfoEncode {
+        /// Convert to Arq
+        pub fn to_arq(&self, start: Loc) -> Arq {
+            Arq::new(
+                self.dht_storage_arq_power,
+                start,
+                self.dht_storage_arq_count,
+            )
+        }
+    }
+
+    impl From<Arq> for AgentMetaInfoEncode {
+        fn from(arq: Arq) -> Self {
+            Self {
+                dht_storage_arq_count: arq.count,
+                dht_storage_arq_power: arq.power,
+            }
+        }
     }
 
     #[allow(missing_docs)]
@@ -69,7 +94,7 @@ pub struct AgentInfoInner {
     pub agent: Arc<KitsuneAgent>,
 
     /// The storage arc currently being published by this agent.
-    pub storage_arc: DhtArc,
+    pub storage_arq: Arq,
 
     /// List of urls the agent can be reached at, in the agent's own preference order.
     pub url_list: UrlList,
@@ -104,7 +129,7 @@ impl std::fmt::Debug for AgentInfoInner {
         f.debug_struct("AgentInfoSigned")
             .field("space", &self.space)
             .field("agent", &self.agent)
-            .field("storage_arc", &self.storage_arc)
+            .field("storage_arq", &self.storage_arq)
             .field("url_list", &self.url_list)
             .field("signed_at_ms", &self.signed_at_ms)
             .field("expires_at_ms", &self.expires_at_ms)
@@ -179,8 +204,7 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
         }
 
         let start_loc = agent.get_loc();
-        let storage_arc =
-            DhtArc::from_start_and_half_len(start_loc, meta.dht_storage_arc_half_length);
+        let storage_arq = meta.to_arq(agent.get_loc());
 
         let AgentInfoEncode {
             space,
@@ -194,7 +218,7 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
         let inner = AgentInfoInner {
             space,
             agent,
-            storage_arc,
+            storage_arq,
             url_list: urls,
             signed_at_ms,
             expires_at_ms: signed_at_ms + expires_after_ms,
@@ -211,7 +235,7 @@ impl AgentInfoSigned {
     pub async fn sign<'a, R, F>(
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
-        dht_storage_arc_half_length: u32,
+        meta: AgentMetaInfoEncode,
         url_list: UrlList,
         signed_at_ms: u64,
         expires_at_ms: u64,
@@ -221,9 +245,8 @@ impl AgentInfoSigned {
         R: std::future::Future<Output = KitsuneResult<Arc<KitsuneSignature>>>,
         F: FnOnce(&[u8]) -> R,
     {
-        let meta = AgentMetaInfoEncode {
-            dht_storage_arc_half_length,
-        };
+        let storage_arq = meta.to_arq(agent.get_loc());
+
         let mut buf = Vec::new();
         crate::codec::rmp_encode(&mut buf, meta).map_err(KitsuneError::other)?;
         let meta = buf.into_boxed_slice();
@@ -242,11 +265,10 @@ impl AgentInfoSigned {
 
         let signature = f(&encoded_bytes).await?;
 
-        let start_loc = agent.get_loc();
         let inner = AgentInfoInner {
             space,
             agent,
-            storage_arc: DhtArc::from_start_and_half_len(start_loc, dht_storage_arc_half_length),
+            storage_arq,
             url_list,
             signed_at_ms,
             expires_at_ms,
@@ -270,14 +292,14 @@ impl AgentInfoSigned {
         Ok(buf.into_boxed_slice())
     }
 
-    /// get just the agent and its storage arc
-    pub fn to_agent_arc(&self) -> AgentArc {
-        (self.agent.clone(), self.storage_arc)
-    }
-
     /// Accessor
     pub fn agent(&self) -> Arc<KitsuneAgent> {
         self.agent.clone()
+    }
+
+    /// Convert arq to arc
+    pub fn storage_arc(&self) -> DhtArc {
+        self.storage_arq.to_dht_arc(topo)
     }
 }
 

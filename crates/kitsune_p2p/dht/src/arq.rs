@@ -117,7 +117,10 @@ impl ArqStart for SpaceOffset {
 /// In this case, there is no definite location associated, so we want to forget
 /// about the original Location data associated with each Arq.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct Arq<S: ArqStart = Loc> {
     /// The "start" defines the left edge of the arq
     pub start: S,
@@ -331,6 +334,17 @@ impl Arq<Loc> {
         let qa = a.absolute_chunk_width(dim);
         let qb = b.absolute_chunk_width(dim);
         a.start == b.start && (a.count.wrapping_mul(qa) == b.count.wrapping_mul(qb))
+    }
+
+    /// Computes the Arq which most closely matches the given params
+    pub fn from_start_and_half_len_approximate(
+        topo: &Topology,
+        strat: &ArqStrat,
+        start: Loc,
+        half_len: u32,
+    ) -> Self {
+        let arc = DhtArc::from_start_and_half_len(start, half_len);
+        Self::from_dht_arc_approximate(topo, strat, &arc)
     }
 }
 

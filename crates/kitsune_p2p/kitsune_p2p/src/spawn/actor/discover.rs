@@ -1,5 +1,7 @@
 use super::*;
-use kitsune_p2p_types::{agent_info::AgentInfoSigned, dht_arc::DhtLocation};
+use kitsune_p2p_types::{
+    agent_info::AgentInfoSigned, dht::spacetime::Topology, dht_arc::DhtLocation,
+};
 use std::future::Future;
 
 /// This enum represents the outcomes from peer discovery
@@ -251,6 +253,7 @@ pub(crate) struct SearchRemotesCoveringBasisLogic {
     backoff: KitsuneBackoff,
     check_node_count: usize,
     basis_loc: DhtLocation,
+    topo: Topology,
 }
 
 impl SearchRemotesCoveringBasisLogic {
@@ -260,6 +263,7 @@ impl SearchRemotesCoveringBasisLogic {
         check_node_count: usize,
         basis_loc: DhtLocation,
         timeout: KitsuneTimeout,
+        topo: Topology,
     ) -> Self {
         let backoff = timeout.backoff(initial_delay_ms, max_delay_ms);
         Self {
@@ -267,6 +271,7 @@ impl SearchRemotesCoveringBasisLogic {
             backoff,
             check_node_count,
             basis_loc,
+            topo,
         }
     }
 
@@ -290,11 +295,11 @@ impl SearchRemotesCoveringBasisLogic {
             }
 
             // skip nodes that can't tell us about any peers
-            if node.storage_arc.range().is_empty() {
+            if node.storage_arc(&self.topo).range().is_empty() {
                 continue;
             }
 
-            if node.storage_arc.contains(self.basis_loc) {
+            if node.storage_arc(&self.topo).contains(self.basis_loc) {
                 cover_nodes.push(node);
             } else {
                 near_nodes.push(node);
@@ -334,6 +339,7 @@ pub(crate) fn search_remotes_covering_basis(
     inner: Arc<SpaceReadOnlyInner>,
     basis_loc: DhtLocation,
     timeout: KitsuneTimeout,
+    topo: Topology,
 ) -> impl Future<Output = KitsuneP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
     const INITIAL_DELAY_MS: u64 = 100;
     const MAX_DELAY_MS: u64 = 1000;
@@ -345,6 +351,7 @@ pub(crate) fn search_remotes_covering_basis(
         CHECK_NODE_COUNT,
         basis_loc,
         timeout,
+        topo,
     );
 
     async move {

@@ -4,6 +4,7 @@ use crate::prelude::*;
 use crate::sql::*;
 use holochain_util::hex::many_bytes_string;
 use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSpace};
+use kitsune_p2p_dht::spacetime::Topology;
 use kitsune_p2p_dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use once_cell::sync::Lazy;
@@ -45,6 +46,7 @@ pub trait AsP2pStateTxExt {
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
+        topo: &Topology,
     ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agents sorted by nearness to basis loc
@@ -53,6 +55,7 @@ pub trait AsP2pStateTxExt {
         space: Arc<KitsuneSpace>,
         basis: u32,
         limit: u32,
+        topo: &Topology,
     ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Extrapolate coverage from agents within our own storage arc
@@ -77,6 +80,7 @@ pub trait AsP2pStateReadExt {
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
+        topo: &Topology,
     ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agents sorted by nearness to basis loc
@@ -84,6 +88,7 @@ pub trait AsP2pStateReadExt {
         &self,
         basis: u32,
         limit: u32,
+        topo: &Topology,
     ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Extrapolate coverage from agents within our own storage arc
@@ -182,6 +187,7 @@ impl AgentStore {
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
+        topo: &Topology,
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
         Ok(self
             .0
@@ -200,7 +206,7 @@ impl AgentStore {
                     return None;
                 }
 
-                let interval = DhtArcRange::from(info.storage_arc);
+                let interval = DhtArcRange::from(info.storage_arq.to_dht_arc(topo));
                 if !arcset.overlap(&interval.into()) {
                     return None;
                 }
@@ -210,14 +216,19 @@ impl AgentStore {
             .collect())
     }
 
-    fn query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
+    fn query_near_basis(
+        &self,
+        basis: u32,
+        limit: u32,
+        topo: &Topology,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
         let lock = self.0.lock();
 
         let mut out: Vec<(u32, &AgentInfoSigned)> = lock
             .values()
             .filter_map(|v| {
                 if v.is_active() {
-                    Some((v.storage_arc.dist(basis), v))
+                    Some((v.storage_arc(topo).dist(basis), v))
                 } else {
                     None
                 }
@@ -330,8 +341,9 @@ async fn cache_get_async(db: &DbRead<DbKindP2pAgents>) -> DatabaseResult<AgentSt
 pub async fn p2p_put(
     db: &DbWrite<DbKindP2pAgents>,
     signed: &AgentInfoSigned,
+    topo: &Topology,
 ) -> DatabaseResult<()> {
-    let record = P2pRecord::from_signed(signed)?;
+    let record = P2pRecord::from_signed(signed, topo)?;
     db.write_async(move |txn| tx_p2p_put(txn, record)).await
 }
 
@@ -339,12 +351,13 @@ pub async fn p2p_put(
 pub async fn p2p_put_all(
     db: &DbWrite<DbKindP2pAgents>,
     signed: impl Iterator<Item = &AgentInfoSigned>,
+    topo: &Topology,
 ) -> DatabaseResult<()> {
     let mut records = Vec::new();
     let mut ns = Vec::new();
     for s in signed {
         ns.push(s.clone());
-        records.push(P2pRecord::from_signed(s)?);
+        records.push(P2pRecord::from_signed(s, topo)?);
     }
     let space = db.kind().0.clone();
     db.write_async(move |txn| {
@@ -365,9 +378,10 @@ pub fn p2p_put_single(
     space: Arc<KitsuneSpace>,
     txn: &mut Transaction<'_>,
     signed: &AgentInfoSigned,
+    topo: &Topology,
 ) -> DatabaseResult<()> {
     cache_get(space, &*txn)?.put(signed.clone())?;
-    let record = P2pRecord::from_signed(signed)?;
+    let record = P2pRecord::from_signed(signed, topo)?;
     tx_p2p_put(txn, record)
 }
 
@@ -448,18 +462,22 @@ impl AsP2pStateReadExt for DbRead<DbKindP2pAgents> {
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
+        topo: &Topology,
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
         cache_get_async(self)
             .await?
-            .query_agents(since_ms, until_ms, arcset)
+            .query_agents(since_ms, until_ms, arcset, topo)
     }
 
     async fn p2p_query_near_basis(
         &self,
         basis: u32,
         limit: u32,
+        topo: &Topology,
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        cache_get_async(self).await?.query_near_basis(basis, limit)
+        cache_get_async(self)
+            .await?
+            .query_near_basis(basis, limit, topo)
     }
 
     async fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
@@ -515,8 +533,9 @@ impl AsP2pStateTxExt for Transaction<'_> {
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
+        topo: &Topology,
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        cache_get(space, self)?.query_agents(since_ms, until_ms, arcset)
+        cache_get(space, self)?.query_agents(since_ms, until_ms, arcset, topo)
     }
 
     fn p2p_query_near_basis(
@@ -524,8 +543,9 @@ impl AsP2pStateTxExt for Transaction<'_> {
         space: Arc<KitsuneSpace>,
         basis: u32,
         limit: u32,
+        topo: &Topology,
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        cache_get(space, self)?.query_near_basis(basis, limit)
+        cache_get(space, self)?.query_near_basis(basis, limit, topo)
     }
 
     fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
@@ -603,20 +623,21 @@ pub fn clamp64(u: u64) -> i64 {
 }
 
 impl P2pRecord {
-    pub fn from_signed(signed: &AgentInfoSigned) -> DatabaseResult<Self> {
+    pub fn from_signed(signed: &AgentInfoSigned, topo: &Topology) -> DatabaseResult<Self> {
         let agent = signed.agent.clone();
 
         let encoded = signed.encode().map_err(|e| anyhow::anyhow!(e))?;
 
         let signed_at_ms = signed.signed_at_ms;
         let expires_at_ms = signed.expires_at_ms;
-        let arc = signed.storage_arc;
+        let arq = signed.storage_arq;
 
-        let storage_center_loc = arc.start_loc().into();
+        let storage_center_loc = arq.start_loc().into();
 
         let is_active = signed.is_active();
 
-        let (storage_start_loc, storage_end_loc) = arc.to_primitive_bounds_detached();
+        let (storage_start_loc, storage_end_loc) =
+            arq.to_dht_arc(topo).to_primitive_bounds_detached();
 
         Ok(Self {
             agent,

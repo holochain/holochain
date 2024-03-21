@@ -11,6 +11,7 @@ use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::NetworkType;
 use kitsune_p2p_types::dht::prelude::ArqClamping;
+use kitsune_p2p_types::dht::spacetime::Topology;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
@@ -1016,8 +1017,12 @@ impl KitsuneP2pHandler for Space {
         // then, find a list of agents in a potentially remote neighborhood
         // that should be responsible for holding the data.
         let ro_inner = self.ro_inner.clone();
-        let discover_fut =
-            discover::search_remotes_covering_basis(ro_inner.clone(), basis.get_loc(), timeout);
+        let discover_fut = discover::search_remotes_covering_basis(
+            ro_inner.clone(),
+            basis.get_loc(),
+            timeout,
+            &self.topo,
+        );
         Ok(async move {
             futures::future::join_all(local_notify_events).await;
             futures::future::join_all(local_agent_info_events).await;
@@ -1351,6 +1356,7 @@ pub(crate) struct Space {
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
     mdns_listened_spaces: HashSet<String>,
     gossip_mod: HashMap<GossipModuleType, GossipModule>,
+    topo: Topology,
 }
 
 impl Space {
@@ -1366,6 +1372,7 @@ impl Space {
         bandwidth_throttles: BandwidthThrottles,
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
         fetch_pool: FetchPool,
+        topo: Topology,
     ) -> Self {
         let metrics = MetricsSync::default();
 
@@ -1493,6 +1500,7 @@ impl Space {
             mdns_handles: HashMap::new(),
             mdns_listened_spaces: HashSet::new(),
             gossip_mod,
+            topo,
         }
     }
 

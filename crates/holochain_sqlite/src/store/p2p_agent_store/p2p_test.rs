@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use kitsune_p2p_bin_data::KitsuneBinType;
 use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSignature, KitsuneSpace};
+use kitsune_p2p_dht::{Arq, ArqStrat};
 use kitsune_p2p_dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use rand::Rng;
@@ -39,6 +40,7 @@ async fn rand_insert(
     agent: &Arc<KitsuneAgent>,
     long: bool,
 ) {
+    let topo = kitsune_p2p_dht::prelude::Topology::standard_epoch_full();
     let mut rng = rand::thread_rng();
 
     let signed_at_ms = rand_signed_at_ms();
@@ -56,10 +58,17 @@ async fn rand_insert(
         _ => rng.gen_range(0..u32::MAX / 1000),
     };
 
+    let arq = Arq::from_start_and_half_len_approximate(
+        &topo,
+        &ArqStrat::default(),
+        agent.get_loc(),
+        half_len,
+    );
+
     let signed = AgentInfoSigned::sign(
         space.clone(),
         agent.clone(),
-        half_len,
+        arq.into(),
         vec!["fake:".try_into().unwrap()],
         signed_at_ms,
         expires_at_ms,
@@ -68,7 +77,7 @@ async fn rand_insert(
     .await
     .unwrap();
 
-    p2p_put(db, &signed).await.unwrap();
+    p2p_put(db, &signed, &topo).await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -123,6 +132,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
         .tempdir()
         .unwrap();
 
+    let topo = kitsune_p2p_dht::prelude::Topology::standard_epoch_full();
     let space = rand_space();
 
     let db = DbWrite::test(tmp_dir.path(), DbKindP2pAgents(space.clone())).unwrap();
@@ -146,7 +156,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     // nonzero ones
     let num_nonzero = all
         .iter()
-        .filter(|a| a.storage_arc.half_length() > 0)
+        .filter(|a| a.storage_arc(&topo).half_length() > 0)
         .count();
 
     // make sure we can get our example result
@@ -160,6 +170,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
             u64::MIN,
             u64::MAX,
             DhtArcRange::from_bounds(0, u32::MAX).into(),
+            &topo,
         )
         .await
         .unwrap();
@@ -171,6 +182,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
             u64::MIN,
             u64::MIN,
             DhtArcRange::from_bounds(0, u32::MAX).into(),
+            &topo,
         )
         .await
         .unwrap();
@@ -178,7 +190,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     // check that gossip query over zero arc returns zero results
     let all = db
-        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArcRange::Empty.into())
+        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArcRange::Empty.into(), &topo)
         .await
         .unwrap();
     assert_eq!(all.len(), 0);
@@ -190,6 +202,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
             u64::MIN,
             u64::MAX,
             DhtArcRange::from_bounds(0, u32::MAX as u64 / 4).into(),
+            &topo,
         )
         .await
         .unwrap();
@@ -199,11 +212,11 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     // near
     let tgt = u32::MAX / 2;
-    let near = db.p2p_query_near_basis(tgt, 20).await.unwrap();
+    let near = db.p2p_query_near_basis(tgt, 20, &topo).await.unwrap();
     let mut prev = 0;
     for agent_info_signed in near {
         let loc = agent_info_signed.agent.get_loc();
-        let record = super::P2pRecord::from_signed(&agent_info_signed).unwrap();
+        let record = super::P2pRecord::from_signed(&agent_info_signed, &topo).unwrap();
         let mut dist = u32::MAX;
         let mut deb = "not reset";
 

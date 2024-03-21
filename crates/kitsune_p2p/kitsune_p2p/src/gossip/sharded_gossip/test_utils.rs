@@ -3,6 +3,7 @@ use std::sync::Arc;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash},
+    dht::spacetime::Topology,
     tx2::tx2_utils::PoolBuf,
 };
 
@@ -14,10 +15,11 @@ use super::*;
 pub fn create_agent_bloom<'a>(
     agents: impl Iterator<Item = &'a AgentInfoSigned>,
     filter: Option<&AgentInfoSigned>,
+    topo: &Topology,
 ) -> Option<PoolBuf> {
     let agents: Vec<_> = match filter {
         Some(filter) => agents
-            .filter(|a| filter.storage_arc.contains(a.agent.get_loc()))
+            .filter(|a| filter.storage_arc(topo).contains(a.agent.get_loc()))
             .collect(),
         None => agents.collect(),
     };

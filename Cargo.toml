@@ -65,6 +65,7 @@ resolver = "2"
 [workspace.dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
+arbitrary = { version = "1.0", features = ["derive"] }
 derive_more = "0.99"
 futures = "0.3"
 holochain_wasmer_common = "=0.0.92"
