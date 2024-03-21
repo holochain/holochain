@@ -14,12 +14,10 @@ use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
 
-use crate::calls::AddAppWs;
 use crate::cli::LaunchInfo;
 use crate::config::*;
 use crate::ports::random_admin_port;
 use crate::ports::set_admin_port;
-use crate::CmdRunner;
 
 // MAYBE: Export these strings from their respective repos
 //        so that we can be sure to keep them in sync.

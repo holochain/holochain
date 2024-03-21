@@ -12,7 +12,7 @@ use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::ensure;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
-use holochain_conductor_api::AdminRequest;
+use holochain_conductor_api::{AdminRequest, AppInterfaceInfo};
 use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
@@ -531,7 +531,7 @@ pub async fn uninstall_app(cmd: &mut CmdRunner, args: UninstallApp) -> anyhow::R
 }
 
 /// Calls [`AdminRequest::ListAppInterfaces`].
-pub async fn list_app_ws(cmd: &mut CmdRunner) -> anyhow::Result<Vec<u16>> {
+pub async fn list_app_ws(cmd: &mut CmdRunner) -> anyhow::Result<Vec<AppInterfaceInfo>> {
     let resp = cmd.command(AdminRequest::ListAppInterfaces).await?;
     Ok(expect_match!(resp => AdminResponse::AppInterfacesListed, "Failed to list app interfaces"))
 }
