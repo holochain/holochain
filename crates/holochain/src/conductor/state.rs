@@ -7,6 +7,7 @@ use holochain_conductor_services::DpkiInstallation;
 use holochain_conductor_services::DPKI_APP_ID;
 use holochain_p2p::NetworkCompatParams;
 use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -276,10 +277,13 @@ pub struct AppInterfaceConfig {
 
 impl AppInterfaceConfig {
     /// Create config for a websocket interface
-    pub fn websocket(port: u16) -> Self {
+    pub fn websocket(port: u16, allowed_origins: AllowedOrigins) -> Self {
         Self {
             signal_subscriptions: HashMap::new(),
-            driver: InterfaceDriver::Websocket { port },
+            driver: InterfaceDriver::Websocket {
+                port,
+                allowed_origins,
+            },
         }
     }
 }

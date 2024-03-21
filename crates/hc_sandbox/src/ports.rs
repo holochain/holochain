@@ -7,6 +7,7 @@ use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::{
     config::conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver,
 };
+use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::{self as ws, WebsocketConfig, WebsocketSender};
 
 use crate::config::read_config;
@@ -33,7 +34,7 @@ pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
         if let Some(config) = read_config(ConfigRootPath::from(p))? {
             if let Some(ai) = config.admin_interfaces {
                 if let Some(AdminInterfaceConfig {
-                    driver: InterfaceDriver::Websocket { port },
+                    driver: InterfaceDriver::Websocket { port, .. },
                 }) = ai.first()
                 {
                     ports.push(*port)
@@ -56,11 +57,11 @@ pub(crate) async fn get_admin_api(
 async fn websocket_client_by_port(
     port: u16,
 ) -> std::io::Result<(WebsocketSender, tokio::task::JoinHandle<()>)> {
-    let (send, mut recv) = ws::connect(
-        Arc::new(WebsocketConfig::default()),
-        ([127, 0, 0, 1], port).into(),
-    )
-    .await?;
+    let req = holochain_websocket::ConnectRequest::new(([127, 0, 0, 1], port).into())
+        .try_set_header("Origin", "hc_sandbox")
+        .expect("Failed to set `Origin` header for websocket connection request");
+
+    let (send, mut recv) = ws::connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), req).await?;
     let task = tokio::task::spawn(async move {
         while recv
             .recv::<holochain_conductor_api::AdminResponse>()
@@ -74,7 +75,7 @@ async fn websocket_client_by_port(
 pub(crate) fn random_admin_port(config: &mut ConductorConfig) {
     match config.admin_interfaces.as_mut().and_then(|i| i.first_mut()) {
         Some(AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port },
+            driver: InterfaceDriver::Websocket { port, .. },
         }) => {
             if *port != 0 {
                 *port = 0;
@@ -83,7 +84,10 @@ pub(crate) fn random_admin_port(config: &mut ConductorConfig) {
         None => {
             let port = 0;
             config.admin_interfaces = Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port },
+                driver: InterfaceDriver::Websocket {
+                    port,
+                    allowed_origins: AllowedOrigins::Any,
+                },
             }]);
         }
     }
@@ -92,7 +96,10 @@ pub(crate) fn random_admin_port(config: &mut ConductorConfig) {
 pub(crate) fn set_admin_port(config: &mut ConductorConfig, port: u16) {
     let p = port;
     let port = AdminInterfaceConfig {
-        driver: InterfaceDriver::Websocket { port },
+        driver: InterfaceDriver::Websocket {
+            port,
+            allowed_origins: AllowedOrigins::Any,
+        },
     };
     match config
         .admin_interfaces

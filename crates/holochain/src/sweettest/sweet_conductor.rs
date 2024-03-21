@@ -18,6 +18,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::*;
 use nanoid::nanoid;
 use rand::Rng;
@@ -550,7 +551,7 @@ impl SweetConductor {
     pub async fn app_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
         let port = self
             .raw_handle()
-            .add_app_interface(either::Either::Left(0))
+            .add_app_interface(either::Either::Left(0), AllowedOrigins::Any)
             .await
             .expect("Couldn't create app interface");
         websocket_client_by_port(port).await.unwrap()
@@ -755,12 +756,10 @@ impl SweetConductor {
 }
 
 /// Get a websocket client on localhost at the specified port
-pub async fn websocket_client_by_port(
-    port: u16,
-) -> std::io::Result<(WebsocketSender, WebsocketReceiver)> {
-    holochain_websocket::connect(
-        Arc::new(WebsocketConfig::default()),
-        ([127, 0, 0, 1], port).into(),
+pub async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, WebsocketReceiver)> {
+    connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port).into()),
     )
     .await
 }

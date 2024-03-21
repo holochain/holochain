@@ -49,5 +49,6 @@ pub mod facts;
 pub mod inline_zome;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
+pub mod websocket;
 
 pub use holochain_zome_types::entry::EntryHashed;

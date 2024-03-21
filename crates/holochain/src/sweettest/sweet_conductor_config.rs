@@ -5,6 +5,7 @@ use holochain_conductor_api::{
     conductor::{ConductorConfig, ConductorTuningParams},
     AdminInterfaceConfig, InterfaceDriver,
 };
+use holochain_types::websocket::AllowedOrigins;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 pub(crate) static NUM_CREATED: AtomicUsize = AtomicUsize::new(0);
@@ -26,7 +27,10 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
         ConductorConfig {
             network,
             admin_interfaces: Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: 0 },
+                driver: InterfaceDriver::Websocket {
+                    port: 0,
+                    allowed_origins: AllowedOrigins::Any,
+                },
             }]),
             tuning_params: Some(ConductorTuningParams {
                 sys_validation_retry_delay: Some(std::time::Duration::from_secs(1)),

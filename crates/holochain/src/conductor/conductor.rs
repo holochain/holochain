@@ -376,14 +376,15 @@ mod startup_shutdown_impls {
 /// Methods related to conductor interfaces
 mod interface_impls {
     use super::*;
+    use holochain_types::websocket::AllowedOrigins;
 
     impl Conductor {
         /// Spawn all admin interface tasks, register them with the TaskManager,
         /// and modify the conductor accordingly, based on the config passed in
-        pub(crate) async fn add_admin_interfaces(
+        pub async fn add_admin_interfaces(
             self: Arc<Self>,
             configs: Vec<AdminInterfaceConfig>,
-        ) -> ConductorResult<()> {
+        ) -> ConductorResult<Vec<u16>> {
             let admin_api = RealAdminInterfaceApi::new(self.clone());
             let tm = self.task_manager();
 
@@ -393,8 +394,11 @@ mod interface_impls {
                 let tm = tm.clone();
                 async move {
                     match driver {
-                        InterfaceDriver::Websocket { port } => {
-                            let listener = spawn_websocket_listener(port).await?;
+                        InterfaceDriver::Websocket {
+                            port,
+                            allowed_origins,
+                        } => {
+                            let listener = spawn_websocket_listener(port, allowed_origins).await?;
                             let port = listener.local_addr()?.port();
                             spawn_admin_interface_tasks(
                                 tm.clone(),
@@ -419,10 +423,11 @@ mod interface_impls {
             // Exit if the admin interfaces fail to be created
             let ports = ports.map_err(Box::new)?;
 
-            for p in ports {
-                self.add_admin_port(p);
+            for p in &ports {
+                self.add_admin_port(*p);
             }
-            Ok(())
+
+            Ok(ports)
         }
 
         /// Spawn a new app interface task, register it with the TaskManager,
@@ -432,6 +437,7 @@ mod interface_impls {
         pub async fn add_app_interface(
             self: Arc<Self>,
             port: either::Either<u16, AppInterfaceId>,
+            allowed_origins: AllowedOrigins,
         ) -> ConductorResult<u16> {
             let interface_id = match port {
                 either::Either::Left(port) => AppInterfaceId::new(port),
@@ -447,9 +453,15 @@ mod interface_impls {
             let tm = self.task_manager();
 
             // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
-            let port = spawn_app_interface_task(tm.clone(), port, app_api, signal_tx.clone())
-                .await
-                .map_err(Box::new)?;
+            let port = spawn_app_interface_task(
+                tm.clone(),
+                port,
+                allowed_origins.clone(),
+                app_api,
+                signal_tx.clone(),
+            )
+            .await
+            .map_err(Box::new)?;
             let interface = AppInterfaceRuntime::Websocket { signal_tx };
 
             self.app_interfaces.share_mut(|app_interfaces| {
@@ -462,7 +474,7 @@ mod interface_impls {
                 app_interfaces.insert(interface_id.clone(), interface);
                 Ok(())
             })?;
-            let config = AppInterfaceConfig::websocket(port);
+            let config = AppInterfaceConfig::websocket(port, allowed_origins);
             self.update_state(|mut state| {
                 state.app_interfaces.insert(interface_id, config);
                 Ok(state)
@@ -493,9 +505,15 @@ mod interface_impls {
         /// This should only be run at conductor initialization.
         #[allow(irrefutable_let_patterns)]
         pub(crate) async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()> {
-            for id in self.get_state().await?.app_interfaces.keys().cloned() {
-                tracing::debug!("Starting up app interface: {:?}", id);
-                let _ = self.clone().add_app_interface(either::Right(id)).await?;
+            for (id, config) in &self.get_state().await?.app_interfaces {
+                debug!("Starting up app interface: {:?}", id);
+                let _ = self
+                    .clone()
+                    .add_app_interface(
+                        either::Right(id.clone()),
+                        config.driver.allowed_origins().clone(),
+                    )
+                    .await?;
             }
             Ok(())
         }
