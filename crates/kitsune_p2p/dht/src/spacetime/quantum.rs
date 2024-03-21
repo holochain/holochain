@@ -24,7 +24,7 @@ pub struct SpaceQuantum(u32);
 impl SpaceQuantum {
     /// The inclusive locations at either end of this quantum
     pub fn to_loc_bounds(&self, topo: &Topology) -> (Loc, Loc) {
-        let (a, b): (u32, u32) = bounds(&topo.space, 0, self.0.into(), 1);
+        let (a, b): (u32, u32) = bounds(topo.space.into(), 0, self.0.into(), 1);
         (Loc::from(a), Loc::from(b))
     }
 }
@@ -59,7 +59,7 @@ impl TimeQuantum {
 
     /// The inclusive timestamps at either end of this quantum
     pub fn to_timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
-        let (a, b): (i64, i64) = bounds64(&topo.time, 0, self.0.into(), 1);
+        let (a, b): (i64, i64) = bounds64(topo.time.into(), 0, self.0.into(), 1);
         (
             Timestamp::from_micros(a + topo.time_origin.as_micros()),
             Timestamp::from_micros(b + topo.time_origin.as_micros()),
@@ -75,24 +75,24 @@ pub trait Quantum:
     /// The absolute coordinate which this quantum corresponds to (time or space)
     type Absolute;
 
+    /// The dimension type which this quantum corresponds to (time or space)
+    type Dim: Into<Dimension> + Copy;
+
     /// The u32 representation
     fn inner(&self) -> u32;
 
-    /// Return the proper dimension (time or space) from the topology
-    fn dimension(topo: &Topology) -> &Dimension;
-
     /// If this coord is beyond the max value for its dimension, wrap it around
     /// the max value
-    fn normalized(self, topo: &Topology) -> Self;
+    fn normalized(self, dim: Self::Dim) -> Self;
 
     /// The maximum quantum for this dimension
-    fn max_value(topo: &Topology) -> Self {
-        Self::from((2u64.pow(Self::dimension(topo).bit_depth as u32) - 1) as u32)
+    fn max_value(dim: Self::Dim) -> Self {
+        Self::from((2u64.pow(dim.into().bit_depth as u32) - 1) as u32)
     }
 
     /// Convert to the absolute u32 coordinate space, wrapping if needed
-    fn exp_wrapping(&self, topo: &Topology, pow: u8) -> u32 {
-        (self.inner() as u64 * Self::dimension(topo).quantum as u64 * 2u64.pow(pow as u32)) as u32
+    fn exp_wrapping(&self, dim: Self::Dim, pow: u8) -> u32 {
+        (self.inner() as u64 * dim.into().quantum as u64 * 2u64.pow(pow as u32)) as u32
     }
 
     /// Exposes wrapping addition for the u32
@@ -108,17 +108,14 @@ pub trait Quantum:
 
 impl Quantum for SpaceQuantum {
     type Absolute = Loc;
+    type Dim = SpaceDimension;
 
     fn inner(&self) -> u32 {
         self.0
     }
 
-    fn dimension(topo: &Topology) -> &Dimension {
-        &topo.space
-    }
-
-    fn normalized(self, topo: &Topology) -> Self {
-        let depth = topo.space.bit_depth;
+    fn normalized(self, dim: SpaceDimension) -> Self {
+        let depth = dim.bit_depth;
         if depth >= 32 {
             self
         } else {
@@ -129,17 +126,14 @@ impl Quantum for SpaceQuantum {
 
 impl Quantum for TimeQuantum {
     type Absolute = Timestamp;
+    type Dim = TimeDimension;
 
     fn inner(&self) -> u32 {
         self.0
     }
 
-    fn dimension(topo: &Topology) -> &Dimension {
-        &topo.time
-    }
-
     // Time coordinates do not wrap, so normalization is an identity
-    fn normalized(self, _topo: &Topology) -> Self {
+    fn normalized(self, _dim: TimeDimension) -> Self {
         self
     }
 }

@@ -2,7 +2,7 @@
 
 use kitsune_p2p_dht_arc::DhtArcRange;
 
-use crate::{spacetime::Topology, Loc};
+use crate::{spacetime::*, Loc};
 
 use super::{Arq, ArqStart};
 
@@ -45,10 +45,10 @@ pub fn add_location_ascii(mut s: String, locs: Vec<Loc>) -> String {
 impl<S: ArqStart> Arq<S> {
     /// Handy ascii representation of an arc, especially useful when
     /// looking at several arcs at once to get a sense of their overlap
-    pub fn to_ascii(&self, topo: &Topology, len: usize) -> String {
+    pub fn to_ascii(&self, dim: &impl SpaceDim, len: usize) -> String {
         let empty = || {
             let mut s = " ".repeat(len);
-            let ix = loc_downscale(len, self.start.to_loc(topo, self.power));
+            let ix = loc_downscale(len, self.start.to_loc(dim, self.power));
             s.replace_range(ix..=ix, ".");
             s
         };
@@ -71,7 +71,7 @@ impl<S: ArqStart> Arq<S> {
             }
         };
 
-        match self.to_dht_arc_range(topo) {
+        match self.to_dht_arc_range(dim) {
             DhtArcRange::Full => full(),
             DhtArcRange::Empty => empty(),
             DhtArcRange::Bounded(lo0, hi0) => {

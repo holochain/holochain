@@ -11,18 +11,17 @@ pub trait Offset: Sized + Copy + Clone + Deref<Target = u32> + From<u32> {
     type Quantum: Quantum;
 
     /// Get the absolute coordinate for this Offset
-    fn to_absolute(
-        &self,
-        topo: &Topology,
-        power: u8,
-    ) -> <<Self as Offset>::Quantum as Quantum>::Absolute;
+    fn to_absolute(&self, dim: QDim<Self>, power: u8) -> QAbs<Self>;
 
     /// Get the quantum coordinate for this Offset
     fn to_quantum(&self, power: u8) -> Self::Quantum;
 
     /// Get the nearest rounded-down Offset for the given Loc
-    fn from_absolute_rounded(loc: Loc, topo: &Topology, power: u8) -> Self;
+    fn from_absolute_rounded(loc: Loc, dim: QDim<Self>, power: u8) -> Self;
 }
+
+pub type QAbs<O> = <<O as Offset>::Quantum as Quantum>::Absolute;
+pub type QDim<O> = <<O as Offset>::Quantum as Quantum>::Dim;
 
 /// An Offset in space.
 #[derive(
@@ -78,8 +77,8 @@ impl Offset for SpaceOffset {
     type Quantum = SpaceQuantum;
 
     /// Get the absolute coordinate for this Offset
-    fn to_absolute(&self, topo: &Topology, power: u8) -> Loc {
-        self.wrapping_mul(topo.space.quantum)
+    fn to_absolute(&self, dim: SpaceDimension, power: u8) -> Loc {
+        self.wrapping_mul(dim.quantum)
             .wrapping_mul(pow2(power))
             .into()
     }
@@ -90,8 +89,8 @@ impl Offset for SpaceOffset {
     }
 
     /// Get the nearest rounded-down Offset for the given Loc
-    fn from_absolute_rounded(loc: Loc, topo: &Topology, power: u8) -> Self {
-        (loc.as_u32() / topo.space.quantum / pow2(power)).into()
+    fn from_absolute_rounded(loc: Loc, dim: SpaceDimension, power: u8) -> Self {
+        (loc.as_u32() / dim.quantum / pow2(power)).into()
     }
 }
 
@@ -99,11 +98,8 @@ impl Offset for TimeOffset {
     type Quantum = TimeQuantum;
 
     /// Get the absolute coordinate for this Offset
-    fn to_absolute(&self, topo: &Topology, power: u8) -> Timestamp {
-        Timestamp::from_micros(
-            self.wrapping_mul(topo.time.quantum)
-                .wrapping_mul(pow2(power)) as i64,
-        )
+    fn to_absolute(&self, dim: TimeDimension, power: u8) -> Timestamp {
+        Timestamp::from_micros(self.wrapping_mul(dim.quantum).wrapping_mul(pow2(power)) as i64)
     }
 
     /// Get the quantum coordinate for this Offset
@@ -112,8 +108,8 @@ impl Offset for TimeOffset {
     }
 
     /// Get the nearest rounded-down Offset for the given Loc
-    fn from_absolute_rounded(loc: Loc, topo: &Topology, power: u8) -> Self {
-        (loc.as_u32() / topo.time.quantum / pow2(power)).into()
+    fn from_absolute_rounded(loc: Loc, dim: TimeDimension, power: u8) -> Self {
+        (loc.as_u32() / dim.quantum / pow2(power)).into()
     }
 }
 
@@ -148,26 +144,26 @@ impl<O: Offset> Segment<O> {
     }
 
     /// The length, in absolute terms (Location or microseconds of time)
-    pub fn absolute_length(&self, topo: &Topology) -> u64 {
-        let q = O::Quantum::dimension(topo).quantum as u64;
+    pub fn absolute_length(&self, dim: QDim<O>) -> u64 {
+        let q = dim.into().quantum as u64;
         // If power is 32, this overflows a u32
         self.num_quanta() * q
     }
 
     /// Get the quanta which bound this segment
-    pub fn quantum_bounds(&self, topo: &Topology) -> (O::Quantum, O::Quantum) {
+    pub fn quantum_bounds(&self, dim: QDim<O>) -> (O::Quantum, O::Quantum) {
         let n = self.num_quanta();
         let a = (n * u64::from(*self.offset)) as u32;
         (
-            O::Quantum::from(a).normalized(topo),
-            O::Quantum::from(a.wrapping_add(n as u32).wrapping_sub(1)).normalized(topo),
+            O::Quantum::from(a).normalized(dim),
+            O::Quantum::from(a.wrapping_add(n as u32).wrapping_sub(1)).normalized(dim),
         )
     }
 
     /// The segment contains the given quantum coord
-    pub fn contains_quantum(&self, topo: &Topology, coord: O::Quantum) -> bool {
-        let (lo, hi) = self.quantum_bounds(topo);
-        let coord = coord.normalized(topo);
+    pub fn contains_quantum(&self, dim: QDim<O>, coord: O::Quantum) -> bool {
+        let (lo, hi) = self.quantum_bounds(dim);
+        let coord = coord.normalized(dim);
         if lo <= hi {
             lo <= coord && coord <= hi
         } else {
@@ -192,8 +188,8 @@ impl<O: Offset> Segment<O> {
 
 impl SpaceSegment {
     /// Get the start and end bounds, in absolute Loc coordinates, for this segment
-    pub fn loc_bounds(&self, topo: &Topology) -> (Loc, Loc) {
-        let (a, b): (u32, u32) = bounds(&topo.space, self.power, self.offset, 1);
+    pub fn loc_bounds(&self, dim: &impl SpaceDim) -> (Loc, Loc) {
+        let (a, b): (u32, u32) = bounds(dim.into().into(), self.power, self.offset, 1);
         (Loc::from(a), Loc::from(b))
     }
 }
@@ -201,7 +197,7 @@ impl SpaceSegment {
 impl TimeSegment {
     /// Get the start and end bounds, in absolute Timestamp coordinates, for this segment
     pub fn timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
-        let (a, b): (i64, i64) = bounds64(&topo.time, self.power, self.offset, 1);
+        let (a, b): (i64, i64) = bounds64(topo.time.into(), self.power, self.offset, 1);
         let o = topo.time_origin.as_micros();
         (Timestamp::from_micros(a + o), Timestamp::from_micros(b + o))
     }
@@ -213,7 +209,7 @@ pub type SpaceSegment = Segment<SpaceOffset>;
 pub type TimeSegment = Segment<TimeOffset>;
 
 pub(super) fn bounds<N: From<u32>>(
-    dim: &Dimension,
+    dim: Dimension,
     power: u8,
     offset: SpaceOffset,
     count: u32,
@@ -227,7 +223,7 @@ pub(super) fn bounds<N: From<u32>>(
 }
 
 pub(super) fn bounds64<N: From<i64>>(
-    dim: &Dimension,
+    dim: Dimension,
     power: u8,
     offset: TimeOffset,
     count: u32,

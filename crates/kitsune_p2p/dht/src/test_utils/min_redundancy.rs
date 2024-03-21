@@ -26,7 +26,7 @@ pub fn calc_min_redundancy(topo: &Topology, peers: Vec<Arq>) -> u32 {
     // shared by both sides.
     let mut id = 0;
     let mut sides = |arq: &Arq| {
-        let (left, right) = arq.to_edge_locs(topo);
+        let (left, right) = arq.to_edge_locs(topo.space);
         let i = id;
         let l = Arm {
             id: i,
@@ -48,7 +48,7 @@ pub fn calc_min_redundancy(topo: &Topology, peers: Vec<Arq>) -> u32 {
     let peers: Vec<_> = peers
         .into_iter()
         .filter(|a| {
-            if (a.coverage(topo) - 1.0).abs() < ERROR_MARGIN {
+            if (a.coverage(topo.space) - 1.0).abs() < ERROR_MARGIN {
                 full_r += 1;
                 false
             } else {

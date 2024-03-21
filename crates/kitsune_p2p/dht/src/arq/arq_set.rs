@@ -2,11 +2,7 @@
 
 use kitsune_p2p_dht_arc::DhtArcSet;
 
-use crate::{
-    arq::ArqBounds,
-    spacetime::{SpaceOffset, Topology},
-    ArqStrat,
-};
+use crate::{arq::ArqBounds, spacetime::*, ArqStrat};
 
 use super::{power_and_count_from_length, power_and_count_from_length_exact, Arq, ArqStart};
 
@@ -78,11 +74,11 @@ impl<S: ArqStart> ArqSet<S> {
     }
 
     /// Convert to a set of "continuous" arcs
-    pub fn to_dht_arc_set(&self, topo: &Topology) -> DhtArcSet {
+    pub fn to_dht_arc_set(&self, dim: &impl SpaceDim) -> DhtArcSet {
         DhtArcSet::from(
             self.arqs
                 .iter()
-                .map(|a| a.to_dht_arc_range(topo))
+                .map(|a| a.to_dht_arc_range(dim))
                 .collect::<Vec<_>>(),
         )
     }
@@ -97,16 +93,16 @@ impl<S: ArqStart> ArqSet<S> {
     }
 
     /// Intersection of all arqs contained within
-    pub fn intersection(&self, topo: &Topology, other: &Self) -> ArqSet<SpaceOffset> {
+    pub fn intersection(&self, dim: &impl SpaceDim, other: &Self) -> ArqSet<SpaceOffset> {
         let power = self.power.min(other.power());
-        let a1 = self.requantize(power).unwrap().to_dht_arc_set(topo);
-        let a2 = other.requantize(power).unwrap().to_dht_arc_set(topo);
+        let a1 = self.requantize(power).unwrap().to_dht_arc_set(dim);
+        let a2 = other.requantize(power).unwrap().to_dht_arc_set(dim);
         ArqSet {
             arqs: DhtArcSet::intersection(&a1, &a2)
                 .intervals()
                 .into_iter()
                 .map(|interval| {
-                    ArqBounds::from_interval(topo, power, interval).expect("cannot fail")
+                    ArqBounds::from_interval(dim, power, interval).expect("cannot fail")
                 })
                 .collect(),
             power,
@@ -115,14 +111,14 @@ impl<S: ArqStart> ArqSet<S> {
 
     /// View ascii for all arq bounds
     #[cfg(feature = "test_utils")]
-    pub fn print_arqs(&self, topo: &Topology, len: usize) {
+    pub fn print_arqs(&self, dim: &impl SpaceDim, len: usize) {
         println!("{} arqs, power: {}", self.arqs().len(), self.power());
         for (i, arq) in self.arqs().iter().enumerate() {
             println!(
                 "{:>3}: |{}| {} {}/{} @ {:?}",
                 i,
-                arq.to_ascii(topo, len),
-                arq.absolute_length(topo),
+                arq.to_ascii(dim, len),
+                arq.absolute_length(dim),
                 arq.power(),
                 arq.count(),
                 arq.start
@@ -147,7 +143,7 @@ impl ArqSet {
     //   may need to refactor agent info to include power level so as not to lose
     //   this info.
     pub fn from_dht_arc_set_exact(
-        topo: &Topology,
+        dim: &impl SpaceDim,
         strat: &ArqStrat,
         dht_arc_set: &DhtArcSet,
     ) -> Option<Self> {
@@ -157,9 +153,8 @@ impl ArqSet {
                 .into_iter()
                 .map(|i| {
                     let len = i.length();
-                    let (pow, _) =
-                        power_and_count_from_length_exact(&topo.space, len, strat.min_chunks())?;
-                    ArqBounds::from_interval(topo, pow, i)
+                    let (pow, _) = power_and_count_from_length_exact(dim, len, strat.min_chunks())?;
+                    ArqBounds::from_interval(dim, pow, i)
                 })
                 .collect::<Option<Vec<_>>>()?,
         ))
@@ -168,7 +163,7 @@ impl ArqSet {
     /// Convert back from a continuous arc set to a quantized one.
     /// If the match is not exact, return the nearest possible quantized arcs.
     pub fn from_dht_arc_set_rounded(
-        topo: &Topology,
+        dim: &impl SpaceDim,
         strat: &ArqStrat,
         dht_arc_set: &DhtArcSet,
     ) -> (Self, bool) {
@@ -179,8 +174,8 @@ impl ArqSet {
             .into_iter()
             .map(|i| {
                 let len = i.length();
-                let (pow, _) = power_and_count_from_length(&topo.space, len, max_chunks);
-                let (a, r) = ArqBounds::from_interval_rounded(topo, pow, i);
+                let (pow, _) = power_and_count_from_length(dim.get(), len, max_chunks);
+                let (a, r) = ArqBounds::from_interval_rounded(dim, pow, i);
                 if r {
                     rounded = true;
                 }
@@ -193,10 +188,10 @@ impl ArqSet {
 
 /// Print ascii for arq bounds
 #[cfg(feature = "test_utils")]
-pub fn print_arq<S: ArqStart>(topo: &Topology, arq: &Arq<S>, len: usize) {
+pub fn print_arq<S: ArqStart>(dim: &impl SpaceDim, arq: &Arq<S>, len: usize) {
     println!(
         "|{}| {} *2^{}",
-        arq.to_ascii(topo, len),
+        arq.to_ascii(dim, len),
         arq.count(),
         arq.power()
     );
@@ -204,13 +199,13 @@ pub fn print_arq<S: ArqStart>(topo: &Topology, arq: &Arq<S>, len: usize) {
 
 /// Print a collection of arqs
 #[cfg(feature = "test_utils")]
-pub fn print_arqs<S: ArqStart>(topo: &Topology, arqs: &[Arq<S>], len: usize) {
+pub fn print_arqs<S: ArqStart>(dim: &impl SpaceDim, arqs: &[Arq<S>], len: usize) {
     for (i, arq) in arqs.iter().enumerate() {
         println!(
             "|{}| {}:\t{} +{} *2^{}",
-            arq.to_ascii(topo, len),
+            arq.to_ascii(dim, len),
             i,
-            *arq.start.to_offset(topo, arq.power()),
+            *arq.start.to_offset(dim, arq.power()),
             arq.count(),
             arq.power()
         );
