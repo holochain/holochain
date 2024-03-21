@@ -20,6 +20,7 @@ pub struct DpkiConfig {
 
     /// For testing only, we can turn off DPKI if needed.
     /// TODO: this can be removed once DPKI is truly optional again.
+    #[serde(default)]
     pub no_dpki: bool,
 }
 
