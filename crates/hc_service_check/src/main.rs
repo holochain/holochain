@@ -1,5 +1,9 @@
 use clap::{Parser, Subcommand};
 use std::io::{Error, Result};
+use std::sync::Arc;
+use tx5_go_pion::*;
+
+const ONE_KB: [u8; 1024] = [0xdb; 1024];
 
 #[derive(Subcommand, Debug)]
 enum Cmd {
@@ -38,6 +42,10 @@ enum Cmd {
         /// The transport of the turn server to check.
         #[arg(short, long, default_value = "udp")]
         transport: String,
+
+        /// How many 1KiB messages to send through the turn server.
+        #[arg(short, long, default_value_t = 2)]
+        msg_count: usize,
     },
 }
 
@@ -60,7 +68,8 @@ async fn main() {
             user,
             cred,
             transport,
-        } => turn(host, port, user, cred, transport).await,
+            msg_count,
+        } => turn(host, port, user, cred, transport, msg_count).await,
     } {
         Ok(()) => println!("done."),
         Err(err) => eprintln!("{err:?}"),
@@ -92,17 +101,13 @@ async fn signal(url: String) -> Result<()> {
     Ok(())
 }
 
-const ONE_KB: [u8; 1024] = [0xdb; 1024];
-const MSG_CNT: usize = 2;
-use std::sync::Arc;
-use tx5_go_pion::*;
-
 async fn turn(
     host: String,
     port: u16,
     user: String,
     cred: String,
     transport: String,
+    msg_count: usize,
 ) -> Result<()> {
     tokio::time::timeout(std::time::Duration::from_secs(5), async move {
         let ice = IceServer {
@@ -160,6 +165,7 @@ async fn turn(
                 start,
                 chan_ready1,
                 rcv_done1,
+                msg_count,
             ));
 
             let mut offer = c1.create_offer(OfferConfig::default()).await.unwrap();
@@ -229,6 +235,7 @@ async fn turn(
                         start,
                         chan_ready.clone(),
                         rcv_done.clone(),
+                        msg_count,
                     ));
                 }
                 Cmd::Offer(offer) => {
@@ -295,6 +302,7 @@ async fn spawn_chan(
     start: std::time::Instant,
     chan_ready: Arc<tokio::sync::Barrier>,
     rcv_done: Arc<tokio::sync::Barrier>,
+    msg_count: usize,
 ) {
     loop {
         match data_recv.recv().await {
@@ -310,7 +318,7 @@ async fn spawn_chan(
 
     print_chan_ready_time(start);
 
-    for _ in 0..MSG_CNT {
+    for _ in 0..msg_count {
         let buf = GoBuf::from_slice(ONE_KB).unwrap();
         data_chan.send(buf).await.unwrap();
     }
@@ -326,7 +334,7 @@ async fn spawn_chan(
                 std::io::Write::write_all(&mut std::io::stdout(), b".").unwrap();
                 std::io::Write::flush(&mut std::io::stdout()).unwrap();
                 cnt += 1;
-                if cnt == MSG_CNT {
+                if cnt == msg_count {
                     break;
                 }
             }
