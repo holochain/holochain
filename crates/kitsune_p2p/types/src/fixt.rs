@@ -1,12 +1,12 @@
 //! Fixturators for Kitsune P2p types
 
-use crate::agent_info::agent_info_helper::AgentMetaInfoEncode;
 use crate::agent_info::AgentInfoSigned;
 use crate::agent_info::UrlList;
 use ::fixt::prelude::*;
 use kitsune_p2p_bin_data::fixt::KitsuneAgentFixturator;
 use kitsune_p2p_bin_data::fixt::KitsuneSignatureFixturator;
 use kitsune_p2p_bin_data::fixt::KitsuneSpaceFixturator;
+use kitsune_p2p_dht::arq::ArqSize;
 use std::sync::Arc;
 use url2::url2;
 
@@ -44,9 +44,9 @@ fixturator!(
             AgentInfoSigned::sign(
                 Arc::new(fixt!(KitsuneSpace, Empty)),
                 Arc::new(fixt!(KitsuneAgent, Empty)),
-                AgentMetaInfoEncode {
-                    dht_storage_arq_count: 8.into(),
-                    dht_storage_arq_power: 27
+                ArqSize {
+                    count: 8.into(),
+                    power: 27
                 },
                 fixt!(UrlList, Empty),
                 0,
@@ -62,9 +62,9 @@ fixturator!(
             AgentInfoSigned::sign(
                 Arc::new(fixt!(KitsuneSpace, Unpredictable)),
                 Arc::new(fixt!(KitsuneAgent, Unpredictable)),
-                AgentMetaInfoEncode {
-                    dht_storage_arq_count: 8.into(),
-                    dht_storage_arq_power: 27,
+                ArqSize {
+                    count: 8.into(),
+                    power: 27,
                 },
                 fixt!(UrlList, Unpredictable),
                 0,
@@ -80,9 +80,9 @@ fixturator!(
             AgentInfoSigned::sign(
                 Arc::new(fixt!(KitsuneSpace, Predictable)),
                 Arc::new(fixt!(KitsuneAgent, Predictable)),
-                AgentMetaInfoEncode {
-                    dht_storage_arq_count: 8.into(),
-                    dht_storage_arq_power: 27,
+                ArqSize {
+                    count: 8.into(),
+                    power: 27,
                 },
                 fixt!(UrlList, Empty),
                 0,

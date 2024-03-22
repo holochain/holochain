@@ -15,56 +15,19 @@ pub type AgentArc = (Arc<KitsuneAgent>, DhtArc);
 
 /// agent_info helper types
 pub mod agent_info_helper {
-    use dht::{spacetime::SpaceOffset, Loc};
+    use dht::arq::ArqSize;
 
     use super::*;
 
     #[allow(missing_docs)]
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, serde::Serialize, serde::Deserialize, derive_more::From, derive_more::Into)]
     pub struct AgentMetaInfoEncode {
-        pub dht_storage_arq_count: SpaceOffset,
-        pub dht_storage_arq_power: u8,
-    }
-
-    impl AgentMetaInfoEncode {
-        /// Convert to Arq
-        pub fn to_arq(&self, start: Loc) -> Arq {
-            Arq::new(
-                self.dht_storage_arq_power,
-                start,
-                self.dht_storage_arq_count,
-            )
-        }
-
-        /// Data for an empty arc
-        pub fn empty() -> Self {
-            Self {
-                dht_storage_arq_count: 0.into(),
-                dht_storage_arq_power: 0,
-            }
-        }
-
-        /// Construct approximate quantized info from an arc half-length
-        #[cfg(feature = "test_utils")]
-        pub fn from_half_len(half_len: u32) -> Self {
-            use dht::{spacetime::SpaceDimension, ArqStrat};
-
-            Arq::from_start_and_half_len_approximate(
-                SpaceDimension::standard(),
-                &ArqStrat::default(),
-                0.into(),
-                half_len,
-            )
-            .into()
-        }
+        pub arq_size: ArqSize,
     }
 
     impl From<Arq> for AgentMetaInfoEncode {
         fn from(arq: Arq) -> Self {
-            Self {
-                dht_storage_arq_count: arq.count,
-                dht_storage_arq_power: arq.power,
-            }
+            ArqSize::from(arq).into()
         }
     }
 
@@ -224,7 +187,7 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
             return Err(serde::de::Error::custom("agent mismatch"));
         }
 
-        let storage_arq = meta.to_arq(agent.get_loc());
+        let storage_arq = meta.arq_size.to_arq(agent.get_loc());
 
         let AgentInfoEncode {
             space,
@@ -255,7 +218,7 @@ impl AgentInfoSigned {
     pub async fn sign<'a, R, F>(
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
-        meta: AgentMetaInfoEncode,
+        meta: impl Into<AgentMetaInfoEncode>,
         url_list: UrlList,
         signed_at_ms: u64,
         expires_at_ms: u64,
@@ -265,7 +228,8 @@ impl AgentInfoSigned {
         R: std::future::Future<Output = KitsuneResult<Arc<KitsuneSignature>>>,
         F: FnOnce(&[u8]) -> R,
     {
-        let storage_arq = meta.to_arq(agent.get_loc());
+        let meta = meta.into();
+        let storage_arq = meta.arq_size.to_arq(agent.get_loc());
 
         let mut buf = Vec::new();
         crate::codec::rmp_encode(&mut buf, meta).map_err(KitsuneError::other)?;
@@ -325,6 +289,8 @@ impl AgentInfoSigned {
 
 #[cfg(test)]
 mod tests {
+    use dht::arq::ArqSize;
+
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -335,7 +301,7 @@ mod tests {
         let info = AgentInfoSigned::sign(
             space.clone(),
             agent.clone(),
-            AgentMetaInfoEncode::empty(),
+            ArqSize::empty(),
             vec![],
             42,
             69,

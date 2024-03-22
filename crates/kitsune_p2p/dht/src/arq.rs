@@ -486,6 +486,51 @@ impl ArqBounds {
     }
 }
 
+/// Just the size of a quantized arc, without a start location
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ArqSize {
+    /// The power
+    pub power: u8,
+    /// The count
+    pub count: SpaceOffset,
+}
+
+impl ArqSize {
+    /// Data for an empty arc
+    pub fn empty() -> Self {
+        Self {
+            count: 0.into(),
+            power: 0,
+        }
+    }
+
+    /// Convert to Arq
+    pub fn to_arq(&self, start: Loc) -> Arq {
+        Arq::new(self.power, start, self.count)
+    }
+
+    /// Construct approximate quantized info from an arc half-length
+    #[cfg(feature = "test_utils")]
+    pub fn from_half_len(half_len: u32) -> Self {
+        Arq::from_start_and_half_len_approximate(
+            SpaceDimension::standard(),
+            &ArqStrat::default(),
+            0.into(),
+            half_len,
+        )
+        .into()
+    }
+}
+
+impl From<Arq> for ArqSize {
+    fn from(arq: Arq) -> Self {
+        Self {
+            count: arq.count,
+            power: arq.power,
+        }
+    }
+}
+
 /// Calculate whether a given combination of power and count corresponds to
 /// full DHT coverage.
 ///
@@ -509,6 +554,7 @@ pub fn is_full(dim: impl SpaceDim, power: u8, count: u32) -> bool {
 /// Calculate the unique pairing of power and count implied by a given length
 /// and max number of chunks. Gives the nearest value that satisfies the constraints,
 /// but may not be exact.
+// TODO: use ArqSize
 pub fn power_and_count_from_length(dim: impl SpaceDim, len: u64, max_chunks: u32) -> (u8, u32) {
     let dim = dim.get();
     assert!(len <= U32_LEN);
@@ -527,6 +573,7 @@ pub fn power_and_count_from_length(dim: impl SpaceDim, len: u64, max_chunks: u32
 /// Calculate the highest power and lowest count such that the given length is
 /// represented exactly. If the length is not representable even at the quantum
 /// level (power==0), return None.
+// TODO: use ArqSize
 pub fn power_and_count_from_length_exact(
     dim: impl SpaceDim,
     len: u64,

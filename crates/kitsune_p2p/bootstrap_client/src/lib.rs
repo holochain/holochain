@@ -242,7 +242,7 @@ mod tests {
         let agent_info_signed = AgentInfoSigned::sign(
             Arc::new(space),
             Arc::new(agent),
-            Arq::arbitrary(&mut u).unwrap().into(),
+            Arq::arbitrary(&mut u).unwrap(),
             urls,
             signed_at_ms,
             expires_at_ms,
@@ -336,7 +336,7 @@ mod tests {
             let agent_info_signed = AgentInfoSigned::sign(
                 Arc::new(space.clone()),
                 Arc::new(kitsune_agent.clone()),
-                Arq::arbitrary(&mut u).unwrap().into(),
+                Arq::arbitrary(&mut u).unwrap(),
                 fixt!(UrlList),
                 signed_at_ms,
                 expires_at_ms,

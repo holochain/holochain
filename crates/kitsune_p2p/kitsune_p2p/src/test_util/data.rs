@@ -1,12 +1,12 @@
 use crate::{KitsuneAgent, KitsuneBinType, KitsuneSignature, KitsuneSpace};
-use kitsune_p2p_types::agent_info::{agent_info_helper::AgentMetaInfoEncode, AgentInfoSigned};
+use kitsune_p2p_types::{agent_info::AgentInfoSigned, dht::arq::ArqSize};
 use std::sync::Arc;
 
 pub async fn mk_agent_info(u: u8) -> AgentInfoSigned {
     AgentInfoSigned::sign(
         Arc::new(KitsuneSpace::new(vec![0x11; 32])),
         Arc::new(KitsuneAgent::new(vec![u; 32])),
-        AgentMetaInfoEncode::empty(),
+        ArqSize::empty(),
         vec![],
         0,
         0,

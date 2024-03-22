@@ -68,7 +68,7 @@ async fn rand_insert(
     let signed = AgentInfoSigned::sign(
         space.clone(),
         agent.clone(),
-        arq.into(),
+        arq,
         vec!["fake:".try_into().unwrap()],
         signed_at_ms,
         expires_at_ms,
@@ -132,7 +132,6 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
         .tempdir()
         .unwrap();
 
-    let topo = kitsune_p2p_dht::prelude::Topology::standard_epoch_full();
     let space = rand_space();
 
     let db = DbWrite::test(tmp_dir.path(), DbKindP2pAgents(space.clone())).unwrap();

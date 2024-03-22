@@ -61,7 +61,7 @@ fn bootstrap(bench: &mut Criterion) {
                 let info = AgentInfoSigned::sign(
                     space.clone(),
                     Arc::new(fixt!(KitsuneAgent, Unpredictable)),
-                    AgentMetaInfoEncode::from_half_len(u32::MAX / 4),
+                    ArqSize::from_half_len(u32::MAX / 4),
                     fixt!(UrlList, Empty),
                     0,
                     std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64 + 60_000_000,

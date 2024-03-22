@@ -1,4 +1,4 @@
-use kitsune_p2p_dht_arc::{DhtArc, DEFAULT_MIN_PEERS};
+use kitsune_p2p_dht_arc::DEFAULT_MIN_PEERS;
 
 use crate::spacetime::Topology;
 

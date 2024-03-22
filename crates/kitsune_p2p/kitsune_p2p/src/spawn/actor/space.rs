@@ -6,15 +6,15 @@ use ghost_actor::dependencies::tracing;
 use kitsune_p2p_bootstrap_client::BootstrapNet;
 use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_mdns::*;
-use kitsune_p2p_types::agent_info::agent_info_helper::AgentMetaInfoEncode;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::NetworkType;
+use kitsune_p2p_types::dht::arq::ArqSize;
 use kitsune_p2p_types::dht::prelude::ArqClamping;
-use kitsune_p2p_types::dht::spacetime::{SpaceDimension, Topology};
-use kitsune_p2p_types::dht::{Arq, ArqStrat};
-use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
+use kitsune_p2p_types::dht::spacetime::SpaceDimension;
+use kitsune_p2p_types::dht::Arq;
+use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
@@ -704,7 +704,7 @@ async fn update_single_agent_info(
     let agent_info_signed = AgentInfoSigned::sign(
         space.clone(),
         agent.clone(),
-        arq.into(),
+        arq,
         urls.clone(),
         signed_at_ms,
         expires_at_ms,
@@ -1527,7 +1527,7 @@ impl Space {
             let agent_info_signed = AgentInfoSigned::sign(
                 space.clone(),
                 agent.clone(),
-                AgentMetaInfoEncode::empty(), // no storage arc
+                ArqSize::empty(), // no storage arc
                 Vec::new(), // no urls
                 signed_at_ms,
                 expires_at_ms,

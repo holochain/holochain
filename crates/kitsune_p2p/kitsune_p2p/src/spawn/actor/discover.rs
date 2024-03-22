@@ -1,7 +1,5 @@
 use super::*;
-use kitsune_p2p_types::{
-    agent_info::AgentInfoSigned, dht::spacetime::Topology, dht_arc::DhtLocation,
-};
+use kitsune_p2p_types::{agent_info::AgentInfoSigned, dht_arc::DhtLocation};
 use std::future::Future;
 
 /// This enum represents the outcomes from peer discovery
