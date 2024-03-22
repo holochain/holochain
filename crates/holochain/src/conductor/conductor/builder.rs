@@ -259,7 +259,7 @@ impl ConductorBuilder {
             match handle.clone().install_dpki(dna).await {
                 Ok(_) => tracing::info!("Installed DPKI from DNA {}", dna_hash),
                 Err(ConductorError::AppAlreadyInstalled(_)) => {
-                    tracing::debug!("DPKI already installed, skipping")
+                    tracing::debug!("DPKI already installed, skipping installation")
                 }
                 Err(e) => return Err(e),
             }
@@ -518,7 +518,15 @@ impl ConductorBuilder {
                 });
             }
             (None, Some(dna)) => {
-                handle.clone().install_dpki(dna).await?;
+                // Install DPKI from DNA
+                let dna_hash = dna.dna_hash().clone();
+                match handle.clone().install_dpki(dna).await {
+                    Ok(_) => tracing::info!("Installed DPKI from DNA {}", dna_hash),
+                    Err(ConductorError::AppAlreadyInstalled(_)) => {
+                        tracing::debug!("DPKI already installed, skipping installation")
+                    }
+                    Err(e) => return Err(e),
+                }
             }
             (None, None) => unreachable!(
                 "We currently require DPKI to be used, but this may change in the future"
