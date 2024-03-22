@@ -322,7 +322,7 @@ async fn spawn_chan(
             Some(DataChannelEvent::Open) => (),
             Some(DataChannelEvent::BufferedAmountLow) => (),
             Some(DataChannelEvent::Message(mut buf)) => {
-                assert_eq!(1024, buf.len().unwrap());
+                assert_eq!(ONE_KB.len(), buf.len().unwrap());
                 std::io::Write::write_all(&mut std::io::stdout(), b".").unwrap();
                 std::io::Write::flush(&mut std::io::stdout()).unwrap();
                 cnt += 1;
