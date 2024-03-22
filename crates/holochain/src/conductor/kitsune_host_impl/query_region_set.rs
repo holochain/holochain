@@ -3,7 +3,7 @@ use std::sync::{
     Arc,
 };
 
-use holochain_p2p::{dht::prelude::*, dht_arc::DhtArcSet};
+use holochain_p2p::dht::prelude::*;
 use holochain_sqlite::prelude::*;
 use rusqlite::named_params;
 
@@ -24,57 +24,8 @@ pub async fn query_region_set(
     db: DbWrite<DbKindDht>,
     topology: Topology,
     strat: &ArqStrat,
-    dht_arc_set: Arc<DhtArcSet>,
+    arq_set: Arc<ArqSet>,
 ) -> ConductorResult<RegionSetLtcs> {
-    let arq_set =
-        ArqSet::from_dht_arc_set_exact(&topology, strat, &dht_arc_set).unwrap_or_else(|| {
-            // If an exact match couldn't be made, try the rounding approach, though this is probably
-            // hopeless since the only way the exact match can fail is if the arc cannot be represented
-            // by a quantized arq at all. But, this code was already here, so I'm keeping it here
-            // anyway, just in case.
-
-            let (arq_set, rounded) =
-                ArqSet::from_dht_arc_set_rounded(&topology, strat, &dht_arc_set);
-            if rounded {
-                // If an arq was rounded, emit a warning, but throttle it to once every LOG_RATE_MS
-                // so we don't get slammed.
-                let it_is_time = LAST_LOG_MS
-                    .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |t| {
-                        let now = Timestamp::now();
-                        // If the difference is greater than the logging interval,
-                        // produce a Some so that the atomic val gets updated, which
-                        // will trigger a log after the update.
-                        now.checked_difference_signed(&Timestamp::from_micros(t * 1000))
-                            .map(|d| d > chrono::Duration::milliseconds(LOG_RATE_MS))
-                            .unwrap_or(false)
-                            .then(|| now.as_millis())
-                    })
-                    .is_ok();
-                if it_is_time {
-                    let diff = dht_arc_set
-                        .intervals()
-                        .into_iter()
-                        .map(|i| i.length() as i64)
-                        .sum::<i64>()
-                        - arq_set
-                            .to_dht_arc_set(&topology)
-                            .intervals()
-                            .into_iter()
-                            .map(|i| i.length() as i64)
-                            .sum::<i64>();
-                    let diff = diff.abs();
-                    tracing::warn!(
-                        "A continuous arc set could not be properly quantized.
-    Original:    {dht_arc_set:?}
-    Quantized:   {arq_set:?}
-    Difference:  {diff} (total length of all arcs)
-"
-                    );
-                }
-            }
-            arq_set
-        });
-
     let times = TelescopingTimes::historical(&topology);
     let coords = RegionCoordSetLtcs::new(times, arq_set);
 

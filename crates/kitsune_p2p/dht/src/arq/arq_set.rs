@@ -381,7 +381,6 @@ mod tests {
         p5 in 12u8..17, s5: u32, c5: u32,
         p6 in 12u8..17, s6: u32, c6: u32,
     ) {
-    // fn rounded_arcset_intersections() {
         use crate::Loc;
 
         let topo = Topology::standard_epoch_full();
@@ -435,6 +434,42 @@ mod tests {
 
         println!("...");
         assert!(!rounded);
+    }
+
+
+    #[test]
+    fn arqset_intersection_smoke(
+        p1 in 12u8..17, s1: u32, c1: u32,
+        p2 in 12u8..17, s2: u32, c2: u32,
+        p3 in 12u8..17, s3: u32, c3: u32,
+        p4 in 12u8..17, s4: u32, c4: u32,
+        p5 in 12u8..17, s5: u32, c5: u32,
+        p6 in 12u8..17, s6: u32, c6: u32,
+    ) {
+        use crate::Loc;
+
+        let topo = Topology::standard_epoch_full();
+        let strat = ArqStrat::default();
+
+        let c1 = strat.min_chunks() + c1 % (strat.max_chunks() - strat.min_chunks());
+        let c2 = strat.min_chunks() + c2 % (strat.max_chunks() - strat.min_chunks());
+        let c3 = strat.min_chunks() + c3 % (strat.max_chunks() - strat.min_chunks());
+        let c4 = strat.min_chunks() + c4 % (strat.max_chunks() - strat.min_chunks());
+        let c5 = strat.min_chunks() + c5 % (strat.max_chunks() - strat.min_chunks());
+        let c6 = strat.min_chunks() + c6 % (strat.max_chunks() - strat.min_chunks());
+
+        let arq1 = Arq::new(p1, Loc::from(s1), c1.into());
+        let arq2 = Arq::new(p2, Loc::from(s2), c2.into());
+        let arq3 = Arq::new(p3, Loc::from(s3), c3.into());
+        let arq4 = Arq::new(p4, Loc::from(s4), c4.into());
+        let arq5 = Arq::new(p5, Loc::from(s5), c5.into());
+        let arq6 = Arq::new(p6, Loc::from(s6), c6.into());
+
+        let arcset1 = ArqSet::new(vec![ arq1, arq2, arq3 ]);
+        let arcset2 = ArqSet::new(vec![ arq4, arq5, arq6 ]);
+
+        // This can panic
+        arcset1.intersection(&topo, &arcset2);
 
     }
     }

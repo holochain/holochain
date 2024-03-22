@@ -1,4 +1,7 @@
-use kitsune_p2p_types::dht_arc::DhtArcRange;
+use kitsune_p2p_types::{
+    dht::{arq::ArqSet, ArqBounds},
+    dht_arc::DhtArcRange,
+};
 use rand::Rng;
 
 use super::*;
@@ -199,21 +202,27 @@ impl ShardedGossipLocal {
     pub(super) async fn generate_blooms_or_regions(
         &self,
         remote_agent_list: Vec<AgentInfoSigned>,
-        local_arcs: Vec<DhtArcRange>,
-        remote_arc_set: Vec<DhtArcRange>,
+        local_arqs: Vec<ArqBounds>,
+        remote_arqs: Vec<ArqBounds>,
         gossip: &mut Vec<ShardedGossipWire>,
         agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<RoundState> {
+        let topo = self
+            .host_api
+            .get_topology(self.space.clone())
+            .await
+            .map_err(KitsuneError::other)?;
+
         // Create the common arc set from the remote and local arcs.
-        let arc_set: DhtArcSet = local_arcs.into();
-        let remote_arc_set: DhtArcSet = remote_arc_set.into();
-        let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
+        let local_arqs = ArqSet::new(local_arqs);
+        let remote_arqs = ArqSet::new(remote_arqs);
+        let common_arqs = Arc::new(local_arqs.intersection(&topo, &remote_arqs));
 
         let region_set = if let GossipType::Historical = self.gossip_type {
             let region_set = store::query_region_set(
                 self.host_api.clone().api,
                 self.space.clone(),
-                common_arc_set.clone(),
+                common_arqs.clone(),
             )
             .await?;
             gossip.push(ShardedGossipWire::op_regions(region_set.clone()));
@@ -225,7 +234,7 @@ impl ShardedGossipLocal {
         // Generate the new state.
         let mut state = self.new_state(
             remote_agent_list,
-            common_arc_set,
+            common_arqs,
             region_set,
             self.tuning_params.gossip_round_timeout(),
         )?;
