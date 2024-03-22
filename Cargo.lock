@@ -3112,19 +3112,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_cli_util"
-version = "0.3.0-beta-dev.24"
-dependencies = [
- "clap 4.5.3",
- "futures",
- "holochain_trace",
- "kitsune_p2p_dht",
- "kitsune_p2p_dht_arc",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "holochain_conductor_api"
 version = "0.3.0-beta-dev.41"
 dependencies = [

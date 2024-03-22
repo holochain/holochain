@@ -32,7 +32,6 @@ members = [
 
   "crates/hc",
   "crates/hc_bundle",
-  "crates/hc_cli_util",
   "crates/hc_sandbox",
   "crates/hc_sleuth",
   "crates/hc_run_local_services",
