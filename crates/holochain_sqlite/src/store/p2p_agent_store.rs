@@ -151,7 +151,10 @@ impl AgentStore {
             let new_url_list: HashSet<_> = agent_info.url_list.iter().collect();
 
             // Find URLs that were in the old list but AREN'T in the new list
-            let unused_urls: HashSet<_> = old_url_list.difference(&new_url_list).map(|&u| u.clone()).collect();
+            let unused_urls: HashSet<_> = old_url_list
+                .difference(&new_url_list)
+                .map(|&u| u.clone())
+                .collect();
             if !unused_urls.is_empty() {
                 tracing::info!(?agent_info.agent, "Agent URLs changed, no longer advertising at: {:?}", unused_urls);
             }
