@@ -77,7 +77,7 @@ async fn rand_insert(
     .await
     .unwrap();
 
-    p2p_put(db, &signed, &topo).await.unwrap();
+    p2p_put(db, &signed).await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -156,7 +156,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     // nonzero ones
     let num_nonzero = all
         .iter()
-        .filter(|a| a.storage_arc(&topo).half_length() > 0)
+        .filter(|a| a.storage_arc().half_length() > 0)
         .count();
 
     // make sure we can get our example result
@@ -170,7 +170,6 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
             u64::MIN,
             u64::MAX,
             DhtArcRange::from_bounds(0, u32::MAX).into(),
-            &topo,
         )
         .await
         .unwrap();
@@ -182,7 +181,6 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
             u64::MIN,
             u64::MIN,
             DhtArcRange::from_bounds(0, u32::MAX).into(),
-            &topo,
         )
         .await
         .unwrap();
@@ -190,7 +188,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     // check that gossip query over zero arc returns zero results
     let all = db
-        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArcRange::Empty.into(), &topo)
+        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArcRange::Empty.into())
         .await
         .unwrap();
     assert_eq!(all.len(), 0);
@@ -202,7 +200,6 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
             u64::MIN,
             u64::MAX,
             DhtArcRange::from_bounds(0, u32::MAX as u64 / 4).into(),
-            &topo,
         )
         .await
         .unwrap();
@@ -212,11 +209,11 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     // near
     let tgt = u32::MAX / 2;
-    let near = db.p2p_query_near_basis(tgt, 20, &topo).await.unwrap();
+    let near = db.p2p_query_near_basis(tgt, 20).await.unwrap();
     let mut prev = 0;
     for agent_info_signed in near {
         let loc = agent_info_signed.agent.get_loc();
-        let record = super::P2pRecord::from_signed(&agent_info_signed, &topo).unwrap();
+        let record = super::P2pRecord::from_signed(&agent_info_signed).unwrap();
         let mut dist = u32::MAX;
         let mut deb = "not reset";
 

@@ -241,13 +241,13 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_query_peer_density(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+        arq: kitsune_p2p_types::dht::Arq,
     ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
         let strat = PeerStrat::from(self.strat.clone());
-        let arcs: Vec<_> = self.agent_store.values().map(|v| v.storage_arc).collect();
+        let arcs: Vec<_> = self.agent_store.values().map(|v| v.storage_arq).collect();
 
         // contains is already checked in the iterator
-        let view = strat.view(self.topology.clone(), dht_arc, arcs.as_slice());
+        let view = strat.view(self.topology.clone(), arcs.as_slice());
 
         Ok(async move { Ok(view) }.boxed().into())
     }

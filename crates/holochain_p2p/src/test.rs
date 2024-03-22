@@ -7,6 +7,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::fixt::ActionFixturator;
+use kitsune_p2p::dht::Arq;
 struct StubNetwork;
 
 impl ghost_actor::GhostHandler<HolochainP2p> for StubNetwork {}
@@ -19,7 +20,7 @@ impl HolochainP2pHandler for StubNetwork {
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arc: Option<crate::dht_arc::DhtArc>,
+        initial_arq: Option<Arq>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }

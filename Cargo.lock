@@ -3115,7 +3115,7 @@ dependencies = [
 name = "holochain_cli_util"
 version = "0.3.0-beta-dev.24"
 dependencies = [
- "clap 4.5.1",
+ "clap 4.5.3",
  "futures",
  "holochain_trace",
  "kitsune_p2p_dht",

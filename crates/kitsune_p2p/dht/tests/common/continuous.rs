@@ -1,8 +1,7 @@
 #![allow(dead_code)]
 #![cfg(feature = "test_utils")]
 
-use kitsune_p2p_dht::arq::PeerStrat;
-use kitsune_p2p_dht::spacetime::Topology;
+use kitsune_p2p_dht::prelude::*;
 use kitsune_p2p_dht::test_utils::get_input;
 use kitsune_p2p_dht_arc::*;
 use rand::prelude::StdRng;
@@ -25,7 +24,7 @@ pub const DETAIL: u8 = 1;
 
 type DataVec = statrs::statistics::Data<Vec<f64>>;
 
-pub type Peers = Vec<DhtArc>;
+pub type Peers = Vec<Arq>;
 
 pub fn seeded_rng(seed: Option<u64>) -> StdRng {
     let seed = seed.unwrap_or_else(|| thread_rng().gen());
@@ -117,11 +116,11 @@ pub fn run_one_epoch(
             }
         }
         let p = peers.clone();
-        let mut arc = peers.get_mut(i).unwrap();
-        let view = strat.view(topo.clone(), *arc, p.as_slice());
-        let before = arc.length() as f64;
-        view.update_arc(&mut arc);
-        let after = arc.length() as f64;
+        let mut arq = peers.get_mut(i).unwrap();
+        let view = strat.view(topo.clone(), p.as_slice());
+        let before = arq.absolute_length(topo) as f64;
+        view.update_arc(&mut arq);
+        let after = arq.absolute_length(topo) as f64;
         let delta = after - before;
         // dbg!(&before, &after, &delta);
         net += delta;
@@ -137,16 +136,30 @@ pub fn run_one_epoch(
     }
 
     if detail >= 2 {
-        tracing::info!("min: |{}| {}", peers[index_min].to_ascii(64), index_min);
-        tracing::info!("max: |{}| {}", peers[index_max].to_ascii(64), index_max);
+        tracing::info!(
+            "min: |{}| {}",
+            peers[index_min].to_ascii(topo, 64),
+            index_min
+        );
+        tracing::info!(
+            "max: |{}| {}",
+            peers[index_max].to_ascii(topo, 64),
+            index_max
+        );
         tracing::info!("");
     } else if detail >= 3 {
-        print_arcs(&peers);
+        print_arcs(topo, &peers);
         get_input();
     }
 
     let tot = peers.len() as f64;
-    let min_redundancy = check_redundancy(peers.clone());
+    let min_redundancy = check_redundancy(
+        peers
+            .clone()
+            .into_iter()
+            .map(|p| p.to_dht_arc(topo))
+            .collect(),
+    );
     let stats = EpochStats {
         net_delta_avg: net / tot / FULL_LEN_F,
         gross_delta_avg: gross / tot / FULL_LEN_F,
@@ -178,7 +191,12 @@ pub fn unit_arcs<H: Iterator<Item = (f64, f64)>>(arcs: H) -> Peers {
     let fc = FULL_LEN_F;
     let fh = MAX_HALF_LENGTH as f64;
     arcs.map(|(s, h)| {
-        DhtArc::from_start_and_half_len((s * fc).min(u32::MAX as f64) as u32, (h * fh) as u32)
+        Arq::from_start_and_half_len_approximate(
+            SpaceDimension::standard(),
+            &ArqStrat::default(),
+            Loc::from((s * fc).min(u32::MAX as f64) as u32),
+            (h * fh) as u32,
+        )
     })
     .collect()
 }
@@ -426,8 +444,8 @@ impl ArcLenStrategy {
 }
 
 /// View ascii for all arcs
-pub fn print_arcs(arcs: &Peers) {
+pub fn print_arcs(dim: impl SpaceDim, arcs: &Peers) {
     for (i, arc) in arcs.into_iter().enumerate() {
-        println!("|{}| {}", arc.to_ascii(64), i);
+        println!("|{}| {}", arc.to_ascii(dim, 64), i);
     }
 }

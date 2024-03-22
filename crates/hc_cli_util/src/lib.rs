@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
-use kitsune_p2p_dht::{arq::ArqSet, spacetime::Topology, Arq, ArqBounds, ArqStrat};
-use kitsune_p2p_dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
+use kitsune_p2p_dht::{spacetime::Topology, Arq, ArqBounds, ArqStrat};
+use kitsune_p2p_dht_arc::DhtArc;
 
 /// Utility functions for holochain debugging and diagnostics.
 #[derive(Debug, Parser)]

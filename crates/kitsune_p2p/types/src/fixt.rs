@@ -7,7 +7,6 @@ use ::fixt::prelude::*;
 use kitsune_p2p_bin_data::fixt::KitsuneAgentFixturator;
 use kitsune_p2p_bin_data::fixt::KitsuneSignatureFixturator;
 use kitsune_p2p_bin_data::fixt::KitsuneSpaceFixturator;
-use kitsune_p2p_dht::Arq;
 use std::sync::Arc;
 use url2::url2;
 

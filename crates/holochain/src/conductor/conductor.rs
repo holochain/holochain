@@ -935,12 +935,12 @@ mod network_impls {
                             )? {
                                 None => (0.0, 0),
                                 Some(agent) => {
-                                    let arc_size = agent.storage_arc.coverage();
+                                    let arc_size = agent.storage_arc().coverage();
                                     let agents_in_arc = txn.p2p_gossip_query_agents(
                                         space.clone(),
                                         u64::MIN,
                                         u64::MAX,
-                                        agent.storage_arc.inner().into(),
+                                        agent.storage_arc().inner().into(),
                                     )?;
                                     let number_of_agents_in_arc = agents_in_arc.len();
                                     let total_network_peers = if number_of_agents_in_arc == 0 {

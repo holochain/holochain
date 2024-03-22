@@ -260,7 +260,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         &self,
         _agent: AgentPubKey,
         _maybe_agent_info: Option<AgentInfoSigned>,
-        _initial_arc: Option<DhtArc>,
+        _initial_arq: Option<Arq>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -466,7 +466,7 @@ impl HolochainP2pDnaT for MockNetwork {
         &self,
         _agent: AgentPubKey,
         _agent_info: Option<AgentInfoSigned>,
-        _initial_arc: Option<DhtArc>,
+        _initial_arq: Option<Arq>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }

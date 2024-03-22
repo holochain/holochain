@@ -22,15 +22,9 @@ impl Default for PeerStrat {
 impl PeerStrat {
     /// Generate a view using this strategy.
     /// Ensures that only peers which are visible from `arc` are included.
-    pub fn view(&self, topo: Topology, _arc: DhtArc, peers: &[DhtArc]) -> PeerView {
+    pub fn view(&self, topo: Topology, peers: &[Arq]) -> PeerView {
         match self {
-            Self::Quantized(s) => {
-                let peers = peers
-                    .iter()
-                    .map(|p| Arq::from_dht_arc_approximate(topo.space, s, p))
-                    .collect();
-                PeerViewQ::new(topo, s.clone(), peers).into()
-            }
+            Self::Quantized(s) => PeerViewQ::new(topo, s.clone(), peers.to_vec()).into(),
         }
     }
 }

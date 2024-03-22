@@ -167,10 +167,7 @@ pub fn render_bootstrap_widget<B: Backend>(
             )),
             ListItem::new(format!(
                 "storage arc : {:?}",
-                agents[selected].storage_arc(
-                    // OK to use this because origin time is irrelevant in this case
-                    &kitsune_p2p_types::dht::spacetime::Topology::standard_epoch_full()
-                )
+                agents[selected].storage_arc()
             )),
             ListItem::new(format!("url list    : {:?}", agents[selected].url_list)),
             ListItem::new(format!(

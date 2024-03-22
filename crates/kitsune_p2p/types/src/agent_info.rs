@@ -5,7 +5,6 @@ use crate::dht_arc::DhtArc;
 use crate::tx2::tx2_utils::TxUrl;
 use crate::*;
 use agent_info_helper::*;
-use dht::spacetime::Topology;
 use dht::Arq;
 
 /// A list of Urls.
@@ -35,6 +34,28 @@ pub mod agent_info_helper {
                 start,
                 self.dht_storage_arq_count,
             )
+        }
+
+        /// Data for an empty arc
+        pub fn empty() -> Self {
+            Self {
+                dht_storage_arq_count: 0.into(),
+                dht_storage_arq_power: 0,
+            }
+        }
+
+        /// Construct approximate quantized info from an arc half-length
+        #[cfg(feature = "test_utils")]
+        pub fn from_half_len(half_len: u32) -> Self {
+            use dht::{spacetime::SpaceDimension, ArqStrat};
+
+            Arq::from_start_and_half_len_approximate(
+                SpaceDimension::standard(),
+                &ArqStrat::default(),
+                0.into(),
+                half_len,
+            )
+            .into()
         }
     }
 
@@ -203,7 +224,6 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
             return Err(serde::de::Error::custom("agent mismatch"));
         }
 
-        let start_loc = agent.get_loc();
         let storage_arq = meta.to_arq(agent.get_loc());
 
         let AgentInfoEncode {
@@ -299,7 +319,7 @@ impl AgentInfoSigned {
 
     /// Convert arq to arc
     pub fn storage_arc(&self) -> DhtArc {
-        self.storage_arq.to_dht_arc(topo)
+        self.storage_arq.to_dht_arc_std()
     }
 }
 
@@ -315,7 +335,7 @@ mod tests {
         let info = AgentInfoSigned::sign(
             space.clone(),
             agent.clone(),
-            42,
+            AgentMetaInfoEncode::empty(),
             vec![],
             42,
             69,

@@ -258,6 +258,15 @@ impl<S: ArqStart> Arq<S> {
 }
 
 impl Arq<Loc> {
+    /// Construct an empty arq (count = 0) at the minimum power.
+    pub fn new_empty(dim: impl SpaceDim, start: Loc) -> Self {
+        Self {
+            start,
+            power: dim.get().min_power(),
+            count: 0.into(),
+        }
+    }
+
     /// Construct a full arq at the given power.
     /// The `count` is calculated accordingly.
     pub fn new_full(dim: impl SpaceDim, start: Loc, power: u8) -> Self {
@@ -268,6 +277,11 @@ impl Arq<Loc> {
             power,
             count: count.into(),
         }
+    }
+
+    /// Construct a full arq at the maximum power.
+    pub fn new_full_max(dim: impl SpaceDim, strat: &ArqStrat, start: Loc) -> Self {
+        Self::new_full(dim, start, dim.get().max_power(strat))
     }
 
     /// Reduce the power by 1
@@ -320,6 +334,11 @@ impl Arq<Loc> {
         DhtArc::from_start_and_len(self.start, len)
     }
 
+    /// Convert to [`DhtArc`] using the standard SpaceDimension
+    pub fn to_dht_arc_std(&self) -> DhtArc {
+        self.to_dht_arc(SpaceDimension::standard())
+    }
+
     /// Computes the Arq which most closely matches the given [`DhtArc`]
     pub fn from_dht_arc_approximate(
         dim: impl SpaceDim,
@@ -338,13 +357,13 @@ impl Arq<Loc> {
 
     /// Computes the Arq which most closely matches the given params
     pub fn from_start_and_half_len_approximate(
-        topo: &Topology,
+        dim: impl SpaceDim,
         strat: &ArqStrat,
         start: Loc,
         half_len: u32,
     ) -> Self {
         let arc = DhtArc::from_start_and_half_len(start, half_len);
-        Self::from_dht_arc_approximate(topo, strat, &arc)
+        Self::from_dht_arc_approximate(dim, strat, &arc)
     }
 }
 

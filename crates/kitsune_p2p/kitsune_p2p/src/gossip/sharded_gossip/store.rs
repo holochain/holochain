@@ -12,7 +12,6 @@ use crate::types::event::KitsuneP2pEventSender;
 use crate::{HostApi, HostApiLegacy};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
-use kitsune_p2p_types::dht::spacetime::Topology;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KitsuneAgent, KitsuneOpHash, KitsuneSpace},
@@ -38,22 +37,17 @@ pub(super) struct AgentInfoSession {
     /// Cache of agents whose storage arc is contained in an arc set.
     /// Finding these agents requires a host query so we cache the results because they are used frequently.
     agents_by_arc_set_cache: HashMap<Arc<DhtArcSet>, Vec<AgentInfoSigned>>,
-
-    /// For quantized arc conversions
-    topo: Topology,
 }
 
 impl AgentInfoSession {
     pub(super) fn new(
         local_agents: Vec<AgentInfoSigned>,
         all_agents: Vec<AgentInfoSigned>,
-        topo: Topology,
     ) -> Self {
         Self {
             local_agents,
             all_agents,
             agents_by_arc_set_cache: HashMap::new(),
-            topo,
         }
     }
 
@@ -75,7 +69,7 @@ impl AgentInfoSession {
     pub(super) fn local_agent_arcs(&self) -> Vec<(Arc<KitsuneAgent>, DhtArc)> {
         self.local_agents
             .iter()
-            .map(|info| (info.agent.clone(), info.storage_arc(&self.topo)))
+            .map(|info| (info.agent.clone(), info.storage_arc()))
             .collect()
     }
 
@@ -83,7 +77,7 @@ impl AgentInfoSession {
     pub(super) fn local_arcs(&self) -> Vec<DhtArc> {
         self.local_agents
             .iter()
-            .map(|info| info.storage_arc(&self.topo))
+            .map(|info| info.storage_arc())
             .collect()
     }
 

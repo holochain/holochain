@@ -54,7 +54,7 @@ mod tests {
     use super::*;
     use ::fixt::prelude::*;
     use kitsune_p2p_bin_data::fixt::*;
-    use kitsune_p2p_types::fixt::*;
+    use kitsune_p2p_types::{agent_info::agent_info_helper::AgentMetaInfoEncode, fixt::*};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_put() {
@@ -64,7 +64,7 @@ mod tests {
         let info = AgentInfoSigned::sign(
             Arc::new(fixt!(KitsuneSpace, Unpredictable)),
             Arc::new(fixt!(KitsuneAgent, Unpredictable)),
-            u32::MAX / 4,
+            AgentMetaInfoEncode::from_half_len(u32::MAX / 4),
             fixt!(UrlList, Empty),
             0,
             std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64 + 60_000_000,
