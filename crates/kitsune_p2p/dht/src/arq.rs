@@ -117,7 +117,10 @@ impl ArqStart for SpaceOffset {
 /// In this case, there is no definite location associated, so we want to forget
 /// about the original Location data associated with each Arq.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct Arq<S: ArqStart = Loc> {
     /// The "start" defines the left edge of the arq
     pub start: S,
@@ -255,6 +258,15 @@ impl<S: ArqStart> Arq<S> {
 }
 
 impl Arq<Loc> {
+    /// Construct an empty arq (count = 0) at the minimum power.
+    pub fn new_empty(dim: impl SpaceDim, start: Loc) -> Self {
+        Self {
+            start,
+            power: dim.get().min_power(),
+            count: 0.into(),
+        }
+    }
+
     /// Construct a full arq at the given power.
     /// The `count` is calculated accordingly.
     pub fn new_full(dim: impl SpaceDim, start: Loc, power: u8) -> Self {
@@ -265,6 +277,11 @@ impl Arq<Loc> {
             power,
             count: count.into(),
         }
+    }
+
+    /// Construct a full arq at the maximum power.
+    pub fn new_full_max(dim: impl SpaceDim, strat: &ArqStrat, start: Loc) -> Self {
+        Self::new_full(dim, start, dim.get().max_power(strat))
     }
 
     /// Reduce the power by 1
@@ -317,6 +334,11 @@ impl Arq<Loc> {
         DhtArc::from_start_and_len(self.start, len)
     }
 
+    /// Convert to [`DhtArc`] using the standard SpaceDimension
+    pub fn to_dht_arc_std(&self) -> DhtArc {
+        self.to_dht_arc(SpaceDimension::standard())
+    }
+
     /// Computes the Arq which most closely matches the given [`DhtArc`]
     pub fn from_dht_arc_approximate(
         dim: impl SpaceDim,
@@ -331,6 +353,17 @@ impl Arq<Loc> {
         let qa = a.absolute_chunk_width(dim);
         let qb = b.absolute_chunk_width(dim);
         a.start == b.start && (a.count.wrapping_mul(qa) == b.count.wrapping_mul(qb))
+    }
+
+    /// Computes the Arq which most closely matches the given params
+    pub fn from_start_and_half_len_approximate(
+        dim: impl SpaceDim,
+        strat: &ArqStrat,
+        start: Loc,
+        half_len: u32,
+    ) -> Self {
+        let arc = DhtArc::from_start_and_half_len(start, half_len);
+        Self::from_dht_arc_approximate(dim, strat, &arc)
     }
 }
 
@@ -423,7 +456,7 @@ impl ArqBounds {
                 // should be 1 less, but we'll accept if it bleeds over by 1 too.
                 let rem = len % s;
                 let diff = rem.min(s - rem);
-                let lossless = lo == offset * s && (diff <= 1);
+                let lossless = dbg!(lo == offset * s) && (dbg!(diff) <= 1);
                 if always_round || lossless {
                     Some((
                         Self {
@@ -453,6 +486,51 @@ impl ArqBounds {
     }
 }
 
+/// Just the size of a quantized arc, without a start location
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ArqSize {
+    /// The power
+    pub power: u8,
+    /// The count
+    pub count: SpaceOffset,
+}
+
+impl ArqSize {
+    /// Data for an empty arc
+    pub fn empty() -> Self {
+        Self {
+            count: 0.into(),
+            power: 0,
+        }
+    }
+
+    /// Convert to Arq
+    pub fn to_arq(&self, start: Loc) -> Arq {
+        Arq::new(self.power, start, self.count)
+    }
+
+    /// Construct approximate quantized info from an arc half-length
+    #[cfg(feature = "test_utils")]
+    pub fn from_half_len(half_len: u32) -> Self {
+        Arq::from_start_and_half_len_approximate(
+            SpaceDimension::standard(),
+            &ArqStrat::default(),
+            0.into(),
+            half_len,
+        )
+        .into()
+    }
+}
+
+impl From<Arq> for ArqSize {
+    fn from(arq: Arq) -> Self {
+        Self {
+            count: arq.count,
+            power: arq.power,
+        }
+    }
+}
+
 /// Calculate whether a given combination of power and count corresponds to
 /// full DHT coverage.
 ///
@@ -476,6 +554,7 @@ pub fn is_full(dim: impl SpaceDim, power: u8, count: u32) -> bool {
 /// Calculate the unique pairing of power and count implied by a given length
 /// and max number of chunks. Gives the nearest value that satisfies the constraints,
 /// but may not be exact.
+// TODO: use ArqSize
 pub fn power_and_count_from_length(dim: impl SpaceDim, len: u64, max_chunks: u32) -> (u8, u32) {
     let dim = dim.get();
     assert!(len <= U32_LEN);
@@ -494,6 +573,7 @@ pub fn power_and_count_from_length(dim: impl SpaceDim, len: u64, max_chunks: u32
 /// Calculate the highest power and lowest count such that the given length is
 /// represented exactly. If the length is not representable even at the quantum
 /// level (power==0), return None.
+// TODO: use ArqSize
 pub fn power_and_count_from_length_exact(
     dim: impl SpaceDim,
     len: u64,
@@ -502,9 +582,12 @@ pub fn power_and_count_from_length_exact(
     let dim = dim.get();
     assert!(len <= U32_LEN);
 
+    dbg!(len);
+    dbg!(format!("{len:b}"));
     let z = len.trailing_zeros();
 
     if z < dim.quantum_power.into() {
+        dbg!(z);
         return None;
     }
     let mut power = z as u8 - dim.quantum_power;
@@ -735,22 +818,26 @@ mod tests {
             let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
             let strat = ArqStrat::default();
             let arq = approximate_arq(&topo, &strat, center.into(), length);
-            let dht_arc = arq.to_dht_arc(&topo);
-            assert_eq!(arq.absolute_length(&topo), dht_arc.length());
-            let arq2 = Arq::from_dht_arc_approximate(&topo, &strat, &dht_arc);
+            let arc = arq.to_dht_arc(&topo);
+            assert_eq!(arq.absolute_length(&topo), arc.length());
+            let arq2 = Arq::from_dht_arc_approximate(&topo, &strat, &arc);
             assert_eq!(arq, arq2);
+            let arc2 = arq2.to_dht_arc(&topo);
+            assert_eq!(arc.range(), arc2.range());
         }
 
         #[test]
-        fn dht_arc_roundtrip_standard_topo(center: u32, pow in 0..16u8, count in 0..8u32) {
+        fn dht_arc_roundtrip_standard_topo(center: u32, pow in 0..16u8, count in 0..16u32) {
             let topo = Topology::standard_epoch_full();
             let length = count as u64 * 2u64.pow(pow as u32) / 2 * 2;
             let strat = ArqStrat::default();
             let arq = approximate_arq(&topo, &strat, center.into(), length);
-            let dht_arc = arq.to_dht_arc(&topo);
-            assert_eq!(arq.absolute_length(&topo), dht_arc.length());
-            let arq2 = Arq::from_dht_arc_approximate(&topo, &strat, &dht_arc);
+            let arc = arq.to_dht_arc(&topo);
+            assert_eq!(arq.absolute_length(&topo), arc.length());
+            let arq2 = Arq::from_dht_arc_approximate(&topo, &strat, &arc);
             assert!(Arq::<Loc>::equivalent(&topo, &arq, &arq2));
+            let arc2 = arq2.to_dht_arc(&topo);
+            assert_eq!(arc.range(), arc2.range());
         }
 
         #[test]

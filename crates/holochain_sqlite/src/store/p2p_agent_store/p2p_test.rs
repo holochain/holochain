@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use kitsune_p2p_bin_data::KitsuneBinType;
 use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSignature, KitsuneSpace};
+use kitsune_p2p_dht::{Arq, ArqStrat};
 use kitsune_p2p_dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use rand::Rng;
@@ -39,6 +40,7 @@ async fn rand_insert(
     agent: &Arc<KitsuneAgent>,
     long: bool,
 ) {
+    let topo = kitsune_p2p_dht::prelude::Topology::standard_epoch_full();
     let mut rng = rand::thread_rng();
 
     let signed_at_ms = rand_signed_at_ms();
@@ -56,10 +58,17 @@ async fn rand_insert(
         _ => rng.gen_range(0..u32::MAX / 1000),
     };
 
+    let arq = Arq::from_start_and_half_len_approximate(
+        &topo,
+        &ArqStrat::default(),
+        agent.get_loc(),
+        half_len,
+    );
+
     let signed = AgentInfoSigned::sign(
         space.clone(),
         agent.clone(),
-        half_len,
+        arq,
         vec!["fake:".try_into().unwrap()],
         signed_at_ms,
         expires_at_ms,
@@ -146,7 +155,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     // nonzero ones
     let num_nonzero = all
         .iter()
-        .filter(|a| a.storage_arc.half_length() > 0)
+        .filter(|a| a.storage_arc().half_length() > 0)
         .count();
 
     // make sure we can get our example result

@@ -90,7 +90,7 @@ impl TestLegacyHost {
                                         .iter()
                                         .filter_map(|v| {
                                             if v.is_active() {
-                                                Some((v.storage_arc.dist(basis.as_u32()), v))
+                                                Some((v.storage_arc().dist(basis.as_u32()), v))
                                             } else {
                                                 None
                                             }

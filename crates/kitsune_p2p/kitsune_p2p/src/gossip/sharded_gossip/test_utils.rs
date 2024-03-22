@@ -17,7 +17,7 @@ pub fn create_agent_bloom<'a>(
 ) -> Option<PoolBuf> {
     let agents: Vec<_> = match filter {
         Some(filter) => agents
-            .filter(|a| filter.storage_arc.contains(a.agent.get_loc()))
+            .filter(|a| filter.storage_arc().contains(a.agent.get_loc()))
             .collect(),
         None => agents.collect(),
     };

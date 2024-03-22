@@ -69,7 +69,7 @@ impl AgentInfoSession {
     pub(super) fn local_agent_arcs(&self) -> Vec<(Arc<KitsuneAgent>, DhtArc)> {
         self.local_agents
             .iter()
-            .map(|info| (info.agent.clone(), info.storage_arc))
+            .map(|info| (info.agent.clone(), info.storage_arc()))
             .collect()
     }
 
@@ -77,7 +77,7 @@ impl AgentInfoSession {
     pub(super) fn local_arcs(&self) -> Vec<DhtArc> {
         self.local_agents
             .iter()
-            .map(|info| info.storage_arc)
+            .map(|info| info.storage_arc())
             .collect()
     }
 

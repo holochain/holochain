@@ -1031,7 +1031,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arc: Option<crate::dht_arc::DhtArc>,
+        initial_arq: Option<Arq>,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
         let agent = agent_pub_key.into_kitsune();

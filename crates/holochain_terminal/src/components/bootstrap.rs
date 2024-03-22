@@ -165,7 +165,10 @@ pub fn render_bootstrap_widget<B: Backend>(
                 "agent       : {:?}",
                 kitsune_agent_to_pub_key(agents[selected].agent.clone())
             )),
-            ListItem::new(format!("storage arc : {:?}", agents[selected].storage_arc)),
+            ListItem::new(format!(
+                "storage arc : {:?}",
+                agents[selected].storage_arc()
+            )),
             ListItem::new(format!("url list    : {:?}", agents[selected].url_list)),
             ListItem::new(format!(
                 "signed at   : {:?}",
