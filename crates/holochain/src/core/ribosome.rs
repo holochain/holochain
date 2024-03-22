@@ -870,12 +870,8 @@ pub mod wasm_test {
             let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
             let mut conductor = SweetConductor::from_standard_config().await;
-            let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
 
-            let apps = conductor
-                .setup_app_for_agents("app-", [&alice_pubkey, &bob_pubkey], [&dna_file])
-                .await
-                .unwrap();
+            let apps = conductor.setup_apps("app-", 2, [&dna_file]).await.unwrap();
 
             let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
 
@@ -897,6 +893,9 @@ pub mod wasm_test {
 
             let alice = alice_cell.zome(test_wasm);
             let bob = bob_cell.zome(test_wasm);
+
+            let alice_pubkey = alice_cell.agent_pubkey().clone();
+            let bob_pubkey = bob_cell.agent_pubkey().clone();
 
             Self {
                 conductor,
