@@ -219,7 +219,7 @@ async fn app_validation_workflow_inner(
     }
     ops_validated += accepted_ops;
     ops_validated += rejected_ops;
-    tracing::debug!("{accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected. {ops_validated} validated in total so far out of {num_ops_to_validate} ops to validate in this workflow run");
+    tracing::debug!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected.");
 
     Ok(if ops_validated < num_ops_to_validate {
         // trigger app validation workflow again in 10 seconds
@@ -602,7 +602,6 @@ async fn store_record_zomes_to_invoke(
     }
 }
 
-#[async_recursion::async_recursion]
 async fn run_validation_callback_inner<R>(
     invocation: ValidateInvocation,
     ribosome: &R,
@@ -616,32 +615,30 @@ where
         ValidateHostAccess::new(workspace_read.clone(), network.clone()),
         invocation.clone(),
     )?;
+    match &validate_result {
+        ValidateResult::Valid => (),
+        _ => tracing::error!("validate result {validate_result:?}"),
+    }
     match validate_result {
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(hashes)) => {
-            // tokio::spawn(async {
-            //     let in_flight = hashes.into_iter().map(|hash| async {
-            //         let cascade_workspace = workspace_read.clone();
-            //         let cascade = CascadeImpl::from_workspace_and_network(
-            //             &cascade_workspace,
-            //             network.clone(),
-            //         );
-            //         cascade
-            //             .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
-            //             .await?;
-            //         Ok(hash)
-            //     });
-            //     let results: Vec<_> = futures::stream::iter(in_flight)
-            //         // 10 is completely arbitrary.
-            //         .buffered(10)
-            //         .collect()
-            //         .await;
-            //     let results: AppValidationResult<Vec<_>> = results.into_iter().collect();
-            //     for hash in results? {
-            //         fetched_deps.insert(hash);
-            //     }
-            // });
+            tracing::error!("got unresolved deps {hashes:?}");
+            hashes.clone().into_iter().for_each(|hash| {
+                let cascade_workspace = workspace_read.clone();
+                tokio::spawn({
+                    let cascade = CascadeImpl::from_workspace_and_network(
+                        &cascade_workspace,
+                        network.clone(),
+                    );
+                    async move {
+                        let result = cascade
+                            .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
+                            .await;
+                        tracing::error!("fetch_record result is {result:?}");
+                    }
+                });
+            });
             Ok(Outcome::AwaitingDeps(hashes))
         }
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::AgentActivity(

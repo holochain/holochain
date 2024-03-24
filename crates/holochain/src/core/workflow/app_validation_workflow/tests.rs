@@ -3,7 +3,7 @@ use crate::core::queue_consumer::WorkComplete;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::app_validation_workflow::{
-    app_validation_workflow_inner, check_app_entry_def, put_validation_limbo,
+    app_validation_workflow_inner, check_app_entry_def, put_integrated, put_validation_limbo,
     AppValidationWorkspace,
 };
 use crate::core::workflow::sys_validation_workflow::validation_query;
@@ -22,25 +22,21 @@ use hdk::prelude::*;
 use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, EntryHash};
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_p2p::actor::HolochainP2pRefToDna;
-use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations::{insert_entry, insert_op};
 use holochain_state::prelude::{from_blob, StateQueryResult};
-use holochain_state::query::get_public_op_from_db;
 use holochain_state::test_utils::test_db_dir;
 use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::{TestWasm, TestWasmPair, TestZomes};
-use holochain_zome_types::action::{Create, Delete, Dna};
 use holochain_zome_types::fixt::{
-    CreateFixturator, DeleteFixturator, EntryFixturator, SignatureFixturator,
+    ActionHashFixturator, CreateFixturator, DeleteFixturator, EntryFixturator, SignatureFixturator,
 };
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
 use matches::assert_matches;
-use rusqlite::params;
 use rusqlite::{named_params, Transaction};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
@@ -60,7 +56,7 @@ async fn main_loop_app_validation_workflow() {
             {
                 let result =
                     api.must_get_action(MustGetActionInput::new(original_action.to_hash()));
-                if let Ok(action) = result {
+                if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(

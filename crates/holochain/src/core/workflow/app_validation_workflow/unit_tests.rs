@@ -7,50 +7,43 @@ use crate::{
         },
         workflow::app_validation_workflow::{run_validation_callback_inner, Outcome},
     },
-    sweettest::{
-        SweetConductor, SweetConductorConfig, SweetDnaFile, SweetInlineZomes, SweetLocalRendezvous,
-    },
+    sweettest::{SweetDnaFile, SweetInlineZomes},
+    test_utils::test_network_with_events,
 };
 use fixt::fixt;
-use holo_hash::HashableContentExtSync;
+use holo_hash::{hash_type::AnyDht, AnyDhtHash, HashableContentExtSync};
 use holochain_keystore::test_keystore;
-use holochain_p2p::{
-    actor::HolochainP2pRefToDna, spawn_holochain_p2p, stub_network, HolochainP2pDna,
-    HolochainP2pDnaT,
-};
+use holochain_p2p::{actor::HolochainP2pRefToDna, event::HolochainP2pEvent, stub_network};
 use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, mutations::insert_op};
 use holochain_types::{
-    dht_op::{DhtOp, DhtOpHashed},
-    inline_zome::InlineZomeSet,
-    record::SignedActionHashedExt,
+    dht_op::{DhtOp, DhtOpHashed, WireOps},
+    record::{SignedActionHashedExt, WireRecordOps},
 };
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::{
-    action::{ActionHashed, AppEntryDef, Create, Delete, EntryType},
-    cell::CellId,
-    chain::{ChainFilter, MustGetAgentActivityInput},
+    action::ActionHashed,
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
-    dna_def::{DnaDef, DnaDefHashed},
-    entry::{MustGetActionInput, MustGetEntryInput},
-    entry_def::EntryVisibility,
-    fixt::{CreateFixturator, DeleteFixturator, EntryFixturator, SignatureFixturator},
-    op::{Op, RegisterAgentActivity, RegisterDelete, StoreEntry, StoreRecord},
+    entry::MustGetActionInput,
+    fixt::{ActionFixturator, CreateFixturator, SignatureFixturator},
+    judged::Judged,
+    op::{Op, RegisterAgentActivity},
     record::SignedActionHashed,
+    validate::ValidationStatus,
     Action,
 };
+use kitsune_p2p_types::ok_fut;
 use matches::assert_matches;
 use parking_lot::RwLock;
-use std::{hash::Hash, sync::Arc};
+use std::{sync::Arc, time::Duration};
 
+// test app validation with a must get action
+// where initially the action is not in the cache db
+// and is then added to it
 #[tokio::test(flavor = "multi_thread")]
 async fn validation_callback_must_get_action() {
     let zomes =
         SweetInlineZomes::new(vec![], 0).integrity_function("validate", move |api, op: Op| {
-            if let Op::RegisterAgentActivity(RegisterAgentActivity {
-                action,
-                cached_entry,
-            }) = op
-            {
+            if let Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) = op {
                 if let Ok(action) = api.must_get_action(MustGetActionInput::new(action.to_hash())) {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
@@ -106,6 +99,7 @@ async fn validation_callback_must_get_action() {
         .to_dna(dna_file.dna_hash().to_owned(), None);
 
     // action has not been written to a database yet
+    // validation should indicate it is awaiting create action hash
     let outcome = run_validation_callback_inner(
         invocation.clone(),
         &ribosome,
@@ -114,13 +108,11 @@ async fn validation_callback_must_get_action() {
     )
     .await
     .unwrap();
-    // validation should indicate it is awaiting create action hash
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![create_action.to_hash().into()]);
 
     // write action to be must got during validation to dht cache db
     let dht_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
-    // let cache = conductor.get_cache_db(&cell_id).await.unwrap();
     test_space
         .space
         .cache_db
@@ -139,4 +131,130 @@ async fn validation_callback_must_get_action() {
     assert_matches!(outcome, Outcome::Accepted);
 }
 
+// test that unresolved dependency hashes are fetched
 #[tokio::test(flavor = "multi_thread")]
+async fn validation_callback_awaiting_deps_hashes() {
+    holochain_trace::test_run().unwrap();
+
+    let keystore = test_keystore();
+    let agent_key = keystore.new_sign_keypair_random().await.unwrap();
+
+    let action = fixt!(Action);
+
+    let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
+        let action_hash = action.clone().to_hash();
+        move |api, op: Op| {
+            if let Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) = op {
+                let result = api.must_get_action(MustGetActionInput(action.as_hash().to_owned()));
+                if result.is_ok() {
+                    Ok(ValidateCallbackResult::Valid)
+                } else {
+                    Ok(ValidateCallbackResult::UnresolvedDependencies(
+                        UnresolvedDependencies::Hashes(vec![action_hash.clone().into()]),
+                    ))
+                }
+            } else {
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    });
+
+    let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
+    let dna_hash = dna_file.dna_hash().clone();
+
+    let space = TestSpace::new(dna_hash.clone());
+
+    let action_signed_hashed = SignedActionHashed::new_unchecked(action.clone(), fixt!(Signature));
+    let action_op = Op::RegisterAgentActivity(RegisterAgentActivity {
+        action: action_signed_hashed.clone(),
+        cached_entry: None,
+    });
+    let invocation = ValidateInvocation::new(zomes_to_invoke, &action_op).unwrap();
+
+    let ribosome = RealRibosome::new(
+        dna_file.clone(),
+        Arc::new(RwLock::new(ModuleCache::new(None))),
+    )
+    .unwrap();
+
+    let workspace_read = HostFnWorkspaceRead::new(
+        space.space.authored_db.into(),
+        space.space.dht_db.into(),
+        space.space.dht_query_cache,
+        space.space.cache_db.into(),
+        keystore.clone(),
+        None,
+        Arc::new(dna_file.dna_def().to_owned()),
+    )
+    .await
+    .unwrap();
+
+    // handle only Get events
+    let filter_events = |evt: &_| match evt {
+        holochain_p2p::event::HolochainP2pEvent::Get { .. } => true,
+        _ => false,
+    };
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+    let network = test_network_with_events(
+        Some(dna_hash.clone()),
+        Some(agent_key.clone()),
+        filter_events,
+        tx,
+    )
+    .await;
+
+    // respond to Get request with requested action
+    let action_hash = action.clone().to_hash();
+    let action_hash_32 = action_hash.get_raw_32().to_vec();
+    tokio::spawn({
+        async move {
+            while let Some(evt) = rx.recv().await {
+                if let HolochainP2pEvent::Get {
+                    dht_hash, respond, ..
+                } = evt
+                {
+                    assert_eq!(dht_hash.get_raw_32().to_vec(), action_hash_32);
+
+                    respond.r(ok_fut(Ok(WireOps::Record(WireRecordOps {
+                        action: Some(Judged::new(
+                            action_signed_hashed.clone().into(),
+                            ValidationStatus::Valid,
+                        )),
+                        deletes: vec![],
+                        updates: vec![],
+                        entry: None,
+                    }))))
+                }
+            }
+        }
+    });
+
+    // app validation should indicate missing action is being awaited
+    let outcome = run_validation_callback_inner(
+        invocation.clone(),
+        &ribosome,
+        workspace_read.clone(),
+        network.dna_network(),
+    )
+    .await
+    .unwrap();
+    let random_action_hash = action.clone().to_hash();
+    let random_action_hash_32 = random_action_hash.get_raw_32().to_vec();
+    assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![AnyDhtHash::from_raw_32_and_type(random_action_hash_32, AnyDht::Action)]);
+
+    // await while missing record is being fetched in background task
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // app validation outcome should be accepted, now that the missing record
+    // has been fetched
+    let outcome = run_validation_callback_inner(
+        invocation.clone(),
+        &ribosome,
+        workspace_read.clone(),
+        network.dna_network(),
+    )
+    .await
+    .unwrap();
+    assert_matches!(outcome, Outcome::Accepted)
+}
