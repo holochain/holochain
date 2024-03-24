@@ -545,7 +545,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
 
     let num_published = published.len();
     let mut num_integrated = 0;
-    for _i in 0..num_attempts {
+    for i in 0..num_attempts {
         num_integrated = get_integrated_count(db).await;
         if num_integrated >= num_published {
             if num_integrated > num_published {
@@ -553,7 +553,11 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
                 Consistency may not be complete.", num_integrated, num_published)
             }
             return;
+        } else {
+            let total_time_waited = delay * i as u32;
+            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await, "consistency-status");
         }
+
         tokio::time::sleep(delay).await;
     }
 
@@ -639,7 +643,7 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
             return;
         } else {
             let total_time_waited = delay * i as u32;
-            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await);
+            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await, "consistency-status");
         }
         tokio::time::sleep(delay).await;
     }
