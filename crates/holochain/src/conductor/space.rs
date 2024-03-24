@@ -877,4 +877,13 @@ impl TestSpace {
             _temp_dir: temp_dir,
         }
     }
+
+    pub fn new_for_agent(dna_hash: DnaHash, agent_key: AgentPubKey) -> Self {
+        let test_space = TestSpace::new(dna_hash);
+        let authored_db = test_space
+            .space
+            .get_or_create_authored_db(agent_key)
+            .unwrap();
+        test_space
+    }
 }

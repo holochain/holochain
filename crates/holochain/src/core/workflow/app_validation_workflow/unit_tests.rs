@@ -59,9 +59,9 @@ async fn validation_callback_must_get_action() {
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zomes_to_invoke = ZomesToInvoke::one_integrity(integrity_zomes[0].clone());
 
-    let test_space = TestSpace::new(dna_file.dna_hash().to_owned());
     let keystore = test_keystore();
     let agent_key = keystore.new_sign_keypair_random().await.unwrap();
+    let test_space = TestSpace::new_for_agent(dna_file.dna_hash().to_owned(), agent_key.clone());
 
     let mut create = fixt!(Create);
     create.author = agent_key.clone();
@@ -83,7 +83,14 @@ async fn validation_callback_must_get_action() {
     .unwrap();
 
     let workspace_read = HostFnWorkspaceRead::new(
-        test_space.space.authored_db.into(),
+        test_space
+            .space
+            .authored_dbs
+            .lock()
+            .get(&agent_key)
+            .unwrap()
+            .to_owned()
+            .into(),
         test_space.space.dht_db.into(),
         test_space.space.dht_query_cache,
         test_space.space.cache_db.clone().into(),
@@ -179,10 +186,17 @@ async fn validation_callback_awaiting_deps_hashes() {
     .unwrap();
 
     let workspace_read = HostFnWorkspaceRead::new(
-        space.space.authored_db.into(),
-        space.space.dht_db.into(),
-        space.space.dht_query_cache,
-        space.space.cache_db.into(),
+        test_space
+            .space
+            .authored_dbs
+            .lock()
+            .get(&agent_key)
+            .unwrap()
+            .to_owned()
+            .into(),
+        test_space.space.dht_db.into(),
+        test_space.space.dht_query_cache,
+        test_space.space.cache_db.into(),
         keystore.clone(),
         None,
         Arc::new(dna_file.dna_def().to_owned()),
