@@ -528,9 +528,9 @@ impl ConductorBuilder {
                     Err(e) => return Err(e),
                 }
             }
-            (None, None) => unreachable!(
-                "We currently require DPKI to be used, but this may change in the future"
-            ),
+            (None, None) => {
+                tracing::warn!("Not using DPKI. Cannot talk to nodes who are using DPKI!")
+            }
         }
 
         // Install extra DNAs, in particular:

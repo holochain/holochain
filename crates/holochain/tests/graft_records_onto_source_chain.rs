@@ -18,8 +18,6 @@ use holochain_types::record::SignedActionHashedExt;
 #[tokio::test(flavor = "multi_thread")]
 async fn grafting() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-    dbg!(dna_file.dna_def());
-    dbg!(dna_file.dna_hash());
     let mut config = ConductorConfig::default();
     config.dpki = Some(DpkiConfig::disabled());
     config.chc_url = Some(url2::Url2::parse(
@@ -30,7 +28,6 @@ async fn grafting() {
 
     let apps = conductor.setup_app("app", [&dna_file]).await.unwrap();
     let (alice,) = apps.into_tuple();
-    dbg!(alice.cell_id());
     let zome = alice.zome(SweetInlineZomes::COORDINATOR);
 
     // Trigger init.
@@ -189,7 +186,7 @@ async fn grafting() {
         .await;
 
     // Fork is detected
-    assert!(dbg!(result).is_err());
+    assert!(result.is_err());
 
     // Restore and validate the original records
     // (there has been no change at this point, but it helps for clarity to reset the chain anyway)
@@ -218,8 +215,6 @@ async fn grafting() {
     )
     .await;
 
-    dbg!(&payload);
-
     let records = conductor
         .get_chc(alice.cell_id())
         .unwrap()
@@ -227,8 +222,6 @@ async fn grafting() {
         .get_record_data(None)
         .await
         .unwrap();
-    dbg!(records.len());
-    dbg!(alice.cell_id());
 
     // let records = holochain::conductor::chc::CHC_LOCAL_MAP
     //     .lock()
