@@ -439,7 +439,6 @@ impl SweetConductor {
 
     /// Opinionated app setup.
     /// Creates an app for the given agent, using the given DnaFiles, with no extra configuration.
-    #[deprecated = "Use `setup_app` so that DPKI can be invoked. Only use this with an agent already registered in DPKI."]
     pub async fn setup_app_for_agent<'a>(
         &mut self,
         installed_app_id: &str,
@@ -478,7 +477,6 @@ impl SweetConductor {
     /// - RoleName: {dna_hash}
     ///
     /// Returns a batch of SweetApps, sorted in the same order as Agents passed in.
-    #[deprecated = "Use `setup_apps` so that DPKI can be invoked. Only use this with an agent already registered in DPKI."]
     pub async fn setup_app_for_agents<'a>(
         &mut self,
         app_id_prefix: &str,

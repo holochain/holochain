@@ -188,7 +188,6 @@ async fn test_list_running_apps_for_dependent_cell_id() {
     // Install two apps on the Conductor:
     // Both share a CellId in common, and also include a distinct CellId each.
     let mut conductor = SweetConductor::from_standard_config().await;
-    let alice = SweetAgents::one(conductor.keystore()).await;
     let app1 = conductor.setup_app("app1", [&dna1, &dna2]).await.unwrap();
     let alice = app1.agent().clone();
     let app2 = conductor

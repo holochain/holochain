@@ -191,7 +191,6 @@ async fn test_block_invalid_receipt() {
 
     let mut alice_conductor = conductors.next().unwrap();
     let mut bob_conductor = conductors.next().unwrap();
-    let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
 
     let (dna_that_creates, _, _) =
         SweetDnaFile::from_inline_zomes(network_seed.into(), zomes_that_create).await;

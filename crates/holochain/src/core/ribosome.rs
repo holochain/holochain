@@ -752,7 +752,6 @@ pub fn weigh_placeholder() -> EntryRateWeight {
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
     use crate::core::ribosome::ZomeCall;
-    use crate::sweettest::SweetAgents;
     use crate::sweettest::SweetCell;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;

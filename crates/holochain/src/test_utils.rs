@@ -555,7 +555,8 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
             return;
         } else {
             let total_time_waited = delay * i as u32;
-            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await, "consistency-status");
+            let queries = query_integration(db).await;
+            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?queries, "consistency-status");
         }
 
         tokio::time::sleep(delay).await;

@@ -193,7 +193,6 @@ mod tests {
         let mut conductor = SweetConductor::from_config(config).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-        let (agent, _) = SweetAgents::alice_and_bob();
 
         let (cell,) = conductor
             .setup_app("app", &[dna_file])

@@ -1001,7 +1001,6 @@ pub mod wasm_test {
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetLocalRendezvous;
-    use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_nonce::fresh_nonce;
     use holochain_types::prelude::AgentPubKeyFixturator;

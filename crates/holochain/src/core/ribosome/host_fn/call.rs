@@ -231,7 +231,6 @@ pub mod wasm_test {
     use rusqlite::named_params;
 
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use crate::sweettest::SweetAgents;
     use crate::test_utils::new_zome_call_unsigned;
     use holochain_conductor_api::ZomeCall;
     use holochain_sqlite::prelude::DatabaseResult;
@@ -249,7 +248,7 @@ pub mod wasm_test {
 
         let mut conductor = SweetConductor::from_standard_config().await;
 
-        let apps = conductor
+        let app = conductor
             .setup_app(
                 "app-",
                 [
@@ -260,6 +259,7 @@ pub mod wasm_test {
             .await
             .unwrap();
 
+        let agent_pubkey = app.agent().clone();
         let (cell1, cell2) = app.into_tuple();
 
         let zome1 = cell1.zome(test_wasm);
@@ -271,13 +271,13 @@ pub mod wasm_test {
             let agent_info: AgentInfo = conductor
                 .call(&zome1, "who_are_they_local", cell2.cell_id())
                 .await;
-            assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
-            assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
+            assert_eq!(agent_info.agent_initial_pubkey, agent_pubkey);
+            assert_eq!(agent_info.agent_latest_pubkey, agent_pubkey);
         }
         {
             let agent_info: AgentInfo = conductor.call(&zome1, "who_are_they_role", "role2").await;
-            assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
-            assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
+            assert_eq!(agent_info.agent_initial_pubkey, agent_pubkey);
+            assert_eq!(agent_info.agent_latest_pubkey, agent_pubkey);
         }
     }
 
