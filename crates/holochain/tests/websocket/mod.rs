@@ -747,16 +747,11 @@ async fn full_state_dump_cursor_works() {
 
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    let agent = SweetAgents::one(conductor.keystore()).await;
-
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
         .0;
 
-    let app = conductor
-        .setup_app_for_agent("app", agent, &[dna_file])
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
 
     let cell_id = app.into_cells()[0].cell_id().clone();
 

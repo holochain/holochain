@@ -144,7 +144,6 @@ async fn prevents_cross_app_clone_operations() {
 
     let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
     let (cell,) = app.clone().into_tuple();
-    let alice = cell.agent_pubkey().clone();
 
     let zome = SweetZome::new(
         cell.cell_id().clone(),
@@ -160,7 +159,7 @@ async fn prevents_cross_app_clone_operations() {
 
     let (other_dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
     let other_app = conductor
-        .setup_app_for_agent("other app", alice.clone(), [&other_dna_file])
+        .setup_app("other app", [&other_dna_file])
         .await
         .unwrap();
     let (other_cell,) = other_app.clone().into_tuple();

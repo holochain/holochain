@@ -31,14 +31,8 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    // Get two agents
-    let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
-
     // Install DNA and install and enable apps in conductor
-    let apps = conductor
-        .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
-        .await
-        .unwrap();
+    let apps = conductor.setup_apps("app", 2, &[dna_file]).await.unwrap();
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
@@ -79,10 +73,8 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let (dna_bar, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
-    let agents = SweetAgents::get(conductor.keystore(), 3).await;
-
     let apps = conductor
-        .setup_app_for_agents("app", &agents, &[dna_foo, dna_bar])
+        .setup_apps("app", 3, &[dna_foo, dna_bar])
         .await
         .unwrap();
 
@@ -164,8 +156,6 @@ async fn invalid_cell() -> anyhow::Result<()> {
 
     let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let (dna_bar, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-
-    // let agents = SweetAgents::get(conductor.keystore(), 2).await;
 
     let _app_foo = conductor.setup_app("foo", &[dna_foo]).await;
 
@@ -318,11 +308,8 @@ fn simple_validation_zome() -> InlineZomeSet {
 async fn simple_validation() -> anyhow::Result<()> {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_validation_zome()).await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
-    let apps = conductor
-        .setup_app_for_agents("app", &[alice.clone(), bobbo.clone()], &[dna_file])
-        .await
-        .unwrap();
+
+    let apps = conductor.setup_apps("app", 2, &[dna_file]).await.unwrap();
     let ((alice,), (_bobbo,)) = apps.into_tuples();
 
     let alice = alice.zome(SweetInlineZomes::COORDINATOR);

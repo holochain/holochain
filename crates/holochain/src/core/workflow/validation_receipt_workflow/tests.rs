@@ -199,19 +199,19 @@ async fn test_block_invalid_receipt() {
     let (dna_that_checks, _, _) =
         SweetDnaFile::from_inline_zomes(network_seed.into(), zomes_that_check).await;
 
-    let alice_apps = alice_conductor
-        .setup_app_for_agents(app_prefix, &[alice_pubkey.clone()], &[dna_that_creates])
+    let alice_app = alice_conductor
+        .setup_app(app_prefix, &[dna_that_creates])
         .await
         .unwrap();
 
-    let ((alice_cell,),) = alice_apps.into_tuples();
+    let (alice_cell,) = alice_app.into_tuple();
 
     let bob_apps = bob_conductor
-        .setup_app_for_agents(app_prefix, &[bob_pubkey.clone()], &[dna_that_checks])
+        .setup_app(app_prefix, &[dna_that_checks])
         .await
         .unwrap();
 
-    let ((bob_cell,),) = bob_apps.into_tuples();
+    let (bob_cell,) = bob_apps.into_tuple();
 
     let _action_hash: ActionHash = alice_conductor
         .call(&alice_cell.zome(coordinator_name), create_function_name, ())
