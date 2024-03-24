@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p"
-version = "0.3.0-beta-dev.33"
+version = "0.3.0-beta-dev.34"
 description = "p2p / dht communication framework"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -44,7 +44,7 @@ thiserror = "1.0.22"
 tokio = { workspace = true }
 tracing = { workspace = true }
 tokio-stream = "0.1"
-tx5 = { version = "=0.0.7-alpha", optional = true }
+tx5 = { workspace = true, optional = true }
 url2 = { workspace = true }
 fixt = { path = "../../fixt", version = "^0.3.0-beta-dev.2"}
 

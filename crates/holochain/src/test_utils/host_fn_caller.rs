@@ -115,7 +115,9 @@ impl HostFnCaller {
         dna_file: &DnaFile,
         zome_index: usize,
     ) -> HostFnCaller {
-        let authored_db = handle.get_authored_db(cell_id.dna_hash()).unwrap();
+        let authored_db = handle
+            .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
+            .unwrap();
         let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
         let dht_db_cache = handle.get_dht_db_cache(cell_id.dna_hash()).unwrap();
         let cache = handle.get_cache_db(cell_id).await.unwrap();
