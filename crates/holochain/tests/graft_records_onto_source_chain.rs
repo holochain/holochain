@@ -6,7 +6,7 @@ use hdk::prelude::*;
 use holochain::conductor::api::error::ConductorApiError;
 use holochain::sweettest::{DynSweetRendezvous, SweetConductor, SweetDnaFile, SweetInlineZomes};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
-use holochain_conductor_api::conductor::ConductorConfig;
+use holochain_conductor_api::conductor::{ConductorConfig, DpkiConfig};
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
 use holochain_sqlite::error::DatabaseResult;
@@ -21,6 +21,7 @@ async fn grafting() {
     dbg!(dna_file.dna_def());
     dbg!(dna_file.dna_hash());
     let mut config = ConductorConfig::default();
+    config.dpki = Some(DpkiConfig::disabled());
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
@@ -199,6 +200,8 @@ async fn grafting() {
         // will pass validation.
         .await
         .expect("Should restore original chain");
+
+    drop(conductor);
 
     // Start a second conductor.
     let conductor =

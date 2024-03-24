@@ -6,6 +6,7 @@ use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
 use async_once_cell::OnceCell;
 use contrafact::MutationError;
+use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_types::prelude::DnaFile;
 use holochain_util::tokio_helper;
@@ -51,6 +52,7 @@ impl NetworkTopologyConductor {
     /// it needs to initialize the conductor if it hasn't been initialized yet.
     pub async fn lock(&self) -> &RwLock<SweetConductor> {
         let mut config = SweetConductorConfig::standard();
+        config.dpki = Some(DpkiConfig::disabled());
         config.keystore = KeystoreConfig::DangerTestKeystore;
         self.0
             .get_or_init(async { RwLock::new(SweetConductor::from_config(config).await) })
