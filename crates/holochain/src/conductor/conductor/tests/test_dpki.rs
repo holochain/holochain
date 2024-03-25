@@ -132,16 +132,9 @@ async fn mock_dpki_validation_limbo() {
 
     let alice_clone = alice.clone();
     let bob_clone = bob.clone();
-    tokio::spawn(async move {
-        consistency(
-            [&alice_clone, &bob_clone],
-            3,
-            tokio::time::Duration::from_secs(1),
-        )
+    tokio::spawn(async move { await_consistency!(3, [&alice_clone, &bob_clone]) })
         .await
-    })
-    .await
-    .unwrap_err();
+        .unwrap_err();
 
     let record_bob: Option<Record> = conductors[1]
         .call(&bob.zome("simple"), "read", hash.clone())
@@ -164,7 +157,7 @@ async fn mock_dpki_validation_limbo() {
         });
     }
 
-    consistency_10s([&alice, &bob]).await;
+    await_consistency!(10, [&alice, &bob]);
 
     assert!(matches!(
         get_key_state(&conductors[0], bob.agent_pubkey()).await,
@@ -242,16 +235,9 @@ async fn mock_dpki_invalid_key_state() {
     // tokio::time::sleep(tokio::time::Duration::from_secs(3))
     let alice_clone = alice.clone();
     let bob_clone = bob.clone();
-    tokio::spawn(async move {
-        consistency(
-            [&alice_clone, &bob_clone],
-            3,
-            tokio::time::Duration::from_secs(1),
-        )
+    tokio::spawn(async move { await_consistency!(3, [&alice_clone, &bob_clone]) })
         .await
-    })
-    .await
-    .unwrap_err();
+        .unwrap_err();
 
     let record_alice: Option<Details> = conductors[0]
         .call(&alice.zome("simple"), "read_details", hash.clone())
@@ -337,13 +323,13 @@ async fn mock_dpki_preflight_check() {
         });
     }
 
-    consistency_10s([&alice, &bob]).await;
+    await_consistency!(10, [&alice, &bob]);
 
     let hash: ActionHash = conductors[0]
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    consistency_60s([&alice, &bob]).await;
+    await_consistency!(60, [&alice, &bob]);
 
     assert!(matches!(
         get_key_state(&conductors[0], bob.agent_pubkey()).await,

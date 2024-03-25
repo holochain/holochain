@@ -97,7 +97,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
     conductors.exchange_peer_info().await;
 
     let dpki_cells = conductors.dpki_cells();
-    consistency!(10, dpki_cells.as_slice());
+    await_consistency!(10, dpki_cells.as_slice());
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 

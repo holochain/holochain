@@ -1,7 +1,5 @@
 use holochain::{
-    conductor::config::DpkiConfig,
-    sweettest::*,
-    test_utils::{consistency_10s, consistency_60s, inline_zomes::simple_create_read_zome},
+    conductor::config::DpkiConfig, sweettest::*, test_utils::inline_zomes::simple_create_read_zome,
 };
 use holochain_conductor_services::KeyState;
 use holochain_types::prelude::*;
@@ -89,7 +87,7 @@ async fn validate_with_dpki() {
 
     dbg!(Timestamp::now());
 
-    consistency_10s([&alice, &bob]).await;
+    await_consistency!(10, [&alice, &bob]);
 
     dbg!(Timestamp::now());
 
@@ -99,7 +97,7 @@ async fn validate_with_dpki() {
 
     dbg!(Timestamp::now());
 
-    consistency_60s([&alice, &bob]).await;
+    await_consistency!(60, [&alice, &bob]);
 
     dbg!(Timestamp::now());
     // Both see each other in DPKI
