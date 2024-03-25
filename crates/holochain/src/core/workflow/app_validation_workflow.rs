@@ -643,8 +643,21 @@ where
         }
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::AgentActivity(
             author,
-            _filter,
-        )) => Ok(Outcome::AwaitingDeps(vec![author.into()])),
+            filter,
+        )) => {
+            tracing::error!("got unresolved deps agent activity {author:?} {filter:?}");
+            let cascade_workspace = workspace_read.clone();
+            tokio::spawn({
+                let author = author.clone();
+                let cascade =
+                    CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
+                async move {
+                    let result = cascade.must_get_agent_activity(author, filter).await;
+                    tracing::error!("must_get_agent_activity result is {result:?}");
+                }
+            });
+            Ok(Outcome::AwaitingDeps(vec![author.into()]))
+        }
     }
 }
 

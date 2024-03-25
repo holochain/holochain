@@ -3,7 +3,7 @@ use crate::core::queue_consumer::WorkComplete;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::app_validation_workflow::{
-    app_validation_workflow_inner, check_app_entry_def, put_integrated, put_validation_limbo,
+    app_validation_workflow_inner, check_app_entry_def, put_validation_limbo,
     AppValidationWorkspace,
 };
 use crate::core::workflow::sys_validation_workflow::validation_query;
@@ -32,7 +32,7 @@ use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::{TestWasm, TestWasmPair, TestZomes};
 use holochain_zome_types::fixt::{
-    ActionHashFixturator, CreateFixturator, DeleteFixturator, EntryFixturator, SignatureFixturator,
+    CreateFixturator, DeleteFixturator, EntryFixturator, SignatureFixturator,
 };
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
@@ -49,9 +49,7 @@ async fn main_loop_app_validation_workflow() {
     let zomes =
         SweetInlineZomes::new(vec![], 0).integrity_function("validate", move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete {
-                delete,
-                original_action,
-                original_entry,
+                original_action, ..
             }) = op
             {
                 let result =
@@ -68,7 +66,7 @@ async fn main_loop_app_validation_workflow() {
             }
         });
 
-    let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let dna_hash = dna_file.dna_hash().clone();
 
     let mut conductor = SweetConductor::from_config_rendezvous(
@@ -151,7 +149,6 @@ async fn main_loop_app_validation_workflow() {
 
     // insert dependent create op in dht cache db
     // as cascade would do with fetched dependent ops
-    let op_hash = dht_create_op_hashed.hash.clone();
     app_validation_workspace.cache.test_write(move |txn| {
         insert_op(txn, &dht_create_op_hashed).unwrap();
         insert_entry(txn, &entry.clone().to_hash(), &entry).unwrap();
@@ -159,7 +156,8 @@ async fn main_loop_app_validation_workflow() {
             txn,
             &dht_create_op_hashed.hash,
             ValidationStage::SysValidated,
-        );
+        )
+        .unwrap();
     });
 
     // there is still only the 1 delete op to be validated
