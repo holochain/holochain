@@ -45,7 +45,8 @@ fn consistency(bench: &mut Criterion) {
                 num_tries,
                 std::time::Duration::from_millis(500),
             )
-            .await;
+            .await
+            .unwrap();
             // holochain_state::prelude::dump_tmp(consumer.cell.env());
         });
     }
@@ -145,7 +146,8 @@ impl Consumer {
                         1,
                         std::time::Duration::from_millis(10),
                     )
-                    .await;
+                    .await
+                    .unwrap();
                 }
             }
             // dump_tmp(self.cell.env());

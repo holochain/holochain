@@ -107,7 +107,7 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_60s([&alice, &bobbo]).await;
+    consistency!(60, [&alice, &bobbo]).await.unwrap();
     // let p2p = conductors[0].envs().p2p().lock().values().next().cloned().unwrap();
     // holochain_state::prelude::dump_tmp(&p2p);
     // holochain_state::prelude::dump_tmp(&alice.env());
@@ -170,7 +170,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s([&alice, &bobbo, &carol]).await;
+    consistency!(10, [&alice, &bobbo, &carol]).await.unwrap();
 
     let mut all_op_hashes = vec![];
 
@@ -490,7 +490,7 @@ async fn test_gossip_shutdown() {
     // Ensure that gossip loops resume upon startup
     conductors[0].startup().await;
 
-    consistency_60s([&cell_0, &cell_1]).await;
+    consistency!(60, [&cell_0, &cell_1]).await.unwrap();
     let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
     assert_eq!(record.unwrap().action_address(), &hash);
 }
@@ -536,7 +536,7 @@ async fn test_gossip_startup() {
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     SweetConductor::exchange_peer_info([&conductor0, &conductor1]).await;
 
-    consistency_60s([&cell0, &cell1]).await;
+    consistency!(60, [&cell0, &cell1]).await.unwrap();
     let record: Option<Record> = conductor1.call(&zome1, "read", hash.clone()).await;
     assert_eq!(record.unwrap().action_address(), &hash);
 }
@@ -614,7 +614,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         hashes.push(hash);
     }
 
-    consistency_10s([&cells[0], &cells[1]]).await;
+    consistency!(10, [&cells[0], &cells[1]]).await.unwrap();
 
     println!(
         "Done waiting for consistency between first two nodes. Elapsed: {:?}",
@@ -674,11 +674,11 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     );
 
     consistency_advanced(
+        std::time::Duration::from_secs(10),
         [(&cells[0], false), (&cells[1], true), (&cell, true)],
-        10,
-        std::time::Duration::from_secs(1),
     )
-    .await;
+    .await
+    .unwrap();
 
     println!(
         "Done waiting for consistency between last two nodes. Elapsed: {:?}",
@@ -732,7 +732,7 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     let hash: ActionHash = conductor.call(&alice.zome("simple"), "create", ()).await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s([&alice, &bobbo]).await;
+    consistency!(10, [&alice, &bobbo]).await.unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductor.call(&bobbo.zome("simple"), "read", hash).await;

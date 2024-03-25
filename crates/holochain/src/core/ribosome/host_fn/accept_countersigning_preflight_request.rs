@@ -797,7 +797,7 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        consistency!(10, [&alice_cell, &bob_cell]).await.unwrap();
 
         assert_eq!(alice_activity.valid_activity.len(), 7);
         assert_eq!(
@@ -1106,7 +1106,7 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        consistency!(10, [&alice_cell, &bob_cell]).await.unwrap();
 
         assert_eq!(alice_activity.valid_activity.len(), 8);
         assert_eq!(
@@ -1264,7 +1264,7 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        consistency!(10, [&alice_cell, &bob_cell]).await.unwrap();
 
         // Now the action appears in alice's activty.
         let alice_activity: AgentActivity = conductor
@@ -1334,7 +1334,9 @@ pub mod wasm_test {
 
         // NON ENZYMATIC
         {
-            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+            consistency!(10, [&alice_cell, &bob_cell, &carol_cell])
+                .await
+                .unwrap();
 
             // The countersigned entry does NOT appear in alice's activity yet.
             let alice_activity_pre: AgentActivity = bob_conductor
@@ -1404,7 +1406,9 @@ pub mod wasm_test {
                     unreachable!();
                 };
 
-            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+            consistency!(10, [&alice_cell, &bob_cell, &carol_cell])
+                .await
+                .unwrap();
 
             // Alice commits the action.
             let _countersigned_action_hash_alice: ActionHash = alice_conductor
@@ -1424,7 +1428,9 @@ pub mod wasm_test {
                 )
                 .await;
 
-            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+            consistency!(10, [&alice_cell, &bob_cell, &carol_cell])
+                .await
+                .unwrap();
 
             // Now the action appears in alice's activty.
             let alice_activity: AgentActivity = bob_conductor

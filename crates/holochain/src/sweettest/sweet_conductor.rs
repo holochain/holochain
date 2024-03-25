@@ -541,6 +541,14 @@ impl SweetConductor {
         self.raw_handle().install_dpki(dna).await.unwrap()
     }
 
+    /// Get the cell providing the DPKI service, if applicable
+    pub fn dpki_cell(&self) -> Option<SweetCell> {
+        let dpki = self.raw_handle().running_services().dpki?;
+        let agent = dpki.dpki_agent();
+        let cell_id = CellId::new(DnaHash::from_raw_32(dpki.uuid().to_vec()), agent.clone());
+        Some(self.get_sweet_cell(cell_id).unwrap())
+    }
+
     /// Call into the underlying create_clone_cell function, and register the
     /// created dna with SweetConductor so it will be reloaded on restart.
     pub async fn create_clone_cell(

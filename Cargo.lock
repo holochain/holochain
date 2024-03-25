@@ -2662,6 +2662,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hc_service_check"
+version = "0.1.0-beta-rc.0"
+dependencies = [
+ "clap 4.5.3",
+ "kitsune_p2p_bootstrap_client",
+ "tokio",
+ "tx5-go-pion",
+ "tx5-signal",
+ "url2",
+]
+
+[[package]]
 name = "hc_sleuth"
 version = "0.2.0-beta-dev.11"
 dependencies = [

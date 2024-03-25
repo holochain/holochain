@@ -45,7 +45,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
         )
         .await;
 
-    consistency_10s([&alice, &bobbo]).await;
+    consistency!(10, [&alice, &bobbo]).await.unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let records: Option<Record> = conductor
@@ -107,8 +107,12 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     assert_ne!(hash_foo, hash_bar);
 
     // Wait long enough for others to receive gossip
-    consistency_10s([&alice_foo, &bobbo_foo, &carol_foo]).await;
-    consistency_10s([&alice_bar, &bobbo_bar, &carol_bar]).await;
+    consistency!(10, [&alice_foo, &bobbo_foo, &carol_foo])
+        .await
+        .unwrap();
+    consistency!(10, [&alice_bar, &bobbo_bar, &carol_bar])
+        .await
+        .unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     // on the "foo" DNA
@@ -205,7 +209,7 @@ async fn get_deleted() -> anyhow::Result<()> {
         )
         .await;
 
-    consistency_10s([&alice]).await;
+    consistency!(10, [&alice]).await.unwrap();
 
     let records: Option<Record> = conductor
         .call(
@@ -231,7 +235,7 @@ async fn get_deleted() -> anyhow::Result<()> {
         )
         .await;
 
-    consistency_10s([&alice]).await;
+    consistency!(10, [&alice]).await.unwrap();
 
     let records: Vec<Option<Record>> = conductor
         .call(

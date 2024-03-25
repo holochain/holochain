@@ -230,6 +230,11 @@ impl SweetConductorBatch {
         crate::conductor::p2p_agent_store::reveal_peer_info(observer_envs, seen_envs).await;
     }
 
+    /// Get the DPKI cell for each conductor, if applicable
+    pub fn dpki_cells(&self) -> Vec<SweetCell> {
+        self.0.iter().filter_map(|c| c.dpki_cell()).collect()
+    }
+
     /// Force trigger all dht ops that haven't received
     /// enough validation receipts yet.
     pub async fn force_all_publish_dht_ops(&self) {

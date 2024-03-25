@@ -8,51 +8,36 @@ use std::time::Duration;
 use super::*;
 
 /// Wait for all cells to reach consistency for 10 seconds
-pub async fn consistency_10s<'a, I: IntoIterator<Item = &'a SweetCell>>(all_cells: I) {
-    const NUM_ATTEMPTS: usize = 100;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-    consistency(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+#[macro_export]
+macro_rules! consistency {
+    ($secs:literal, $cells:expr) => {{
+        let dur = std::time::Duration::from_secs($secs);
+        if let Err(err) = consistency(dur, $cells).await {
+            println!("{err}");
+            panic!("`consistency!()` failure. Error printed above.");
+        }
+    }};
 }
 
-/// Wait for all cells to reach consistency for 10 seconds,
-/// with the option to specify that some cells are offline.
-pub async fn consistency_10s_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
-    all_cells: I,
-) {
-    const NUM_ATTEMPTS: usize = 100;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-    consistency_advanced(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
-}
-
-/// Wait for all cells to reach consistency for 60 seconds
-pub async fn consistency_60s<'a, I: IntoIterator<Item = &'a SweetCell>>(all_cells: I) {
-    const NUM_ATTEMPTS: usize = 60;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_secs(1);
-    consistency(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
-}
-
-/// Wait for all cells to reach consistency for 60 seconds,
-/// with the option to specify that some cells are offline.
-pub async fn consistency_60s_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
-    all_cells: I,
-) {
-    const NUM_ATTEMPTS: usize = 60;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_secs(1);
-    consistency_advanced(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+/// Wait for all cells to reach consistency for 10 seconds
+#[macro_export]
+macro_rules! consistency_advanced {
+    ($secs:literal, $cells:expr) => {
+        let dur = std::time::Duration::from_secs($secs);
+        if let Err(err) = consistency_advanced(dur, $cells).await {
+            println!("{err}");
+            panic!("`consistency_advanced!()` failure. Error printed above.");
+        }
+    };
 }
 
 /// Wait for all cells to reach consistency
-pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
+#[tracing::instrument(skip(all_cells))]
+pub(super) async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
+    timeout: Duration,
     all_cells: I,
-    num_attempts: usize,
-    delay: Duration,
-) {
-    consistency_advanced(
-        all_cells.into_iter().map(|c| (c, true)),
-        num_attempts,
-        delay,
-    )
-    .await
+) -> Result<(), String> {
+    consistency_advanced(timeout, all_cells.into_iter().map(|c| (c, true))).await
 }
 
 /// Wait for all cells to reach consistency,
@@ -61,11 +46,11 @@ pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
 /// Cells paired with a `false` value will have their authored ops counted towards the total,
 /// but not their integrated ops (since they are not online to integrate things).
 /// This is useful for tests where nodes go offline.
-pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
+#[tracing::instrument(skip(all_cells))]
+pub(super) async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
+    timeout: Duration,
     all_cells: I,
-    num_attempts: usize,
-    delay: Duration,
-) {
+) -> Result<(), String> {
     #[allow(clippy::type_complexity)]
     let all_cell_dbs: Vec<(
         SleuthId,
@@ -87,5 +72,5 @@ pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, boo
         .iter()
         .map(|c| (&c.0, &c.1, &c.2, c.3.as_ref()))
         .collect();
-    consistency_dbs(&all_cell_dbs[..], num_attempts, delay).await
+    consistency_dbs(&all_cell_dbs[..], timeout).await
 }

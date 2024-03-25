@@ -34,7 +34,9 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         .await;
 
     // Wait until they all see the created entry, at that point validation receipts should be getting sent soon
-    consistency_60s([&alice, &bobbo, &carol, &danny, &emma, &fred]).await;
+    consistency!(60, [&alice, &bobbo, &carol, &danny, &emma, &fred])
+        .await
+        .unwrap();
 
     let ops_to_publish = alice
         .authored_db()
