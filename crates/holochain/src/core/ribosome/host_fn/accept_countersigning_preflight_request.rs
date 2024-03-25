@@ -797,7 +797,7 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency!(10, [&alice_cell, &bob_cell]).await.unwrap();
+        consistency!(10, [&alice_cell, &bob_cell]);
 
         assert_eq!(alice_activity.valid_activity.len(), 7);
         assert_eq!(
@@ -1106,7 +1106,7 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency!(10, [&alice_cell, &bob_cell]).await.unwrap();
+        consistency!(10, [&alice_cell, &bob_cell]);
 
         assert_eq!(alice_activity.valid_activity.len(), 8);
         assert_eq!(
@@ -1264,7 +1264,7 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency!(10, [&alice_cell, &bob_cell]).await.unwrap();
+        consistency!(10, [&alice_cell, &bob_cell]);
 
         // Now the action appears in alice's activty.
         let alice_activity: AgentActivity = conductor

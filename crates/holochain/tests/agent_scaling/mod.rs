@@ -4,7 +4,6 @@ use futures::future;
 use futures::FutureExt;
 use hdk::prelude::GetLinksInputBuilder;
 use holochain::sweettest::*;
-use holochain::test_utils::consistency_10s;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
@@ -60,7 +59,7 @@ async fn many_agents_can_reach_consistency_agent_links() {
     let alice = cells[0].zome("links");
 
     // Must have integrated or be able to get the agent key to link from it
-    consistency!(10, &cells[..]).await.unwrap();
+    consistency!(10, &cells[..]);
 
     let base: AnyLinkableHash = cells[0].agent_pubkey().clone().into();
     let target: AnyLinkableHash = cells[1].agent_pubkey().clone().into();
@@ -73,7 +72,7 @@ async fn many_agents_can_reach_consistency_agent_links() {
         )
         .await;
 
-    consistency!(10, &cells[..]).await.unwrap();
+    consistency!(10, &cells[..]);
 
     let mut seen = [0usize; NUM_AGENTS];
 
@@ -109,7 +108,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
 
     let _: ActionHash = conductor.call(&alice, "create_link", ()).await;
 
-    consistency!(10, &cells[..]).await.unwrap();
+    consistency!(10, &cells[..]);
 
     let mut num_seen = 0;
 
