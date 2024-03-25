@@ -674,9 +674,8 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     );
 
     consistency_advanced(
+        std::time::Duration::from_secs(10),
         [(&cells[0], false), (&cells[1], true), (&cell, true)],
-        10,
-        std::time::Duration::from_secs(1),
     )
     .await;
 
