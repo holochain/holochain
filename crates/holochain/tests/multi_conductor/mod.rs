@@ -227,9 +227,6 @@ async fn private_entries_dont_leak() {
 
     conductors.exchange_peer_info().await;
 
-    // let dpki_cells = conductors.dpki_cells();
-    // consistency!(10, dpki_cells.as_slice());
-
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())

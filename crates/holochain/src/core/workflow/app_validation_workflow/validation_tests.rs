@@ -395,7 +395,7 @@ async fn app_validation_ops() {
         .call(&alice.zome("zome1"), "create_a", ())
         .await;
 
-    consistency_10s([&alice, &bob]).await;
+    consistency_10s([&alice, &bob]).await.unwrap();
 
     let mut expected = Expected(HashSet::new());
 
