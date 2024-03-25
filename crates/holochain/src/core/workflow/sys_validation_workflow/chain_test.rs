@@ -1,6 +1,5 @@
 use super::*;
 use crate::sweettest::*;
-use crate::test_utils::consistency_10s;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 
 /// Unfortunately this test doesn't do anything yet because
@@ -42,5 +41,5 @@ async fn sys_validation_agent_activity_test() {
     assert_eq!(changed, 2);
 
     conductors.exchange_peer_info().await;
-    consistency!(10, [&cell_1, &cell_2]);
+    await_consistency!(10, [&cell_1, &cell_2]);
 }

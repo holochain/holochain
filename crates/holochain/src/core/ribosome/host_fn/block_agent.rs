@@ -41,11 +41,7 @@ pub fn block_agent(
 mod test {
     use crate::conductor::api::error::ConductorApiResult;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use crate::sweettest::consistency_60s;
-    use crate::sweettest::SweetConductorBatch;
-    use crate::sweettest::SweetConductorConfig;
-    use crate::sweettest::SweetDnaFile;
-    use crate::test_utils::consistency_10s;
+    use crate::sweettest::*;
     use holo_hash::ActionHash;
     use holo_hash::AgentPubKey;
     use holochain_types::prelude::CapSecret;
@@ -128,12 +124,12 @@ mod test {
 
         let action0: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
-        consistency!(10, [&alice_cell, &bob_cell]);
+        await_consistency!(10, [&alice_cell, &bob_cell]);
 
         // Before bob is blocked he can get posts just fine.
         let bob_get0: Option<Record> = bob_conductor.call(&bob, "get_post", action0).await;
         // Await bob's init to propagate to alice.
-        consistency!(10, [&alice_cell, &bob_cell]);
+        await_consistency!(10, [&alice_cell, &bob_cell]);
         assert!(bob_get0.is_some());
 
         // Bob gets blocked by alice.
@@ -144,7 +140,7 @@ mod test {
         let action1: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
         // Now that bob is blocked by alice he cannot get data from alice.
-        consistency!(10, [&alice_cell]);
+        await_consistency!(10, [&alice_cell]);
         let bob_get1: Option<Record> = bob_conductor.call(&bob, "get_post", action1.clone()).await;
 
         assert!(bob_get1.is_none());
@@ -154,9 +150,7 @@ mod test {
 
         conductors.exchange_peer_info().await;
 
-        consistency!(60, [&alice_cell, &bob_cell, &carol_cell])
-            .await
-            .unwrap();
+        await_consistency!(60, [&alice_cell, &bob_cell, &carol_cell]);
 
         // Bob can get data from alice via. carol.
         let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;

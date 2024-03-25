@@ -69,7 +69,7 @@ mod generate_records;
 pub use generate_records::*;
 use holochain_types::websocket::AllowedOrigins;
 
-pub use crate::{consistency, consistency_advanced};
+pub use crate::{await_consistency, await_consistency_advanced};
 
 use self::consistency::request_published_ops;
 

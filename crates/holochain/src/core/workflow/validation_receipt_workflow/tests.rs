@@ -1,7 +1,6 @@
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::prelude::InlineZomeSet;
 use crate::sweettest::*;
-use crate::test_utils::consistency_10s;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
@@ -30,7 +29,7 @@ async fn test_validation_receipt() {
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    consistency!(10, [&alice, &bobbo, &carol]);
+    await_consistency!(10, [&alice, &bobbo, &carol]);
 
     // Get op hashes
     let vault = alice.dht_db();
@@ -216,7 +215,7 @@ async fn test_block_invalid_receipt() {
         .call(&alice_cell.zome(coordinator_name), create_function_name, ())
         .await;
 
-    consistency!(10, [&alice_cell, &bob_cell]);
+    await_consistency!(10, [&alice_cell, &bob_cell]);
 
     let alice_block_target = BlockTargetId::Cell(alice_cell.cell_id().to_owned());
     let bob_block_target = BlockTargetId::Cell(bob_cell.cell_id().to_owned());
