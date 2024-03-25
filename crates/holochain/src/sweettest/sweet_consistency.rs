@@ -10,13 +10,13 @@ use super::*;
 /// Wait for all cells to reach consistency for 10 seconds
 #[macro_export]
 macro_rules! consistency {
-    ($secs:literal, $cells:expr) => {
+    ($secs:literal, $cells:expr) => {{
         let dur = std::time::Duration::from_secs($secs);
-        if let Err(err) = consistency(dur, $cells).await {
+        if let Err(err) = $crate::sweettest::consistency(dur, $cells).await {
             println!("{err}");
             panic!("`consistency!()` failure. Error printed above.");
         }
-    };
+    }};
 }
 
 /// Wait for all cells to reach consistency for 10 seconds
@@ -24,7 +24,7 @@ macro_rules! consistency {
 macro_rules! consistency_advanced {
     ($secs:literal, $cells:expr) => {
         let dur = std::time::Duration::from_secs($secs);
-        if let Err(err) = consistency_advanced(dur, $cells).await {
+        if let Err(err) = $crate::sweettest::consistency_advanced(dur, $cells).await {
             println!("{err}");
             panic!("`consistency_advanced!()` failure. Error printed above.");
         }
@@ -33,7 +33,7 @@ macro_rules! consistency_advanced {
 
 /// Wait for all cells to reach consistency
 #[tracing::instrument(skip(all_cells))]
-pub(super) async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
+pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
     timeout: Duration,
     all_cells: I,
 ) -> Result<(), String> {
@@ -47,7 +47,7 @@ pub(super) async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
 /// but not their integrated ops (since they are not online to integrate things).
 /// This is useful for tests where nodes go offline.
 #[tracing::instrument(skip(all_cells))]
-pub(super) async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
+pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
     timeout: Duration,
     all_cells: I,
 ) -> Result<(), String> {
