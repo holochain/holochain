@@ -1,6 +1,5 @@
 use super::*;
 use crate::sweettest::*;
-use crate::test_utils::consistency_10s;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 
 /// Unfortunately this test doesn't do anything yet because

@@ -6,10 +6,7 @@ use std::{
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
 
-use crate::{
-    core::ribosome::guest_callback::validate::ValidateResult, sweettest::*,
-    test_utils::consistency_10s,
-};
+use crate::{core::ribosome::guest_callback::validate::ValidateResult, sweettest::*};
 
 const ZOME_A_0: &'static str = "ZOME_A_0";
 const ZOME_A_1: &'static str = "ZOME_A_1";
@@ -395,7 +392,7 @@ async fn app_validation_ops() {
         .call(&alice.zome("zome1"), "create_a", ())
         .await;
 
-    consistency!(10, [&alice, &bob]);
+    await_consistency!(10, [&alice, &bob]);
 
     let mut expected = Expected(HashSet::new());
 
