@@ -9,24 +9,26 @@ use super::*;
 
 /// Wait for all cells to reach consistency for 10 seconds
 #[macro_export]
-macro_rules! consistency {
-    ($secs:literal, $cells:expr) => {{
+macro_rules! await_consistency {
+    ($secs:literal, $cells:expr $(,)?) => {{
         let dur = std::time::Duration::from_secs($secs);
-        if let Err(err) = $crate::sweettest::consistency(dur, $cells).await {
+        if let Err(err) = $crate::sweettest::sweet_consistency::consistency(dur, $cells).await {
             println!("{err}");
-            panic!("`consistency!()` failure. Error printed above.");
+            panic!("`await_consistency!()` failure. Error printed above.");
         }
     }};
 }
 
 /// Wait for all cells to reach consistency for 10 seconds
 #[macro_export]
-macro_rules! consistency_advanced {
-    ($secs:literal, $cells:expr) => {
+macro_rules! await_consistency_advanced {
+    ($secs:literal, $cells:expr $(,)?) => {
         let dur = std::time::Duration::from_secs($secs);
-        if let Err(err) = $crate::sweettest::consistency_advanced(dur, $cells).await {
+        if let Err(err) =
+            $crate::sweettest::sweet_consistency::consistency_advanced(dur, $cells).await
+        {
             println!("{err}");
-            panic!("`consistency_advanced!()` failure. Error printed above.");
+            panic!("`await_consistency_advanced!()` failure. Error printed above.");
         }
     };
 }
