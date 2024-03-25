@@ -7,6 +7,7 @@ description = "A mock version of the holochain HDI"
 license = "Apache-2.0"
 documentation = "https://docs.rs/holochain_mock_hdi"
 
+# reminder - do not use workspace deps
 [dependencies]
 hdi = { path = "../hdi" }
 mockall = { version = "0.11.3" }
