@@ -20,38 +20,20 @@ macro_rules! consistency {
 }
 
 /// Wait for all cells to reach consistency for 10 seconds
-pub async fn consistency_10s<'a, I: IntoIterator<Item = &'a SweetCell>>(
-    all_cells: I,
-) -> Result<(), String> {
-    consistency(Duration::from_secs(10), all_cells).await
-}
-
-/// Wait for all cells to reach consistency for 10 seconds,
-/// with the option to specify that some cells are offline.
-pub async fn consistency_10s_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
-    all_cells: I,
-) -> Result<(), String> {
-    consistency_advanced(Duration::from_secs(10), all_cells).await
-}
-
-/// Wait for all cells to reach consistency for 60 seconds
-pub async fn consistency_60s<'a, I: IntoIterator<Item = &'a SweetCell>>(
-    all_cells: I,
-) -> Result<(), String> {
-    consistency(Duration::from_secs(60), all_cells).await
-}
-
-/// Wait for all cells to reach consistency for 60 seconds,
-/// with the option to specify that some cells are offline.
-pub async fn consistency_60s_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
-    all_cells: I,
-) -> Result<(), String> {
-    consistency_advanced(Duration::from_secs(60), all_cells).await
+#[macro_export]
+macro_rules! consistency_advanced {
+    ($secs:literal, $cells:expr) => {
+        let dur = std::time::Duration::from_secs($secs);
+        if let Err(err) = consistency_advanced(dur, $cells).await {
+            println!("{err}");
+            panic!("`consistency_advanced!()` failure. Error printed above.");
+        }
+    };
 }
 
 /// Wait for all cells to reach consistency
 #[tracing::instrument(skip(all_cells))]
-pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
+pub(super) async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
     timeout: Duration,
     all_cells: I,
 ) -> Result<(), String> {
@@ -65,7 +47,7 @@ pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
 /// but not their integrated ops (since they are not online to integrate things).
 /// This is useful for tests where nodes go offline.
 #[tracing::instrument(skip(all_cells))]
-pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
+pub(super) async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
     timeout: Duration,
     all_cells: I,
 ) -> Result<(), String> {
