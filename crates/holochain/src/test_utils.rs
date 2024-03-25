@@ -556,9 +556,8 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     let start = tokio::time::Instant::now();
 
     let num_published = published.len();
-    let mut num_integrated = 0;
     while start.elapsed() < timeout {
-        num_integrated = get_integrated_count(&db).await;
+        let num_integrated = get_integrated_count(&db).await;
         let delay = if num_integrated >= num_published {
             if num_integrated > num_published {
                 tracing::warn!("num integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test.
@@ -583,6 +582,10 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
 
     // Timeout has been reached at this point, so print a helpful report
 
+    if published.is_empty() {
+        return Err(format!("No ops were published in {timeout:?}"));
+    }
+
     // Otherwise just print a report of which ops were not integrated
     let mut published_displays: Vec<_> = published.iter().map(display_op).collect();
     let mut integrated: Vec<_> = get_integrated_ops(&db)
@@ -602,10 +605,10 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         .cloned()
         .collect::<Vec<_>>();
 
-    assert!(
-        !unintegrated.is_empty(),
-        "consistency should only fail if items were published but not integrated"
-    );
+    if unintegrated.is_empty() {
+        // Even though the main loop failed, the final check shows that we have all ops!
+        return Ok(());
+    }
 
     if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
         // If hc_sleuth has been initialized, print a sleuthy report
@@ -636,7 +639,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         "Consistency not achieved after {:?}. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n\n{:?}",
         timeout,
         num_published,
-        num_integrated,
+        integrated.len(),
         header,
         unintegrated.join("\n"),
         integration_dump,

@@ -12,7 +12,10 @@ use super::*;
 macro_rules! consistency {
     ($secs:literal, $cells:expr) => {
         let dur = std::time::Duration::from_secs($secs);
-        consistency(dur, $cells).await.unwrap();
+        if let Err(err) = consistency(dur, $cells).await {
+            println!("{err}");
+            panic!("`consistency!()` failure. Error printed above.");
+        }
     };
 }
 
