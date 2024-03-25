@@ -407,7 +407,7 @@ pub async fn validate_op<R>(
 where
     R: RibosomeT,
 {
-    check_entry_def(op, ribosome.dna_hash(), conductor_handle)
+    check_entry_def(op, &network.dna_hash(), conductor_handle)
         .await
         .map_err(AppValidationError::SysValidationError)?;
 
