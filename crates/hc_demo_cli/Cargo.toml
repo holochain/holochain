@@ -7,6 +7,7 @@ license = "Apache-2.0"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+# reminder - do not use workspace deps
 [dependencies]
 cfg-if = "0.1"
 clap = { version = "4.2.2", features = [ "derive", "wrap_help" ], optional = true }

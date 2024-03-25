@@ -4,6 +4,7 @@ version = "0.1.0-beta-rc.0"
 edition = "2021"
 license = "Apache-2.0"
 
+# reminder - do not use workspace deps
 [dependencies]
 clap = { version = "4.5.3", features = [ "derive", "wrap_help" ] }
 tokio = { version = "1.36.0", features = [ "full" ] }

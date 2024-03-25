@@ -8,6 +8,7 @@ documentation = "https://docs.rs/holochain_secure_primitive"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
 serde = { version = "1.0", features = [ "derive" ] }
 paste = "1.0"
