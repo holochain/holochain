@@ -8,15 +8,16 @@ documentation = "https://docs.rs/holochain_websocket"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-futures = { workspace = true }
-holochain_serialized_bytes = { workspace = true }
+futures = "0.3"
+holochain_serialized_bytes = "=0.0.53"
 holochain_types = { version = "0.3.0-beta-dev.36", path = "../holochain_types" }
-serde = { workspace = true }
-serde_bytes = { workspace = true }
-tokio = { workspace = true }
-tokio-tungstenite = { workspace = true }
-tracing = { workspace = true }
+serde = "1.0"
+serde_bytes = "0.11.14"
+tokio = { version = "1.36.0", features = ["full"] }
+tokio-tungstenite = "0.21.0"
+tracing = "0.1"
 
 [dev-dependencies]
 holochain_trace = { version = "^0.3.0-beta-dev.8", path = "../holochain_trace" }

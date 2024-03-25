@@ -8,17 +8,18 @@ documentation = "https://docs.rs/holochain_sqlite"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-async-trait = { workspace = true }
-anyhow = "1.0.26"
+async-trait = "0.1"
+anyhow = "1.0"
 # pinned here with = to fix a compilation issue in a dependent crate.
 # feel free to drop the = if it causes problems in the future.
 chashmap = "=2.2.0"
-derive_more = { workspace = true }
+derive_more = "0.99"
 fallible-iterator = "0.2.0"
-futures = "0.3.1"
+futures = "0.3"
 holo_hash = { path = "../holo_hash", version = "^0.3.0-beta-dev.24"}
-holochain_serialized_bytes = { workspace = true }
+holochain_serialized_bytes = "=0.0.53"
 holochain_util = { version = "^0.3.0-beta-dev.5", path = "../holochain_util", features = ["backtrace"], optional = true }
 holochain_zome_types = { version = "^0.3.0-beta-dev.30", path = "../holochain_zome_types" }
 holochain_nonce = {version = "^0.3.0-beta-dev.25", path = "../holochain_nonce"}
@@ -32,7 +33,7 @@ num_cpus = "1.13.0"
 parking_lot = "0.10"
 r2d2 = "0.8"
 r2d2_sqlite = { version = "0.1", package = "r2d2_sqlite_neonphog" }
-rmp-serde = { workspace = true }
+rmp-serde = "=0.15.5"
 scheduled-thread-pool = "0.2"
 serde = "1.0"
 serde_derive = "1.0"
