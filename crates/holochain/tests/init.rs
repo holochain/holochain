@@ -9,8 +9,7 @@ use holochain_conductor_api::conductor::DpkiConfig;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_from_init_across_cells() {
-    let mut config = SweetConductorConfig::standard();
-    config.dpki = Some(DpkiConfig::disabled());
+    let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let inits = Arc::new(AtomicU8::new(0));

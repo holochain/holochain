@@ -81,6 +81,12 @@ impl SweetConductorConfig {
             })
     }
 
+    /// Disable DPKI, which is on by default
+    pub fn no_dpki(mut self) -> Self {
+        self.dpki = Some(holochain_conductor_api::conductor::DpkiConfig::disabled());
+        self
+    }
+
     /// Rendezvous config for SweetConductors
     pub fn rendezvous(bootstrap: bool) -> Self {
         let mut config = Self::standard();

@@ -15,7 +15,6 @@ use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::{CellInfo, ProvisionedCell};
-use holochain_conductor_services::DPKI_APP_ID;
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
@@ -712,17 +711,16 @@ impl SweetConductor {
     pub async fn exchange_peer_info(conductors: impl Clone + IntoIterator<Item = &Self>) {
         let mut all = Vec::new();
         for c in conductors.clone().into_iter() {
-            let dpki_dna_hash =
-                DnaHash::from_raw_32(c.running_services().dpki.as_ref().unwrap().uuid().to_vec());
-            c.spaces.get_or_create_space(&dpki_dna_hash).unwrap();
+            if let Some(dpki) = c.running_services().dpki.as_ref() {
+                // Ensure the space is created for DPKI so the agent db exists
+                let dpki_dna_hash = DnaHash::from_raw_32(dpki.uuid().to_vec());
+                c.spaces.get_or_create_space(&dpki_dna_hash).unwrap();
+            }
             for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
                 all.push(env.clone());
             }
         }
         crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
-        // for c in conductors.into_iter() {
-        //     c.enable_app(DPKI_APP_ID.to_string()).await.unwrap();
-        // }
     }
 
     /// Drop the specified agent keys from each conductor's peer table

@@ -51,8 +51,7 @@ impl NetworkTopologyConductor {
     /// Get the conductor share for this node. This is an async function because
     /// it needs to initialize the conductor if it hasn't been initialized yet.
     pub async fn lock(&self) -> &RwLock<SweetConductor> {
-        let mut config = SweetConductorConfig::standard();
-        config.dpki = Some(DpkiConfig::disabled());
+        let mut config = SweetConductorConfig::standard().no_dpki();
         config.keystore = KeystoreConfig::DangerTestKeystore;
         self.0
             .get_or_init(async { RwLock::new(SweetConductor::from_config(config).await) })
