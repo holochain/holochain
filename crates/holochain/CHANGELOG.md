@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   This is a pretty serious bottleneck when the same app is being run for multiple agents on the same conductor. They are now separate files on disk and writes can proceed independently.
   There is no migration path for this change, if you have existing databases they will not be found. [#3450](https://github.com/holochain/holochain/pull/3450)
 - App validation workflow: Refactored to not wait for ops that the op being validated depends on, that are being fetched and thus keep the workflow occupied. The workflow does no longer await the dependencies and instead sends off fetch requests in the background.
+- App validation workflow: Integration workflow is only triggered when ops have been validated (either accepted or rejected).
 
 ## 0.3.0-beta-dev.42
 

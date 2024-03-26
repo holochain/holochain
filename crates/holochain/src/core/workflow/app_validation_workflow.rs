@@ -16,6 +16,7 @@ use crate::core::SysValidationError;
 use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
 pub use error::*;
+use futures::StreamExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
@@ -49,6 +50,12 @@ mod unit_tests;
 mod error;
 mod types;
 
+struct OutcomeSummary {
+    pub num_ops_to_validate: usize,
+    pub validated: usize,
+    pub missing: usize,
+}
+
 #[instrument(skip(
     workspace,
     trigger_integration,
@@ -65,7 +72,7 @@ pub async fn app_validation_workflow(
     network: HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
 ) -> WorkflowResult<WorkComplete> {
-    let complete = app_validation_workflow_inner(
+    let outcome_summary = app_validation_workflow_inner(
         dna_hash,
         workspace,
         conductor_handle,
@@ -76,10 +83,19 @@ pub async fn app_validation_workflow(
     .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-    // trigger other workflows
-    trigger_integration.trigger(&"app_validation_workflow");
+    // if ops have been accepted or rejected, trigger integration
+    if outcome_summary.validated > 0 {
+        trigger_integration.trigger(&"app_validation_workflow");
+    }
 
-    Ok(complete)
+    Ok(
+        if outcome_summary.validated < outcome_summary.num_ops_to_validate {
+            // trigger app validation workflow again in 10 seconds
+            WorkComplete::Incomplete(Some(Duration::from_secs(10)))
+        } else {
+            WorkComplete::Complete
+        },
+    )
 }
 
 async fn app_validation_workflow_inner(
@@ -89,7 +105,7 @@ async fn app_validation_workflow_inner(
     network: &HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
     fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
-) -> WorkflowResult<WorkComplete> {
+) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
     let num_ops_to_validate = sorted_ops.len();
@@ -235,11 +251,10 @@ async fn app_validation_workflow_inner(
     ops_validated += rejected_ops;
     tracing::debug!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected.");
 
-    Ok(if ops_validated < num_ops_to_validate {
-        // trigger app validation workflow again in 10 seconds
-        WorkComplete::Incomplete(Some(Duration::from_secs(10)))
-    } else {
-        WorkComplete::Complete
+    Ok(OutcomeSummary {
+        num_ops_to_validate,
+        validated: ops_validated,
+        missing: awaiting_ops,
     })
 }
 
@@ -643,7 +658,6 @@ where
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(hashes)) => {
-            tracing::debug!("unresolved dependencies: hashes {hashes:?}");
             // fetch all missing hashes in the background without awaiting them
             let cascade_workspace = workspace_read.clone();
             let cascade =
@@ -673,16 +687,13 @@ where
             });
             // await all fetches in a separate task without awaiting the task
             // to finish
-            tokio::spawn(async { futures::future::join_all(fetches).await });
+            tokio::spawn(async { futures::stream::iter(fetches).buffer_unordered(10).await });
             Ok(Outcome::AwaitingDeps(hashes))
         }
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::AgentActivity(
             author,
             filter,
         )) => {
-            tracing::debug!(
-                "unresolved dependencies: agent activity of {author:?} with filter {filter:?}"
-            );
             // fetch missing agent activities in the background without awaiting them
             tokio::spawn({
                 let cascade_workspace = workspace_read.clone();
