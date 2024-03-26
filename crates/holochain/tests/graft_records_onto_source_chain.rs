@@ -6,13 +6,13 @@ use hdk::prelude::*;
 use holochain::conductor::api::error::ConductorApiError;
 use holochain::sweettest::{DynSweetRendezvous, SweetConductor, SweetDnaFile, SweetInlineZomes};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
-use holochain_conductor_api::conductor::{ConductorConfig, DpkiConfig};
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::prelude::{StateMutationError, Store, Txn};
 use holochain_types::chc::ChainHeadCoordinatorExt;
 use holochain_types::record::SignedActionHashedExt;
+use rusqlite::Transaction;
 
 /// Test that records can be manually grafted onto a source chain.
 #[tokio::test(flavor = "multi_thread")]
@@ -61,7 +61,7 @@ async fn grafting() {
         .read_async({
             let query_chain = chain.clone();
 
-            move |txn| -> DatabaseResult<Vec<_>> {
+            move |txn: Transaction| -> DatabaseResult<Vec<_>> {
                 let txn: Txn = (&txn).into();
                 Ok(query_chain
                     .iter()

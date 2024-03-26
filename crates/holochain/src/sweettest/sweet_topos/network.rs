@@ -6,7 +6,6 @@ use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
 use async_once_cell::OnceCell;
 use contrafact::MutationError;
-use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_types::prelude::DnaFile;
 use holochain_util::tokio_helper;
