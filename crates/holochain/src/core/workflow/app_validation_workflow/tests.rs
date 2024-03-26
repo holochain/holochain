@@ -37,6 +37,7 @@ use holochain_zome_types::fixt::{
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
 use matches::assert_matches;
+use parking_lot::Mutex;
 use rusqlite::{named_params, Transaction};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
@@ -132,6 +133,8 @@ async fn main_loop_app_validation_workflow() {
             .unwrap();
     assert_eq!(ops_to_validate.len(), 1);
 
+    let fetched_dependencies = Arc::new(Mutex::new(HashSet::new()));
+
     // run validation workflow
     // outcome should be incomplete - delete op is missing the dependent create op
     let app_validation_result = app_validation_workflow_inner(
@@ -143,6 +146,7 @@ async fn main_loop_app_validation_workflow() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
+        fetched_dependencies.clone(),
     )
     .await;
     assert_matches!(app_validation_result, Ok(WorkComplete::Incomplete(_)));
@@ -178,6 +182,7 @@ async fn main_loop_app_validation_workflow() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
+        fetched_dependencies.clone(),
     )
     .await;
     assert_matches!(app_validation_result, Ok(WorkComplete::Complete));

@@ -26,7 +26,9 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
+use parking_lot::Mutex;
 use rusqlite::Transaction;
+use std::collections::HashSet;
 use std::convert::TryInto;
 use std::sync::Arc;
 use std::time::Duration;
@@ -57,6 +59,7 @@ mod types;
 pub async fn app_validation_workflow(
     dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
+    fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
     trigger_integration: TriggerSender,
     conductor_handle: ConductorHandle,
     network: HolochainP2pDna,
@@ -68,6 +71,7 @@ pub async fn app_validation_workflow(
         conductor_handle,
         &network,
         dht_query_cache,
+        fetched_dependencies,
     )
     .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
@@ -84,6 +88,7 @@ async fn app_validation_workflow_inner(
     conductor: ConductorHandle,
     network: &HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
+    fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
@@ -99,6 +104,7 @@ async fn app_validation_workflow_inner(
             let network = network.clone();
             let conductor = conductor.clone();
             let workspace = workspace.clone();
+            let fetched_dependencies = fetched_dependencies.clone();
             let dna_hash = dna_hash.clone();
             async move {
                 let (op, op_hash) = so.into_inner();
@@ -120,7 +126,15 @@ async fn app_validation_workflow_inner(
                 let cascade = Arc::new(workspace.full_cascade(network.clone()));
                 let r = match dhtop_to_op(op, cascade).await {
                     Ok(op) => {
-                        validate_op_outer(dna_hash, &op, &conductor, &workspace, &network).await
+                        validate_op_outer(
+                            dna_hash,
+                            &op,
+                            &conductor,
+                            &workspace,
+                            fetched_dependencies,
+                            &network,
+                        )
+                        .await
                     }
                     Err(e) => Err(e),
                 };
@@ -384,6 +398,7 @@ async fn validate_op_outer(
     op: &Op,
     conductor_handle: &ConductorHandle,
     workspace: &AppValidationWorkspace,
+    fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
     network: &HolochainP2pDna,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
@@ -394,12 +409,21 @@ async fn validate_op_outer(
         .get_ribosome(dna_hash.as_ref())
         .map_err(|_| AppValidationError::DnaMissing((*dna_hash).clone()))?;
 
-    validate_op(op, host_fn_workspace, network, &ribosome, conductor_handle).await
+    validate_op(
+        op,
+        host_fn_workspace,
+        fetched_dependencies,
+        network,
+        &ribosome,
+        conductor_handle,
+    )
+    .await
 }
 
 pub async fn validate_op<R>(
     op: &Op,
     workspace: HostFnWorkspaceRead,
+    fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
     network: &HolochainP2pDna,
     ribosome: &R,
     conductor_handle: &ConductorHandle,
@@ -458,8 +482,7 @@ where
         ribosome,
         workspace,
         network.clone(),
-        // (HashSet::<AnyDhtHash>::new(), 0),
-        // HashSet::new(),
+        fetched_dependencies,
     )
     .await?;
 
@@ -607,6 +630,7 @@ async fn run_validation_callback_inner<R>(
     ribosome: &R,
     workspace_read: HostFnWorkspaceRead,
     network: HolochainP2pDna,
+    fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
 ) -> AppValidationResult<Outcome>
 where
     R: RibosomeT,
@@ -615,27 +639,36 @@ where
         ValidateHostAccess::new(workspace_read.clone(), network.clone()),
         invocation.clone(),
     )?;
-    match &validate_result {
-        ValidateResult::Valid => (),
-        _ => tracing::error!("validate result {validate_result:?}"),
-    }
     match validate_result {
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(hashes)) => {
-            tracing::error!("got unresolved deps {hashes:?}");
+            tracing::debug!("unresolved dependencies: hashes {hashes:?}");
+            // fetch all missing hashes in the background without awaiting them
             hashes.clone().into_iter().for_each(|hash| {
-                let cascade_workspace = workspace_read.clone();
                 tokio::spawn({
+                    let cascade_workspace = workspace_read.clone();
                     let cascade = CascadeImpl::from_workspace_and_network(
                         &cascade_workspace,
                         network.clone(),
                     );
+                    // keep track of which dependencies are being fetched to
+                    // prevent multiple fetches of the same hash
+                    let fetched_dependencies = fetched_dependencies.clone();
                     async move {
-                        let result = cascade
-                            .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
-                            .await;
-                        tracing::error!("fetch_record result is {result:?}");
+                        let new_dependency = fetched_dependencies.lock().insert(hash.clone());
+                        // fetch dependency if it is not being fetched yet
+                        if new_dependency {
+                            let result = cascade
+                                .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
+                                .await;
+                            if let Err(err) = result {
+                                tracing::warn!("error fetching dependent hash {hash:?}: {err}");
+                            } else {
+                                // dependency has been fetched and added to the cache
+                                fetched_dependencies.lock().remove(&hash);
+                            }
+                        }
                     }
                 });
             });
@@ -645,15 +678,35 @@ where
             author,
             filter,
         )) => {
-            tracing::error!("got unresolved deps agent activity {author:?} {filter:?}");
-            let cascade_workspace = workspace_read.clone();
+            tracing::debug!(
+                "unresolved dependencies: agent activity of {author:?} with filter {filter:?}"
+            );
+            // fetch missing agent activities in the background without awaiting them
             tokio::spawn({
+                let cascade_workspace = workspace_read.clone();
                 let author = author.clone();
                 let cascade =
                     CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
+
+                // keep track of which dependencies are being fetched to
+                // prevent multiple fetches of the same hash
+                let fetched_dependencies = fetched_dependencies.clone();
                 async move {
-                    let result = cascade.must_get_agent_activity(author, filter).await;
-                    tracing::error!("must_get_agent_activity result is {result:?}");
+                    let new_dependency = fetched_dependencies.lock().insert(author.clone().into());
+                    // fetch dependency if it is not being fetched yet
+                    if new_dependency {
+                        let result = cascade
+                            .must_get_agent_activity(author.clone(), filter)
+                            .await;
+                        if let Err(err) = result {
+                            tracing::warn!(
+                                "error fetching dependent chain of agent {author:?}: {err}"
+                            );
+                        } else {
+                            // dependency has been fetched and added to the cache
+                            fetched_dependencies.lock().remove(&author.into());
+                        }
+                    }
                 }
             });
             Ok(Outcome::AwaitingDeps(vec![author.into()]))

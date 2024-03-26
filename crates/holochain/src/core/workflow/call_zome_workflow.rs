@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use super::app_validation_workflow;
 use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
@@ -20,9 +18,11 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::source_chain::SourceChainError;
-use holochain_zome_types::record::Record;
-
 use holochain_types::prelude::*;
+use holochain_zome_types::record::Record;
+use parking_lot::Mutex;
+use std::collections::HashSet;
+use std::sync::Arc;
 use tracing::instrument;
 
 #[cfg(test)]
@@ -265,10 +265,12 @@ where
                 Ok(op) => op,
                 Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
             };
+            let fetched_dependencies = Arc::new(Mutex::new(HashSet::new()));
 
             let outcome = app_validation_workflow::validate_op(
                 &op,
                 workspace.clone().into(),
+                fetched_dependencies.clone(),
                 &network,
                 &ribosome,
                 &conductor_handle,
