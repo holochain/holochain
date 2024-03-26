@@ -69,8 +69,6 @@ mod generate_records;
 pub use generate_records::*;
 use holochain_types::websocket::AllowedOrigins;
 
-pub use crate::{await_consistency, await_consistency_advanced};
-
 use self::consistency::request_published_ops;
 
 /// Produce file and line number info at compile-time
@@ -483,6 +481,7 @@ pub fn warm_wasm_tests() {
     }
 }
 
+/// Consistency was failed to be reached. Here's a report.
 #[derive(derive_more::From)]
 pub struct ConsistencyError(String);
 
@@ -492,6 +491,7 @@ impl std::fmt::Debug for ConsistencyError {
     }
 }
 
+/// Alias
 pub type ConsistencyResult = Result<(), ConsistencyError>;
 
 /// Wait for all cell envs to reach consistency, meaning that every op
@@ -534,7 +534,7 @@ where
     )
     .await
     .into_iter()
-    .collect::<Result<Vec<()>, String>>()?;
+    .collect::<Result<Vec<()>, ConsistencyError>>()?;
     Ok(())
 }
 
@@ -594,7 +594,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     // Timeout has been reached at this point, so print a helpful report
 
     if published.is_empty() {
-        return Err(format!("No ops were published in {timeout:?}"));
+        return Err(format!("No ops were published in {timeout:?}").into());
     }
 
     // Otherwise just print a report of which ops were not integrated
@@ -654,7 +654,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         header,
         unintegrated.join("\n"),
         integration_dump,
-    ))
+    ).into())
 }
 
 /// Wait for num_attempts * delay, or until all published ops have been integrated.

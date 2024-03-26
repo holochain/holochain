@@ -2,18 +2,25 @@
 
 use hc_sleuth::SleuthId;
 
-use crate::{prelude::*, test_utils::consistency_dbs};
+use crate::{
+    prelude::*,
+    test_utils::{consistency_dbs, ConsistencyResult},
+};
 use std::time::Duration;
 
 use super::*;
 
+/// A duration expressed properly, or just as seconds
 #[derive(derive_more::From, Debug)]
 pub enum DurationOrSeconds {
+    /// Proper duration
     Duration(Duration),
+    /// Just seconds
     Seconds(u64),
 }
 
 impl DurationOrSeconds {
+    /// Get the proper duration
     pub fn into_duration(self) -> Duration {
         match self {
             Self::Duration(d) => d,
@@ -23,12 +30,12 @@ impl DurationOrSeconds {
 }
 
 /// Wait for all cells to reach consistency
-#[tracing::instrument(skip(all_cells))]
+#[tracing::instrument(skip_all)]
 pub async fn await_consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
     timeout: impl Into<DurationOrSeconds>,
     all_cells: I,
 ) -> ConsistencyResult {
-    consistency_advanced(timeout, all_cells.into_iter().map(|c| (c, true))).await
+    await_consistency_advanced(timeout, all_cells.into_iter().map(|c| (c, true))).await
 }
 
 /// Wait for all cells to reach consistency,
@@ -37,7 +44,7 @@ pub async fn await_consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
 /// Cells paired with a `false` value will have their authored ops counted towards the total,
 /// but not their integrated ops (since they are not online to integrate things).
 /// This is useful for tests where nodes go offline.
-#[tracing::instrument(skip(all_cells))]
+#[tracing::instrument(skip_all)]
 pub async fn await_consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
     timeout: impl Into<DurationOrSeconds>,
     all_cells: I,

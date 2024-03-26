@@ -27,7 +27,6 @@ mod sweet_dna;
 pub mod sweet_topos;
 mod sweet_zome;
 
-pub use crate::{await_consistency, await_consistency_advanced};
 pub use sweet_agents::*;
 pub use sweet_app::*;
 pub use sweet_app_installation::*;

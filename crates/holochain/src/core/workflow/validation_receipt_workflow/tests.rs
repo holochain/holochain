@@ -29,7 +29,9 @@ async fn test_validation_receipt() {
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    await_consistency!(10, [&alice, &bobbo, &carol]);
+    await_consistency(10, [&alice, &bobbo, &carol])
+        .await
+        .unwrap();
 
     // Get op hashes
     let vault = alice.dht_db();
@@ -216,7 +218,9 @@ async fn test_block_invalid_receipt() {
         .call(&alice_cell.zome(coordinator_name), create_function_name, ())
         .await;
 
-    await_consistency!(10, [&alice_cell, &bob_cell]);
+    await_consistency(10, [&alice_cell, &bob_cell])
+        .await
+        .unwrap();
 
     let alice_block_target = BlockTargetId::Cell(alice_cell.cell_id().to_owned());
     let bob_block_target = BlockTargetId::Cell(bob_cell.cell_id().to_owned());

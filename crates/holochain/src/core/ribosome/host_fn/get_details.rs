@@ -206,7 +206,9 @@ pub mod wasm_test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
+    use crate::sweettest::{
+        await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
+    };
     use holo_hash::ActionHash;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::metadata::Details;
@@ -240,6 +242,10 @@ pub mod slow_tests {
 
         // now make both agents aware of each other
         conductors.exchange_peer_info().await;
+
+        await_consistency(1, apps.cells_flattened().as_slice())
+            .await
+            .unwrap();
 
         // bob gets details by action hash from local databases
         let zome_bob = apps[1].cells()[0].zome(TestWasm::Crud.coordinator_zome_name());
