@@ -715,10 +715,7 @@ impl SweetConductor {
             let dpki_dna_hash =
                 DnaHash::from_raw_32(c.running_services().dpki.as_ref().unwrap().uuid().to_vec());
             c.spaces.get_or_create_space(&dpki_dna_hash).unwrap();
-            for env in c.spaces.get_from_spaces(|s| {
-                dbg!(&s.dna_hash);
-                s.p2p_agents_db.clone()
-            }) {
+            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
                 all.push(env.clone());
             }
         }
