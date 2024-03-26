@@ -483,12 +483,23 @@ pub fn warm_wasm_tests() {
     }
 }
 
+#[derive(derive_more::From)]
+pub struct ConsistencyError(String);
+
+impl std::fmt::Debug for ConsistencyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+pub type ConsistencyResult = Result<(), ConsistencyError>;
+
 /// Wait for all cell envs to reach consistency, meaning that every op
 /// published by every cell has been integrated by every node
 pub async fn consistency_dbs<AuthorDb, DhtDb>(
     all_cell_dbs: &[(&SleuthId, &AgentPubKey, &AuthorDb, Option<&DhtDb>)],
     timeout: Duration,
-) -> Result<(), String>
+) -> ConsistencyResult
 where
     AuthorDb: ReadAccess<DbKindAuthored>,
     DhtDb: ReadAccess<DbKindDht>,
@@ -540,7 +551,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     db: Db,
     published: Arc<Vec<DhtOp>>,
     timeout: Duration,
-) -> Result<(), String> {
+) -> ConsistencyResult {
     fn display_op(op: &DhtOp) -> String {
         format!(
             "{} {:>3}  {} ({})",
