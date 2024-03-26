@@ -357,7 +357,7 @@ pub async fn setup_app_in_new_conductor(
 
     let conductor_handle = ConductorBuilder::new()
         .with_data_root_path(db_dir.path().to_path_buf().into())
-        .test(&[], true)
+        .test(&[])
         .await
         .unwrap();
 
@@ -454,7 +454,7 @@ pub async fn setup_app_inner(
     };
     let conductor_handle = ConductorBuilder::new()
         .config(config)
-        .test(&[], true)
+        .test(&[])
         .await
         .unwrap();
 

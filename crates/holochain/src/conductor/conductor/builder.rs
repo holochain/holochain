@@ -253,18 +253,6 @@ impl ConductorBuilder {
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
 
-        // Install DPKI from DNA
-        if let Some(dna) = dpki_dna_to_install {
-            let dna_hash = dna.dna_hash().clone();
-            match handle.clone().install_dpki(dna, true).await {
-                Ok(_) => tracing::info!("Installed DPKI from DNA {}", dna_hash),
-                Err(ConductorError::AppAlreadyInstalled(_)) => {
-                    tracing::debug!("DPKI already installed, skipping installation")
-                }
-                Err(e) => return Err(e),
-            }
-        }
-
         {
             let handle = handle.clone();
             tokio::task::spawn(async move {
@@ -280,6 +268,7 @@ impl ConductorBuilder {
         Self::finish(
             handle,
             config,
+            dpki_dna_to_install,
             p2p_evt,
             post_commit_receiver,
             outcome_rx,
@@ -344,6 +333,7 @@ impl ConductorBuilder {
     pub(crate) async fn finish(
         conductor: ConductorHandle,
         config: Arc<ConductorConfig>,
+        dpki_dna_to_install: Option<DnaFile>,
         p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         outcome_receiver: OutcomeReceiver,
@@ -387,6 +377,18 @@ impl ConductorBuilder {
             );
         }
 
+        // Install DPKI from DNA
+        if let Some(dna) = dpki_dna_to_install {
+            let dna_hash = dna.dna_hash().clone();
+            match conductor.clone().install_dpki(dna, true).await {
+                Ok(_) => tracing::info!("Installed DPKI from DNA {}", dna_hash),
+                Err(ConductorError::AppAlreadyInstalled(_)) => {
+                    tracing::debug!("DPKI already installed, skipping installation")
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
         if !no_print_setup {
             conductor.print_setup();
         }
@@ -421,11 +423,7 @@ impl ConductorBuilder {
 
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
-    pub async fn test(
-        self,
-        extra_dnas: &[DnaFile],
-        install_dpki: bool,
-    ) -> ConductorResult<ConductorHandle> {
+    pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
         let keystore = self
             .keystore
             .unwrap_or_else(holochain_keystore::test_keystore);
@@ -513,30 +511,11 @@ impl ConductorBuilder {
         let handle: ConductorHandle = Arc::new(conductor);
 
         // Install DPKI from DNA or mock
-        match (self.dpki, dpki_dna_to_install) {
-            // If an override is specified, use that regardless of config
-            (Some(dpki_impl), _) => {
-                // This is a mock DPKI impl, so inject it into the conductor directly
-                handle.running_services_mutex().share_mut(|s| {
-                    s.dpki = Some(dpki_impl);
-                });
-            }
-            (None, Some(dna)) => {
-                if install_dpki {
-                    // Install DPKI from DNA
-                    let dna_hash = dna.dna_hash().clone();
-                    match handle.clone().install_dpki(dna, true).await {
-                        Ok(_) => tracing::info!("Installed DPKI from DNA {}", dna_hash),
-                        Err(ConductorError::AppAlreadyInstalled(_)) => {
-                            tracing::debug!("DPKI already installed, skipping installation")
-                        }
-                        Err(e) => return Err(e),
-                    }
-                }
-            }
-            (None, None) => {
-                tracing::warn!("Not using DPKI. Cannot talk to nodes who are using DPKI!")
-            }
+        if let Some(dpki_impl) = self.dpki {
+            // This is a mock DPKI impl, so inject it into the conductor directly
+            handle.running_services_mutex().share_mut(|s| {
+                s.dpki = Some(dpki_impl);
+            });
         }
 
         // Install extra DNAs, in particular:
@@ -553,6 +532,7 @@ impl ConductorBuilder {
         Self::finish(
             handle,
             config,
+            dpki_dna_to_install,
             p2p_evt,
             post_commit_receiver,
             outcome_rx,

@@ -20,14 +20,9 @@ async fn dpki_gossip() {
 
     let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
 
-    for c in conductors.iter() {
-        c.install_dpki().await;
-    }
-
     conductors.exchange_peer_info().await;
 
-    let dpki_cells = conductors.dpki_cells();
-    await_consistency!(10, dpki_cells.as_slice());
+    await_consistency!(10, conductors.dpki_cells().as_slice());
 }
 
 /// Test that op publishing is sufficient for bobbo to get alice's op
@@ -51,6 +46,7 @@ async fn test_publish() -> anyhow::Result<()> {
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
     config.network = network;
+    config.dpki = Some(DpkiConfig::disabled());
     config.tuning_params = Some(ConductorTuningParams {
         sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),
         ..Default::default()
@@ -236,19 +232,16 @@ async fn private_entries_dont_leak() {
                 .map_err(Into::into)
         });
 
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.0).await;
     let dnas = vec![dna_file];
 
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
 
-    let ((alice,), (bobbo,)) = apps.into_tuples();
-
     conductors.exchange_peer_info().await;
 
-    let dpki_cells = conductors.dpki_cells();
-    await_consistency!(10, dpki_cells.as_slice());
+    let ((alice,), (bobbo,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]

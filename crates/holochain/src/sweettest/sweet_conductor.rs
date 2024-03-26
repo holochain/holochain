@@ -214,7 +214,7 @@ impl SweetConductor {
         let db_dir = TestDir::new(test_db_dir());
         let builder = builder.with_data_root_path(db_dir.as_ref().to_path_buf().into());
         let config = builder.config.clone();
-        let handle = builder.test(&[], false).await.unwrap();
+        let handle = builder.test(&[]).await.unwrap();
         Self::new(handle, db_dir, Arc::new(config), None).await
     }
 
@@ -229,7 +229,7 @@ impl SweetConductor {
         let db_dir = TestDir::new(test_db_dir());
         let builder = builder.with_data_root_path(db_dir.as_ref().to_path_buf().into());
         let config = builder.config.clone();
-        let handle = builder.test(&[], false).await.unwrap();
+        let handle = builder.test(&[]).await.unwrap();
         Self::new(handle, db_dir, Arc::new(config), Some(rendezvous.into())).await
     }
 
@@ -245,7 +245,7 @@ impl SweetConductor {
             .config(config.clone())
             .with_keystore(keystore)
             .no_print_setup()
-            .test(extra_dnas, false)
+            .test(extra_dnas)
             .await
             .unwrap()
     }

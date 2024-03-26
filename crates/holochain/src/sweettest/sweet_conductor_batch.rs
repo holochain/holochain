@@ -38,9 +38,17 @@ impl SweetConductorBatch {
         C: Into<SweetConductorConfig>,
         I: IntoIterator<Item = C>,
     {
-        Self::new(
+        let conductors = Self::new(
             future::join_all(configs.into_iter().map(|c| SweetConductor::from_config(c))).await,
-        )
+        );
+
+        let dpki_cells = conductors.dpki_cells();
+        if !dpki_cells.is_empty() {
+            conductors.exchange_peer_info().await;
+            crate::await_consistency!(10, dpki_cells.as_slice());
+        }
+
+        conductors
     }
 
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
@@ -76,19 +84,31 @@ impl SweetConductorBatch {
     {
         let rendezvous = crate::sweettest::SweetLocalRendezvous::new().await;
         let config = config.into();
-        Self::new(
+        let conductors = Self::new(
             future::join_all(
                 std::iter::repeat(config)
                     .take(num)
                     .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
             )
             .await,
-        )
+        );
+
+        let dpki_cells = conductors.dpki_cells();
+        if !dpki_cells.is_empty() {
+            conductors.exchange_peer_info().await;
+            crate::await_consistency!(10, dpki_cells.as_slice());
+        }
+
+        conductors
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
     pub async fn from_standard_config(num: usize) -> SweetConductorBatch {
-        Self::from_configs(std::iter::repeat_with(SweetConductorConfig::standard).take(num)).await
+        let conductors =
+            Self::from_configs(std::iter::repeat_with(SweetConductorConfig::standard).take(num))
+                .await;
+
+        conductors
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
