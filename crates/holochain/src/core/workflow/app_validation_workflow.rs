@@ -645,33 +645,35 @@ where
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(hashes)) => {
             tracing::debug!("unresolved dependencies: hashes {hashes:?}");
             // fetch all missing hashes in the background without awaiting them
-            hashes.clone().into_iter().for_each(|hash| {
-                tokio::spawn({
-                    let cascade_workspace = workspace_read.clone();
-                    let cascade = CascadeImpl::from_workspace_and_network(
-                        &cascade_workspace,
-                        network.clone(),
-                    );
-                    // keep track of which dependencies are being fetched to
-                    // prevent multiple fetches of the same hash
-                    let fetched_dependencies = fetched_dependencies.clone();
-                    async move {
-                        let new_dependency = fetched_dependencies.lock().insert(hash.clone());
-                        // fetch dependency if it is not being fetched yet
-                        if new_dependency {
-                            let result = cascade
-                                .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
-                                .await;
-                            if let Err(err) = result {
-                                tracing::warn!("error fetching dependent hash {hash:?}: {err}");
-                            } else {
-                                // dependency has been fetched and added to the cache
-                                fetched_dependencies.lock().remove(&hash);
-                            }
+            let cascade_workspace = workspace_read.clone();
+            let cascade =
+                CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
+            // build a collection of futures to fetch the individual missing
+            // hashes
+            let fetches = hashes.clone().into_iter().map(move |hash| {
+                let cascade = cascade.clone();
+                // keep track of which dependencies are being fetched to
+                // prevent multiple fetches of the same hash
+                let fetched_dependencies = fetched_dependencies.clone();
+                async move {
+                    let new_dependency = fetched_dependencies.lock().insert(hash.clone());
+                    // fetch dependency if it is not being fetched yet
+                    if new_dependency {
+                        let result = cascade
+                            .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
+                            .await;
+                        if let Err(err) = result {
+                            tracing::warn!("error fetching dependent hash {hash:?}: {err}");
+                        } else {
+                            // dependency has been fetched and added to the cache
+                            fetched_dependencies.lock().remove(&hash);
                         }
                     }
-                });
+                }
             });
+            // await all fetches in a separate task without awaiting the task
+            // to finish
+            tokio::spawn(async { futures::future::join_all(fetches).await });
             Ok(Outcome::AwaitingDeps(hashes))
         }
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::AgentActivity(
