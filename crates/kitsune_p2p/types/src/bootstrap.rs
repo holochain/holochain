@@ -1,6 +1,8 @@
 //! Types for the bootstrap server
+use std::collections::HashSet;
 use crate::bin_types::{KitsuneBinType, KitsuneSpace};
 use std::sync::Arc;
+use crate::tx2::tx2_utils::TxUrl;
 
 /// The number of random agent infos we want to collect from the bootstrap service when we want to
 /// populate an empty local space.
@@ -35,4 +37,11 @@ impl Default for RandomLimit {
     fn default() -> Self {
         Self(RANDOM_LIMIT_DEFAULT)
     }
+}
+
+/// The result of storing a new agent info with Kitsune's host.
+#[derive(Default)]
+pub struct AgentInfoPut {
+    /// URLs that were in the previous agent info for the agent but are no longer present.
+    pub removed_urls: HashSet<TxUrl>,
 }
