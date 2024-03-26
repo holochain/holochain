@@ -243,10 +243,6 @@ pub mod slow_tests {
         // now make both agents aware of each other
         conductors.exchange_peer_info().await;
 
-        await_consistency(1, apps.cells_flattened().as_slice())
-            .await
-            .unwrap();
-
         // bob gets details by action hash from local databases
         let zome_bob = apps[1].cells()[0].zome(TestWasm::Crud.coordinator_zome_name());
         let local_entries_with_details: Vec<Option<Details>> = conductors[1]
