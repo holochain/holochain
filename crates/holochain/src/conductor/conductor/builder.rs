@@ -256,7 +256,7 @@ impl ConductorBuilder {
         // Install DPKI from DNA
         if let Some(dna) = dpki_dna_to_install {
             let dna_hash = dna.dna_hash().clone();
-            match handle.clone().install_dpki(dna).await {
+            match handle.clone().install_dpki(dna, true).await {
                 Ok(_) => tracing::info!("Installed DPKI from DNA {}", dna_hash),
                 Err(ConductorError::AppAlreadyInstalled(_)) => {
                     tracing::debug!("DPKI already installed, skipping installation")
@@ -421,7 +421,11 @@ impl ConductorBuilder {
 
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
-    pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
+    pub async fn test(
+        self,
+        extra_dnas: &[DnaFile],
+        install_dpki: bool,
+    ) -> ConductorResult<ConductorHandle> {
         let keystore = self
             .keystore
             .unwrap_or_else(holochain_keystore::test_keystore);
@@ -518,14 +522,16 @@ impl ConductorBuilder {
                 });
             }
             (None, Some(dna)) => {
-                // Install DPKI from DNA
-                let dna_hash = dna.dna_hash().clone();
-                match handle.clone().install_dpki(dna).await {
-                    Ok(_) => tracing::info!("Installed DPKI from DNA {}", dna_hash),
-                    Err(ConductorError::AppAlreadyInstalled(_)) => {
-                        tracing::debug!("DPKI already installed, skipping installation")
+                if install_dpki {
+                    // Install DPKI from DNA
+                    let dna_hash = dna.dna_hash().clone();
+                    match handle.clone().install_dpki(dna, true).await {
+                        Ok(_) => tracing::info!("Installed DPKI from DNA {}", dna_hash),
+                        Err(ConductorError::AppAlreadyInstalled(_)) => {
+                            tracing::debug!("DPKI already installed, skipping installation")
+                        }
+                        Err(e) => return Err(e),
                     }
-                    Err(e) => return Err(e),
                 }
             }
             (None, None) => {
@@ -553,14 +559,5 @@ impl ConductorBuilder {
             self.no_print_setup,
         )
         .await
-    }
-}
-
-/// Get the DPKI DNA from the filesystem or use the built-in one.
-async fn get_dpki_dna(config: &DpkiConfig) -> DnaResult<DnaBundle> {
-    if let Some(dna_path) = config.dna_path.as_ref() {
-        DnaBundle::read_from_file(dna_path).await
-    } else {
-        DnaBundle::decode(holochain_deepkey_dna::DEEPKEY_DNA_BUNDLE_BYTES)
     }
 }

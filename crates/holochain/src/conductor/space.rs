@@ -328,6 +328,7 @@ impl Spaces {
                             self.db_dir.to_path_buf(),
                             self.config.db_sync_strategy,
                         )?;
+                        dbg!("created space", dna_hash);
 
                         let r = f(&space);
                         entry.insert(space);

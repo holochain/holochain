@@ -271,15 +271,14 @@ async fn sys_validation_workflow_inner(
         // rejected and don't have dependencies.
         let dependency = op_type.sys_validation_dependency(&action);
 
+        let dpki = workspace
+            .dpki
+            .clone()
+            .filter(|dpki| dpki.should_run(workspace.dna_def_hashed().as_hash()));
+
         // Note that this is async only because of the signature checks done during countersigning.
         // In most cases this will be a fast synchronous call.
-        let r = validate_op(
-            &op,
-            &dna_def,
-            current_validation_dependencies.clone(),
-            workspace.dpki.clone(),
-        )
-        .await;
+        let r = validate_op(&op, &dna_def, current_validation_dependencies.clone(), dpki).await;
 
         match r {
             Ok(outcome) => validation_outcomes.push((op_hash, outcome, dependency)),

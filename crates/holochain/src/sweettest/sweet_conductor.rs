@@ -13,7 +13,9 @@ use crate::conductor::{
 };
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
+use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::{CellInfo, ProvisionedCell};
+use holochain_conductor_services::DPKI_APP_ID;
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
@@ -212,7 +214,7 @@ impl SweetConductor {
         let db_dir = TestDir::new(test_db_dir());
         let builder = builder.with_data_root_path(db_dir.as_ref().to_path_buf().into());
         let config = builder.config.clone();
-        let handle = builder.test(&[]).await.unwrap();
+        let handle = builder.test(&[], false).await.unwrap();
         Self::new(handle, db_dir, Arc::new(config), None).await
     }
 
@@ -227,7 +229,7 @@ impl SweetConductor {
         let db_dir = TestDir::new(test_db_dir());
         let builder = builder.with_data_root_path(db_dir.as_ref().to_path_buf().into());
         let config = builder.config.clone();
-        let handle = builder.test(&[]).await.unwrap();
+        let handle = builder.test(&[], false).await.unwrap();
         Self::new(handle, db_dir, Arc::new(config), Some(rendezvous.into())).await
     }
 
@@ -243,7 +245,7 @@ impl SweetConductor {
             .config(config.clone())
             .with_keystore(keystore)
             .no_print_setup()
-            .test(extra_dnas)
+            .test(extra_dnas, false)
             .await
             .unwrap()
     }
@@ -537,8 +539,19 @@ impl SweetConductor {
     }
 
     /// Install DPKI a bit more concisely
-    pub async fn install_dpki(&self, dna: DnaFile) {
-        self.raw_handle().install_dpki(dna).await.unwrap()
+    pub async fn install_dpki(&self) {
+        let dpki_config = self
+            .config
+            .dpki
+            .clone()
+            .unwrap_or(DpkiConfig::new(None, "UNUSED".to_string()));
+        let (dna, _) = crate::conductor::conductor::get_dpki_dna(&dpki_config)
+            .await
+            .unwrap()
+            .into_dna_file(Default::default())
+            .await
+            .unwrap();
+        self.raw_handle().install_dpki(dna, true).await.unwrap()
     }
 
     /// Get the cell providing the DPKI service, if applicable
@@ -696,14 +709,23 @@ impl SweetConductor {
     }
 
     /// Let each conductor know about each others' agents so they can do networking
-    pub async fn exchange_peer_info(conductors: impl IntoIterator<Item = &Self>) {
+    pub async fn exchange_peer_info(conductors: impl Clone + IntoIterator<Item = &Self>) {
         let mut all = Vec::new();
-        for c in conductors.into_iter() {
-            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
+        for c in conductors.clone().into_iter() {
+            let dpki_dna_hash =
+                DnaHash::from_raw_32(c.running_services().dpki.as_ref().unwrap().uuid().to_vec());
+            c.spaces.get_or_create_space(&dpki_dna_hash).unwrap();
+            for env in c.spaces.get_from_spaces(|s| {
+                dbg!(&s.dna_hash);
+                s.p2p_agents_db.clone()
+            }) {
                 all.push(env.clone());
             }
         }
         crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
+        // for c in conductors.into_iter() {
+        //     c.enable_app(DPKI_APP_ID.to_string()).await.unwrap();
+        // }
     }
 
     /// Drop the specified agent keys from each conductor's peer table

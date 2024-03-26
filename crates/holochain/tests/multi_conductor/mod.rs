@@ -1,6 +1,6 @@
 use hdk::prelude::*;
 use holochain::await_consistency;
-use holochain::conductor::config::ConductorConfig;
+use holochain::conductor::config::{ConductorConfig, DpkiConfig};
 use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::*;
 use holochain_conductor_api::conductor::ConductorTuningParams;
@@ -12,6 +12,23 @@ use unwrap_to::unwrap_to;
 #[serde(transparent)]
 #[repr(transparent)]
 struct AppString(String);
+
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+async fn dpki_gossip() {
+    let _g = holochain_trace::test_run().ok();
+
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+
+    for c in conductors.iter() {
+        c.install_dpki().await;
+    }
+
+    conductors.exchange_peer_info().await;
+
+    let dpki_cells = conductors.dpki_cells();
+    await_consistency!(10, dpki_cells.as_slice());
+}
 
 /// Test that op publishing is sufficient for bobbo to get alice's op
 /// even with gossip disabled.
@@ -229,6 +246,9 @@ async fn private_entries_dont_leak() {
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
     conductors.exchange_peer_info().await;
+
+    let dpki_cells = conductors.dpki_cells();
+    await_consistency!(10, dpki_cells.as_slice());
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]

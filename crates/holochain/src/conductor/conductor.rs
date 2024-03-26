@@ -54,7 +54,7 @@ use tracing::*;
 
 pub use builder::*;
 use holo_hash::DnaHash;
-use holochain_conductor_api::conductor::KeystoreConfig;
+use holochain_conductor_api::conductor::{DpkiConfig, KeystoreConfig};
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullIntegrationStateDump;
@@ -2180,7 +2180,11 @@ mod service_impls {
         }
 
         /// Install the DPKI service using the given Deepkey DNA
-        pub async fn install_dpki(self: Arc<Self>, dna: DnaFile) -> ConductorResult<()> {
+        pub async fn install_dpki(
+            self: Arc<Self>,
+            dna: DnaFile,
+            enable: bool,
+        ) -> ConductorResult<()> {
             let dna_hash = dna.dna_hash().clone();
             self.register_dna(dna.clone()).await?;
 
@@ -2212,12 +2216,25 @@ mod service_impls {
             // The initial agent key is the first derivation from the device seed.
             // Updated DPKI agent keys are sequential derivations from the same device seed.
             let agent = holo_hash::AgentPubKey::from_raw_32(seed_info.ed25519_pub_key.0.to_vec());
-            let cell_id = CellId::new(dna_hash, agent.clone());
+            let cell_id = CellId::new(dna_hash.clone(), agent.clone());
 
             self.clone()
                 .install_app_minimal(DPKI_APP_ID.into(), Some(agent), &[(dna, None)])
                 .await?;
-            self.clone().enable_app(DPKI_APP_ID.into()).await?;
+
+            // In multi-conductor tests, we often want to delay enabling DPKI until all conductors
+            // have exchanged peer info, so that the initial DPKI publish can go more smoothly.
+            if enable {
+                self.clone().enable_app(DPKI_APP_ID.into()).await?;
+            }
+
+            // Ensure that the space is created for DPKI, in case it's not enabled
+            self.spaces.get_or_create_space(&dna_hash)?;
+
+            assert!(self
+                .spaces
+                .get_from_spaces(|s| (*s.dna_hash).clone())
+                .contains(&dna_hash));
 
             let installation = DeepkeyInstallation {
                 cell_id,
@@ -2229,7 +2246,15 @@ mod service_impls {
             })
             .await?;
 
-            self.initialize_service_dpki().await?;
+            self.clone().initialize_service_dpki().await?;
+
+            if enable {
+                if let Ok(Some(info)) = self.get_app_info(&DPKI_APP_ID.into()).await {
+                    assert_eq!(info.status, holochain_conductor_api::AppInfoStatus::Running);
+                } else {
+                    panic!("DPKI service not installed!");
+                }
+            }
 
             Ok(())
         }
@@ -3200,6 +3225,15 @@ pub(crate) async fn genesis_cells(
         Err(ConductorError::GenesisFailed { errors })
     } else {
         Ok(())
+    }
+}
+
+/// Get the DPKI DNA from the filesystem or use the built-in one.
+pub(crate) async fn get_dpki_dna(config: &DpkiConfig) -> DnaResult<DnaBundle> {
+    if let Some(dna_path) = config.dna_path.as_ref() {
+        DnaBundle::read_from_file(dna_path).await
+    } else {
+        DnaBundle::decode(holochain_deepkey_dna::DEEPKEY_DNA_BUNDLE_BYTES)
     }
 }
 

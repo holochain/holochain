@@ -91,6 +91,11 @@ impl SweetConductorBatch {
         Self::from_configs(std::iter::repeat_with(SweetConductorConfig::standard).take(num)).await
     }
 
+    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
+    pub async fn from_standard_config_rendezvous(num: usize) -> SweetConductorBatch {
+        Self::from_config_rendezvous(num, SweetConductorConfig::standard()).await
+    }
+
     /// Iterate over the SweetConductors
     pub fn iter(&self) -> impl Iterator<Item = &SweetConductor> {
         self.0.iter()

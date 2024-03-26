@@ -55,6 +55,10 @@ impl DpkiService for DeepkeyBuiltin {
             .unwrap()
     }
 
+    fn should_run(&self, dna_hash: &DnaHash) -> bool {
+        self.installation.cell_id.dna_hash() != dna_hash
+    }
+
     fn dpki_agent(&self) -> AgentPubKey {
         self.installation.cell_id.agent_pubkey().clone()
     }

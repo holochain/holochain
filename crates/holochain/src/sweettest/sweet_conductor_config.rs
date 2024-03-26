@@ -69,7 +69,16 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        KitsuneP2pConfig::default().into()
+        SweetConductorConfig::from(KitsuneP2pConfig::default())
+            .tune(|tune| {
+                tune.gossip_loop_iteration_delay_ms = 500;
+                tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
+                tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;
+                tune.gossip_round_timeout_ms = 10_000;
+            })
+            .tune_conductor(|tune| {
+                tune.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
+            })
     }
 
     /// Rendezvous config for SweetConductors
