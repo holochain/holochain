@@ -208,6 +208,7 @@ pub mod wasm_test {
 pub mod slow_tests {
     use crate::sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
     use holo_hash::ActionHash;
+    use holochain_conductor_api::conductor::DpkiConfig;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::metadata::Details;
 
@@ -215,11 +216,12 @@ pub mod slow_tests {
     async fn get_action_entry_local_only() {
         holochain_trace::test_run().unwrap();
         // agents should not pass around data
-        let config = SweetConductorConfig::rendezvous(false).tune(|config| {
+        let mut config = SweetConductorConfig::rendezvous(false).tune(|config| {
             config.disable_historical_gossip = true;
             config.disable_recent_gossip = true;
             config.disable_publish = true;
         });
+        config.dpki = Some(DpkiConfig::disabled());
         let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crud]).await;
         let apps = conductors.setup_app("test", &[dna_file]).await.unwrap();

@@ -83,18 +83,15 @@ impl SweetConductorConfig {
 
     /// Rendezvous config for SweetConductors
     pub fn rendezvous(bootstrap: bool) -> Self {
-        let mut tuning =
-            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-        tuning.gossip_strategy = "sharded-gossip".to_string();
+        let mut config = Self::standard();
 
-        let mut network = KitsuneP2pConfig::default();
         if bootstrap {
-            network.bootstrap_service = Some(url2::url2!("rendezvous:"));
+            config.network.bootstrap_service = Some(url2::url2!("rendezvous:"));
         }
 
         /*#[cfg(not(feature = "tx5"))]
         {
-            network.transport_pool = vec![TransportConfig::Quic {
+            config.network.transport_pool = vec![TransportConfig::Quic {
                 bind_to: None,
                 override_host: None,
                 override_port: None,
@@ -103,13 +100,13 @@ impl SweetConductorConfig {
 
         #[cfg(feature = "tx5")]
         {
-            network.transport_pool = vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
-                signal_url: "rendezvous:".into(),
-            }];
+            config.network.transport_pool =
+                vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
+                    signal_url: "rendezvous:".into(),
+                }];
         }
 
-        network.tuning_params = Arc::new(tuning);
-        network.into()
+        config
     }
 
     /// Set network tuning params.
