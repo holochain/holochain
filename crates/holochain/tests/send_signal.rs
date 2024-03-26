@@ -22,14 +22,18 @@ async fn send_signal_after_conductor_restart() {
         Default::default(),
     )
     .await;
-    let app = conductor.setup_app("app_id", &[dna_file]).await.unwrap();
+    let installed_app_id = "app_id".to_string();
+    let app = conductor
+        .setup_app(&installed_app_id, &[dna_file])
+        .await
+        .unwrap();
     let alice = app.agent();
     let alice_cell_id = app.cells()[0].cell_id().to_owned();
 
     // add app interface
     let app_interface_port_1 = (*conductor)
         .clone()
-        .add_app_interface(either::Either::Left(0), AllowedOrigins::Any)
+        .add_app_interface(installed_app_id, 0, AllowedOrigins::Any)
         .await
         .unwrap();
 
@@ -92,7 +96,7 @@ async fn send_signal_after_conductor_restart() {
         .unwrap();
 
     let app_interfaces = conductor.list_app_interfaces().await.unwrap();
-    let app_interface_port_1 = app_interfaces[0];
+    let app_interface_port_1 = app_interfaces[0].port;
 
     // reconnect app websocket
     let (_, mut app_ws_rx_1) = holochain_websocket::connect(
@@ -105,7 +109,7 @@ async fn send_signal_after_conductor_restart() {
     // add a second app interface without websocket connection
     let _ = (*conductor)
         .clone()
-        .add_app_interface(either::Either::Left(0), AllowedOrigins::Any)
+        .add_app_interface("dummy".into(), 0, AllowedOrigins::Any)
         .await
         .unwrap();
 

@@ -12,18 +12,18 @@ use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::ensure;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
-use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
-use holochain_types::prelude::DnaHash;
+use holochain_conductor_api::{AdminRequest, AppInterfaceInfo};
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::Timestamp;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
+use holochain_types::prelude::{DnaHash, InstalledAppId};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use std::convert::TryFrom;
@@ -107,6 +107,9 @@ pub struct AddAdminWs {
 /// and adds another app interface.
 #[derive(Debug, Args, Clone)]
 pub struct AddAppWs {
+    /// The app that this interface is for.
+    app_id: InstalledAppId,
+
     /// Optional port number.
     /// Defaults to assigned by OS.
     pub port: Option<u16>,
@@ -528,7 +531,7 @@ pub async fn uninstall_app(cmd: &mut CmdRunner, args: UninstallApp) -> anyhow::R
 }
 
 /// Calls [`AdminRequest::ListAppInterfaces`].
-pub async fn list_app_ws(cmd: &mut CmdRunner) -> anyhow::Result<Vec<u16>> {
+pub async fn list_app_ws(cmd: &mut CmdRunner) -> anyhow::Result<Vec<AppInterfaceInfo>> {
     let resp = cmd.command(AdminRequest::ListAppInterfaces).await?;
     Ok(expect_match!(resp => AdminResponse::AppInterfacesListed, "Failed to list app interfaces"))
 }
@@ -593,6 +596,7 @@ pub async fn disable_app(cmd: &mut CmdRunner, args: DisableApp) -> anyhow::Resul
 pub async fn attach_app_interface(cmd: &mut CmdRunner, args: AddAppWs) -> anyhow::Result<u16> {
     let resp = cmd
         .command(AdminRequest::AttachAppInterface {
+            installed_app_id: args.app_id,
             port: args.port,
             allowed_origins: args.allowed_origins,
         })

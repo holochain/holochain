@@ -182,7 +182,7 @@ mod tests {
 
         let mut signals = Vec::new();
         for h in conductors.iter() {
-            signals.push(h.signal_broadcaster().subscribe_merged())
+            signals.push(h.signal_broadcaster_for_cell().subscribe_merged())
         }
 
         let _: () = conductors[0]

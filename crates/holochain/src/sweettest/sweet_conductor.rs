@@ -5,7 +5,6 @@ use super::{
     DynSweetRendezvous, SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig,
     SweetConductorHandle, NUM_CREATED,
 };
-use crate::conductor::state::AppInterfaceId;
 use crate::conductor::ConductorHandle;
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, space::Spaces,
@@ -54,7 +53,6 @@ pub struct SweetConductor {
     pub(crate) spaces: Spaces,
     config: Arc<ConductorConfig>,
     dnas: Vec<DnaFile>,
-    signal_stream: Option<SignalStream>,
     rendezvous: Option<DynSweetRendezvous>,
 }
 
@@ -124,15 +122,6 @@ impl SweetConductor {
         config: Arc<ConductorConfig>,
         rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
-        // Automatically add a test app interface
-        handle
-            .add_test_app_interface(AppInterfaceId::default())
-            .await
-            .expect("Couldn't set up test app interface");
-
-        // Get a stream of all signals since conductor startup
-        let signal_stream = handle.signal_broadcaster().subscribe_merged();
-
         // XXX: this is a bit wonky.
         // We create a Spaces instance here purely because it's easier to initialize
         // the per-space databases this way. However, we actually use the TestEnvs
@@ -150,7 +139,6 @@ impl SweetConductor {
             spaces,
             config,
             dnas: Vec::new(),
-            signal_stream: Some(Box::new(signal_stream)),
             rendezvous,
         }
     }
@@ -497,9 +485,13 @@ impl SweetConductor {
     /// created dna with SweetConductor so it will be reloaded on restart.
     pub async fn create_clone_cell(
         &mut self,
+        installed_app_id: InstalledAppId,
         payload: CreateCloneCellPayload,
-    ) -> ConductorApiResult<holochain_zome_types::clone::ClonedCell> {
-        let clone = self.raw_handle().create_clone_cell(payload).await?;
+    ) -> ConductorApiResult<ClonedCell> {
+        let clone = self
+            .raw_handle()
+            .create_clone_cell(installed_app_id, payload)
+            .await?;
         let dna_file = self.get_dna_file(clone.cell_id.dna_hash()).unwrap();
         self.dnas.push(dna_file);
         Ok(clone)
@@ -528,10 +520,13 @@ impl SweetConductor {
 
     /// Create a new app interface and get a websocket client which can send requests
     /// to it.
-    pub async fn app_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
+    pub async fn app_ws_client(
+        &self,
+        installed_app_id: InstalledAppId,
+    ) -> (WebsocketSender, WebsocketReceiver) {
         let port = self
             .raw_handle()
-            .add_app_interface(either::Either::Left(0), AllowedOrigins::Any)
+            .add_app_interface(installed_app_id, 0, AllowedOrigins::Any)
             .await
             .expect("Couldn't create app interface");
         websocket_client_by_port(port).await.unwrap()

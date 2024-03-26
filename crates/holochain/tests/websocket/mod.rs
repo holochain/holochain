@@ -177,8 +177,9 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 
     // Activate cells
+    let installed_app_id = "test".to_string();
     let request = AdminRequest::EnableApp {
-        installed_app_id: "test".to_string(),
+        installed_app_id: installed_app_id.clone(),
     };
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
@@ -202,7 +203,7 @@ async fn call_zome() {
     .await;
 
     // Attach App Interface
-    let app_port = attach_app_interface(&mut admin_tx, None).await;
+    let app_port = attach_app_interface(&mut admin_tx, installed_app_id, None).await;
 
     let (mut app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
     let _app_rx = PollRecv::new::<AppResponse>(app_rx);
@@ -249,7 +250,7 @@ async fn call_zome() {
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
     let app_port = match response {
-        AdminResponse::AppInterfacesListed(ports) => *ports.first().unwrap(),
+        AdminResponse::AppInterfacesListed(ports) => ports.first().unwrap().port,
         _ => panic!("Unexpected response"),
     };
 
@@ -308,7 +309,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let mut rxs = Vec::new();
     for h in conductors.iter() {
-        rxs.extend(h.signal_broadcaster().subscribe_separately())
+        rxs.extend(h.signal_broadcaster_for_cell().subscribe_separately())
     }
 
     let signal = fixt!(ExternIo);
@@ -388,8 +389,9 @@ async fn emit_signals() {
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
 
     // Activate cells
+    let installed_app_id = "test".to_string();
     let request = AdminRequest::EnableApp {
-        installed_app_id: "test".to_string(),
+        installed_app_id: installed_app_id.clone(),
     };
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
@@ -413,7 +415,7 @@ async fn emit_signals() {
     .await;
 
     // Attach App Interface
-    let app_port = attach_app_interface(&mut admin_tx, None).await;
+    let app_port = attach_app_interface(&mut admin_tx, installed_app_id, None).await;
 
     ///////////////////////////////////////////////////////
     // Emit signals (the real test!)
@@ -876,7 +878,8 @@ async fn app_allowed_origins() {
     let port = conductor
         .clone()
         .add_app_interface(
-            either::Either::Left(0),
+            "dummy".into(),
+            0,
             "http://localhost:3000".to_string().into(),
         )
         .await
@@ -901,7 +904,8 @@ async fn app_allowed_origins_independence() {
     let port_1 = conductor
         .clone()
         .add_app_interface(
-            either::Either::Left(0),
+            "dummy1".into(),
+            0,
             "http://localhost:3001".to_string().into(),
         )
         .await
@@ -910,7 +914,8 @@ async fn app_allowed_origins_independence() {
     let port_2 = conductor
         .clone()
         .add_app_interface(
-            either::Either::Left(0),
+            "dummy2".into(),
+            0,
             "http://localhost:3002".to_string().into(),
         )
         .await

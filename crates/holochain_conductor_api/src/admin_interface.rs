@@ -170,6 +170,13 @@ pub enum AdminRequest {
     ///
     /// [`AppRequest`]: super::AppRequest
     AttachAppInterface {
+        /// The application that this app websocket is bound to.
+        ///
+        /// It will only be possible to perform actions on this app through this interface.
+        /// Similarly, for signals from this app, they will only be sent back on interfaces with
+        /// a matching [InstalledAppId].
+        installed_app_id: InstalledAppId,
+
         /// Optional port number
         port: Option<u16>,
 
@@ -424,7 +431,7 @@ pub enum AdminResponse {
     },
 
     /// The list of attached app interfaces.
-    AppInterfacesListed(Vec<u16>),
+    AppInterfacesListed(Vec<AppInterfaceInfo>),
 
     /// The successful response to an [`AdminRequest::EnableApp`].
     ///
@@ -536,6 +543,13 @@ pub enum AppStatusFilter {
     Running,
     Stopped,
     Paused,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
+pub struct AppInterfaceInfo {
+    pub installed_app_id: InstalledAppId,
+    pub port: u16,
+    pub allowed_origins: AllowedOrigins,
 }
 
 #[test]

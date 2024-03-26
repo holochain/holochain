@@ -66,8 +66,10 @@ async fn ser_regression_test() {
     // //////////
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+
+    let installed_app_id = "app".to_string();
     let ((alice,), (_bob,)) = conductors
-        .setup_app("app", vec![&dna_file])
+        .setup_app(&installed_app_id, vec![&dna_file])
         .await
         .unwrap()
         .into_tuples();
@@ -93,7 +95,7 @@ async fn ser_regression_test() {
     .await
     .unwrap();
 
-    let app_api = RealAppInterfaceApi::new(conductors[0].clone());
+    let app_api = RealAppInterfaceApi::new(conductors[0].clone(), installed_app_id);
     let request = Box::new(invocation.clone());
     let request = AppRequest::CallZome(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;

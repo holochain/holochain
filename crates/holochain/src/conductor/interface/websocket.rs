@@ -435,6 +435,7 @@ pub mod test {
 
         // Attach App Interface
         let request = AdminRequest::AttachAppInterface {
+            installed_app_id: app_info.installed_app_id.clone(),
             port: None,
             allowed_origins: AllowedOrigins::Any,
         };
@@ -545,6 +546,7 @@ pub mod test {
 
     async fn call_zome<R: FnOnce(AppResponse) + 'static + Send>(
         conductor_handle: ConductorHandle,
+        installed_app_id: InstalledAppId,
         cell_id: CellId,
         wasm: TestWasm,
         function_name: String,
@@ -571,7 +573,7 @@ pub mod test {
         test_handle_incoming_message(
             msg,
             respond,
-            RealAppInterfaceApi::new(conductor_handle.clone()),
+            RealAppInterfaceApi::new(conductor_handle.clone(), installed_app_id),
         )
         .await
         .unwrap();
@@ -623,8 +625,9 @@ pub mod test {
         let dna_hash = dna.dna_hash().clone();
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
 
+        let installed_app_id = "test app".to_string();
         let (_tmpdir, _, handle) = setup_app_in_new_conductor(
-            "test app".to_string(),
+            installed_app_id.clone(),
             cell_id.agent_pubkey().clone(),
             vec![(dna, None)],
         )
@@ -632,6 +635,7 @@ pub mod test {
 
         call_zome(
             handle.clone(),
+            installed_app_id,
             cell_id.clone(),
             TestWasm::Foo,
             "foo".into(),
@@ -848,6 +852,7 @@ pub mod test {
 
         call_zome(
             conductor_handle.clone(),
+            app_id.clone(),
             cell_id_0.clone(),
             TestWasm::Link,
             "get_links".into(),
@@ -963,6 +968,7 @@ pub mod test {
 
         call_zome(
             conductor_handle.clone(),
+            app_id.clone(),
             cell_id_0.clone(),
             TestWasm::Link,
             "get_links".into(),
@@ -981,6 +987,7 @@ pub mod test {
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface {
+            installed_app_id: "test_app".to_string(),
             port: None,
             allowed_origins: AllowedOrigins::Any,
         };

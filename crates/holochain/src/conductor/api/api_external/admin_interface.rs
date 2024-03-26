@@ -220,6 +220,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::AppDisabled)
             }
             AttachAppInterface {
+                installed_app_id,
                 port,
                 allowed_origins,
             } => {
@@ -227,7 +228,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let port = self
                     .conductor_handle
                     .clone()
-                    .add_app_interface(either::Either::Left(port), allowed_origins)
+                    .add_app_interface(installed_app_id, port, allowed_origins)
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
