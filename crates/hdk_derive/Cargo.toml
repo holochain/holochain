@@ -13,6 +13,7 @@ edition = "2021"
 [lib]
 proc-macro = true
 
+# reminder - do not use workspace deps
 [dependencies]
 syn = { version = "1", features = ["full", "extra-traits"] }
 quote = "1"

@@ -11,8 +11,9 @@ categories = [ "network-programming" ]
 edition = "2021"
 
 
+# reminder - do not use workspace deps
 [dependencies]
-derive_more = { workspace = true }
+derive_more = "0.99"
 kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.8", path = "../timestamp"}
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.23", path = "../types" }
 serde = { version = "1.0", features = [ "derive" ] }

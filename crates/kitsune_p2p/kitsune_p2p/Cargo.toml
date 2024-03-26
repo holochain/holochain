@@ -10,12 +10,13 @@ keywords = ["holochain", "holo", "p2p", "dht", "networking"]
 categories = ["network-programming"]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
 arrayref = "0.3.6"
 base64 = "0.21.2"
 bloomfilter = { version = "1.0.5", features = ["serde"] }
 bytes = "1.4.0"
-derive_more = { workspace = true }
+derive_more = "0.99"
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.6"
 governor = "0.3.2"
@@ -41,11 +42,11 @@ serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 thiserror = "1.0.22"
-tokio = { workspace = true }
-tracing = { workspace = true }
+tokio = { version = "1.36.0", features = ["full"] }
+tracing = "0.1"
 tokio-stream = "0.1"
-tx5 = { workspace = true, optional = true }
-url2 = { workspace = true }
+tx5 = { version = "=0.0.8-alpha", optional = true }
+url2 = "0.0.6"
 fixt = { path = "../../fixt", version = "^0.3.0-beta-dev.2"}
 
 # fuzzing
@@ -72,7 +73,7 @@ pretty_assertions = "1.4.0"
 test-case = "1.0.0"
 tokio = { version = "1.11", features = ["full", "test-util"] }
 tracing-subscriber = "0.3.16"
-tx5-signal-srv = { workspace = true }
+tx5-signal-srv = "=0.0.8-alpha"
 ed25519-dalek = "1"
 rand_dalek = { version = "0.7", package = "rand" } # Compatibility with dalek
 
