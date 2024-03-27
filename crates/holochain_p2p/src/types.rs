@@ -1,3 +1,6 @@
+/// I'll document this later, I promise
+pub type GenericNetwork = Arc<dyn HolochainP2pDnaT>;
+
 /// Error type for Holochain P2p.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -113,8 +116,12 @@ pub mod mock_network;
 
 pub(crate) mod wire;
 
+use std::sync::Arc;
+
 pub use wire::WireDhtOpData;
 pub use wire::WireMessage;
+
+use crate::HolochainP2pDnaT;
 
 macro_rules! to_and_from_kitsune {
     ($($i:ident<$h:ty> -> $k:ty,)*) => {

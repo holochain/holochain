@@ -16,12 +16,12 @@ use crate::core::SysValidationError;
 use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
 pub use error::*;
-use futures::StreamExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
+use holochain_p2p::GenericNetwork;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -50,12 +50,6 @@ mod unit_tests;
 mod error;
 mod types;
 
-struct OutcomeSummary {
-    pub num_ops_to_validate: usize,
-    pub validated: usize,
-    pub missing: usize,
-}
-
 #[instrument(skip(
     workspace,
     trigger_integration,
@@ -72,7 +66,7 @@ pub async fn app_validation_workflow(
     network: HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
 ) -> WorkflowResult<WorkComplete> {
-    let outcome_summary = app_validation_workflow_inner(
+    let complete = app_validation_workflow_inner(
         dna_hash,
         workspace,
         conductor_handle,
@@ -83,19 +77,10 @@ pub async fn app_validation_workflow(
     .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-    // if ops have been accepted or rejected, trigger integration
-    if outcome_summary.validated > 0 {
-        trigger_integration.trigger(&"app_validation_workflow");
-    }
+    // trigger other workflows
+    trigger_integration.trigger(&"app_validation_workflow");
 
-    Ok(
-        if outcome_summary.validated < outcome_summary.num_ops_to_validate {
-            // trigger app validation workflow again in 10 seconds
-            WorkComplete::Incomplete(Some(Duration::from_secs(10)))
-        } else {
-            WorkComplete::Complete
-        },
-    )
+    Ok(complete)
 }
 
 async fn app_validation_workflow_inner(
@@ -105,7 +90,7 @@ async fn app_validation_workflow_inner(
     network: &HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
     fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
-) -> WorkflowResult<OutcomeSummary> {
+) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
     let num_ops_to_validate = sorted_ops.len();
@@ -251,10 +236,11 @@ async fn app_validation_workflow_inner(
     ops_validated += rejected_ops;
     tracing::debug!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected.");
 
-    Ok(OutcomeSummary {
-        num_ops_to_validate,
-        validated: ops_validated,
-        missing: awaiting_ops,
+    Ok(if ops_validated < num_ops_to_validate {
+        // trigger app validation workflow again in 10 seconds
+        WorkComplete::Incomplete(Some(Duration::from_secs(10)))
+    } else {
+        WorkComplete::Complete
     })
 }
 
@@ -453,7 +439,8 @@ where
     let zomes_to_invoke = match op {
         Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => ZomesToInvoke::AllIntegrity,
         Op::StoreRecord(StoreRecord { record }) => {
-            let cascade = CascadeImpl::from_workspace_and_network(&workspace, network.clone());
+            let cascade =
+                CascadeImpl::from_workspace_and_network(&workspace, Arc::new(network.clone()));
             store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await?
         }
         Op::StoreEntry(StoreEntry {
@@ -496,7 +483,7 @@ where
         invocation,
         ribosome,
         workspace,
-        network.clone(),
+        Arc::new(network.clone()),
         fetched_dependencies,
     )
     .await?;
@@ -644,7 +631,7 @@ async fn run_validation_callback_inner<R>(
     invocation: ValidateInvocation,
     ribosome: &R,
     workspace_read: HostFnWorkspaceRead,
-    network: HolochainP2pDna,
+    network: GenericNetwork,
     fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
 ) -> AppValidationResult<Outcome>
 where
@@ -687,7 +674,7 @@ where
             });
             // await all fetches in a separate task without awaiting the task
             // to finish
-            tokio::spawn(async { futures::stream::iter(fetches).buffer_unordered(10).await });
+            tokio::spawn(async { futures::future::join_all(fetches).await });
             Ok(Outcome::AwaitingDeps(hashes))
         }
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::AgentActivity(
@@ -768,14 +755,11 @@ impl AppValidationWorkspace {
         .await?)
     }
 
-    pub fn full_cascade<Network: HolochainP2pDnaT + Clone + 'static + Send>(
-        &self,
-        network: Network,
-    ) -> CascadeImpl<Network> {
+    pub fn full_cascade<Network: HolochainP2pDnaT>(&self, network: Network) -> CascadeImpl {
         CascadeImpl::empty()
             .with_authored(self.authored_db.clone())
             .with_dht(self.dht_db.clone().into())
-            .with_network(network, self.cache.clone())
+            .with_network(Arc::new(network), self.cache.clone())
     }
 }
 

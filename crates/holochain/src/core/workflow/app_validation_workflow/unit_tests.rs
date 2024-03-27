@@ -14,8 +14,9 @@ use crate::{
 };
 use fixt::fixt;
 use holo_hash::{hash_type::AnyDht, AgentPubKey, AnyDhtHash, DhtOpHash, HashableContentExtSync};
+use holochain_cascade::test_utils::MockNetwork;
 use holochain_keystore::{test_keystore, MetaLairClient};
-use holochain_p2p::{event::HolochainP2pEvent, HolochainP2pDnaFixturator};
+use holochain_p2p::{event::HolochainP2pEvent, HolochainP2pDnaFixturator, MockHolochainP2pDnaT};
 use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, mutations::insert_op};
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed, WireOps},
@@ -93,7 +94,7 @@ async fn validation_callback_must_get_action() {
     let zomes_to_invoke = ZomesToInvoke::one_integrity(integrity_zomes[0].clone());
     let invocation = ValidateInvocation::new(zomes_to_invoke, &op).unwrap();
 
-    let network = fixt!(HolochainP2pDna);
+    let network = Arc::new(fixt!(HolochainP2pDna));
     let fetched_dependencies = Arc::new(Mutex::new(HashSet::new()));
 
     // action has not been written to a database yet
@@ -177,13 +178,16 @@ async fn validation_callback_awaiting_deps_hashes() {
         _ => false,
     };
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
-    let network = test_network_with_events(
-        Some(dna_hash.clone()),
-        Some(agent_key.clone()),
-        filter_events,
-        tx,
-    )
-    .await;
+    let network = Arc::new(
+        test_network_with_events(
+            Some(dna_hash.clone()),
+            Some(agent_key.clone()),
+            filter_events,
+            tx,
+        )
+        .await
+        .dna_network(),
+    );
 
     // respond to Get request with requested action
     tokio::spawn({
@@ -218,7 +222,7 @@ async fn validation_callback_awaiting_deps_hashes() {
         invocation.clone(),
         &ribosome,
         workspace_read.clone(),
-        network.dna_network(),
+        network.clone(),
         fetched_dependencies.clone(),
     )
     .await
@@ -236,7 +240,7 @@ async fn validation_callback_awaiting_deps_hashes() {
         invocation.clone(),
         &ribosome,
         workspace_read.clone(),
-        network.dna_network(),
+        network.clone(),
         fetched_dependencies.clone(),
     )
     .await
@@ -299,7 +303,11 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     let dna_hash = dna_file.dna_hash().clone();
     let invocation = ValidateInvocation::new(zomes_to_invoke, &action_op).unwrap();
 
-    let network = test_network(Some(dna_hash.clone()), Some(alice.clone())).await;
+    let network = Arc::new(
+        test_network(Some(dna_hash.clone()), Some(alice.clone()))
+            .await
+            .dna_network(),
+    );
     let fetched_dependencies = Arc::new(Mutex::new(HashSet::new()));
 
     // app validation should indicate missing action is being awaited
@@ -307,7 +315,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         invocation.clone(),
         &ribosome,
         workspace_read.clone(),
-        network.dna_network(),
+        network.clone(),
         fetched_dependencies.clone(),
     )
     .await
@@ -331,7 +339,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         invocation.clone(),
         &ribosome,
         workspace_read.clone(),
-        network.dna_network(),
+        network.clone(),
         fetched_dependencies.clone(),
     )
     .await
@@ -390,13 +398,16 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
         _ => false,
     };
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
-    let network = test_network_with_events(
-        Some(dna_file.dna_hash().clone()),
-        Some(agent_key.clone()),
-        filter_events,
-        tx,
-    )
-    .await;
+    let network = Arc::new(
+        test_network_with_events(
+            Some(dna_file.dna_hash().clone()),
+            Some(agent_key.clone()),
+            filter_events,
+            tx,
+        )
+        .await
+        .dna_network(),
+    );
 
     let times_same_hash_is_fetched = Arc::new(AtomicI8::new(0));
 
@@ -436,14 +447,134 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
         invocation.clone(),
         &ribosome,
         workspace_read.clone(),
-        network.dna_network(),
+        network.clone(),
         fetched_dependencies.clone(),
     );
     let validate_2 = run_validation_callback_inner(
         invocation.clone(),
         &ribosome,
         workspace_read.clone(),
-        network.dna_network(),
+        network.clone(),
+        fetched_dependencies.clone(),
+    );
+    let outcomes = futures::future::join_all([validate_1, validate_2]).await;
+
+    // await while missing records are being fetched in background task
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    assert_eq!(times_same_hash_is_fetched.load(Ordering::Relaxed), 1);
+    // after successfully fetching dependencies, the set should be empty
+    assert_eq!(fetched_dependencies.lock().len(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validation_callback_prevent_multiple_identical_agent_activity_fetches() {
+    holochain_trace::test_run().unwrap();
+
+    let action = fixt!(Action);
+    let action_signed_hashed = SignedActionHashed::new_unchecked(action.clone(), fixt!(Signature));
+    let action_op = Op::RegisterAgentActivity(RegisterAgentActivity {
+        action: action_signed_hashed.clone(),
+        cached_entry: None,
+    });
+
+    let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
+        let action_hash = action.clone().to_hash();
+        move |api, op: Op| {
+            if let Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) = op {
+                let result = api.must_get_action(MustGetActionInput(action.as_hash().to_owned()));
+                if result.is_ok() {
+                    Ok(ValidateCallbackResult::Valid)
+                } else {
+                    Ok(ValidateCallbackResult::UnresolvedDependencies(
+                        UnresolvedDependencies::Hashes(vec![action_hash.clone().into()]),
+                    ))
+                }
+            } else {
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    });
+
+    let TestCase {
+        agent_key,
+        dna_file,
+        integrity_zomes,
+        ribosome,
+        workspace_read,
+        ..
+    } = TestCase::new(zomes).await;
+
+    let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
+    let invocation = ValidateInvocation::new(zomes_to_invoke, &action_op).unwrap();
+
+    // handle only Get events
+    let mut network = MockHolochainP2pDnaT::new();
+    network.expect_get().returning(|holo_hash, actor| {
+        println!("hello {holo_hash:?} actor {actor:?}");
+        Ok(vec![])
+    });
+    let network = Arc::new(network);
+    // let filter_events = |evt: &_| match evt {
+    //     holochain_p2p::event::HolochainP2pEvent::Get { .. } => true,
+    //     _ => false,
+    // };
+    // let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+
+    // let network = test_network_with_events(
+    //     Some(dna_file.dna_hash().clone()),
+    //     Some(agent_key.clone()),
+    //     filter_events,
+    //     tx,
+    // )
+    // .await;
+
+    let times_same_hash_is_fetched = Arc::new(AtomicI8::new(0));
+
+    // respond to Get request with requested action
+    // tokio::spawn({
+    //     let action_hash = action.clone().to_hash();
+    //     let action_hash_32 = action_hash.get_raw_32().to_vec();
+    //     let times_fetched = Arc::clone(&times_same_hash_is_fetched);
+    //     async move {
+    //         while let Some(evt) = rx.recv().await {
+    //             if let HolochainP2pEvent::Get {
+    //                 dht_hash, respond, ..
+    //             } = evt
+    //             {
+    //                 assert_eq!(dht_hash.get_raw_32().to_vec(), action_hash_32);
+
+    //                 respond.r(ok_fut(Ok(WireOps::Record(WireRecordOps {
+    //                     action: Some(Judged::new(
+    //                         action_signed_hashed.clone().into(),
+    //                         ValidationStatus::Valid,
+    //                     )),
+    //                     deletes: vec![],
+    //                     updates: vec![],
+    //                     entry: None,
+    //                 }))));
+
+    //                 times_fetched.fetch_add(1, Ordering::Relaxed);
+    //             }
+    //         }
+    //     }
+    // });
+
+    let fetched_dependencies = Arc::new(Mutex::new(HashSet::new()));
+
+    // run two op validations that depend on the same record in parallel
+    let validate_1 = run_validation_callback_inner(
+        invocation.clone(),
+        &ribosome,
+        workspace_read.clone(),
+        network.clone(),
+        fetched_dependencies.clone(),
+    );
+    let validate_2 = run_validation_callback_inner(
+        invocation.clone(),
+        &ribosome,
+        workspace_read.clone(),
+        network.clone(),
         fetched_dependencies.clone(),
     );
     let outcomes = futures::future::join_all([validate_1, validate_2]).await;

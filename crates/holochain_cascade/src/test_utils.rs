@@ -25,6 +25,7 @@ use holochain_types::test_utils::chain::TestChainItem;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use std::collections::HashSet;
+use std::sync::Arc;
 use QueryFilter;
 use Signature;
 use ValidationStatus;
@@ -48,19 +49,19 @@ pub struct PassThroughNetwork {
 
 impl PassThroughNetwork {
     /// Declare that this node has full coverage
-    pub fn authority_for_all(envs: Vec<DbRead<DbKindDht>>) -> Self {
-        Self {
+    pub fn authority_for_all(envs: Vec<DbRead<DbKindDht>>) -> Arc<Self> {
+        Arc::new(Self {
             envs,
             authority: true,
-        }
+        })
     }
 
     /// Declare that this node has zero coverage
-    pub fn authority_for_nothing(envs: Vec<DbRead<DbKindDht>>) -> Self {
-        Self {
+    pub fn authority_for_nothing(envs: Vec<DbRead<DbKindDht>>) -> Arc<Self> {
+        Arc::new(Self {
             envs,
             authority: false,
-        }
+        })
     }
 }
 

@@ -30,7 +30,7 @@ pub use kitsune_p2p;
 #[async_trait::async_trait]
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
 /// I.e. a sender that is tied to a specific cell.
-pub trait HolochainP2pDnaT: Send + Sync {
+pub trait HolochainP2pDnaT: Send + Sync + 'static {
     /// owned getter
     fn dna_hash(&self) -> DnaHash;
 
@@ -270,9 +270,6 @@ mockall::mock! {
         async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()>;
         fn chc(&self) -> Option<ChcImpl>;
     }
-    impl Clone for HolochainP2pDnaT {
-        fn clone(&self) -> Self;
-    }
 }
 
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
@@ -282,6 +279,12 @@ pub struct HolochainP2pDna {
     sender: ghost_actor::GhostSender<actor::HolochainP2p>,
     dna_hash: Arc<DnaHash>,
     chc: Option<ChcImpl>,
+}
+
+impl From<HolochainP2pDna> for GenericNetwork {
+    fn from(value: HolochainP2pDna) -> Self {
+        Arc::new(value)
+    }
 }
 
 /// A CHC implementation

@@ -82,6 +82,7 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::*;
 use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
@@ -209,16 +210,17 @@ impl HostContext {
     }
 
     /// Get the network, panics if none was provided
-    pub fn network(&self) -> &HolochainP2pDna {
-        match self {
+    pub fn network(&self) -> Arc<dyn HolochainP2pDnaT> {
+        let network = match self {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
-            | Self::PostCommit(PostCommitHostAccess { network, .. })
-            | Self::Validate(ValidateHostAccess { network, .. }) => network,
+            | Self::PostCommit(PostCommitHostAccess { network, .. }) => Arc::new(network.clone()),
+            Self::Validate(ValidateHostAccess { network, .. }) => network.clone(),
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),
-        }
+        };
+        network
     }
 
     /// Get the signal broadcaster, panics if none was provided
