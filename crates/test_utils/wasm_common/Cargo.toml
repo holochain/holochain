@@ -12,6 +12,7 @@ name = "holochain_test_wasm_common"
 crate-type = [ "cdylib", "rlib" ]
 path = "src/lib.rs"
 
+# reminder - do not use workspace deps
 [dependencies]
 hdk = { path = "../../hdk", version = "^0.3.0-beta-dev.35"}
 serde = "1.0"

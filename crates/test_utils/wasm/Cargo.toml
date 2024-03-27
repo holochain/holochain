@@ -18,6 +18,7 @@ build = []
 only_check = []
 
 
+# reminder - do not use workspace deps
 [dependencies]
 holochain_types = { path = "../../holochain_types", version = "^0.3.0-beta-dev.37"}
 strum = "0.18.0"

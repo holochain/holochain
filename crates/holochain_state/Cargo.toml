@@ -8,11 +8,12 @@ documentation = "https://docs.rs/holochain_state"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
 aitia = { version = "^0.2.0-beta-dev.6", path = "../aitia" }
 byteorder = "1.3.4"
 cfg-if = "0.1"
-chrono = { version = "0.4", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
+chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 derive_more = { workspace = true }
 either = "1.5"
 holochain_sqlite = { version = "^0.3.0-beta-dev.37", path = "../holochain_sqlite" }
@@ -21,7 +22,7 @@ fallible-iterator = "0.2.0"
 futures = "0.3"
 hc_sleuth = { version = "^0.2.0-beta-dev.11", path = "../hc_sleuth" }
 holochain_keystore = { version = "^0.3.0-beta-dev.31", path = "../holochain_keystore" }
-holochain_serialized_bytes = { workspace = true }
+holochain_serialized_bytes = "=0.0.53"
 holochain_p2p = { version = "^0.3.0-beta-dev.40", path = "../holochain_p2p" }
 holochain_types = { version = "^0.3.0-beta-dev.37", path = "../holochain_types" }
 holochain_util = { version = "^0.3.0-beta-dev.5", path = "../holochain_util" }
@@ -38,7 +39,7 @@ shrinkwraprs = "0.3.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
 thiserror = "1.0.22"
-tokio = { workspace = true }
+tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1.26"
 tracing-futures = "0.2.5"
 cron = "0.9"
@@ -55,7 +56,7 @@ contrafact = { version = "0.2.0-rc.1", optional = true }
 [dev-dependencies]
 holochain_state = { path = ".", features = ["test_utils"] }
 
-anyhow = "1.0.26"
+anyhow = "1.0"
 arbitrary = "1.0"
 fixt = { path = "../fixt" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm" }
