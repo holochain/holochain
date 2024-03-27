@@ -54,7 +54,7 @@ async fn network_info() {
     );
     let _: ActionHash = conductors[0].call(&zome, "create_entry", ()).await;
 
-    await_consistency!(10, &cells);
+    await_consistency(10, &cells).await.unwrap();
 
     // wait_for_integration(
     //     &conductors[1].get_dht_db(dna.dna_hash()).unwrap(),

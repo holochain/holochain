@@ -51,7 +51,7 @@ async fn conductors_call_remote(num_conductors: usize) {
 
     // Make sure that genesis records are integrated now that conductors have discovered each other. This makes it
     // more likely that Kitsune knows about all the agents in the network to be able to make remote calls to them.
-    await_consistency!(60, cells.iter());
+    await_consistency(60, cells.iter()).await.unwrap();
 
     let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
 
@@ -83,7 +83,7 @@ async fn conductors_call_remote(num_conductors: usize) {
         .await;
 
     // Ensure that all the create requests were received and published.
-    await_consistency!(60, cells.iter());
+    await_consistency(60, cells.iter()).await.unwrap();
 }
 
 // TODO - rewrite all these tests to use local sweettest

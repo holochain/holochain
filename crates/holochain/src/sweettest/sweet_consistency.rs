@@ -2,44 +2,40 @@
 
 use hc_sleuth::SleuthId;
 
-use crate::{prelude::*, test_utils::consistency_dbs};
+use crate::{
+    prelude::*,
+    test_utils::{consistency_dbs, ConsistencyResult},
+};
 use std::time::Duration;
 
 use super::*;
 
-/// Wait for all cells to reach consistency for 10 seconds
-#[macro_export]
-macro_rules! await_consistency {
-    ($secs:literal, $cells:expr $(,)?) => {{
-        let dur = std::time::Duration::from_secs($secs);
-        if let Err(err) = $crate::sweettest::sweet_consistency::consistency(dur, $cells).await {
-            println!("{err}");
-            panic!("`await_consistency!()` failure. Error printed above.");
-        }
-    }};
+/// A duration expressed properly, or just as seconds
+#[derive(derive_more::From, Debug)]
+pub enum DurationOrSeconds {
+    /// Proper duration
+    Duration(Duration),
+    /// Just seconds
+    Seconds(u64),
 }
 
-/// Wait for all cells to reach consistency for 10 seconds
-#[macro_export]
-macro_rules! await_consistency_advanced {
-    ($secs:literal, $cells:expr $(,)?) => {
-        let dur = std::time::Duration::from_secs($secs);
-        if let Err(err) =
-            $crate::sweettest::sweet_consistency::consistency_advanced(dur, $cells).await
-        {
-            println!("{err}");
-            panic!("`await_consistency_advanced!()` failure. Error printed above.");
+impl DurationOrSeconds {
+    /// Get the proper duration
+    pub fn into_duration(self) -> Duration {
+        match self {
+            Self::Duration(d) => d,
+            Self::Seconds(s) => Duration::from_secs(s),
         }
-    };
+    }
 }
 
 /// Wait for all cells to reach consistency
-#[tracing::instrument(skip(all_cells))]
-pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
-    timeout: Duration,
+#[tracing::instrument(skip_all)]
+pub async fn await_consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
+    timeout: impl Into<DurationOrSeconds>,
     all_cells: I,
-) -> Result<(), String> {
-    consistency_advanced(timeout, all_cells.into_iter().map(|c| (c, true))).await
+) -> ConsistencyResult {
+    await_consistency_advanced(timeout, all_cells.into_iter().map(|c| (c, true))).await
 }
 
 /// Wait for all cells to reach consistency,
@@ -48,11 +44,11 @@ pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
 /// Cells paired with a `false` value will have their authored ops counted towards the total,
 /// but not their integrated ops (since they are not online to integrate things).
 /// This is useful for tests where nodes go offline.
-#[tracing::instrument(skip(all_cells))]
-pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
-    timeout: Duration,
+#[tracing::instrument(skip_all)]
+pub async fn await_consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
+    timeout: impl Into<DurationOrSeconds>,
     all_cells: I,
-) -> Result<(), String> {
+) -> ConsistencyResult {
     #[allow(clippy::type_complexity)]
     let all_cell_dbs: Vec<(
         SleuthId,
@@ -74,5 +70,17 @@ pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, boo
         .iter()
         .map(|c| (&c.0, &c.1, &c.2, c.3.as_ref()))
         .collect();
-    consistency_dbs(&all_cell_dbs[..], timeout).await
+    consistency_dbs(&all_cell_dbs[..], timeout.into().into_duration()).await
+}
+
+/// Wait for all cells to reach consistency for 10 seconds
+#[deprecated = "Use `await_consistency()` with a timeout of `10` instead"]
+pub async fn consistency_10s<'a, I: IntoIterator<Item = &'a SweetCell>>(all_cells: I) {
+    await_consistency(10, all_cells).await.unwrap()
+}
+
+/// Wait for all cells to reach consistency for 60 seconds
+#[deprecated = "Use `await_consistency()` with a timeout of `60` instead"]
+pub async fn consistency_60s<'a, I: IntoIterator<Item = &'a SweetCell>>(all_cells: I) {
+    await_consistency(60, all_cells).await.unwrap()
 }

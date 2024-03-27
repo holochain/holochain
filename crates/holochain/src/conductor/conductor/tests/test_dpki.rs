@@ -132,9 +132,15 @@ async fn mock_dpki_validation_limbo() {
 
     let alice_clone = alice.clone();
     let bob_clone = bob.clone();
-    tokio::spawn(async move { await_consistency!(3, [&alice_clone, &bob_clone]) })
-        .await
-        .unwrap_err();
+
+    // Assert that we *can't* reach consistency in 3 seconds
+    tokio::spawn(async move {
+        await_consistency(3, [&alice_clone, &bob_clone])
+            .await
+            .unwrap()
+    })
+    .await
+    .unwrap_err();
 
     let record_bob: Option<Record> = conductors[1]
         .call(&bob.zome("simple"), "read", hash.clone())
@@ -157,7 +163,7 @@ async fn mock_dpki_validation_limbo() {
         });
     }
 
-    await_consistency!(10, [&alice, &bob]);
+    await_consistency(10, [&alice, &bob]).await.unwrap();
 
     assert!(matches!(
         get_key_state(&conductors[0], bob.agent_pubkey()).await,
@@ -232,12 +238,17 @@ async fn mock_dpki_invalid_key_state() {
 
     let hash: ActionHash = conductors[1].call(&bob.zome("simple"), "create", ()).await;
 
-    // tokio::time::sleep(tokio::time::Duration::from_secs(3))
     let alice_clone = alice.clone();
     let bob_clone = bob.clone();
-    tokio::spawn(async move { await_consistency!(3, [&alice_clone, &bob_clone]) })
-        .await
-        .unwrap_err();
+
+    // Assert that we *can't* reach consistency in 3 seconds
+    tokio::spawn(async move {
+        await_consistency(3, [&alice_clone, &bob_clone])
+            .await
+            .unwrap()
+    })
+    .await
+    .unwrap_err();
 
     let record_alice: Option<Details> = conductors[0]
         .call(&alice.zome("simple"), "read_details", hash.clone())
@@ -323,13 +334,13 @@ async fn mock_dpki_preflight_check() {
         });
     }
 
-    await_consistency!(10, [&alice, &bob]);
+    await_consistency(10, [&alice, &bob]).await.unwrap();
 
     let hash: ActionHash = conductors[0]
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    await_consistency!(60, [&alice, &bob]);
+    await_consistency(60, [&alice, &bob]).await.unwrap();
 
     assert!(matches!(
         get_key_state(&conductors[0], bob.agent_pubkey()).await,

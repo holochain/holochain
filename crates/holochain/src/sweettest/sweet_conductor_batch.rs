@@ -1,6 +1,6 @@
 use super::{SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::api::error::ConductorApiResult;
-use crate::sweettest::{SweetCell, SweetLocalRendezvous};
+use crate::sweettest::*;
 use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
@@ -45,7 +45,7 @@ impl SweetConductorBatch {
         let dpki_cells = conductors.dpki_cells();
         if !dpki_cells.is_empty() {
             conductors.exchange_peer_info().await;
-            crate::await_consistency!(10, dpki_cells.as_slice());
+            await_consistency(10, dpki_cells.as_slice()).await.unwrap();
         }
 
         conductors
@@ -96,7 +96,7 @@ impl SweetConductorBatch {
         let dpki_cells = conductors.dpki_cells();
         if !dpki_cells.is_empty() {
             conductors.exchange_peer_info().await;
-            crate::await_consistency!(10, dpki_cells.as_slice());
+            await_consistency(10, dpki_cells.as_slice()).await.unwrap();
         }
 
         conductors

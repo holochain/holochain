@@ -87,7 +87,7 @@ async fn validate_with_dpki() {
 
     dbg!(Timestamp::now());
 
-    await_consistency!(10, [&alice, &bob]);
+    await_consistency(10, [&alice, &bob]).await.unwrap();
 
     dbg!(Timestamp::now());
 
@@ -97,7 +97,7 @@ async fn validate_with_dpki() {
 
     dbg!(Timestamp::now());
 
-    await_consistency!(60, [&alice, &bob]);
+    await_consistency(60, [&alice, &bob]).await.unwrap();
 
     dbg!(Timestamp::now());
     // Both see each other in DPKI

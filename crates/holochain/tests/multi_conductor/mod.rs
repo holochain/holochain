@@ -1,5 +1,4 @@
 use hdk::prelude::*;
-use holochain::await_consistency;
 use holochain::conductor::config::{ConductorConfig, DpkiConfig};
 use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::*;
@@ -22,7 +21,9 @@ async fn dpki_gossip() {
 
     conductors.exchange_peer_info().await;
 
-    await_consistency!(10, conductors.dpki_cells().as_slice());
+    await_consistency(10, conductors.dpki_cells().as_slice())
+        .await
+        .unwrap();
 }
 
 /// Test that op publishing is sufficient for bobbo to get alice's op
@@ -67,7 +68,9 @@ async fn test_publish() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    await_consistency!(10, [&alice, &bobbo, &carol]);
+    await_consistency(10, [&alice, &bobbo, &carol])
+        .await
+        .unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductors[1]
@@ -110,7 +113,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
     conductors.exchange_peer_info().await;
 
     let dpki_cells = conductors.dpki_cells();
-    await_consistency!(10, dpki_cells.as_slice());
+    await_consistency(10, dpki_cells.as_slice()).await.unwrap();
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
@@ -120,7 +123,9 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    await_consistency!(10, [&alice, &bobbo, &carol]);
+    await_consistency(10, [&alice, &bobbo, &carol])
+        .await
+        .unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductors[1]
@@ -248,7 +253,7 @@ async fn private_entries_dont_leak() {
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    await_consistency!(60, [&alice, &bobbo]);
+    await_consistency(60, [&alice, &bobbo]).await.unwrap();
 
     let entry_hash =
         EntryHash::with_data_sync(&Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap());
@@ -272,7 +277,7 @@ async fn private_entries_dont_leak() {
     let bob_hash: ActionHash = conductors[1]
         .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
-    await_consistency!(60, [&alice, &bobbo]);
+    await_consistency(60, [&alice, &bobbo]).await.unwrap();
 
     check_all_gets_for_private_entry(
         &conductors[0],
