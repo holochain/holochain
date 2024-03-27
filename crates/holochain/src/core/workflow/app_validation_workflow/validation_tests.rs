@@ -302,7 +302,8 @@ async fn app_validation_ops() {
             }
         };
 
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let mut conductors =
+        SweetConductorBatch::from_config(2, SweetConductorConfig::standard().no_dpki()).await;
 
     let zomes = InlineZomeSet::new(
         [

@@ -259,7 +259,7 @@ mod tests {
     // TODO: run this remotely too
     #[tokio::test(flavor = "multi_thread")]
     async fn multi_conductor_chc_sync() {
-        let mut config = ConductorConfig::default();
+        let mut config = SweetConductorConfig::standard().no_dpki();
         // config.chc_url = Some(url2::Url2::parse("http://127.0.0.1:40845/"));
         config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
         let mut conductors = SweetConductorBatch::from_config(4, config).await;

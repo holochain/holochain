@@ -8,6 +8,8 @@ use holochain_conductor_api::{
 use holochain_types::websocket::AllowedOrigins;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
+use super::SweetConductor;
+
 pub(crate) static NUM_CREATED: AtomicUsize = AtomicUsize::new(0);
 
 /// Wrapper around ConductorConfig with some helpful builder methods
@@ -113,6 +115,11 @@ impl SweetConductorConfig {
         }
 
         config
+    }
+
+    /// Build a SweetConductor from this config
+    pub async fn build_conductor(self) -> SweetConductor {
+        SweetConductor::from_config(self).await
     }
 
     /// Set network tuning params.

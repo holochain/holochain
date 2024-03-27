@@ -206,11 +206,8 @@ pub mod wasm_test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::sweettest::{
-        await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
-    };
+    use crate::sweettest::*;
     use holo_hash::ActionHash;
-    use holochain_conductor_api::conductor::DpkiConfig;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::metadata::Details;
 

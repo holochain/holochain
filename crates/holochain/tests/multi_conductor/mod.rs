@@ -14,10 +14,26 @@ struct AppString(String);
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-async fn dpki_gossip() {
+async fn dpki_publish() {
     let _g = holochain_trace::test_run().ok();
 
-    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+    let config = SweetConductorConfig::standard();
+    let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+
+    conductors.exchange_peer_info().await;
+
+    await_consistency(10, conductors.dpki_cells().as_slice())
+        .await
+        .unwrap();
+}
+
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+async fn dpki_no_publish() {
+    let _g = holochain_trace::test_run().ok();
+
+    let config = SweetConductorConfig::standard().no_publish();
+    let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     conductors.exchange_peer_info().await;
 

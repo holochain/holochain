@@ -348,9 +348,14 @@ pub type DnasWithProofs = Vec<(DnaFile, Option<MembraneProof>)>;
 /// One of various ways to setup an app, used somewhere...
 pub async fn setup_app_in_new_conductor(
     installed_app_id: InstalledAppId,
-    agent: AgentPubKey,
+    agent: Option<AgentPubKey>,
     dnas: DnasWithProofs,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (
+    Arc<TempDir>,
+    RealAppInterfaceApi,
+    ConductorHandle,
+    AgentPubKey,
+) {
     let db_dir = test_db_dir();
 
     let conductor_handle = ConductorBuilder::new()
@@ -359,7 +364,8 @@ pub async fn setup_app_in_new_conductor(
         .await
         .unwrap();
 
-    install_app_in_conductor(conductor_handle.clone(), installed_app_id, agent, &dnas).await;
+    let agent =
+        install_app_in_conductor(conductor_handle.clone(), installed_app_id, agent, &dnas).await;
 
     let handle = conductor_handle.clone();
 
@@ -367,6 +373,7 @@ pub async fn setup_app_in_new_conductor(
         Arc::new(db_dir),
         RealAppInterfaceApi::new(conductor_handle),
         handle,
+        agent,
     )
 }
 
@@ -374,16 +381,16 @@ pub async fn setup_app_in_new_conductor(
 pub async fn install_app_in_conductor(
     conductor_handle: ConductorHandle,
     installed_app_id: InstalledAppId,
-    agent: AgentPubKey,
+    agent: Option<AgentPubKey>,
     dnas_with_proofs: &[(DnaFile, Option<MembraneProof>)],
-) {
+) -> AgentPubKey {
     for (dna, _) in dnas_with_proofs {
         conductor_handle.register_dna(dna.clone()).await.unwrap();
     }
 
-    conductor_handle
+    let agent = conductor_handle
         .clone()
-        .install_app_minimal(installed_app_id.clone(), Some(agent), dnas_with_proofs)
+        .install_app_minimal(installed_app_id.clone(), agent, dnas_with_proofs)
         .await
         .unwrap();
 
@@ -400,6 +407,8 @@ pub async fn install_app_in_conductor(
         .unwrap();
 
     assert!(errors.is_empty());
+
+    agent
 }
 
 /// Setup an app for testing

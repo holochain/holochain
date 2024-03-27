@@ -81,7 +81,6 @@ pub fn get<'a>(
 pub mod slow_tests {
     use crate::sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
     use holo_hash::ActionHash;
-    use holochain_conductor_api::conductor::DpkiConfig;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::record::Record;
 

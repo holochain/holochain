@@ -14,7 +14,6 @@ use crate::{
 use ::fixt::prelude::*;
 use holochain_conductor_api::AppInfoStatus;
 use holochain_conductor_api::CellInfo;
-use holochain_conductor_services::DPKI_APP_ID;
 use holochain_keystore::crude_mock_keystore::*;
 use holochain_keystore::test_keystore;
 use holochain_types::inline_zome::InlineZomeSet;
@@ -263,7 +262,7 @@ async fn common_genesis_test_app(
 async fn test_uninstall_app() {
     holochain_trace::test_run().ok();
     let (dna, _, _) = mk_dna(simple_crud_zome()).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductorConfig::standard().build_conductor().await;
 
     let app1 = conductor.setup_app(&"app1", [&dna]).await.unwrap();
 
@@ -387,6 +386,7 @@ async fn test_signing_error_during_genesis() {
     let db_dir = test_db_dir();
     let config = ConductorConfig {
         data_root_path: Some(db_dir.path().to_path_buf().into()),
+        dpki: Some(DpkiConfig::disabled()),
         ..Default::default()
     };
     let mut conductor = SweetConductor::new(
@@ -849,7 +849,10 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
                 Ok(hash)
             });
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductorConfig::standard()
+        .no_dpki()
+        .build_conductor()
+        .await;
     let app = common_genesis_test_app(&mut conductor, bad_zome)
         .await
         .unwrap();

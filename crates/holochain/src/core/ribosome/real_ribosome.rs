@@ -1003,7 +1003,6 @@ pub mod wasm_test {
     use crate::sweettest::SweetLocalRendezvous;
     use hdk::prelude::*;
     use holochain_nonce::fresh_nonce;
-    use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
     use std::sync::Arc;
