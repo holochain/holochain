@@ -8,12 +8,8 @@ use crate::core::workflow::app_validation_workflow::{
 };
 use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
-use crate::sweettest::{
-    SweetConductor, SweetConductorBatch, SweetConductorConfig, SweetDnaFile, SweetLocalRendezvous,
-};
-use crate::test_utils::{
-    consistency_10s, host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration,
-};
+use crate::sweettest::*;
+use crate::test_utils::{host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration};
 use ::fixt::fixt;
 use arbitrary::Arbitrary;
 use hdk::hdi::test_utils::set_zome_types;
@@ -290,7 +286,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
         .call(&alice.zome("coordinator"), "create", ())
         .await;
 
-    consistency_10s([&alice, &bob]).await;
+    await_consistency(10, [&alice, &bob]).await.unwrap();
 
     {
         let vfs = validation_failures.lock();
