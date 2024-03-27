@@ -63,35 +63,12 @@ exclude = ["crates/release-automation"]
 resolver = "2"
 
 [workspace.dependencies]
-anyhow = "1.0"
-async-trait = "0.1"
-derive_more = "0.99"
-futures = "0.3"
-holochain_wasmer_common = "=0.0.92"
-holochain_wasmer_guest = "=0.0.92"
-holochain_wasmer_host = "=0.0.92"
-holochain_serialized_bytes = "=0.0.53"
-nanoid = "0.4"
-mockall = "0.11"
-must_future = "0.1"
-lair_keystore = { version = "0.4.4", default-features = false }
-lair_keystore_api = "=0.4.4"
-rmp-serde = "=0.15.5"
-serde = "1.0"
-serde_bytes = "0.11.14"
-serde_json = "1.0"
-sodoken = "=0.0.11"
-thiserror = "1.0"
-tx5 = "=0.0.8-alpha"
-tx5-go-pion-turn = "=0.0.8-alpha"
-tx5-signal-srv = "=0.0.8-alpha"
-url2 = "0.0.6"
-wasmer = "=4.2.4"
-wasmer-middlewares = "=4.2.4"
-uuid = { version = "0.7", features = [ "serde", "v4" ] }
-tokio = { version = "1.36.0", features = ["full"] }
-tokio-tungstenite = { version = "0.21.0" }
-tracing = "0.1"
+# !!!
+# WARNING - PUT NOTHING HERE
+# !!!
+#
+# release automation currently cannot handle workspace.dependencies
+# it will publish unbuildable releases to crates.io
 
 [workspace.lints.clippy]
 nursery = "allow"
@@ -103,7 +80,6 @@ complexity = "deny"
 perf = "deny"
 correctness = "deny"
 dbg_macro = "deny"
-
 
 [profile.fast-test]
 inherits = "dev"

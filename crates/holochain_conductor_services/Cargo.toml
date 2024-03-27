@@ -9,17 +9,18 @@ readme = "README.md"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-anyhow = { workspace = true }
-async-trait = { workspace = true }
-derive_more = { workspace = true }
-futures = { workspace = true }
-mockall = { workspace = true }
-nanoid = { workspace = true }
-must_future = { workspace = true }
-serde = { workspace = true }
-thiserror = { workspace = true }
-tokio = { workspace = true }
+anyhow = "1.0"
+async-trait = "0.1"
+derive_more = "0.99"
+futures = "0.3"
+mockall = "0.11"
+nanoid = "0.4"
+must_future = "0.1"
+serde = "1.0"
+thiserror = "1.0"
+tokio = "1"
 
 holochain_keystore = { version = "^0.3.0-beta-dev.31", path = "../holochain_keystore" }
 holochain_types = { version = "^0.3.0-beta-dev.37", path = "../holochain_types" }

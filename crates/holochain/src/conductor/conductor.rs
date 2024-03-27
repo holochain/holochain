@@ -2941,7 +2941,7 @@ impl Conductor {
         });
 
         // Join on all apps and return a list of
-        // apps that had succelly created cells
+        // apps that had successfully created cells
         // and any apps that encounted errors
         Ok(futures::future::join_all(tasks).await)
     }
