@@ -14,6 +14,7 @@ use crate::{
 use ::fixt::prelude::*;
 use holochain_conductor_api::AppInfoStatus;
 use holochain_conductor_api::CellInfo;
+use holochain_conductor_services::DPKI_APP_ID;
 use holochain_keystore::crude_mock_keystore::*;
 use holochain_keystore::test_keystore;
 use holochain_types::inline_zome::InlineZomeSet;
@@ -158,14 +159,16 @@ async fn role_names_are_unique() {
 #[tokio::test(flavor = "multi_thread")]
 async fn can_set_fake_state() {
     let db_dir = test_db_dir();
-    let state = ConductorState::default();
+    let expected = ConductorState::default();
     let conductor = ConductorBuilder::new()
-        .fake_state(state.clone())
+        .config(SweetConductorConfig::standard().no_dpki().into())
+        .fake_state(expected.clone())
         .with_data_root_path(db_dir.path().to_path_buf().into())
         .test(&[])
         .await
         .unwrap();
-    assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
+    let actual = conductor.get_state_from_handle().await.unwrap();
+    assert_eq!(actual, expected);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1020,7 +1023,8 @@ async fn test_cell_and_app_status_reconciliation() {
         mk_dna(mk_zome()).await.0,
     ];
     let app_id = "app".to_string();
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
     conductor.setup_app(&app_id, &dnas).await.unwrap();
 
     let cell_ids: Vec<_> = conductor.running_cell_ids().into_iter().collect();

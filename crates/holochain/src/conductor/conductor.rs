@@ -1553,6 +1553,7 @@ mod app_impls {
             let state = self.get_state().await?;
             Ok(state
                 .running_apps_and_services()
+                .filter(|(id, _)| is_app(id))
                 .map(|(id, _)| id)
                 .cloned()
                 .collect())
