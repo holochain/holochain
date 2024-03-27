@@ -1,5 +1,3 @@
-use holochain::prelude::metrics::PeerAgentHistory;
-
 use super::*;
 
 pub mod gossip_agent_history;

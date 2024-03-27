@@ -4,7 +4,6 @@ use futures::future;
 use futures::FutureExt;
 use hdk::prelude::GetLinksInputBuilder;
 use holochain::sweettest::*;
-use holochain::test_utils::consistency_10s;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
@@ -52,16 +51,15 @@ async fn many_agents_can_reach_consistency_agent_links() {
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
-        .setup_app_for_agents("app", &agents, &[dna_file])
+        .setup_apps("app", NUM_AGENTS, &[dna_file])
         .await
         .unwrap();
     let cells = apps.cells_flattened();
     let alice = cells[0].zome("links");
 
     // Must have integrated or be able to get the agent key to link from it
-    consistency_10s(&cells[..]).await;
+    await_consistency(10, &cells[..]).await.unwrap();
 
     let base: AnyLinkableHash = cells[0].agent_pubkey().clone().into();
     let target: AnyLinkableHash = cells[1].agent_pubkey().clone().into();
@@ -74,7 +72,7 @@ async fn many_agents_can_reach_consistency_agent_links() {
         )
         .await;
 
-    consistency_10s(&cells[..]).await;
+    await_consistency(10, &cells[..]).await.unwrap();
 
     let mut seen = [0usize; NUM_AGENTS];
 
@@ -101,9 +99,8 @@ async fn many_agents_can_reach_consistency_normal_links() {
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
-        .setup_app_for_agents("app", &agents, &[dna_file])
+        .setup_apps("app", NUM_AGENTS, &[dna_file])
         .await
         .unwrap();
     let cells = apps.cells_flattened();
@@ -111,7 +108,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
 
     let _: ActionHash = conductor.call(&alice, "create_link", ()).await;
 
-    consistency_10s(&cells[..]).await;
+    await_consistency(10, &cells[..]).await.unwrap();
 
     let mut num_seen = 0;
 
@@ -205,9 +202,8 @@ async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
-        .setup_app_for_agents("app", &agents, &[dna_file])
+        .setup_apps("app", NUM_AGENTS, &[dna_file])
         .await
         .unwrap();
     let cells = apps.cells_flattened();

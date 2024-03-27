@@ -289,21 +289,11 @@ mod tests {
                 if facts.pending {
                     // No need to do anything because status and stage are null already.
                 } else if facts.awaiting_sys_deps {
-                    set_validation_stage(
-                        txn,
-                        &hash,
-                        ValidationStage::AwaitingSysDeps(fixt!(AnyDhtHash)),
-                    )
-                    .unwrap();
+                    set_validation_stage(txn, &hash, ValidationStage::AwaitingSysDeps).unwrap();
                 } else if facts.sys_validated {
                     set_validation_stage(txn, &hash, ValidationStage::SysValidated).unwrap();
                 } else if facts.awaiting_app_deps {
-                    set_validation_stage(
-                        txn,
-                        &hash,
-                        ValidationStage::AwaitingAppDeps(vec![fixt!(AnyDhtHash)]),
-                    )
-                    .unwrap();
+                    set_validation_stage(txn, &hash, ValidationStage::AwaitingAppDeps).unwrap();
                 } else if facts.awaiting_integration {
                     set_validation_stage(txn, &hash, ValidationStage::AwaitingIntegration).unwrap();
                 }

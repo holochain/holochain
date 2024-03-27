@@ -1,7 +1,7 @@
 use super::sys_validation_workflow;
+use super::validation_deps::ValDeps;
 use super::validation_query::get_ops_to_app_validate;
 use super::SysValidationWorkspace;
-use super::ValidationDependencies;
 use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::TriggerReceiver;
 use crate::core::queue_consumer::TriggerSender;
@@ -38,7 +38,6 @@ use holochain_zome_types::judged::Judged;
 use holochain_zome_types::record::SignedActionHashed;
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
-use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -278,7 +277,7 @@ struct TestCase {
     test_space: TestSpace,
     keystore: MetaLairClient,
     agent: AgentPubKey,
-    current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    current_validation_dependencies: ValDeps,
     app_validation_trigger: (TriggerSender, TriggerReceiver),
     self_trigger: (TriggerSender, TriggerReceiver),
     actual_network: Option<MockHolochainP2pDnaT>,
@@ -300,7 +299,7 @@ impl TestCase {
             test_space,
             keystore,
             agent,
-            current_validation_dependencies: Arc::new(Mutex::new(Default::default())),
+            current_validation_dependencies: ValDeps::default(),
             app_validation_trigger: TriggerSender::new(),
             self_trigger: TriggerSender::new(),
             actual_network: None,
@@ -362,6 +361,7 @@ impl TestCase {
             self.test_space.space.dht_query_cache.clone(),
             self.test_space.space.cache_db.clone().into(),
             Arc::new(self.dna_def.clone()),
+            None,
             std::time::Duration::from_secs(10),
         );
 

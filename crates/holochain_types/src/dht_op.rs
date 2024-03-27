@@ -480,6 +480,21 @@ impl DhtOp {
         }
     }
 
+    /// returns a reference to the action author
+    pub fn author(&self) -> &AgentPubKey {
+        match self {
+            DhtOp::StoreRecord(_, a, _) => a.author(),
+            DhtOp::StoreEntry(_, a, _) => a.author(),
+            DhtOp::RegisterAgentActivity(_, a) => a.author(),
+            DhtOp::RegisterUpdatedContent(_, a, _) => &a.author,
+            DhtOp::RegisterUpdatedRecord(_, a, _) => &a.author,
+            DhtOp::RegisterDeletedBy(_, a) => &a.author,
+            DhtOp::RegisterDeletedEntryAction(_, a) => &a.author,
+            DhtOp::RegisterAddLink(_, a) => &a.author,
+            DhtOp::RegisterRemoveLink(_, a) => &a.author,
+        }
+    }
+
     /// Calculate the op's sys validation dependency action hash
     pub fn sys_validation_dependency(&self) -> SysValDep {
         self.get_type().sys_validation_dependency(&self.action())

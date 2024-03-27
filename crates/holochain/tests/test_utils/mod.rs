@@ -204,19 +204,16 @@ pub async fn generate_agent_pubkey(client: &mut WebsocketSender, timeout: u64) -
     unwrap_to::unwrap_to!(response => AdminResponse::AgentPubKeyGenerated).clone()
 }
 
+/// Returns the hash of the DNA installed, after modifiers have been applied
 pub async fn register_and_install_dna(
     client: &mut WebsocketSender,
-    orig_dna_hash: DnaHash,
-    agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
     role_name: RoleName,
     timeout: u64,
-) -> DnaHash {
+) -> CellId {
     register_and_install_dna_named(
         client,
-        orig_dna_hash,
-        agent_key,
         dna_path,
         properties,
         role_name,
@@ -226,16 +223,15 @@ pub async fn register_and_install_dna(
     .await
 }
 
+/// Returns the hash of the DNA installed, after modifiers have been applied
 pub async fn register_and_install_dna_named(
     client: &mut WebsocketSender,
-    _orig_dna_hash: DnaHash,
-    agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
     role_name: RoleName,
     name: String,
     timeout: u64,
-) -> DnaHash {
+) -> CellId {
     let mods = DnaModifiersOpt {
         properties,
         ..Default::default()
@@ -243,17 +239,18 @@ pub async fn register_and_install_dna_named(
 
     let dna_bundle1 = DnaBundle::read_from_file(&dna_path).await.unwrap();
     let dna_bundle = DnaBundle::read_from_file(&dna_path).await.unwrap();
-    let (_dna, dna_hash) = dna_bundle1
+    let (dna, _) = dna_bundle1
         .into_dna_file(mods.clone().serialized().unwrap())
         .await
         .unwrap();
+    let dna_hash = dna.dna_hash().clone();
 
     let roles = vec![AppRoleManifest {
         name: role_name,
         dna: AppRoleDnaManifest {
             location: Some(DnaLocation::Bundled(dna_path.clone())),
             modifiers: mods,
-            installed_hash: Some(dna_hash.clone().into()),
+            installed_hash: None,
             clone_limit: 0,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
@@ -273,7 +270,7 @@ pub async fn register_and_install_dna_named(
         .unwrap();
 
     let payload = InstallAppPayload {
-        agent_key,
+        agent_key: None,
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(name),
         network_seed: None,
@@ -284,8 +281,11 @@ pub async fn register_and_install_dna_named(
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
     let response = check_timeout_named("InstallApp", response, timeout).await;
-    assert_matches!(response, AdminResponse::AppInstalled(_));
-    dna_hash
+    if let AdminResponse::AppInstalled(app) = response {
+        CellId::new(dna_hash, app.agent_pub_key)
+    } else {
+        panic!("InstallApp failed: {:?}", response);
+    }
 }
 
 pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16> {

@@ -25,6 +25,11 @@ pub fn simple_create_read_zome() -> InlineIntegrityZome {
                 .map(|e| e.into_iter().next().unwrap())
                 .map_err(Into::into)
         })
+        .function("read_details", |api, hash: ActionHash| {
+            api.get_details(vec![GetInput::new(hash.into(), GetOptions::default())])
+                .map(|e| e.into_iter().next().unwrap())
+                .map_err(Into::into)
+        })
 }
 
 /// An InlineZome with a function to create many random entries at once,

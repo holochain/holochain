@@ -256,8 +256,7 @@ impl DnaFile {
         clone
     }
 
-    /// Change the DNA modifiers -- the network seed, origin time and properties -- while
-    /// leaving the actual DNA code intact.
+    /// Change the DNA modifiers while leaving the actual DNA code intact.
     pub fn update_modifiers(&self, dna_modifiers: DnaModifiersOpt) -> Self {
         let mut clone = self.clone();
         clone.dna = DnaDefHashed::from_content_sync(clone.dna.update_modifiers(dna_modifiers));

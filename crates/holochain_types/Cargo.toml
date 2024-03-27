@@ -19,7 +19,7 @@ automap = { version = "0.1", features = ["serde"] }
 backtrace = "0.3.27"
 base64 = "0.13"
 cfg-if = "0.1"
-chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 derive_builder = "0.9.0"
 derive_more = "0.99"
 either = "1.5"
@@ -33,8 +33,9 @@ holochain_keystore = { version = "^0.3.0-beta-dev.31", path = "../holochain_keys
 holochain_nonce = {version = "^0.3.0-beta-dev.25", path = "../holochain_nonce"}
 holochain_serialized_bytes = "=0.0.53"
 holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.37"}
-holochain_wasmer_host = "=0.0.92"
+holochain_trace = { version = "^0.3.0-beta-dev.8", path = "../holochain_trace" }
 holochain_util = { version = "^0.3.0-beta-dev.5", path = "../holochain_util", features = ["backtrace"] }
+holochain_wasmer_host = "=0.0.92"
 holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.30", features = ["full"] }
 itertools = { version = "0.10" }
 kitsune_p2p_dht = { version = "^0.3.0-beta-dev.19", path = "../kitsune_p2p/dht" }
@@ -42,8 +43,7 @@ lazy_static = "1.4.0"
 mockall = "0.11.3"
 mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.3.0-beta-dev.7"}
 must_future = "0.1.1"
-nanoid = "0.3"
-holochain_trace = { version = "^0.3.0-beta-dev.8", path = "../holochain_trace" }
+nanoid = "0.4"
 parking_lot = "0.10"
 rand = "0.8.5"
 regex = "1.4"

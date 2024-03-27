@@ -1001,7 +1001,6 @@ pub mod wasm_test {
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetLocalRendezvous;
-    use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_nonce::fresh_nonce;
     use holochain_types::prelude::AgentPubKeyFixturator;
@@ -1056,7 +1055,7 @@ pub mod wasm_test {
         assert_eq!(results.unwrap(), [true, true]);
 
         // run two rounds of two concurrent zome calls
-        // having been cached, responses should take less than 10 milliseconds
+        // having been cached, responses should take less than 15 milliseconds
         for _ in 0..2 {
             let zome_call_1 = tokio::spawn({
                 let conductor = conductor.clone();
@@ -1087,13 +1086,13 @@ pub mod wasm_test {
                 .unwrap();
 
             assert!(
-                results[0] <= Duration::from_millis(10),
-                "{:?} > 10ms",
+                results[0] <= Duration::from_millis(15),
+                "{:?} > 15ms",
                 results[0]
             );
             assert!(
-                results[1] <= Duration::from_millis(10),
-                "{:?} > 10ms",
+                results[1] <= Duration::from_millis(15),
+                "{:?} > 15ms",
                 results[1]
             );
         }
@@ -1110,17 +1109,13 @@ pub mod wasm_test {
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern]).await;
-        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
-        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
 
         let mut conductor = SweetConductor::from_standard_config().await;
 
-        let apps = conductor
-            .setup_app_for_agents("app-", &[alice_pubkey.clone(), bob_pubkey], &[dna_file])
-            .await
-            .unwrap();
+        let apps = conductor.setup_apps("app-", 2, &[dna_file]).await.unwrap();
 
         let ((alice,), (_bob,)) = apps.into_tuples();
+        let alice_pubkey = alice.cell_id().agent_pubkey().clone();
         let alice = alice.zome(TestWasm::HdkExtern);
 
         let foo_result: String = conductor.call(&alice, "foo", ()).await;

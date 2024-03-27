@@ -47,8 +47,15 @@ pub struct ConductorConfig {
     #[serde(default)]
     pub keystore: KeystoreConfig,
 
-    /// Optional DPKI configuration if conductor is using a DPKI app to initalize and manage
-    /// keys for new instances.
+    /// DPKI config for this conductor. This setting must not change once the conductor has been
+    /// started for the first time.
+    ///  
+    /// If `dna_path` is present, the DNA file at this path will be used to install the DPKI service upon first conductor startup.
+    /// If not present, the Deepkey DNA specified by the `holochain_deepkey_dna` crate will be used instead.
+    ///
+    /// `device_seed_lair_tag` is currently unused but may be required in the future.
+    // TODO: once device seed generation is fully hooked up, make this config required.
+    #[serde(default)]
     pub dpki: Option<DpkiConfig>,
 
     /// Setup admin interfaces to control this conductor through a websocket connection.
@@ -238,8 +245,8 @@ mod tests {
       type: lair_server_in_proc
 
     dpki:
-      instance_id: some_id
-      init_params: some_params
+      dna_path: path/to/dna.dna
+      device_seed_lair_tag: "device-seed"
 
     admin_interfaces:
       - driver:
@@ -291,10 +298,10 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                dpki: Some(DpkiConfig {
-                    instance_id: "some_id".into(),
-                    init_params: "some_params".into()
-                }),
+                dpki: Some(DpkiConfig::new(
+                    Some("path/to/dna.dna".into()),
+                    "device-seed".into()
+                )),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket {

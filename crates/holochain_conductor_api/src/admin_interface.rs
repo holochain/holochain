@@ -492,6 +492,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::StorageInfo`].
     StorageInfo(StorageInfo),
+
+    /// Successful response to whatever request was made, with no extra information included
+    Ok,
 }
 
 /// Error type that goes over the websocket wire.

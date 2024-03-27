@@ -402,10 +402,10 @@ pub mod test {
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::PostCommitSignal]).await;
-        let app_bundle = app_bundle_from_dnas([&dna_file]).await;
+        let app_bundle = app_bundle_from_dnas(&[dna_file.clone()]).await;
         let request = AdminRequest::InstallApp(Box::new(InstallAppPayload {
             source: AppBundleSource::Bundle(app_bundle),
-            agent_key: agent_key.clone(),
+            agent_key: Some(agent_key.clone()),
             installed_app_id: None,
             membrane_proofs: HashMap::new(),
             network_seed: None,
@@ -518,7 +518,7 @@ pub mod test {
 
         conductor_handle
             .clone()
-            .install_app_minimal("test app".to_string(), agent, &dnas_with_proofs)
+            .install_app_minimal("test app".to_string(), Some(agent), &dnas_with_proofs)
             .await
             .unwrap();
 
@@ -686,7 +686,7 @@ pub mod test {
                         current_number_of_peers: 1,
                         arc_size: 1.0,
                         total_network_peers: 1,
-                        bytes_since_last_time_queried: 1848,
+                        bytes_since_last_time_queried: 1844,
                         completed_rounds_since_last_time_queried: 0,
                     }]
                 )
@@ -870,7 +870,6 @@ pub mod test {
             })
             .unwrap()
             .all_cells()
-            .cloned()
             .collect();
 
         // Collect the expected result
@@ -921,7 +920,6 @@ pub mod test {
             })
             .unwrap()
             .all_cells()
-            .cloned()
             .collect();
 
         assert_eq!(expected, cell_ids);

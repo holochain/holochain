@@ -1763,6 +1763,7 @@ dependencies = [
  "futures",
  "holochain_diagnostics",
  "holochain_trace",
+ "kitsune_p2p",
  "tokio",
  "tokio-stream",
  "tui",
@@ -2909,6 +2910,7 @@ dependencies = [
  "holochain_cascade",
  "holochain_conductor_api",
  "holochain_conductor_services",
+ "holochain_deepkey_dna",
  "holochain_keystore",
  "holochain_metrics",
  "holochain_nonce",
@@ -2943,7 +2945,7 @@ dependencies = [
  "mockall",
  "mr_bundle",
  "must_future",
- "nanoid 0.3.0",
+ "nanoid",
  "num_cpus",
  "once_cell",
  "one_err",
@@ -3110,7 +3112,7 @@ dependencies = [
  "holochain_websocket",
  "kitsune_p2p_types",
  "matches",
- "nanoid 0.3.0",
+ "nanoid",
  "once_cell",
  "serde",
  "serde_json",
@@ -3157,16 +3159,26 @@ name = "holochain_conductor_services"
 version = "0.2.0-beta-dev.11"
 dependencies = [
  "anyhow",
+ "arbitrary",
  "async-trait",
  "derive_more",
  "futures",
+ "hdk",
  "holochain_keystore",
  "holochain_types",
  "mockall",
  "must_future",
+ "nanoid",
  "serde",
  "thiserror",
+ "tokio",
 ]
+
+[[package]]
+name = "holochain_deepkey_dna"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77b9aaa7601f867c727bc2eb69b19658bc13c05526dd6267b75bd28556ab5e61"
 
 [[package]]
 name = "holochain_diagnostics"
@@ -3224,7 +3236,7 @@ dependencies = [
  "kitsune_p2p_types",
  "lair_keystore",
  "must_future",
- "nanoid 0.4.0",
+ "nanoid",
  "one_err",
  "parking_lot 0.11.2",
  "serde",
@@ -3359,7 +3371,7 @@ dependencies = [
  "kitsune_p2p_timestamp",
  "kitsune_p2p_types",
  "loom",
- "nanoid 0.4.0",
+ "nanoid",
  "num_cpus",
  "once_cell",
  "opentelemetry_api",
@@ -3418,7 +3430,7 @@ dependencies = [
  "kitsune_p2p",
  "matches",
  "mockall",
- "nanoid 0.3.0",
+ "nanoid",
  "one_err",
  "parking_lot 0.10.2",
  "pretty_assertions",
@@ -3511,7 +3523,7 @@ dependencies = [
  "mockall",
  "mr_bundle",
  "must_future",
- "nanoid 0.3.0",
+ "nanoid",
  "one_err",
  "parking_lot 0.10.2",
  "pretty_assertions",
@@ -3649,7 +3661,7 @@ dependencies = [
  "kitsune_p2p_dht",
  "kitsune_p2p_timestamp",
  "matches",
- "nanoid 0.3.0",
+ "nanoid",
  "num_enum",
  "once_cell",
  "paste",
@@ -4282,7 +4294,7 @@ dependencies = [
  "maplit",
  "mockall",
  "must_future",
- "nanoid 0.4.0",
+ "nanoid",
  "num-traits",
  "once_cell",
  "opentelemetry_api",
@@ -4581,7 +4593,7 @@ dependencies = [
  "dunce",
  "hc_seed_bundle",
  "lru",
- "nanoid 0.4.0",
+ "nanoid",
  "once_cell",
  "parking_lot 0.12.1",
  "rcgen",
@@ -5082,15 +5094,6 @@ dependencies = [
  "proc-macro2 1.0.79",
  "quote 1.0.35",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "nanoid"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6226bc4e142124cb44e309a37a04cd9bb10e740d8642855441d3b14808f635e"
-dependencies = [
- "rand 0.6.5",
 ]
 
 [[package]]

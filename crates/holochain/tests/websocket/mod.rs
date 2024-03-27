@@ -78,8 +78,6 @@ async fn call_admin() {
     let (mut client, rx) = websocket_client_by_port(port).await.unwrap();
     let _rx = PollRecv::new::<AdminResponse>(rx);
 
-    let original_dna_hash = dna.dna_hash().clone();
-
     // Make properties
     let properties = holochain_zome_types::properties::YamlProperties::new(
         serde_yaml::from_str(
@@ -91,35 +89,29 @@ how_many: 42
         .unwrap(),
     );
 
+    let original_dna_hash = dna.dna_hash().clone();
+
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
 
-    let orig_dna_hash = dna.dna_hash().clone();
-    register_and_install_dna(
+    let installed_cell_id = register_and_install_dna(
         &mut client,
-        orig_dna_hash,
-        fake_agent_pubkey_1(),
         fake_dna_path,
         Some(properties.clone()),
         "role_name".into(),
         10000,
     )
     .await;
+    let installed_dna_hash = installed_cell_id.dna_hash().clone();
+
+    assert_ne!(installed_dna_hash, original_dna_hash);
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
     let response = check_timeout(response, 10000).await;
 
-    let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
-    let mut tmp_dna = dna.dna_def().clone();
-    tmp_dna.modifiers.properties = properties.try_into().unwrap();
-    let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm).await;
-
-    assert_ne!(&original_dna_hash, dna.dna_hash());
-
-    let expects = vec![dna.dna_hash().clone()];
-    assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
+    assert_matches!(response, AdminResponse::DnasListed(a) if a.contains(&installed_dna_hash));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -150,31 +142,19 @@ async fn call_zome() {
         &uuid.to_string(),
         vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
     );
-    let original_dna_hash = dna.dna_hash().clone();
-
-    let agent_key = fake_agent_pubkey_1();
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let dna_hash = register_and_install_dna(
-        &mut admin_tx,
-        original_dna_hash.clone(),
-        agent_key.clone(),
-        fake_dna_path,
-        None,
-        "".into(),
-        10000,
-    )
-    .await;
-    let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
+    let cell_id =
+        register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000).await;
+    let installed_dna_hash = cell_id.dna_hash().clone();
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
 
-    let expects = vec![original_dna_hash.clone()];
-    assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
+    assert_matches!(response, AdminResponse::DnasListed(a) if a.contains(&installed_dna_hash));
 
     // Activate cells
     let request = AdminRequest::EnableApp {
@@ -369,23 +349,11 @@ async fn emit_signals() {
         &uuid.to_string(),
         vec![(TestWasm::EmitSignal.into(), TestWasm::EmitSignal.into())],
     );
-    let orig_dna_hash = dna.dna_hash().clone();
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
 
-    let agent_key = fake_agent_pubkey_1();
-
     // Install Dna
-    let dna_hash = register_and_install_dna(
-        &mut admin_tx,
-        orig_dna_hash,
-        agent_key.clone(),
-        fake_dna_path,
-        None,
-        "".into(),
-        10000,
-    )
-    .await;
-    let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
+    let cell_id =
+        register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000).await;
 
     // Activate cells
     let request = AdminRequest::EnableApp {
@@ -706,15 +674,10 @@ async fn concurrent_install_dna() {
                 &name,
                 zomes.clone(),
             );
-            let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-            let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;
-            // println!("[{}] Agent pub key generated", i);
 
-            let _dna_hash = register_and_install_dna_named(
+            let _cell_id = register_and_install_dna_named(
                 &mut client,
-                original_dna_hash.clone(),
-                agent_key,
                 fake_dna_path.clone(),
                 None,
                 name.clone(),
@@ -724,8 +687,8 @@ async fn concurrent_install_dna() {
             .await;
 
             // println!(
-            //     "[{}] installed dna with hash {} and name {}",
-            //     i, _dna_hash, name
+            //     "[{}] installed app with cell id {} and name {}",
+            //     i, _cell_id, name
             // );
         })
     }))
@@ -784,16 +747,11 @@ async fn full_state_dump_cursor_works() {
 
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    let agent = SweetAgents::one(conductor.keystore()).await;
-
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
         .0;
 
-    let app = conductor
-        .setup_app_for_agent("app", agent, &[dna_file])
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
 
     let cell_id = app.into_cells()[0].cell_id().clone();
 
