@@ -1,0 +1,19 @@
+[package]
+name = "test_wasm_must_get_agent_activity"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "test_wasm_must_get_agent_activity"
+crate-type = [ "cdylib", "rlib" ]
+
+[[example]]
+name = "integrity_test_wasm_must_get_agent_activity"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
+# reminder - do not use workspace deps
+[dependencies]
+serde = "1.0"
+hdk = { path = "../../../../hdk" }
+hdi = { path = "../../../../hdi" }

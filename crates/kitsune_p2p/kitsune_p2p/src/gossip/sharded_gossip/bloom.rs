@@ -14,12 +14,14 @@ impl ShardedGossipLocal {
     pub(super) async fn generate_agent_bloom(
         &self,
         state: RoundState,
+        agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Option<BloomFilter>> {
         let RoundState { common_arc_set, .. } = state;
         // Get the time range for this gossip.
         // Get all the agent info that is within the common arc set.
-        let agents_within_arc: Vec<_> =
-            get_agent_info(&self.host_api, &self.space, common_arc_set).await?;
+        let agents_within_arc: Vec<_> = agent_info_session
+            .agent_info_within_arc_set(&self.host_api, &self.space, common_arc_set)
+            .await?;
 
         // There was no agents so we don't create a bloom.
         if agents_within_arc.is_empty() {
@@ -228,17 +230,6 @@ impl ShardedGossipLocal {
             None => Ok(Batch::Complete(Vec::with_capacity(0))),
         }
     }
-}
-
-async fn get_agent_info(
-    host_api: &HostApiLegacy,
-    space: &Arc<KitsuneSpace>,
-    arc_set: Arc<DhtArcSet>,
-) -> KitsuneResult<Vec<AgentInfoSigned>> {
-    Ok(store::agent_info_within_arc_set(host_api, space, arc_set)
-        .await?
-        // Need to collect to know the length for the bloom filter.
-        .collect())
 }
 
 #[derive(Debug)]

@@ -1,5 +1,6 @@
 use holo_hash::*;
 use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
@@ -164,10 +165,23 @@ pub enum AdminRequest {
     /// Optionally a `port` parameter can be passed to this request. If it is `None`,
     /// a free port is chosen by the conductor.
     ///
+    /// An `allowed_origins` parameter to control which origins are allowed to connect
+    /// to the app interface.
+    ///
     /// [`AppRequest`]: super::AppRequest
     AttachAppInterface {
         /// Optional port number
         port: Option<u16>,
+
+        /// Allowed origins for this app interface.
+        ///
+        /// This should be one of:
+        /// - A comma separated list of origins - `http://localhost:3000,http://localhost:3001`,
+        /// - A single origin - `http://localhost:3000`,
+        /// - Any origin - `*`
+        ///
+        /// Connections from any origin which is not permitted by this config will be rejected.
+        allowed_origins: AllowedOrigins,
     },
 
     /// List all the app interfaces currently attached with [`AttachAppInterface`].
@@ -191,6 +205,14 @@ pub enum AdminRequest {
         /// The cell ID for which to dump state
         cell_id: Box<CellId>,
     },
+
+    /// Dump the state of the conductor, including the in-memory representation
+    /// and the persisted ConductorState, as JSON.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::ConductorStateDumped`]
+    DumpConductorState,
 
     /// Dump the full state of the Cell specified by argument `cell_id`,
     /// including its chain and DHT shard, as a string containing JSON.
@@ -432,6 +454,11 @@ pub enum AdminResponse {
     ///
     /// Note that this result can be very big, as it's requesting the full database of the cell.
     FullStateDumped(FullStateDump),
+
+    /// The successful response to an [`AdminRequest::DumpConductorState`].
+    ///
+    /// Simply a JSON serialized snapshot of `Conductor` and `ConductorState` from the `holochain` crate.
+    ConductorStateDumped(String),
 
     /// The successful result of a call to [`AdminRequest::DumpNetworkMetrics`].
     ///

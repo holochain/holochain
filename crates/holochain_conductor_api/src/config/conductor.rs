@@ -55,7 +55,8 @@ pub struct ConductorConfig {
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Optional config for the network module.
-    pub network: Option<KitsuneP2pConfig>,
+    #[serde(default)]
+    pub network: KitsuneP2pConfig,
 
     /// Optional specification of Chain Head Coordination service URL.
     /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
@@ -74,14 +75,6 @@ pub struct ConductorConfig {
     /// [sqlite documentation]: https://www.sqlite.org/pragma.html#pragma_synchronous
     #[serde(default)]
     pub db_sync_strategy: DbSyncStrategy,
-
-    /// All logs from all managed tasks will be instrumented to contain this string,
-    /// so that logs from multiple conductors in the same process can be disambiguated.
-    /// NOTE: Kitsune config has a similar option for its own tasks, because it has its
-    /// own task management system (or lack thereof). You probably want to ensure
-    /// that this value matches the one in KitsuneP2pConfig!
-    #[serde(default)]
-    pub tracing_scope: Option<String>,
 
     /// Tuning parameters to adjust the behaviour of the conductor.
     #[serde(default)]
@@ -110,10 +103,17 @@ impl ConductorConfig {
 
     /// Get tuning params for this config (default if not set)
     pub fn kitsune_tuning_params(&self) -> KitsuneP2pTuningParams {
-        self.network
-            .as_ref()
-            .map(|c| c.tuning_params.clone())
-            .unwrap_or_default()
+        self.network.tuning_params.clone()
+    }
+
+    /// Get the tracing scope from the network config
+    pub fn tracing_scope(&self) -> Option<String> {
+        self.network.tracing_scope.clone()
+    }
+
+    /// Get the string used for hc_sleuth logging
+    pub fn sleuth_id(&self) -> String {
+        self.tracing_scope().unwrap_or("<NONE>".to_string())
     }
 
     /// Get the data directory for this config or say something nice and die.
@@ -174,6 +174,7 @@ impl Default for ConductorTuningParams {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use holochain_types::websocket::AllowedOrigins;
     use kitsune_p2p_types::config::TransportConfig;
     use matches::assert_matches;
     use std::path::Path;
@@ -211,12 +212,11 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                network: None,
+                network: Default::default(),
                 dpki: None,
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
-                tracing_scope: None,
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
@@ -245,6 +245,7 @@ mod tests {
       - driver:
           type: websocket
           port: 1234
+          allowed_origins: "*"
 
     network:
       bootstrap_service: https://bootstrap-staging.holo.host
@@ -296,11 +297,13 @@ mod tests {
                 }),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
-                    driver: InterfaceDriver::Websocket { port: 1234 }
+                    driver: InterfaceDriver::Websocket {
+                        port: 1234,
+                        allowed_origins: AllowedOrigins::Any
+                    }
                 }]),
-                network: Some(network_config),
+                network: network_config,
                 db_sync_strategy: DbSyncStrategy::Fast,
-                tracing_scope: None,
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
@@ -324,14 +327,13 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                network: None,
+                network: Default::default(),
                 dpki: None,
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::Fast,
-                tracing_scope: None,
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,

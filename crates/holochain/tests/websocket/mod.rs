@@ -9,13 +9,14 @@ use holochain::sweettest::SweetDnaFile;
 use holochain::sweettest::{SweetAgents, SweetConductorConfig};
 use holochain::{
     conductor::{
-        api::{AdminRequest, AdminResponse},
+        api::{AdminRequest, AdminResponse, AppResponse},
         error::ConductorError,
         Conductor,
     },
     fixt::*,
 };
 
+use holochain_conductor_api::{AdminInterfaceConfig, AppRequest, InterfaceDriver};
 use holochain_types::{
     prelude::*,
     test_utils::{fake_dna_zomes, write_fake_dna_file},
@@ -26,14 +27,32 @@ use matches::assert_matches;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
-use tokio_stream::StreamExt;
 use tracing::*;
-use url2::prelude::*;
 
 use crate::test_utils::*;
 
+struct PollRecv(tokio::task::JoinHandle<()>);
+
+impl Drop for PollRecv {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
+impl PollRecv {
+    pub fn new<D>(mut rx: WebsocketReceiver) -> Self
+    where
+        D: std::fmt::Debug,
+        SerializedBytes: TryInto<D, Error = SerializedBytesError>,
+    {
+        Self(tokio::task::spawn(async move {
+            while rx.recv::<D>().await.is_ok() {}
+        }))
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "glacial_tests")]
+#[cfg(feature = "slow_tests")]
 async fn call_admin() {
     holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
@@ -56,7 +75,8 @@ async fn call_admin() {
     let (_holochain, port) = start_holochain(config_path.clone()).await;
     let port = port.await.unwrap();
 
-    let (mut client, _) = websocket_client_by_port(port).await.unwrap();
+    let (mut client, rx) = websocket_client_by_port(port).await.unwrap();
+    let _rx = PollRecv::new::<AdminResponse>(rx);
 
     let original_dna_hash = dna.dna_hash().clone();
 
@@ -103,9 +123,10 @@ how_many: 42
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "glacial_tests")]
+#[cfg(feature = "slow_tests")]
 async fn call_zome() {
     holochain_trace::test_run().ok();
+
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -120,8 +141,9 @@ async fn call_zome() {
     let (holochain, admin_port) = start_holochain(config_path.clone()).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
-    let (_, receiver2) = websocket_client_by_port(admin_port).await.unwrap();
+    let (mut admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _admin_rx = PollRecv::new::<AdminResponse>(admin_rx);
+    let (_, mut receiver2) = websocket_client_by_port(admin_port).await.unwrap();
 
     let uuid = uuid::Uuid::new_v4();
     let dna = fake_dna_zomes(
@@ -182,7 +204,8 @@ async fn call_zome() {
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
 
-    let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
+    let (mut app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    let _app_rx = PollRecv::new::<AppResponse>(app_rx);
 
     // Call Zome
     tracing::info!("Calling zome");
@@ -201,11 +224,12 @@ async fn call_zome() {
     // responses are not broadcast to all connected clients, only the one
     // that made the request.
     // Err means the timeout elapsed
-    assert!(Box::pin(receiver2.timeout(Duration::from_millis(500)))
-        .next()
-        .await
-        .unwrap()
-        .is_err());
+    assert!(tokio::time::timeout(
+        Duration::from_millis(500),
+        receiver2.recv::<AdminResponse>(),
+    )
+    .await
+    .is_err());
 
     // Shutdown holochain
     std::mem::drop(holochain);
@@ -216,7 +240,8 @@ async fn call_zome() {
     let (_holochain, admin_port) = start_holochain(config_path).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _admin_rx = PollRecv::new::<AdminResponse>(admin_rx);
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
@@ -228,12 +253,13 @@ async fn call_zome() {
         _ => panic!("Unexpected response"),
     };
 
-    let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
+    let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    let _app_rx = PollRecv::new::<AppResponse>(app_rx);
 
     // Call Zome again on the existing app interface port
     tracing::info!("Calling zome again");
     call_zome_fn(
-        &mut app_tx,
+        &app_tx,
         cell_id.clone(),
         &signing_keypair,
         cap_secret,
@@ -303,7 +329,12 @@ async fn remote_signals() -> anyhow::Result<()> {
         for mut rx in rxs {
             let r = rx.recv().await;
             // Each handle should recv a signal
-            assert_matches!(r, Ok(Signal::App{signal: a,..}) if a == signal);
+            match r {
+                Ok(Signal::App { signal: r, .. }) => {
+                    assert_eq!(r, signal);
+                }
+                oth => panic!("unexpected: {oth:?}"),
+            }
         }
     })
     .await
@@ -330,7 +361,8 @@ async fn emit_signals() {
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (mut admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _admin_rx = PollRecv::new::<AdminResponse>(admin_rx);
 
     let uuid = uuid::Uuid::new_v4();
     let dna = fake_dna_zomes(
@@ -386,11 +418,40 @@ async fn emit_signals() {
     ///////////////////////////////////////////////////////
     // Emit signals (the real test!)
 
-    let (mut app_tx_1, app_rx_1) = websocket_client_by_port(app_port).await.unwrap();
-    let (_, app_rx_2) = websocket_client_by_port(app_port).await.unwrap();
+    let (app_tx_1, mut app_rx_1) = websocket_client_by_port(app_port).await.unwrap();
+    let (sig1_send, sig1_recv) = tokio::sync::oneshot::channel();
+    let mut sig1_send = Some(sig1_send);
+    let sig1_task = tokio::task::spawn(async move {
+        loop {
+            match app_rx_1.recv::<AppResponse>().await {
+                Ok(ReceiveMessage::Signal(sig1)) => {
+                    if let Some(sig1_send) = sig1_send.take() {
+                        let _ = sig1_send.send(sig1);
+                    }
+                }
+                oth => panic!("unexpected: {oth:?}"),
+            }
+        }
+    });
+
+    let (_, mut app_rx_2) = websocket_client_by_port(app_port).await.unwrap();
+    let (sig2_send, sig2_recv) = tokio::sync::oneshot::channel();
+    let mut sig2_send = Some(sig2_send);
+    let sig2_task = tokio::task::spawn(async move {
+        loop {
+            match app_rx_2.recv::<AppResponse>().await {
+                Ok(ReceiveMessage::Signal(sig2)) => {
+                    if let Some(sig2_send) = sig2_send.take() {
+                        let _ = sig2_send.send(sig2);
+                    }
+                }
+                oth => panic!("unexpected: {oth:?}"),
+            }
+        }
+    });
 
     call_zome_fn(
-        &mut app_tx_1,
+        &app_tx_1,
         cell_id.clone(),
         &signing_keypair,
         cap_secret,
@@ -400,19 +461,10 @@ async fn emit_signals() {
     )
     .await;
 
-    let (sig1, msg1) = Box::pin(app_rx_1.timeout(Duration::from_secs(1)))
-        .next()
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(!msg1.is_request());
-
-    let (sig2, msg2) = Box::pin(app_rx_2.timeout(Duration::from_secs(1)))
-        .next()
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(!msg2.is_request());
+    let sig1 = Signal::try_from_vec(sig1_recv.await.unwrap()).unwrap();
+    let sig2 = Signal::try_from_vec(sig2_recv.await.unwrap()).unwrap();
+    sig1_task.abort();
+    sig2_task.abort();
 
     assert_eq!(
         Signal::App {
@@ -420,7 +472,7 @@ async fn emit_signals() {
             zome_name,
             signal: AppSignal::new(ExternIO::encode(()).unwrap()),
         },
-        Signal::try_from(sig1.clone()).unwrap(),
+        sig1,
     );
     assert_eq!(sig1, sig2);
 
@@ -434,7 +486,8 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
     let conductor_handle = Conductor::builder().config(config).build().await?;
-    let (mut client, _) = websocket_client(&conductor_handle).await?;
+    let (client, rx) = websocket_client(&conductor_handle).await?;
+    let _rx = PollRecv::new::<AdminResponse>(rx);
 
     let dna = fake_dna_zomes("", vec![(TestWasm::Foo.into(), TestWasm::Foo.into())]);
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
@@ -462,14 +515,14 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    let (mut client, mut _rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
-        url2!("ws://127.0.0.1:{}", port),
-        Arc::new(WebsocketConfig {
-            default_request_timeout_s: 1,
-            ..Default::default()
-        }),
+    let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
+    ws_config.default_request_timeout = Duration::from_secs(1);
+    let (client, rx): (WebsocketSender, WebsocketReceiver) = connect(
+        Arc::new(ws_config),
+        ConnectRequest::new(([127, 0, 0, 1], port).into()),
     )
     .await?;
+    let _rx = PollRecv::new::<AdminResponse>(rx);
 
     let request = AdminRequest::ListAppInterfaces;
 
@@ -501,12 +554,11 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    let (mut client, mut rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
-        url2!("ws://127.0.0.1:{}", port),
-        Arc::new(WebsocketConfig {
-            default_request_timeout_s: 1,
-            ..Default::default()
-        }),
+    let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
+    ws_config.default_request_timeout = Duration::from_secs(1);
+    let (client, mut rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
+        Arc::new(ws_config),
+        ConnectRequest::new(([127, 0, 0, 1], port).into()),
     )
     .await?;
 
@@ -521,7 +573,13 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
         Err(ConductorError::ShuttingDown)
     );
 
-    assert!(rx.next().await.is_none());
+    assert!(tokio::time::timeout(
+        std::time::Duration::from_secs(7),
+        rx.recv::<AdminResponse>(),
+    )
+    .await
+    .unwrap()
+    .is_err());
 
     info!("About to make failing request");
 
@@ -540,8 +598,8 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
         tokio::time::timeout(Duration::from_secs(1), client.request(request)).await;
 
     // request should have encountered an error since the conductor shut down,
-    // but should not have timed out (which would be an `Err(Err(_))`)
-    assert_matches!(response, Ok(Err(WebsocketError::Shutdown)));
+    // but should not have timed out (which would be an `Err(_)`)
+    assert_matches!(response, Ok(Err(_)));
 
     Ok(())
 }
@@ -557,25 +615,29 @@ async fn connection_limit_is_respected() {
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
 
-    let url = url2!("ws://127.0.0.1:{}", port);
-    let cfg = Arc::new(WebsocketConfig::default());
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    let cfg = Arc::new(WebsocketConfig::CLIENT_DEFAULT);
 
     // Retain handles so that the test can control when to disconnect clients
     let mut handles = Vec::new();
 
+    tracing::warn!("OPEN FIRST CONNECTION");
     // The first `MAX_CONNECTIONS` connections should succeed
-    for _ in 0..MAX_CONNECTIONS {
-        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+    for count in 0..MAX_CONNECTIONS {
+        let (sender, rx) = connect(cfg.clone(), addr).await.unwrap();
+        let rx = PollRecv::new::<AdminResponse>(rx);
         let _: AdminResponse = sender
             .request(AdminRequest::ListDnas)
             .await
-            .expect("Admin request should succeed because there are enough available connections");
-        handles.push(sender);
+            .map_err(|e| Error::other(format!("Admin request should succeed because there are enough available connections: {count}: {e:?}")))
+            .unwrap();
+        handles.push((sender, rx));
     }
 
     // Try lots of failed connections to make sure the limit is respected
     for _ in 0..2 * MAX_CONNECTIONS {
-        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let (sender, rx) = connect(cfg.clone(), addr).await.unwrap();
+        let _rx = PollRecv::new::<AdminResponse>(rx);
 
         // Getting a sender back isn't enough to know that the connection succeeded because the other side takes a moment to shutdown, try sending to be sure
         sender
@@ -588,13 +650,15 @@ async fn connection_limit_is_respected() {
     handles.clear();
 
     // Should now be possible to connect new clients
-    for _ in 0..MAX_CONNECTIONS {
-        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+    for count in 0..MAX_CONNECTIONS {
+        let (sender, rx) = connect(cfg.clone(), addr).await.unwrap();
+        let rx = PollRecv::new::<AdminResponse>(rx);
         let _: AdminResponse = sender
             .request(AdminRequest::ListDnas)
             .await
-            .expect("Admin request should succeed because there are enough available connections");
-        handles.push(sender);
+            .map_err(|e| Error::other(format!("Admin request should succeed because there are enough available connections: {count}: {e:?}")))
+            .unwrap();
+        handles.push((sender, rx));
     }
 
     conductor_handle.shutdown();
@@ -625,7 +689,8 @@ async fn concurrent_install_dna() {
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (client, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (client, rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _rx = PollRecv::new::<AdminResponse>(rx);
 
     // let before = std::time::Instant::now();
 
@@ -693,10 +758,9 @@ async fn network_stats() {
     let _ = batch.setup_app("app", &[dna_file]).await.unwrap();
     batch.exchange_peer_info().await;
 
-    let (mut client, _) = batch.get(0).unwrap().admin_ws_client().await;
+    let (client, rx) = batch.get(0).unwrap().admin_ws_client().await;
+    let _rx = PollRecv::new::<AdminResponse>(rx);
 
-    #[cfg(not(feature = "tx5"))]
-    const EXPECT: &str = "tx2-quic";
     #[cfg(feature = "tx5")]
     const EXPECT: &str = "go-pion";
 
@@ -733,7 +797,8 @@ async fn full_state_dump_cursor_works() {
 
     let cell_id = app.into_cells()[0].cell_id().clone();
 
-    let (mut client, _) = conductor.admin_ws_client().await;
+    let (mut client, rx) = conductor.admin_ws_client().await;
+    let _rx = PollRecv::new::<AdminResponse>(rx);
 
     let full_state = dump_full_state(&mut client, cell_id.clone(), None).await;
 
@@ -761,4 +826,134 @@ async fn full_state_dump_cursor_works() {
         integrated_ops_count + validation_limbo_ops_count + integration_limbo_ops_count;
 
     assert_eq!(1, new_all_dht_ops_count);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn admin_allowed_origins() {
+    holochain_trace::test_run().ok();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let ports = conductor
+        .clone()
+        .add_admin_interfaces(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket {
+                port: 0,
+                allowed_origins: "http://localhost:3000".to_string().into(),
+            },
+        }])
+        .await
+        .unwrap();
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], *ports.first().unwrap()).into())
+    )
+    .await
+    .is_err());
+
+    let (client, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], *ports.first().unwrap()).into())
+            .try_set_header("origin", "http://localhost:3000")
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let _rx = PollRecv::new::<AdminResponse>(rx);
+
+    let request = AdminRequest::ListAppInterfaces;
+    let _: AdminResponse = client.request(request).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_allowed_origins() {
+    holochain_trace::test_run().ok();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let port = conductor
+        .clone()
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3000".to_string().into(),
+        )
+        .await
+        .unwrap();
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port).into())
+    )
+    .await
+    .is_err());
+
+    check_app_port(port, "http://localhost:3000").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_allowed_origins_independence() {
+    holochain_trace::test_run().ok();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let port_1 = conductor
+        .clone()
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3001".to_string().into(),
+        )
+        .await
+        .unwrap();
+
+    let port_2 = conductor
+        .clone()
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3002".to_string().into(),
+        )
+        .await
+        .unwrap();
+
+    // Check that access to another port's origin is blocked
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port_1).into())
+            .try_set_header("origin", "http://localhost:3002")
+            .unwrap()
+    )
+    .await
+    .is_err());
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port_2).into())
+            .try_set_header("origin", "http://localhost:3001")
+            .unwrap()
+    )
+    .await
+    .is_err());
+
+    // Check that correct access is allowed
+
+    check_app_port(port_1, "http://localhost:3001").await;
+    check_app_port(port_2, "http://localhost:3002").await;
+}
+
+async fn check_app_port(port: u16, origin: &str) {
+    let (client, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port).into())
+            .try_set_header("origin", origin)
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let _rx = PollRecv::new::<AppResponse>(rx);
+
+    let request = AppRequest::ListWasmHostFunctions;
+    let _: AppResponse = client.request(request).await.unwrap();
 }

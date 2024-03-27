@@ -74,6 +74,51 @@ kitsune_p2p_types::write_codec_enum! {
     }
 }
 
+kitsune_p2p_types::write_codec_enum! {
+    /// Preflight data for tx5.
+    /// Since this is all about compatibility, the codec itself contains versioned payloads,
+    /// in case the preflight check needs to evolve over time.
+    codec PreflightData {
+        /// Version 0
+        V0(0) {
+            /// Kitsune protocol version which is bumped at every breaking change
+            kitsune_protocol_version.0: u16,
+            /// Our local peer info
+            peer_list.1: Vec<AgentInfoSigned>,
+            /// Data provided by the host, which must match across nodes in order
+            /// for preflight to succeed
+            user_data.2: Vec<u8>,
+        },
+    }
+}
+
+/// Host-defined data used to implement custom connection preflight checks.
+///
+/// The `bytes` are sent with every preflight, and the `comparator` is used to validate
+/// the bytes sent by the remote peer. If the comparator returns an Err, the preflight
+/// fails and no connection is made.
+///
+/// The string returned in the Err is logged from kitsune to indicate the point of failure.
+pub struct PreflightUserData {
+    /// The bytes to send with every preflight.
+    pub bytes: Vec<u8>,
+    /// The comparator function to use to validate the bytes sent by the remote peer.
+    ///
+    /// Typically this will be a closure that captures the bytes sent, so that the two values can
+    /// be compared.
+    #[allow(clippy::type_complexity)]
+    pub comparator: Box<dyn Fn(&tx5::Tx5Url, &[u8]) -> Result<(), String> + Send + Sync + 'static>,
+}
+
+impl Default for PreflightUserData {
+    fn default() -> Self {
+        Self {
+            bytes: Vec::new(),
+            comparator: Box::new(|_, _| Ok(())),
+        }
+    }
+}
+
 fn next_msg_id() -> u64 {
     static MSG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
     // MAYBE - track these message ids at the connection level
@@ -274,8 +319,8 @@ pub enum MetaNetCon {
     #[cfg(feature = "tx5")]
     Tx5 {
         host: HostApiLegacy,
-        ep: tx5::Ep,
-        rem_url: tx5::Tx5Url,
+        ep: Arc<tx5::Ep3>,
+        rem_url: tx5::PeerUrl,
         res: ResStore,
         tun: KitsuneP2pTuningParams,
     },
@@ -292,7 +337,7 @@ impl PartialEq for MetaNetCon {
             #[cfg(feature = "tx2")]
             (MetaNetCon::Tx2(a, _), MetaNetCon::Tx2(b, _)) => a == b,
             #[cfg(feature = "tx5")]
-            (MetaNetCon::Tx5 { ep: a, .. }, MetaNetCon::Tx5 { ep: b, .. }) => a == b,
+            (MetaNetCon::Tx5 { ep: a, .. }, MetaNetCon::Tx5 { ep: b, .. }) => Arc::ptr_eq(a, b),
             _ => false,
         }
     }
@@ -369,7 +414,7 @@ impl MetaNetCon {
         let start = std::time::Instant::now();
         let msg_id = next_msg_id();
 
-        let result = (move || async move {
+        let result = async move {
             match self.wire_is_authorized(payload, Timestamp::now()).await {
                 MetaNetAuth::Authorized => {
                     #[cfg(test)]
@@ -425,7 +470,7 @@ impl MetaNetCon {
                     return Ok(());
                 }
             }
-        })()
+        }
         .await;
 
         let elapsed_s = start.elapsed().as_secs_f64();
@@ -445,7 +490,7 @@ impl MetaNetCon {
 
         tracing::trace!(?payload, "initiating request");
 
-        let result = (move || async move {
+        let result = async move {
             match self.wire_is_authorized(payload, Timestamp::now()).await {
                 MetaNetAuth::Authorized => {
                     #[cfg(feature = "tx2")]
@@ -502,7 +547,7 @@ impl MetaNetCon {
                     return Err(KitsuneErrorKind::Unauthorized.into());
                 }
             }
-        })()
+        }
         .await;
 
         let elapsed_s = start.elapsed().as_secs_f64();
@@ -586,8 +631,8 @@ pub enum MetaNet {
     #[cfg(feature = "tx5")]
     Tx5 {
         host: HostApiLegacy,
-        ep: tx5::Ep,
-        url: tx5::Tx5Url,
+        ep: Arc<tx5::Ep3>,
+        url: tx5::PeerUrl,
         res: ResStore,
         tun: KitsuneP2pTuningParams,
     },
@@ -806,75 +851,110 @@ impl MetaNet {
         host: HostApiLegacy,
         kitsune_internal_sender: ghost_actor::GhostSender<crate::spawn::Internal>,
         signal_url: String,
+        preflight_user_data: PreflightUserData,
     ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
+        use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+
         let (mut evt_send, evt_recv) =
             futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
 
+        let PreflightUserData {
+            bytes: user_data_sent,
+            comparator: user_data_cmp,
+        } = preflight_user_data;
+
         let evt_sender = host.legacy.clone();
-        let mut tx5_config = tx5::DefConfig::default()
-            .with_max_send_bytes(tuning_params.tx5_max_send_bytes)
-            .with_max_recv_bytes(tuning_params.tx5_max_recv_bytes)
-            .with_max_conn_count(tuning_params.tx5_max_conn_count)
-            .with_max_conn_init(tuning_params.tx5_max_conn_init())
-            .with_conn_preflight(move |_, _| {
-                let i_s = kitsune_internal_sender.clone();
+        let tx5_config = tx5::Config3 {
+            connection_count_max: tuning_params.tx5_connection_count_max,
+            send_buffer_bytes_max: tuning_params.tx5_send_buffer_bytes_max,
+            recv_buffer_bytes_max: tuning_params.tx5_recv_buffer_bytes_max,
+            incoming_message_bytes_max: tuning_params.tx5_incoming_message_bytes_max,
+            message_size_max: tuning_params.tx5_message_size_max,
+            internal_event_channel_size: tuning_params.tx5_internal_event_channel_size,
+            timeout: std::time::Duration::from_secs(tuning_params.tx5_timeout_s as u64),
+            backoff_start: std::time::Duration::from_secs(tuning_params.tx5_backoff_start_s as u64),
+            backoff_max: std::time::Duration::from_secs(tuning_params.tx5_backoff_max_s as u64),
+            preflight: Some((
+                Arc::new(move |_| {
+                    let i_s = kitsune_internal_sender.clone();
+                    let user_data_sent = user_data_sent.clone();
 
-                Box::pin(async move {
-                    match i_s.get_all_local_joined_agent_infos().await {
-                        Ok(agent_list) => Ok(wire::Wire::peer_unsolicited(agent_list)
+                    Box::pin(async move {
+                        let agent_list = i_s
+                            .get_all_local_joined_agent_infos()
+                            .await
+                            .unwrap_or_default();
+                        PreflightData::v0(KITSUNE_PROTOCOL_VERSION, agent_list, user_data_sent)
                             .encode_vec()
-                            .ok()
-                            .map(|v| v.into())),
-                        Err(err) => {
-                            tracing::warn!(?err, "error getting local peer list");
-                            Ok(None)
-                        }
-                    }
-                })
-            })
-            .with_conn_validate(move |_, _, maybe_data| {
-                let e_s = evt_sender.clone();
-                Box::pin(async move {
-                    match maybe_data.map(|data| wire::Wire::decode_ref(&data)) {
-                        Some(Ok((
+                    })
+                }),
+                Arc::new(move |url, data| {
+                    let e_s = evt_sender.clone();
+                    let url = url.clone();
+                    match PreflightData::decode_ref(&data) {
+                        Ok((
                             _,
-                            wire::Wire::PeerUnsolicited(wire::PeerUnsolicited { peer_list }),
-                        ))) => {
-                            // @todo This loop only exists because we have to put a
-                            // space on PutAgentInfoSignedEvt, if the internal peer
-                            // space was used instead we could do this in a single
-                            // event with the whole list.
-                            for peer in peer_list {
-                                if let Err(err) = e_s
-                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                        space: peer.space.clone(),
-                                        peer_data: vec![peer.clone()],
-                                    })
-                                    .await
-                                {
-                                    tracing::warn!(
-                                        ?err,
-                                        "error processing incoming agent info unsolicited"
-                                    );
-                                }
+                            PreflightData::V0(V0 {
+                                kitsune_protocol_version,
+                                peer_list,
+                                user_data: user_data_bytes_received,
+                            }),
+                        )) => {
+                            if kitsune_protocol_version != KITSUNE_PROTOCOL_VERSION {
+                                tracing::warn!(
+                                    ?url,
+                                    "kitsune protocol version mismatch: ours = {}, theirs = {}",
+                                    KITSUNE_PROTOCOL_VERSION,
+                                    kitsune_protocol_version,
+                                );
+                                return box_fut_plain(Err(std::io::Error::other(
+                                    "kitsune protocol version mismatch",
+                                )));
                             }
+
+                            if let Err(reason) = user_data_cmp(&url, &user_data_bytes_received) {
+                                tracing::warn!(?url, "tx5 preflight user_data mismatch");
+                                return box_fut_plain(Err(std::io::Error::other(
+                                    "tx5 preflight user_data mismatch",
+                                )));
+                            }
+                            Box::pin(async move {
+                                // @todo This loop only exists because we have
+                                // to put a space on PutAgentInfoSignedEvt, if
+                                // the internal peer space was used instead we
+                                // could do this in a single event with the
+                                // whole list.
+                                for peer in peer_list {
+                                    if let Err(err) = e_s
+                                        .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                            space: peer.space.clone(),
+                                            peer_data: vec![peer.clone()],
+                                        })
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            ?err,
+                                            "error processing incoming agent info unsolicited"
+                                        );
+                                    }
+                                }
+                                Ok(())
+                            })
                         }
-                        Some(Err(err)) => tracing::warn!(?err, "error decoding connection peers"),
-                        _ => {}
+                        Err(err) => {
+                            tracing::warn!(?err, ?url, "Could not decode PreflightData");
+                            box_fut_plain(Err(std::io::Error::other(
+                                "Could not decode PreflightData",
+                            )))
+                        }
+                        _ => box_fut_plain(Err(std::io::Error::other("Unexpected wire message"))),
                     }
-                    Ok(())
-                })
-            });
+                }),
+            )),
+            //..Default::default()
+        };
 
-        tracing::info!(/*?tx5_config,*/ "meta net startup tx5");
-
-        if let Some(lair_client) = host.lair_client() {
-            tx5_config.set_lair_client(lair_client);
-        }
-
-        if let Some(lair_tag) = host.lair_tag() {
-            tx5_config.set_lair_tag(lair_tag);
-        }
+        tracing::info!(?tx5_config, "meta net startup tx5");
 
         if let Err(err) = (tx5::deps::tx5_core::Tx5InitConfig {
             ephemeral_udp_port_min: tuning_params.tx5_min_ephemeral_udp_port,
@@ -884,7 +964,8 @@ impl MetaNet {
         {
             tracing::warn!(?err, "Tx5InitConfig failed, you must be running multiple conductors in the same process. Be aware they will all share whichever Tx5InitConfig was first to be registered.");
         }
-        let (ep_hnd, mut ep_evt) = tx5::Ep::with_config(tx5_config).await?;
+        let (ep_hnd, mut ep_evt) = tx5::Ep3::new(Arc::new(tx5_config)).await;
+        let ep_hnd = Arc::new(ep_hnd);
 
         let cli_url = ep_hnd.listen(tx5::Tx5Url::new(&signal_url)?).await?;
         tracing::info!(%cli_url, "tx5 listening at url");
@@ -897,23 +978,18 @@ impl MetaNet {
         let spawn_host = host.clone();
         tokio::task::spawn(async move {
             while let Some(evt) = ep_evt.recv().await {
-                let evt = match evt {
-                    Ok(evt) => evt,
-                    Err(err) => {
-                        tracing::error!(?err, "tx5 err event");
-                        continue;
-                    }
-                };
-
                 match evt {
-                    tx5::EpEvt::Connected { rem_cli_url } => {
+                    tx5::Ep3Event::Error(err) => {
+                        tracing::error!(?err, "tx5 error");
+                    }
+                    tx5::Ep3Event::Connected { peer_url } => {
                         if evt_send
                             .send(MetaNetEvt::Connected {
-                                remote_url: rem_cli_url.to_string(),
+                                remote_url: peer_url.to_string(),
                                 con: MetaNetCon::Tx5 {
                                     host: spawn_host.clone(),
                                     ep: ep_hnd2.clone(),
-                                    rem_url: rem_cli_url,
+                                    rem_url: peer_url,
                                     res: res_store2.clone(),
                                     tun: tuning_params2.clone(),
                                 },
@@ -924,14 +1000,14 @@ impl MetaNet {
                             break;
                         }
                     }
-                    tx5::EpEvt::Disconnected { rem_cli_url } => {
+                    tx5::Ep3Event::Disconnected { peer_url } => {
                         if evt_send
                             .send(MetaNetEvt::Disconnected {
-                                remote_url: rem_cli_url.to_string(),
+                                remote_url: peer_url.to_string(),
                                 con: MetaNetCon::Tx5 {
                                     host: spawn_host.clone(),
                                     ep: ep_hnd2.clone(),
-                                    rem_url: rem_cli_url,
+                                    rem_url: peer_url,
                                     res: res_store2.clone(),
                                     tun: tuning_params2.clone(),
                                 },
@@ -942,25 +1018,22 @@ impl MetaNet {
                             break;
                         }
                     }
-                    tx5::EpEvt::Data {
-                        rem_cli_url,
-                        data,
-                        permit,
-                    } => {
-                        tracing::trace!(%rem_cli_url, byte_count=?data.remaining(), "received bytes");
+                    tx5::Ep3Event::Message { peer_url, message } => {
+                        tracing::trace!(%peer_url, byte_count=?message.len(), "received bytes");
 
-                        match WireWrap::decode(&mut bytes::Buf::reader(data)) {
+                        let mut message = std::io::Cursor::new(&message);
+                        match WireWrap::decode(&mut message) {
                             Ok(WireWrap::Notify(Notify { msg_id, data })) => {
                                 match wire::Wire::decode_ref(&data) {
                                     Ok((_, data)) => {
                                         tracing::trace!(%msg_id, ?data, "received notify");
                                         if evt_send
                                             .send(MetaNetEvt::Notify {
-                                                remote_url: rem_cli_url.to_string(),
+                                                remote_url: peer_url.to_string(),
                                                 con: MetaNetCon::Tx5 {
                                                     host: spawn_host.clone(),
                                                     ep: ep_hnd2.clone(),
-                                                    rem_url: rem_cli_url,
+                                                    rem_url: peer_url,
                                                     res: res_store2.clone(),
                                                     tun: tuning_params2.clone(),
                                                 },
@@ -982,7 +1055,7 @@ impl MetaNet {
                                 match wire::Wire::decode_ref(&data) {
                                     Ok((_, data)) => {
                                         let ep_hnd = ep_hnd2.clone();
-                                        let rem_cli_url2 = rem_cli_url.clone();
+                                        let peer_url2 = peer_url.clone();
                                         let respond: Respond = Box::new(move |data| {
                                             let out: RespondFut = Box::pin(async move {
                                                 let wire = match data.encode_vec() {
@@ -995,19 +1068,18 @@ impl MetaNet {
                                                     Ok(data) => data,
                                                     Err(_) => return,
                                                 };
-                                                let _ = ep_hnd
-                                                    .send(rem_cli_url2, data.as_slice())
-                                                    .await;
+                                                let _ =
+                                                    ep_hnd.send(peer_url2, data.as_slice()).await;
                                             });
                                             out
                                         });
                                         if evt_send
                                             .send(MetaNetEvt::Request {
-                                                remote_url: rem_cli_url.to_string(),
+                                                remote_url: peer_url.to_string(),
                                                 con: MetaNetCon::Tx5 {
                                                     host: spawn_host.clone(),
                                                     ep: ep_hnd2.clone(),
-                                                    rem_url: rem_cli_url,
+                                                    rem_url: peer_url,
                                                     res: res_store2.clone(),
                                                     tun: tuning_params2.clone(),
                                                 },
@@ -1048,7 +1120,6 @@ impl MetaNet {
                             }
                         }
                     }
-                    tx5::EpEvt::Demo { rem_cli_url: _ } => (),
                 }
             }
         });
@@ -1125,9 +1196,7 @@ impl MetaNet {
                 let wrap = WireWrap::notify(msg_id, WireData(wire));
 
                 let data = wrap.encode_vec().map_err(KitsuneError::other)?;
-                ep.broadcast(data.as_slice())
-                    .await
-                    .map_err(KitsuneError::other)?;
+                ep.broadcast(data.as_slice()).await;
                 return Ok(());
             }
         }
@@ -1198,8 +1267,8 @@ impl MetaNet {
         #[cfg(feature = "tx5")]
         {
             if let MetaNet::Tx5 { ep, .. } = self {
-                let fut = ep.get_stats();
-                return async move { fut.await.map_err(KitsuneError::other) }.boxed();
+                let ep = ep.clone();
+                return async move { Ok(ep.get_stats().await) }.boxed();
             }
         }
 

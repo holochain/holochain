@@ -18,8 +18,18 @@ fn action_details(action_hashes: Vec<ActionHash>) -> ExternResult<Vec<Option<Det
 }
 
 #[hdk_extern]
+fn action_details_local_only(action_hashes: Vec<ActionHash>) -> ExternResult<Vec<Option<Details>>> {
+    countree::CounTree::action_details_local_only(action_hashes)
+}
+
+#[hdk_extern]
 fn entry_details(entry_hashes: Vec<EntryHash>) -> ExternResult<Vec<Option<Details>>> {
     countree::CounTree::entry_details(entry_hashes)
+}
+
+#[hdk_extern]
+fn entry_details_local_only(_: ()) -> ExternResult<Vec<Option<Details>>> {
+    countree::CounTree::entry_details_local_only(entry_hash(countree::CounTree::default())?)
 }
 
 #[hdk_extern]

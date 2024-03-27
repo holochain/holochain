@@ -7,6 +7,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.38
+
+- Added `AllowedOrigins` which is intended to be used with `holochain_websocket` for controlling access. It is placed here for crates need to know about origins but don’t depend on `holochain_websocket`. [\#3460](https://github.com/holochain/holochain/pull/3460)
+
+## 0.3.0-beta-dev.37
+
+## 0.3.0-beta-dev.36
+
+## 0.3.0-beta-dev.35
+
+## 0.3.0-beta-dev.34
+
+## 0.3.0-beta-dev.33
+
+## 0.3.0-beta-dev.32
+
+## 0.3.0-beta-dev.31
+
+- Refactor: All logic related to modules and wasmer caching has been moved to `holochain-wasmer`. Consequently functions for wasmer development under iOS need to be imported from there.
+
+## 0.3.0-beta-dev.30
+
+## 0.3.0-beta-dev.29
+
+## 0.3.0-beta-dev.28
+
+## 0.3.0-beta-dev.27
+
+## 0.3.0-beta-dev.26
+
+## 0.3.0-beta-dev.25
+
 ## 0.3.0-beta-dev.24
 
 - **BREAKING CHANGE**: A `DnaManifest` and all its sub-fields will now reject unknown fields when deserialized. This will make it harder to provide an invalid DNA manifest to Holochain without realising. For example, coordinator zomes not appearing in your installed hApp because their field was indented to the wrong place. This is not a breaking change for valid manifests but Holochain will now reject more invalid manifests.

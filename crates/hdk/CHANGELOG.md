@@ -7,7 +7,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- **BREAKING CHANGE** Rename `remote_signal` to `send_remote_signal` to match the grammar of other HDK functions. [#3113](https://github.com/holochain/holochain/pull/3113)
+## 0.3.0-beta-dev.36
+
+## 0.3.0-beta-dev.35
+
+## 0.3.0-beta-dev.34
+
+## 0.3.0-beta-dev.33
+
+## 0.3.0-beta-dev.32
+
+- Added `create_clone_cell`, `disable_clone_cell`, `enable_clone_cell` and `delete_clone_cell` functionality to the HDK. This was previously only available on the admin interface of Holochain which shouldn’t be used by apps. Exposing this functionality through the HDK allows happ developers to manage clones from their backend code without having to worry about their apps breaking when more security is added to the admin interface. The only restriction on the use of these methods is that they will not permit you to create clones in another app. You can create clones of any cell within the app you make the host function calls from.
+- **BREAKING**: Added parameter `GetOptions` to calls `get_links` and `get_link_details`, to allow for fetching only local data. With the default setting of this option - `Latest`, links and link details are fetched from the network. When specifically set to `Content`, the network call is skipped and the calls only consider locally available data.
+
+## 0.3.0-beta-dev.31
+
+## 0.3.0-beta-dev.30
+
+## 0.3.0-beta-dev.29
+
+## 0.3.0-beta-dev.28
+
+## 0.3.0-beta-dev.27
+
+## 0.3.0-beta-dev.26
+
+## 0.3.0-beta-dev.25
+
+## 0.3.0-beta-dev.24
+
+## 0.3.0-beta-dev.23
+
+- **BREAKING CHANGE** Rename `remote_signal` to `send_remote_signal` to match the grammar of other HDK functions. [\#3113](https://github.com/holochain/holochain/pull/3113)
 
 - Remove access to `Timestamp::now()` which comes from `kitsune_p2p_timestamp` and was not supposed to be available in WASM. It would always panic in WASM calls so it should be safe to assume that nobody was actually using this in real apps. If you were trying to and this breaks your hApp then please consider using `sys_time` from the HDK instead which is safe to use for getting the current time.
 

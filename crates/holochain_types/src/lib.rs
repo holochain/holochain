@@ -36,7 +36,6 @@ pub mod signal;
 #[warn(missing_docs)]
 pub mod sql;
 pub mod validation_receipt;
-pub mod wasmer_types;
 pub mod web_app;
 pub mod zome_types;
 
@@ -50,5 +49,6 @@ pub mod facts;
 pub mod inline_zome;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
+pub mod websocket;
 
 pub use holochain_zome_types::entry::EntryHashed;

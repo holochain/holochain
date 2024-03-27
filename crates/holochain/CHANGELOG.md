@@ -7,12 +7,73 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- `consistency_10s` and `consistency_60s` from `holochain::sweettest` are deprecated. Use `await_consistency` instead.
+
+## 0.3.0-beta-dev.43
+
+- BREAKING: Holochain websockets now require an `allowed_origins` configuration to be provided. When connecting to the websocket a matching origin must be specified in the connection request `Origin` header. [\#3460](https://github.com/holochain/holochain/pull/3460)
+  - The `ConductorConfiguration` has been changed so that specifying an admin interface requires an `allowed_origins` as well as the port it already required.
+  - `AdminRequest::AddAdminInterfaces` has been updated as per the previous point.
+  - `AdminRequest::AttachAppInterface` has also been updated so that attaching app ports requires an `allowed_origins` as well as the port it already required.
+- BREAKING: Split the authored database by author. It was previous partitioned by DNA only and each agent that shared a DB because they were running the same DNA would have to share the write lock. This is a pretty serious bottleneck when the same app is being run for multiple agents on the same conductor. They are now separate files on disk and writes can proceed independently. There is no migration path for this change, if you have existing databases they will not be found. [\#3450](https://github.com/holochain/holochain/pull/3450)
+
+## 0.3.0-beta-dev.42
+
+## 0.3.0-beta-dev.41
+
+## 0.3.0-beta-dev.40
+
+## 0.3.0-beta-dev.39
+
+## 0.3.0-beta-dev.38
+
+- Some of the function signatures around SweetConductor app installation have changed slightly. You may need to use a slice (`&[x]`) instead of a collection of references (`[&x]`), or vice versa, in some places. If this is cumbersome please open an issue. [\#3310](https://github.com/holochain/holochain/pull/3310)
+- Start refactoring app validation workflow by simplifying main validation loop. All op validations are awaited at once now instead of creating a stream of tasks and processing it in the background.
+
+## 0.3.0-beta-dev.37
+
+## 0.3.0-beta-dev.36
+
+- Added `lair_keystore_version_req` to the output of `--build-info` for Holochain.
+- BREAKING: Changed `post_commit` behavior so that it only gets called after a commit to the source chain. Previously, it would get called after every zome call, regardless of if a commit happened. [\#3302](https://github.com/holochain/holochain/pull/3302)
+- Fixed a performance bug: various extra tasks were being triggered after every zome call which are only necessary if the zome call resulted in commits to the source chain. The fix should improve performance for read-only zome calls. [\#3302](https://github.com/holochain/holochain/pull/3302)
+- Fixed a bug during the admin call `GrantZomeCallCapability`, where if the source chain had not yet been initialized, it was possible to create a capability grant before the `init()` callback runs. Now, `init()` is guaranteed to run before any cap grants are created.
+- Updates sys validation to allow the timestamps of two actions on the same chain to be equal, rather than requiring them to strictly increasing.
+
+## 0.3.0-beta-dev.35
+
+- There is no longer a notion of “joining the network”. Previously, apps could fail to be enabled, accompanied by an error “Timed out trying to join the network” or “Error while trying to join the network”. Now, apps never fail to start for this reason. If the network cannot be reached, the app starts anyway. It is up to the UI to determine whether the node is in an “online” state via `AppRequest::NetworkInfo` (soon-to-be improved with richer information).
+- CellStatus is deprecated and only remains in areas where deserialization would break if it were removed. The only valid CellStatus now is `CellStatus::Joined`.
+
+## 0.3.0-beta-dev.34
+
+- Fix: Wasmer cache was deserializing modules for every zome call which slowed them down. Additionally the instance cache that was supposed to store callable instances of modules was not doing that correctly. A cache for deserialized modules has been re-introduced and the instance cache was removed, following recommendation from the wasmer team regarding caching.
+- Fix: Call contexts of internal callbacks like `validate` were not cleaned up from an in-memory map. Now external as well as internal callbacks remove the call contexts from memory. This is covered by a test.
+- **BREAKING CHANGE:** Wasmer-related items from `holochain_types` have been moved to crate `holochain_wasmer_host::module`.
+- Refactor: Every ribosome used to create a separate wasmer module cache. During app installation of multiple agents on the same conductor, the caches weren’t used, regardless of whether that DNA is already registered or not. The module cache is now moved to the conductor and kept there as a single instance.
+
+## 0.3.0-beta-dev.33
+
+- Make sqlite-encrypted a default feature
+
+- Sys validation will no longer check the integrity with the previous action for StoreRecord or StoreEntry ops. These ‘store record’ checks are now only done for RegisterAgentActivity ops which we are sent when we are responsible for validating an agents whole chain. This avoids fetching and caching ops that we don’t actually need.
+
+## 0.3.0-beta-dev.32
+
+## 0.3.0-beta-dev.31
+
+## 0.3.0-beta-dev.30
+
+## 0.3.0-beta-dev.29
+
 - Sys validation will now validate that a DeleteLink points to an action which is a CreateLink through the `link_add_address` of the delete.
 
-- Fix an issue where app validation for StoreRecord ops with a Delete or DeleteLink action were always passed to all zomes. These ops are now only passed to the zome which defined the entry type of the op that is being deleted. [#3107](https://github.com/holochain/holochain/pull/3107)
-- Wasmer bumped from 4.2.2 to 4.2.4 [#3025](https://github.com/holochain/holochain/pull/3025)
-- Compiled wasms are now persisted to the file system so no longer need to be recompiled on subsequent loads [#3025](https://github.com/holochain/holochain/pull/3025)
-- **BREAKING CHANGE** Several changes to the file system [#3025](https://github.com/holochain/holochain/pull/3025):
+## 0.3.0-beta-dev.28
+
+- Fix an issue where app validation for StoreRecord ops with a Delete or DeleteLink action were always passed to all zomes. These ops are now only passed to the zome which defined the entry type of the op that is being deleted. [\#3107](https://github.com/holochain/holochain/pull/3107)
+- Wasmer bumped from 4.2.2 to 4.2.4 [\#3025](https://github.com/holochain/holochain/pull/3025)
+- Compiled wasms are now persisted to the file system so no longer need to be recompiled on subsequent loads [\#3025](https://github.com/holochain/holochain/pull/3025)
+- **BREAKING CHANGE** Several changes to the file system [\#3025](https://github.com/holochain/holochain/pull/3025):
   - The environment path in config file is now called `data_root_path`
   - The `data_root_path` is no longer optional so MUST be specified in config
   - Interactive mode is no longer supported, so paths MUST be provided in config
@@ -27,7 +88,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix: Countersigning test `lock_chain` which ensures that source chain is locked while in a countersigning session.
 
 - Major refactor of the sys validation workflow to improve reliability and performance:
-
+  
   - Reliability: The workflow will now prioritise validating ops that have their dependencies available locally. As soon as it has finished with those it will trigger app validation before dealing with missing dependencies.
   - Reliability: For ops which have dependencies we aren’t holding locally, the network get will now be retried. This was a cause of undesirable behaviour for validation where a failed get would result in validation for ops with missing dependencies not being retried until new ops arrived. The workflow now retries the get on an interval until it finds dependencies and can proceed with validation.
   - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was uneccessary and doing database queries so it should be good to have that gone.
@@ -264,7 +325,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 0.0.154
 
 - Revert: “Add the `hdi_version_req` key:value field to the output of the `--build-info` argument” because it broke. [\#1521](https://github.com/holochain/holochain/pull/1521)
-
+  
   Reason: it causes a build failure of the *holochain*  crate on crates.io
 
 ## 0.0.153
@@ -430,7 +491,7 @@ network:
 - **BREAKING CHANGE** `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
 
 - **BREAKING CHANGE**: The notion of “cell nicknames” (“nicks”) and “app slots” has been unified into the notion of “app roles”. This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
-
+  
   - The `slots` field in App manifests is now called `roles`
   - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
   - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
@@ -460,7 +521,7 @@ network:
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
-
+  
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
   - `DnaInfo` includes `name`, `hash`, `properties`

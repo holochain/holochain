@@ -25,8 +25,8 @@ pub use crate::entry::must_get_entry;
 pub use crate::entry::must_get_valid_record;
 pub use crate::entry::update;
 pub use crate::entry::update_entry;
-pub use crate::entry_def;
-pub use crate::entry_defs;
+pub use crate::entry_type;
+pub use crate::entry_types;
 pub use crate::hash::*;
 pub use crate::hash_path::anchor::anchor;
 pub use crate::hash_path::anchor::list_anchor_addresses;
@@ -56,8 +56,11 @@ pub use crate::random::*;
 pub use crate::time::schedule;
 pub use crate::time::sleep;
 pub use crate::time::sys_time;
-pub use crate::time::*;
+
+pub use crate::clone::*;
 pub use crate::x_salsa20_poly1305::create_x25519_keypair;
+pub use crate::x_salsa20_poly1305::ed_25519_x_salsa20_poly1305_decrypt;
+pub use crate::x_salsa20_poly1305::ed_25519_x_salsa20_poly1305_encrypt;
 pub use crate::x_salsa20_poly1305::x_25519_x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_25519_x_salsa20_poly1305_encrypt;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_decrypt;
@@ -78,9 +81,9 @@ pub use hdk_derive;
 pub use hdk_derive::dna_properties;
 pub use hdk_derive::hdk_dependent_entry_types;
 pub use hdk_derive::hdk_dependent_link_types;
-pub use hdk_derive::hdk_entry_defs;
-pub use hdk_derive::hdk_entry_defs_conversions;
 pub use hdk_derive::hdk_entry_helper;
+pub use hdk_derive::hdk_entry_types;
+pub use hdk_derive::hdk_entry_types_conversions;
 pub use hdk_derive::hdk_extern;
 pub use hdk_derive::hdk_link_types;
 pub use hdk_derive::hdk_to_coordinates;
@@ -163,7 +166,13 @@ macro_rules! holochain_externs {
             x_salsa20_poly1305_decrypt:1,
             x_25519_x_salsa20_poly1305_encrypt:1,
             x_25519_x_salsa20_poly1305_decrypt:1,
-            create_x25519_keypair:1
+            ed_25519_x_salsa20_poly1305_encrypt:1,
+            ed_25519_x_salsa20_poly1305_decrypt:1,
+            create_x25519_keypair:1,
+            create_clone_cell:1,
+            disable_clone_cell:1,
+            enable_clone_cell:1,
+            delete_clone_cell:1
         );
     };
 }

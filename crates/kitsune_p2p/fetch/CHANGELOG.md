@@ -7,6 +7,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.27
+
+## 0.3.0-beta-dev.26
+
+## 0.3.0-beta-dev.25
+
+## 0.3.0-beta-dev.24
+
+## 0.3.0-beta-dev.23
+
+## 0.3.0-beta-dev.22
+
+- Enhance source backoff logic. The fetch pool used to give a source a 5 minute pause if it failed to serve an op before using the source again. Now the failures to serve by sources is tracked across the pool. Sources that fail too often will be put on a backoff to give them a chance to deal with their current workload before we use them again. For hosts that continue to not respond they will be dropped as sources for ops. Ops that end up with no sources will be dropped from the fetch pool. This means that we can stop using resources on ops we will never be able to fetch. If a source appears who is capable of serving the missing ops then they should be re-added to the fetch pool.
+
+## 0.3.0-beta-dev.21
+
+## 0.3.0-beta-dev.20
+
+## 0.3.0-beta-dev.19
+
+## 0.3.0-beta-dev.18
+
+## 0.3.0-beta-dev.17
+
 ## 0.3.0-beta-dev.16
 
 ## 0.3.0-beta-dev.15

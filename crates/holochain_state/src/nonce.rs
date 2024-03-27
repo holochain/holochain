@@ -66,25 +66,23 @@ pub mod test {
         let (nonce_0, expires_0) = fresh_nonce(now_0).unwrap();
 
         // First witnessing should be fresh.
-        let witness_0 =
-            super::witness_nonce(&db, agent_0.clone(), nonce_0.clone(), now_0, expires_0)
-                .await
-                .unwrap();
+        let witness_0 = super::witness_nonce(&db, agent_0.clone(), nonce_0, now_0, expires_0)
+            .await
+            .unwrap();
 
         assert_eq!(witness_0, WitnessNonceResult::Fresh);
 
         // Second witnessing stale.
-        let witness_1 =
-            super::witness_nonce(&db, agent_0.clone(), nonce_0.clone(), now_0, expires_0)
-                .await
-                .unwrap();
+        let witness_1 = super::witness_nonce(&db, agent_0.clone(), nonce_0, now_0, expires_0)
+            .await
+            .unwrap();
 
         assert_eq!(witness_1, WitnessNonceResult::Duplicate);
 
         // Different agent is different witnessing even with same params.
         assert_eq!(
             WitnessNonceResult::Fresh,
-            super::witness_nonce(&db, agent_1, nonce_0.clone(), now_0, expires_0)
+            super::witness_nonce(&db, agent_1, nonce_0, now_0, expires_0)
                 .await
                 .unwrap()
         );
@@ -95,7 +93,7 @@ pub mod test {
 
         assert_eq!(
             WitnessNonceResult::Fresh,
-            super::witness_nonce(&db, agent_0.clone(), nonce_1.clone(), now_1, expires_1)
+            super::witness_nonce(&db, agent_0.clone(), nonce_1, now_1, expires_1)
                 .await
                 .unwrap()
         );
@@ -106,7 +104,7 @@ pub mod test {
 
         assert_eq!(
             WitnessNonceResult::Expired,
-            super::witness_nonce(&db, agent_0.clone(), nonce_2.clone(), past, past)
+            super::witness_nonce(&db, agent_0.clone(), nonce_2, past, past)
                 .await
                 .unwrap()
         );
@@ -117,7 +115,7 @@ pub mod test {
 
         assert_eq!(
             WitnessNonceResult::Future,
-            super::witness_nonce(&db, agent_0.clone(), nonce_3.clone(), now_1, expires_3)
+            super::witness_nonce(&db, agent_0.clone(), nonce_3, now_1, expires_3)
                 .await
                 .unwrap()
         );
@@ -128,13 +126,13 @@ pub mod test {
 
         assert_eq!(
             WitnessNonceResult::Fresh,
-            super::witness_nonce(&db, agent_0.clone(), nonce_4.clone(), now_2, expires_4)
+            super::witness_nonce(&db, agent_0.clone(), nonce_4, now_2, expires_4)
                 .await
                 .unwrap()
         );
         assert_eq!(
             WitnessNonceResult::Duplicate,
-            super::witness_nonce(&db, agent_0.clone(), nonce_4.clone(), now_2, expires_4)
+            super::witness_nonce(&db, agent_0.clone(), nonce_4, now_2, expires_4)
                 .await
                 .unwrap()
         );

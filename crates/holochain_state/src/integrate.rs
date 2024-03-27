@@ -16,8 +16,8 @@ use crate::{prelude::*, query::get_public_op_from_db};
 pub async fn authored_ops_to_dht_db(
     network: &(dyn HolochainP2pDnaT + Send + Sync),
     hashes: Vec<(DhtOpHash, AnyLinkableHash)>,
-    authored_db: &DbRead<DbKindAuthored>,
-    dht_db: &DbWrite<DbKindDht>,
+    authored_db: DbRead<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
     dht_db_cache: &DhtDbQueryCache,
 ) -> StateMutationResult<()> {
     // Check if any agents in this space are an authority for these hashes.
@@ -41,8 +41,8 @@ pub async fn authored_ops_to_dht_db(
 /// on basis hash alone.
 pub async fn authored_ops_to_dht_db_without_check(
     hashes: Vec<DhtOpHash>,
-    authored_db: &DbRead<DbKindAuthored>,
-    dht_db: &DbWrite<DbKindDht>,
+    authored_db: DbRead<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
     dht_db_cache: &DhtDbQueryCache,
 ) -> StateMutationResult<()> {
     // Get the ops from the authored database.
@@ -71,9 +71,9 @@ pub async fn authored_ops_to_dht_db_without_check(
         })
         .await?;
     for op in activity {
-        let dependency = get_dependency(op.get_type(), &op.action());
+        let dependency = op.sys_validation_dependency();
 
-        if matches!(dependency, Dependency::Null) {
+        if dependency.is_none() {
             let _ = dht_db_cache
                 .set_activity_to_integrated(op.action().author(), op.action().action_seq())
                 .await;
@@ -98,7 +98,7 @@ fn insert_locally_validated_op(
     let op = filter_private_entry(op)?;
     let hash = op.as_hash();
 
-    let dependency = get_dependency(op.get_type(), &op.action());
+    let dependency = op.sys_validation_dependency();
     let op_type = op.get_type();
 
     // Insert the op.
@@ -106,13 +106,15 @@ fn insert_locally_validated_op(
     // Set the status to valid because we authored it.
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
 
-    if let Dependency::Null = dependency {
+    // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
+    // Set the stage to awaiting integration.
+    if dependency.is_none() {
         // This set the validation stage to pending which is correct when
         // it's integrated.
-        set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
+        set_validation_stage(txn, hash, ValidationStage::Pending)?;
         set_when_integrated(txn, hash, holochain_zome_types::prelude::Timestamp::now())?;
     } else {
-        set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
+        set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
     }
 
     // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.

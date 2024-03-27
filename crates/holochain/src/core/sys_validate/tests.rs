@@ -113,14 +113,18 @@ async fn record_with_deps_fixup(
             let prev_seq = action.action_seq() - 1;
 
             let entry = action.entry_data_mut().map(|(entry_hash, entry_type)| {
-                let entry = contrafact::brute("Not countersigning entry", |e: &Entry| {
-                    !matches!(e, Entry::CounterSign(_, _))
+                let et = entry_type.clone();
+                let entry = contrafact::brute("matching entry", move |e: &Entry| match (&et, e) {
+                    (EntryType::AgentPubKey, Entry::Agent(_)) => true,
+                    (EntryType::App(_), Entry::App(_)) => true,
+                    (EntryType::CapClaim, Entry::CapClaim(_)) => true,
+                    (EntryType::CapGrant, Entry::CapGrant(_)) => true,
+                    _ => false,
                 })
                 .build(&mut g);
+
                 *entry_hash = EntryHash::with_data_sync(&entry);
-                *entry_type = entry
-                    .entry_type(Some(AppEntryDef::arbitrary(&mut g).unwrap()))
-                    .unwrap();
+
                 entry
             });
 
@@ -153,7 +157,11 @@ async fn record_with_deps_fixup(
             match action {
                 Action::Create(_create) => {}
                 Action::Update(update) => {
-                    let mut create = matching_record(&mut g, is_entry_record);
+                    let mut create = matching_record(&mut g, |r| {
+                        // Updates to agent pub key can get tricky
+                        r.action().entry_type() != Some(&EntryType::AgentPubKey)
+                            && is_entry_record(r)
+                    });
                     update.original_action_address = create.action_address().clone();
                     update.original_entry_address =
                         create.entry().as_option().unwrap().to_hash().clone();
@@ -195,6 +203,7 @@ async fn record_with_deps_fixup(
                 }
                 Action::Dna(_) => unreachable!(),
             };
+
             (entry, deps)
         }
     };
@@ -553,8 +562,12 @@ async fn check_entry_size_test() {
 
     let keystore = test_keystore();
 
-    let (mut record, cascade) =
-        record_with_cascade(&keystore, Create::arbitrary(&mut g).unwrap().into()).await;
+    let action = contrafact::brute("app entry create", |a: &Create| {
+        matches!(a.entry_type, EntryType::App(_))
+    })
+    .build(&mut g);
+
+    let (mut record, cascade) = record_with_cascade(&keystore, action.into()).await;
 
     let tiny_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
         (0..5).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
@@ -588,7 +601,13 @@ async fn check_update_reference_test() {
     let keystore = test_keystore();
 
     let action = contrafact::brute("non agent entry type", move |a: &Action| {
-        matches!(a, Action::Update(..))
+        matches!(
+            a,
+            Action::Update(Update {
+                entry_type: EntryType::App(_),
+                ..
+            })
+        ) && !matches!(a, Action::AgentValidationPkg(..))
             && a.entry_type()
                 .map(|et| *et != EntryType::AgentPubKey)
                 .unwrap_or(false)

@@ -31,13 +31,7 @@ pub fn spawn_publish_dht_ops_consumer(
             let agent = cell_id.agent_pubkey().clone();
             let network = network.clone();
             async move {
-                if conductor
-                    .get_config()
-                    .network
-                    .as_ref()
-                    .map(|c| c.tuning_params.disable_publish)
-                    .unwrap_or(false)
-                {
+                if conductor.get_config().network.tuning_params.disable_publish {
                     Ok(WorkComplete::Complete)
                 } else {
                     publish_dht_ops_workflow(env, Arc::new(network), tx, agent).await

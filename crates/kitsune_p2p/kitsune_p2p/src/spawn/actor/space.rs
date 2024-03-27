@@ -357,7 +357,7 @@ impl SpaceInternalHandler for Space {
         // local agents.
         let mut local_notify_events = Vec::new();
         let mut local_agent_info_events = Vec::new();
-        match &data {
+        let broadcast_source = match &data {
             BroadcastData::User(data) => {
                 for agent in self.local_joined_agents.keys() {
                     if let Some(arc) = self.agent_arcs.get(agent) {
@@ -375,6 +375,8 @@ impl SpaceInternalHandler for Space {
                         }
                     }
                 }
+
+                None
             }
             BroadcastData::AgentInfo(agent_info) => {
                 if self
@@ -395,13 +397,16 @@ impl SpaceInternalHandler for Space {
                         }
                     });
                 }
+
+                None
             }
-            BroadcastData::Publish { .. } => {
+            BroadcastData::Publish { source, .. } => {
                 // Don't do anything here. This case is handled by the actor
                 // invoking incoming_publish instead of
                 // incoming_delegate_broadcast.
+                Some(source.clone())
             }
-        }
+        };
 
         // next, gather a list of agents covering this data to be
         // published to.
@@ -420,10 +425,10 @@ impl SpaceInternalHandler for Space {
             // i.e. if `agent.get_loc() % mod_cnt == mod_idx` we know we are
             // responsible for delegating the broadcast to that agent.
             let mut all = Vec::new();
-            for info in info_list
-                .into_iter()
-                .filter(|info| info.agent.get_loc().as_u32() % mod_cnt == mod_idx)
-            {
+            for info in info_list.into_iter().filter(|info| {
+                info.agent.get_loc().as_u32() % mod_cnt == mod_idx
+                    && Some(info.agent()) != broadcast_source
+            }) {
                 let ro_inner = ro_inner.clone();
                 let space = space.clone();
                 let data = data.clone();
@@ -512,10 +517,15 @@ impl SpaceInternalHandler for Space {
                         space: space.clone(),
                         source: FetchSource::Agent(source.clone()),
                         size: op_hash.maybe_size(),
-                        // TODO - get the author from somewhere
-                        author: None,
                         context: Some(context),
+                        transfer_method: TransferMethod::Publish,
                     });
+
+                    ro_inner.host_api.handle_op_hash_received(
+                        &space,
+                        &op_hash,
+                        TransferMethod::Publish,
+                    );
 
                     // Register a callback if maybe_delegate.is_some()
                     // to invoke the delegation on receipt of data.
@@ -1071,8 +1081,8 @@ impl KitsuneP2pHandler for Space {
 
                 let mut all = Vec::new();
 
-                // determine the total number of nodes we'll be publishing to
-                // we'll make each remote responsible for a subset of delegate
+                // Determine the total number of nodes we'll be publishing to.
+                // We'll make each remote responsible for a subset of delegate
                 // broadcasting by having them apply the formula:
                 // `agent.get_loc() % mod_cnt == mod_idx` -- if true,
                 // they'll be responsible for forwarding the data to that node.
@@ -1548,12 +1558,19 @@ impl Space {
             match network_type {
                 NetworkType::QuicMdns => tracing::warn!("NOT publishing leaves to mdns"),
                 NetworkType::QuicBootstrap => {
-                    kitsune_p2p_bootstrap_client::put(
+                    match kitsune_p2p_bootstrap_client::put(
                         bootstrap_service.clone(),
                         agent_info_signed,
                         bootstrap_net,
                     )
-                    .await?;
+                    .await {
+                        Ok(_) => {
+                            tracing::debug!("Successfully publish agent info to the bootstrap service");
+                        }
+                        Err(err) => {
+                            tracing::info!(?err, "Failed to publish agent info to the bootstrap service while leaving");
+                        }
+                    }
                 }
             }
 

@@ -1,6 +1,6 @@
 [package]
 name = "fixt"
-version = "0.3.0-beta-dev.0"
+version = "0.3.0-beta-dev.3"
 description = "minimum viable fixtures"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -10,6 +10,7 @@ keywords = [ "holochain", "holo", "test", "fixture" ]
 categories = [ "fixtures" ]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
 holochain_serialized_bytes = "=0.0.53"
 lazy_static = "1.4"
@@ -20,6 +21,9 @@ rand_core = "0.6"
 serde = { version = "1.0", features = [ "derive" ] }
 strum = "0.18.0"
 strum_macros = "0.18.0"
+
+[lints]
+workspace = true
 
 [features]
 fixt = [ ]

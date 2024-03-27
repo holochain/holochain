@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use super::SweetZome;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_sqlite::db::{DbKindAuthored, DbKindDht};
 use holochain_types::db::DbWrite;
 /// A reference to a Cell created by a SweetConductor installation function.
@@ -10,6 +13,7 @@ pub struct SweetCell {
     pub(super) cell_id: CellId,
     pub(super) cell_authored_db: DbWrite<DbKindAuthored>,
     pub(super) cell_dht_db: DbWrite<DbKindDht>,
+    pub(super) conductor_config: Arc<ConductorConfig>,
 }
 
 impl SweetCell {
@@ -41,5 +45,10 @@ impl SweetCell {
     /// Get a SweetZome with the given name
     pub fn zome<Z: Into<ZomeName>>(&self, zome_name: Z) -> SweetZome {
         SweetZome::new(self.cell_id.clone(), zome_name.into())
+    }
+
+    /// Accessor for ConductorConfig
+    pub fn conductor_config(&self) -> Arc<ConductorConfig> {
+        self.conductor_config.clone()
     }
 }

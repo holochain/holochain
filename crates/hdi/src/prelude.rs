@@ -5,7 +5,7 @@ pub use crate::ed25519::verify_signature_raw;
 pub use crate::entry::must_get_action;
 pub use crate::entry::must_get_entry;
 pub use crate::entry::must_get_valid_record;
-pub use crate::entry_defs;
+pub use crate::entry_types;
 pub use crate::flat_op::*;
 pub use crate::hash::*;
 pub use crate::hash_path::anchor::Anchor;
@@ -22,13 +22,14 @@ pub use crate::map_extern::ExternResult;
 pub use crate::map_extern_infallible;
 pub use crate::map_extern_preamble;
 pub use crate::op::*;
+pub use crate::x_salsa20_poly1305::ed_25519_x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_25519_x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_decrypt;
 pub use hdk_derive;
 pub use hdk_derive::dna_properties;
-pub use hdk_derive::hdk_entry_defs;
-pub use hdk_derive::hdk_entry_defs_conversions;
 pub use hdk_derive::hdk_entry_helper;
+pub use hdk_derive::hdk_entry_types;
+pub use hdk_derive::hdk_entry_types_conversions;
 pub use hdk_derive::hdk_extern;
 pub use hdk_derive::hdk_link_types;
 pub use hdk_derive::hdk_to_coordinates;
@@ -90,7 +91,8 @@ macro_rules! holochain_externs {
             must_get_action:1,
             must_get_agent_activity:1,
             x_salsa20_poly1305_decrypt:1,
-            x_25519_x_salsa20_poly1305_decrypt:1
+            x_25519_x_salsa20_poly1305_decrypt:1,
+            ed_25519_x_salsa20_poly1305_decrypt:1
         );
     };
 }

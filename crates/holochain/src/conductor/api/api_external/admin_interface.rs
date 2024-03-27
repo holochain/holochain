@@ -4,7 +4,6 @@ use super::InterfaceApi;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::api::error::SerializationError;
-use crate::conductor::conductor::CellStatus;
 use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
@@ -176,7 +175,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             ListCellIds => {
                 let cell_ids = self
                     .conductor_handle
-                    .running_cell_ids(Some(CellStatus::Joined))
+                    .running_cell_ids()
                     .into_iter()
                     .collect();
                 Ok(AdminResponse::CellIdsListed(cell_ids))
@@ -220,12 +219,15 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AppDisabled)
             }
-            AttachAppInterface { port } => {
+            AttachAppInterface {
+                port,
+                allowed_origins,
+            } => {
                 let port = port.unwrap_or(0);
                 let port = self
                     .conductor_handle
                     .clone()
-                    .add_app_interface(either::Either::Left(port))
+                    .add_app_interface(either::Either::Left(port), allowed_origins)
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
@@ -236,6 +238,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             DumpState { cell_id } => {
                 let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
                 Ok(AdminResponse::StateDumped(state))
+            }
+            DumpConductorState => {
+                let state = self.conductor_handle.dump_conductor_state().await?;
+                Ok(AdminResponse::ConductorStateDumped(state))
             }
             DumpFullState {
                 cell_id,

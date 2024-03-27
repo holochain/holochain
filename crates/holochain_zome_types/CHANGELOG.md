@@ -7,6 +7,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.31
+
+## 0.3.0-beta-dev.30
+
+## 0.3.0-beta-dev.29
+
+- **BREAKING**: Rename `GetOptions` variants. `Content` becomes `Local` and queries now consistently only locally available data. No network calls are made. This applies to `get` and `get_details`. `Latest` becomes `Network` and fetches from the network if the caller is not an authority of the requested Action or Entry.
+
+## 0.3.0-beta-dev.28
+
+## 0.3.0-beta-dev.27
+
+## 0.3.0-beta-dev.26
+
+## 0.3.0-beta-dev.25
+
+## 0.3.0-beta-dev.24
+
+## 0.3.0-beta-dev.23
+
+## 0.3.0-beta-dev.22
+
+## 0.3.0-beta-dev.21
+
+## 0.3.0-beta-dev.20
+
+## 0.3.0-beta-dev.19
+
 ## 0.3.0-beta-dev.18
 
 - **BREAKING CHANGE:** Export error types directly `inline_zome::*` instead of `inline_zome::error::*`.

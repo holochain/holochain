@@ -50,6 +50,10 @@ pub trait HdiT: Send + Sync {
         &self,
         x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+    fn ed_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<XSalsa20Poly1305Data>;
 }
 
 /// Used as a placeholder before any other Hdi is registered.
@@ -108,6 +112,12 @@ impl HdiT for ErrHdi {
         _: X25519XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
         Self::err("x_25519_x_salsa20_poly1305_decrypt")
+    }
+    fn ed_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        _: Ed25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<XSalsa20Poly1305Data> {
+        Self::err("ed_25519_x_salsa20_poly1305_decrypt")
     }
 }
 
@@ -193,6 +203,15 @@ impl HdiT for HostHdi {
         host_call::<X25519XSalsa20Poly1305Decrypt, Option<XSalsa20Poly1305Data>>(
             __hc__x_25519_x_salsa20_poly1305_decrypt_1,
             x_25519_x_salsa20_poly1305_decrypt,
+        )
+    }
+    fn ed_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<XSalsa20Poly1305Data> {
+        host_call::<Ed25519XSalsa20Poly1305Decrypt, XSalsa20Poly1305Data>(
+            __hc__ed_25519_x_salsa20_poly1305_decrypt_1,
+            ed_25519_x_salsa20_poly1305_decrypt,
         )
     }
 }

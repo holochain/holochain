@@ -7,6 +7,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.0-beta-dev.32
+
+## 0.4.0-beta-dev.31
+
+## 0.4.0-beta-dev.30
+
+## 0.4.0-beta-dev.29
+
+## 0.4.0-beta-dev.28
+
+## 0.4.0-beta-dev.27
+
+## 0.4.0-beta-dev.26
+
+## 0.4.0-beta-dev.25
+
+## 0.4.0-beta-dev.24
+
+## 0.4.0-beta-dev.23
+
+## 0.4.0-beta-dev.22
+
+## 0.4.0-beta-dev.21
+
+## 0.4.0-beta-dev.20
+
+## 0.4.0-beta-dev.19
+
 ## 0.4.0-beta-dev.18
 
 ## 0.4.0-beta-dev.17

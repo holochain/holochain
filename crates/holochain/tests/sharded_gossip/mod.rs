@@ -8,7 +8,7 @@ use holochain::test_utils::inline_zomes::{
     batch_create_zome, simple_create_read_zome, simple_crud_zome,
 };
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
-use holochain::test_utils::{consistency_10s, consistency_60s, consistency_advanced, WaitFor};
+use holochain::test_utils::WaitFor;
 use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
@@ -93,7 +93,7 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
@@ -107,7 +107,7 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_60s([&alice, &bobbo]).await;
+    await_consistency(60, [&alice, &bobbo]).await.unwrap();
     // let p2p = conductors[0].envs().p2p().lock().values().next().cloned().unwrap();
     // holochain_state::prelude::dump_tmp(&p2p);
     // holochain_state::prelude::dump_tmp(&alice.env());
@@ -156,10 +156,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("zome", batch_create_zome())).await;
 
-    let apps = conductors
-        .setup_app("app", &[dna_file.clone()])
-        .await
-        .unwrap();
+    let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
@@ -173,7 +170,9 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s([&alice, &bobbo, &carol]).await;
+    await_consistency(10, [&alice, &bobbo, &carol])
+        .await
+        .unwrap();
 
     let mut all_op_hashes = vec![];
 
@@ -273,7 +272,7 @@ async fn test_zero_arc_no_gossip_2way() {
     let mut conductors = SweetConductorBatch::from_configs_rendezvous([config_0, config_1]).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
     let ((cell_0,), (cell_1,)) = apps.into_tuples();
 
     conductors.exchange_peer_info().await;
@@ -363,7 +362,7 @@ async fn test_zero_arc_no_gossip_4way() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let dna_hash = dna_file.dna_hash().clone();
 
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
     let cells = apps.cells_flattened();
     let zomes: Vec<_> = cells
         .iter()
@@ -471,7 +470,7 @@ async fn test_gossip_shutdown() {
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
     let ((cell_0,), (cell_1,)) = apps.into_tuples();
     let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
     let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
@@ -493,7 +492,7 @@ async fn test_gossip_shutdown() {
     // Ensure that gossip loops resume upon startup
     conductors[0].startup().await;
 
-    consistency_60s([&cell_0, &cell_1]).await;
+    await_consistency(60, [&cell_0, &cell_1]).await.unwrap();
     let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
     assert_eq!(record.unwrap().action_address(), &hash);
 }
@@ -515,7 +514,7 @@ async fn test_gossip_startup() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let mk_conductor = || async {
         let cfg = config();
-        assert!(cfg.network.as_ref().unwrap().is_tx5());
+        assert!(cfg.network.is_tx5());
         let mut conductor =
             SweetConductor::from_config_rendezvous(cfg, SweetLocalRendezvous::new().await).await;
         // let mut conductor = SweetConductor::from_config(config()).await;
@@ -539,7 +538,7 @@ async fn test_gossip_startup() {
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     SweetConductor::exchange_peer_info([&conductor0, &conductor1]).await;
 
-    consistency_60s([&cell0, &cell1]).await;
+    await_consistency(60, [&cell0, &cell1]).await.unwrap();
     let record: Option<Record> = conductor1.call(&zome1, "read", hash.clone()).await;
     assert_eq!(record.unwrap().action_address(), &hash);
 }
@@ -548,7 +547,7 @@ async fn test_gossip_startup() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_recent() {
-    holochain_trace::test_run().ok();
+    hc_sleuth::init_subscriber();
     let config = TestConfig {
         publish: false,
         recent: true,
@@ -564,7 +563,7 @@ async fn three_way_gossip_recent() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_historical() {
-    holochain_trace::test_run().ok();
+    hc_sleuth::init_subscriber();
     let config = TestConfig {
         publish: false,
         recent: false,
@@ -577,8 +576,8 @@ async fn three_way_gossip_historical() {
 }
 
 /// Test that:
-/// - 6MB of data can pass from node A to B,
-/// - then A can shut down and C and start up,
+/// - 6MB of data passes from node A to B,
+/// - then A shuts down and C starts up,
 /// - and then that same data passes from B to C.
 async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config.clone()).await;
@@ -617,7 +616,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         hashes.push(hash);
     }
 
-    consistency_10s([&cells[0], &cells[1]]).await;
+    await_consistency(10, [&cells[0], &cells[1]]).await.unwrap();
 
     println!(
         "Done waiting for consistency between first two nodes. Elapsed: {:?}",
@@ -648,10 +647,10 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     conductors.forget_peer_info([cells[0].agent_pubkey()]).await;
     conductors[0].shutdown().await;
 
-    let new_config = config.random_scope();
-    let new_scope = new_config.tracing_scope.clone().unwrap();
     // Bring a third conductor online
-    conductors.add_conductor_from_config(new_config).await;
+    conductors.add_conductor_from_config(config).await;
+
+    conductors.persist_dbs();
 
     let (cell,) = conductors[2]
         .setup_app("app", [&dna_file])
@@ -663,12 +662,12 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
 
     println!(
         "Newcomer agent joined: scope={}, agent={:#?}",
-        new_scope,
+        conductors[2].get_config().sleuth_id(),
         cell.agent_pubkey().to_kitsune()
     );
 
     conductors[2]
-        .require_initial_gossip_activity_for_cell(&cell, 2, Duration::from_secs(10))
+        .require_initial_gossip_activity_for_cell(&cell, 2, Duration::from_secs(30))
         .await;
 
     println!(
@@ -676,12 +675,9 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         start.elapsed()
     );
 
-    consistency_advanced(
-        [(&cells[0], false), (&cells[1], true), (&cell, true)],
-        10,
-        std::time::Duration::from_secs(1),
-    )
-    .await;
+    await_consistency_advanced(10, [(&cells[0], false), (&cells[1], true), (&cell, true)])
+        .await
+        .unwrap();
 
     println!(
         "Done waiting for consistency between last two nodes. Elapsed: {:?}",
@@ -724,13 +720,10 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
-    let alice = conductor
-        .setup_app("app", &[dna_file.clone()])
-        .await
-        .unwrap();
+    let alice = conductor.setup_app("app", [&dna_file]).await.unwrap();
 
     let (alice,) = alice.into_tuple();
-    let bobbo = conductor.setup_app("app2 ", &[dna_file]).await.unwrap();
+    let bobbo = conductor.setup_app("app2 ", [&dna_file]).await.unwrap();
 
     let (bobbo,) = bobbo.into_tuple();
 
@@ -738,7 +731,7 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     let hash: ActionHash = conductor.call(&alice.zome("simple"), "create", ()).await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s([&alice, &bobbo]).await;
+    await_consistency(10, [&alice, &bobbo]).await.unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductor.call(&bobbo.zome("simple"), "read", hash).await;
@@ -1178,7 +1171,7 @@ async fn mock_network_sharded_gossip() {
     }];
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
-    config.network = Some(network);
+    config.network = network;
 
     // Add it to the conductor builder.
     let builder = ConductorBuilder::new().config(config);
@@ -1191,10 +1184,7 @@ async fn mock_network_sharded_gossip() {
         .unwrap();
 
     // Install the real agent alice.
-    let apps = conductor
-        .setup_app("app", &[dna_file.clone()])
-        .await
-        .unwrap();
+    let apps = conductor.setup_app("app", [&dna_file]).await.unwrap();
 
     let (alice,) = apps.into_tuple();
     let alice_p2p_agents_db = conductor.get_p2p_db(alice.cell_id().dna_hash());
@@ -1205,10 +1195,7 @@ async fn mock_network_sharded_gossip() {
         let alice_info = alice_info.clone();
         async move {
             loop {
-                let info = alice_p2p_agents_db.test_read({
-                    let alice_kit = alice_kit.clone();
-                    move |txn| txn.p2p_get_agent(&alice_kit).unwrap()
-                });
+                let info = alice_p2p_agents_db.p2p_get_agent(&alice_kit).await.unwrap();
 
                 *alice_info.lock() = info;
 
@@ -1687,17 +1674,14 @@ async fn mock_network_sharding() {
     }];
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
-    config.network = Some(network);
+    config.network = network;
 
     // Add it to the conductor builder.
     let builder = ConductorBuilder::new().config(config);
     let mut conductor = SweetConductor::from_builder(builder).await;
 
     // Install the real agent alice.
-    let apps = conductor
-        .setup_app("app", &[dna_file.clone()])
-        .await
-        .unwrap();
+    let apps = conductor.setup_app("app", [&dna_file]).await.unwrap();
 
     let (alice,) = apps.into_tuple();
     let alice_p2p_agents_db = conductor.get_p2p_db(alice.cell_id().dna_hash());
@@ -1708,25 +1692,15 @@ async fn mock_network_sharding() {
         let alice_info = alice_info.clone();
         async move {
             loop {
-                alice_p2p_agents_db
-                    .read_async({
-                        let my_alice_kit = alice_kit.clone();
-                        let my_alice_info = alice_info.clone();
+                let info = alice_p2p_agents_db.p2p_get_agent(&alice_kit).await.unwrap();
 
-                        move |txn| -> DatabaseResult<()> {
-                            let info = txn.p2p_get_agent(&my_alice_kit).unwrap();
-                            {
-                                if let Some(info) = &info {
-                                    eprintln!("Alice coverage {:.2}", info.storage_arc.coverage());
-                                }
-                                *my_alice_info.lock() = info;
-                            }
+                {
+                    if let Some(info) = &info {
+                        eprintln!("Alice coverage {:.2}", info.storage_arc.coverage());
+                    }
+                    *alice_info.lock() = info;
+                }
 
-                            Ok(())
-                        }
-                    })
-                    .await
-                    .unwrap();
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             }
         }

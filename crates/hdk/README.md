@@ -54,20 +54,20 @@ An example coordinator zome can be found in the wasm workspace of the Holochain 
 HDK implements several key features:
 
 - Base HDKT trait for standardisation, mocking, unit testing support: [`hdk`] module
-- Capabilities and function level access control: `capability` module
-- Holochain Deterministic Integrity (HDI)
-- Application data and entry definitions for the source chain and DHT: `entry`
-module and `entry_defs` callback
-- Referencing/linking entries on the DHT together into a graph structure: `link` module
-- Defining tree-like structures out of links and entries for discoverability and scalability: `hash_path` module
+- Capabilities and function level access control: [`capability`] module
+- [Holochain Deterministic Integrity (HDI)]
+- Application data and entry definitions for the source chain and DHT: [`entry`]
+module and [entry_types] callback
+- Referencing/linking entries on the DHT together into a graph structure: [`link`] module
+- Defining tree-like structures out of links and entries for discoverability and scalability: [`hash_path`] module
 - Create, read, update, delete (CRUD) operations on the above
-- Libsodium compatible symmetric/secret (secretbox) and asymmetric/keypair (box) encryption: `x_salsa20_poly1305` module
-- Ed25519 signing and verification of data: `ed25519` module
-- Exposing information about the current execution context such as zome name: `info` module
+- Libsodium compatible symmetric/secret (secretbox) and asymmetric/keypair (box) encryption: [`x_salsa20_poly1305`] module
+- Ed25519 signing and verification of data: [`ed25519`] module
+- Exposing information about the current execution context such as zome name: [`info`] module
 - Other utility functions provided by the host such as generating randomness and timestamps that are impossible in WASM: utility module
 - Exposing functions to external processes and callbacks to the host: [`hdk_extern!`](macro@crate::prelude::hdk_extern) and [`map_extern!`](macro@crate::prelude::map_extern) macros
 - Integration with the Rust [tracing](https://docs.rs/tracing/0.1.23/tracing/) crate
-- Exposing a `prelude` of common types and functions for convenience
+- Exposing a [`prelude`] of common types and functions for convenience
 
 Generally these features are structured logically into modules but there are some affordances to the layering of abstractions.
 
@@ -177,7 +177,6 @@ The callbacks are (see above for examples):
   - Allows the guest to pass/fail/retry any operation.
   - Only the originating zome is called.
   - Failure overrides retry.
-  - See `validate` for more details.
 
 ## HDK has layers 🧅
 

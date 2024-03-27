@@ -7,6 +7,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.30
+
+## 0.3.0-beta-dev.29
+
+- Added support for `#[hdk_extern]` usage with parameterless functions
+
+## 0.3.0-beta-dev.28
+
+## 0.3.0-beta-dev.27
+
+## 0.3.0-beta-dev.26
+
+## 0.3.0-beta-dev.25
+
+## 0.3.0-beta-dev.24
+
+## 0.3.0-beta-dev.23
+
+- **BREAKING CHANGE**: Renamed macros `hdk_entry_defs` to `hdk_entry_types` and `entry_def` to `entry_type` for naming consistency with `hdk_link_types` [\#2979](https://github.com/holochain/holochain/pull/2979)
+
+## 0.3.0-beta-dev.22
+
+## 0.3.0-beta-dev.21
+
+## 0.3.0-beta-dev.20
+
+## 0.3.0-beta-dev.19
+
+## 0.3.0-beta-dev.18
+
 ## 0.3.0-beta-dev.17
 
 - Added a macro `#![dna_properties]` which when applied to a struct, exposes a function `try_from_dna_properties()` on that struct

@@ -22,7 +22,7 @@ use holochain_sqlite::rusqlite::params;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
-use holochain_state_types::SourceChainJsonRecord;
+use holochain_state_types::SourceChainDumpRecord;
 use holochain_types::sql::AsSql;
 
 use crate::prelude::*;
@@ -299,18 +299,20 @@ impl SourceChain {
             .vault
             .write_async(move |txn: &mut Transaction| {
                 let now = Timestamp::now();
+                // TODO: if the chain is locked, functions can still be scheduled.
+                //       Do we want that?
                 for scheduled_fn in scheduled_fns {
                     schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
                 }
-
-                // As at check.
-                let head_info = chain_head_db(txn, author.clone())?;
-                let latest_head = head_info.as_ref().map(|h| h.action.clone());
 
                 if actions.last().is_none() {
                     // Nothing to write
                     return Ok(Vec::new());
                 }
+
+                // As at check.
+                let head_info = chain_head_db(txn, author.clone())?;
+                let latest_head = head_info.as_ref().map(|h| h.action.clone());
 
                 if persisted_head != latest_head {
                     return Err(SourceChainError::HeadMoved(
@@ -321,6 +323,7 @@ impl SourceChain {
                     ));
                 }
 
+                // TODO: should this be moved to the top of the function?
                 if is_chain_locked(txn, &lock, author.as_ref())? {
                     return Err(SourceChainError::ChainLocked);
                 }
@@ -340,13 +343,17 @@ impl SourceChain {
                 for shh in actions.iter() {
                     insert_action(txn, shh)?;
                 }
-                for (op, op_hash, op_order, timestamp, _) in &ops {
+                for (op, op_hash, op_order, timestamp, dep) in &ops {
                     insert_op_lite_into_authored(txn, op, op_hash, op_order, timestamp)?;
                     // If this is a countersigning session we want to withhold
                     // publishing the ops until the session is successful.
                     if is_countersigning_session {
                         set_withhold_publish(txn, op_hash)?;
                     }
+                    aitia::trace!(&hc_sleuth::Event::Authored {
+                        by: (*author).clone(),
+                        op: hc_sleuth::OpInfo::new(op.clone(), op_hash.clone(), dep.clone()),
+                    });
                 }
                 SourceChainResult::Ok(actions)
             })
@@ -394,8 +401,8 @@ impl SourceChain {
                 authored_ops_to_dht_db(
                     network,
                     ops_to_integrate,
-                    &self.vault,
-                    &self.dht_db,
+                    self.vault.clone().into(),
+                    self.dht_db.clone(),
                     &self.dht_db_cache,
                 )
                 .await?;
@@ -503,11 +510,8 @@ where
         self.author.clone()
     }
 
-    pub fn cell_id(&self) -> CellId {
-        CellId::new(
-            self.vault.kind().dna_hash().clone(),
-            self.agent_pubkey().clone(),
-        )
+    pub fn cell_id(&self) -> Arc<CellId> {
+        self.vault.kind().0.clone()
     }
 
     /// This has to clone all the data because we can't return
@@ -540,10 +544,6 @@ where
         self.zomes_initialized.store(value, Ordering::Relaxed);
     }
 
-    pub fn is_empty(&self) -> SourceChainResult<bool> {
-        Ok(self.len()? == 0)
-    }
-
     /// Accessor for the chain head that will be used at flush time to check
     /// the "as at" for ordering integrity etc.
     pub fn persisted_head_info(&self) -> Option<HeadInfo> {
@@ -562,7 +562,7 @@ where
         self.chain_head()?.ok_or(SourceChainError::ChainEmpty)
     }
 
-    #[allow(clippy::len_without_is_empty)]
+    #[cfg(feature = "test_utils")]
     pub fn len(&self) -> SourceChainResult<u32> {
         Ok(self.scratch.apply(|scratch| {
             let scratch_max = scratch.chain_head().map(|h| h.seq);
@@ -575,6 +575,12 @@ where
             }
         })?)
     }
+
+    #[cfg(feature = "test_utils")]
+    pub fn is_empty(&self) -> SourceChainResult<bool> {
+        Ok(self.len()? == 0)
+    }
+
     pub async fn valid_cap_grant(
         &self,
         check_function: GrantedFunction,
@@ -754,7 +760,7 @@ where
                         }
                         Some(types) => {
                             // Value should not be 'Some' until it has at least one value
-                            args.push((":entry_type".to_string(), Box::new(types.get(0).unwrap().as_sql())));
+                            args.push((":entry_type".to_string(), Box::new(types.first().unwrap().as_sql())));
                             for i in 1..types.len() {
                                 args.push((format!(":entry_type_{}", i), Box::new(types.get(i).unwrap().as_sql())));
                             }
@@ -765,7 +771,7 @@ where
                         None => args.push((":action_type".to_string(), Box::new(None::<EntryType>.as_sql()))),
                         Some(types) => {
                             // Value should not be 'Some' until it has at least one value
-                            args.push((":action_type".to_string(), Box::new(types.get(0).as_ref().unwrap().as_sql())));
+                            args.push((":action_type".to_string(), Box::new(types.first().as_ref().unwrap().as_sql())));
                             for i in 1..types.len() {
                                 args.push((format!(":action_type_{}", i), Box::new(types.get(i).unwrap().as_sql())));
                             }
@@ -881,6 +887,10 @@ where
         })?;
         Ok(r)
     }
+
+    pub async fn dump(&self) -> SourceChainResult<SourceChainDump> {
+        dump_state(self.author_db().clone().into(), (*self.author).clone()).await
+    }
 }
 
 fn named_param_seq(base_name: &str, repeat: usize) -> String {
@@ -910,7 +920,7 @@ fn build_ops_from_actions(
     actions: Vec<SignedActionHashed>,
 ) -> SourceChainResult<(
     Vec<SignedActionHashed>,
-    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, Dependency)>,
+    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, SysValDep)>,
 )> {
     // Actions end up back in here.
     let mut actions_output = Vec::with_capacity(actions.len());
@@ -937,7 +947,7 @@ fn build_ops_from_actions(
             let op_order = OpOrder::new(op_type, action.timestamp());
             let timestamp = action.timestamp();
             // Put the action back by value.
-            let dependency = get_dependency(op_type, &action);
+            let dependency = op.get_type().sys_validation_dependency(&action);
             h = Some(action);
             // Collect the DhtOpLite, DhtOpHash and OpOrder.
             ops.push((op, op_hash, op_order, timestamp, dependency));
@@ -1066,8 +1076,13 @@ pub async fn genesis(
             SourceChainResult::Ok(ops_to_integrate)
         })
         .await?;
-    authored_ops_to_dht_db_without_check(ops_to_integrate, &authored, &dht_db, dht_db_cache)
-        .await?;
+    authored_ops_to_dht_db_without_check(
+        ops_to_integrate,
+        authored.clone().into(),
+        dht_db,
+        dht_db_cache,
+    )
+    .await?;
     Ok(())
 }
 
@@ -1224,7 +1239,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
 pub async fn dump_state(
     vault: DbRead<DbKindAuthored>,
     author: AgentPubKey,
-) -> Result<SourceChainJsonDump, SourceChainError> {
+) -> Result<SourceChainDump, SourceChainError> {
     Ok(vault
         .read_async(move |txn| {
             let records = txn
@@ -1253,7 +1268,7 @@ pub async fn dump_state(
                             Some(entry) => Some(from_blob(entry)?),
                             None => None,
                         };
-                        StateQueryResult::Ok(SourceChainJsonRecord {
+                        StateQueryResult::Ok(SourceChainDumpRecord {
                             signature,
                             action_address,
                             action,
@@ -1276,7 +1291,7 @@ pub async fn dump_state(
                 },
                 |row| row.get(0),
             )?;
-            StateQueryResult::Ok(SourceChainJsonDump {
+            StateQueryResult::Ok(SourceChainDump {
                 records,
                 published_ops_count,
             })
@@ -1340,7 +1355,7 @@ mod tests {
         .await
         .unwrap();
         let chain_1 = SourceChain::new(
-            db.clone().into(),
+            db.clone(),
             dht_db.to_db(),
             dht_db_cache.clone(),
             keystore.clone(),
@@ -1348,7 +1363,7 @@ mod tests {
         )
         .await?;
         let chain_2 = SourceChain::new(
-            db.clone().into(),
+            db.clone(),
             dht_db.to_db(),
             dht_db_cache.clone(),
             keystore.clone(),
@@ -1356,7 +1371,7 @@ mod tests {
         )
         .await?;
         let chain_3 = SourceChain::new(
-            db.clone().into(),
+            db.clone(),
             dht_db.to_db(),
             dht_db_cache.clone(),
             keystore.clone(),
@@ -1381,7 +1396,7 @@ mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_1))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1392,7 +1407,7 @@ mod tests {
         ));
         let author_2 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_2))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_2))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1400,7 +1415,7 @@ mod tests {
         chain_3.flush(&mock).await?;
         let author_3 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_3))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_3))
             .await?
             .seq;
         assert_eq!(seq, 4);
@@ -1435,7 +1450,7 @@ mod tests {
         .unwrap();
 
         let chain_1 = SourceChain::new(
-            db.clone().into(),
+            db.clone(),
             dht_db.to_db(),
             dht_db_cache.clone(),
             keystore.clone(),
@@ -1443,7 +1458,7 @@ mod tests {
         )
         .await?;
         let chain_2 = SourceChain::new(
-            db.clone().into(),
+            db.clone(),
             dht_db.to_db(),
             dht_db_cache.clone(),
             keystore.clone(),
@@ -1451,7 +1466,7 @@ mod tests {
         )
         .await?;
         let chain_3 = SourceChain::new(
-            db.clone().into(),
+            db.clone(),
             dht_db.to_db(),
             dht_db_cache.clone(),
             keystore.clone(),
@@ -1500,7 +1515,7 @@ mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_1))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1513,9 +1528,7 @@ mod tests {
         chain_3.flush(&mock).await?;
         let author_2 = Arc::clone(&author);
         let head = db
-            .write_async(move |txn: &mut Transaction| {
-                chain_head_db_nonempty(&txn, author_2.clone())
-            })
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_2.clone()))
             .await?;
 
         // not equal since action hash change due to rebasing
@@ -1598,7 +1611,7 @@ mod tests {
         // are ignored
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
+                .valid_cap_grant(function.clone(), alice.clone(), secret)
                 .await?,
             Some(CapGrant::ChainAuthor(alice.clone())),
         );
@@ -1606,7 +1619,7 @@ mod tests {
         // bob should not get a cap grant as the secret hasn't been committed yet
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
+                .valid_cap_grant(function.clone(), bob.clone(), secret)
                 .await?,
             None
         );
@@ -1630,7 +1643,7 @@ mod tests {
         // committed grant even if she passes in the secret
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
+                .valid_cap_grant(function.clone(), alice.clone(), secret)
                 .await?,
             Some(CapGrant::ChainAuthor(alice.clone())),
         );
@@ -1639,20 +1652,20 @@ mod tests {
         // when passing in the secret
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
+                .valid_cap_grant(function.clone(), bob.clone(), secret)
                 .await?,
             Some(grant.clone().into())
         );
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), carol.clone(), secret.clone())
+                .valid_cap_grant(function.clone(), carol.clone(), secret)
                 .await?,
             Some(grant.clone().into())
         );
         // bob should not be authorized for other zomes/functions than the ones granted
         assert_eq!(
             chain
-                .valid_cap_grant(("boo".into(), "far".into()), bob.clone(), secret.clone())
+                .valid_cap_grant(("boo".into(), "far".into()), bob.clone(), secret)
                 .await?,
             None
         );
@@ -1661,13 +1674,13 @@ mod tests {
         let mut assignees = BTreeSet::new();
         assignees.insert(bob.clone());
         let updated_secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
-        let updated_access = CapAccess::from((updated_secret.clone().unwrap(), assignees));
+        let updated_access = CapAccess::from((updated_secret.unwrap(), assignees));
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
         // commit grant update to alice's source chain
         let (updated_action_hash, updated_entry_hash) = {
             let chain = SourceChain::new(
-                db.clone().into(),
+                db.clone(),
                 dht_db.to_db(),
                 dht_db_cache.clone(),
                 keystore.clone(),
@@ -1694,13 +1707,13 @@ mod tests {
         // chain author grant should always be returned
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
+                .valid_cap_grant(function.clone(), alice.clone(), secret)
                 .await?,
             Some(CapGrant::ChainAuthor(alice.clone())),
         );
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), alice.clone(), updated_secret.clone())
+                .valid_cap_grant(function.clone(), alice.clone(), updated_secret)
                 .await?,
             Some(CapGrant::ChainAuthor(alice.clone())),
         );
@@ -1709,7 +1722,7 @@ mod tests {
         // as it is invalidated by the cap grant update
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
+                .valid_cap_grant(function.clone(), bob.clone(), secret)
                 .await?,
             None
         );
@@ -1717,7 +1730,7 @@ mod tests {
         // bob being an assignee
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), bob.clone(), updated_secret.clone())
+                .valid_cap_grant(function.clone(), bob.clone(), updated_secret)
                 .await?,
             Some(updated_grant.clone().into())
         );
@@ -1726,13 +1739,13 @@ mod tests {
         // or the updated secret (because she is not an assignee)
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), carol.clone(), secret.clone())
+                .valid_cap_grant(function.clone(), carol.clone(), secret)
                 .await?,
             None
         );
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), carol.clone(), updated_secret.clone())
+                .valid_cap_grant(function.clone(), carol.clone(), updated_secret)
                 .await?,
             None
         );
@@ -1764,7 +1777,7 @@ mod tests {
             .await
             .unwrap();
             let maybe_cap_grant = carol_chain
-                .valid_cap_grant(("".into(), "".into()), alice.clone(), secret.clone())
+                .valid_cap_grant(("".into(), "".into()), alice.clone(), secret)
                 .await
                 .unwrap();
             assert_eq!(maybe_cap_grant, None);
@@ -1773,7 +1786,7 @@ mod tests {
         // delete updated cap grant
         {
             let chain = SourceChain::new(
-                db.clone().into(),
+                db.clone(),
                 dht_db.to_db(),
                 dht_db_cache.clone(),
                 keystore.clone(),
@@ -1794,13 +1807,13 @@ mod tests {
         // any provided secret
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
+                .valid_cap_grant(function.clone(), alice.clone(), secret)
                 .await?,
             Some(CapGrant::ChainAuthor(alice.clone())),
         );
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), alice.clone(), updated_secret.clone())
+                .valid_cap_grant(function.clone(), alice.clone(), updated_secret)
                 .await?,
             Some(CapGrant::ChainAuthor(alice.clone())),
         );
@@ -1808,13 +1821,13 @@ mod tests {
         // bob should not get a cap grant for any secret anymore
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
+                .valid_cap_grant(function.clone(), bob.clone(), secret)
                 .await?,
             None
         );
         assert_eq!(
             chain
-                .valid_cap_grant(function.clone(), bob.clone(), updated_secret.clone())
+                .valid_cap_grant(function.clone(), bob.clone(), updated_secret)
                 .await?,
             None
         );
@@ -1827,7 +1840,7 @@ mod tests {
         );
         let (original_action_address, original_entry_address) = {
             let chain = SourceChain::new(
-                db.clone().into(),
+                db.clone(),
                 dht_db.to_db(),
                 dht_db_cache.clone(),
                 keystore.clone(),
@@ -1904,7 +1917,7 @@ mod tests {
         // delete unrestricted cap grant
         {
             let chain = SourceChain::new(
-                db.clone().into(),
+                db.clone(),
                 dht_db.to_db(),
                 dht_db_cache.clone(),
                 keystore.clone(),
@@ -1957,7 +1970,7 @@ mod tests {
 
         {
             let chain = SourceChain::new(
-                db.clone().into(),
+                db.clone(),
                 dht_db.to_db(),
                 dht_db_cache.clone(),
                 keystore.clone(),
@@ -2071,7 +2084,7 @@ mod tests {
             .await
             .unwrap();
         genesis(
-            vault.clone().into(),
+            vault.clone(),
             dht_db.to_db(),
             &dht_db_cache,
             keystore.clone(),
@@ -2084,7 +2097,7 @@ mod tests {
         .unwrap();
 
         let source_chain = SourceChain::new(
-            vault.clone().into(),
+            vault.clone(),
             dht_db.to_db(),
             dht_db_cache.clone(),
             keystore.clone(),
@@ -2171,7 +2184,7 @@ mod tests {
         let vault = test_db.to_db();
         let author = keystore.new_sign_keypair_random().await.unwrap();
         genesis(
-            vault.clone().into(),
+            vault.clone(),
             dht_db.to_db(),
             &dht_db_cache,
             keystore.clone(),
@@ -2213,7 +2226,7 @@ mod tests {
         let dna_hash = fixt!(DnaHash);
 
         genesis(
-            vault.clone().into(),
+            vault.clone(),
             dht_db.to_db(),
             &dht_db_cache,
             keystore.clone(),
@@ -2226,7 +2239,7 @@ mod tests {
         .unwrap();
 
         genesis(
-            vault.clone().into(),
+            vault.clone(),
             dht_db.to_db(),
             &dht_db_cache,
             keystore.clone(),
@@ -2357,7 +2370,7 @@ mod tests {
         let dna_hash = fixt!(DnaHash);
 
         genesis(
-            vault.clone().into(),
+            vault.clone(),
             dht_db.to_db(),
             &dht_db_cache,
             keystore.clone(),
@@ -2398,7 +2411,7 @@ mod tests {
         let dna_hash = fixt!(DnaHash);
 
         genesis(
-            vault.clone().into(),
+            vault.clone(),
             dht_db.to_db(),
             &dht_db_cache,
             keystore.clone(),
@@ -2416,7 +2429,7 @@ mod tests {
 
         // zomes initialized should be false after genesis
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
-        assert_eq!(zomes_initialized, false);
+        assert!(!zomes_initialized);
 
         // insert init marker into source chain
         let result = chain
@@ -2435,6 +2448,6 @@ mod tests {
 
         // zomes initialized should be true after init zomes has run
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
-        assert_eq!(zomes_initialized, true);
+        assert!(zomes_initialized);
     }
 }

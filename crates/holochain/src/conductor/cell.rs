@@ -4,10 +4,31 @@
 //! Records can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
-use super::api::CellConductorHandle;
-use super::interface::SignalBroadcaster;
-use super::space::Space;
-use super::ConductorHandle;
+use std::hash::Hash;
+use std::hash::Hasher;
+use std::sync::Arc;
+
+use futures::future::FutureExt;
+use holochain_serialized_bytes::SerializedBytes;
+use rusqlite::OptionalExtension;
+use rusqlite::Transaction;
+use tracing::*;
+use tracing_futures::Instrument;
+
+use error::CellError;
+use holo_hash::*;
+use holochain_cascade::authority;
+use holochain_conductor_api::ZomeCall;
+use holochain_nonce::fresh_nonce;
+use holochain_p2p::event::CountersigningSessionNegotiationMessage;
+use holochain_p2p::ChcImpl;
+use holochain_p2p::HolochainP2pDna;
+use holochain_sqlite::prelude::*;
+use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::prelude::*;
+use holochain_state::schedule::live_scheduled_fns;
+use holochain_types::db_cache::DhtDbQueryCache;
+
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::cell::error::CellResult;
 use crate::core::queue_consumer::spawn_queue_consumer_tasks;
@@ -27,28 +48,11 @@ use crate::core::workflow::GenesisWorkspace;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
 use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
-use error::CellError;
-use futures::future::FutureExt;
-use holo_hash::*;
-use holochain_cascade::authority;
-use holochain_conductor_api::ZomeCall;
-use holochain_nonce::fresh_nonce;
-use holochain_p2p::event::CountersigningSessionNegotiationMessage;
-use holochain_p2p::ChcImpl;
-use holochain_p2p::HolochainP2pDna;
-use holochain_serialized_bytes::SerializedBytes;
-use holochain_sqlite::prelude::*;
-use holochain_state::host_fn_workspace::SourceChainWorkspace;
-use holochain_state::prelude::*;
-use holochain_state::schedule::live_scheduled_fns;
-use holochain_types::db_cache::DhtDbQueryCache;
-use rusqlite::OptionalExtension;
-use rusqlite::Transaction;
-use std::hash::Hash;
-use std::hash::Hasher;
-use std::sync::Arc;
-use tracing::*;
-use tracing_futures::Instrument;
+
+use super::api::CellConductorHandle;
+use super::interface::SignalBroadcaster;
+use super::space::Space;
+use super::ConductorHandle;
 
 pub const INIT_MUTEX_TIMEOUT_SECS: u64 = 30;
 
@@ -117,14 +121,15 @@ impl Cell {
         id: CellId,
         conductor_handle: ConductorHandle,
         space: Space,
-        holochain_p2p_cell: holochain_p2p::HolochainP2pDna,
+        holochain_p2p_cell: HolochainP2pDna,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
         let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
+        let authored_db = space.get_or_create_authored_db(id.agent_pubkey().clone())?;
 
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran.
-            GenesisWorkspace::new(space.authored_db.clone(), space.dht_db.clone())?
+            GenesisWorkspace::new(authored_db.clone(), space.dht_db.clone())?
                 .has_genesis(id.agent_pubkey().clone())
                 .await?
         };
@@ -136,7 +141,7 @@ impl Cell {
                 &space,
                 conductor_handle.clone(),
             )
-            .await;
+            .await?;
 
             Ok((
                 Self {
@@ -239,10 +244,19 @@ impl Cell {
     }
 
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
+        let authored_db = match self.get_or_create_authored_db() {
+            Ok(db) => db,
+            Err(e) => {
+                error!(
+                    "error getting authored db, cannot dispatch scheduled functions: {:?}",
+                    e
+                );
+                return;
+            }
+        };
+
         let author = self.id.agent_pubkey().clone();
-        let lives = self
-            .space
-            .authored_db
+        let live_fns = authored_db
             .write_async(move |txn: &mut Transaction| {
                 // Rescheduling should not fail as the data in the database
                 // should be valid schedules only.
@@ -257,14 +271,14 @@ impl Cell {
             })
             .await;
 
-        match lives {
+        match live_fns {
             // Cannot proceed if we don't know what to run.
             Err(e) => {
                 error!("error calling scheduled fn: {:?}", e);
             }
-            Ok(lives) => {
+            Ok(live_fns) => {
                 let mut tasks = vec![];
-                for (scheduled_fn, schedule) in &lives {
+                for (scheduled_fn, schedule) in &live_fns {
                     // Failing to encode a schedule should never happen.
                     // If it does log the error and bail.
                     let payload = match ExternIO::encode(schedule) {
@@ -305,7 +319,7 @@ impl Cell {
                                 self.conductor_handle.keystore(),
                                 unsigned_zome_call,
                             )
-                            .await
+                                .await
                             {
                                 Ok(zome_call) => zome_call,
                                 Err(e) => {
@@ -322,11 +336,9 @@ impl Cell {
 
                 let author = self.id.agent_pubkey().clone();
                 // We don't do anything with errors in here.
-                let _ = self
-                    .space
-                    .authored_db
+                let _ = authored_db
                     .write_async(move |txn: &mut Transaction| {
-                        for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
+                        for ((scheduled_fn, _), result) in live_fns.iter().zip(results.iter()) {
                             match result {
                                 Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
                                     let next_schedule: Schedule = match extern_io.decode() {
@@ -365,6 +377,11 @@ impl Cell {
 
     #[instrument(skip(self, evt))]
     /// Entry point for incoming messages from the network that need to be handled
+    //
+    // TODO: when we had CellStatus to track whether a cell had joined the network or not,
+    // we would disallow zome calls for cells which had not joined. If we want that behavior,
+    // we can do that check at the time of this function call, rather than at the time of trying
+    // to access the Cell itself, as it was previously done.
     pub async fn handle_holochain_p2p_event(
         &self,
         evt: holochain_p2p::event::HolochainP2pEvent,
@@ -733,13 +750,12 @@ impl Cell {
         receipts: ValidationReceiptBundle,
     ) -> CellResult<()> {
         for receipt in receipts.into_iter() {
-            tracing::debug!(from = ?receipt.receipt.validators, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
+            debug!(from = ?receipt.receipt.validators, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
 
             // Get the action for this op so we can check the entry type.
             let hash = receipt.receipt.dht_op_hash.clone();
             let action: Option<SignedAction> = self
-                .space
-                .authored_db
+                .get_or_create_authored_db()?
                 .read_async(move |txn| {
                     let h: Option<Vec<u8>> = txn
                         .query_row(
@@ -818,8 +834,7 @@ impl Cell {
             if receipt_count >= required_validation_count as usize {
                 // Note that the flag is set in the authored db because that's what the publish workflow checks to decide
                 // whether to republish the op for more validation receipts.
-                self.space
-                    .authored_db
+                self.get_or_create_authored_db()?
                     .write_async(move |txn| -> StateMutationResult<()> {
                         set_receipts_complete(txn, &receipt_op_hash, true)
                     })
@@ -868,7 +883,11 @@ impl Cell {
     }
 
     /// Function called by the Conductor
-    // #[instrument(skip(self, call, workspace_lock))]
+    //
+    // TODO: when we had CellStatus to track whether a cell had joined the network or not,
+    // we would disallow zome calls for cells which had not joined. If we want that behavior,
+    // we can do that check at the time of the zome call, rather than at the time of trying
+    // to access the Cell itself, as it was previously done.
     pub async fn call_zome(
         &self,
         call: ZomeCall,
@@ -900,7 +919,7 @@ impl Cell {
             Some(l) => l,
             None => {
                 SourceChainWorkspace::new(
-                    self.authored_db().clone(),
+                    self.get_or_create_authored_db()?,
                     self.dht_db().clone(),
                     self.space.dht_query_cache.clone(),
                     self.cache().clone(),
@@ -934,7 +953,7 @@ impl Cell {
 
     /// Check if each Zome's init callback has been run, and if not, run it.
     #[tracing::instrument(skip(self))]
-    async fn check_or_run_zome_init(&self) -> CellResult<()> {
+    pub(crate) async fn check_or_run_zome_init(&self) -> CellResult<()> {
         // Ensure that only one init check is run at a time
         let _guard = tokio::time::timeout(
             std::time::Duration::from_secs(INIT_MUTEX_TIMEOUT_SECS),
@@ -955,7 +974,7 @@ impl Cell {
 
         // Create the workspace
         let workspace = SourceChainWorkspace::init_as_root(
-            self.authored_db().clone(),
+            self.get_or_create_authored_db()?,
             self.dht_db().clone(),
             self.space.dht_query_cache.clone(),
             self.cache().clone(),
@@ -1026,8 +1045,10 @@ impl Cell {
     }
 
     /// Accessor for the authored database backing this Cell
-    pub(crate) fn authored_db(&self) -> &DbWrite<DbKindAuthored> {
-        &self.space.authored_db
+    pub(crate) fn get_or_create_authored_db(&self) -> CellResult<DbWrite<DbKindAuthored>> {
+        Ok(self
+            .space
+            .get_or_create_authored_db(self.id.agent_pubkey().clone())?)
     }
 
     /// Accessor for the authored database backing this Cell

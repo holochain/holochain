@@ -20,6 +20,7 @@ pub fn spawn_sys_validation_consumer(
     let trigger_self = tx.clone();
     let workspace = Arc::new(workspace);
     let space = Arc::new(space);
+    let config = conductor.config.clone();
 
     let current_validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
@@ -35,6 +36,7 @@ pub fn spawn_sys_validation_consumer(
                 trigger_app_validation.clone(),
                 trigger_self.clone(),
                 network.clone(),
+                config.clone(),
             )
         },
     );
