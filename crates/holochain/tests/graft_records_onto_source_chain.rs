@@ -4,7 +4,9 @@
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::conductor::api::error::ConductorApiError;
-use holochain::sweettest::{DynSweetRendezvous, SweetConductor, SweetDnaFile, SweetInlineZomes};
+use holochain::sweettest::{
+    DynSweetRendezvous, SweetConductor, SweetConductorConfig, SweetDnaFile, SweetInlineZomes,
+};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
