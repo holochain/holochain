@@ -399,7 +399,9 @@ async fn test_signing_error_during_genesis() {
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign]).await;
 
-    let result = conductor.setup_app(&"app", [&dna]).await;
+    let result = conductor
+        .setup_app_for_agents(&"app", &[fixt!(AgentPubKey)], [&dna])
+        .await;
 
     // - Assert that we got an error during Genesis. However, this test is
     //   pretty useless. What we really want is to ensure that the system is

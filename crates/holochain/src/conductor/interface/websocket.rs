@@ -317,6 +317,8 @@ pub mod test {
     use crate::sweettest::SweetDnaFile;
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
+    use holochain_conductor_api::conductor::ConductorConfig;
+    use holochain_conductor_api::conductor::DpkiConfig;
     use holochain_keystore::test_keystore;
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
@@ -718,11 +720,17 @@ pub mod test {
         // Run the same DNA in cell 3 to check that grouping works correctly
         let cell_id_3 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_2()));
 
-        let handle = SweetConductorConfig::standard()
-            .no_dpki()
-            .build_conductor()
+        let db_dir = test_db_dir();
+
+        let handle = ConductorBuilder::new()
+            .config(ConductorConfig {
+                dpki: Some(DpkiConfig::disabled()),
+                ..Default::default()
+            })
+            .with_data_root_path(db_dir.path().to_path_buf().into())
+            .test(&[])
             .await
-            .raw_handle();
+            .unwrap();
 
         install_app_in_conductor(
             handle.clone(),
@@ -1062,7 +1070,11 @@ pub mod test {
             make_dna("2", vec![TestWasm::Anchor]).await,
         ];
 
-        let mut conductor = SweetConductorConfig::standard().build_conductor().await;
+        let mut conductor = SweetConductorConfig::standard()
+            .no_dpki()
+            .build_conductor()
+            .await;
+
         let agent = conductor.setup_app("app", &dnas).await.unwrap().cells()[0]
             .agent_pubkey()
             .clone();
@@ -1084,7 +1096,7 @@ pub mod test {
                 }
                 count
             },
-            2
+            2 + 1 // + 1 for DPKI
         );
 
         // - Get agents and space
