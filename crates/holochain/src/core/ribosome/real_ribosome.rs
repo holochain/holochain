@@ -630,10 +630,7 @@ impl RealRibosome {
         self.usage_meter.add(
             points_used,
             &[
-                opentelemetry_api::KeyValue::new(
-                    "dna",
-                    self.dna_file.dna().hash.to_string(),
-                ),
+                opentelemetry_api::KeyValue::new("dna", self.dna_file.dna().hash.to_string()),
                 opentelemetry_api::KeyValue::new(
                     "zome",
                     call_context.zome().zome_name().to_string(),
