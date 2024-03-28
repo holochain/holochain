@@ -384,13 +384,13 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                 writeln!(out, "This DNA {:?} is {:?}", this_dna.0, this_dna.1)?;
 
                 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-                let duration = Duration::milliseconds(info.signed_at_ms as i64);
+                let duration = Duration::try_milliseconds(info.signed_at_ms as i64).unwrap();
                 let s = duration.num_seconds();
                 let n = duration.clone().to_std().unwrap().subsec_nanos();
                 // TODO FIXME
                 #[allow(deprecated)]
                 let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-                let duration = Duration::milliseconds(info.expires_at_ms as i64);
+                let duration = Duration::try_milliseconds(info.expires_at_ms as i64).unwrap();
                 let s = duration.num_seconds();
                 let n = duration.clone().to_std().unwrap().subsec_nanos();
                 // TODO FIXME
