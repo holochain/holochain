@@ -527,7 +527,16 @@ mod dna_impls {
     impl Conductor {
         /// Get the list of hashes of installed Dnas in this Conductor
         pub fn list_dnas(&self) -> Vec<DnaHash> {
-            self.ribosome_store().share_ref(|ds| ds.list())
+            let dpki_dna_hash = self
+                .running_services()
+                .dpki
+                .and_then(|dpki| dpki.cell_id())
+                .map(|id| id.dna_hash().clone());
+            let mut hashes = self.ribosome_store().share_ref(|ds| ds.list());
+            if let Some(dpki_dna_hash) = dpki_dna_hash {
+                hashes.retain(|h| *h != dpki_dna_hash);
+            }
+            hashes
         }
 
         /// Get a [`DnaDef`](holochain_types::prelude::DnaDef) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)

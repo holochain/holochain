@@ -27,7 +27,8 @@ pub type DpkiImpl = Arc<dyn DpkiService>;
 pub trait DpkiService: Send + Sync {
     fn uuid(&self) -> [u8; 32];
 
-    fn dpki_agent(&self) -> AgentPubKey;
+    /// If the service is backed by a cell, return the CellId
+    fn cell_id(&self) -> Option<CellId>;
 
     /// Allows the DPKI service to determine if it should run for a given DNA.
     ///

@@ -556,8 +556,7 @@ impl SweetConductor {
     /// Get the cell providing the DPKI service, if applicable
     pub fn dpki_cell(&self) -> Option<SweetCell> {
         let dpki = self.raw_handle().running_services().dpki?;
-        let agent = dpki.dpki_agent();
-        let cell_id = CellId::new(DnaHash::from_raw_32(dpki.uuid().to_vec()), agent.clone());
+        let cell_id = dpki.cell_id()?;
         Some(self.get_sweet_cell(cell_id).unwrap())
     }
 

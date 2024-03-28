@@ -59,8 +59,8 @@ impl DpkiService for DeepkeyBuiltin {
         self.installation.cell_id.dna_hash() != dna_hash
     }
 
-    fn dpki_agent(&self) -> AgentPubKey {
-        self.installation.cell_id.agent_pubkey().clone()
+    fn cell_id(&self) -> Option<CellId> {
+        Some(self.installation.cell_id.clone())
     }
 
     async fn key_state(
@@ -134,7 +134,7 @@ impl DpkiService for DeepkeyBuiltin {
             .map_err(|e| DpkiServiceError::Lair(e.into()))?;
         let app_agent = AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec());
 
-        let dpki_agent = self.dpki_agent();
+        let dpki_agent = self.installation.cell_id.agent_pubkey();
         // This is the signature Deepkey requires
         let signature = app_agent
             .sign_raw(&self.keystore, dpki_agent.get_raw_39().into())
