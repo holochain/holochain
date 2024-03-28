@@ -68,6 +68,7 @@ mod tests {
             fixt!(UrlList, Empty),
             0,
             std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64 + 60_000_000,
+            true,
             |_| async move { Ok(Arc::new(fixt!(KitsuneSignature, Unpredictable))) },
         )
         .await

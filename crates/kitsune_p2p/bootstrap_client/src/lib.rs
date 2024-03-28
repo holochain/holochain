@@ -243,6 +243,7 @@ mod tests {
             urls,
             signed_at_ms,
             expires_at_ms,
+            true,
             |d| {
                 let d = Arc::new(d.to_vec());
                 async move {
@@ -336,6 +337,7 @@ mod tests {
                 fixt!(UrlList),
                 signed_at_ms,
                 expires_at_ms,
+                true,
                 |d| {
                     let d = Arc::new(d.to_vec());
                     async move {
