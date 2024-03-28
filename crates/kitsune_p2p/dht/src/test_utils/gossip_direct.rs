@@ -50,7 +50,7 @@ pub fn gossip_direct<Peer: HostAccessTest>(
         al.print_arqs(topo, 64);
         ar.print_arqs(topo, 64);
         if (al.power() as i8 - ar.power() as i8).unsigned_abs()
-            > u8::min(gpl.max_space_power_offset, gpr.max_space_power_offset)
+            > u8::min(gpl.max_power_offset, gpr.max_power_offset)
         {
             return Err(GossipError::ArqPowerDiffTooLarge);
         }

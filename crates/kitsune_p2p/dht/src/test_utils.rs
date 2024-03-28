@@ -60,7 +60,7 @@ pub fn unit_arq(topo: &Topology, strat: &ArqStrat, unit_start: f64, unit_len: f6
     );
 
     approximate_arq(
-        topo,
+        topo.space,
         strat,
         Loc::from((unit_start * full_len()) as u32),
         (unit_len * full_len()) as u64,
@@ -159,12 +159,12 @@ fn test_unit_arc() {
 
     {
         let a = unit_arq(&topo, &strat, 0.0, 0.0);
-        assert_eq!(a.power(), topo.min_space_power());
+        assert_eq!(a.power(), topo.space.min_power());
         assert_eq!(a.count(), 0);
     }
     {
         let a = unit_arq(&topo, &strat, 0.0, 1.0);
-        assert_eq!(a.power(), topo.max_space_power(&strat));
+        assert_eq!(a.power(), topo.space.max_power(&strat));
         assert_eq!(a.count(), 8);
     }
     {
@@ -273,8 +273,8 @@ mod tests {
                 ..ArqStrat::default()
             };
             let a = unit_arq(&topo, &strat, center, len);
-            assert!(a.power() >= topo.min_space_power());
-            assert!(a.power() <= topo.max_space_power(&strat));
+            assert!(a.power() >= topo.space.min_power());
+            assert!(a.power() <= topo.space.max_power(&strat));
         }
 
         #[test]

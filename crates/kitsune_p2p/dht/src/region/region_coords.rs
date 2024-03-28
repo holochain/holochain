@@ -2,7 +2,7 @@ use crate::Loc;
 use kitsune_p2p_dht_arc::DhtArc;
 use kitsune_p2p_timestamp::Timestamp;
 
-use crate::spacetime::{SpaceSegment, SpacetimeQuantumCoords, TimeSegment, Topology};
+use crate::spacetime::*;
 
 /// The cross product of a space segment and at time segment forms a Region.
 /// Hence, these two segments are the coordinates which define a Region of spacetime.
@@ -32,15 +32,15 @@ impl RegionCoords {
     /// bounds specifying the region
     pub fn to_bounds(&self, topo: &Topology) -> RegionBounds {
         RegionBounds {
-            x: self.space.loc_bounds(topo),
+            x: self.space.loc_bounds(topo.space),
             t: self.time.timestamp_bounds(topo),
         }
     }
 
     /// Does the region contain this spacetime quantum?
     pub fn contains(&self, topo: &Topology, coords: &SpacetimeQuantumCoords) -> bool {
-        self.space.contains_quantum(topo, coords.space)
-            && self.time.contains_quantum(topo, coords.time)
+        self.space.contains_quantum(topo.space, coords.space)
+            && self.time.contains_quantum(topo.time, coords.time)
     }
 
     /// Split this region into 4 equal subregions, if possible.

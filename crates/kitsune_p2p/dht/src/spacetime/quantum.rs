@@ -24,7 +24,7 @@ pub struct SpaceQuantum(u32);
 impl SpaceQuantum {
     /// The inclusive locations at either end of this quantum
     pub fn to_loc_bounds(&self, topo: &Topology) -> (Loc, Loc) {
-        let (a, b): (u32, u32) = bounds(&topo.space, 0, self.0.into(), 1);
+        let (a, b): (u32, u32) = bounds(topo.space.into(), 0, self.0.into(), 1);
         (Loc::from(a), Loc::from(b))
     }
 }
@@ -59,7 +59,7 @@ impl TimeQuantum {
 
     /// The inclusive timestamps at either end of this quantum
     pub fn to_timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
-        let (a, b): (i64, i64) = bounds64(&topo.time, 0, self.0.into(), 1);
+        let (a, b): (i64, i64) = bounds64(topo.time.into(), 0, self.0.into(), 1);
         (
             Timestamp::from_micros(a + topo.time_origin.as_micros()),
             Timestamp::from_micros(b + topo.time_origin.as_micros()),
@@ -75,24 +75,24 @@ pub trait Quantum:
     /// The absolute coordinate which this quantum corresponds to (time or space)
     type Absolute;
 
+    /// The dimension type which this quantum corresponds to (time or space)
+    type Dim: Into<Dimension> + Copy;
+
     /// The u32 representation
     fn inner(&self) -> u32;
 
-    /// Return the proper dimension (time or space) from the topology
-    fn dimension(topo: &Topology) -> &Dimension;
-
     /// If this coord is beyond the max value for its dimension, wrap it around
     /// the max value
-    fn normalized(self, topo: &Topology) -> Self;
+    fn normalized(self, dim: impl Into<Self::Dim>) -> Self;
 
     /// The maximum quantum for this dimension
-    fn max_value(topo: &Topology) -> Self {
-        Self::from((2u64.pow(Self::dimension(topo).bit_depth as u32) - 1) as u32)
+    fn max_value(dim: impl Into<Self::Dim>) -> Self {
+        Self::from((2u64.pow(dim.into().into().bit_depth as u32) - 1) as u32)
     }
 
     /// Convert to the absolute u32 coordinate space, wrapping if needed
-    fn exp_wrapping(&self, topo: &Topology, pow: u8) -> u32 {
-        (self.inner() as u64 * Self::dimension(topo).quantum as u64 * 2u64.pow(pow as u32)) as u32
+    fn exp_wrapping(&self, dim: impl Into<Self::Dim>, pow: u8) -> u32 {
+        (self.inner() as u64 * dim.into().into().quantum as u64 * 2u64.pow(pow as u32)) as u32
     }
 
     /// Exposes wrapping addition for the u32
@@ -108,17 +108,14 @@ pub trait Quantum:
 
 impl Quantum for SpaceQuantum {
     type Absolute = Loc;
+    type Dim = SpaceDimension;
 
     fn inner(&self) -> u32 {
         self.0
     }
 
-    fn dimension(topo: &Topology) -> &Dimension {
-        &topo.space
-    }
-
-    fn normalized(self, topo: &Topology) -> Self {
-        let depth = topo.space.bit_depth;
+    fn normalized(self, dim: impl Into<SpaceDimension>) -> Self {
+        let depth = dim.into().bit_depth;
         if depth >= 32 {
             self
         } else {
@@ -129,17 +126,14 @@ impl Quantum for SpaceQuantum {
 
 impl Quantum for TimeQuantum {
     type Absolute = Timestamp;
+    type Dim = TimeDimension;
 
     fn inner(&self) -> u32 {
         self.0
     }
 
-    fn dimension(topo: &Topology) -> &Dimension {
-        &topo.time
-    }
-
     // Time coordinates do not wrap, so normalization is an identity
-    fn normalized(self, _topo: &Topology) -> Self {
+    fn normalized(self, _dim: impl Into<TimeDimension>) -> Self {
         self
     }
 }
@@ -173,7 +167,7 @@ mod tests {
             (12.into(), 12.into())
         );
         assert_eq!(
-            SpaceQuantum::max_value(&topo).to_loc_bounds(&topo),
+            SpaceQuantum::max_value(topo.space).to_loc_bounds(&topo),
             (u32::MAX.into(), u32::MAX.into())
         );
 
@@ -183,7 +177,7 @@ mod tests {
         );
 
         assert_eq!(
-            TimeQuantum::max_value(&topo).to_timestamp_bounds(&topo),
+            TimeQuantum::max_value(topo.time).to_timestamp_bounds(&topo),
             (
                 Timestamp::from_micros(u32::MAX as i64),
                 Timestamp::from_micros(u32::MAX as i64),
@@ -204,7 +198,7 @@ mod tests {
             ((12 * xq).into(), (13 * xq - 1).into())
         );
         assert_eq!(
-            SpaceQuantum::max_value(&topo).to_loc_bounds(&topo),
+            SpaceQuantum::max_value(topo.space).to_loc_bounds(&topo),
             ((u32::MAX - xq + 1).into(), u32::MAX.into())
         );
 
@@ -217,16 +211,19 @@ mod tests {
         );
 
         // just ensure this doesn't panic
-        let _ = TimeQuantum::max_value(&topo).to_timestamp_bounds(&topo);
+        let _ = TimeQuantum::max_value(topo.time).to_timestamp_bounds(&topo);
     }
 
     #[test]
     fn test_contains() {
         let topo = Topology::unit_zero();
         let s = TimeSegment::new(31, 0);
-        assert_eq!(s.quantum_bounds(&topo), (0.into(), (u32::MAX / 2).into()));
-        assert!(s.contains_quantum(&topo, 0.into()));
-        assert!(!s.contains_quantum(&topo, (u32::MAX / 2 + 2).into()));
+        assert_eq!(
+            s.quantum_bounds(topo.time),
+            (0.into(), (u32::MAX / 2).into())
+        );
+        assert!(s.contains_quantum(topo.time, 0.into()));
+        assert!(!s.contains_quantum(topo.time, (u32::MAX / 2 + 2).into()));
     }
 
     #[test]
@@ -234,15 +231,15 @@ mod tests {
         let topo = Topology::standard_epoch_full();
         let m = pow2(topo.space.bit_depth);
         let s = SpaceSegment::new(2, m + 5);
-        let bounds = s.quantum_bounds(&topo);
+        let bounds = s.quantum_bounds(topo.space);
         // The quantum bounds are normalized (wrapped)
-        assert_eq!(bounds, SpaceSegment::new(2, 5).quantum_bounds(&topo));
+        assert_eq!(bounds, SpaceSegment::new(2, 5).quantum_bounds(topo.space));
         assert_eq!(bounds, (20.into(), 23.into()));
 
-        assert!(s.contains_quantum(&topo, 20.into()));
-        assert!(s.contains_quantum(&topo, 23.into()));
-        assert!(s.contains_quantum(&topo, (m * 2 + 20).into()));
-        assert!(s.contains_quantum(&topo, (m * 3 + 23).into()));
-        assert!(!s.contains_quantum(&topo, (m * 4 + 24).into()));
+        assert!(s.contains_quantum(topo.space, 20.into()));
+        assert!(s.contains_quantum(topo.space, 23.into()));
+        assert!(s.contains_quantum(topo.space, (m * 2 + 20).into()));
+        assert!(s.contains_quantum(topo.space, (m * 3 + 23).into()));
+        assert!(!s.contains_quantum(topo.space, (m * 4 + 24).into()));
     }
 }

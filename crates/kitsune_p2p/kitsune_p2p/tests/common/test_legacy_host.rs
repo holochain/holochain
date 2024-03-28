@@ -10,11 +10,7 @@ use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     dependencies::lair_keystore_api::LairClient,
-    dht::{
-        arq::LocalStorageConfig,
-        spacetime::{Dimension, Topology},
-        ArqStrat, PeerStrat,
-    },
+    dht::{arq::LocalStorageConfig, spacetime::*, ArqStrat, PeerStrat},
     dht_arc::{DhtArc, DhtArcRange},
     KAgent,
 };
@@ -172,8 +168,8 @@ impl TestLegacyHost {
                         } => {
                             let cutoff = std::time::Duration::from_secs(60 * 15);
                             let topology = Topology {
-                                space: Dimension::standard_space(),
-                                time: Dimension::time(std::time::Duration::from_secs(60 * 5)),
+                                space: SpaceDimension::standard(),
+                                time: TimeDimension::new(std::time::Duration::from_secs(60 * 5)),
                                 time_origin: Timestamp::now(),
                                 time_cutoff: cutoff,
                             };
