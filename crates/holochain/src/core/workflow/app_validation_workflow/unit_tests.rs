@@ -187,15 +187,15 @@ async fn validation_callback_awaiting_deps_hashes() {
 
     // respond to Get request with requested action
     tokio::spawn({
-        let action_hash = action.clone().to_hash();
-        let action_hash_32 = action_hash.get_raw_32().to_vec();
+        let action = action.clone();
         async move {
+            let action_hash = action.clone().to_hash();
             while let Some(evt) = rx.recv().await {
                 if let HolochainP2pEvent::Get {
                     dht_hash, respond, ..
                 } = evt
                 {
-                    assert_eq!(dht_hash.get_raw_32().to_vec(), action_hash_32);
+                    assert_eq!(dht_hash, action_hash.clone().into());
 
                     respond.r(ok_fut(Ok(WireOps::Record(WireRecordOps {
                         action: Some(Judged::new(
@@ -223,9 +223,7 @@ async fn validation_callback_awaiting_deps_hashes() {
     )
     .await
     .unwrap();
-    let random_action_hash = action.clone().to_hash();
-    let random_action_hash_32 = random_action_hash.get_raw_32().to_vec();
-    assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![AnyDhtHash::from_raw_32_and_type(random_action_hash_32, AnyDht::Action)]);
+    assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![action.clone().to_hash().into()]);
 
     // await while missing record is being fetched in background task
     tokio::time::sleep(Duration::from_millis(500)).await;
@@ -402,16 +400,15 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
 
     // respond to Get request with requested action
     tokio::spawn({
-        let action_hash = action.clone().to_hash();
-        let action_hash_32 = action_hash.get_raw_32().to_vec();
         let times_fetched = Arc::clone(&times_same_hash_is_fetched);
         async move {
+            let action_hash = action.clone().to_hash();
             while let Some(evt) = rx.recv().await {
                 if let HolochainP2pEvent::Get {
                     dht_hash, respond, ..
                 } = evt
                 {
-                    assert_eq!(dht_hash.get_raw_32().to_vec(), action_hash_32);
+                    assert_eq!(dht_hash, action_hash.clone().into());
 
                     respond.r(ok_fut(Ok(WireOps::Record(WireRecordOps {
                         action: Some(Judged::new(
