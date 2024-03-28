@@ -47,6 +47,7 @@ use holochain::{
 };
 use holochain_conductor_api::AppResponse;
 use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 use holochain_util::tokio_helper;
 
 /// Wrapper that synchronously waits for the Child to terminate on drop.
@@ -160,7 +161,10 @@ pub async fn call_zome_fn<S>(
 }
 
 pub async fn attach_app_interface(client: &mut WebsocketSender, port: Option<u16>) -> u16 {
-    let request = AdminRequest::AttachAppInterface { port };
+    let request = AdminRequest::AttachAppInterface {
+        port,
+        allowed_origins: AllowedOrigins::Any,
+    };
     let response = client.request(request);
     let response = check_timeout(response, 3000).await;
     match response {
@@ -200,17 +204,16 @@ pub async fn generate_agent_pubkey(client: &mut WebsocketSender, timeout: u64) -
     unwrap_to::unwrap_to!(response => AdminResponse::AgentPubKeyGenerated).clone()
 }
 
+/// Returns the hash of the DNA installed, after modifiers have been applied
 pub async fn register_and_install_dna(
     client: &mut WebsocketSender,
-    agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
     role_name: RoleName,
     timeout: u64,
-) -> DnaHash {
+) -> CellId {
     register_and_install_dna_named(
         client,
-        agent_key,
         dna_path,
         properties,
         role_name,
@@ -220,24 +223,24 @@ pub async fn register_and_install_dna(
     .await
 }
 
+/// Returns the hash of the DNA installed, after modifiers have been applied
 pub async fn register_and_install_dna_named(
     client: &mut WebsocketSender,
-    agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
     role_name: RoleName,
     name: String,
     timeout: u64,
-) -> DnaHash {
+) -> CellId {
     let mods = DnaModifiersOpt {
         properties,
         ..Default::default()
     };
-    let dna_compat = DnaCompatParams::default();
+
     let dna_bundle1 = DnaBundle::read_from_file(&dna_path).await.unwrap();
     let dna_bundle = DnaBundle::read_from_file(&dna_path).await.unwrap();
     let (dna, _) = dna_bundle1
-        .into_dna_file(mods.clone().serialized().unwrap(), dna_compat)
+        .into_dna_file(mods.clone().serialized().unwrap())
         .await
         .unwrap();
     let dna_hash = dna.dna_hash().clone();
@@ -262,14 +265,12 @@ pub async fn register_and_install_dna_named(
 
     let resources = vec![(dna_path.clone(), dna_bundle)];
 
-    dbg!(&manifest);
-
     let bundle = AppBundle::new(manifest.clone().into(), resources, dna_path.clone())
         .await
         .unwrap();
 
     let payload = InstallAppPayload {
-        agent_key,
+        agent_key: None,
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(name),
         network_seed: None,
@@ -280,8 +281,11 @@ pub async fn register_and_install_dna_named(
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
     let response = check_timeout_named("InstallApp", response, timeout).await;
-    assert_matches!(response, AdminResponse::AppInstalled(_));
-    dna_hash
+    if let AdminResponse::AppInstalled(app) = response {
+        CellId::new(dna_hash, app.agent_pub_key)
+    } else {
+        panic!("InstallApp failed: {:?}", response);
+    }
 }
 
 pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16> {
@@ -335,7 +339,10 @@ pub async fn check_started(holochain: &mut Child) {
 pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig {
     ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port },
+            driver: InterfaceDriver::Websocket {
+                port,
+                allowed_origins: AllowedOrigins::Any,
+            },
         }]),
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,

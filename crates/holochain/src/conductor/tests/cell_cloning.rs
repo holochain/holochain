@@ -29,9 +29,8 @@ async fn create_clone_cell_with_wrong_app_or_role_name_fails() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
-    let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna)])
+        .setup_app("app", [&(role_name.clone(), dna)])
         .await
         .unwrap();
 
@@ -65,9 +64,8 @@ async fn create_clone_cell_creates_callable_cell() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
-    let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna.clone())])
+        .setup_app("app", [&(role_name.clone(), dna.clone())])
         .await
         .unwrap();
 
@@ -101,9 +99,8 @@ async fn create_clone_cell_run_twice_returns_correct_clones() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
-    let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna.clone())])
+        .setup_app("app", [&(role_name.clone(), dna.clone())])
         .await
         .unwrap();
 
@@ -141,13 +138,8 @@ async fn create_identical_clone_cell_twice_fails() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
-    let (alice, bob) = SweetAgents::two(conductor.keystore()).await;
     let apps = conductor
-        .setup_app_for_agents(
-            "app",
-            &[alice.clone(), bob.clone()],
-            [&(role_name.clone(), dna.clone())],
-        )
+        .setup_apps("app", 2, [&(role_name.clone(), dna.clone())])
         .await
         .unwrap()
         .into_inner();
@@ -181,7 +173,7 @@ async fn create_identical_clone_cell_twice_fails() {
         .clone()
         .disable_clone_cell(&DisableCloneCellPayload {
             app_id: alice_app.installed_app_id().clone(),
-            clone_cell_id: CloneCellId::CellId(alice_clone_cell.cell_id.clone()),
+            clone_cell_id: CloneCellId::DnaHash(alice_clone_cell.cell_id.dna_hash().clone()),
         })
         .await
         .unwrap();
@@ -216,10 +208,9 @@ async fn clone_cell_deletion() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
-    let alice = SweetAgents::one(conductor.keystore()).await;
     let app_id = "app";
     conductor
-        .setup_app_for_agent(app_id, alice.clone(), [&(role_name.clone(), dna)])
+        .setup_app(app_id, [&(role_name.clone(), dna)])
         .await
         .unwrap();
     let clone_cell = conductor
@@ -305,7 +296,7 @@ async fn clone_cell_deletion() {
         .raw_handle()
         .enable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.into(),
-            clone_cell_id: CloneCellId::CellId(clone_cell.cell_id.clone()),
+            clone_cell_id: CloneCellId::DnaHash(clone_cell.cell_id.dna_hash().clone()),
         })
         .await
         .unwrap();
@@ -326,7 +317,7 @@ async fn clone_cell_deletion() {
         .raw_handle()
         .delete_clone_cell(&DeleteCloneCellPayload {
             app_id: app_id.into(),
-            clone_cell_id: CloneCellId::CellId(clone_cell.cell_id.clone()),
+            clone_cell_id: CloneCellId::DnaHash(clone_cell.cell_id.dna_hash().clone()),
         })
         .await
         .unwrap();
@@ -346,9 +337,8 @@ async fn conductor_can_startup_with_cloned_cell() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
-    let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna)])
+        .setup_app("app", [&(role_name.clone(), dna)])
         .await
         .unwrap();
 
@@ -391,7 +381,7 @@ async fn conductor_can_startup_with_cloned_cell() {
         .clone()
         .disable_clone_cell(&DisableCloneCellPayload {
             app_id: app.installed_app_id().clone(),
-            clone_cell_id: CloneCellId::CellId(clone_cell.cell_id.clone()),
+            clone_cell_id: CloneCellId::DnaHash(clone_cell.cell_id.dna_hash().clone()),
         })
         .await
         .unwrap();

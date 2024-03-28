@@ -151,7 +151,7 @@ pub enum OpRecord<ET: UnitEnum, LT> {
     /// [`Action::OpenChain`] and contains the previous
     /// chains's [`DnaHash`].
     OpenChain {
-        /// Hash of the prevous DNA that we are migrating from
+        /// Hash of the previous DNA that we are migrating from
         previous_dna_hash: DnaHash,
         /// The [`OpenChain`] action
         action: OpenChain,

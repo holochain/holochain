@@ -4,7 +4,7 @@
 //! implementation details we don't know or care about. We want well-defined interfaces for these
 //! services such that a third party could write their own.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 mod dpki_service;
 pub use dpki_service::*;
@@ -31,28 +31,9 @@ pub trait CellRunner: Send + Sync + 'static {
 #[derive(Clone, Default)]
 pub struct ConductorServices {
     /// The DPKI service
-    pub dpki: Option<Arc<dyn DpkiService>>,
+    pub dpki: Option<DpkiImpl>,
     /// The AppStore service
     pub app_store: Option<Arc<dyn AppStoreService>>,
-}
-
-impl ConductorServices {
-    /// Get the list of any CellIds which may be protected due to being in use by ConductorServices
-    pub fn protected_cell_ids(&self) -> HashSet<&CellId> {
-        let dpki_cell = self
-            .dpki
-            .as_ref()
-            .map(|d| d.cell_id())
-            .into_iter()
-            .collect();
-        let app_store_cells = self
-            .app_store
-            .as_ref()
-            .map(|d| d.cell_ids())
-            .unwrap_or_default();
-
-        app_store_cells.union(&dpki_cell).copied().collect()
-    }
 }
 
 /// Initialized for ConductorService: just the CellIds that are used for each service

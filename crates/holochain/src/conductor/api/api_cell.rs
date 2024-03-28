@@ -75,7 +75,9 @@ impl CellConductorApiT for CellConductorApi {
     }
 
     fn conductor_services(&self) -> ConductorServices {
-        self.conductor_handle.services.share_ref(|s| s.clone())
+        self.conductor_handle
+            .running_services
+            .share_ref(|s| s.clone())
     }
 
     fn keystore(&self) -> &MetaLairClient {
@@ -102,12 +104,12 @@ impl CellConductorApiT for CellConductorApi {
             .get_ribosome(self.cell_id.dna_hash())?)
     }
 
+    #[tracing::instrument(skip(self))]
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
-        Ok(self
+        let dna = self
             .get_dna(dna_hash)
-            .ok_or_else(|| ConductorApiError::DnaMissing(dna_hash.clone()))?
-            .dna_def()
-            .get_zome(zome_name)?)
+            .ok_or_else(|| ConductorApiError::DnaMissing(dna_hash.clone()))?;
+        Ok(dna.dna_def().get_zome(zome_name)?)
     }
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {

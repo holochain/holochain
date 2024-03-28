@@ -4,7 +4,7 @@ use std::{collections::HashMap, path::PathBuf};
 use crate::conductor::api::error::ConductorApiError;
 use crate::{conductor::error::ConductorError, sweettest::*};
 use ::fixt::prelude::strum_macros;
-use holo_hash::{AgentPubKey, DnaHash};
+use holo_hash::DnaHash;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use matches::assert_matches;
@@ -17,7 +17,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
 
-    async fn make_payload(agent_key: AgentPubKey, clone_limit: u32) -> InstallAppPayload {
+    async fn make_payload(clone_limit: u32) -> InstallAppPayload {
         // The integrity zome in this WASM will fail if the properties are not set. This helps verify that genesis
         // is not being run for the clone-only cell and will only run for the cloned cells.
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![
@@ -51,7 +51,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             .unwrap();
 
         InstallAppPayload {
-            agent_key,
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
@@ -65,7 +65,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
     assert_matches!(
         conductor
             .clone()
-            .install_app_bundle(make_payload(agent.clone(), 0).await)
+            .install_app_bundle(make_payload(0).await)
             .await
             .unwrap_err(),
         ConductorError::AppBundleError(AppBundleError::AppManifestError(
@@ -73,11 +73,13 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
         ))
     );
 
+    todo!("Need to be able to roll back the DPKI failure here.");
+
     {
         // Succeeds with clone limit of 1
         let app = conductor
             .clone()
-            .install_app_bundle(make_payload(agent.clone(), 1).await)
+            .install_app_bundle(make_payload(1).await)
             .await
             .unwrap();
 
@@ -137,12 +139,10 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
 #[tokio::test(flavor = "multi_thread")]
 async fn reject_duplicate_app_for_same_agent() {
     let conductor = SweetConductor::from_standard_config().await;
-    let alice = SweetAgents::one(conductor.keystore()).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let path = PathBuf::from(format!("{}", dna.dna_hash()));
     let modifiers = DnaModifiersOpt::none();
-    let cell_id = CellId::new(dna.dna_hash().to_owned(), alice.clone());
 
     let roles = vec![AppRoleManifest {
         name: "name".into(),
@@ -166,10 +166,10 @@ async fn reject_duplicate_app_for_same_agent() {
         .await
         .unwrap();
 
-    conductor
+    let app = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            agent_key: alice.clone(),
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
@@ -179,6 +179,9 @@ async fn reject_duplicate_app_for_same_agent() {
         })
         .await
         .unwrap();
+    let alice = app.agent_key().clone();
+
+    let cell_id = CellId::new(dna.dna_hash().to_owned(), app.agent_key().clone());
 
     let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
     let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
@@ -188,7 +191,7 @@ async fn reject_duplicate_app_for_same_agent() {
         .clone()
         .install_app_bundle(InstallAppPayload {
             source: AppBundleSource::Bundle(bundle),
-            agent_key: alice.clone(),
+            agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
             membrane_proofs: HashMap::new(),
             #[cfg(feature = "chc")]
@@ -212,7 +215,7 @@ async fn reject_duplicate_app_for_same_agent() {
         .clone()
         .install_app_bundle(InstallAppPayload {
             source: AppBundleSource::Bundle(bundle),
-            agent_key: alice.clone(),
+            agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
             membrane_proofs: HashMap::new(),
             #[cfg(feature = "chc")]
@@ -233,7 +236,7 @@ async fn reject_duplicate_app_for_same_agent() {
         .clone()
         .install_app_bundle(InstallAppPayload {
             source: AppBundleSource::Bundle(bundle),
-            agent_key: alice.clone(),
+            agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
             membrane_proofs: HashMap::new(),
             #[cfg(feature = "chc")]
@@ -247,7 +250,6 @@ async fn reject_duplicate_app_for_same_agent() {
 #[tokio::test(flavor = "multi_thread")]
 async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_info() {
     let conductor = SweetConductor::from_standard_config().await;
-    let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let path = PathBuf::from(format!("{}", dna.dna_hash()));
@@ -283,7 +285,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            agent_key: alice.clone(),
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
             network_seed: Some("final seed".into()),
@@ -327,7 +329,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            agent_key: bobbo,
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_2".into()),
             network_seed: None,
@@ -342,7 +344,6 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
 #[tokio::test(flavor = "multi_thread")]
 async fn network_seed_regression() {
     let conductor = SweetConductor::from_standard_config().await;
-    let agent = SweetAgents::one(conductor.keystore()).await;
     let tmp = tempdir().unwrap();
     let (dna, _, _) = SweetDnaFile::from_test_wasms(
         "".into(),
@@ -392,7 +393,7 @@ async fn network_seed_regression() {
     let _app1 = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            agent_key: agent.clone(),
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle1),
             installed_app_id: Some("no-seed".into()),
             network_seed: None,
@@ -406,7 +407,7 @@ async fn network_seed_regression() {
     let _app2 = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            agent_key: agent.clone(),
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle2),
             installed_app_id: Some("yes-seed".into()),
             network_seed: Some("seed".into()),
@@ -574,7 +575,6 @@ impl TestCase {
             Seed::B => common.dnas[2].clone(),
         };
         let dna_hash = dna.dna_hash();
-        let agent_key = SweetAgents::one(common.conductor.keystore()).await;
 
         let dna_modifiers = match role_seed {
             Seed::None => DnaModifiersOpt::none(),
@@ -657,7 +657,7 @@ impl TestCase {
             .conductor
             .clone()
             .install_app_bundle(InstallAppPayload {
-                agent_key,
+                agent_key: None,
                 source,
                 installed_app_id: Some(case_str.clone()),
                 network_seed,

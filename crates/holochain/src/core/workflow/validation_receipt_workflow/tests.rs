@@ -1,7 +1,6 @@
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::prelude::InlineZomeSet;
 use crate::sweettest::*;
-use crate::test_utils::consistency_10s;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
@@ -30,7 +29,9 @@ async fn test_validation_receipt() {
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    consistency_10s([&alice, &bobbo, &carol]).await;
+    await_consistency(10, [&alice, &bobbo, &carol])
+        .await
+        .unwrap();
 
     // Get op hashes
     let vault = alice.dht_db();
@@ -191,7 +192,6 @@ async fn test_block_invalid_receipt() {
 
     let mut alice_conductor = conductors.next().unwrap();
     let mut bob_conductor = conductors.next().unwrap();
-    let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
 
     let (dna_that_creates, _, _) =
         SweetDnaFile::from_inline_zomes(network_seed.into(), zomes_that_create).await;
@@ -199,25 +199,27 @@ async fn test_block_invalid_receipt() {
     let (dna_that_checks, _, _) =
         SweetDnaFile::from_inline_zomes(network_seed.into(), zomes_that_check).await;
 
-    let alice_apps = alice_conductor
-        .setup_app_for_agents(app_prefix, &[alice_pubkey.clone()], &[dna_that_creates])
+    let alice_app = alice_conductor
+        .setup_app(app_prefix, &[dna_that_creates])
         .await
         .unwrap();
 
-    let ((alice_cell,),) = alice_apps.into_tuples();
+    let (alice_cell,) = alice_app.into_tuple();
 
     let bob_apps = bob_conductor
-        .setup_app_for_agents(app_prefix, &[bob_pubkey.clone()], &[dna_that_checks])
+        .setup_app(app_prefix, &[dna_that_checks])
         .await
         .unwrap();
 
-    let ((bob_cell,),) = bob_apps.into_tuples();
+    let (bob_cell,) = bob_apps.into_tuple();
 
     let _action_hash: ActionHash = alice_conductor
         .call(&alice_cell.zome(coordinator_name), create_function_name, ())
         .await;
 
-    consistency_10s([&alice_cell, &bob_cell]).await;
+    await_consistency(10, [&alice_cell, &bob_cell])
+        .await
+        .unwrap();
 
     let alice_block_target = BlockTargetId::Cell(alice_cell.cell_id().to_owned());
     let bob_block_target = BlockTargetId::Cell(bob_cell.cell_id().to_owned());

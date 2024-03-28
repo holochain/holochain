@@ -38,14 +38,14 @@ pub struct ClonedCell {
     pub enabled: bool,
 }
 
-/// Ways of specifying a clone cell.
+/// Ways of specifying a clone cell in the context of an app.
 #[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum CloneCellId {
     /// Clone id consisting of role name and clone index.
     CloneId(CloneId),
-    /// Cell id consisting of DNA hash and agent pub key.
-    CellId(CellId),
+    /// The DNA hash of the clone to use within an app.
+    DnaHash(DnaHash),
 }
 
 /// Arguments to specify the clone cell to be disabled.

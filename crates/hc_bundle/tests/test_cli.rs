@@ -94,7 +94,7 @@ async fn test_integrity() {
         let dna_path = PathBuf::from(format!("{}/integrity dna.dna", path));
         let original_dna = read_dna(&dna_path).unwrap();
         original_dna
-            .into_dna_file(DnaModifiersOpt::none(), DnaCompatParams::default())
+            .into_dna_file(DnaModifiersOpt::none())
             .await
             .unwrap()
     };
@@ -165,7 +165,7 @@ async fn test_multi_integrity() {
         let dna_path = PathBuf::from(format!("{}/multi integrity dna.dna", path));
         let original_dna = read_dna(&dna_path).unwrap();
         original_dna
-            .into_dna_file(DnaModifiersOpt::none(), DnaCompatParams::default())
+            .into_dna_file(DnaModifiersOpt::none())
             .await
             .unwrap()
     };
@@ -193,7 +193,6 @@ async fn test_multi_integrity() {
             origin_time,
             quantum_time: Duration::from_secs(5 * 60),
         },
-        compatibility: DnaCompatParams::default(),
         integrity_zomes: vec![
             (
                 "zome1".into(),

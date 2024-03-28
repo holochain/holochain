@@ -4,7 +4,7 @@ use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppInfo, AppRequest, AppResponse, CellInfo, NetworkInfo,
 };
 use holochain_types::prelude::{InstalledAppId, NetworkInfoRequestPayload};
-use holochain_websocket::{connect, WebsocketConfig, WebsocketSender};
+use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketSender};
 use std::sync::Arc;
 
 pub struct AppClient {
@@ -21,7 +21,11 @@ impl Drop for AppClient {
 impl AppClient {
     /// Creates a App websocket client which can send messages but ignores any incoming messages
     async fn connect(addr: std::net::SocketAddr) -> anyhow::Result<Self> {
-        let (tx, mut rx) = connect(Arc::new(WebsocketConfig::default()), addr).await?;
+        let (tx, mut rx) = connect(
+            Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+            ConnectRequest::new(addr).try_set_header("origin", "hcterm")?,
+        )
+        .await?;
 
         let rx = tokio::task::spawn(async move { while rx.recv::<AppResponse>().await.is_ok() {} });
 
@@ -108,7 +112,7 @@ impl Drop for AdminClient {
 impl AdminClient {
     /// Creates an Admin websocket client which can send messages but ignores any incoming messages
     pub async fn connect(addr: std::net::SocketAddr) -> anyhow::Result<Self> {
-        let (tx, mut rx) = connect(Arc::new(WebsocketConfig::default()), addr).await?;
+        let (tx, mut rx) = connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), addr).await?;
 
         let rx =
             tokio::task::spawn(async move { while rx.recv::<AdminResponse>().await.is_ok() {} });
@@ -139,7 +143,10 @@ impl AdminClient {
     }
 
     async fn attach_app_interface(&mut self, port: u16) -> anyhow::Result<u16> {
-        let msg = AdminRequest::AttachAppInterface { port: Some(port) };
+        let msg = AdminRequest::AttachAppInterface {
+            port: Some(port),
+            allowed_origins: "hcterm".to_string().into(),
+        };
         let response = self.send(msg).await?;
         match response {
             AdminResponse::AppInterfaceAttached { port } => Ok(port),

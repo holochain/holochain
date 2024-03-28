@@ -38,7 +38,7 @@ async fn corrupt_source_chain_panics() {
     let mut u = arbitrary::Unstructured::new(&holochain_zome_types::prelude::NOISE);
     holochain_trace::test_run().ok();
 
-    let kind = DbKindAuthored(Arc::new(DnaHash::arbitrary(&mut u).unwrap()));
+    let kind = DbKindAuthored(Arc::new(CellId::arbitrary(&mut u).unwrap()));
 
     // - Create a corrupt cell db.
     let testdir = create_corrupt_db(kind.clone(), &mut u);

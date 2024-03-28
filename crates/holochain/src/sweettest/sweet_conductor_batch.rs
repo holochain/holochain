@@ -1,9 +1,10 @@
-use super::{DnaWithRole, SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
+use super::{SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::api::error::ConductorApiResult;
-use crate::sweettest::{SweetCell, SweetLocalRendezvous};
+use crate::sweettest::*;
 use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
+use holochain_types::prelude::*;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -37,9 +38,17 @@ impl SweetConductorBatch {
         C: Into<SweetConductorConfig>,
         I: IntoIterator<Item = C>,
     {
-        Self::new(
+        let conductors = Self::new(
             future::join_all(configs.into_iter().map(|c| SweetConductor::from_config(c))).await,
-        )
+        );
+
+        let dpki_cells = conductors.dpki_cells();
+        if !dpki_cells.is_empty() {
+            conductors.exchange_peer_info().await;
+            await_consistency(10, dpki_cells.as_slice()).await.unwrap();
+        }
+
+        conductors
     }
 
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
@@ -75,19 +84,32 @@ impl SweetConductorBatch {
     {
         let rendezvous = crate::sweettest::SweetLocalRendezvous::new().await;
         let config = config.into();
-        Self::new(
+        let conductors = Self::new(
             future::join_all(
                 std::iter::repeat(config)
                     .take(num)
                     .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
             )
             .await,
-        )
+        );
+
+        let dpki_cells = conductors.dpki_cells();
+        if !dpki_cells.is_empty() {
+            conductors.exchange_peer_info().await;
+            await_consistency(10, dpki_cells.as_slice()).await.unwrap();
+        }
+
+        conductors
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
     pub async fn from_standard_config(num: usize) -> SweetConductorBatch {
         Self::from_configs(std::iter::repeat_with(SweetConductorConfig::standard).take(num)).await
+    }
+
+    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
+    pub async fn from_standard_config_rendezvous(num: usize) -> SweetConductorBatch {
+        Self::from_config_rendezvous(num, SweetConductorConfig::standard()).await
     }
 
     /// Iterate over the SweetConductors
@@ -136,19 +158,14 @@ impl SweetConductorBatch {
     pub async fn setup_app<'a>(
         &mut self,
         installed_app_id: &str,
-        dna_files: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
+        dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetAppBatch> {
         let apps = self
             .0
             .iter_mut()
             .map(|conductor| {
-                let dna_files = dna_files.clone();
-                async move {
-                    let agent = SweetAgents::one(conductor.keystore()).await;
-                    conductor
-                        .setup_app_for_agent(installed_app_id, agent, dna_files)
-                        .await
-                }
+                let dnas_with_roles = dnas_with_roles.clone();
+                async move { conductor.setup_app(installed_app_id, dnas_with_roles).await }
             })
             .collect::<Vec<_>>();
 
@@ -232,6 +249,11 @@ impl SweetConductorBatch {
         }
 
         crate::conductor::p2p_agent_store::reveal_peer_info(observer_envs, seen_envs).await;
+    }
+
+    /// Get the DPKI cell for each conductor, if applicable
+    pub fn dpki_cells(&self) -> Vec<SweetCell> {
+        self.0.iter().filter_map(|c| c.dpki_cell()).collect()
     }
 
     /// Force trigger all dht ops that haven't received

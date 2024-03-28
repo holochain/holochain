@@ -109,7 +109,10 @@ async fn test_must_get_agent_activity(
         cache,
     );
     let authored = commit_chain(
-        DbKindAuthored(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
+        DbKindAuthored(Arc::new(CellId::new(
+            DnaHash::from_raw_36(vec![0; 36]),
+            AgentPubKey::from_raw_36(vec![0; 36]),
+        ))),
         authored,
     );
     let sync_scratch = match scratch {

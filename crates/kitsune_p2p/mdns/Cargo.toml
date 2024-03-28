@@ -18,10 +18,11 @@ path = "examples/broadcast.rs"
 name = "discover"
 path = "examples/discover.rs"
 
+# reminder - do not use workspace deps
 [dependencies]
 libmdns = "=0.7.4"
 mdns = "=3.0.0"
-futures-util = "0.3.1"
+futures = "0.3"
 base64 = "0.21.2"
 err-derive = "0.3.1"
 tokio = { version = "1.27", features = [ "full" ] }

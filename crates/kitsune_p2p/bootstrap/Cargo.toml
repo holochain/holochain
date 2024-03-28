@@ -10,9 +10,10 @@ keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
 categories = [ "network-programming" ]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
 clap = { version = "4.3.21", features = [ "derive" ] }
-futures = "0.3.15"
+futures = "0.3"
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.23", path = "../types" }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.18", path = "../bin_data" }
 parking_lot = "0.12.1"

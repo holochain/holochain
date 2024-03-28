@@ -3,15 +3,13 @@
 use crate::prelude::*;
 use crate::sql::*;
 use holochain_util::hex::many_bytes_string;
-use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dht_arc::DhtArcRange;
-use kitsune_p2p::dht_arc::DhtArcSet;
-use kitsune_p2p::KitsuneAgent;
-use kitsune_p2p_bin_data::KitsuneSpace;
+use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSpace};
+use kitsune_p2p_dht_arc::{DhtArcRange, DhtArcSet};
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rusqlite::*;
-use std::collections::{hash_map, HashMap};
+use std::collections::{hash_map, HashMap, HashSet};
 use std::sync::Arc;
 
 #[cfg(test)]
@@ -140,9 +138,23 @@ impl AgentStore {
     fn put(&self, agent_info: AgentInfoSigned) -> DatabaseResult<()> {
         let mut lock = self.0.lock();
 
+        // If we already have an info then this is an updated info
         if let Some(a) = lock.get(&agent_info.agent) {
+            // Check whether we already have a newer info for this agent.
             if a.signed_at_ms >= agent_info.signed_at_ms {
                 return Ok(());
+            }
+
+            let old_url_list: HashSet<_> = a.url_list.iter().collect();
+            let new_url_list: HashSet<_> = agent_info.url_list.iter().collect();
+
+            // Find URLs that were in the old list but AREN'T in the new list
+            let unused_urls: HashSet<_> = old_url_list
+                .difference(&new_url_list)
+                .map(|&u| u.clone())
+                .collect();
+            if !unused_urls.is_empty() {
+                tracing::info!(?agent_info.agent, "Agent URLs changed, no longer advertising at: {:?}", unused_urls);
             }
         }
 

@@ -10,8 +10,9 @@ keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
 categories = [ "network-programming" ]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-derive_more = { workspace = true }
+derive_more = "0.99"
 gcollections = "1.5.0"
 intervallum = "1.4.0"
 num-traits = "0.2"
@@ -29,7 +30,7 @@ holochain_trace = { version = "^0.3.0-beta-dev.8", path = "../../holochain_trace
 pretty_assertions = "1.4.0"
 rand = "0.8.5"
 statrs = "0.16.0"
-tracing = { workspace = true }
+tracing = "0.1"
 
 [lints]
 workspace = true

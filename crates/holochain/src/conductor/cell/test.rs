@@ -22,7 +22,10 @@ async fn test_cell_handle_publish() {
     let agent = cell_id.agent_pubkey().clone();
 
     let spaces = TestSpaces::new([dna.clone()]);
-    let db = spaces.test_spaces[&dna].space.authored_db.clone();
+    let db = spaces.test_spaces[&dna]
+        .space
+        .get_or_create_authored_db(cell_id.agent_pubkey().clone())
+        .unwrap();
     let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
     let dht_db_cache = spaces.test_spaces[&dna].space.dht_query_cache.clone();
 
@@ -32,6 +35,11 @@ async fn test_cell_handle_publish() {
     let db_dir = test_db_dir().path().to_path_buf();
     let data_root_path: DataRootPath = db_dir.clone().into();
     let handle = Conductor::builder()
+        .config(
+            crate::sweettest::SweetConductorConfig::standard()
+                .no_dpki()
+                .into(),
+        )
         .with_keystore(keystore.clone())
         .with_data_root_path(data_root_path.clone())
         .test(&[])

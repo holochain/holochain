@@ -1,9 +1,7 @@
 use hdk::prelude::*;
-use holochain::conductor::config::ConductorConfig;
+use holochain::conductor::config::{ConductorConfig, DpkiConfig};
 use holochain::sweettest::SweetConductorConfig;
-use holochain::sweettest::{SweetConductor, SweetZome};
-use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
-use holochain::test_utils::consistency_10s;
+use holochain::sweettest::*;
 use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_sqlite::db::{DbKindT, DbWrite};
 use holochain_sqlite::prelude::DatabaseResult;
@@ -14,6 +12,36 @@ use unwrap_to::unwrap_to;
 #[repr(transparent)]
 struct AppString(String);
 
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+async fn dpki_publish() {
+    let _g = holochain_trace::test_run().ok();
+
+    let config = SweetConductorConfig::standard();
+    let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+
+    conductors.exchange_peer_info().await;
+
+    await_consistency(10, conductors.dpki_cells().as_slice())
+        .await
+        .unwrap();
+}
+
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+async fn dpki_no_publish() {
+    let _g = holochain_trace::test_run().ok();
+
+    let config = SweetConductorConfig::standard().no_publish();
+    let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+
+    conductors.exchange_peer_info().await;
+
+    await_consistency(10, conductors.dpki_cells().as_slice())
+        .await
+        .unwrap();
+}
+
 /// Test that op publishing is sufficient for bobbo to get alice's op
 /// even with gossip disabled.
 #[cfg(feature = "test_utils")]
@@ -21,7 +49,7 @@ struct AppString(String);
 async fn test_publish() -> anyhow::Result<()> {
     use std::sync::Arc;
 
-    use holochain::test_utils::{consistency_10s, inline_zomes::simple_create_read_zome};
+    use holochain::test_utils::inline_zomes::simple_create_read_zome;
     use kitsune_p2p_types::config::KitsuneP2pConfig;
 
     let _g = holochain_trace::test_run().ok();
@@ -35,6 +63,7 @@ async fn test_publish() -> anyhow::Result<()> {
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
     config.network = network;
+    config.dpki = Some(DpkiConfig::disabled());
     config.tuning_params = Some(ConductorTuningParams {
         sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),
         ..Default::default()
@@ -55,7 +84,9 @@ async fn test_publish() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s([&alice, &bobbo, &carol]).await;
+    await_consistency(10, [&alice, &bobbo, &carol])
+        .await
+        .unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductors[1]
@@ -97,6 +128,9 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
 
+    let dpki_cells = conductors.dpki_cells();
+    await_consistency(10, dpki_cells.as_slice()).await.unwrap();
+
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
@@ -105,7 +139,9 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s([&alice, &bobbo, &carol]).await;
+    await_consistency(10, [&alice, &bobbo, &carol])
+        .await
+        .unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductors[1]
@@ -188,7 +224,6 @@ async fn sharded_consistency() {
 #[tokio::test(flavor = "multi_thread")]
 async fn private_entries_dont_leak() {
     use holochain::sweettest::SweetInlineZomes;
-    use holochain::test_utils::consistency_60s;
     use holochain_types::inline_zome::InlineZomeSet;
 
     let _g = holochain_trace::test_run().ok();
@@ -218,22 +253,23 @@ async fn private_entries_dont_leak() {
                 .map_err(Into::into)
         });
 
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.0).await;
     let dnas = vec![dna_file];
 
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
 
+    conductors.exchange_peer_info().await;
+
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
-    conductors.exchange_peer_info().await;
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    consistency_60s([&alice, &bobbo]).await;
+    await_consistency(60, [&alice, &bobbo]).await.unwrap();
 
     let entry_hash =
         EntryHash::with_data_sync(&Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap());
@@ -257,7 +293,7 @@ async fn private_entries_dont_leak() {
     let bob_hash: ActionHash = conductors[1]
         .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
-    consistency_60s([&alice, &bobbo]).await;
+    await_consistency(60, [&alice, &bobbo]).await.unwrap();
 
     check_all_gets_for_private_entry(
         &conductors[0],

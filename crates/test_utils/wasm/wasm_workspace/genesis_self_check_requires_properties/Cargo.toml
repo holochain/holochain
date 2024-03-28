@@ -12,8 +12,9 @@ name = "integrity_test_wasm_genesis_self_check_requires_properties"
 path = "src/integrity.rs"
 crate-type = ["cdylib", "rlib"]
 
+# reminder - do not use workspace deps
 [dependencies]
-serde = { workspace = true }
+serde = "1.0"
 serde_yaml = "0.9"
 hdk = { path = "../../../../hdk" }
 hdi = { path = "../../../../hdi" }

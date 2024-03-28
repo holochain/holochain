@@ -88,7 +88,7 @@ pub struct AgentInfoInner {
     /// Raw bytes of agent info signature as kitsune signature.
     pub signature: Arc<KitsuneSignature>,
 
-    /// the raw encoded bytes sent to bootstrap server or use for sig verify.
+    /// the raw encoded bytes sent to bootstrap server to use for sig verify.
     pub encoded_bytes: Box<[u8]>,
 }
 

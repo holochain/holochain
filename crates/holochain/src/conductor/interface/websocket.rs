@@ -12,6 +12,7 @@ use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 
+use holochain_types::websocket::AllowedOrigins;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
@@ -34,13 +35,16 @@ pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
 pub const MAX_CONNECTIONS: usize = 400;
 
 /// Create a WebsocketListener to be used in interfaces
-pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
+pub async fn spawn_websocket_listener(
+    port: u16,
+    allowed_origins: AllowedOrigins,
+) -> InterfaceResult<WebsocketListener> {
     trace!("Initializing Admin interface");
-    let listener = WebsocketListener::bind(
-        Arc::new(WebsocketConfig::default()),
-        format!("127.0.0.1:{}", port),
-    )
-    .await?;
+
+    let mut config = WebsocketConfig::LISTENER_DEFAULT;
+    config.allowed_origins = Some(allowed_origins);
+
+    let listener = WebsocketListener::bind(Arc::new(config), format!("127.0.0.1:{}", port)).await?;
     trace!("LISTENING AT: {}", listener.local_addr()?);
     Ok(listener)
 }
@@ -107,15 +111,16 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
 pub async fn spawn_app_interface_task<A: InterfaceApi>(
     tm: TaskManagerClient,
     port: u16,
+    allowed_origins: AllowedOrigins,
     api: A,
     signal_broadcaster: broadcast::Sender<Signal>,
 ) -> InterfaceResult<u16> {
     trace!("Initializing App interface");
-    let listener = WebsocketListener::bind(
-        Arc::new(WebsocketConfig::default()),
-        format!("127.0.0.1:{}", port),
-    )
-    .await?;
+
+    let mut config = WebsocketConfig::LISTENER_DEFAULT;
+    config.allowed_origins = Some(allowed_origins);
+
+    let listener = WebsocketListener::bind(Arc::new(config), format!("127.0.0.1:{}", port)).await?;
     let addr = listener.local_addr()?;
     trace!("LISTENING AT: {}", addr);
     let port = addr.port();
@@ -308,10 +313,12 @@ pub mod test {
     use crate::fixt::RealRibosomeFixturator;
     use crate::sweettest::app_bundle_from_dnas;
     use crate::sweettest::websocket_client_by_port;
-    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
+    use holochain_conductor_api::conductor::ConductorConfig;
+    use holochain_conductor_api::conductor::DpkiConfig;
     use holochain_keystore::test_keystore;
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
@@ -378,7 +385,10 @@ pub mod test {
         conductor_handle
             .clone()
             .add_admin_interfaces(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: admin_port },
+                driver: InterfaceDriver::Websocket {
+                    port: admin_port,
+                    allowed_origins: AllowedOrigins::Any,
+                },
             }])
             .await
             .unwrap();
@@ -386,18 +396,12 @@ pub mod test {
         let (admin_tx, rx) = websocket_client_by_port(admin_port).await.unwrap();
         let _rx = PollRecv::new::<AdminResponse>(rx);
 
-        let agent_key = conductor_handle
-            .keystore()
-            .new_sign_keypair_random()
-            .await
-            .unwrap();
-
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::PostCommitSignal]).await;
-        let app_bundle = app_bundle_from_dnas(&[&dna_file]).await;
+        let app_bundle = app_bundle_from_dnas(&[dna_file.clone()]).await;
         let request = AdminRequest::InstallApp(Box::new(InstallAppPayload {
             source: AppBundleSource::Bundle(app_bundle),
-            agent_key: agent_key.clone(),
+            agent_key: None,
             installed_app_id: None,
             membrane_proofs: HashMap::new(),
             network_seed: None,
@@ -417,6 +421,7 @@ pub mod test {
             CellInfo::Provisioned(cell) => cell.cell_id.clone(),
             _ => panic!("emit_signal cell not available"),
         };
+        let agent_key = cell_id.agent_pubkey().clone();
 
         // Activate cells
         let request = AdminRequest::EnableApp {
@@ -426,7 +431,10 @@ pub mod test {
         assert_matches!(response, AdminResponse::AppEnabled { .. });
 
         // Attach App Interface
-        let request = AdminRequest::AttachAppInterface { port: None };
+        let request = AdminRequest::AttachAppInterface {
+            port: None,
+            allowed_origins: AllowedOrigins::Any,
+        };
         let response: AdminResponse = admin_tx.request(request).await.unwrap();
         let app_port = match response {
             AdminResponse::AppInterfaceAttached { port } => port,
@@ -495,7 +503,11 @@ pub mod test {
         dnas_with_proofs: Vec<(DnaFile, Option<MembraneProof>)>,
     ) -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
+        let config = holochain::sweettest::SweetConductorConfig::standard()
+            .no_dpki()
+            .into();
         let conductor_handle = ConductorBuilder::new()
+            .config(config)
             .with_data_root_path(db_dir.path().to_path_buf().into())
             .test(&[])
             .await
@@ -507,7 +519,7 @@ pub mod test {
 
         conductor_handle
             .clone()
-            .install_app_minimal("test app".to_string(), agent, &dnas_with_proofs)
+            .install_app_minimal("test app".to_string(), Some(agent), &dnas_with_proofs)
             .await
             .unwrap();
 
@@ -610,14 +622,10 @@ pub mod test {
             .unwrap();
 
         let dna_hash = dna.dna_hash().clone();
-        let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
 
-        let (_tmpdir, _, handle) = setup_app_in_new_conductor(
-            "test app".to_string(),
-            cell_id.agent_pubkey().clone(),
-            vec![(dna, None)],
-        )
-        .await;
+        let (_tmpdir, _, handle, agent_key) =
+            setup_app_in_new_conductor("test app".to_string(), None, vec![(dna, None)]).await;
+        let cell_id = CellId::from((dna_hash.clone(), agent_key));
 
         call_zome(
             handle.clone(),
@@ -651,14 +659,9 @@ pub mod test {
             .unwrap();
 
         let dna_hash = dna.dna_hash().clone();
-        let agent_pub_key = fake_agent_pubkey_1();
 
-        let (_tmpdir, app_api, handle) = setup_app_in_new_conductor(
-            "test app".to_string(),
-            agent_pub_key.clone(),
-            vec![(dna, None)],
-        )
-        .await;
+        let (_tmpdir, app_api, handle, agent_pub_key) =
+            setup_app_in_new_conductor("test app".to_string(), None, vec![(dna, None)]).await;
         let request = NetworkInfoRequestPayload {
             agent_pub_key,
             dnas: vec![dna_hash],
@@ -675,7 +678,7 @@ pub mod test {
                         current_number_of_peers: 1,
                         arc_size: 1.0,
                         total_network_peers: 1,
-                        bytes_since_last_time_queried: 1848,
+                        bytes_since_last_time_queried: 1844,
                         completed_rounds_since_last_time_queried: 0,
                     }]
                 )
@@ -717,17 +720,30 @@ pub mod test {
         // Run the same DNA in cell 3 to check that grouping works correctly
         let cell_id_3 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_2()));
 
-        let (_tmpdir, _, handle) = setup_app_in_new_conductor(
+        let db_dir = test_db_dir();
+
+        let handle = ConductorBuilder::new()
+            .config(ConductorConfig {
+                dpki: Some(DpkiConfig::disabled()),
+                ..Default::default()
+            })
+            .with_data_root_path(db_dir.path().to_path_buf().into())
+            .test(&[])
+            .await
+            .unwrap();
+
+        install_app_in_conductor(
+            handle.clone(),
             "test app 1".to_string(),
-            cell_id_1.agent_pubkey().clone(),
-            vec![(dna_1, None)],
+            Some(cell_id_1.agent_pubkey().clone()),
+            &[(dna_1, None)],
         )
         .await;
 
         install_app_in_conductor(
             handle.clone(),
             "test app 2".to_string(),
-            cell_id_2.agent_pubkey().clone(),
+            Some(cell_id_2.agent_pubkey().clone()),
             &[(dna_2.clone(), None)],
         )
         .await;
@@ -735,7 +751,7 @@ pub mod test {
         install_app_in_conductor(
             handle.clone(),
             "test app 3".to_string(),
-            cell_id_3.agent_pubkey().clone(),
+            Some(cell_id_3.agent_pubkey().clone()),
             &[(dna_2, None)],
         )
         .await;
@@ -859,7 +875,6 @@ pub mod test {
             })
             .unwrap()
             .all_cells()
-            .cloned()
             .collect();
 
         // Collect the expected result
@@ -910,7 +925,6 @@ pub mod test {
             })
             .unwrap()
             .all_cells()
-            .cloned()
             .collect();
 
         assert_eq!(expected, cell_ids);
@@ -969,7 +983,10 @@ pub mod test {
         holochain_trace::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
-        let msg = AdminRequest::AttachAppInterface { port: None };
+        let msg = AdminRequest::AttachAppInterface {
+            port: None,
+            allowed_origins: AllowedOrigins::Any,
+        };
         let msg = msg.try_into().unwrap();
         let respond = |response: AdminResponse| {
             assert_matches!(response, AdminResponse::AppInterfaceAttached { .. });
@@ -1025,7 +1042,6 @@ pub mod test {
                     origin_time: Timestamp::HOLOCHAIN_EPOCH,
                     quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
                 },
-                compatibility: DnaCompatParams::default(),
                 integrity_zomes: zomes
                     .clone()
                     .into_iter()
@@ -1054,7 +1070,11 @@ pub mod test {
             make_dna("2", vec![TestWasm::Anchor]).await,
         ];
 
-        let mut conductor = SweetConductor::from_standard_config().await;
+        let mut conductor = SweetConductorConfig::standard()
+            .no_dpki()
+            .build_conductor()
+            .await;
+
         let agent = conductor.setup_app("app", &dnas).await.unwrap().cells()[0]
             .agent_pubkey()
             .clone();
@@ -1076,7 +1096,7 @@ pub mod test {
                 }
                 count
             },
-            2
+            2 + 1 // + 1 for DPKI
         );
 
         // - Get agents and space

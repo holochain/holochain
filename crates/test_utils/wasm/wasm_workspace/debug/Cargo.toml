@@ -13,9 +13,10 @@ name = "integrity_test_wasm_debug"
 path = "src/integrity.rs"
 crate-type = ["cdylib", "rlib"]
 
+# reminder - do not use workspace deps
 [dependencies]
-serde = { workspace = true }
-tracing = { workspace = true }
+serde = "1.0"
+tracing = "0.1"
 tracing-core = "0.1"
 hdi = { path = "../../../../hdi", features = ["trace"] }
 hdk = { path = "../../../../hdk" }

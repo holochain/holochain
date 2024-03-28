@@ -16,6 +16,7 @@ use holochain::{
     fixt::*,
 };
 
+use holochain_conductor_api::{AdminInterfaceConfig, AppRequest, InterfaceDriver};
 use holochain_types::{
     prelude::*,
     test_utils::{fake_dna_zomes, write_fake_dna_file},
@@ -88,28 +89,29 @@ how_many: 42
         .unwrap(),
     );
 
+    let original_dna_hash = dna.dna_hash().clone();
+
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
 
-    let installed_dna_hash = register_and_install_dna(
+    let installed_cell_id = register_and_install_dna(
         &mut client,
-        fake_agent_pubkey_1(),
         fake_dna_path,
         Some(properties.clone()),
         "role_name".into(),
         10000,
     )
     .await;
+    let installed_dna_hash = installed_cell_id.dna_hash().clone();
+
+    assert_ne!(installed_dna_hash, original_dna_hash);
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
     let response = check_timeout(response, 10000).await;
 
-    assert_ne!(&installed_dna_hash, dna.dna_hash());
-
-    let expects = vec![installed_dna_hash];
-    assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
+    assert_matches!(response, AdminResponse::DnasListed(a) if a.contains(&installed_dna_hash));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -141,28 +143,18 @@ async fn call_zome() {
         vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
     );
 
-    let agent_key = fake_agent_pubkey_1();
-
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let installed_dna_hash = register_and_install_dna(
-        &mut admin_tx,
-        agent_key.clone(),
-        fake_dna_path,
-        None,
-        "".into(),
-        10000,
-    )
-    .await;
-    let cell_id = CellId::new(installed_dna_hash.clone(), agent_key.clone());
+    let cell_id =
+        register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000).await;
+    let installed_dna_hash = cell_id.dna_hash().clone();
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
 
-    let expects = vec![installed_dna_hash.clone()];
-    assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
+    assert_matches!(response, AdminResponse::DnasListed(a) if a.contains(&installed_dna_hash));
 
     // Activate cells
     let request = AdminRequest::EnableApp {
@@ -359,19 +351,9 @@ async fn emit_signals() {
     );
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
 
-    let agent_key = fake_agent_pubkey_1();
-
     // Install Dna
-    let installed_dna_hash = register_and_install_dna(
-        &mut admin_tx,
-        agent_key.clone(),
-        fake_dna_path,
-        None,
-        "".into(),
-        10000,
-    )
-    .await;
-    let cell_id = CellId::new(installed_dna_hash.clone(), agent_key.clone());
+    let cell_id =
+        register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000).await;
 
     // Activate cells
     let request = AdminRequest::EnableApp {
@@ -501,12 +483,11 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    let (client, rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
-        Arc::new(WebsocketConfig {
-            default_request_timeout: std::time::Duration::from_secs(1),
-            ..Default::default()
-        }),
-        ([127, 0, 0, 1], port).into(),
+    let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
+    ws_config.default_request_timeout = Duration::from_secs(1);
+    let (client, rx): (WebsocketSender, WebsocketReceiver) = connect(
+        Arc::new(ws_config),
+        ConnectRequest::new(([127, 0, 0, 1], port).into()),
     )
     .await?;
     let _rx = PollRecv::new::<AdminResponse>(rx);
@@ -541,12 +522,11 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
+    let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
+    ws_config.default_request_timeout = Duration::from_secs(1);
     let (client, mut rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
-        Arc::new(WebsocketConfig {
-            default_request_timeout: std::time::Duration::from_secs(1),
-            ..Default::default()
-        }),
-        ([127, 0, 0, 1], port).into(),
+        Arc::new(ws_config),
+        ConnectRequest::new(([127, 0, 0, 1], port).into()),
     )
     .await?;
 
@@ -604,7 +584,7 @@ async fn connection_limit_is_respected() {
     let port = admin_port(&conductor_handle).await;
 
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
-    let cfg = Arc::new(WebsocketConfig::default());
+    let cfg = Arc::new(WebsocketConfig::CLIENT_DEFAULT);
 
     // Retain handles so that the test can control when to disconnect clients
     let mut handles = Vec::new();
@@ -695,12 +675,9 @@ async fn concurrent_install_dna() {
                 zomes.clone(),
             );
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-            let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;
-            // println!("[{}] Agent pub key generated", i);
 
-            let _dna_hash = register_and_install_dna_named(
+            let _cell_id = register_and_install_dna_named(
                 &mut client,
-                agent_key,
                 fake_dna_path.clone(),
                 None,
                 name.clone(),
@@ -710,8 +687,8 @@ async fn concurrent_install_dna() {
             .await;
 
             // println!(
-            //     "[{}] installed dna with hash {} and name {}",
-            //     i, _dna_hash, name
+            //     "[{}] installed app with cell id {} and name {}",
+            //     i, _cell_id, name
             // );
         })
     }))
@@ -770,16 +747,11 @@ async fn full_state_dump_cursor_works() {
 
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    let agent = SweetAgents::one(conductor.keystore()).await;
-
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
         .0;
 
-    let app = conductor
-        .setup_app_for_agent("app", agent, &[dna_file])
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
 
     let cell_id = app.into_cells()[0].cell_id().clone();
 
@@ -812,4 +784,134 @@ async fn full_state_dump_cursor_works() {
         integrated_ops_count + validation_limbo_ops_count + integration_limbo_ops_count;
 
     assert_eq!(1, new_all_dht_ops_count);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn admin_allowed_origins() {
+    holochain_trace::test_run().ok();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let ports = conductor
+        .clone()
+        .add_admin_interfaces(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket {
+                port: 0,
+                allowed_origins: "http://localhost:3000".to_string().into(),
+            },
+        }])
+        .await
+        .unwrap();
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], *ports.first().unwrap()).into())
+    )
+    .await
+    .is_err());
+
+    let (client, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], *ports.first().unwrap()).into())
+            .try_set_header("origin", "http://localhost:3000")
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let _rx = PollRecv::new::<AdminResponse>(rx);
+
+    let request = AdminRequest::ListAppInterfaces;
+    let _: AdminResponse = client.request(request).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_allowed_origins() {
+    holochain_trace::test_run().ok();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let port = conductor
+        .clone()
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3000".to_string().into(),
+        )
+        .await
+        .unwrap();
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port).into())
+    )
+    .await
+    .is_err());
+
+    check_app_port(port, "http://localhost:3000").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_allowed_origins_independence() {
+    holochain_trace::test_run().ok();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let port_1 = conductor
+        .clone()
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3001".to_string().into(),
+        )
+        .await
+        .unwrap();
+
+    let port_2 = conductor
+        .clone()
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3002".to_string().into(),
+        )
+        .await
+        .unwrap();
+
+    // Check that access to another port's origin is blocked
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port_1).into())
+            .try_set_header("origin", "http://localhost:3002")
+            .unwrap()
+    )
+    .await
+    .is_err());
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port_2).into())
+            .try_set_header("origin", "http://localhost:3001")
+            .unwrap()
+    )
+    .await
+    .is_err());
+
+    // Check that correct access is allowed
+
+    check_app_port(port_1, "http://localhost:3001").await;
+    check_app_port(port_2, "http://localhost:3002").await;
+}
+
+async fn check_app_port(port: u16, origin: &str) {
+    let (client, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(([127, 0, 0, 1], port).into())
+            .try_set_header("origin", origin)
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let _rx = PollRecv::new::<AppResponse>(rx);
+
+    let request = AppRequest::ListWasmHostFunctions;
+    let _: AppResponse = client.request(request).await.unwrap();
 }

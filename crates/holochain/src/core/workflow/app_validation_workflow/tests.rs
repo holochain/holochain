@@ -8,12 +8,8 @@ use crate::core::workflow::app_validation_workflow::{
 };
 use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
-use crate::sweettest::{
-    SweetConductor, SweetConductorBatch, SweetConductorConfig, SweetDnaFile, SweetLocalRendezvous,
-};
-use crate::test_utils::{
-    consistency_10s, host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration,
-};
+use crate::sweettest::*;
+use crate::test_utils::{host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration};
 use ::fixt::fixt;
 use arbitrary::Arbitrary;
 use hdk::hdi::test_utils::set_zome_types;
@@ -59,7 +55,10 @@ async fn main_loop_app_validation_workflow() {
     let cell_id = app.cells()[0].cell_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
-        conductor.get_authored_db(&dna_hash).unwrap().into(),
+        conductor
+            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
+            .unwrap()
+            .into(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
@@ -287,7 +286,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
         .call(&alice.zome("coordinator"), "create", ())
         .await;
 
-    consistency_10s([&alice, &bob]).await;
+    await_consistency(10, [&alice, &bob]).await.unwrap();
 
     {
         let vfs = validation_failures.lock();
@@ -368,7 +367,6 @@ async fn check_app_entry_def_test() {
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
                 quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
             },
-            compatibility: DnaCompatParams::default(),
             integrity_zomes: vec![TestZomes::from(TestWasm::EntryDefs).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::EntryDefs)
                 .coordinator

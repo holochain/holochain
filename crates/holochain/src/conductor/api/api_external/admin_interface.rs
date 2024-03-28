@@ -97,17 +97,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                             .update_modifiers(modifiers)
                     }
                     DnaSource::Path(ref path) => {
-                        let compat = self.conductor_handle.get_dna_compat();
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
-                        let (dna_file, _original_hash) =
-                            bundle.into_dna_file(modifiers, compat).await?;
+                        let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
                         dna_file
                     }
                     DnaSource::Bundle(bundle) => {
-                        let compat = self.conductor_handle.get_dna_compat();
-                        let (dna_file, _original_hash) =
-                            bundle.into_dna_file(modifiers, compat).await?;
+                        let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
                         dna_file
                     }
                 };
@@ -223,12 +219,15 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AppDisabled)
             }
-            AttachAppInterface { port } => {
+            AttachAppInterface {
+                port,
+                allowed_origins,
+            } => {
                 let port = port.unwrap_or(0);
                 let port = self
                     .conductor_handle
                     .clone()
-                    .add_app_interface(either::Either::Left(port))
+                    .add_app_interface(either::Either::Left(port), allowed_origins)
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
@@ -298,21 +297,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             StorageInfo => Ok(AdminResponse::StorageInfo(
                 self.conductor_handle.storage_info().await?,
             )),
-
-            // FIXME: A "device seed" should be derived from the master seed and passed in here.
-            //        Currently it just gets auto-generated, making re-derivation impossible.
-            InitializeDeepkey { deepkey_dna } => {
-                let dna_compat = self.conductor_handle.get_dna_compat();
-                let (deepkey_dna, _) = deepkey_dna
-                    .into_dna_file(Default::default(), dna_compat)
-                    .await?;
-
-                self.conductor_handle
-                    .clone()
-                    .install_dpki(deepkey_dna)
-                    .await?;
-                Ok(AdminResponse::Ok)
-            }
         }
     }
 }

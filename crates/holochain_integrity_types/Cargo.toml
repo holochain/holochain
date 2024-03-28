@@ -9,9 +9,10 @@ readme = "README.md"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
 holo_hash = { version = "^0.3.0-beta-dev.24", path = "../holo_hash" }
-holochain_serialized_bytes = { workspace = true }
+holochain_serialized_bytes = "=0.0.53"
 holochain_util = { version = "^0.3.0-beta-dev.5", path = "../holochain_util", default-features = false }
 holochain_secure_primitive = { version = "^0.3.0-beta-dev.22", path = "../holochain_secure_primitive"}
 paste = "1.0"
@@ -37,7 +38,7 @@ tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]
 holochain_integrity_types = { path = ".", features = ["test_utils", "fuzzing"]}
-serde_json = { workspace = true }
+serde_json = "1.0"
 
 [lints]
 workspace = true

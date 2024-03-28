@@ -5,7 +5,10 @@ use holochain_conductor_api::{
     conductor::{ConductorConfig, ConductorTuningParams},
     AdminInterfaceConfig, InterfaceDriver,
 };
+use holochain_types::websocket::AllowedOrigins;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
+
+use super::SweetConductor;
 
 pub(crate) static NUM_CREATED: AtomicUsize = AtomicUsize::new(0);
 
@@ -26,7 +29,10 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
         ConductorConfig {
             network,
             admin_interfaces: Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: 0 },
+                driver: InterfaceDriver::Websocket {
+                    port: 0,
+                    allowed_origins: AllowedOrigins::Any,
+                },
             }]),
             tuning_params: Some(ConductorTuningParams {
                 sys_validation_retry_delay: Some(std::time::Duration::from_secs(1)),
@@ -65,23 +71,35 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        KitsuneP2pConfig::default().into()
+        SweetConductorConfig::from(KitsuneP2pConfig::default())
+            .tune(|tune| {
+                tune.gossip_loop_iteration_delay_ms = 500;
+                tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
+                tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;
+                tune.gossip_round_timeout_ms = 10_000;
+            })
+            .tune_conductor(|tune| {
+                tune.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
+            })
+    }
+
+    /// Disable DPKI, which is on by default
+    pub fn no_dpki(mut self) -> Self {
+        self.dpki = Some(holochain_conductor_api::conductor::DpkiConfig::disabled());
+        self
     }
 
     /// Rendezvous config for SweetConductors
     pub fn rendezvous(bootstrap: bool) -> Self {
-        let mut tuning =
-            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-        tuning.gossip_strategy = "sharded-gossip".to_string();
+        let mut config = Self::standard();
 
-        let mut network = KitsuneP2pConfig::default();
         if bootstrap {
-            network.bootstrap_service = Some(url2::url2!("rendezvous:"));
+            config.network.bootstrap_service = Some(url2::url2!("rendezvous:"));
         }
 
         /*#[cfg(not(feature = "tx5"))]
         {
-            network.transport_pool = vec![TransportConfig::Quic {
+            config.network.transport_pool = vec![TransportConfig::Quic {
                 bind_to: None,
                 override_host: None,
                 override_port: None,
@@ -90,13 +108,18 @@ impl SweetConductorConfig {
 
         #[cfg(feature = "tx5")]
         {
-            network.transport_pool = vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
-                signal_url: "rendezvous:".into(),
-            }];
+            config.network.transport_pool =
+                vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
+                    signal_url: "rendezvous:".into(),
+                }];
         }
 
-        network.tuning_params = Arc::new(tuning);
-        network.into()
+        config
+    }
+
+    /// Build a SweetConductor from this config
+    pub async fn build_conductor(self) -> SweetConductor {
+        SweetConductor::from_config(self).await
     }
 
     /// Set network tuning params.

@@ -45,7 +45,7 @@ pub async fn query_region_set(
                         // produce a Some so that the atomic val gets updated, which
                         // will trigger a log after the update.
                         now.checked_difference_signed(&Timestamp::from_micros(t * 1000))
-                            .map(|d| d > chrono::Duration::milliseconds(LOG_RATE_MS))
+                            .map(|d| d > chrono::Duration::try_milliseconds(LOG_RATE_MS).unwrap())
                             .unwrap_or(false)
                             .then(|| now.as_millis())
                     })

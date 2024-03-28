@@ -12,8 +12,9 @@ name = "integrity_test_wasm_validate_reject_app_types"
 path = "src/integrity.rs"
 crate-type = ["cdylib", "rlib"]
 
+# reminder - do not use workspace deps
 [dependencies]
-serde = { workspace = true }
+serde = "1.0"
 hdk = { path = "../../../../hdk" }
 hdi = { path = "../../../../hdi" }
 

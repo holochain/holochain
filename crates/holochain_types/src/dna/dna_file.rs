@@ -256,20 +256,10 @@ impl DnaFile {
         clone
     }
 
-    /// Change the DNA modifiers -- the network seed, origin time and properties -- while
-    /// leaving the actual DNA code intact.
+    /// Change the DNA modifiers while leaving the actual DNA code intact.
     pub fn update_modifiers(&self, dna_modifiers: DnaModifiersOpt) -> Self {
         let mut clone = self.clone();
         clone.dna = DnaDefHashed::from_content_sync(clone.dna.update_modifiers(dna_modifiers));
-        clone
-    }
-
-    /// Change the DnaCompatParams (and the hash) without changing anything else
-    pub fn update_compat(&self, compat: DnaCompatParams) -> Self {
-        let mut clone = self.clone();
-        let mut dna = self.dna.clone().into_content();
-        dna.compatibility = compat;
-        clone.dna = DnaDefHashed::from_content_sync(dna);
         clone
     }
 }

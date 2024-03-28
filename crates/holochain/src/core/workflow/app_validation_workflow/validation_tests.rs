@@ -1,15 +1,13 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Write,
+    sync::Arc,
 };
 
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
 
-use crate::{
-    core::ribosome::guest_callback::validate::ValidateResult, sweettest::*,
-    test_utils::consistency_10s,
-};
+use crate::{core::ribosome::guest_callback::validate::ValidateResult, sweettest::*};
 
 const ZOME_A_0: &'static str = "ZOME_A_0";
 const ZOME_A_1: &'static str = "ZOME_A_1";
@@ -199,11 +197,14 @@ async fn app_validation_ops() {
 
     let (events_tx, mut events_rx) = tokio::sync::mpsc::channel(100);
 
+    type AgentsMutex = Arc<parking_lot::Mutex<HashMap<AgentPubKey, &'static str>>>;
+
+    let agents: AgentsMutex = Arc::new(parking_lot::Mutex::new(HashMap::new()));
+
     let validation_callback =
-        |zome: &'static str,
-         agents: HashMap<AgentPubKey, &'static str>,
-         events: tokio::sync::mpsc::Sender<Event>| {
+        |zome: &'static str, agents: AgentsMutex, events: tokio::sync::mpsc::Sender<Event>| {
             move |_api: BoxApi, op: Op| {
+                let agents = agents.lock();
                 let event = match op {
                     Op::StoreRecord(StoreRecord { record }) => Event {
                         action: ActionLocation::new(record.action().clone(), &agents),
@@ -301,13 +302,8 @@ async fn app_validation_ops() {
             }
         };
 
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
-    let alice = SweetAgents::one(conductors[0].keystore()).await;
-    let bob = SweetAgents::one(conductors[1].keystore()).await;
-
-    let mut agents = HashMap::new();
-    agents.insert(alice.clone(), ALICE);
-    agents.insert(bob.clone(), BOB);
+    let mut conductors =
+        SweetConductorBatch::from_config(2, SweetConductorConfig::standard().no_dpki()).await;
 
     let zomes = InlineZomeSet::new(
         [
@@ -379,23 +375,34 @@ async fn app_validation_ops() {
     );
 
     let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes).await;
-    let app = conductors[0]
-        .setup_app_for_agent(&"test_app", alice.clone(), &[dna_file_a.clone()])
-        .await
-        .unwrap();
-    let (alice,) = app.into_tuple();
-    let app = conductors[1]
-        .setup_app_for_agent(&"test_app", bob.clone(), &[dna_file_b.clone()])
-        .await
-        .unwrap();
-    let (bob,) = app.into_tuple();
+
+    let (alice, bob) = {
+        let mut agents = agents.lock();
+
+        let app = conductors[0]
+            .setup_app(&"test_app", &[dna_file_a.clone()])
+            .await
+            .unwrap();
+        let (alice,) = app.into_tuple();
+        let app = conductors[1]
+            .setup_app(&"test_app", &[dna_file_b.clone()])
+            .await
+            .unwrap();
+        let (bob,) = app.into_tuple();
+
+        agents.insert(alice.agent_pubkey().clone(), ALICE);
+        agents.insert(bob.agent_pubkey().clone(), BOB);
+
+        (alice, bob)
+    };
+
     conductors.exchange_peer_info().await;
 
     let _: ActionHash = conductors[0]
         .call(&alice.zome("zome1"), "create_a", ())
         .await;
 
-    consistency_10s([&alice, &bob]).await;
+    await_consistency(10, [&alice, &bob]).await.unwrap();
 
     let mut expected = Expected(HashSet::new());
 

@@ -79,11 +79,10 @@ pub fn test_authored_db() -> TestDb<DbKindAuthored> {
 }
 
 pub fn test_authored_db_with_id(id: u8) -> TestDb<DbKindAuthored> {
-    test_db(DbKindAuthored(Arc::new(fake_dna_hash(id))))
-}
-
-pub fn test_authored_db_with_dna_hash(hash: DnaHash) -> TestDb<DbKindAuthored> {
-    test_db(DbKindAuthored(Arc::new(hash)))
+    test_db(DbKindAuthored(Arc::new(CellId::new(
+        fake_dna_hash(id),
+        fake_agent_pub_key(id),
+    ))))
 }
 
 /// Create a [`TestDb`] of [`DbKindDht`], backed by a temp directory.
@@ -214,7 +213,8 @@ impl<Kind: DbKindT> TestDb<Kind> {
 
     pub fn dna_hash(&self) -> Option<Arc<DnaHash>> {
         match self.db.kind().kind() {
-            DbKind::Authored(hash) | DbKind::Cache(hash) | DbKind::Dht(hash) => Some(hash),
+            DbKind::Cache(hash) | DbKind::Dht(hash) => Some(hash),
+            DbKind::Authored(cell_id) => Some(Arc::new(cell_id.dna_hash().clone())),
             _ => None,
         }
     }

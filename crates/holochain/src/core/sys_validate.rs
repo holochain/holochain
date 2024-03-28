@@ -381,18 +381,18 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
 
 /// Check that the agent was valid at the time of authoring according to the installed DPKI network
 pub async fn check_dpki_agent_validity(
-    op: &DhtOp,
-    dpki: Arc<dyn DpkiService>,
+    dpki: &dyn DpkiService,
+    author: AgentPubKey,
+    timestamp: Timestamp,
 ) -> SysValidationResult<()> {
-    let timestamp = op.action().timestamp();
-    let author = op.action().author().clone();
+    let key_state = dpki.key_state(author.clone(), timestamp).await?;
 
-    match dpki.key_state(author.clone(), timestamp).await? {
+    match key_state {
         KeyState::Valid(_) => Ok(()),
         KeyState::Invalidated(_) => {
-            Err(ValidationOutcome::DpkiAgentInvalid(author.clone(), timestamp).into())
+            Err(ValidationOutcome::DpkiAgentInvalid(author, timestamp).into())
         }
-        KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(author.clone()).into()),
+        KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(author).into()),
     }
 }
 

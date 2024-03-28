@@ -16,8 +16,8 @@ use crate::{prelude::*, query::get_public_op_from_db};
 pub async fn authored_ops_to_dht_db(
     network: &(dyn HolochainP2pDnaT + Send + Sync),
     hashes: Vec<(DhtOpHash, AnyLinkableHash)>,
-    authored_db: &DbRead<DbKindAuthored>,
-    dht_db: &DbWrite<DbKindDht>,
+    authored_db: DbRead<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
     dht_db_cache: &DhtDbQueryCache,
 ) -> StateMutationResult<()> {
     // Check if any agents in this space are an authority for these hashes.
@@ -41,8 +41,8 @@ pub async fn authored_ops_to_dht_db(
 /// on basis hash alone.
 pub async fn authored_ops_to_dht_db_without_check(
     hashes: Vec<DhtOpHash>,
-    authored_db: &DbRead<DbKindAuthored>,
-    dht_db: &DbWrite<DbKindDht>,
+    authored_db: DbRead<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
     dht_db_cache: &DhtDbQueryCache,
 ) -> StateMutationResult<()> {
     // Get the ops from the authored database.

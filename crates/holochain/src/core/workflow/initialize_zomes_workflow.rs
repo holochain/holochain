@@ -95,6 +95,7 @@ where
     } = args;
     let call_zome_handle =
         CellConductorApi::new(conductor_handle.clone(), cell_id.clone()).into_call_zome_handle();
+
     // Call the init callback
     let result = {
         let host_access = InitHostAccess::new(

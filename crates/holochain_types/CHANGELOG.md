@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Added `AllowedOrigins` which is intended to be used with `holochain_websocket` for controlling access. It is placed here
+  for crates need to know about origins but don't depend on `holochain_websocket`. [#3460](https://github.com/holochain/holochain/pull/3460)
+
+## 0.3.0-beta-dev.37
+
 ## 0.3.0-beta-dev.36
 
 ## 0.3.0-beta-dev.35

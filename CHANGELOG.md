@@ -14,6 +14,70 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240320.130406
+
+## [hcterm-0.3.0-beta-dev.17](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.17)
+
+## [holochain\_cli-0.3.0-beta-dev.41](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [holochain-0.3.0-beta-dev.42](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.42)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.41](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [holochain\_cascade-0.3.0-beta-dev.41](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.41](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.39](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.39)
+
+## [holochain\_state-0.3.0-beta-dev.40](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [holochain\_p2p-0.3.0-beta-dev.40](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [hc\_sleuth-0.2.0-beta-dev.11](crates/hc_sleuth/CHANGELOG.md#0.2.0-beta-dev.11)
+
+## [kitsune\_p2p-0.3.0-beta-dev.34](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.34)
+
+# 20240320.003423
+
+## [hcterm-0.3.0-beta-dev.16](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.16)
+
+## [holochain\_cli-0.3.0-beta-dev.40](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [holochain-0.3.0-beta-dev.41](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.38](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.38)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.40](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [holochain\_cascade-0.3.0-beta-dev.40](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.40](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [holochain\_conductor\_services-0.2.0-beta-dev.11](crates/holochain_conductor_services/CHANGELOG.md#0.2.0-beta-dev.11)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.35](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.35)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.38](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.38)
+
+## [hdk-0.3.0-beta-dev.35](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.35)
+
+## [holochain\_state-0.3.0-beta-dev.39](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.39)
+
+## [hdi-0.4.0-beta-dev.31](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.31)
+
+## [holochain\_p2p-0.3.0-beta-dev.39](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.39)
+
+## [hc\_sleuth-0.2.0-beta-dev.10](crates/hc_sleuth/CHANGELOG.md#0.2.0-beta-dev.10)
+
+## [hdk\_derive-0.3.0-beta-dev.29](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.29)
+
+- Added support for `#[hdk_extern]` usage with parameterless functions
+
+## [holochain\_types-0.3.0-beta-dev.37](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.37)
+
+## [holochain\_sqlite-0.3.0-beta-dev.37](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.37)
+
 # 20240313.004312
 
 ## [hcterm-0.3.0-beta-dev.15](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.15)
@@ -551,8 +615,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [holochain\_integrity\_types-0.3.0-beta-dev.23](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.23)
 
-- Adds `DnaCompatParams` to DnaDef, a new set of parameters that determines network compatibility between instances. These parameters are similar to DnaModifiers in that they affect the DNA hash, but they are not settable by the DNA dev – they are set automatically by the conductor at install time. This ensures that the same DNA installed into two different conductors with incompatible features will wind up with two different DNA hashes, so that they won’t attempt to communicate and fail.
-
 # 20240112.112002
 
 ## [hcterm-0.3.0-beta-dev.8](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.8)
@@ -970,7 +1032,7 @@ Initial version
   
   - Reliability: The workflow will now prioritise validating ops that have their dependencies available locally. As soon as it has finished with those it will trigger app validation before dealing with missing dependencies.
   - Reliability: For ops which have dependencies we aren’t holding locally, the network get will now be retried. This was a cause of undesirable behaviour for validation where a failed get would result in validation for ops with missing dependencies not being retried until new ops arrived. The workflow now retries the get on an interval until it finds dependencies and can proceed with validation.
-  - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was uneccessary and doing database queries so it should be good to have that gone.
+  - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was unnecessary and doing database queries so it should be good to have that gone.
   - Performance: In-memory caching for sys validation dependencies. When we have to wait to validate an op because it has a missing dependency, any other actions required by that op will be held in memory rather than being refetched from the database. This has a fairly small memory footprint because actions are relatively small but saves repeatedly hitting the cascade for the same data if it takes a bit of time to find a dependency on the network.
 
 - **BREAKING* CHANGE*: The `ConductorConfig` has been updated to add a new option for configuring conductor behaviour. This should be compatible with existing conductor config YAML files but if you are creating the struct directly then you will need to include the new field. Currently this just has one setting which controls how fast the sys validation workflow will retry network gets for missing dependencies. It’s likely this option will change in the near future.
@@ -5125,7 +5187,7 @@ As Holochain has evolved, the meaning behind these concepts, as well as our unde
 
 ## [holochain-0.0.139](crates/holochain/CHANGELOG.md#0.0.139)
 
-- Udpate lair to 0.1.3 - largely just documentation updates, but also re-introduces some dependency pinning to fix mismatch client/server version check [\#1377](https://github.com/holochain/holochain/pull/1377)
+- Update lair to 0.1.3 - largely just documentation updates, but also re-introduces some dependency pinning to fix mismatch client/server version check [\#1377](https://github.com/holochain/holochain/pull/1377)
 
 ## [holochain\_websocket-0.0.37](crates/holochain_websocket/CHANGELOG.md#0.0.37)
 

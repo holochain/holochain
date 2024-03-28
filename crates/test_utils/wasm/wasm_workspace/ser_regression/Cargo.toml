@@ -13,9 +13,10 @@ name = "integrity_test_wasm_ser_regression"
 path = "src/integrity.rs"
 crate-type = ["cdylib", "rlib"]
 
+# reminder - do not use workspace deps
 [dependencies]
-derive_more = { workspace = true }
-serde = { workspace = true }
+derive_more = "0.99"
+serde = "1.0"
 hdk = { path = "../../../../hdk" }
 hdi = { path = "../../../../hdi" }
 

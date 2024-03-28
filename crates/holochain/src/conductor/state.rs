@@ -3,10 +3,11 @@
 
 use holochain_conductor_api::config::InterfaceDriver;
 use holochain_conductor_api::signal_subscription::SignalSubscription;
-use holochain_conductor_services::DpkiInstallation;
+use holochain_conductor_services::DeepkeyInstallation;
 use holochain_conductor_services::DPKI_APP_ID;
 use holochain_p2p::NetworkCompatParams;
 use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -30,7 +31,7 @@ impl Default for ConductorStateTag {
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize, Default, Debug, SerializedBytes)]
 pub struct ConductorServicesState {
     /// Data needed to initialize the DPKI service, if installed
-    pub dpki: Option<DpkiInstallation>,
+    pub dpki: Option<DeepkeyInstallation>,
 }
 
 /// Mutable conductor state, stored in a DB and writable only via Admin interface.
@@ -239,7 +240,7 @@ impl ConductorState {
     pub fn find_app_containing_cell(&self, cell_id: &CellId) -> Option<&InstalledApp> {
         self.installed_apps_and_services
             .values()
-            .find(|app| app.all_cells().any(|id| id == cell_id))
+            .find(|app| app.all_cells().any(|id| id == *cell_id))
     }
 
     /// Get network compability params
@@ -247,7 +248,7 @@ impl ConductorState {
     /// conductor initialization)
     pub fn get_network_compat(&self) -> NetworkCompatParams {
         NetworkCompatParams {
-            dpki_hash: {
+            dpki_uuid: {
                 tracing::warn!("Using default NetworkCompatParams");
                 None
             },
@@ -276,10 +277,13 @@ pub struct AppInterfaceConfig {
 
 impl AppInterfaceConfig {
     /// Create config for a websocket interface
-    pub fn websocket(port: u16) -> Self {
+    pub fn websocket(port: u16, allowed_origins: AllowedOrigins) -> Self {
         Self {
             signal_subscriptions: HashMap::new(),
-            driver: InterfaceDriver::Websocket { port },
+            driver: InterfaceDriver::Websocket {
+                port,
+                allowed_origins,
+            },
         }
     }
 }
