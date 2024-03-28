@@ -24,6 +24,7 @@ pub fn create_config(
         None => {
             conductor_config.keystore = KeystoreConfig::LairServerInProc {
                 lair_root: Some(config_root_path.is_also_data_root_path().try_into()?),
+                pw_hash_strength: None,
             };
         }
     }

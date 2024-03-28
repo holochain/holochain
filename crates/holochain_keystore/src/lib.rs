@@ -29,6 +29,8 @@
 //! }
 //! ```
 
+pub use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::PwHashLimits;
+
 use holochain_serialized_bytes::prelude::*;
 
 mod error;
@@ -82,3 +84,6 @@ pub async fn spawn_mem_keystore() -> LairResult<MetaLairClient> {
     let (s, _) = tokio::sync::mpsc::unbounded_channel();
     Ok(MetaLairClient(Arc::new(parking_lot::Mutex::new(client)), s))
 }
+
+#[cfg(test)]
+mod test;
