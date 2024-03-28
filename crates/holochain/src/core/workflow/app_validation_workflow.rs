@@ -664,10 +664,13 @@ where
                             .await;
                         if let Err(err) = result {
                             tracing::warn!("error fetching dependent hash {hash:?}: {err}");
-                        } else {
-                            // dependency has been fetched and added to the cache
-                            validation_dependencies.lock().remove(&hash);
                         }
+                        // dependency has been fetched and added to the cache
+                        // or an error occurred along the way; in case of an
+                        // error the hash is still removed from the
+                        // collection so that it will be tried again to be
+                        // fetched in the subsequent workflow run
+                        validation_dependencies.lock().remove(&hash);
                     }
                 }
             });
@@ -705,10 +708,13 @@ where
                             tracing::warn!(
                                 "error fetching dependent chain of agent {author:?}: {err}"
                             );
-                        } else {
-                            // dependency has been fetched and added to the cache
-                            validation_dependencies.lock().remove(&author.into());
                         }
+                        // dependency has been fetched and added to the cache
+                        // or an error occurred along the way; in case of an
+                        // error the hash is still removed from the
+                        // collection so that it will be tried again to be
+                        // fetched in the subsequent workflow run
+                        validation_dependencies.lock().remove(&author.into());
                     }
                 }
             });
