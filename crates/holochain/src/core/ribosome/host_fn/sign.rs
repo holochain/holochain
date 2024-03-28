@@ -56,24 +56,35 @@ pub mod wasm_test {
             ..
         } = RibosomeTestFixture::new(TestWasm::Sign).await;
 
-        let mut sigs = HashSet::new();
-        // signatures should not change for a given pubkey
-        for (k, data) in vec![
+        for (key, data) in vec![
             (alice_pubkey.clone(), vec![100_u8, 200_u8, 50_u8]),
             (bob_pubkey.clone(), vec![100_u8, 200_u8, 50_u8]),
             (alice_pubkey, vec![1_u8, 2_u8, 3_u8]),
             (bob_pubkey, vec![1_u8, 2_u8, 3_u8]),
         ] {
+            let mut sigs = HashSet::new();
             for _ in 0..2 {
-                let output: Signature = conductor
-                    .call(&alice, "sign", Sign::new_raw(k.clone(), data.clone()))
+                let signature: Signature = conductor
+                    .call(&alice, "sign", Sign::new_raw(key.clone(), data.clone()))
                     .await;
 
-                sigs.insert(output);
-            }
-        }
+                sigs.insert(signature.clone());
 
-        // All signatures should be different
-        assert_eq!(sigs.len(), 4);
+                let valid: bool = conductor
+                    .call(
+                        &alice,
+                        "verify_signature_raw",
+                        VerifySignature {
+                            key: key.clone(),
+                            signature,
+                            data: data.clone(),
+                        },
+                    )
+                    .await;
+
+                assert!(valid);
+            }
+            assert_eq!(sigs.len(), 1);
+        }
     }
 }
