@@ -59,7 +59,7 @@ mod types;
 pub async fn app_validation_workflow(
     dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
-    fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
+    validation_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
     trigger_integration: TriggerSender,
     conductor_handle: ConductorHandle,
     network: HolochainP2pDna,
@@ -71,7 +71,7 @@ pub async fn app_validation_workflow(
         conductor_handle,
         &network,
         dht_query_cache,
-        fetched_dependencies,
+        validation_dependencies,
     )
     .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
@@ -88,7 +88,7 @@ async fn app_validation_workflow_inner(
     conductor: ConductorHandle,
     network: &HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
-    fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
+    validation_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
@@ -104,7 +104,7 @@ async fn app_validation_workflow_inner(
             let network = network.clone();
             let conductor = conductor.clone();
             let workspace = workspace.clone();
-            let fetched_dependencies = fetched_dependencies.clone();
+            let validation_dependencies = validation_dependencies.clone();
             let dna_hash = dna_hash.clone();
             async move {
                 let (op, op_hash) = so.into_inner();
@@ -131,7 +131,7 @@ async fn app_validation_workflow_inner(
                             &op,
                             &conductor,
                             &workspace,
-                            fetched_dependencies,
+                            validation_dependencies,
                             &network,
                         )
                         .await
@@ -398,7 +398,7 @@ async fn validate_op_outer(
     op: &Op,
     conductor_handle: &ConductorHandle,
     workspace: &AppValidationWorkspace,
-    fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
+    validation_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
     network: &HolochainP2pDna,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
@@ -412,7 +412,7 @@ async fn validate_op_outer(
     validate_op(
         op,
         host_fn_workspace,
-        fetched_dependencies,
+        validation_dependencies,
         network,
         &ribosome,
         conductor_handle,
@@ -423,7 +423,7 @@ async fn validate_op_outer(
 pub async fn validate_op<R>(
     op: &Op,
     workspace: HostFnWorkspaceRead,
-    fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
+    validation_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
     network: &HolochainP2pDna,
     ribosome: &R,
     conductor_handle: &ConductorHandle,
@@ -482,7 +482,7 @@ where
         ribosome,
         workspace,
         network.clone(),
-        fetched_dependencies,
+        validation_dependencies,
     )
     .await?;
 
@@ -630,7 +630,7 @@ async fn run_validation_callback_inner<R>(
     ribosome: &R,
     workspace_read: HostFnWorkspaceRead,
     network: HolochainP2pDna,
-    fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
+    validation_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
 ) -> AppValidationResult<Outcome>
 where
     R: RibosomeT,
@@ -654,9 +654,9 @@ where
                 let cascade = cascade.clone();
                 // keep track of which dependencies are being fetched to
                 // prevent multiple fetches of the same hash
-                let fetched_dependencies = fetched_dependencies.clone();
+                let validation_dependencies = validation_dependencies.clone();
                 async move {
-                    let new_dependency = fetched_dependencies.lock().insert(hash.clone());
+                    let new_dependency = validation_dependencies.lock().insert(hash.clone());
                     // fetch dependency if it is not being fetched yet
                     if new_dependency {
                         let result = cascade
@@ -666,7 +666,7 @@ where
                             tracing::warn!("error fetching dependent hash {hash:?}: {err}");
                         } else {
                             // dependency has been fetched and added to the cache
-                            fetched_dependencies.lock().remove(&hash);
+                            validation_dependencies.lock().remove(&hash);
                         }
                     }
                 }
@@ -692,9 +692,10 @@ where
 
                 // keep track of which dependencies are being fetched to
                 // prevent multiple fetches of the same hash
-                let fetched_dependencies = fetched_dependencies.clone();
+                let validation_dependencies = validation_dependencies.clone();
                 async move {
-                    let new_dependency = fetched_dependencies.lock().insert(author.clone().into());
+                    let new_dependency =
+                        validation_dependencies.lock().insert(author.clone().into());
                     // fetch dependency if it is not being fetched yet
                     if new_dependency {
                         let result = cascade
@@ -706,7 +707,7 @@ where
                             );
                         } else {
                             // dependency has been fetched and added to the cache
-                            fetched_dependencies.lock().remove(&author.into());
+                            validation_dependencies.lock().remove(&author.into());
                         }
                     }
                 }
