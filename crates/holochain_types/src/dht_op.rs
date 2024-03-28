@@ -136,7 +136,7 @@ pub type DhtOpLight = DhtOpLite;
 /// Alias for DhtOpLite
 pub type OpLite = DhtOpLite;
 
-/// A type for storing in databases that don't need the actual
+/// A type for storing in databases that doesn't need the actual
 /// data. Everything is a hash of the type except the signatures.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, derive_more::Display)]

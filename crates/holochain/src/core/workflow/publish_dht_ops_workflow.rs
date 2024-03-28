@@ -221,7 +221,6 @@ mod tests {
         // Receive events and increment count
         let recv_task = tokio::task::spawn({
             async move {
-                // use tokio_stream::StreamExt;
                 let mut tx_complete = Some(tx_complete);
                 while let Some(evt) = recv.recv().await {
                     use holochain_p2p::event::HolochainP2pEvent::*;

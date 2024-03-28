@@ -132,7 +132,7 @@ pub trait HolochainP2pDnaT: Send + Sync {
         options: actor::GetActivityOptions,
     ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>>;
 
-    /// Get agent deterministic activity from the DHT.
+    /// Get agent activity deterministically from the DHT.
     async fn must_get_agent_activity(
         &self,
         author: AgentPubKey,
