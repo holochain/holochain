@@ -19,6 +19,7 @@ use holochain_keystore::{test_keystore, MetaLairClient};
 use holochain_p2p::{event::HolochainP2pEvent, HolochainP2pDnaFixturator, MockHolochainP2pDnaT};
 use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, mutations::insert_op};
 use holochain_types::{
+    chain::MustGetAgentActivityResponse,
     dht_op::{DhtOp, DhtOpHashed, WireOps},
     dna::DnaFile,
     record::{SignedActionHashedExt, WireRecordOps},
@@ -257,16 +258,16 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         move |api, op: Op| {
             if let Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) = op {
                 let result = api.must_get_agent_activity(MustGetAgentActivityInput {
-                    author: action.hashed.author().to_owned(),
-                    chain_filter: ChainFilter::new(action.as_hash().to_owned()),
+                    author: action.hashed.author().clone(),
+                    chain_filter: ChainFilter::new(action.as_hash().clone()),
                 });
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
                         UnresolvedDependencies::AgentActivity(
-                            action.hashed.author().to_owned(),
-                            ChainFilter::new(action.as_hash().to_owned()),
+                            action.hashed.author().clone(),
+                            ChainFilter::new(action.as_hash().clone()),
                         ),
                     ))
                 }
@@ -286,6 +287,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         workspace_read,
     } = TestCase::new(zomes).await;
 
+    // create an action by bob that is must got by alice
     let bob = keystore.new_sign_keypair_random().await.unwrap();
 
     let action = Action::Dna(Dna {
@@ -303,11 +305,22 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     let dna_hash = dna_file.dna_hash().clone();
     let invocation = ValidateInvocation::new(zomes_to_invoke, &action_op).unwrap();
 
-    let network = Arc::new(
-        test_network(Some(dna_hash.clone()), Some(alice.clone()))
-            .await
-            .dna_network(),
-    );
+    // mock network with alice not being an authority of bob's action
+    let mut network = MockHolochainP2pDnaT::new();
+    network.expect_authority_for_hash().returning(|_| Ok(false));
+    // return single action as requested chain
+    network
+        .expect_must_get_agent_activity()
+        .returning(move |agent_key, chain_filter| {
+            Ok(vec![MustGetAgentActivityResponse::Activity(vec![
+                RegisterAgentActivity {
+                    action: action_signed_hashed.clone(),
+                    cached_entry: None,
+                },
+            ])])
+        });
+    let network = Arc::new(network);
+
     let fetched_dependencies = Arc::new(Mutex::new(HashSet::new()));
 
     // app validation should indicate missing action is being awaited
@@ -322,19 +335,11 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     .unwrap();
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![action.author().to_owned().into()]);
 
-    // alice is an authority for bob, so must_get_agent_activity will not go to
-    // the network and return IncompleteChain instead
-    // therefore write the op manually to alice's cache db
-    let dht_op = DhtOp::RegisterAgentActivity(action_signed_hashed.signature, action.clone());
-    let dht_op_hash = DhtOpHash::with_data_sync(&dht_op);
-    let dht_op_hashed = DhtOpHashed::with_pre_hashed(dht_op, dht_op_hash.clone());
-    test_space.space.cache_db.test_write(move |txn| {
-        insert_op(txn, &dht_op_hashed).unwrap();
-        put_integrated(txn, &dht_op_hash, ValidationStatus::Valid).unwrap();
-    });
+    // await while bob's chain is being fetched in background task
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
-    // app validation outcome should be accepted, now that the missing agent
-    // activity is available
+    // app validation outcome should be accepted, now that bob's missing agent
+    // activity is available in alice's cache
     let outcome = run_validation_callback_inner(
         invocation.clone(),
         &ribosome,
