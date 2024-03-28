@@ -4,7 +4,7 @@ use std::{collections::HashMap, path::PathBuf};
 use crate::conductor::api::error::ConductorApiError;
 use crate::{conductor::error::ConductorError, sweettest::*};
 use ::fixt::prelude::strum_macros;
-use holo_hash::{AgentPubKey, DnaHash};
+use holo_hash::DnaHash;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use matches::assert_matches;
@@ -17,7 +17,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
 
-    async fn make_payload(agent_key: AgentPubKey, clone_limit: u32) -> InstallAppPayload {
+    async fn make_payload(clone_limit: u32) -> InstallAppPayload {
         // The integrity zome in this WASM will fail if the properties are not set. This helps verify that genesis
         // is not being run for the clone-only cell and will only run for the cloned cells.
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![
@@ -51,7 +51,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             .unwrap();
 
         InstallAppPayload {
-            agent_key: Some(agent_key),
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
@@ -65,7 +65,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
     assert_matches!(
         conductor
             .clone()
-            .install_app_bundle(make_payload(agent.clone(), 0).await)
+            .install_app_bundle(make_payload(0).await)
             .await
             .unwrap_err(),
         ConductorError::AppBundleError(AppBundleError::AppManifestError(
@@ -73,11 +73,13 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
         ))
     );
 
+    todo!("Need to be able to roll back the DPKI failure here.");
+
     {
         // Succeeds with clone limit of 1
         let app = conductor
             .clone()
-            .install_app_bundle(make_payload(agent.clone(), 1).await)
+            .install_app_bundle(make_payload(1).await)
             .await
             .unwrap();
 
