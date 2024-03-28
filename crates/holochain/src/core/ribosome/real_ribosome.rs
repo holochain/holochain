@@ -106,9 +106,15 @@ use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
+use opentelemetry_api::global::meter_with_version;
+use opentelemetry_api::metrics::Counter;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use wasmer_middlewares::metering::get_remaining_points;
+use wasmer_middlewares::metering::set_remaining_points;
+use wasmer_middlewares::metering::MeteringPoints;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -125,6 +131,8 @@ pub struct RealRibosome {
 
     /// Dependencies for every zome.
     pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
+
+    pub usage_meter: Arc<Counter<u64>>,
 
     /// File system and in-memory cache for wasm modules.
     pub wasmer_module_cache: Arc<RwLock<ModuleCache>>,
@@ -211,6 +219,19 @@ impl HostFnBuilder {
 }
 
 impl RealRibosome {
+    pub fn standard_usage_meter() -> Arc<Counter<u64>> {
+        meter_with_version(
+            "hc.ribosome.wasm",
+            Some("0"),
+            None::<&'static str>,
+            Some(vec![]),
+        )
+        .u64_counter("hc.ribosome.wasm.usage")
+        .with_description("The metered usage of a wasm ribosome.")
+        .init()
+        .into()
+    }
+
     /// Create a new instance
     pub fn new(
         dna_file: DnaFile,
@@ -220,6 +241,7 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
+            usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache,
         };
 
@@ -312,6 +334,7 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
+            usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache: Arc::new(RwLock::new(ModuleCache::new(None))),
         }
     }
@@ -590,6 +613,7 @@ impl RealRibosome {
         let instance = instance_with_store.instance.clone();
         let mut store_lock = instance_with_store.store.lock();
         let mut store_mut = store_lock.as_store_mut();
+        set_remaining_points(&mut store_mut, instance.as_ref(), WASM_METERING_LIMIT);
         let result = holochain_wasmer_host::guest::call(
             &mut store_mut,
             instance,
@@ -598,6 +622,33 @@ impl RealRibosome {
             // the whole invocation is cloned!
             // @todo - is this a problem for large payloads like entries?
             invocation.to_owned().host_input()?,
+        );
+        let points_used = match get_remaining_points(&mut store_mut, instance.as_ref()) {
+            MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
+            MeteringPoints::Exhausted => WASM_METERING_LIMIT,
+        };
+        self.usage_meter.add(
+            points_used,
+            &[
+                opentelemetry_api::KeyValue::new("dna", self.dna_file.dna().hash.to_string()),
+                opentelemetry_api::KeyValue::new(
+                    "zome",
+                    call_context.zome().zome_name().to_string(),
+                ),
+                opentelemetry_api::KeyValue::new("fn", to_call.to_string()),
+                opentelemetry_api::KeyValue::new(
+                    "chain",
+                    call_context
+                        .host_context
+                        .workspace()
+                        .source_chain()
+                        .as_ref()
+                        .expect("No source chain on this workspace.")
+                        .agent_pubkey()
+                        .clone()
+                        .to_string(),
+                ),
+            ],
         );
 
         if let Err(runtime_error) = &result {
