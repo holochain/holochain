@@ -1,6 +1,6 @@
 [package]
 name = "holochain_nonce"
-version = "0.3.0-beta-dev.25"
+version = "0.3.0-beta-dev.26"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2021"
 description = "This crate is for generating nonces."
@@ -11,8 +11,8 @@ documentation = "https://docs.rs/holochain_nonces"
 # reminder - do not use workspace deps
 [dependencies]
 getrandom = { version = "0.2.7", default-features = false, features = ["std"] }
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.8", path = "../kitsune_p2p/timestamp" }
-holochain_secure_primitive = { version = "^0.3.0-beta-dev.22", path = "../holochain_secure_primitive", default-features = false }
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.9", path = "../kitsune_p2p/timestamp" }
+holochain_secure_primitive = { version = "^0.3.0-beta-dev.23", path = "../holochain_secure_primitive", default-features = false }
 
 [lints]
 workspace = true

@@ -72,7 +72,7 @@ pub enum DhtOp {
     ///
     /// - Ensure that *the action alone* passes surface-level validation.
     /// - Store the action into their DHT shard.
-    ///   - FIXME: @artbrock, do they?
+    //   - FIXME: @artbrock, do they?
     /// - Add an "agent-activity" reference from the public key to the hash
     ///   of the action.
     ///
