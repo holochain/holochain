@@ -4,10 +4,11 @@ version = "0.1.0-beta-rc.0"
 edition = "2021"
 license = "Apache-2.0"
 
+# reminder - do not use workspace deps
 [dependencies]
 clap = { version = "4.5.3", features = [ "derive", "wrap_help" ] }
 tokio = { version = "1.36.0", features = [ "full" ] }
-kitsune_p2p_bootstrap_client = { version = "0.3.0-beta-dev.29", path = "../kitsune_p2p/bootstrap_client" }
+kitsune_p2p_bootstrap_client = { version = "^0.3.0-beta-dev.30", path = "../kitsune_p2p/bootstrap_client" }
 tx5-go-pion = { version = "0.0.8-alpha" }
 tx5-signal = { version = "0.0.8-alpha" }
 url2 = "0.0.6"

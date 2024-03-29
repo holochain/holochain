@@ -1,8 +1,6 @@
 use holo_hash::ActionHash;
 use holochain::core::workflow::publish_dht_ops_workflow::num_still_needing_publish;
-use holochain::sweettest::{
-    consistency_60s, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
-};
+use holochain::sweettest::*;
 use holochain_wasm_test_utils::TestWasm;
 
 /// Verifies that publishing terminates naturally when enough validation receipts are received.
@@ -34,7 +32,9 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         .await;
 
     // Wait until they all see the created entry, at that point validation receipts should be getting sent soon
-    consistency_60s([&alice, &bobbo, &carol, &danny, &emma, &fred]).await;
+    await_consistency(60, [&alice, &bobbo, &carol, &danny, &emma, &fred])
+        .await
+        .unwrap();
 
     let ops_to_publish = alice
         .authored_db()

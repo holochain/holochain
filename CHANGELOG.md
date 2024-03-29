@@ -14,6 +14,110 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240327.004300
+
+## [hcterm-0.3.0-beta-dev.18](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.18)
+
+## [holochain\_cli-0.3.0-beta-dev.42](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.42)
+
+## [holochain-0.3.0-beta-dev.43](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.43)
+
+- BREAKING: Holochain websockets now require an `allowed_origins` configuration to be provided. When connecting to the websocket a matching origin must be specified in the connection request `Origin` header. [\#3460](https://github.com/holochain/holochain/pull/3460)
+  - The `ConductorConfiguration` has been changed so that specifying an admin interface requires an `allowed_origins` as well as the port it already required.
+  - `AdminRequest::AddAdminInterfaces` has been updated as per the previous point.
+  - `AdminRequest::AttachAppInterface` has also been updated so that attaching app ports requires an `allowed_origins` as well as the port it already required.
+- BREAKING: Split the authored database by author. It was previous partitioned by DNA only and each agent that shared a DB because they were running the same DNA would have to share the write lock. This is a pretty serious bottleneck when the same app is being run for multiple agents on the same conductor. They are now separate files on disk and writes can proceed independently. There is no migration path for this change, if you have existing databases they will not be found. [\#3450](https://github.com/holochain/holochain/pull/3450)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.39](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.39)
+
+## [holochain\_cli\_run\_local\_services-0.3.0-beta-dev.25](crates/holochain_cli_run_local_services/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.42](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.42)
+
+## [holochain\_cascade-0.3.0-beta-dev.42](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.42)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.42](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.42)
+
+## [holochain\_conductor\_services-0.2.0-beta-dev.12](crates/holochain_conductor_services/CHANGELOG.md#0.2.0-beta-dev.12)
+
+## [holochain\_metrics-0.3.0-beta-dev.10](crates/holochain_metrics/CHANGELOG.md#0.3.0-beta-dev.10)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.36](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.36)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.40](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [holochain\_websocket-0.3.0-beta-dev.17](crates/holochain_websocket/CHANGELOG.md#0.3.0-beta-dev.17)
+
+- `WebsocketListener` now requires an `allowed_origins` configuration to be provided. When connecting to the websocket a matching origin must be specified in the connection request `Origin` header. [\#3460](https://github.com/holochain/holochain/pull/3460)
+
+## [hdk-0.3.0-beta-dev.36](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.36)
+
+## [holochain\_state-0.3.0-beta-dev.41](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [hdi-0.4.0-beta-dev.32](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.32)
+
+## [holochain\_p2p-0.3.0-beta-dev.41](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [hc\_sleuth-0.2.0-beta-dev.12](crates/hc_sleuth/CHANGELOG.md#0.2.0-beta-dev.12)
+
+## [hdk\_derive-0.3.0-beta-dev.30](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.30)
+
+## [aitia-0.2.0-beta-dev.7](crates/aitia/CHANGELOG.md#0.2.0-beta-dev.7)
+
+## [holochain\_state\_types-0.3.0-beta-dev.36](crates/holochain_state_types/CHANGELOG.md#0.3.0-beta-dev.36)
+
+## [holochain\_types-0.3.0-beta-dev.38](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.38)
+
+- Added `AllowedOrigins` which is intended to be used with `holochain_websocket` for controlling access. It is placed here for crates need to know about origins but don’t depend on `holochain_websocket`. [\#3460](https://github.com/holochain/holochain/pull/3460)
+
+## [kitsune\_p2p-0.3.0-beta-dev.35](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.35)
+
+## [holochain\_keystore-0.3.0-beta-dev.32](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.32)
+
+## [holochain\_sqlite-0.3.0-beta-dev.38](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.38)
+
+## [kitsune\_p2p\_bootstrap\_client-0.3.0-beta-dev.30](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.3.0-beta-dev.30)
+
+## [kitsune\_p2p\_fetch-0.3.0-beta-dev.27](crates/kitsune_p2p_fetch/CHANGELOG.md#0.3.0-beta-dev.27)
+
+## [kitsune\_p2p\_mdns-0.3.0-beta-dev.3](crates/kitsune_p2p_mdns/CHANGELOG.md#0.3.0-beta-dev.3)
+
+## [kitsune\_p2p\_proxy-0.3.0-beta-dev.24](crates/kitsune_p2p_proxy/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [mr\_bundle-0.3.0-beta-dev.8](crates/mr_bundle/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [holochain\_zome\_types-0.3.0-beta-dev.31](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.31)
+
+## [kitsune\_p2p\_bootstrap-0.2.0-beta-dev.24](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.2.0-beta-dev.24)
+
+## [kitsune\_p2p\_transport\_quic-0.3.0-beta-dev.24](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.29](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.29)
+
+## [holochain\_nonce-0.3.0-beta-dev.26](crates/holochain_nonce/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [kitsune\_p2p\_block-0.3.0-beta-dev.21](crates/kitsune_p2p_block/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [kitsune\_p2p\_types-0.3.0-beta-dev.24](crates/kitsune_p2p_types/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holo\_hash-0.3.0-beta-dev.25](crates/holo_hash/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [holochain\_secure\_primitive-0.3.0-beta-dev.23](crates/holochain_secure_primitive/CHANGELOG.md#0.3.0-beta-dev.23)
+
+## [kitsune\_p2p\_bin\_data-0.3.0-beta-dev.19](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.3.0-beta-dev.19)
+
+## [kitsune\_p2p\_dht-0.3.0-beta-dev.20](crates/kitsune_p2p_dht/CHANGELOG.md#0.3.0-beta-dev.20)
+
+## [fixt-0.3.0-beta-dev.3](crates/fixt/CHANGELOG.md#0.3.0-beta-dev.3)
+
+## [holochain\_util-0.3.0-beta-dev.6](crates/holochain_util/CHANGELOG.md#0.3.0-beta-dev.6)
+
+## [kitsune\_p2p\_dht\_arc-0.3.0-beta-dev.18](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.3.0-beta-dev.18)
+
+## [holochain\_trace-0.3.0-beta-dev.9](crates/holochain_trace/CHANGELOG.md#0.3.0-beta-dev.9)
+
+## [kitsune\_p2p\_timestamp-0.3.0-beta-dev.9](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.3.0-beta-dev.9)
+
 # 20240320.130406
 
 ## [hcterm-0.3.0-beta-dev.17](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.17)
@@ -1034,7 +1138,7 @@ Initial version
   
   - Reliability: The workflow will now prioritise validating ops that have their dependencies available locally. As soon as it has finished with those it will trigger app validation before dealing with missing dependencies.
   - Reliability: For ops which have dependencies we aren’t holding locally, the network get will now be retried. This was a cause of undesirable behaviour for validation where a failed get would result in validation for ops with missing dependencies not being retried until new ops arrived. The workflow now retries the get on an interval until it finds dependencies and can proceed with validation.
-  - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was uneccessary and doing database queries so it should be good to have that gone.
+  - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was unnecessary and doing database queries so it should be good to have that gone.
   - Performance: In-memory caching for sys validation dependencies. When we have to wait to validate an op because it has a missing dependency, any other actions required by that op will be held in memory rather than being refetched from the database. This has a fairly small memory footprint because actions are relatively small but saves repeatedly hitting the cascade for the same data if it takes a bit of time to find a dependency on the network.
 
 - **BREAKING* CHANGE*: The `ConductorConfig` has been updated to add a new option for configuring conductor behaviour. This should be compatible with existing conductor config YAML files but if you are creating the struct directly then you will need to include the new field. Currently this just has one setting which controls how fast the sys validation workflow will retry network gets for missing dependencies. It’s likely this option will change in the near future.
@@ -5189,7 +5293,7 @@ As Holochain has evolved, the meaning behind these concepts, as well as our unde
 
 ## [holochain-0.0.139](crates/holochain/CHANGELOG.md#0.0.139)
 
-- Udpate lair to 0.1.3 - largely just documentation updates, but also re-introduces some dependency pinning to fix mismatch client/server version check [\#1377](https://github.com/holochain/holochain/pull/1377)
+- Update lair to 0.1.3 - largely just documentation updates, but also re-introduces some dependency pinning to fix mismatch client/server version check [\#1377](https://github.com/holochain/holochain/pull/1377)
 
 ## [holochain\_websocket-0.0.37](crates/holochain_websocket/CHANGELOG.md#0.0.37)
 
