@@ -439,7 +439,8 @@ where
     let zomes_to_invoke = match op {
         Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => ZomesToInvoke::AllIntegrity,
         Op::StoreRecord(StoreRecord { record }) => {
-            let cascade = CascadeImpl::from_workspace_and_network(&workspace, network.clone());
+            let cascade =
+                CascadeImpl::from_workspace_and_network(&workspace, Arc::new(network.clone()));
             store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await?
         }
         Op::StoreEntry(StoreEntry {
