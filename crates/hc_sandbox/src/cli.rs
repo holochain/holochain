@@ -180,7 +180,7 @@ impl HcSandbox {
                 return result;
             }
             HcSandboxSubcommand::Call(call) => {
-                crate::calls::call(&self.holochain_path, call, self.structured).await?
+                crate::calls::call(&self.holochain_path, call, self.force_admin_ports, self.structured).await?
             }
             // HcSandboxSubcommand::Task => todo!("Running custom tasks is coming soon"),
             HcSandboxSubcommand::List { verbose } => {
