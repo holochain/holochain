@@ -232,7 +232,12 @@ pub struct ListApps {
 }
 
 #[doc(hidden)]
-pub async fn call(holochain_path: &Path, req: Call, force_admin_ports: Vec<u16>, structured: Output) -> anyhow::Result<()> {
+pub async fn call(
+    holochain_path: &Path,
+    req: Call,
+    force_admin_ports: Vec<u16>,
+    structured: Output,
+) -> anyhow::Result<()> {
     let Call {
         existing,
         running,
