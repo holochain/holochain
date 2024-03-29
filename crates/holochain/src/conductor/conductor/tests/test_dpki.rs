@@ -134,13 +134,9 @@ async fn mock_dpki_validation_limbo() {
     let bob_clone = bob.clone();
 
     // Assert that we *can't* reach consistency in 3 seconds
-    tokio::spawn(async move {
-        await_consistency(3, [&alice_clone, &bob_clone])
-            .await
-            .unwrap()
-    })
-    .await
-    .unwrap_err();
+    await_consistency(3, [&alice_clone, &bob_clone])
+        .await
+        .unwrap_err();
 
     let record_bob: Option<Record> = conductors[1]
         .call(&bob.zome("simple"), "read", hash.clone())
