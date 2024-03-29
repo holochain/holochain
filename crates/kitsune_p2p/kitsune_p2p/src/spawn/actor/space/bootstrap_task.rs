@@ -12,6 +12,7 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 use std::time::Duration;
 use url2::Url2;
+use crate::spawn::meta_net::MetaNet;
 
 const MAX_AGENTS_PER_QUERY: u32 = 8;
 
@@ -46,6 +47,7 @@ impl BootstrapTask {
         space: Arc<KitsuneSpace>,
         bootstrap_service: Option<Url2>,
         bootstrap_net: BootstrapNet,
+        ep_hnd: MetaNet,
         bootstrap_check_delay_backoff_multiplier: u32,
         mut bootstrap_max_delay_s: u32,
     ) -> Arc<RwLock<Self>> {
@@ -69,6 +71,7 @@ impl BootstrapTask {
             internal_sender,
             host_sender,
             space,
+            ep_hnd,
             Box::new(bootstrap_query),
             bootstrap_check_delay_backoff_multiplier,
         )
@@ -79,6 +82,7 @@ impl BootstrapTask {
         internal_sender: GhostSender<SpaceInternal>,
         host_sender: Sender<KitsuneP2pEvent>,
         space: Arc<KitsuneSpace>,
+        ep_hnd: MetaNet,
         bootstrap_query: Box<impl BootstrapService + Send + Sync + 'static>,
         bootstrap_check_delay_backoff_multiplier: u32,
     ) -> Arc<RwLock<Self>> {
@@ -141,21 +145,26 @@ impl BootstrapTask {
                             }
                         }
 
-                        if let Err(err) = host_sender
+                        match host_sender
                             .put_agent_info_signed(PutAgentInfoSignedEvt {
                                 space: space.clone(),
                                 peer_data,
                             })
-                            .await
-                        {
-                            match err {
-                                KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                    tracing::error!(?err, "Bootstrap task cannot communicate with the host, shutting down");
-                                    break;
+                            .await {
+                            Ok(responses) => {
+                                for removed_url in responses.into_iter().flat_map(|r| r.removed_urls) {
+                                    tracing::debug!(?removed_url, "peer URL changed, closing connection");
+                                    if let Err(e) = ep_hnd.close_peer_con(removed_url.clone()) {
+                                        tracing::error!(?e, ?removed_url, "error closing peer connection");
+                                    }
                                 }
-                                _ => {
-                                    tracing::error!(?err, "error storing bootstrap agent_info");
-                                }
+                            }
+                            Err(err @ KitsuneP2pError::GhostError(GhostError::Disconnected)) => {
+                                tracing::error!(?err, "Bootstrap task cannot communicate with the host, shutting down");
+                                break;
+                            }
+                            Err(err)  => {
+                                tracing::error!(?err, "error storing bootstrap agent_info");
                             }
                         }
                     }

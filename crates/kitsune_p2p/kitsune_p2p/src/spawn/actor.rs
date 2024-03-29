@@ -250,6 +250,7 @@ pub(super) async fn create_meta_net(
 use crate::spawn::actor::fetch::{FetchResponseConfig, FetchTask};
 use crate::spawn::actor::meta_net_task::MetaNetTask;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 
 impl ghost_actor::GhostControlHandler for KitsuneP2pActor {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
@@ -503,7 +504,7 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_put_agent_info_signed(
         &mut self,
         input: crate::event::PutAgentInfoSignedEvt,
-    ) -> KitsuneP2pEventHandlerResult<()> {
+    ) -> KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>> {
         Ok(self.host_api.legacy.put_agent_info_signed(input))
     }
 

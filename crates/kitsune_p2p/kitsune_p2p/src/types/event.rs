@@ -175,7 +175,7 @@ ghost_actor::ghost_chan! {
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
 
         /// We need to store signed agent info.
-        fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
+        fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> Vec<kitsune_p2p_types::bootstrap::AgentInfoPut>;
 
         /// We need to get previously stored agent info.
         fn query_agents(input: QueryAgentsEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;

@@ -46,6 +46,7 @@ use opentelemetry_api::metrics::Histogram;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tx5::PeerUrl;
 
 use crate::spawn::actor::UNAUTHORIZED_DISCONNECT_CODE;
 use crate::spawn::actor::UNAUTHORIZED_DISCONNECT_REASON;
@@ -1212,6 +1213,20 @@ impl MetaNet {
         }
 
         // TODO - currently no way to shutdown tx5
+    }
+
+    pub fn close_peer_con(&self, peer_url: TxUrl) -> KitsuneResult<()> {
+        // Not supported for tx2
+
+        #[cfg(feature = "tx5")]
+        {
+            if let MetaNet::Tx5 { ep, .. } = self {
+                let peer_url = PeerUrl::new(peer_url.to_string()).map_err(KitsuneError::other)?;
+                ep.close(peer_url).map_err(KitsuneError::other)?;
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn get_connection(

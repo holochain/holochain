@@ -24,6 +24,7 @@ use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashSet;
 use std::future::Future;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 
 macro_rules! timing_trace {
     ($code:block $($rest:tt)*) => {{
@@ -50,7 +51,7 @@ impl WrapEvtSender {
         &self,
         dna_hash: DnaHash,
         peer_data: Vec<AgentInfoSigned>,
-    ) -> impl Future<Output = HolochainP2pResult<()>> + 'static + Send {
+    ) -> impl Future<Output = HolochainP2pResult<Vec<AgentInfoPut>>> + 'static + Send {
         timing_trace!(
             { self.0.put_agent_info_signed(dna_hash, peer_data) },
             "(hp2p:handle) put_agent_info_signed",
@@ -637,7 +638,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     fn handle_put_agent_info_signed(
         &mut self,
         input: kitsune_p2p::event::PutAgentInfoSignedEvt,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>> {
         let kitsune_p2p::event::PutAgentInfoSignedEvt { space, peer_data } = input;
         let space = DnaHash::from_kitsune(&space);
         let evt_sender = self.evt_sender.clone();

@@ -422,7 +422,7 @@ fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
 pub async fn p2p_prune(
     db: &DbWrite<DbKindP2pAgents>,
     local_agents: Vec<Arc<KitsuneAgent>>,
-) -> DatabaseResult<Vec<AgentInfoSigned>> {
+) -> DatabaseResult<()> {
     let mut agent_list = Vec::with_capacity(local_agents.len() * 36);
     for agent in local_agents.iter() {
         agent_list.extend_from_slice(agent.as_ref());
@@ -433,13 +433,13 @@ pub async fn p2p_prune(
         agent_list.extend_from_slice(&[0; 36]);
     }
     let space = db.kind().0.clone();
-    let removed = db.write_async(move |txn| {
+    db.write_async(move |txn| {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
 
-        let removed = cache_get(space, &*txn)?.prune(now, &local_agents)?;
+        cache_get(space, &*txn)?.prune(now, &local_agents)?;
 
         txn.execute(
             sql_p2p_agent_store::PRUNE,
@@ -449,11 +449,11 @@ pub async fn p2p_prune(
             },
         )?;
 
-        DatabaseResult::Ok(removed)
+        DatabaseResult::Ok(())
     })
     .await?;
 
-    Ok(removed)
+    Ok(())
 }
 
 #[async_trait::async_trait]
