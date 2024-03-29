@@ -1,6 +1,6 @@
 [package]
 name = "holochain_sqlite"
-version = "0.3.0-beta-dev.37"
+version = "0.3.0-beta-dev.38"
 description = "Abstractions for persistence of Holochain state via SQLite"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -18,16 +18,16 @@ chashmap = "=2.2.0"
 derive_more = "0.99"
 fallible-iterator = "0.2.0"
 futures = "0.3"
-holo_hash = { path = "../holo_hash", version = "^0.3.0-beta-dev.24"}
+holo_hash = { path = "../holo_hash", version = "^0.3.0-beta-dev.25"}
 holochain_serialized_bytes = "=0.0.53"
-holochain_util = { version = "^0.3.0-beta-dev.5", path = "../holochain_util", features = ["backtrace"], optional = true }
-holochain_zome_types = { version = "^0.3.0-beta-dev.30", path = "../holochain_zome_types" }
-holochain_nonce = {version = "^0.3.0-beta-dev.25", path = "../holochain_nonce"}
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.23", path = "../kitsune_p2p/types", optional = true }
-kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.17", path = "../kitsune_p2p/dht_arc" }
-kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.18", path = "../kitsune_p2p/bin_data" }
-kitsune_p2p_dht = { version = "^0.3.0-beta-dev.19", path = "../kitsune_p2p/dht" }
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.8", path = "../kitsune_p2p/timestamp" }
+holochain_util = { version = "^0.3.0-beta-dev.6", path = "../holochain_util", features = ["backtrace"], optional = true }
+holochain_zome_types = { version = "^0.3.0-beta-dev.31", path = "../holochain_zome_types" }
+holochain_nonce = {version = "^0.3.0-beta-dev.26", path = "../holochain_nonce"}
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.24", path = "../kitsune_p2p/types", optional = true }
+kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.18", path = "../kitsune_p2p/dht_arc" }
+kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.19", path = "../kitsune_p2p/bin_data" }
+kitsune_p2p_dht = { version = "^0.3.0-beta-dev.20", path = "../kitsune_p2p/dht" }
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.9", path = "../kitsune_p2p/timestamp" }
 once_cell = "1.4.1"
 num_cpus = "1.13.0"
 parking_lot = "0.10"
@@ -60,7 +60,7 @@ rusqlite = { version = "0.29", features = [
 
 [dev-dependencies]
 holochain_sqlite = { path = ".", features = ["test_utils", "slow_tests"] }
-holochain_trace = { version = "^0.3.0-beta-dev.8", path = "../holochain_trace" }
+holochain_trace = { version = "^0.3.0-beta-dev.9", path = "../holochain_trace" }
 nanoid = "0.4"
 rand = "0.8.5"
 
