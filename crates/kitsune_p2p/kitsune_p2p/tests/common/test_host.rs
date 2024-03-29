@@ -12,7 +12,7 @@ use kitsune_p2p_types::{
         hash::RegionHash,
         region::RegionData,
         region_set::{RegionCoordSetLtcs, RegionSetLtcs},
-        spacetime::{Dimension, TelescopingTimes, Topology},
+        spacetime::*,
         ArqStrat,
     },
 };
@@ -229,8 +229,8 @@ impl KitsuneHost for TestHost {
         let cutoff = RECENT_THRESHOLD_DEFAULT;
         async move {
             Ok(Topology {
-                space: Dimension::standard_space(),
-                time: Dimension::time(std::time::Duration::from_secs(60 * 5)),
+                space: SpaceDimension::standard(),
+                time: TimeDimension::new(std::time::Duration::from_secs(60 * 5)),
                 time_origin: Timestamp::ZERO,
                 time_cutoff: cutoff,
             })
