@@ -28,7 +28,8 @@ pub struct ConductorBuilder {
     #[cfg(any(test, feature = "test_utils"))]
     pub state: Option<ConductorState>,
 
-    /// Optional DPKI service implementation
+    /// Optional DPKI service implementation, used to override the service specified in the config,
+    /// especially for testing with a mock
     #[cfg(any(test, feature = "test_utils"))]
     pub dpki: Option<DpkiImpl>,
 

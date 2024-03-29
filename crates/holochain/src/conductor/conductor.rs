@@ -696,11 +696,7 @@ mod dna_impls {
         pub(crate) async fn start_paused_apps(&self) -> ConductorResult<AppStatusFx> {
             let (_, delta) = self
                 .update_state_prime(|mut state| {
-                    let ids = state
-                        .paused_apps_and_services()
-                        .map(first)
-                        .cloned()
-                        .collect::<Vec<_>>();
+                    let ids = state.paused_apps().map(first).cloned().collect::<Vec<_>>();
                     if !ids.is_empty() {
                         tracing::info!("Restarting {} paused apps: {:#?}", ids.len(), ids);
                     }
@@ -1561,7 +1557,7 @@ mod app_impls {
         pub async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
             let state = self.get_state().await?;
             Ok(state
-                .running_apps_and_services()
+                .running_apps()
                 .filter(|(id, _)| is_app(id))
                 .map(|(id, _)| id)
                 .cloned()
@@ -1578,27 +1574,27 @@ mod app_impls {
 
             let apps_ids: Vec<&String> = match status_filter {
                 Some(Enabled) => conductor_state
-                    .enabled_apps_and_services()
+                    .enabled_apps()
                     .filter(|(id, _)| is_app(id))
                     .map(|(id, _)| id)
                     .collect(),
                 Some(Disabled) => conductor_state
-                    .disabled_apps_and_services()
+                    .disabled_apps()
                     .filter(|(id, _)| is_app(id))
                     .map(|(id, _)| id)
                     .collect(),
                 Some(Running) => conductor_state
-                    .running_apps_and_services()
+                    .running_apps()
                     .filter(|(id, _)| is_app(id))
                     .map(|(id, _)| id)
                     .collect(),
                 Some(Stopped) => conductor_state
-                    .stopped_apps_and_services()
+                    .stopped_apps()
                     .filter(|(id, _)| is_app(id))
                     .map(|(id, _)| id)
                     .collect(),
                 Some(Paused) => conductor_state
-                    .paused_apps_and_services()
+                    .paused_apps()
                     .filter(|(id, _)| is_app(id))
                     .map(|(id, _)| id)
                     .collect(),
@@ -1628,7 +1624,7 @@ mod app_impls {
             Ok(self
                 .get_state()
                 .await?
-                .running_apps_and_services()
+                .running_apps()
                 .filter(|(_, v)| v.all_cells().any(|i| i == *cell_id))
                 .map(|(k, _)| k)
                 .cloned()
@@ -1644,7 +1640,7 @@ mod app_impls {
             Ok(self
                 .get_state()
                 .await?
-                .running_apps_and_services()
+                .running_apps()
                 .find(|(_, running_app)| running_app.all_cells().any(|i| i == *cell_id))
                 .and_then(|(_, running_app)| {
                     running_app
@@ -1666,7 +1662,7 @@ mod app_impls {
             Ok(self
                 .get_state()
                 .await?
-                .running_apps_and_services()
+                .running_apps()
                 .filter(|(_, v)| v.all_cells().any(|i| i.dna_hash() == dna_hash))
                 .map(|(k, _)| k)
                 .cloned()
@@ -2189,7 +2185,10 @@ mod service_impls {
             Ok(())
         }
 
-        /// Install the DPKI service using the given Deepkey DNA
+        /// Install the DPKI service using the given Deepkey DNA.
+        /// Note, this currently is done automatically when the conductor is first initialized,
+        /// using the DpkiConfig in the conductor config. We may also provide this as an admin
+        /// method some day.
         pub async fn install_dpki(
             self: Arc<Self>,
             dna: DnaFile,
@@ -2802,7 +2801,7 @@ impl Conductor {
         let state = self.get_state().await?;
 
         let keepers: HashSet<CellId> = state
-            .enabled_apps_and_services()
+            .enabled_apps()
             .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
 

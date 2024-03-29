@@ -70,10 +70,7 @@ async fn can_update_state() {
         .unwrap();
     let state = conductor.get_state().await.unwrap();
     assert_eq!(
-        state
-            .stopped_apps_and_services()
-            .map(second)
-            .collect::<Vec<_>>()[0]
+        state.stopped_apps().map(second).collect::<Vec<_>>()[0]
             .all_cells()
             .collect::<Vec<_>>()
             .as_slice(),
@@ -297,10 +294,7 @@ async fn test_uninstall_app() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (
-                state.running_apps_and_services().count(),
-                state.stopped_apps_and_services().count(),
-            )
+            (state.running_apps().count(), state.stopped_apps().count())
         },
         (2, 0)
     );
@@ -333,10 +327,7 @@ async fn test_uninstall_app() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (
-                state.running_apps_and_services().count(),
-                state.stopped_apps_and_services().count(),
-            )
+            (state.running_apps().count(), state.stopped_apps().count())
         },
         (0, 0)
     );
@@ -872,10 +863,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (
-                state.running_apps_and_services().count(),
-                state.stopped_apps_and_services().count(),
-            )
+            (state.running_apps().count(), state.stopped_apps().count())
         },
         (1, 0)
     );
@@ -934,10 +922,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (
-                state.running_apps_and_services().count(),
-                state.stopped_apps_and_services().count(),
-            )
+            (state.running_apps().count(), state.stopped_apps().count())
         },
         (0, 1)
     );

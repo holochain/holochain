@@ -125,29 +125,26 @@ impl ConductorState {
     }
 
     /// Iterate over only the "enabled" apps
-    pub fn enabled_apps_and_services(
-        &self,
-    ) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
+    pub fn enabled_apps(&self) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
         self.installed_apps_and_services
             .iter()
             .filter(|(_, app)| app.status().is_enabled())
+            .filter(|(id, _)| is_app(id))
     }
 
     /// Iterate over only the "disabled" apps
-    pub fn disabled_apps_and_services(
-        &self,
-    ) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
+    pub fn disabled_apps(&self) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
         self.installed_apps_and_services
             .iter()
+            .filter(|(id, _)| is_app(id))
             .filter(|(_, app)| !app.status().is_enabled())
     }
 
     /// Iterate over only the "running" apps
-    pub fn running_apps_and_services(
-        &self,
-    ) -> impl Iterator<Item = (&InstalledAppId, RunningApp)> + '_ {
+    pub fn running_apps(&self) -> impl Iterator<Item = (&InstalledAppId, RunningApp)> + '_ {
         self.installed_apps_and_services
             .iter()
+            .filter(|(id, _)| is_app(id))
             .filter_map(|(id, app)| {
                 if *app.status() == AppStatus::Running {
                     let running = RunningApp::from(app.as_ref().clone());
@@ -159,11 +156,10 @@ impl ConductorState {
     }
 
     /// Iterate over only the paused apps
-    pub fn paused_apps_and_services(
-        &self,
-    ) -> impl Iterator<Item = (&InstalledAppId, StoppedApp)> + '_ {
+    pub fn paused_apps(&self) -> impl Iterator<Item = (&InstalledAppId, StoppedApp)> + '_ {
         self.installed_apps_and_services
             .iter()
+            .filter(|(id, _)| is_app(id))
             .filter_map(|(id, app)| {
                 if app.status.is_paused() {
                     StoppedApp::from_app(app).map(|stopped| (id, stopped))
@@ -174,11 +170,10 @@ impl ConductorState {
     }
 
     /// Iterate over only the "stopped" apps (paused OR disabled)
-    pub fn stopped_apps_and_services(
-        &self,
-    ) -> impl Iterator<Item = (&InstalledAppId, StoppedApp)> + '_ {
+    pub fn stopped_apps(&self) -> impl Iterator<Item = (&InstalledAppId, StoppedApp)> + '_ {
         self.installed_apps_and_services
             .iter()
+            .filter(|(id, _)| is_app(id))
             .filter_map(|(id, app)| StoppedApp::from_app(app).map(|stopped| (id, stopped)))
     }
 
