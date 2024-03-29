@@ -650,15 +650,14 @@ where
                 CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
             // build a collection of futures to fetch the individual missing
             // hashes
-            let val_deps = validation_dependencies.clone();
+            let validation_deps = validation_dependencies.clone();
             let fetches = hashes
                 .clone()
                 .into_iter()
                 .filter(move |hash| {
                     // keep track of which dependencies are being fetched to
                     // prevent multiple fetches of the same hash
-                    // let validation_dependencies = validation_dependencies.clone();
-                    let is_new_dependency = val_deps.lock().insert(hash.clone());
+                    let is_new_dependency = validation_deps.lock().insert(hash.clone());
                     is_new_dependency
                 })
                 .map(move |hash| {
@@ -672,15 +671,12 @@ where
                             tracing::warn!("error fetching dependent hash {hash:?}: {err}");
                         }
                         // dependency has been fetched and added to the cache
-                        // or an error occurred along the way; in case of an
-                        // error the hash is still removed from the
-                        // collection so that it will be tried again to be
+                        // or an error occurred along the way;
+                        // in case of an error the hash is still removed from
+                        // the collection so that it will be tried again to be
                         // fetched in the subsequent workflow run
                         validation_dependencies.lock().remove(&hash);
                     }
-                    // } else {
-                    //     None
-                    // }
                 });
             // await all fetches in a separate task in the background
             tokio::spawn(async { futures::future::join_all(fetches).await });
@@ -694,20 +690,20 @@ where
                 "unresolved dependencies: agent activity of {author:?} with filter {filter:?}"
             );
             // fetch missing agent activities in the background without awaiting them
-            tokio::spawn({
-                let cascade_workspace = workspace_read.clone();
-                let author = author.clone();
-                let cascade =
-                    CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
+            let cascade_workspace = workspace_read.clone();
+            let author = author.clone();
+            let cascade =
+                CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
 
-                // keep track of which dependencies are being fetched to
-                // prevent multiple fetches of the same hash
-                let validation_dependencies = validation_dependencies.clone();
-                async move {
-                    let new_dependency =
-                        validation_dependencies.lock().insert(author.clone().into());
-                    // fetch dependency if it is not being fetched yet
-                    if new_dependency {
+            // keep track of which dependencies are being fetched to
+            // prevent multiple fetches of the same hash
+            let validation_dependencies = validation_dependencies.clone();
+            let is_new_dependency = validation_dependencies.lock().insert(author.clone().into());
+            // fetch dependency if it is not being fetched yet
+            if is_new_dependency {
+                tokio::spawn({
+                    let author = author.clone();
+                    async move {
                         let result = cascade
                             .must_get_agent_activity(author.clone(), filter)
                             .await;
@@ -723,8 +719,8 @@ where
                         // fetched in the subsequent workflow run
                         validation_dependencies.lock().remove(&author.into());
                     }
-                }
-            });
+                });
+            }
             Ok(Outcome::AwaitingDeps(vec![author.into()]))
         }
     }
