@@ -650,15 +650,21 @@ where
                 CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
             // build a collection of futures to fetch the individual missing
             // hashes
-            let fetches = hashes.clone().into_iter().map(move |hash| {
-                let cascade = cascade.clone();
-                // keep track of which dependencies are being fetched to
-                // prevent multiple fetches of the same hash
-                let validation_dependencies = validation_dependencies.clone();
-                async move {
-                    let new_dependency = validation_dependencies.lock().insert(hash.clone());
-                    // fetch dependency if it is not being fetched yet
-                    if new_dependency {
+            let val_deps = validation_dependencies.clone();
+            let fetches = hashes
+                .clone()
+                .into_iter()
+                .filter(move |hash| {
+                    // keep track of which dependencies are being fetched to
+                    // prevent multiple fetches of the same hash
+                    // let validation_dependencies = validation_dependencies.clone();
+                    let is_new_dependency = val_deps.lock().insert(hash.clone());
+                    is_new_dependency
+                })
+                .map(move |hash| {
+                    let cascade = cascade.clone();
+                    let validation_dependencies = validation_dependencies.clone();
+                    async move {
                         let result = cascade
                             .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
                             .await;
@@ -672,10 +678,11 @@ where
                         // fetched in the subsequent workflow run
                         validation_dependencies.lock().remove(&hash);
                     }
-                }
-            });
-            // await all fetches in a separate task without awaiting the task
-            // to finish
+                    // } else {
+                    //     None
+                    // }
+                });
+            // await all fetches in a separate task in the background
             tokio::spawn(async { futures::future::join_all(fetches).await });
             Ok(Outcome::AwaitingDeps(hashes))
         }
