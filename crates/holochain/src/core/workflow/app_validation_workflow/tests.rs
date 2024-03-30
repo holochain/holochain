@@ -4,7 +4,7 @@ use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::app_validation_workflow::{
     app_validation_workflow_inner, check_app_entry_def, put_validation_limbo,
-    AppValidationWorkspace,
+    AppValidationWorkspace, ValidationDependencies,
 };
 use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
@@ -128,7 +128,7 @@ async fn main_loop_app_validation_workflow() {
             .unwrap();
     assert_eq!(ops_to_validate.len(), 1);
 
-    let fetched_dependencies = Arc::new(Mutex::new(HashSet::new()));
+    let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // run validation workflow
     // outcome should be incomplete - delete op is missing the dependent create op
