@@ -1,6 +1,7 @@
 use super::app_validation_workflow;
 use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
+use super::app_validation_workflow::ValidationDependencies;
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
@@ -21,7 +22,6 @@ use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use holochain_zome_types::record::Record;
 use parking_lot::Mutex;
-use std::collections::HashSet;
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -265,15 +265,15 @@ where
                 Ok(op) => op,
                 Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
             };
-            let fetched_dependencies = Arc::new(Mutex::new(HashSet::new()));
+            let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
             let outcome = app_validation_workflow::validate_op(
                 &op,
                 workspace.clone().into(),
-                fetched_dependencies.clone(),
                 &network,
                 &ribosome,
                 &conductor_handle,
+                validation_dependencies.clone(),
             )
             .await;
             let outcome = outcome.or_else(Outcome::try_from);

@@ -6,7 +6,7 @@ use crate::{
             ZomesToInvoke,
         },
         workflow::app_validation_workflow::{
-            put_integrated, run_validation_callback_inner, Outcome,
+            put_integrated, run_validation_callback_inner, Outcome, ValidationDependencies,
         },
     },
     fixt::MetaLairClientFixturator,
@@ -115,7 +115,7 @@ async fn validation_callback_must_get_action() {
 
     let network = fixt!(HolochainP2pDna);
     let workspace_read = get_workspace_read(&test_space, &alice, dna_file.dna_def()).await;
-    let fetched_dependencies = Arc::new(Mutex::new(HashSet::new()));
+    let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // action has not been written to a database yet
     // validation should indicate it is awaiting create action hash
@@ -259,7 +259,7 @@ async fn validation_callback_awaiting_deps_hashes() {
     });
 
     let workspace_read = get_workspace_read(&test_space, &alice, dna_file.dna_def()).await;
-    let fetched_dependencies = Arc::new(Mutex::new(HashSet::new()));
+    let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback_inner(
@@ -345,7 +345,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 
     let network = test_network(Some(dna_hash.clone()), Some(alice.clone())).await;
     let workspace_read = get_workspace_read(&test_space, &alice, dna_file.dna_def()).await;
-    let fetched_dependencies = Arc::new(Mutex::new(HashSet::new()));
+    let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback_inner(
@@ -498,7 +498,7 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
         }
     });
 
-    let fetched_dependencies = Arc::new(Mutex::new(HashSet::new()));
+    let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
     let workspace_read = get_workspace_read(&test_space, &alice, dna_file.dna_def()).await;
 
     // run two op validations that depend on the same record in parallel
@@ -523,7 +523,7 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
 
     assert_eq!(times_same_hash_is_fetched.load(Ordering::Relaxed), 1);
     // after successfully fetching dependencies, the set should be empty
-    assert_eq!(fetched_dependencies.lock().len(), 0);
+    assert_eq!(fetched_dependencies.lock().missing_hashes.len(), 0);
 }
 
 struct TestCase {

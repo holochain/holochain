@@ -28,6 +28,7 @@ use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
 use parking_lot::Mutex;
 use rusqlite::Transaction;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -49,17 +50,35 @@ mod unit_tests;
 mod error;
 mod types;
 
+/// Dependencies required for app validating an op.
+pub struct ValidationDependencies {
+    /// Missing hashes that are being fetched.
+    pub missing_hashes: HashSet<AnyDhtHash>,
+    /// Dependencies that are missing to app validate an op.
+    pub hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
+}
+
+impl ValidationDependencies {
+    pub fn new() -> Self {
+        Self {
+            missing_hashes: HashSet::new(),
+            hashes_missing_for_op: HashMap::new(),
+        }
+    }
+}
+
 #[instrument(skip(
     workspace,
     trigger_integration,
     conductor_handle,
     network,
-    dht_query_cache
+    dht_query_cache,
+    validation_dependencies,
 ))]
 pub async fn app_validation_workflow(
     dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
-    validation_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
+    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     trigger_integration: TriggerSender,
     conductor_handle: ConductorHandle,
     network: HolochainP2pDna,
@@ -88,7 +107,7 @@ async fn app_validation_workflow_inner(
     conductor: ConductorHandle,
     network: &HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
-    validation_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
+    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
@@ -126,13 +145,14 @@ async fn app_validation_workflow_inner(
                 let cascade = Arc::new(workspace.full_cascade(network.clone()));
                 let r = match dhtop_to_op(op, cascade).await {
                     Ok(op) => {
+                        let validation_dependencies = validation_dependencies.clone();
                         validate_op_outer(
                             dna_hash,
                             &op,
                             &conductor,
                             &workspace,
-                            validation_dependencies,
                             &network,
+                            validation_dependencies,
                         )
                         .await
                     }
@@ -398,8 +418,8 @@ async fn validate_op_outer(
     op: &Op,
     conductor_handle: &ConductorHandle,
     workspace: &AppValidationWorkspace,
-    validation_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
     network: &HolochainP2pDna,
+    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
     let host_fn_workspace = workspace.validation_workspace().await?;
@@ -412,10 +432,10 @@ async fn validate_op_outer(
     validate_op(
         op,
         host_fn_workspace,
-        validation_dependencies,
         network,
         &ribosome,
         conductor_handle,
+        validation_dependencies,
     )
     .await
 }
@@ -423,10 +443,10 @@ async fn validate_op_outer(
 pub async fn validate_op<R>(
     op: &Op,
     workspace: HostFnWorkspaceRead,
-    validation_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
     network: &HolochainP2pDna,
     ribosome: &R,
     conductor_handle: &ConductorHandle,
+    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> AppValidationOutcome<Outcome>
 where
     R: RibosomeT,
@@ -630,7 +650,7 @@ async fn run_validation_callback_inner<R>(
     ribosome: &R,
     workspace_read: HostFnWorkspaceRead,
     network: HolochainP2pDna,
-    validation_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
+    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> AppValidationResult<Outcome>
 where
     R: RibosomeT,
@@ -657,7 +677,8 @@ where
                 .filter(move |hash| {
                     // keep track of which dependencies are being fetched to
                     // prevent multiple fetches of the same hash
-                    let is_new_dependency = validation_deps.lock().insert(hash.clone());
+                    let is_new_dependency =
+                        validation_deps.lock().missing_hashes.insert(hash.clone());
                     is_new_dependency
                 })
                 .map(move |hash| {
@@ -675,7 +696,7 @@ where
                         // in case of an error the hash is still removed from
                         // the collection so that it will be tried again to be
                         // fetched in the subsequent workflow run
-                        validation_dependencies.lock().remove(&hash);
+                        validation_dependencies.lock().missing_hashes.remove(&hash);
                     }
                 });
             // await all fetches in a separate task in the background
@@ -698,7 +719,10 @@ where
             // keep track of which dependencies are being fetched to
             // prevent multiple fetches of the same hash
             let validation_dependencies = validation_dependencies.clone();
-            let is_new_dependency = validation_dependencies.lock().insert(author.clone().into());
+            let is_new_dependency = validation_dependencies
+                .lock()
+                .missing_hashes
+                .insert(author.clone().into());
             // fetch dependency if it is not being fetched yet
             if is_new_dependency {
                 tokio::spawn({
@@ -717,7 +741,10 @@ where
                         // error the hash is still removed from the
                         // collection so that it will be tried again to be
                         // fetched in the subsequent workflow run
-                        validation_dependencies.lock().remove(&author.into());
+                        validation_dependencies
+                            .lock()
+                            .missing_hashes
+                            .remove(&author.into());
                     }
                 });
             }
