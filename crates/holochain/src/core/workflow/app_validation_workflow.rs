@@ -154,7 +154,7 @@ async fn app_validation_workflow_inner(
 
                 // Validate this op
                 let cascade = Arc::new(workspace.full_cascade(network.clone()));
-                let r = match dhtop_to_op(op, cascade).await {
+                let validation_outcome = match dhtop_to_op(op, cascade).await {
                     Ok(op) => {
                         let validation_dependencies = validation_dependencies.clone();
                         validate_op_outer(
@@ -170,32 +170,7 @@ async fn app_validation_workflow_inner(
                     Err(e) => Err(e),
                 };
 
-                if let Ok(Outcome::AwaitingDeps(missing_hashes)) = &r {
-                    // add hashes missing to validate an op to hash map
-                    missing_hashes.iter().for_each(|hash| {
-                        validation_dependencies
-                            .lock()
-                            .hashes_missing_for_op
-                            .entry(op_hash.clone())
-                            .and_modify(|hashes| {
-                                hashes.insert(hash.clone());
-                            })
-                            .or_insert_with(|| {
-                                let mut set = HashSet::new();
-                                set.insert(hash.clone());
-                                set
-                            });
-                    })
-                } else if let Ok(Outcome::Accepted) = &r {
-                    // remove op that possibly had hashes missing for validation
-                    // from hash map
-                    validation_dependencies
-                        .lock()
-                        .hashes_missing_for_op
-                        .remove(&op_hash);
-                }
-
-                (op_hash, dependency, op_lite, r, activity)
+                (op_hash, dependency, op_lite, validation_outcome, activity)
             }
         }
     });
@@ -712,6 +687,32 @@ async fn run_validation_callback(
             let cascade_workspace = workspace.clone();
             let cascade =
                 CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
+            // temporarily hash op and use as key in hash map until the initial
+            // conversion DhtOp to Op is refactored away
+
+            // add hashes missing to validate an op to hash map
+            // hashes.iter().for_each(|hash| {
+            //     validation_dependencies
+            //         .lock()
+            //         .hashes_missing_for_op
+            //         .entry(op_hash)
+            //         .and_modify(|hashes| {
+            //             hashes.insert(hash.clone());
+            //         })
+            //         .or_insert_with(|| {
+            //             let mut set = HashSet::new();
+            //             set.insert(hash.clone());
+            //             set
+            //         });
+            // });
+            // } else if let Ok(Outcome::Accepted) = &r {
+            //     // remove op that possibly had hashes missing for validation
+            //     // from hash map
+            //     validation_dependencies
+            //         .lock()
+            //         .hashes_missing_for_op
+            //         .remove(&op_hash);
+            // }
             // build a collection of futures to fetch the individual missing
             // hashes
             let validation_deps = validation_dependencies.clone();
