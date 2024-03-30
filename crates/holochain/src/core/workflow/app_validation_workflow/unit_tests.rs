@@ -6,7 +6,7 @@ use crate::{
             ZomesToInvoke,
         },
         workflow::app_validation_workflow::{
-            put_integrated, run_validation_callback_inner, Outcome, ValidationDependencies,
+            put_integrated, run_validation_callback, Outcome, ValidationDependencies,
         },
     },
     fixt::MetaLairClientFixturator,
@@ -110,17 +110,14 @@ async fn validation_callback_must_get_action() {
         original_entry: None,
     });
 
-    let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
-    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_op).unwrap();
-
     let network = fixt!(HolochainP2pDna);
     let workspace_read = get_workspace_read(&test_space, &alice, dna_file.dna_def()).await;
     let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // action has not been written to a database yet
     // validation should indicate it is awaiting create action hash
-    let outcome = run_validation_callback_inner(
-        invocation.clone(),
+    let outcome = run_validation_callback(
+        &delete_op,
         &ribosome,
         workspace_read.clone(),
         network.clone(),
@@ -138,8 +135,8 @@ async fn validation_callback_must_get_action() {
     });
 
     // the same validation should now successfully validate the op
-    let outcome = run_validation_callback_inner(
-        invocation.clone(),
+    let outcome = run_validation_callback(
+        &delete_op,
         &ribosome,
         workspace_read.clone(),
         network.clone(),
@@ -208,8 +205,6 @@ async fn validation_callback_awaiting_deps_hashes() {
         original_entry: None,
     });
 
-    let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
-    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_op).unwrap();
     let dna_hash = dna_file.dna_hash().clone();
 
     // handle only Get events
@@ -262,8 +257,8 @@ async fn validation_callback_awaiting_deps_hashes() {
     let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // app validation should indicate missing action is being awaited
-    let outcome = run_validation_callback_inner(
-        invocation.clone(),
+    let outcome = run_validation_callback(
+        &delete_op,
         &ribosome,
         workspace_read.clone(),
         network.dna_network(),
@@ -278,8 +273,8 @@ async fn validation_callback_awaiting_deps_hashes() {
 
     // app validation outcome should be accepted, now that the missing record
     // has been fetched
-    let outcome = run_validation_callback_inner(
-        invocation.clone(),
+    let outcome = run_validation_callback(
+        &delete_op,
         &ribosome,
         workspace_read.clone(),
         network.dna_network(),
@@ -339,17 +334,15 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         cached_entry: None,
     });
 
-    let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
     let dna_hash = dna_file.dna_hash().clone();
-    let invocation = ValidateInvocation::new(zomes_to_invoke, &action_op).unwrap();
 
     let network = test_network(Some(dna_hash.clone()), Some(alice.clone())).await;
     let workspace_read = get_workspace_read(&test_space, &alice, dna_file.dna_def()).await;
     let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // app validation should indicate missing action is being awaited
-    let outcome = run_validation_callback_inner(
-        invocation.clone(),
+    let outcome = run_validation_callback(
+        &action_op,
         &ribosome,
         workspace_read.clone(),
         network.dna_network(),
@@ -372,8 +365,8 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 
     // app validation outcome should be accepted, now that the missing agent
     // activity is available
-    let outcome = run_validation_callback_inner(
-        invocation.clone(),
+    let outcome = run_validation_callback(
+        &action_op,
         &ribosome,
         workspace_read.clone(),
         network.dna_network(),
@@ -444,8 +437,6 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
         original_entry: None,
     });
 
-    let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
-    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_op).unwrap();
     let dna_hash = dna_file.dna_hash().clone();
 
     // handle only Get events
@@ -502,21 +493,21 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
     let workspace_read = get_workspace_read(&test_space, &alice, dna_file.dna_def()).await;
 
     // run two op validations that depend on the same record in parallel
-    let validate_1 = run_validation_callback_inner(
-        invocation.clone(),
+    let validate_1 = run_validation_callback(
+        &delete_op,
         &ribosome,
         workspace_read.clone(),
         network.dna_network(),
         fetched_dependencies.clone(),
     );
-    let validate_2 = run_validation_callback_inner(
-        invocation.clone(),
+    let validate_2 = run_validation_callback(
+        &delete_op,
         &ribosome,
         workspace_read.clone(),
         network.dna_network(),
         fetched_dependencies.clone(),
     );
-    let outcomes = futures::future::join_all([validate_1, validate_2]).await;
+    futures::future::join_all([validate_1, validate_2]).await;
 
     // await while missing records are being fetched in background task
     tokio::time::sleep(Duration::from_millis(500)).await;

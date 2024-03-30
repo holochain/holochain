@@ -17,6 +17,7 @@ use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
 pub use error::*;
 use holo_hash::DhtOpHash;
+use holochain_cascade::error::CascadeError;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
@@ -476,26 +477,41 @@ async fn validate_op_outer(
     .await
 }
 
-pub async fn validate_op<R>(
+pub async fn validate_op(
     op: &Op,
     workspace: HostFnWorkspaceRead,
     network: &HolochainP2pDna,
-    ribosome: &R,
+    ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
-) -> AppValidationOutcome<Outcome>
-where
-    R: RibosomeT,
-{
+) -> AppValidationOutcome<Outcome> {
     check_entry_def(op, &network.dna_hash(), conductor_handle)
         .await
         .map_err(AppValidationError::SysValidationError)?;
 
-    let zomes_to_invoke = match op {
-        Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => ZomesToInvoke::AllIntegrity,
+    let outcome = run_validation_callback(
+        op,
+        ribosome,
+        workspace,
+        network.clone(),
+        validation_dependencies,
+    )
+    .await?;
+
+    Ok(outcome)
+}
+
+async fn get_zomes_to_invoke(
+    op: &Op,
+    workspace: &HostFnWorkspaceRead,
+    network: &HolochainP2pDna,
+    ribosome: &impl RibosomeT,
+) -> AppValidationOutcome<ZomesToInvoke> {
+    match op {
+        Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => Ok(ZomesToInvoke::AllIntegrity),
         Op::StoreRecord(StoreRecord { record }) => {
-            let cascade = CascadeImpl::from_workspace_and_network(&workspace, network.clone());
-            store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await?
+            let cascade = CascadeImpl::from_workspace_and_network(workspace, network.clone());
+            store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await
         }
         Op::StoreEntry(StoreEntry {
             action:
@@ -507,13 +523,13 @@ where
                     ..
                 },
             ..
-        }) => entry_creation_zomes_to_invoke(action, ribosome)?,
+        }) => entry_creation_zomes_to_invoke(action, ribosome),
         Op::RegisterUpdate(RegisterUpdate {
             original_action, ..
         })
         | Op::RegisterDelete(RegisterDelete {
             original_action, ..
-        }) => entry_creation_zomes_to_invoke(original_action, ribosome)?,
+        }) => entry_creation_zomes_to_invoke(original_action, ribosome),
         Op::RegisterCreateLink(RegisterCreateLink {
             create_link:
                 SignedHashed {
@@ -524,25 +540,12 @@ where
                     ..
                 },
             ..
-        }) => create_link_zomes_to_invoke(action, ribosome)?,
+        }) => create_link_zomes_to_invoke(action, ribosome),
         Op::RegisterDeleteLink(RegisterDeleteLink {
             create_link: action,
             ..
-        }) => create_link_zomes_to_invoke(action, ribosome)?,
-    };
-
-    let invocation = ValidateInvocation::new(zomes_to_invoke, op)
-        .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
-    let outcome = run_validation_callback_inner(
-        invocation,
-        ribosome,
-        workspace,
-        network.clone(),
-        validation_dependencies,
-    )
-    .await?;
-
-    Ok(outcome)
+        }) => create_link_zomes_to_invoke(action, ribosome),
+    }
 }
 
 /// Check the AppEntryDef is valid for the zome.
@@ -681,18 +684,23 @@ async fn store_record_zomes_to_invoke(
     }
 }
 
-async fn run_validation_callback_inner<R>(
-    invocation: ValidateInvocation,
-    ribosome: &R,
-    workspace_read: HostFnWorkspaceRead,
+async fn run_validation_callback(
+    op: &Op,
+    ribosome: &impl RibosomeT,
+    workspace: HostFnWorkspaceRead,
     network: HolochainP2pDna,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
-) -> AppValidationResult<Outcome>
-where
-    R: RibosomeT,
-{
+) -> AppValidationResult<Outcome> {
+    let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, &network, ribosome)
+        .await
+        .map_err(|e| {
+            eprintln!("zomes to invoke error {e:?}");
+            AppValidationError::CascadeError(CascadeError::ActionError(ActionError::NotNewEntry))
+        })?;
+    let invocation = ValidateInvocation::new(zomes_to_invoke, op)
+        .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
     let validate_result = ribosome.run_validate(
-        ValidateHostAccess::new(workspace_read.clone(), network.clone()),
+        ValidateHostAccess::new(workspace.clone(), network.clone()),
         invocation.clone(),
     )?;
     match validate_result {
@@ -701,7 +709,7 @@ where
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(hashes)) => {
             tracing::debug!("unresolved dependencies: hashes {hashes:?}");
             // fetch all missing hashes in the background without awaiting them
-            let cascade_workspace = workspace_read.clone();
+            let cascade_workspace = workspace.clone();
             let cascade =
                 CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
             // build a collection of futures to fetch the individual missing
@@ -747,7 +755,7 @@ where
                 "unresolved dependencies: agent activity of {author:?} with filter {filter:?}"
             );
             // fetch missing agent activities in the background without awaiting them
-            let cascade_workspace = workspace_read.clone();
+            let cascade_workspace = workspace.clone();
             let author = author.clone();
             let cascade =
                 CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
