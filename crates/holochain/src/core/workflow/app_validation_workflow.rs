@@ -111,6 +111,16 @@ async fn app_validation_workflow_inner(
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
+    // filter out ops that have missing dependencies
+    let sorted_ops: Vec<_> = sorted_ops
+        .into_iter()
+        .filter(|op| {
+            validation_dependencies
+                .lock()
+                .hashes_missing_for_op
+                .contains_key(op.as_hash())
+        })
+        .collect();
     let num_ops_to_validate = sorted_ops.len();
     tracing::debug!("validating {num_ops_to_validate} ops");
     let sleuth_id = conductor.config.sleuth_id();
@@ -158,6 +168,32 @@ async fn app_validation_workflow_inner(
                     }
                     Err(e) => Err(e),
                 };
+
+                if let Ok(Outcome::AwaitingDeps(missing_hashes)) = &r {
+                    // add hashes missing to validate an op to hash map
+                    missing_hashes.iter().for_each(|hash| {
+                        validation_dependencies
+                            .lock()
+                            .hashes_missing_for_op
+                            .entry(op_hash.clone())
+                            .and_modify(|hashes| {
+                                hashes.insert(hash.clone());
+                            })
+                            .or_insert_with(|| {
+                                let mut set = HashSet::new();
+                                set.insert(hash.clone());
+                                set
+                            });
+                    })
+                } else if let Ok(Outcome::Accepted) = &r {
+                    // remove op that possibly had hashes missing for validation
+                    // from hash map
+                    validation_dependencies
+                        .lock()
+                        .hashes_missing_for_op
+                        .remove(&op_hash);
+                }
+
                 (op_hash, dependency, op_lite, r, activity)
             }
         }
