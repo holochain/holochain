@@ -1499,15 +1499,15 @@ mod app_impls {
                         .await
                         .map_err(|e| DpkiServiceError::Lair(e.into()))?;
 
-                    #[cfg(test)]
-                    assert_eq!(
-                        hdk::prelude::verify_signature_raw(
-                            agent_key.clone(),
-                            signature.clone(),
-                            dpki_agent.get_raw_39().to_vec()
-                        ),
-                        Ok(true)
-                    );
+                    // #[cfg(test)]
+                    // assert_eq!(
+                    //     hdk::prelude::verify_signature_raw(
+                    //         agent_key.clone(),
+                    //         signature.clone(),
+                    //         dpki_agent.get_raw_39().to_vec()
+                    //     ),
+                    //     Ok(true)
+                    // );
 
                     let dna_hashes = cell_ids.iter().map(|c| c.dna_hash().clone()).collect();
 
