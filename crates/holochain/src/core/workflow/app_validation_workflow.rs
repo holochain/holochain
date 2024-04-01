@@ -65,6 +65,10 @@ impl ValidationDependencies {
             hashes_missing_for_op: HashMap::new(),
         }
     }
+
+    pub fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[instrument(skip(
