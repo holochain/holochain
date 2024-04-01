@@ -115,6 +115,7 @@ use std::sync::Arc;
 use wasmer_middlewares::metering::get_remaining_points;
 use wasmer_middlewares::metering::set_remaining_points;
 use wasmer_middlewares::metering::MeteringPoints;
+use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -611,9 +612,9 @@ impl RealRibosome {
     ) -> Result<ExternIO, RibosomeError> {
         let fn_name = fn_name.clone();
         let instance = instance_with_store.instance.clone();
+
         let mut store_lock = instance_with_store.store.lock();
         let mut store_mut = store_lock.as_store_mut();
-        set_remaining_points(&mut store_mut, instance.as_ref(), WASM_METERING_LIMIT);
         let result = holochain_wasmer_host::guest::call(
             &mut store_mut,
             instance,
@@ -622,33 +623,6 @@ impl RealRibosome {
             // the whole invocation is cloned!
             // @todo - is this a problem for large payloads like entries?
             invocation.to_owned().host_input()?,
-        );
-        let points_used = match get_remaining_points(&mut store_mut, instance.as_ref()) {
-            MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
-            MeteringPoints::Exhausted => WASM_METERING_LIMIT,
-        };
-        self.usage_meter.add(
-            points_used,
-            &[
-                opentelemetry_api::KeyValue::new("dna", self.dna_file.dna().hash.to_string()),
-                opentelemetry_api::KeyValue::new(
-                    "zome",
-                    call_context.zome().zome_name().to_string(),
-                ),
-                opentelemetry_api::KeyValue::new("fn", to_call.to_string()),
-                opentelemetry_api::KeyValue::new(
-                    "chain",
-                    call_context
-                        .host_context
-                        .workspace()
-                        .source_chain()
-                        .as_ref()
-                        .expect("No source chain on this workspace.")
-                        .agent_pubkey()
-                        .clone()
-                        .to_string(),
-                ),
-            ],
         );
 
         if let Err(runtime_error) = &result {
@@ -826,6 +800,26 @@ impl RibosomeT for RealRibosome {
         zome: &Zome,
         fn_name: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
+        let otel_info = [
+            opentelemetry_api::KeyValue::new("dna", self.dna_file.dna().hash.to_string()),
+            opentelemetry_api::KeyValue::new(
+                "zome",
+                zome.zome_name().to_string(),
+            ),
+            opentelemetry_api::KeyValue::new("fn", fn_name.to_string()),
+            opentelemetry_api::KeyValue::new(
+                "agent_pubkey",
+                host_context
+                    .workspace()
+                    .source_chain()
+                    .as_ref()
+                    .expect("No source chain on this workspace.")
+                    .agent_pubkey()
+                    .clone()
+                    .to_string(),
+            ),
+        ];
+
         let call_context = CallContext {
             zome: zome.clone(),
             function_name: fn_name.clone(),
@@ -849,9 +843,30 @@ impl RibosomeT for RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
+                    let instance = instance_with_store.instance.clone();
+                    {
+                        let mut store_lock = instance_with_store.store.lock();
+                        let mut store_mut = store_lock.as_store_mut();
+                        set_remaining_points(&mut store_mut, instance.as_ref(), WASM_METERING_LIMIT);
+                    }
+
                     let result = self
-                        .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store)
+                        .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store.clone())
                         .map(Some);
+
+                    {
+                        let mut store_lock = instance_with_store.store.lock();
+                        let mut store_mut = store_lock.as_store_mut();
+                        let points_used = match get_remaining_points(&mut store_mut, instance.as_ref()) {
+                            MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
+                            MeteringPoints::Exhausted => WASM_METERING_LIMIT,
+                        };
+                        self.usage_meter.add(
+                            points_used,
+                            &otel_info,
+                        );
+                    }
+
 
                     // remove context from map after call
                     {
