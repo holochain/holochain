@@ -9,7 +9,7 @@ use super::*;
 /// of each agent in a hashmap.
 type DpkiKeyState = Arc<Mutex<HashMap<AgentPubKey, KeyState>>>;
 
-fn make_mock_dpki_impl(u: &mut Unstructured, state: DpkiKeyState) -> DpkiImpl {
+fn make_mock_dpki_impl(u: &mut Unstructured<'_>, state: DpkiKeyState) -> DpkiImpl {
     let mut dpki = MockDpkiState::new();
 
     let fake_register_key_output = (
@@ -46,7 +46,6 @@ fn make_mock_dpki_impl(u: &mut Unstructured, state: DpkiKeyState) -> DpkiImpl {
                 state
                     .lock()
                     .insert(agent.clone(), KeyState::Valid(fixt!(SignedActionHashed)));
-
                 Ok(fake_register_key_output)
             }
             .boxed()
@@ -55,22 +54,37 @@ fn make_mock_dpki_impl(u: &mut Unstructured, state: DpkiKeyState) -> DpkiImpl {
 
     let dpki: Box<dyn DpkiState> = Box::new(dpki);
 
+    // All share same DNA, but different agent
+    let cell_id = CellId::new(DnaHash::from_raw_32(vec![0; 32]), fixt!(AgentPubKey));
+
     Arc::new(DpkiService {
-        cell_id: fixt!(CellId),
-        device_seed_lair_tag: "UNUSED".to_string(),
+        cell_id,
+        device_seed_lair_tag: "MOCK_DEVICE_SEED".to_string(),
         state: tokio::sync::Mutex::new(dpki),
     })
 }
 
-fn make_dpki_conductor_builder(
-    u: &mut Unstructured,
+async fn make_dpki_conductor_builder(
+    u: &mut Unstructured<'_>,
     // dpki: DpkiImpl,
     config: ConductorConfig,
     // keystore: MetaLairClient,
     state: DpkiKeyState,
 ) -> ConductorBuilder {
+    let keystore = test_keystore();
+
+    // Generate DPKI device seed
+    keystore
+        .lair_client()
+        .new_seed("MOCK_DEVICE_SEED".to_string().into(), None, false)
+        .await
+        .unwrap();
+
     let dpki = make_mock_dpki_impl(u, state);
-    let mut builder = Conductor::builder().config(config).no_print_setup();
+    let mut builder = Conductor::builder()
+        .with_keystore(keystore)
+        .config(config)
+        .no_print_setup();
     builder.dpki = Some(dpki);
     builder
 }
@@ -113,12 +127,12 @@ async fn mock_dpki_validation_limbo() {
 
     let mut conductors = SweetConductorBatch::new(vec![
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(&mut u, config.clone(), states[0].clone()),
+            make_dpki_conductor_builder(&mut u, config.clone(), states[0].clone()).await,
             rendezvous.clone(),
         )
         .await,
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(&mut u, config.clone(), states[1].clone()),
+            make_dpki_conductor_builder(&mut u, config.clone(), states[1].clone()).await,
             rendezvous.clone(),
         )
         .await,
@@ -183,8 +197,6 @@ async fn mock_dpki_validation_limbo() {
         });
     }
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
-
     assert!(matches!(
         get_key_state(&conductors[0], bob.agent_pubkey()).await,
         KeyState::Valid(_)
@@ -193,6 +205,8 @@ async fn mock_dpki_validation_limbo() {
         get_key_state(&conductors[1], alice.agent_pubkey()).await,
         KeyState::Valid(_)
     ));
+
+    await_consistency(10, [&alice, &bob]).await.unwrap();
 
     let record_alice: Option<Record> = conductors[0]
         .call(&alice.zome("simple"), "read", hash.clone())
@@ -225,12 +239,12 @@ async fn mock_dpki_invalid_key_state() {
 
     let mut conductors = SweetConductorBatch::new(vec![
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(&mut u, config.clone(), states[0].clone()),
+            make_dpki_conductor_builder(&mut u, config.clone(), states[0].clone()).await,
             rendezvous.clone(),
         )
         .await,
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(&mut u, config.clone(), states[1].clone()),
+            make_dpki_conductor_builder(&mut u, config.clone(), states[1].clone()).await,
             rendezvous.clone(),
         )
         .await,
@@ -305,12 +319,12 @@ async fn mock_dpki_preflight_check() {
 
     let mut conductors = SweetConductorBatch::new(vec![
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(&mut u, config.clone(), states[0].clone()),
+            make_dpki_conductor_builder(&mut u, config.clone(), states[0].clone()).await,
             rendezvous.clone(),
         )
         .await,
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(&mut u, config.clone(), states[1].clone()),
+            make_dpki_conductor_builder(&mut u, config.clone(), states[1].clone()).await,
             rendezvous.clone(),
         )
         .await,

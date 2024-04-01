@@ -114,26 +114,8 @@ where
         return Err(WorkflowError::GenesisFailure(reason));
     }
 
-    // Don't proceed if DPKI is initialized and the agent key is not valid
-    if let Some(dpki) = api.conductor_services().dpki.as_ref() {
-        // When running genesis on DPKI itself, don't check the agent key
-        if dpki.should_run(dna_file.dna_hash()) {
-            let now = Timestamp::now();
-            let is_valid = dpki
-                .state
-                .lock()
-                .await
-                .key_state(agent_pubkey.clone(), now)
-                .await?
-                .is_valid();
-            if !is_valid {
-                return Err(SysValidationError::ValidationOutcome(
-                    ValidationOutcome::DpkiAgentInvalid(agent_pubkey.clone(), now),
-                )
-                .into());
-            }
-        }
-    }
+    // NOTE: we could check the key against DPKI state here, but the key hasn't even been
+    //       registered at this point, so we can't.
 
     source_chain::genesis(
         workspace.vault.clone(),
