@@ -3,6 +3,7 @@
 use holochain_types::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum KeyState {
     NotFound,
     Invalidated(SignedActionHashed),
@@ -10,6 +11,7 @@ pub enum KeyState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct KeyMeta {
     pub app_binding_addr: ActionHash,
     pub key_index: u32,
@@ -18,6 +20,7 @@ pub struct KeyMeta {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum KeyRegistration {
     // Creates a key under management of current KSR on this chain
     Create(KeyGeneration),
@@ -33,6 +36,7 @@ pub enum KeyRegistration {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct KeyRevocation {
     pub prior_key_registration: ActionHash,
     pub revocation_authorization: Vec<Authorization>,
@@ -41,6 +45,7 @@ pub struct KeyRevocation {
 pub type Authorization = (u8, Signature);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct KeyGeneration {
     pub new_key: AgentPubKey,
 
@@ -49,6 +54,7 @@ pub struct KeyGeneration {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct AppBindingInput {
     pub app_name: String,
     pub installed_app_id: String,
@@ -56,12 +62,14 @@ pub struct AppBindingInput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct DerivationDetailsInput {
     pub app_index: u32,
     pub key_index: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct CreateKeyInput {
     pub key_generation: KeyGeneration,
     pub app_binding: AppBindingInput,

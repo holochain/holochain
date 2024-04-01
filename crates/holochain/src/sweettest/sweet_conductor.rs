@@ -556,7 +556,7 @@ impl SweetConductor {
     /// Get the cell providing the DPKI service, if applicable
     pub fn dpki_cell(&self) -> Option<SweetCell> {
         let dpki = self.raw_handle().running_services().dpki?;
-        let cell_id = dpki.cell_id()?;
+        let cell_id = dpki.cell_id.clone()?;
         Some(self.get_sweet_cell(cell_id).unwrap())
     }
 
@@ -710,10 +710,15 @@ impl SweetConductor {
     pub async fn exchange_peer_info(conductors: impl Clone + IntoIterator<Item = &Self>) {
         let mut all = Vec::new();
         for c in conductors.clone().into_iter() {
-            if let Some(dpki) = c.running_services().dpki.as_ref() {
+            if let Some(dpki_dna_hash) = c
+                .running_services()
+                .dpki
+                .as_ref()
+                .and_then(|dpki| dpki.cell_id.as_ref())
+                .map(|cell_id| cell_id.dna_hash())
+            {
                 // Ensure the space is created for DPKI so the agent db exists
-                let dpki_dna_hash = DnaHash::from_raw_32(dpki.uuid().to_vec());
-                c.spaces.get_or_create_space(&dpki_dna_hash).unwrap();
+                c.spaces.get_or_create_space(dpki_dna_hash).unwrap();
             }
             for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
                 all.push(env.clone());

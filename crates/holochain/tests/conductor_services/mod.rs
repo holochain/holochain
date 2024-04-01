@@ -60,6 +60,9 @@ async fn validate_with_dpki() {
             .dpki
             .as_ref()
             .unwrap()
+            .state
+            .lock()
+            .await
             .key_state(agent.clone(), Timestamp::now())
             .await
             .unwrap()

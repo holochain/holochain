@@ -1,17 +1,22 @@
 use crate::test_utils::inline_zomes::simple_create_read_zome;
+use arbitrary::{Arbitrary, Unstructured};
+use holochain_conductor_services::DerivationDetailsInput;
 use parking_lot::Mutex;
 
 use super::*;
 
 /// Instead of reading KeyState from a Deepkey DNA's chain, we store the KeyState
 /// of each agent in a hashmap.
-type DpkiState = Arc<Mutex<HashMap<AgentPubKey, KeyState>>>;
+type DpkiKeyState = Arc<Mutex<HashMap<AgentPubKey, KeyState>>>;
 
-fn make_mock_dpi_impl(keystore: MetaLairClient, state: DpkiState) -> DpkiImpl {
-    let mut dpki = MockDpkiService::new();
+fn make_mock_dpki_impl(u: &mut Unstructured, state: DpkiKeyState) -> DpkiImpl {
+    let mut dpki = MockDpkiState::new();
 
-    dpki.expect_uuid().return_const([1; 32]);
-    dpki.expect_should_run().return_const(true);
+    let fake_register_key_output = (
+        ActionHash::arbitrary(u).unwrap(),
+        KeyRegistration::arbitrary(u).unwrap(),
+        KeyMeta::arbitrary(u).unwrap(),
+    );
 
     dpki.expect_key_state().returning({
         let state = state.clone();
@@ -21,33 +26,51 @@ fn make_mock_dpi_impl(keystore: MetaLairClient, state: DpkiState) -> DpkiImpl {
         }
     });
 
-    dpki.expect_derive_and_register_new_key().returning({
-        move |_, _| {
-            let keystore = keystore.clone();
+    dpki.expect_next_derivation_details().returning(move |_| {
+        let app_index = AtomicU32::new(0);
+        async move {
+            Ok(DerivationDetailsInput {
+                app_index: app_index.fetch_add(1, Ordering::Relaxed),
+                key_index: 0,
+            })
+        }
+        .boxed()
+    });
+
+    dpki.expect_register_key().returning({
+        move |input| {
             let state = state.clone();
+            let fake_register_key_output = fake_register_key_output.clone();
             async move {
-                let agent = keystore.new_sign_keypair_random().await.unwrap();
+                let agent = input.key_generation.new_key;
                 state
                     .lock()
                     .insert(agent.clone(), KeyState::Valid(fixt!(SignedActionHashed)));
 
-                Ok(agent)
+                Ok(fake_register_key_output)
             }
             .boxed()
         }
     });
 
-    Arc::new(dpki)
+    let dpki: Box<dyn DpkiState> = Box::new(dpki);
+
+    Arc::new(DpkiService {
+        uuid: [1; 32],
+        cell_id: None,
+        device_seed_lair_tag: "UNUSED".to_string(),
+        state: tokio::sync::Mutex::new(dpki),
+    })
 }
 
 fn make_dpki_conductor_builder(
+    u: &mut Unstructured,
     // dpki: DpkiImpl,
     config: ConductorConfig,
     // keystore: MetaLairClient,
-    state: DpkiState,
+    state: DpkiKeyState,
 ) -> ConductorBuilder {
-    let keystore = holochain_keystore::test_keystore();
-    let dpki = make_mock_dpi_impl(keystore.clone(), state);
+    let dpki = make_mock_dpki_impl(u, state);
     let mut builder = Conductor::builder()
         .config(config)
         .with_keystore(keystore)
@@ -62,6 +85,9 @@ async fn get_key_state(conductor: &SweetConductor, agent: &AgentPubKey) -> KeySt
         .dpki
         .as_ref()
         .unwrap()
+        .state
+        .lock()
+        .await
         .key_state(agent.clone(), Timestamp::now())
         .await
         .unwrap()
@@ -77,6 +103,8 @@ async fn get_key_state(conductor: &SweetConductor, agent: &AgentPubKey) -> KeySt
 async fn mock_dpki_validation_limbo() {
     holochain_trace::test_run().ok();
 
+    let mut u = unstructured_noise();
+
     let states = std::iter::repeat_with(|| Arc::new(Mutex::new(HashMap::new())))
         .take(2)
         .collect::<Vec<_>>();
@@ -89,12 +117,12 @@ async fn mock_dpki_validation_limbo() {
 
     let mut conductors = SweetConductorBatch::new(vec![
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(config.clone(), states[0].clone()),
+            make_dpki_conductor_builder(&mut u, config.clone(), states[0].clone()),
             rendezvous.clone(),
         )
         .await,
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(config.clone(), states[1].clone()),
+            make_dpki_conductor_builder(&mut u, config.clone(), states[1].clone()),
             rendezvous.clone(),
         )
         .await,
@@ -187,6 +215,8 @@ async fn mock_dpki_validation_limbo() {
 async fn mock_dpki_invalid_key_state() {
     holochain_trace::test_run().ok();
 
+    let mut u = unstructured_noise();
+
     let states = std::iter::repeat_with(|| Arc::new(Mutex::new(HashMap::new())))
         .take(2)
         .collect::<Vec<_>>();
@@ -199,12 +229,12 @@ async fn mock_dpki_invalid_key_state() {
 
     let mut conductors = SweetConductorBatch::new(vec![
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(config.clone(), states[0].clone()),
+            make_dpki_conductor_builder(&mut u, config.clone(), states[0].clone()),
             rendezvous.clone(),
         )
         .await,
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(config.clone(), states[1].clone()),
+            make_dpki_conductor_builder(&mut u, config.clone(), states[1].clone()),
             rendezvous.clone(),
         )
         .await,
@@ -265,6 +295,8 @@ async fn mock_dpki_invalid_key_state() {
 async fn mock_dpki_preflight_check() {
     holochain_trace::test_run().ok();
 
+    let mut u = unstructured_noise();
+
     let states = std::iter::repeat_with(|| Arc::new(Mutex::new(HashMap::new())))
         .take(2)
         .collect::<Vec<_>>();
@@ -277,12 +309,12 @@ async fn mock_dpki_preflight_check() {
 
     let mut conductors = SweetConductorBatch::new(vec![
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(config.clone(), states[0].clone()),
+            make_dpki_conductor_builder(&mut u, config.clone(), states[0].clone()),
             rendezvous.clone(),
         )
         .await,
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(config.clone(), states[1].clone()),
+            make_dpki_conductor_builder(&mut u, config.clone(), states[1].clone()),
             rendezvous.clone(),
         )
         .await,

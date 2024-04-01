@@ -530,7 +530,7 @@ mod dna_impls {
             let dpki_dna_hash = self
                 .running_services()
                 .dpki
-                .and_then(|dpki| dpki.cell_id())
+                .and_then(|dpki| dpki.cell_id.clone())
                 .map(|id| id.dna_hash().clone());
             let mut hashes = self.ribosome_store().share_ref(|ds| ds.list());
             if let Some(dpki_dna_hash) = dpki_dna_hash {
@@ -1413,9 +1413,10 @@ mod app_impls {
                 }
                 (None, Some(dpki)) => {
                     // TODO: record the DNAs installed, important for key restoration.
-                    let dnas = vec![];
-                    dpki.derive_and_register_new_key(installed_app_id, dnas)
-                        .await?
+                    let dnas: Vec<DnaHash> = vec![];
+                    todo!("remove this, use two separate DPKI fns with mutex loc")
+                    // dpki.derive_and_register_new_key(installed_app_id, dnas)
+                    //     .await?
                 }
                 (None, None) => self.keystore.new_sign_keypair_random().await?,
             })
@@ -2175,10 +2176,9 @@ mod service_impls {
         pub(crate) async fn initialize_service_dpki(self: Arc<Self>) -> ConductorResult<()> {
             if let Some(installation) = self.get_state().await?.conductor_services.dpki {
                 self.running_services.share_mut(|s| {
-                    s.dpki = Some(Arc::new(DeepkeyBuiltin::new(
-                        self.clone(),
-                        self.keystore().clone(),
+                    s.dpki = Some(Arc::new(DpkiService::new_deepkey(
                         installation,
+                        self.clone(),
                     )));
                 });
             }

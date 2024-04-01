@@ -381,11 +381,16 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
 
 /// Check that the agent was valid at the time of authoring according to the installed DPKI network
 pub async fn check_dpki_agent_validity(
-    dpki: &dyn DpkiService,
+    dpki: &DpkiService,
     author: AgentPubKey,
     timestamp: Timestamp,
 ) -> SysValidationResult<()> {
-    let key_state = dpki.key_state(author.clone(), timestamp).await?;
+    let key_state = dpki
+        .state
+        .lock()
+        .await
+        .key_state(author.clone(), timestamp)
+        .await?;
 
     match key_state {
         KeyState::Valid(_) => Ok(()),
