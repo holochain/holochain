@@ -27,7 +27,7 @@ impl PeerStrat {
             Self::Quantized(s) => {
                 let peers = peers
                     .iter()
-                    .map(|p| Arq::from_dht_arc_approximate(&topo, s, p))
+                    .map(|p| Arq::from_dht_arc_approximate(topo.space, s, p))
                     .collect();
                 PeerViewQ::new(topo, s.clone(), peers).into()
             }

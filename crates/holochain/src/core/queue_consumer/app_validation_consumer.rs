@@ -1,10 +1,13 @@
 //! The workflow and queue consumer for sys validation
 
+use std::collections::HashSet;
+
 use super::*;
 use crate::core::workflow::app_validation_workflow::app_validation_workflow;
 use crate::core::workflow::app_validation_workflow::AppValidationWorkspace;
 use holochain_p2p::*;
 use holochain_types::db_cache::DhtDbQueryCache;
+use parking_lot::lock_api::Mutex;
 use tracing::*;
 
 /// Spawn the QueueConsumer for AppValidation workflow
@@ -19,6 +22,7 @@ pub fn spawn_app_validation_consumer(
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
     let workspace = Arc::new(workspace);
+    let validation_dependencies = Arc::new(Mutex::new(HashSet::new()));
 
     super::queue_consumer_dna_bound(
         "app_validation_consumer",
@@ -29,6 +33,7 @@ pub fn spawn_app_validation_consumer(
             app_validation_workflow(
                 dna_hash.clone(),
                 workspace.clone(),
+                validation_dependencies.clone(),
                 trigger_integration.clone(),
                 conductor.clone(),
                 network.clone(),

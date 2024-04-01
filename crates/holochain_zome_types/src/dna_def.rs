@@ -11,7 +11,7 @@ use crate::zome::ZomeError;
 use holo_hash::*;
 
 #[cfg(feature = "full-dna-def")]
-use kitsune_p2p_dht::spacetime::Dimension;
+use kitsune_p2p_dht::spacetime::*;
 
 /// Ordered list of integrity zomes in this DNA.
 pub type IntegrityZomes = Vec<(ZomeName, IntegrityZomeDef)>;
@@ -198,8 +198,8 @@ impl DnaDef {
     /// Get the topology to use for kitsune gossip
     pub fn topology(&self, cutoff: std::time::Duration) -> kitsune_p2p_dht::spacetime::Topology {
         kitsune_p2p_dht::spacetime::Topology {
-            space: Dimension::standard_space(),
-            time: Dimension::time(self.modifiers.quantum_time),
+            space: SpaceDimension::standard(),
+            time: TimeDimension::new(self.modifiers.quantum_time),
             time_origin: self.modifiers.origin_time,
             time_cutoff: cutoff,
         }
