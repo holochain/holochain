@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_bootstrap"
-version = "0.2.0-beta-dev.23"
+version = "0.2.0-beta-dev.24"
 description = "Bootstrap server written in rust for kitsune nodes to find each other"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -10,11 +10,12 @@ keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
 categories = [ "network-programming" ]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
 clap = { version = "4.3.21", features = [ "derive" ] }
-futures = "0.3.15"
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.23", path = "../types" }
-kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.18", path = "../bin_data" }
+futures = "0.3"
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.24", path = "../types" }
+kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.19", path = "../bin_data" }
 parking_lot = "0.12.1"
 rand = "0.8.5"
 reqwest = "0.11.2"
@@ -27,7 +28,7 @@ warp = "0.3"
 [dev-dependencies]
 kitsune_p2p_bootstrap = { path = ".", features = ["test_utils"] }
 kitsune_p2p = { path = "../kitsune_p2p", features = ["sqlite"] }
-fixt = { path = "../../fixt" ,version = "^0.3.0-beta-dev.2"}
+fixt = { path = "../../fixt" ,version = "^0.3.0-beta-dev.3"}
 criterion = "0.5.1"
 reqwest = "0.11.2"
 

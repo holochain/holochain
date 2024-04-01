@@ -7,14 +7,15 @@ authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo" ]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-anyhow = { workspace = true }
+anyhow = "1.0"
 chashmap = "2.2"
 colored = "2"
-futures = { workspace = true }
+futures = "0.3"
 holochain_diagnostics = { path = "../holochain_diagnostics" }
-holochain_trace = { version = "^0.3.0-beta-dev.8", path = "../holochain_trace" }
-tokio = { workspace = true }
+holochain_trace = { version = "^0.3.0-beta-dev.9", path = "../holochain_trace" }
+tokio = { version = "1.36.0", features = ["full"] }
 tokio-stream = "0.1"
 
 crossterm = "0.27"
