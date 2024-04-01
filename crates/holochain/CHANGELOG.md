@@ -7,9 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- App validation workflow: Refactored to not wait for ops that the op being validated depends on, that are being fetched and thus keep the workflow occupied. The workflow does no longer await the dependencies and instead sends off fetch requests in the background.
-- App validation workflow: Integration workflow is only triggered when ops have been validated (either accepted or rejected).
 - App validation workflow: Refactored to not wait for ops that the op being validated depends on, that are being fetched and thus keep the workflow occupied. The workflow no longer awaits the dependencies and instead sends off fetch requests in the background.
+- App validation workflow: Integration workflow is only triggered when ops have been validated (either accepted or rejected).
 - `consistency_10s` and `consistency_60s` from `holochain::sweettest` are deprecated. Use `await_consistency` instead.
 
 ## 0.3.0-beta-dev.43
