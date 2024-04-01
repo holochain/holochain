@@ -58,16 +58,18 @@ pub struct ValidationDependencies {
     pub hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
 }
 
+impl Default for ValidationDependencies {
+    fn default() -> Self {
+        ValidationDependencies::new()
+    }
+}
+
 impl ValidationDependencies {
     pub fn new() -> Self {
         Self {
             missing_hashes: HashSet::new(),
             hashes_missing_for_op: HashMap::new(),
         }
-    }
-
-    pub fn default() -> Self {
-        Self::new()
     }
 }
 
