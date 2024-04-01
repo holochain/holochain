@@ -102,6 +102,7 @@ use wasmer::Store;
 use wasmer::Type;
 
 use crate::core::ribosome::host_fn::count_links::count_links;
+use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
@@ -115,7 +116,6 @@ use std::sync::Arc;
 use wasmer_middlewares::metering::get_remaining_points;
 use wasmer_middlewares::metering::set_remaining_points;
 use wasmer_middlewares::metering::MeteringPoints;
-use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -800,25 +800,26 @@ impl RibosomeT for RealRibosome {
         zome: &Zome,
         fn_name: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
-        let otel_info = [
+        let mut otel_info = vec![
             opentelemetry_api::KeyValue::new("dna", self.dna_file.dna().hash.to_string()),
-            opentelemetry_api::KeyValue::new(
-                "zome",
-                zome.zome_name().to_string(),
-            ),
+            opentelemetry_api::KeyValue::new("zome", zome.zome_name().to_string()),
             opentelemetry_api::KeyValue::new("fn", fn_name.to_string()),
-            opentelemetry_api::KeyValue::new(
-                "agent_pubkey",
-                host_context
-                    .workspace()
+        ];
+
+        host_context
+            .maybe_workspace()
+            .and_then(|workspace| {
+                workspace
                     .source_chain()
                     .as_ref()
-                    .expect("No source chain on this workspace.")
-                    .agent_pubkey()
-                    .clone()
-                    .to_string(),
-            ),
-        ];
+                    .map(|source_chain| source_chain.agent_pubkey().to_string())
+            })
+            .map(|agent_pubkey| {
+                otel_info.push(opentelemetry_api::KeyValue::new(
+                    "source_chain",
+                    agent_pubkey,
+                ));
+            });
 
         let call_context = CallContext {
             zome: zome.clone(),
@@ -847,7 +848,11 @@ impl RibosomeT for RealRibosome {
                     {
                         let mut store_lock = instance_with_store.store.lock();
                         let mut store_mut = store_lock.as_store_mut();
-                        set_remaining_points(&mut store_mut, instance.as_ref(), WASM_METERING_LIMIT);
+                        set_remaining_points(
+                            &mut store_mut,
+                            instance.as_ref(),
+                            WASM_METERING_LIMIT,
+                        );
                     }
 
                     let result = self
@@ -857,16 +862,13 @@ impl RibosomeT for RealRibosome {
                     {
                         let mut store_lock = instance_with_store.store.lock();
                         let mut store_mut = store_lock.as_store_mut();
-                        let points_used = match get_remaining_points(&mut store_mut, instance.as_ref()) {
-                            MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
-                            MeteringPoints::Exhausted => WASM_METERING_LIMIT,
-                        };
-                        self.usage_meter.add(
-                            points_used,
-                            &otel_info,
-                        );
+                        let points_used =
+                            match get_remaining_points(&mut store_mut, instance.as_ref()) {
+                                MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
+                                MeteringPoints::Exhausted => WASM_METERING_LIMIT,
+                            };
+                        self.usage_meter.add(points_used, &otel_info);
                     }
-
 
                     // remove context from map after call
                     {
