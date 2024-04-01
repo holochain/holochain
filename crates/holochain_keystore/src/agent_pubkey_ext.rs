@@ -88,6 +88,7 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         MustBoxFuture::new(f)
     }
 
+    #[tracing::instrument(skip(keystore, data))]
     fn sign_raw(
         &self,
         keystore: &MetaLairClient,

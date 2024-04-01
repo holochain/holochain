@@ -1405,6 +1405,7 @@ mod app_impls {
             ignore_genesis_failure: bool,
         ) -> ConductorResult<StoppedApp> {
             let dpki = self.running_services().dpki.clone();
+
             let mut dpki = if let Some(d) = dpki.as_ref() {
                 let lock = d.state.lock().await;
                 Some((d.clone(), lock))
@@ -1425,13 +1426,18 @@ mod app_impls {
                             .next_derivation_details(installed_app_id.clone())
                             .await?;
 
+                        let dst_tag = format!(
+                            "DPKI-{:04}-{:04}",
+                            derivation_details.app_index, derivation_details.key_index
+                        );
+
                         let info = self
                             .keystore
                             .lair_client()
                             .derive_seed(
                                 dpki.device_seed_lair_tag.clone().into(),
                                 None,
-                                nanoid::nanoid!().into(),
+                                dst_tag.into(),
                                 None,
                                 derivation_details.to_derivation_path().into_boxed_slice(),
                             )

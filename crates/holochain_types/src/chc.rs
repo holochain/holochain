@@ -126,6 +126,8 @@ pub struct AddRecordPayload {
 impl AddRecordPayload {
     /// Create a payload from a list of records.
     /// This performs the necessary signing and encryption the CHC requires.
+
+    #[tracing::instrument(skip(keystore, records))]
     pub async fn from_records(
         keystore: MetaLairClient,
         agent_pubkey: AgentPubKey,
@@ -138,6 +140,7 @@ impl AddRecordPayload {
              }| {
                 let keystore = keystore.clone();
                 let agent_pubkey = agent_pubkey.clone();
+
                 async move {
                     let encrypted_entry_bytes = entry
                         .into_option()

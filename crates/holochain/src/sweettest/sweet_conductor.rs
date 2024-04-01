@@ -459,14 +459,8 @@ impl SweetConductor {
         dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetApp> {
         // If DPKI is in use, we must let DPKI generate the agent key
-        if self.running_services().dpki.is_some() {
-            self.setup_app_for_optional_agent(installed_app_id, None, dnas_with_roles)
-                .await
-        } else {
-            let agent = SweetAgents::one(self.keystore()).await;
-            self.setup_app_for_optional_agent(installed_app_id, Some(agent), dnas_with_roles)
-                .await
-        }
+        self.setup_app_for_optional_agent(installed_app_id, None, dnas_with_roles)
+            .await
     }
 
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
@@ -543,7 +537,7 @@ impl SweetConductor {
             .config
             .dpki
             .clone()
-            .unwrap_or(DpkiConfig::new(None, "UNUSED".to_string()));
+            .unwrap_or(DpkiConfig::new(None, "DPKI_DEVICE_SEED".to_string()));
         let (dna, _) = crate::conductor::conductor::get_dpki_dna(&dpki_config)
             .await
             .unwrap()

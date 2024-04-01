@@ -187,8 +187,10 @@ impl ConductorBuilder {
             config
                 .dpki
                 .clone()
-                .unwrap_or(DpkiConfig::new(None, "UNUSED".to_string())),
+                .unwrap_or(DpkiConfig::new(None, "DPKI_DEVICE_SEED".to_string())),
         );
+
+        dbg!(&dpki_config);
 
         let dpki_dna_to_install = match &dpki_config {
             Some(config) => {
@@ -208,6 +210,8 @@ impl ConductorBuilder {
                 "We currently require DPKI to be used, but this may change in the future"
             ),
         };
+
+        dbg!(dpki_dna_to_install.is_some());
 
         let dpki_uuid = dpki_dna_to_install
             .as_ref()
@@ -457,7 +461,7 @@ impl ConductorBuilder {
             config
                 .dpki
                 .clone()
-                .unwrap_or(DpkiConfig::new(None, "UNUSED".to_string())),
+                .unwrap_or(DpkiConfig::new(None, "DPKI_DEVICE_SEED".to_string())),
         );
 
         let (dpki_uuid, dpki_dna_to_install) = match (&self.dpki, &dpki_config) {
@@ -485,6 +489,7 @@ impl ConductorBuilder {
                 "We currently require DPKI to be used, but this may change in the future"
             ),
         };
+
         let network_compat = NetworkCompatParams { dpki_uuid };
 
         let (holochain_p2p, p2p_evt) =

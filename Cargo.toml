@@ -120,7 +120,7 @@ lto = true
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "proptest" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 #ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
-#lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
+# lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
 #lair_keystore = { path = "../lair/crates/lair_keystore" }
 #lair_keystore_api_0_0 = { path = "../lair_0_0/crates/lair_keystore_api", package = "lair_keystore_api" }
 #lair_keystore_client_0_0 = { path = "../lair_0_0/crates/lair_keystore_client", package = "lair_keystore_client" }

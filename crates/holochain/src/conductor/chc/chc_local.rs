@@ -259,6 +259,8 @@ mod tests {
     // TODO: run this remotely too
     #[tokio::test(flavor = "multi_thread")]
     async fn multi_conductor_chc_sync() {
+        holochain_trace::test_run().ok();
+
         let mut config = SweetConductorConfig::standard().no_dpki();
         // config.chc_url = Some(url2::Url2::parse("http://127.0.0.1:40845/"));
         config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
@@ -266,14 +268,16 @@ mod tests {
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
+        // All conductors share the same known agent, already installed in the test_keystore
+        let agent = SweetAgents::alice();
+
         let (c0,) = conductors[0]
-            .setup_app("app", &[dna_file.clone()])
+            .setup_app_for_agent("app", agent.clone(), &[dna_file.clone()])
             .await
             .unwrap()
             .into_tuple();
 
         let cell_id = c0.cell_id();
-        let agent = cell_id.agent_pubkey().clone();
 
         // Install two apps with ignore_genesis_failure and one without
         let mk_payload = |ignore: bool| {
