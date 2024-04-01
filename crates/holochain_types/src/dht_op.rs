@@ -72,7 +72,7 @@ pub enum DhtOp {
     ///
     /// - Ensure that *the action alone* passes surface-level validation.
     /// - Store the action into their DHT shard.
-    ///   - FIXME: @artbrock, do they?
+    //   - FIXME: @artbrock, do they?
     /// - Add an "agent-activity" reference from the public key to the hash
     ///   of the action.
     ///
@@ -136,7 +136,7 @@ pub type DhtOpLight = DhtOpLite;
 /// Alias for DhtOpLite
 pub type OpLite = DhtOpLite;
 
-/// A type for storing in databases that don't need the actual
+/// A type for storing in databases that doesn't need the actual
 /// data. Everything is a hash of the type except the signatures.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, derive_more::Display)]

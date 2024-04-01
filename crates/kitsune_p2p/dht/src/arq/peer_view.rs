@@ -83,7 +83,7 @@ impl PeerViewQ {
     /// TODO: this probably will be rewritten when PeerView is rewritten to
     /// have the filter baked in.
     pub fn extrapolated_coverage_and_filtered_count(&self, filter: &Arq) -> (f64, usize) {
-        let filter = filter.to_dht_arc(&self.topo);
+        let filter = filter.to_dht_arc(self.topo.space);
         if filter.is_empty() {
             // More accurately this would be 0, but it's handy to not have
             // divide-by-zero crashes
@@ -288,7 +288,7 @@ impl PeerViewQ {
 
         let power_above_min = |pow| {
             // not already at the minimum
-            pow > topo.min_space_power()
+            pow > topo.space.min_power()
              // don't power down if power is already too low
              && (median_power as i8 - pow as i8) < self.strat.max_power_diff as i8
         };
@@ -310,7 +310,7 @@ impl PeerViewQ {
 
         let power_below_max = |pow| {
             // not already at the maximum
-            pow < topo.max_space_power(&self.strat)
+            pow < topo.space.max_power(&self.strat)
             // don't power up if power is already too high
             && (pow as i8 - median_power as i8) < self.strat.max_power_diff as i8
         };
@@ -405,7 +405,7 @@ pub struct UpdateArqStats {
 /// entire view of the DHT, all peers are accounted for here.
 pub fn actual_coverage<'a, P: Iterator<Item = &'a Arq>>(topo: &Topology, peers: P) -> f64 {
     peers
-        .map(|a| a.absolute_length(topo) as f64 / 2f64.powf(32.0))
+        .map(|a| a.absolute_length(topo.space) as f64 / 2f64.powf(32.0))
         .sum()
 }
 
