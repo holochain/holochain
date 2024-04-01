@@ -129,12 +129,14 @@ async fn validation_callback_must_get_action() {
 
 // same as previous test but this time awaiting the background task that
 // fetches the missing original create of a delete
+// instead of explicitly writing the missing op to the cache
 #[tokio::test(flavor = "multi_thread")]
 async fn validation_callback_awaiting_deps_hashes() {
     holochain_trace::test_run().unwrap();
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
+            println!("op {op:?}");
             if let Op::RegisterDelete(RegisterDelete {
                 original_action, ..
             }) = op
@@ -167,54 +169,20 @@ async fn validation_callback_awaiting_deps_hashes() {
 
     let dna_hash = dna_file.dna_hash().clone();
 
-    // handle only Get events
-    let filter_events = |evt: &_| match evt {
-        holochain_p2p::event::HolochainP2pEvent::Get { .. } => true,
-        _ => false,
-    };
-    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
-    let network = Arc::new(
-        test_network_with_events(
-            Some(dna_hash.clone()),
-            Some(alice.clone()),
-            filter_events,
-            tx,
-        )
-        .await
-        .dna_network(),
-    );
-
-    // respond to Get request with action plus delete
-    tokio::spawn({
-        let action = create_action.clone();
-        async move {
-            let action_hash = action.clone().to_hash();
-            while let Some(evt) = rx.recv().await {
-                if let HolochainP2pEvent::Get {
-                    dht_hash, respond, ..
-                } = evt
-                {
-                    assert_eq!(dht_hash, action_hash.clone().into());
-
-                    respond.r(ok_fut(Ok(WireOps::Record(WireRecordOps {
-                        action: Some(Judged::new(
-                            create_action_signed_hashed.clone().into(),
-                            ValidationStatus::Valid,
-                        )),
-                        deletes: vec![Judged::new(
-                            WireDelete {
-                                delete: delete.clone(),
-                                signature: fixt!(Signature),
-                            },
-                            ValidationStatus::Valid,
-                        )],
-                        updates: vec![],
-                        entry: None,
-                    }))))
-                }
-            }
-        }
+    // mock network that returns the requested create action
+    let mut network = MockHolochainP2pDnaT::new();
+    network.expect_get().returning(move |holo_hash, actor| {
+        Ok(vec![WireOps::Record(WireRecordOps {
+            action: Some(Judged::new(
+                create_action_signed_hashed.clone().into(),
+                ValidationStatus::Valid,
+            )),
+            deletes: vec![],
+            updates: vec![],
+            entry: None,
+        })])
     });
+    let network = Arc::new(network);
 
     let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
