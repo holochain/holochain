@@ -1518,7 +1518,7 @@ mod app_impls {
                         },
                         app_binding: AppBindingInput {
                             app_name: installed_app_id.clone(),
-                            installed_app_id: installed_app_id,
+                            installed_app_id,
                             dna_hashes,
                         },
                         derivation_details,

@@ -264,11 +264,11 @@ where
             let first = records.first();
             let last = records.last();
             if let Some(r) = first {
-                check_dpki_agent_validity(&*dpki, author.clone(), r.action().timestamp()).await?;
+                check_dpki_agent_validity(&dpki, author.clone(), r.action().timestamp()).await?;
             }
             if let Some(r) = last {
                 if first != last {
-                    check_dpki_agent_validity(&*dpki, author, r.action().timestamp()).await?;
+                    check_dpki_agent_validity(&dpki, author, r.action().timestamp()).await?;
                 }
             }
         }
