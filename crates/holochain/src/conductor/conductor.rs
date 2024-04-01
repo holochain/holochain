@@ -530,8 +530,7 @@ mod dna_impls {
             let dpki_dna_hash = self
                 .running_services()
                 .dpki
-                .and_then(|dpki| dpki.cell_id.clone())
-                .map(|id| id.dna_hash().clone());
+                .map(|dpki| dpki.cell_id.dna_hash().clone());
             let mut hashes = self.ribosome_store().share_ref(|ds| ds.list());
             if let Some(dpki_dna_hash) = dpki_dna_hash {
                 hashes.retain(|h| *h != dpki_dna_hash);
@@ -1374,8 +1373,6 @@ mod app_impls {
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
             let manifest = app_manifest_from_dnas(&dnas_with_roles, 255);
 
-            let agent = self.resolve_agent(installed_app_id.clone(), agent).await?;
-
             let (dnas_to_register, role_assignments): (Vec<_>, Vec<_>) = data
                 .iter()
                 .map(|(dr, mp)| {
@@ -1392,44 +1389,64 @@ mod app_impls {
                 role_assignments,
             };
 
-            self.install_app_common(installed_app_id, manifest, agent.clone(), ops, false)
+            let app = self
+                .install_app_common(installed_app_id, manifest, agent.clone(), ops, false)
                 .await?;
 
-            Ok(agent)
-        }
-
-        async fn resolve_agent(
-            &self,
-            installed_app_id: InstalledAppId,
-            agent_key: Option<AgentPubKey>,
-        ) -> ConductorResult<AgentPubKey> {
-            Ok(match (agent_key, self.running_services().dpki) {
-                (Some(agent_key), dpki) => {
-                    if dpki.is_some() {
-                        // TODO: allow adding additional apps to an existing DPKI KeyRegistration.
-                        tracing::warn!("Using app with a pre-existing agent key: DPKI will not be used to manage keys for this app.");
-                    }
-                    agent_key
-                }
-                (None, Some(dpki)) => {
-                    // TODO: record the DNAs installed, important for key restoration.
-                    let dnas: Vec<DnaHash> = vec![];
-                    todo!("remove this, use two separate DPKI fns with mutex loc")
-                    // dpki.derive_and_register_new_key(installed_app_id, dnas)
-                    //     .await?
-                }
-                (None, None) => self.keystore.new_sign_keypair_random().await?,
-            })
+            Ok(app.agent_key().clone())
         }
 
         async fn install_app_common(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
             manifest: AppManifest,
-            agent_key: AgentPubKey,
+            agent_key: Option<AgentPubKey>,
             ops: AppRoleResolution,
             ignore_genesis_failure: bool,
         ) -> ConductorResult<StoppedApp> {
+            let dpki = self.running_services().dpki.clone();
+            let mut dpki = if let Some(d) = dpki.as_ref() {
+                let lock = d.state.lock().await;
+                Some((d.clone(), lock))
+            } else {
+                None
+            };
+
+            let (agent_key, derivation_details): (AgentPubKey, Option<DerivationDetailsInput>) =
+                if let Some(agent_key) = agent_key {
+                    if dpki.is_some() {
+                        // TODO: allow adding additional apps to an existing DPKI KeyRegistration.
+                        tracing::warn!("Using app with a pre-existing agent key: DPKI will not be used to manage keys for this app.");
+                    }
+                    (agent_key, None)
+                } else {
+                    if let Some((dpki, state)) = &mut dpki {
+                        let derivation_details = state
+                            .next_derivation_details(installed_app_id.clone())
+                            .await?;
+
+                        let info = self
+                            .keystore
+                            .lair_client()
+                            .derive_seed(
+                                dpki.device_seed_lair_tag.clone().into(),
+                                None,
+                                nanoid::nanoid!().into(),
+                                None,
+                                derivation_details.to_derivation_path().into_boxed_slice(),
+                            )
+                            .await
+                            .map_err(|e| DpkiServiceError::Lair(e.into()))?;
+
+                        (
+                            AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec()),
+                            Some(derivation_details),
+                        )
+                    } else {
+                        (self.keystore.new_sign_keypair_random().await?, None)
+                    }
+                };
+
             let cells_to_create = ops.cells_to_create(agent_key.clone());
 
             // check if cells_to_create contains a cell identical to an existing one
@@ -1462,10 +1479,53 @@ mod app_impls {
 
             if genesis_result.is_ok() || ignore_genesis_failure {
                 let roles = ops.role_assignments;
-                let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
+                let app = InstalledAppCommon::new(
+                    installed_app_id.clone(),
+                    agent_key.clone(),
+                    roles,
+                    manifest,
+                )?;
 
                 // Update the db
                 let stopped_app = self.add_disabled_app_to_db(app).await?;
+
+                if let (Some((dpki, state)), Some(derivation_details)) = (dpki, derivation_details)
+                {
+                    let dpki_agent = dpki.cell_id.agent_pubkey();
+
+                    // This is the signature Deepkey requires
+                    let signature = agent_key
+                        .sign_raw(&self.keystore, dpki_agent.get_raw_39().into())
+                        .await
+                        .map_err(|e| DpkiServiceError::Lair(e.into()))?;
+
+                    #[cfg(test)]
+                    assert_eq!(
+                        hdk::prelude::verify_signature_raw(
+                            agent_key.clone(),
+                            signature.clone(),
+                            dpki_agent.get_raw_39().to_vec()
+                        ),
+                        Ok(true)
+                    );
+
+                    let dna_hashes = cell_ids.iter().map(|c| c.dna_hash().clone()).collect();
+
+                    let input = CreateKeyInput {
+                        key_generation: KeyGeneration {
+                            new_key: agent_key.clone(),
+                            new_key_signing_of_author: signature,
+                        },
+                        app_binding: AppBindingInput {
+                            app_name: installed_app_id.clone(),
+                            installed_app_id: installed_app_id,
+                            dna_hashes,
+                        },
+                        derivation_details,
+                    };
+
+                    state.register_key(input).await?;
+                }
 
                 // Return the result, which be may an error if no_rollback was specified
                 genesis_result.map(|()| stopped_app)
@@ -1519,10 +1579,6 @@ mod app_impls {
             let local_dnas = self
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
-
-            let agent_key = self
-                .resolve_agent(installed_app_id.clone(), agent_key)
-                .await?;
 
             let ops = bundle.resolve_cells(&local_dnas, membrane_proofs).await?;
 

@@ -225,8 +225,7 @@ mod tests {
         });
 
         let dpki = DpkiService {
-            uuid: [0; 32],
-            cell_id: None,
+            cell_id: ::fixt::fixt!(CellId),
             device_seed_lair_tag: "UNUSED".to_string(),
             state: tokio::sync::Mutex::new(Box::new(mock_dpki)),
         };

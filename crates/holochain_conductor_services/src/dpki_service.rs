@@ -21,11 +21,13 @@ pub const DPKI_APP_ID: &str = "DPKI";
 pub type DpkiImpl = Arc<DpkiService>;
 
 pub struct DpkiService {
-    /// Mirrored from the State
-    pub uuid: [u8; 32],
-
-    /// Mirrored from the State
-    pub cell_id: Option<CellId>,
+    /// Mirrored from the State.
+    /// Note, this is a little weird for DPKI implementations which are not backed by a Holochain DNA.
+    /// In that case, the impl still needs an AgentPubKey to sign new key registrations with, and it still
+    /// needs a unique identifier to advertise network compatibility, which is coved by the DnaHash.
+    /// So such an implementation should just use 32 unique bytes and create a DnaHash from that, to be
+    /// used in this CellId.
+    pub cell_id: CellId,
 
     pub device_seed_lair_tag: String,
 
@@ -36,11 +38,12 @@ pub struct DpkiService {
 // /// Interface for the DPKI service
 impl DpkiService {
     pub fn should_run(&self, dna_hash: &DnaHash) -> bool {
-        if let Some(cell_id) = self.cell_id.as_ref() {
-            cell_id.dna_hash() != dna_hash
-        } else {
-            true
-        }
+        self.cell_id.dna_hash() != dna_hash
+    }
+
+    /// Get the UUID of the DPKI service.
+    pub fn uuid(&self) -> [u8; 32] {
+        self.cell_id.dna_hash().get_raw_32().try_into().unwrap()
     }
 
     pub fn new_deepkey(installation: DeepkeyInstallation, runner: Arc<impl CellRunner>) -> Self {
@@ -48,17 +51,10 @@ impl DpkiService {
             runner,
             cell_id: installation.cell_id.clone(),
         });
-        let uuid = installation
-            .cell_id
-            .dna_hash()
-            .get_raw_32()
-            .try_into()
-            .unwrap();
-        let cell_id = Some(installation.cell_id);
+        let cell_id = installation.cell_id;
         let device_seed_lair_tag = installation.device_seed_lair_tag;
         let state = tokio::sync::Mutex::new(state);
         Self {
-            uuid,
             cell_id,
             device_seed_lair_tag,
             state,

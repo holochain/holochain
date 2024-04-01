@@ -462,7 +462,7 @@ impl ConductorBuilder {
 
         let (dpki_uuid, dpki_dna_to_install) = match (&self.dpki, &dpki_config) {
             // If a DPKI impl was provided to the builder, use that
-            (Some(dpki_impl), _) => (Some(dpki_impl.uuid.clone()), None),
+            (Some(dpki_impl), _) => (Some(dpki_impl.uuid()), None),
 
             // Otherwise load the DNA from config if specified
             (None, Some(dpki_config)) => {

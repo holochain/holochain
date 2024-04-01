@@ -56,8 +56,7 @@ fn make_mock_dpki_impl(u: &mut Unstructured, state: DpkiKeyState) -> DpkiImpl {
     let dpki: Box<dyn DpkiState> = Box::new(dpki);
 
     Arc::new(DpkiService {
-        uuid: [1; 32],
-        cell_id: None,
+        cell_id: fixt!(CellId),
         device_seed_lair_tag: "UNUSED".to_string(),
         state: tokio::sync::Mutex::new(dpki),
     })
@@ -71,10 +70,7 @@ fn make_dpki_conductor_builder(
     state: DpkiKeyState,
 ) -> ConductorBuilder {
     let dpki = make_mock_dpki_impl(u, state);
-    let mut builder = Conductor::builder()
-        .config(config)
-        .with_keystore(keystore)
-        .no_print_setup();
+    let mut builder = Conductor::builder().config(config).no_print_setup();
     builder.dpki = Some(dpki);
     builder
 }
