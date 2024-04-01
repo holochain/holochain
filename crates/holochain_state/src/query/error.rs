@@ -24,6 +24,8 @@ pub enum StateQueryError {
     ActionError(#[from] holochain_zome_types::prelude::ActionError),
     #[error(transparent)]
     SyncScratchError(#[from] SyncScratchError),
+    #[error("{0}")]
+    Other(String),
 }
 
 pub type StateQueryResult<T> = Result<T, StateQueryError>;
