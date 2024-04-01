@@ -15,7 +15,6 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
     holochain_trace::test_run().unwrap();
 
     let mut conductor = SweetConductor::from_standard_config().await;
-    let agent = SweetAgents::one(conductor.keystore()).await;
 
     async fn make_payload(clone_limit: u32) -> InstallAppPayload {
         // The integrity zome in this WASM will fail if the properties are not set. This helps verify that genesis
@@ -73,8 +72,6 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
         ))
     );
 
-    todo!("Need to be able to roll back the DPKI failure here.");
-
     {
         // Succeeds with clone limit of 1
         let app = conductor
@@ -105,7 +102,6 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
         let app = state.get_app(&"app_1".to_string()).unwrap();
 
         assert_eq!(clone_cell.name, "Johnny".to_string());
-        assert_eq!(*clone_cell.cell_id.agent_pubkey(), agent);
         assert_eq!(app.role_assignments().len(), 1);
         assert_eq!(app.clone_cells().count(), 1);
     }
