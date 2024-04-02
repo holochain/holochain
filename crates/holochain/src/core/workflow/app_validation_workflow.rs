@@ -55,7 +55,7 @@ pub struct ValidationDependencies {
     /// Missing hashes that are being fetched.
     missing_hashes: HashSet<AnyDhtHash>,
     /// Dependencies that are missing to app validate an op.
-    hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
+    _hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
 }
 
 impl Default for ValidationDependencies {
@@ -68,15 +68,15 @@ impl ValidationDependencies {
     pub fn new() -> Self {
         Self {
             missing_hashes: HashSet::new(),
-            hashes_missing_for_op: HashMap::new(),
+            _hashes_missing_for_op: HashMap::new(),
         }
     }
 
-    pub fn insert_missing_hash(&self, hash: AnyDhtHash) -> bool {
+    pub fn insert_missing_hash(&mut self, hash: AnyDhtHash) -> bool {
         self.missing_hashes.insert(hash)
     }
 
-    pub fn remove_missing_hash(&self, hash: &AnyDhtHash) -> bool {
+    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) -> bool {
         self.missing_hashes.remove(hash)
     }
 }
