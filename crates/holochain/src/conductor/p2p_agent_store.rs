@@ -12,6 +12,7 @@ use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
+use holochain_state::query::StateQueryError;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -296,13 +297,17 @@ pub async fn dump_state(
         let mut dump = String::new();
 
         use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-        let duration = Duration::milliseconds(info.signed_at_ms as i64);
+        let duration = Duration::try_milliseconds(info.signed_at_ms as i64).ok_or_else(|| {
+            StateQueryError::Other("Agent info timestamp out of range".to_string())
+        })?;
         let s = duration.num_seconds();
         let n = duration.clone().to_std().unwrap().subsec_nanos();
         // TODO FIXME
         #[allow(deprecated)]
         let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-        let duration = Duration::milliseconds(info.expires_at_ms as i64);
+        let duration = Duration::try_milliseconds(info.expires_at_ms as i64).ok_or_else(|| {
+            StateQueryError::Other("Agent info timestamp out of range".to_string())
+        })?;
         let s = duration.num_seconds();
         let n = duration.clone().to_std().unwrap().subsec_nanos();
         // TODO FIXME
