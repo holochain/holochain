@@ -52,16 +52,14 @@ fn make_mock_dpki_impl(u: &mut Unstructured<'_>, state: DpkiKeyState) -> DpkiImp
         }
     });
 
-    let dpki: Box<dyn DpkiState> = Box::new(dpki);
-
     // All share same DNA, but different agent
     let cell_id = CellId::new(DnaHash::from_raw_32(vec![0; 32]), fixt!(AgentPubKey));
 
-    Arc::new(DpkiService {
+    Arc::new(DpkiService::new(
         cell_id,
-        device_seed_lair_tag: "MOCK_DEVICE_SEED".to_string(),
-        state: tokio::sync::Mutex::new(dpki),
-    })
+        "MOCK_DEVICE_SEED".to_string(),
+        dpki,
+    ))
 }
 
 async fn make_dpki_conductor_builder(
@@ -95,8 +93,7 @@ async fn get_key_state(conductor: &SweetConductor, agent: &AgentPubKey) -> KeySt
         .dpki
         .as_ref()
         .unwrap()
-        .state
-        .lock()
+        .state()
         .await
         .key_state(agent.clone(), Timestamp::now())
         .await

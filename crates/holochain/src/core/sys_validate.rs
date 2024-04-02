@@ -386,8 +386,7 @@ pub async fn check_dpki_agent_validity(
     timestamp: Timestamp,
 ) -> SysValidationResult<()> {
     let key_state = dpki
-        .state
-        .lock()
+        .state()
         .await
         .key_state(author.clone(), timestamp)
         .await?;

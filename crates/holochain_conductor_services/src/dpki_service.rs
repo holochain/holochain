@@ -32,11 +32,24 @@ pub struct DpkiService {
     pub device_seed_lair_tag: String,
 
     /// State must be accessed through a Mutex
-    pub state: tokio::sync::Mutex<Box<dyn DpkiState>>,
+    state: tokio::sync::Mutex<Box<dyn DpkiState>>,
 }
 
 // /// Interface for the DPKI service
 impl DpkiService {
+    pub fn new(
+        cell_id: CellId,
+        device_seed_lair_tag: String,
+        state: impl DpkiState + 'static,
+    ) -> Self {
+        let state: Box<dyn DpkiState> = Box::new(state);
+        let state = tokio::sync::Mutex::new(state);
+        Self {
+            cell_id,
+            device_seed_lair_tag,
+            state,
+        }
+    }
     pub fn should_run(&self, dna_hash: &DnaHash) -> bool {
         self.cell_id.dna_hash() != dna_hash
     }
@@ -59,6 +72,13 @@ impl DpkiService {
             device_seed_lair_tag,
             state,
         }
+    }
+
+    pub async fn state(&self) -> tokio::sync::MutexGuard<Box<dyn DpkiState>> {
+        dbg!("LOCK");
+        let l = self.state.lock().await;
+        dbg!("UNLOCK");
+        l
     }
 }
 

@@ -800,6 +800,7 @@ impl Space {
 }
 
 /// Get the holochain conductor state
+#[tracing::instrument(skip_all)]
 pub async fn query_conductor_state(
     db: &DbRead<DbKindConductor>,
 ) -> ConductorResult<Option<ConductorState>> {

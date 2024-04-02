@@ -1096,7 +1096,7 @@ pub mod test {
                 }
                 count
             },
-            2 + 1 // + 1 for DPKI
+            2
         );
 
         // - Get agents and space

@@ -206,11 +206,11 @@ mod tests {
             async move { Ok(KeyState::Valid(action)) }.boxed()
         });
 
-        let dpki = DpkiService {
-            cell_id: ::fixt::fixt!(CellId),
-            device_seed_lair_tag: "DPKI_DEVICE_SEED".to_string(),
-            state: tokio::sync::Mutex::new(Box::new(mock_dpki)),
-        };
+        let dpki = DpkiService::new(
+            ::fixt::fixt!(CellId),
+            "DPKI_DEVICE_SEED".to_string(),
+            mock_dpki,
+        );
 
         {
             let workspace = GenesisWorkspace::new(vault.clone().into(), dht_db.to_db()).unwrap();

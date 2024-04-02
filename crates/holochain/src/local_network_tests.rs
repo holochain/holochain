@@ -1,30 +1,3 @@
-/*
-use std::convert::TryFrom;
-use std::sync::Arc;
-
-use crate::conductor::p2p_agent_store::all_agent_infos;
-use crate::conductor::p2p_agent_store::exchange_peer_info;
-use crate::conductor::ConductorHandle;
-use crate::test_utils::host_fn_caller::Post;
-use crate::test_utils::install_app;
-use crate::test_utils::new_zome_call;
-use crate::test_utils::setup_app_with_network;
-use crate::test_utils::wait_for_integration_with_others;
-use hdk::prelude::CellId;
-use holo_hash::AgentPubKey;
-use holochain_keystore::AgentPubKeyExt;
-use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
-use holochain_serialized_bytes::SerializedBytes;
-use holochain_types::prelude::*;
-use holochain_wasm_test_utils::TestZomes;
-use holochain_zome_types::ZomeCallResponse;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
-use matches::assert_matches;
-use shrinkwraprs::Shrinkwrap;
-use tempfile::TempDir;
-use tokio_helper;
-use tracing::debug_span;
-*/
 
 use crate::sweettest::*;
 use futures::StreamExt;
@@ -39,7 +12,8 @@ use test_case::test_case;
 async fn conductors_call_remote(num_conductors: usize) {
     holochain_trace::test_run().ok();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let mut conductors = SweetConductorBatch::from_standard_config(num_conductors).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(num_conductors).await;
+
     let apps = conductors.setup_app("app", [&dna]).await.unwrap();
     let cells: Vec<_> = apps
         .into_inner()
@@ -48,10 +22,12 @@ async fn conductors_call_remote(num_conductors: usize) {
         .collect();
 
     conductors.exchange_peer_info().await;
+    dbg!();
 
     // Make sure that genesis records are integrated now that conductors have discovered each other. This makes it
     // more likely that Kitsune knows about all the agents in the network to be able to make remote calls to them.
     await_consistency(60, cells.iter()).await.unwrap();
+    dbg!();
 
     let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
 

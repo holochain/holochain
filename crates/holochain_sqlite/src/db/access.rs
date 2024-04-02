@@ -39,6 +39,7 @@ pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbRead<Kind>> {
 
 #[async_trait::async_trait]
 impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
+    #[tracing::instrument(skip_all)]
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -56,6 +57,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
 
 #[async_trait::async_trait]
 impl<Kind: DbKindT> ReadAccess<Kind> for DbRead<Kind> {
+    #[tracing::instrument(skip_all)]
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -113,6 +115,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     ///
     /// Note that it is not enforced that your closure runs read-only operations or that it finishes quickly so it is
     /// up to the caller to use this function as intended.
+    #[tracing::instrument(skip_all)]
     pub async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -138,6 +141,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     /// reason.
     ///
     /// A valid reason for this is holding read transactions across multiple databases as part of a cascade query.
+    #[tracing::instrument(skip_all)]
     pub async fn get_read_txn(&self) -> DatabaseResult<PTxnGuard> {
         let conn = self
             .checkout_connection(self.long_read_semaphore.clone())
@@ -145,6 +149,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         Ok(conn.into())
     }
 
+    #[tracing::instrument(skip(self))]
     async fn checkout_connection(&self, semaphore: Arc<Semaphore>) -> DatabaseResult<PConnGuard> {
         let waiting = self.num_readers.fetch_add(1, Ordering::Relaxed);
         if waiting > self.max_readers {
@@ -182,9 +187,11 @@ impl<Kind: DbKindT> DbRead<Kind> {
         r
     }
 
+    #[tracing::instrument]
     async fn acquire_reader_permit(
         semaphore: Arc<Semaphore>,
     ) -> DatabaseResult<OwnedSemaphorePermit> {
+        tracing::trace!("acquire semaphore");
         match tokio::time::timeout(
             std::time::Duration::from_millis(ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)),
             semaphore.acquire_owned(),
