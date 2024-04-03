@@ -645,10 +645,13 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             let put_requests = peer_data
                 .into_iter()
                 .map(|agent| (DnaHash::from_kitsune(&agent.space), agent))
-                .fold(HashMap::new(), |mut acc, (dna, agent)| {
-                    acc.entry(dna).or_insert_with(Vec::new).push(agent);
-                    acc
-                });
+                .fold(
+                    HashMap::<DnaHash, Vec<AgentInfoSigned>>::new(),
+                    |mut acc, (dna, agent)| {
+                        acc.entry(dna).or_default().push(agent);
+                        acc
+                    },
+                );
 
             for (dna, agents) in put_requests {
                 evt_sender.put_agent_info_signed(dna, agents).await?;
