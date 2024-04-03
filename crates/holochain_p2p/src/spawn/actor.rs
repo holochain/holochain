@@ -22,7 +22,7 @@ use holochain_trace::tracing::warn;
 use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
 
 macro_rules! timing_trace {
@@ -638,14 +638,26 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         &mut self,
         input: kitsune_p2p::event::PutAgentInfoSignedEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
-        let kitsune_p2p::event::PutAgentInfoSignedEvt { space, peer_data } = input;
-        let space = DnaHash::from_kitsune(&space);
+        let kitsune_p2p::event::PutAgentInfoSignedEvt { peer_data } = input;
+
         let evt_sender = self.evt_sender.clone();
-        Ok(
-            async move { Ok(evt_sender.put_agent_info_signed(space, peer_data).await?) }
-                .boxed()
-                .into(),
-        )
+        Ok(async move {
+            let put_requests = peer_data
+                .into_iter()
+                .map(|agent| (DnaHash::from_kitsune(&agent.space), agent))
+                .fold(HashMap::new(), |mut acc, (dna, agent)| {
+                    acc.entry(dna).or_insert_with(Vec::new).push(agent);
+                    acc
+                });
+
+            for (dna, agents) in put_requests {
+                evt_sender.put_agent_info_signed(dna, agents).await?;
+            }
+
+            Ok(())
+        }
+        .boxed()
+        .into())
     }
 
     /// We need to get previously stored agent info. A single kitusne agent query
