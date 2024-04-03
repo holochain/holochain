@@ -1,5 +1,4 @@
 #![allow(clippy::new_ret_no_self)]
-#![allow(clippy::blocks_in_if_conditions)]
 //! Next-gen performance kitsune transport proxy
 
 use crate::*;
@@ -380,27 +379,28 @@ impl ProxyEpHnd {
 impl AsEpHnd for ProxyEpHnd {
     fn debug(&self) -> serde_json::Value {
         let addr = self.local_addr();
-        match self.inner.share_mut(|i, _| {
-            let proxy_list = i
-                .digest_to_sub_con_map
-                .keys()
-                .map(|k| format!("{:?}", k))
-                .collect::<Vec<_>>();
-            Ok(serde_json::json!({
-                "type": "tx2_proxy",
-                "state": "open",
-                "addr": addr?,
-                "proxy_count": i.digest_to_sub_con_map.len(),
-                "proxy_list": proxy_list,
-                "sub": self.sub_ep_hnd.debug(),
-            }))
-        }) {
-            Ok(j) => j,
-            Err(_) => serde_json::json!({
-                "type": "tx2_proxy",
-                "state": "closed",
-            }),
-        }
+        self.inner
+            .share_mut(|i, _| {
+                let proxy_list = i
+                    .digest_to_sub_con_map
+                    .keys()
+                    .map(|k| format!("{:?}", k))
+                    .collect::<Vec<_>>();
+                Ok(serde_json::json!({
+                    "type": "tx2_proxy",
+                    "state": "open",
+                    "addr": addr?,
+                    "proxy_count": i.digest_to_sub_con_map.len(),
+                    "proxy_list": proxy_list,
+                    "sub": self.sub_ep_hnd.debug(),
+                }))
+            })
+            .unwrap_or_else(|_| {
+                serde_json::json!({
+                    "type": "tx2_proxy",
+                    "state": "closed",
+                })
+            })
     }
 
     fn uniq(&self) -> Uniq {

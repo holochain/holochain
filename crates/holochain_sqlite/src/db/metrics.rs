@@ -22,7 +22,7 @@ pub fn create_pool_usage_metric(kind: DbKind, db_semaphores: Vec<Arc<Semaphore>>
         .init();
 
     let total_permits: usize = db_semaphores.iter().map(|s| s.available_permits()).sum();
-    match meter.register_callback(&[gauge.as_any()], move |observer| {
+    let registration_result = meter.register_callback(&[gauge.as_any()], move |observer| {
         let current_permits: usize = db_semaphores.iter().map(|s| s.available_permits()).sum();
 
         observer.observe_f64(
@@ -30,7 +30,8 @@ pub fn create_pool_usage_metric(kind: DbKind, db_semaphores: Vec<Arc<Semaphore>>
             (total_permits - current_permits) as f64 / total_permits as f64,
             &[],
         )
-    }) {
+    });
+    match registration_result {
         Ok(_) => {}
         Err(e) => {
             tracing::error!("Failed to register callback for metric: {:?}", e);

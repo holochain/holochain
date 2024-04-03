@@ -2,7 +2,7 @@ use kitsune_p2p_types::{KOpData, KSpace};
 use std::sync::Arc;
 
 /// Drop this when response sending is complete.
-pub struct FetchResponseGuard(tokio::sync::oneshot::Sender<()>);
+pub struct FetchResponseGuard(#[allow(dead_code)] tokio::sync::oneshot::Sender<()>);
 
 #[cfg(any(test, feature = "test_utils"))]
 impl FetchResponseGuard {
