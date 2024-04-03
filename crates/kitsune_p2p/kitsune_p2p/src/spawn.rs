@@ -33,18 +33,28 @@ pub async fn spawn_kitsune_p2p(
     let sender = channel_factory.create_channel::<KitsuneP2p>().await?;
     let host = HostApiLegacy::new(host, evt_send);
 
+    // Create a `HostApiLegacy` that is configured to talk to the `KitsuneP2pActor` rather than directly to the Kitsune host.
+    let self_host_api = {
+        let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
+        let self_host_api = HostApiLegacy::new(host.api.clone(), evt_send);
+        channel_factory.attach_receiver(evt_recv).await?;
+
+        self_host_api
+    };
+
+    // Create the network. Any events it sends will have to wait to be processed until Kitsune has finished initialising
+    // but everything that is needed to construct the network is available now.
+    let (ep_hnd, ep_evt, bootstrap_net) = create_meta_net(
+        &config,
+        tls_config,
+        internal_sender.clone(),
+        self_host_api,
+        preflight_user_data,
+    )
+        .await?;
+
     tokio::task::spawn(
-        builder.spawn(
-            KitsuneP2pActor::new(
-                config,
-                tls_config,
-                channel_factory,
-                internal_sender,
-                host,
-                preflight_user_data,
-            )
-            .await?,
-        ),
+        builder.spawn(KitsuneP2pActor::new(config, channel_factory, internal_sender, host, ep_hnd, ep_evt, bootstrap_net).await?),
     );
 
     Ok((sender, evt_recv))
