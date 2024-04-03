@@ -1,4 +1,3 @@
-
 use crate::sweettest::*;
 use futures::StreamExt;
 use holo_hash::ActionHash;
@@ -12,7 +11,8 @@ use test_case::test_case;
 async fn conductors_call_remote(num_conductors: usize) {
     holochain_trace::test_run().ok();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(num_conductors).await;
+    let config = SweetConductorConfig::standard();
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(num_conductors, config).await;
 
     let apps = conductors.setup_app("app", [&dna]).await.unwrap();
     let cells: Vec<_> = apps

@@ -191,13 +191,15 @@ impl<Kind: DbKindT> DbRead<Kind> {
     async fn acquire_reader_permit(
         semaphore: Arc<Semaphore>,
     ) -> DatabaseResult<OwnedSemaphorePermit> {
-        tracing::trace!("acquire semaphore");
-        match tokio::time::timeout(
+        let id = nanoid::nanoid!(7);
+        tracing::trace!(?id, "acquire semaphore permit");
+        let permit = tokio::time::timeout(
             std::time::Duration::from_millis(ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)),
             semaphore.acquire_owned(),
         )
-        .await
-        {
+        .await;
+        tracing::trace!(?id, ?permit, "semaphore permit obtained");
+        match permit {
             Ok(Ok(s)) => Ok(s),
             Ok(Err(e)) => {
                 tracing::error!("Semaphore should not be closed but got an error while acquiring a permit, {:?}", e);

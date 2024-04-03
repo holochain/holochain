@@ -576,7 +576,7 @@ mod dna_impls {
                 .dna_def()
                 .all_zomes()
                 .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
-            dbg!();
+            dbg!("HERE");
             // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
             if is_full_wasm_dna {
                 Ok(self.put_wasm(ribosome).await?)
@@ -722,7 +722,7 @@ mod dna_impls {
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
             let dna_def = ribosome.dna_def().clone();
             let code = ribosome.dna_file().code().clone().into_values();
-            dbg!();
+            dbg!("HERE");
             let zome_defs = get_entry_defs(ribosome).await?;
             dbg!();
             self.put_wasm_code(dna_def, code, zome_defs).await
@@ -784,7 +784,7 @@ mod dna_impls {
             dbg!();
             let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone())?;
 
-            dbg!();
+            dbg!("HERE");
             let entry_defs = self.register_dna_wasm(ribosome.clone()).await?;
 
             dbg!();
@@ -2277,7 +2277,7 @@ mod service_impls {
             enable: bool,
         ) -> ConductorResult<()> {
             let dna_hash = dna.dna_hash().clone();
-            dbg!();
+            dbg!("HERE");
             self.register_dna(dna.clone()).await?;
             dbg!();
 

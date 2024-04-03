@@ -589,7 +589,9 @@ impl RealRibosome {
         let fn_name = fn_name.clone();
         let instance = instance_with_store.instance.clone();
         let mut store_lock = instance_with_store.store.lock();
+        dbg!();
         let mut store_mut = store_lock.as_store_mut();
+        dbg!();
         let result = holochain_wasmer_host::guest::call(
             &mut store_mut,
             instance,
@@ -599,7 +601,7 @@ impl RealRibosome {
             // @todo - is this a problem for large payloads like entries?
             invocation.to_owned().host_input()?,
         );
-
+        dbg!();
         if let Err(runtime_error) = &result {
             tracing::error!(?runtime_error, ?zome, ?fn_name);
         }
@@ -653,31 +655,39 @@ macro_rules! do_callback {
     ( $self:ident, $access:ident, $invocation:ident, $callback_result:ty ) => {{
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
         // fallible iterator syntax instead of for loop
+        dbg!("1");
+        dbg!(&$access);
         let mut call_iterator = $self.call_iterator($access.into(), $invocation);
+        dbg!("2");
         loop {
             let (zome_name, callback_result): (ZomeName, $callback_result) =
                 match call_iterator.next() {
-                    Ok(Some((zome, extern_io))) => (
+                    Ok(Some((zome, extern_io))) => dbg!((
                         zome.into(),
                         extern_io
                             .decode()
                             .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
-                    ),
-                    Err((zome, RibosomeError::WasmRuntimeError(runtime_error))) => (
+                    )),
+                    Err((zome, RibosomeError::WasmRuntimeError(runtime_error))) => dbg!((
                         zome.into(),
                         <$callback_result>::try_from_wasm_error(runtime_error.downcast()?)
                             .map_err(|e| -> RuntimeError { e.into() })?,
-                    ),
-                    Err((_zome, other_error)) => return Err(other_error),
-                    Ok(None) => break,
+                    )),
+                    Err((_zome, other_error)) => return dbg!(Err(other_error)),
+                    Ok(None) => {
+                        dbg!();
+                        break;
+                    }
                 };
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
+            dbg!("3");
             if callback_result.is_definitive() {
                 return Ok(vec![(zome_name, callback_result)].into());
             }
             results.push((zome_name, callback_result));
         }
+        dbg!("4");
         // fold all the non-definitive callbacks down into a single overall result
         Ok(results.into())
     }};
@@ -781,32 +791,37 @@ impl RibosomeT for RealRibosome {
             host_context,
             auth: invocation.auth(),
         };
+        dbg!();
 
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
+                dbg!();
                 let module = self.get_module_for_zome(zome)?;
+                dbg!();
                 if module.info().exports.contains_key(fn_name.as_ref()) {
                     // there is a corresponding zome fn
                     let context_key = Self::next_context_key();
+                    dbg!();
                     let instance_with_store =
                         self.build_instance_with_store(module, context_key)?;
-
+                    dbg!();
                     // add call context to map for the following call
                     {
                         CONTEXT_MAP
                             .lock()
                             .insert(context_key, Arc::new(call_context));
                     }
+                    dbg!();
 
                     let result = self
                         .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store)
                         .map(Some);
-
+                    dbg!();
                     // remove context from map after call
                     {
                         CONTEXT_MAP.lock().remove(&context_key);
                     }
-
+                    dbg!();
                     result
                 } else {
                     // the callback fn does not exist
@@ -878,6 +893,8 @@ impl RibosomeT for RealRibosome {
         host_context: HostContext,
         invocation: I,
     ) -> CallIterator<Self, I> {
+        dbg!();
+
         CallIterator::new(host_context, self.clone(), invocation)
     }
 

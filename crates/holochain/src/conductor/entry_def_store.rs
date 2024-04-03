@@ -65,12 +65,12 @@ pub(crate) async fn get_entry_defs(
         .enumerate()
         .map(|(i, (zome_name, zome))| (zome_name, (ZomeIndex(i as u8), zome)))
         .collect::<HashMap<_, _>>();
-    dbg!();
+    dbg!("HERE");
     let result = tokio::task::spawn_blocking(move || {
         ribosome.run_entry_defs(EntryDefsHostAccess, invocation)
     })
     .await?;
-dbg!();
+    dbg!();
     match result? {
         EntryDefsResult::Defs(map) => {
             // Turn the defs map into a vec of keys and entry defs
