@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- App validation workflow: Refactored to not wait for ops that the op being validated depends on, that are being fetched and thus keep the workflow occupied. The workflow no longer awaits the dependencies and instead sends off fetch requests in the background.
 - `consistency_10s` and `consistency_60s` from `holochain::sweettest` are deprecated. Use `await_consistency` instead.
 
 ## 0.3.0-beta-dev.43

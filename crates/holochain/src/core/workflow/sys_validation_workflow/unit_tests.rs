@@ -292,7 +292,7 @@ impl TestCase {
         let test_space = TestSpace::new(dna_hash.hash.clone());
 
         let keystore = holochain_keystore::test_keystore();
-        let agent = keystore.new_sign_keypair_random().await.unwrap().into();
+        let agent = keystore.new_sign_keypair_random().await.unwrap();
 
         Self {
             dna_def,

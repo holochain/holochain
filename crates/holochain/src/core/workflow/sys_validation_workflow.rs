@@ -107,8 +107,6 @@ pub mod validation_query;
 #[cfg(test)]
 mod chain_test;
 #[cfg(test)]
-mod test_ideas;
-#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod unit_tests;
