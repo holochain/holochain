@@ -51,10 +51,21 @@ pub async fn spawn_kitsune_p2p(
         self_host_api,
         preflight_user_data,
     )
-        .await?;
+    .await?;
 
     tokio::task::spawn(
-        builder.spawn(KitsuneP2pActor::new(config, channel_factory, internal_sender, host, ep_hnd, ep_evt, bootstrap_net).await?),
+        builder.spawn(
+            KitsuneP2pActor::new(
+                config,
+                channel_factory,
+                internal_sender,
+                host,
+                ep_hnd,
+                ep_evt,
+                bootstrap_net,
+            )
+            .await?,
+        ),
     );
 
     Ok((sender, evt_recv))
