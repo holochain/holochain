@@ -33,7 +33,6 @@ use holochain_zome_types::{
     op::{EntryCreationAction, Op, RegisterAgentActivity, RegisterDelete},
     record::{SignedActionHashed, SignedHashed},
     validate::ValidationStatus,
-    zome::{IntegrityZomeDef, Zome},
     Action,
 };
 use matches::assert_matches;
@@ -74,13 +73,30 @@ async fn validation_callback_must_get_action() {
         ribosome,
         test_space,
         workspace,
-        create_action,
-        invocation,
+        zomes_to_invoke,
+        alice,
+        bob,
         ..
     } = TestCase::new(zomes).await;
 
     let network = Arc::new(fixt!(HolochainP2pDna));
     let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+
+    // a create by alice
+    let mut create = fixt!(Create);
+    create.author = alice.clone();
+    let create_action = Action::Create(create.clone());
+    // a delete by bob that references alice's create
+    let mut delete = fixt!(Delete);
+    delete.author = bob.clone();
+    delete.deletes_address = create_action.clone().to_hash();
+    let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
+    let delete_action_op = Op::RegisterDelete(RegisterDelete {
+        delete: delete_action_signed_hashed.clone(),
+        original_action: EntryCreationAction::Create(create.clone()),
+        original_entry: None,
+    });
+    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
     // action has not been written to a database yet
     // validation should indicate it is awaiting create action hash
@@ -143,11 +159,11 @@ async fn validation_callback_awaiting_deps_hashes() {
     });
 
     let TestCase {
+        dna_file,
+        zomes_to_invoke,
         ribosome,
+        bob,
         workspace,
-        create_action,
-        create_action_signed_hashed,
-        invocation,
         ..
     } = TestCase::new(zomes).await;
 
@@ -165,6 +181,24 @@ async fn validation_callback_awaiting_deps_hashes() {
             entry: None,
         })])
     });
+
+    // a create by alice
+    let mut create = fixt!(Create);
+    create.author = alice.clone();
+    let create_action = Action::Create(create.clone());
+    let create_action_signed_hashed =
+        SignedHashed::new_unchecked(create_action.clone(), fixt!(Signature));
+    // a delete by bob that references alice's create
+    let mut delete = fixt!(Delete);
+    delete.author = bob.clone();
+    delete.deletes_address = create_action.clone().to_hash();
+    let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
+    let delete_action_op = Op::RegisterDelete(RegisterDelete {
+        delete: delete_action_signed_hashed.clone(),
+        original_action: EntryCreationAction::Create(create.clone()),
+        original_entry: None,
+    });
+    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
     let network = Arc::new(network);
 
     let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
@@ -230,11 +264,11 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     });
 
     let TestCase {
-        integrity_zomes,
+        dna_file,
+        zomes_to_invoke,
+        test_space,
         ribosome,
         alice,
-        create_action_signed_hashed,
-        delete_action_op,
         workspace,
         ..
     } = TestCase::new(zomes).await;
@@ -242,31 +276,9 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     let action_to_be_fetched = create_action_signed_hashed;
     let times_same_hash_is_fetched = Arc::new(AtomicI8::new(0));
 
-    // mock network with alice not being an authority of bob's action
-    let mut network = MockHolochainP2pDnaT::new();
-    network.expect_authority_for_hash().returning(|_| Ok(false));
-    // return single action as requested chain
-    network.expect_must_get_agent_activity().returning({
-        let action_to_be_fetched = action_to_be_fetched.clone();
-        let times_same_hash_is_fetched = times_same_hash_is_fetched.clone();
-        move |author, filter| {
-            assert_eq!(author, alice);
-            assert_eq!(&filter.chain_top, action_to_be_fetched.as_hash());
-
-            times_same_hash_is_fetched
-                .clone()
-                .fetch_add(1, Ordering::Relaxed);
-            Ok(vec![MustGetAgentActivityResponse::Activity(vec![
-                RegisterAgentActivity {
-                    action: action_to_be_fetched.clone(),
-                    cached_entry: None,
-                },
-            ])])
-        }
-    });
-    let network = Arc::new(network);
-    let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
-    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
+    let dna_hash = dna_file.dna_hash().clone();
+    let network = test_network(Some(dna_hash.clone()), Some(alice.clone())).await;
+    let invocation = ValidateInvocation::new(zomes_to_invoke, &action_op).unwrap();
     let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // app validation should indicate missing action is being awaited
@@ -327,14 +339,47 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
     });
 
     let TestCase {
+        dna_file,
+        zomes_to_invoke,
         ribosome,
+        alice,
+        bob,
         workspace,
-        create_action_signed_hashed,
-        invocation,
         ..
     } = TestCase::new(zomes).await;
 
-    let action_to_be_fetched = create_action_signed_hashed;
+    // a create by alice
+    let mut create = fixt!(Create);
+    create.author = alice.clone();
+    let create_action = Action::Create(create.clone());
+    let create_action_signed_hashed =
+        SignedHashed::new_unchecked(create_action.clone(), fixt!(Signature));
+    // a delete by bob that references alice's create
+    let mut delete = fixt!(Delete);
+    delete.author = bob.clone();
+    delete.deletes_address = create_action.clone().to_hash();
+    let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
+    let delete_action_op = Op::RegisterDelete(RegisterDelete {
+        delete: delete_action_signed_hashed.clone(),
+        original_action: EntryCreationAction::Create(create.clone()),
+        original_entry: None,
+    });
+    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
+
+    // handle only Get events
+    let filter_events = |evt: &_| match evt {
+        holochain_p2p::event::HolochainP2pEvent::Get { .. } => true,
+        _ => false,
+    };
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+    let network = test_network_with_events(
+        Some(dna_file.dna_hash().clone()),
+        Some(alice.clone()),
+        filter_events,
+        tx,
+    )
+    .await;
+
     let times_same_hash_is_fetched = Arc::new(AtomicI8::new(0));
 
     // mock network that returns the requested create action and increments
@@ -417,11 +462,8 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     });
 
     let TestCase {
-        integrity_zomes,
         ribosome,
         alice,
-        create_action_signed_hashed,
-        delete_action_op,
         workspace,
         ..
     } = TestCase::new(zomes).await;
@@ -481,23 +523,20 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     assert_eq!(fetched_dependencies.lock().missing_hashes.len(), 0);
 }
 
-// test case with alice and bob, a create by alice and a delete by bob that
-// references alice's create
 struct TestCase {
-    integrity_zomes: Vec<Zome<IntegrityZomeDef>>,
+    dna_file: DnaFile,
+    zomes_to_invoke: ZomesToInvoke,
     test_space: TestSpace,
     ribosome: RealRibosome,
     alice: AgentPubKey,
+    bob: AgentPubKey,
     workspace: HostFnWorkspaceRead,
-    create_action: Action,
-    create_action_signed_hashed: SignedActionHashed,
-    delete_action_op: Op,
-    invocation: ValidateInvocation,
 }
 
 impl TestCase {
     async fn new(zomes: SweetInlineZomes) -> Self {
         let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+        let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
         let dna_hash = dna_file.dna_hash().clone();
         let ribosome = RealRibosome::new(
             dna_file.clone(),
@@ -522,37 +561,14 @@ impl TestCase {
         )
         .await
         .unwrap();
-        // a create by alice
-        let mut create = fixt!(Create);
-        create.author = alice.clone();
-        create.action_seq = 5;
-        let create_action = Action::Create(create.clone());
-        let create_action_signed_hashed =
-            SignedHashed::new_unchecked(create_action.clone(), fixt!(Signature));
-        // a delete by bob that references alice's create
-        let mut delete = fixt!(Delete);
-        delete.author = bob.clone();
-        delete.action_seq = 6;
-        delete.deletes_address = create_action.clone().to_hash();
-        let delete_action_signed_hashed =
-            SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
-        let delete_action_op = Op::RegisterDelete(RegisterDelete {
-            delete: delete_action_signed_hashed.clone(),
-            original_action: EntryCreationAction::Create(create.clone()),
-            original_entry: None,
-        });
-        let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
-        let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
         Self {
-            integrity_zomes,
+            dna_file,
+            zomes_to_invoke,
             test_space,
             ribosome,
             alice,
+            bob,
             workspace,
-            create_action,
-            create_action_signed_hashed,
-            delete_action_op,
-            invocation,
         }
     }
 }
