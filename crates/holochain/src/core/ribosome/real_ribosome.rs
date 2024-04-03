@@ -806,20 +806,17 @@ impl RibosomeT for RealRibosome {
             opentelemetry_api::KeyValue::new("fn", fn_name.to_string()),
         ];
 
-        host_context
-            .maybe_workspace()
-            .and_then(|workspace| {
-                workspace
-                    .source_chain()
-                    .as_ref()
-                    .map(|source_chain| source_chain.agent_pubkey().to_string())
-            })
-            .map(|agent_pubkey| {
-                otel_info.push(opentelemetry_api::KeyValue::new(
-                    "source_chain",
-                    agent_pubkey,
-                ));
-            });
+        if let Some(agent_pubkey) = host_context.maybe_workspace().and_then(|workspace| {
+            workspace
+                .source_chain()
+                .as_ref()
+                .map(|source_chain| source_chain.agent_pubkey().to_string())
+        }) {
+            otel_info.push(opentelemetry_api::KeyValue::new(
+                "source_chain",
+                agent_pubkey,
+            ));
+        }
 
         let call_context = CallContext {
             zome: zome.clone(),
