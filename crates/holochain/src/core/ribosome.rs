@@ -211,7 +211,7 @@ impl HostContext {
 
     /// Get the network, panics if none was provided
     pub fn network(&self) -> Arc<dyn HolochainP2pDnaT> {
-        let network = match self {
+        match self {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
             | Self::PostCommit(PostCommitHostAccess { network, .. }) => Arc::new(network.clone()),
@@ -219,8 +219,7 @@ impl HostContext {
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),
-        };
-        network
+        }
     }
 
     /// Get the signal broadcaster, panics if none was provided
