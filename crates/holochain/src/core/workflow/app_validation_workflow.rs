@@ -665,7 +665,7 @@ async fn run_validation_callback(
     invocation: ValidateInvocation,
     ribosome: &impl RibosomeT,
     workspace_read: HostFnWorkspaceRead,
-    network: GenericNetwork,
+    network: GenericNetwork,,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> AppValidationResult<Outcome> {
     let validate_result = ribosome.run_validate(

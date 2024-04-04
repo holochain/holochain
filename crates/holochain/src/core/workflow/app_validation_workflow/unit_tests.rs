@@ -37,7 +37,6 @@ use holochain_zome_types::{
 use matches::assert_matches;
 use parking_lot::{Mutex, RwLock};
 use std::{
-    collections::HashSet,
     sync::{
         atomic::{AtomicI8, Ordering},
         Arc,
@@ -607,6 +606,11 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     assert_eq!(fetched_dependencies.lock().missing_hashes.len(), 0);
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn hashes_missing_for_op_is_updated_with_unresolved_deps() {}
+
+// test case with alice and bob, a create by alice and a delete by bob that
+// references alice's create
 struct TestCase {
     dna_file: DnaFile,
     zomes_to_invoke: ZomesToInvoke,

@@ -102,7 +102,7 @@ pub fn render_bootstrap_widget<B: Backend>(
     if refresh {
         *SELECTED.write().unwrap() = 0;
 
-        match block_on(
+        let query_random_result = block_on(
             async {
                 let network_type = { *NETWORK_TYPE.read().unwrap() };
                 random(
@@ -117,7 +117,8 @@ pub fn render_bootstrap_widget<B: Backend>(
                 .await
             },
             std::time::Duration::from_secs(10),
-        ) {
+        );
+        match query_random_result {
             Ok(Ok(agents)) => {
                 *AGENTS.write().unwrap() = agents;
             }
