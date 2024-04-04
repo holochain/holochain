@@ -483,20 +483,30 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete {
-                original_action, ..
+                delete,
+                original_action,
+                ..
             }) = op
             {
+                // chain filter with delete as chain top and create as chain bottom
+                let mut filter_hashes = HashSet::new();
+                filter_hashes.insert(original_action.to_hash().clone());
+                let chain_filter = ChainFilter {
+                    chain_top: delete.as_hash().clone(),
+                    filters: ChainFilters::Until(filter_hashes),
+                    include_cached_entries: false,
+                };
                 let result = api.must_get_agent_activity(MustGetAgentActivityInput {
-                    author: original_action.author().clone(),
-                    chain_filter: ChainFilter::new(original_action.clone().to_hash()),
+                    author: delete.hashed.author.clone(),
+                    chain_filter: chain_filter.clone(),
                 });
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
                         UnresolvedDependencies::AgentActivity(
-                            original_action.author().clone(),
-                            ChainFilter::new(original_action.clone().to_hash()),
+                            delete.hashed.author.clone(),
+                            chain_filter.clone(),
                         ),
                     ))
                 }
@@ -510,7 +520,6 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
         zomes_to_invoke,
         ribosome,
         alice,
-        bob,
         workspace,
         ..
     } = TestCase::new(zomes).await;
@@ -518,22 +527,29 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     // a create by alice
     let mut create = fixt!(Create);
     create.author = alice.clone();
+    create.action_seq = 0;
     let create_action = Action::Create(create.clone());
     let create_action_signed_hashed =
-        SignedHashed::new_unchecked(create_action.clone(), fixt!(Signature));
-    // a delete by bob that references alice's create
+        SignedActionHashed::new_unchecked(create_action.clone(), fixt!(Signature));
+    // a delete by alice that references the create
     let mut delete = fixt!(Delete);
-    delete.author = bob.clone();
+    delete.author = alice.clone();
+    delete.action_seq = 1;
+    // prev_action must be set, otherwise it will be filtered from the chain
+    // that must_get_agent_activity returns
+    delete.prev_action = create_action.clone().to_hash();
     delete.deletes_address = create_action.clone().to_hash();
-    let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
+    let delete_action = Action::Delete(delete.clone());
+    let delete_action_signed_hashed =
+        SignedActionHashed::new_unchecked(delete_action.clone(), fixt!(Signature));
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
-        delete: delete_action_signed_hashed.clone(),
+        delete: SignedHashed::new_unchecked(delete.clone(), fixt!(Signature)),
         original_action: EntryCreationAction::Create(create.clone()),
         original_entry: None,
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
-    let action_to_be_fetched = create_action_signed_hashed;
+    let expected_chain_top = delete_action_signed_hashed.clone();
     let times_same_hash_is_fetched = Arc::new(AtomicI8::new(0));
 
     // mock network with alice not being an authority of bob's action
@@ -542,16 +558,21 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     // return single action as requested chain
     network.expect_must_get_agent_activity().returning({
         let times_same_hash_is_fetched = times_same_hash_is_fetched.clone();
+        let expected_chain_top = expected_chain_top.clone();
         move |author, filter| {
             assert_eq!(author, alice);
-            assert_eq!(&filter.chain_top, action_to_be_fetched.as_hash());
+            assert_eq!(&filter.chain_top, expected_chain_top.as_hash());
 
             times_same_hash_is_fetched
                 .clone()
                 .fetch_add(1, Ordering::Relaxed);
             Ok(vec![MustGetAgentActivityResponse::Activity(vec![
                 RegisterAgentActivity {
-                    action: action_to_be_fetched.clone(),
+                    action: create_action_signed_hashed.clone(),
+                    cached_entry: None,
+                },
+                RegisterAgentActivity {
+                    action: delete_action_signed_hashed.clone(),
                     cached_entry: None,
                 },
             ])])
