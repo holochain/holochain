@@ -157,7 +157,7 @@ impl AgentStore {
                 .map(|&u| u.clone())
                 .collect();
             if !removed_urls.is_empty() {
-                tracing::info!(?agent_info.agent, "Agent URLs changed, no longer advertising at: {:?}", removed_urls);
+                tracing::info!(?agent_info, "Agent URLs changed, no longer advertising at: {:?}", removed_urls);
             }
 
             removed_urls

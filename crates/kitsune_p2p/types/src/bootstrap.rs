@@ -40,7 +40,7 @@ impl Default for RandomLimit {
 }
 
 /// The result of storing a new agent info with Kitsune's host.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct AgentInfoPut {
     /// URLs that were in the previous agent info for the agent but are no longer present.
     pub removed_urls: HashSet<TxUrl>,

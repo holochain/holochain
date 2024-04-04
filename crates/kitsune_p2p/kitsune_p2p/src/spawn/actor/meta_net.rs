@@ -1115,6 +1115,7 @@ impl MetaNet {
                             Err(err) => {
                                 tracing::error!(?err, "decoding error");
                                 // TODO - drop connection??
+                                // todo yes
                                 continue;
                             }
                         }
