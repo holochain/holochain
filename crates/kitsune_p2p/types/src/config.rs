@@ -594,7 +594,7 @@ pub enum NetworkType {
 
 #[cfg(feature = "tx2")]
 #[derive(Clone)]
-/// A simple wrapper around the [`AdaptorFactory`](tx2::tx2_adapter::AdapterFactory)
+/// A simple wrapper around the [`AdapterFactory`]
 /// to allow implementing Debug and PartialEq.
 pub struct AdapterFactoryMock(pub AdapterFactory);
 
