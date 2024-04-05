@@ -298,7 +298,8 @@ impl SourceChain {
         // Write the entries, actions and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
-        match self
+
+        let chain_flush_result = self
             .vault
             .write_async(move |txn: &mut Transaction| {
                 let now = Timestamp::now();
@@ -360,8 +361,9 @@ impl SourceChain {
                 }
                 SourceChainResult::Ok(actions)
             })
-            .await
-        {
+            .await;
+
+        match chain_flush_result {
             Err(SourceChainError::HeadMoved(actions, entries, old_head, Some(new_head_info))) => {
                 let is_relaxed =
                     self.scratch

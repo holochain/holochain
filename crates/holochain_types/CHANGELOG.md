@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - `AppRoleAssignment::base_cell_id` has become `AppRoleAssignment::base_dna_hash`, because the agent key will always be the same for every cell in the app, so it's redundant to include a CellId which contains the same agent key as the app.
 
+## 0.3.0-beta-dev.39
+
 ## 0.3.0-beta-dev.38
 
 - Added `AllowedOrigins` which is intended to be used with `holochain_websocket` for controlling access. It is placed here for crates need to know about origins but don’t depend on `holochain_websocket`. [\#3460](https://github.com/holochain/holochain/pull/3460)

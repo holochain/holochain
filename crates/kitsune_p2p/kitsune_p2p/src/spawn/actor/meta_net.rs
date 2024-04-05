@@ -6,7 +6,6 @@
 #![allow(unused_imports)]
 #![allow(unreachable_patterns)]
 #![allow(clippy::needless_return)]
-#![allow(clippy::blocks_in_if_conditions)]
 //! Networking abstraction to handle feature flipping.
 
 use crate::wire::WireData;
@@ -805,7 +804,7 @@ impl MetaNet {
                         respond,
                     }) => {
                         let timeout = tuning_params.implicit_timeout();
-                        if evt_send
+                        let send_result = evt_send
                             .send(MetaNetEvt::Request {
                                 remote_url: url.to_string(),
                                 con: MetaNetCon::Tx2(con, host.clone()),
@@ -817,9 +816,8 @@ impl MetaNet {
                                     out
                                 }),
                             })
-                            .await
-                            .is_err()
-                        {
+                            .await;
+                        if send_result.is_err() {
                             break;
                         }
                     }
@@ -919,24 +917,16 @@ impl MetaNet {
                                 )));
                             }
                             Box::pin(async move {
-                                // @todo This loop only exists because we have
-                                // to put a space on PutAgentInfoSignedEvt, if
-                                // the internal peer space was used instead we
-                                // could do this in a single event with the
-                                // whole list.
-                                for peer in peer_list {
-                                    if let Err(err) = e_s
-                                        .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                            space: peer.space.clone(),
-                                            peer_data: vec![peer.clone()],
-                                        })
-                                        .await
-                                    {
-                                        tracing::warn!(
-                                            ?err,
-                                            "error processing incoming agent info unsolicited"
-                                        );
-                                    }
+                                if let Err(err) = e_s
+                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                        peer_data: peer_list,
+                                    })
+                                    .await
+                                {
+                                    tracing::warn!(
+                                        ?err,
+                                        "error processing incoming agent info unsolicited"
+                                    );
                                 }
                                 Ok(())
                             })
