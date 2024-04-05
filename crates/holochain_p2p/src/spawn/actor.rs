@@ -664,7 +664,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             )
             .await
             .into_iter()
-            .collect::<HolochainP2pResult<Vec<AgentInfoPut>>>()?
+            .collect::<HolochainP2pResult<Vec<Vec<AgentInfoPut>>>>()?
             .into_iter()
             .flatten()
             .collect())
