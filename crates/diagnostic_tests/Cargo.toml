@@ -11,7 +11,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 chashmap = "2.2"
-colored = "2"
+colored = "2.1"
 futures = "0.3"
 kitsune_p2p = { version = "^0.3.0-beta-dev.32", path = "../kitsune_p2p/kitsune_p2p" }
 holochain_diagnostics = { path = "../holochain_diagnostics" }

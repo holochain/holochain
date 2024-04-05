@@ -22,6 +22,7 @@ serde = "1.0"
 thiserror = "1.0"
 tokio = "1"
 
+holochain_util = { version = "^0.3.0-beta-dev.6", path = "../holochain_util", features = ["time"] }
 holochain_keystore = { version = "^0.3.0-beta-dev.32", path = "../holochain_keystore" }
 holochain_types = { version = "^0.3.0-beta-dev.38", path = "../holochain_types" }
 

@@ -3166,6 +3166,7 @@ dependencies = [
  "hdk",
  "holochain_keystore",
  "holochain_types",
+ "holochain_util",
  "mockall",
  "must_future",
  "nanoid 0.4.0",
@@ -3554,6 +3555,7 @@ version = "0.3.0-beta-dev.6"
 dependencies = [
  "backtrace",
  "cfg-if 0.1.10",
+ "colored",
  "derive_more",
  "dunce",
  "futures",
