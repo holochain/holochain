@@ -662,20 +662,19 @@ macro_rules! do_callback {
         loop {
             let (zome_name, callback_result): (ZomeName, $callback_result) =
                 match call_iterator.next() {
-                    Ok(Some((zome, extern_io))) => dbg!((
+                    Ok(Some((zome, extern_io))) => (
                         zome.into(),
                         extern_io
                             .decode()
                             .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
-                    )),
-                    Err((zome, RibosomeError::WasmRuntimeError(runtime_error))) => dbg!((
+                    ),
+                    Err((zome, RibosomeError::WasmRuntimeError(runtime_error))) => (
                         zome.into(),
                         <$callback_result>::try_from_wasm_error(runtime_error.downcast()?)
                             .map_err(|e| -> RuntimeError { e.into() })?,
-                    )),
-                    Err((_zome, other_error)) => return dbg!(Err(other_error)),
+                    ),
+                    Err((_zome, other_error)) => return Err(other_error),
                     Ok(None) => {
-                        dbg!();
                         break;
                     }
                 };
