@@ -1,5 +1,4 @@
-/// Type that allows for mocking a network using
-/// [`MockHolochainP2pDnaT`]
+/// Type to mock a Holochain P2p network using [`MockHolochainP2pDnaT`].
 pub type GenericNetwork = Arc<dyn HolochainP2pDnaT>;
 
 /// Error type for Holochain P2p.
