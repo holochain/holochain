@@ -46,7 +46,7 @@ use holochain_zome_types::prelude::*;
 pub struct GetLinksInputBuilder(GetLinksInput);
 
 impl GetLinksInputBuilder {
-    /// Create a new `GetLinksInputBuilder` from the required fields for a `GetLinksInput`
+    /// Create a new `GetLinksInputBuilder` from the required fields for a `GetLinksInput`.
     pub fn try_new(
         base_address: impl Into<AnyLinkableHash>,
         link_type: impl LinkTypeFilterExt,
@@ -92,7 +92,7 @@ impl GetLinksInputBuilder {
         self
     }
 
-    /// Construct the result of the builder
+    /// Construct the result of the builder.
     pub fn build(self) -> GetLinksInput {
         self.0
     }
