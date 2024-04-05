@@ -88,7 +88,6 @@ pub struct AgentInfoInner {
     /// Raw bytes of agent info signature as kitsune signature.
     pub signature: Arc<KitsuneSignature>,
 
-    // TODO Try using this for a bypass of the signature check
     /// the raw encoded bytes sent to bootstrap server to use for sig verify.
     pub encoded_bytes: Box<[u8]>,
 }
