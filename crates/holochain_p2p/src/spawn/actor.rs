@@ -24,6 +24,7 @@ use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
+use std::iter;
 
 macro_rules! timing_trace {
     ($code:block $($rest:tt)*) => {{
@@ -640,22 +641,22 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
         let kitsune_p2p::event::PutAgentInfoSignedEvt { peer_data } = input;
 
+        let put_requests = peer_data
+            .into_iter()
+            .map(|agent| (DnaHash::from_kitsune(&agent.space), agent))
+            .fold(
+                HashMap::<DnaHash, Vec<AgentInfoSigned>>::new(),
+                |mut acc, (dna, agent)| {
+                    acc.entry(dna).or_default().push(agent);
+                    acc
+                },
+            );
+
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
-            let put_requests = peer_data
-                .into_iter()
-                .map(|agent| (DnaHash::from_kitsune(&agent.space), agent))
-                .fold(
-                    HashMap::<DnaHash, Vec<AgentInfoSigned>>::new(),
-                    |mut acc, (dna, agent)| {
-                        acc.entry(dna).or_default().push(agent);
-                        acc
-                    },
-                );
-
-            for (dna, agents) in put_requests {
-                evt_sender.put_agent_info_signed(dna, agents).await?;
-            }
+            futures::future::join_all(iter::repeat_with(|| evt_sender.clone()).zip(put_requests.into_iter()).map(|(evt_sender, (dna, agents))| async move {
+                evt_sender.put_agent_info_signed(dna, agents).await
+            })).await.into_iter().collect::<HolochainP2pResult<Vec<()>>>()?;
 
             Ok(())
         }
