@@ -6,12 +6,12 @@ use holochain_util::hex::many_bytes_string;
 use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSpace};
 use kitsune_p2p_dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rusqlite::*;
 use std::collections::{hash_map, HashMap, HashSet};
 use std::sync::Arc;
-use kitsune_p2p_types::bootstrap::AgentInfoPut;
 
 #[cfg(test)]
 mod p2p_test;
@@ -157,7 +157,11 @@ impl AgentStore {
                 .map(|&u| u.clone())
                 .collect();
             if !removed_urls.is_empty() {
-                tracing::info!(?agent_info, "Agent URLs changed, no longer advertising at: {:?}", removed_urls);
+                tracing::info!(
+                    ?agent_info,
+                    "Agent URLs changed, no longer advertising at: {:?}",
+                    removed_urls
+                );
             }
 
             removed_urls
@@ -167,9 +171,7 @@ impl AgentStore {
 
         lock.insert(agent_info.agent.clone(), agent_info);
 
-        Ok(AgentInfoPut {
-            removed_urls,
-        })
+        Ok(AgentInfoPut { removed_urls })
     }
 
     fn remove(&self, agent: &KitsuneAgent) -> DatabaseResult<()> {

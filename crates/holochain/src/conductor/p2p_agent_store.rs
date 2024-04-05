@@ -13,9 +13,9 @@ use holochain_p2p::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_state::query::StateQueryError;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use std::sync::Arc;
 use thiserror::Error;
-use kitsune_p2p_types::bootstrap::AgentInfoPut;
 
 use super::error::ConductorResult;
 

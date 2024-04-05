@@ -22,9 +22,9 @@ use holochain_trace::tracing::warn;
 use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use std::collections::HashSet;
 use std::future::Future;
-use kitsune_p2p_types::bootstrap::AgentInfoPut;
 
 macro_rules! timing_trace {
     ($code:block $($rest:tt)*) => {{

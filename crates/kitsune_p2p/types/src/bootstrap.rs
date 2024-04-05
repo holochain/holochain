@@ -1,8 +1,8 @@
 //! Types for the bootstrap server
-use std::collections::HashSet;
 use crate::bin_types::{KitsuneBinType, KitsuneSpace};
-use std::sync::Arc;
 use crate::tx2::tx2_utils::TxUrl;
+use std::collections::HashSet;
+use std::sync::Arc;
 
 /// The number of random agent infos we want to collect from the bootstrap service when we want to
 /// populate an empty local space.
