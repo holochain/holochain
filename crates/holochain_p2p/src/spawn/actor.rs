@@ -654,9 +654,16 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
 
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
-            futures::future::join_all(iter::repeat_with(|| evt_sender.clone()).zip(put_requests.into_iter()).map(|(evt_sender, (dna, agents))| async move {
-                evt_sender.put_agent_info_signed(dna, agents).await
-            })).await.into_iter().collect::<HolochainP2pResult<Vec<()>>>()?;
+            futures::future::join_all(
+                iter::repeat_with(|| evt_sender.clone())
+                    .zip(put_requests.into_iter())
+                    .map(|(evt_sender, (dna, agents))| async move {
+                        evt_sender.put_agent_info_signed(dna, agents).await
+                    }),
+            )
+            .await
+            .into_iter()
+            .collect::<HolochainP2pResult<Vec<()>>>()?;
 
             Ok(())
         }
