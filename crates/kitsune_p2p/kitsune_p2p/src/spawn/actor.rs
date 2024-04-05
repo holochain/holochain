@@ -127,6 +127,7 @@ pub(crate) struct KitsuneP2pActor {
 }
 
 impl KitsuneP2pActor {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         config: KitsuneP2pConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
