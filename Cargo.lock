@@ -3554,6 +3554,7 @@ dependencies = [
  "sodoken",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

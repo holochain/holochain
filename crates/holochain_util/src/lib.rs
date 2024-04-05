@@ -13,3 +13,5 @@ pub mod pw;
 pub mod time;
 
 pub mod hex;
+
+pub use ::colored;

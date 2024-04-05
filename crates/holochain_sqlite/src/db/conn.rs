@@ -75,7 +75,9 @@ impl<'e> PConn {
         timed!(
             [10, 100, 1000],
             "execute_in_exclusive_rw_txn:commit",
-            txn.commit().map_err(DatabaseError::from)
-        )
+            txn.commit().map_err(DatabaseError::from)?
+        );
+
+        Ok(result)
     }
 }

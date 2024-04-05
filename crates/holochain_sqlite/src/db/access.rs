@@ -7,7 +7,7 @@ use crate::db::pool::{
 };
 use crate::error::{DatabaseError, DatabaseResult};
 use derive_more::Into;
-use holochain_util::time::log_elapsed;
+use holochain_util::log_elapsed;
 use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
