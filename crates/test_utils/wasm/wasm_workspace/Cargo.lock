@@ -1121,6 +1121,7 @@ dependencies = [
  "getrandom",
  "num_cpus",
  "once_cell",
+ "tracing",
 ]
 
 [[package]]

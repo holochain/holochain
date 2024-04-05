@@ -7,6 +7,7 @@ use crate::db::pool::{
 };
 use crate::error::{DatabaseError, DatabaseResult};
 use derive_more::Into;
+use holochain_util::time::log_elapsed;
 use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
@@ -16,6 +17,7 @@ use std::time::Instant;
 use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tracing::{Instrument, Span};
 
 use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric, UseTimeMetric};
 
@@ -126,13 +128,20 @@ impl<Kind: DbKindT> DbRead<Kind> {
             .checkout_connection(self.read_semaphore.clone())
             .await?;
 
+        let start = tokio::time::Instant::now();
+
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
-                conn.execute_in_read_txn(f)
-            })).await.map_err(|e| {
+                tracing::trace!("start spawn_blocking");
+                log_elapsed([10, 100, 1000], start, "read_async:spawn_blocking:before-closure");
+                let r = conn.execute_in_read_txn(f);
+                log_elapsed([10, 100, 1000], start, "read_async:spawn_blocking:after-closure");
+                tracing::trace!("end spawn_blocking");
+                r
+            })).instrument(Span::current()).await.map_err(|e| {
                 tracing::error!("Failed to claim a thread to run the database read transaction. It's likely that the program is out of threads.");
-                DatabaseError::from(e)
+                DatabaseError::Timeout(e)
             })?.map_err(DatabaseError::from)?
     }
 
@@ -151,6 +160,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
 
     #[tracing::instrument(skip(self))]
     async fn checkout_connection(&self, semaphore: Arc<Semaphore>) -> DatabaseResult<PConnGuard> {
+        // TODO: use semaphore for this message
         let waiting = self.num_readers.fetch_add(1, Ordering::Relaxed);
         if waiting > self.max_readers {
             let s = tracing::info_span!("holochain_perf", kind = ?self.kind().kind());
@@ -160,9 +170,11 @@ impl<Kind: DbKindT> DbRead<Kind> {
                     waiting as f64 / self.max_readers as f64 * 100.0
                 )
             });
+        } else {
+            tracing::trace!("checkout_connection ready to acquire semaphore");
         }
 
-        let permit = Self::acquire_reader_permit(semaphore).await?;
+        let permit = acquire_semaphore_permit(semaphore).await?;
 
         self.num_readers.fetch_sub(1, Ordering::Relaxed);
 
@@ -176,6 +188,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
 
     /// Get a connection from the pool.
     /// TODO: We should eventually swap this for an async solution.
+    #[tracing::instrument(skip_all)]
     fn get_connection_from_pool(&self) -> DatabaseResult<PConn> {
         let now = Instant::now();
         let r = Ok(PConn::new(self.connection_pool.get()?));
@@ -183,30 +196,10 @@ impl<Kind: DbKindT> DbRead<Kind> {
         if el.as_millis() > 20 {
             // TODO Convert to a metric
             tracing::info!("Connection pool took {:?} to be freed", el);
+        } else {
+            tracing::trace!("Got connection");
         }
         r
-    }
-
-    #[tracing::instrument]
-    async fn acquire_reader_permit(
-        semaphore: Arc<Semaphore>,
-    ) -> DatabaseResult<OwnedSemaphorePermit> {
-        let id = nanoid::nanoid!(7);
-        tracing::trace!(?id, "acquire semaphore permit");
-        let permit = tokio::time::timeout(
-            std::time::Duration::from_millis(ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)),
-            semaphore.acquire_owned(),
-        )
-        .await;
-        tracing::trace!(?id, ?permit, "semaphore permit obtained");
-        match permit {
-            Ok(Ok(s)) => Ok(s),
-            Ok(Err(e)) => {
-                tracing::error!("Semaphore should not be closed but got an error while acquiring a permit, {:?}", e);
-                Err(DatabaseError::Other(e.into()))
-            }
-            Err(e) => Err(DatabaseError::Timeout(e)),
-        }
     }
 
     #[cfg(all(any(test, feature = "test_utils"), not(loom)))]
@@ -345,28 +338,31 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Ok(DbWrite(db_read))
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn write_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
         F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
-        let _g = tokio::time::timeout(
-            std::time::Duration::from_secs(10),
-            self.acquire_writer_permit(),
-        )
-        .await
-        .map_err(DatabaseError::from)?;
+        let _permit = acquire_semaphore_permit(self.0.write_semaphore.clone()).await?;
 
         let mut conn = self.get_connection_from_pool()?;
+
+        let start = tokio::time::Instant::now();
 
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
-            conn.execute_in_exclusive_rw_txn(f)
-        })).await.map_err(|e| {
+            tracing::trace!("start spawn_blocking");
+            log_elapsed([10, 100, 1000], start, "write_async:spawn_blocking:before-closure");
+            let r = conn.execute_in_exclusive_rw_txn(f);
+            log_elapsed([10, 100, 1000], start, "write_async:spawn_blocking:after-closure");
+            tracing::trace!("end spawn_blocking");
+            r
+        })).instrument(Span::current()).await.map_err(|e| {
             tracing::error!("Failed to claim a thread to run the database write transaction. It's likely that the program is out of threads.");
-            DatabaseError::from(e)
+            DatabaseError::Timeout(e)
         })?.map_err(DatabaseError::from)?
     }
 
@@ -376,15 +372,6 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
 
     pub fn available_reader_count(&self) -> usize {
         self.read_semaphore.available_permits()
-    }
-
-    async fn acquire_writer_permit(&self) -> OwnedSemaphorePermit {
-        self.0
-            .write_semaphore
-            .clone()
-            .acquire_owned()
-            .await
-            .expect("We don't ever close these semaphores")
     }
 
     fn get_write_semaphore(kind: DbKind) -> Arc<Semaphore> {
@@ -514,4 +501,29 @@ pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
 #[cfg(feature = "test_utils")]
 pub fn set_acquire_timeout(timeout_ms: u64) {
     ACQUIRE_TIMEOUT_MS.store(timeout_ms, Ordering::Relaxed);
+}
+
+#[tracing::instrument]
+async fn acquire_semaphore_permit(
+    semaphore: Arc<Semaphore>,
+) -> DatabaseResult<OwnedSemaphorePermit> {
+    let id = nanoid::nanoid!(7);
+    tracing::trace!(?id, "???     acquire semaphore permit");
+    let permit = tokio::time::timeout(
+        std::time::Duration::from_millis(ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)),
+        semaphore.acquire_owned(),
+    )
+    .await;
+    tracing::trace!(?id, ?permit, "    !!! semaphore permit obtained");
+    match permit {
+        Ok(Ok(s)) => Ok(s),
+        Ok(Err(e)) => {
+            tracing::error!(
+                "Semaphore should not be closed but got an error while acquiring a permit, {:?}",
+                e
+            );
+            Err(DatabaseError::Other(e.into()))
+        }
+        Err(e) => Err(DatabaseError::Timeout(e)),
+    }
 }

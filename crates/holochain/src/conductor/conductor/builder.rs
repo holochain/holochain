@@ -70,6 +70,7 @@ impl ConductorBuilder {
     }
 
     /// Initialize a "production" Conductor
+    #[tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope))]
     pub async fn build(self) -> ConductorResult<ConductorHandle> {
         tracing::debug!(?self.config);
 
@@ -420,6 +421,7 @@ impl ConductorBuilder {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
+    #[tracing::instrument(skip_all)]
     pub(crate) async fn update_fake_state(
         state: Option<ConductorState>,
         conductor: Conductor,
@@ -432,6 +434,7 @@ impl ConductorBuilder {
 
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
+    #[tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope))]
     pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
         let keystore = self
             .keystore
@@ -504,8 +507,8 @@ impl ConductorBuilder {
                 holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host, network_compat)
                     .await?;
 
-                    dbg!();
-                    let (post_commit_sender, post_commit_receiver) =
+        dbg!();
+        let (post_commit_sender, post_commit_receiver) =
             tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
         let (outcome_tx, outcome_rx) = futures::channel::mpsc::channel(8);

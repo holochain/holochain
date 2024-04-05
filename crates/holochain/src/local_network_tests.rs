@@ -9,18 +9,42 @@ use test_case::test_case;
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn conductors_call_remote(num_conductors: usize) {
-    holochain_trace::test_run().ok();
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::Layer;
+
+    tracing_subscriber::Registry::default()
+        .with(
+            tracing_subscriber::fmt::Layer::default()
+                .with_test_writer()
+                .with_writer(std::io::stderr)
+                .with_file(true)
+                .with_line_number(true)
+                .with_target(true)
+                .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
+                .with_filter(holochain_trace::standard_filter().unwrap()),
+        )
+        .init();
+
+    // holochain_trace::test_run().ok();
+
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
     let config = SweetConductorConfig::standard();
+    // let config = SweetConductorConfig::standard().no_dpki();
+
     let mut conductors = SweetConductorBatch::from_config_rendezvous(num_conductors, config).await;
+    dbg!();
 
     let apps = conductors.setup_app("app", [&dna]).await.unwrap();
+    dbg!();
     let cells: Vec<_> = apps
         .into_inner()
         .into_iter()
         .map(|c| c.into_cells().into_iter().next().unwrap())
         .collect();
 
+    dbg!();
     conductors.exchange_peer_info().await;
     dbg!();
 

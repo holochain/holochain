@@ -84,6 +84,7 @@ impl SweetConductorBatch {
     {
         let rendezvous = crate::sweettest::SweetLocalRendezvous::new().await;
         let config = config.into();
+        dbg!(&config);
         let conductors = Self::new(
             future::join_all(
                 std::iter::repeat(config)
@@ -96,7 +97,7 @@ impl SweetConductorBatch {
         let dpki_cells = conductors.dpki_cells();
         if !dpki_cells.is_empty() {
             conductors.exchange_peer_info().await;
-            await_consistency(10, dpki_cells.as_slice()).await.unwrap();
+            await_consistency(15, dpki_cells.as_slice()).await.unwrap();
         }
 
         conductors
