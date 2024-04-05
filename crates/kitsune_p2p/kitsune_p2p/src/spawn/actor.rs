@@ -981,7 +981,6 @@ mod tests {
     use kitsune_p2p_bootstrap_client::BootstrapNet;
     use kitsune_p2p_types::config::{KitsuneP2pConfig, NetworkType, TransportConfig};
     use kitsune_p2p_types::tls::TlsConfig;
-    use kitsune_p2p_types::tx2::tx2_api::Tx2ApiMetrics;
     use std::net::SocketAddr;
     use url2::url2;
 

@@ -221,10 +221,7 @@ impl SpaceInternalHandler for Space {
                 peer_data.push(update_single_agent_info(input).await?);
             }
             internal_sender
-                .publish_agent_info_signed(PutAgentInfoSignedEvt {
-                    space: space.clone(),
-                    peer_data,
-                })
+                .publish_agent_info_signed(PutAgentInfoSignedEvt { peer_data })
                 .await?;
             Ok(())
         }
@@ -266,10 +263,7 @@ impl SpaceInternalHandler for Space {
             };
             let peer_data = vec![update_single_agent_info(input).await?];
             internal_sender
-                .publish_agent_info_signed(PutAgentInfoSignedEvt {
-                    space: space.clone(),
-                    peer_data,
-                })
+                .publish_agent_info_signed(PutAgentInfoSignedEvt { peer_data })
                 .await?;
             Ok(())
         }
@@ -388,7 +382,6 @@ impl SpaceInternalHandler for Space {
                         .host_api
                         .legacy
                         .put_agent_info_signed(PutAgentInfoSignedEvt {
-                            space: self.space.clone(),
                             peer_data: vec![agent_info.clone()],
                         });
                     local_agent_info_events.push(async move {
@@ -727,7 +720,7 @@ async fn update_single_agent_info(
     // Write to the local peer store. The agent info will also be stored via a local broadcast,
     // except in the case of a zero arc where it gets filtered out, so we store it here too
     // to be sure it makes it into the local store.
-    put_local_agent_info(evt_sender.clone(), space.clone(), agent_info_signed.clone()).await?;
+    put_local_agent_info(evt_sender.clone(), agent_info_signed.clone()).await?;
 
     // Push to the network as well
     match network_type {
@@ -840,7 +833,6 @@ impl KitsuneP2pHandler for Space {
                                         // Add to local storage
                                         if let Err(e) = evt_sender
                                             .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                                space: space.clone(),
                                                 peer_data: vec![remote_agent_info_signed],
                                             })
                                             .await
@@ -994,11 +986,8 @@ impl KitsuneP2pHandler for Space {
                     .values()
                     .any(|arc| arc.contains(basis.get_loc()))
                 {
-                    let fut = put_local_agent_info(
-                        self.host_api.legacy.clone(),
-                        self.space.clone(),
-                        agent_info.clone(),
-                    );
+                    let fut =
+                        put_local_agent_info(self.host_api.legacy.clone(), agent_info.clone());
                     local_agent_info_events.push(async move {
                         if let Err(err) = fut.await {
                             tracing::warn!(?err, "failed local broadcast");
@@ -1601,12 +1590,10 @@ impl Space {
 /// semantically see the situations where local info is being added.
 async fn put_local_agent_info(
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    space: KSpace,
     agent_info: AgentInfoSigned,
 ) -> KitsuneP2pResult<()> {
     evt_sender
         .put_agent_info_signed(PutAgentInfoSignedEvt {
-            space,
             peer_data: vec![agent_info],
         })
         .await?;
