@@ -264,7 +264,7 @@ async fn mock_dpki_invalid_key_state() {
         let a1 = s1.keys().next().unwrap().clone();
 
         // Alice thinks Bob's DPKI key is invalid
-        s0.insert(a1, KeyState::Invalidated(fixt!(SignedActionHashed)));
+        s0.insert(a1, KeyState::Invalid(None));
         // But Bob thinks Alice is valid
         s1.insert(a0, KeyState::Valid(fixt!(SignedActionHashed)));
     }

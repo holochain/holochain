@@ -266,7 +266,7 @@ impl Spaces {
             // state yet, but more atomic, so worth it.
             None => self.update_state(Ok).await,
         };
-        log_elapsed([10, 100, 1000], start, "get_state");
+        log_elapsed([1, 10, 1000], start, "get_state");
         res
     }
 
@@ -308,7 +308,7 @@ impl Spaces {
             })
             .await?;
 
-        log_elapsed([10, 100, 1000], start, "update_state_prime");
+        log_elapsed([1, 10, 1000], start, "update_state_prime");
         Ok(output)
     }
 

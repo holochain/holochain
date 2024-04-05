@@ -393,9 +393,7 @@ pub async fn check_dpki_agent_validity(
 
     match key_state {
         KeyState::Valid(_) => Ok(()),
-        KeyState::Invalidated(_) => {
-            Err(ValidationOutcome::DpkiAgentInvalid(author, timestamp).into())
-        }
+        KeyState::Invalid(_) => Err(ValidationOutcome::DpkiAgentInvalid(author, timestamp).into()),
         KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(author).into()),
     }
 }

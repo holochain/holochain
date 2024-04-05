@@ -6,7 +6,7 @@ use holochain_types::prelude::*;
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum KeyState {
     NotFound,
-    Invalidated(SignedActionHashed),
+    Invalid(Option<SignedActionHashed>),
     Valid(SignedActionHashed),
 }
 
