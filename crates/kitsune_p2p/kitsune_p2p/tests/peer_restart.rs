@@ -1,3 +1,5 @@
+mod common;
+
 use std::sync::Arc;
 
 use base64::Engine;
@@ -7,9 +9,6 @@ use common::*;
 use fixt::prelude::*;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::fixt::KitsuneSpaceFixturator;
-
-#[allow(dead_code)]
-mod common;
 
 // When Kitsune restarts, it will create a new connection to the signal server. That means a new
 // peer URL will be distributed with the agent info. The connection via the old peer URL should be

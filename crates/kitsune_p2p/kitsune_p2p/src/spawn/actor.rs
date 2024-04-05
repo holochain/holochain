@@ -515,7 +515,7 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
             for removed_url in puts.iter().flat_map(|r| r.removed_urls.clone()) {
                 tracing::debug!(?removed_url, "peer URL changed, closing connection");
                 if let Err(e) = ep_hnd.close_peer_con(removed_url.clone()) {
-                    tracing::error!(?e, ?removed_url, "error closing peer connection");
+                    tracing::info!(?e, ?removed_url, "could not close peer connection");
                 }
             }
 
@@ -999,7 +999,6 @@ mod tests {
     use kitsune_p2p_bootstrap_client::BootstrapNet;
     use kitsune_p2p_types::config::{KitsuneP2pConfig, NetworkType, TransportConfig};
     use kitsune_p2p_types::tls::TlsConfig;
-    use kitsune_p2p_types::tx2::tx2_api::Tx2ApiMetrics;
     use std::net::SocketAddr;
     use url2::url2;
 

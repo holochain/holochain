@@ -1046,7 +1046,9 @@ impl MetaNet {
                                     }
                                     Err(err) => {
                                         tracing::error!(?err, "decoding error");
-                                        // TODO - drop connection??
+                                        if let Err(e) = ep_hnd2.close(peer_url) {
+                                            tracing::info!(?e, "could not close peer connection");
+                                        }
                                     }
                                 }
                             }
@@ -1093,7 +1095,9 @@ impl MetaNet {
                                     }
                                     Err(err) => {
                                         tracing::error!(?err, "decoding error");
-                                        // TODO - drop connection??
+                                        if let Err(e) = ep_hnd2.close(peer_url) {
+                                            tracing::info!(?e, "could not close peer connection");
+                                        }
                                     }
                                 }
                             }
@@ -1114,8 +1118,9 @@ impl MetaNet {
                             }
                             Err(err) => {
                                 tracing::error!(?err, "decoding error");
-                                // TODO - drop connection??
-                                // todo yes
+                                if let Err(e) = ep_hnd2.close(peer_url) {
+                                    tracing::info!(?e, "could not close peer connection");
+                                }
                                 continue;
                             }
                         }

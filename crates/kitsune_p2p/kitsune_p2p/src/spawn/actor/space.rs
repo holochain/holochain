@@ -1465,7 +1465,6 @@ impl Space {
                 space.clone(),
                 config.bootstrap_service.clone(),
                 bootstrap_net,
-                ep_hnd.clone(),
                 config
                     .tuning_params
                     .bootstrap_check_delay_backoff_multiplier,
