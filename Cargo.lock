@@ -3551,6 +3551,7 @@ dependencies = [
  "rpassword 7.3.1",
  "sodoken",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

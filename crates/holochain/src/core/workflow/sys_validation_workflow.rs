@@ -986,6 +986,7 @@ impl SysValidationWorkspace {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn is_chain_empty(&self, author: &AgentPubKey) -> SourceChainResult<bool> {
         // If we have a query cache then this is an authority node and
         // we can quickly check if the chain is empty from the cache.
