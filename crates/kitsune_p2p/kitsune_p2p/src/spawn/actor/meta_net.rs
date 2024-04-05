@@ -1224,7 +1224,8 @@ impl MetaNet {
             // Even if tx5 is enabled, check that the peer_url is a ws or wss url to the signal server
             if peer_url.scheme() == "ws" || peer_url.scheme() == "wss" {
                 if let MetaNet::Tx5 { ep, .. } = self {
-                    let peer_url = PeerUrl::new(peer_url.to_string()).map_err(KitsuneError::other)?;
+                    let peer_url =
+                        PeerUrl::new(peer_url.to_string()).map_err(KitsuneError::other)?;
                     ep.close(peer_url).map_err(KitsuneError::other)?;
                 }
             }

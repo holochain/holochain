@@ -520,7 +520,9 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
             }
 
             Ok(puts)
-        }.boxed().into())
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_query_agents(
@@ -926,7 +928,7 @@ mockall::mock! {
         fn handle_put_agent_info_signed(
             &mut self,
             input: crate::event::PutAgentInfoSignedEvt,
-        ) -> KitsuneP2pEventHandlerResult<()>;
+        ) -> KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>>;
 
         fn handle_query_agents(
             &mut self,

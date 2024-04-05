@@ -1,5 +1,6 @@
 use crate::event::{KitsuneP2pEvent, KitsuneP2pEventSender, PutAgentInfoSignedEvt};
 use crate::spawn::actor::space::{SpaceInternal, SpaceInternalSender};
+use crate::spawn::meta_net::MetaNet;
 use crate::{KitsuneP2pError, KitsuneP2pResult, KitsuneSpace};
 use futures::channel::mpsc::Sender;
 use futures::future::BoxFuture;
@@ -12,7 +13,6 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 use std::time::Duration;
 use url2::Url2;
-use crate::spawn::meta_net::MetaNet;
 
 const MAX_AGENTS_PER_QUERY: u32 = 8;
 
@@ -150,12 +150,22 @@ impl BootstrapTask {
                                 space: space.clone(),
                                 peer_data,
                             })
-                            .await {
+                            .await
+                        {
                             Ok(responses) => {
-                                for removed_url in responses.into_iter().flat_map(|r| r.removed_urls) {
-                                    tracing::debug!(?removed_url, "peer URL changed, closing connection");
+                                for removed_url in
+                                    responses.into_iter().flat_map(|r| r.removed_urls)
+                                {
+                                    tracing::debug!(
+                                        ?removed_url,
+                                        "peer URL changed, closing connection"
+                                    );
                                     if let Err(e) = ep_hnd.close_peer_con(removed_url.clone()) {
-                                        tracing::error!(?e, ?removed_url, "error closing peer connection");
+                                        tracing::error!(
+                                            ?e,
+                                            ?removed_url,
+                                            "error closing peer connection"
+                                        );
                                     }
                                 }
                             }
@@ -163,7 +173,7 @@ impl BootstrapTask {
                                 tracing::error!(?err, "Bootstrap task cannot communicate with the host, shutting down");
                                 break;
                             }
-                            Err(err)  => {
+                            Err(err) => {
                                 tracing::error!(?err, "error storing bootstrap agent_info");
                             }
                         }
