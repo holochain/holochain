@@ -37,6 +37,7 @@ use holochain_zome_types::{
 use matches::assert_matches;
 use parking_lot::{Mutex, RwLock};
 use std::{
+    collections::HashSet,
     sync::{
         atomic::{AtomicI8, Ordering},
         Arc,
@@ -612,7 +613,6 @@ async fn hashes_missing_for_op_is_updated_with_unresolved_deps() {}
 // test case with alice and bob, a create by alice and a delete by bob that
 // references alice's create
 struct TestCase {
-    dna_file: DnaFile,
     zomes_to_invoke: ZomesToInvoke,
     test_space: TestSpace,
     ribosome: RealRibosome,
@@ -650,7 +650,6 @@ impl TestCase {
         .await
         .unwrap();
         Self {
-            dna_file,
             zomes_to_invoke,
             test_space,
             ribosome,

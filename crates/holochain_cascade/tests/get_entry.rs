@@ -260,12 +260,12 @@ async fn entry_authoring() {
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(false));
-    let mock = MockNetwork::new(mock);
+    let mock = Arc::new(mock);
 
     // Cascade
     let cascade = CascadeImpl::empty()
         .with_scratch(scratch.into_sync())
-        .with_network(Arc::new(mock), cache.to_db());
+        .with_network(mock, cache.to_db());
 
     assert_can_get(&td_entry, &td_record, &cascade, GetOptions::network()).await;
 }
@@ -288,12 +288,12 @@ async fn entry_authority() {
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(true));
-    let mock = MockNetwork::new(mock);
+    let mock = Arc::new(mock);
 
     // Cascade
     let cascade = CascadeImpl::empty()
         .with_authored(vault.to_db().into())
-        .with_network(Arc::new(mock), cache.to_db());
+        .with_network(mock, cache.to_db());
 
     assert_can_get(&td_entry, &td_record, &cascade, GetOptions::network()).await;
 }
@@ -316,12 +316,12 @@ async fn content_not_authority_or_authoring() {
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(false));
-    let mock = MockNetwork::new(mock);
+    let mock = Arc::new(mock);
 
     // Cascade
     let cascade = CascadeImpl::empty()
         .with_authored(vault.to_db().into())
-        .with_network(Arc::new(mock), cache.to_db());
+        .with_network(mock, cache.to_db());
 
     assert_can_get(&td_entry, &td_record, &cascade, GetOptions::local()).await;
 }
@@ -354,12 +354,12 @@ async fn content_authoring() {
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(false));
-    let mock = MockNetwork::new(mock);
+    let mock = Arc::new(mock);
 
     // Cascade
     let cascade = CascadeImpl::empty()
         .with_scratch(scratch.into_sync())
-        .with_network(Arc::new(mock), cache.to_db());
+        .with_network(mock, cache.to_db());
 
     assert_can_get(&td_entry, &td_record, &cascade, GetOptions::local()).await;
 }
@@ -380,12 +380,12 @@ async fn content_authority() {
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(true));
-    let mock = MockNetwork::new(mock);
+    let mock = Arc::new(mock);
 
     // Cascade
     let cascade = CascadeImpl::empty()
         .with_authored(vault.to_db().into())
-        .with_network(Arc::new(mock), cache.to_db());
+        .with_network(mock, cache.to_db());
 
     assert_is_none(&td_entry, &td_record, &cascade, GetOptions::local()).await;
 }
