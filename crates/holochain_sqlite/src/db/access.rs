@@ -136,9 +136,9 @@ impl<Kind: DbKindT> DbRead<Kind> {
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
                 let _s = span.enter();
                 tracing::trace!("start spawn_blocking");
-                log_elapsed([10, 100, 1000], start, "read_async:before-closure");
+                log_elapsed!([10, 100, 1000], start, "read_async:before-closure");
                 let r = conn.execute_in_read_txn(f);
-                log_elapsed([10, 100, 1000], start, "read_async:after-closure");
+                log_elapsed!([10, 100, 1000], start, "read_async:after-closure");
                 tracing::trace!("end spawn_blocking");
                 r
             })).in_current_span().await.map_err(|e| {
@@ -359,9 +359,9 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
             let _s = span.enter();
             tracing::trace!("start spawn_blocking");
-            log_elapsed([10, 100, 1000], start, "write_async:before-closure");
+            log_elapsed!([10, 100, 1000], start, "write_async:before-closure");
             let r = conn.execute_in_exclusive_rw_txn(f);
-            log_elapsed([10, 100, 1000], start, "write_async:after-closure");
+            log_elapsed!([10, 100, 1000], start, "write_async:after-closure");
             tracing::trace!("end spawn_blocking");
             r
         })).in_current_span().await.map_err(|e| {

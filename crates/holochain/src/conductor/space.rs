@@ -43,7 +43,6 @@ use holochain_state::{
     prelude::*,
     query::{map_sql_dht_op_common, StateQueryError},
 };
-use holochain_util::time::log_elapsed;
 use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use kitsune_p2p_block::NodeId;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
@@ -258,16 +257,15 @@ impl Spaces {
     /// Get the holochain conductor state
     #[tracing::instrument(skip_all)]
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
-        let start = tokio::time::Instant::now();
-        let res = match query_conductor_state(&self.conductor_db).await? {
-            Some(state) => Ok(state),
-            // update_state will again try to read the state. It's a little
-            // inefficient in the infrequent case where we haven't saved the
-            // state yet, but more atomic, so worth it.
-            None => self.update_state(Ok).await,
-        };
-        log_elapsed([10, 100, 1000], start, "get_state");
-        res
+        timed!([1, 10, 1000], "get_state", {
+            match query_conductor_state(&self.conductor_db).await? {
+                Some(state) => Ok(state),
+                // update_state will again try to read the state. It's a little
+                // inefficient in the infrequent case where we haven't saved the
+                // state yet, but more atomic, so worth it.
+                None => self.update_state(Ok).await,
+            }
+        })
     }
 
     /// Update the internal state with a pure function mapping old state to new
@@ -290,26 +288,25 @@ impl Spaces {
         O: Send + 'static,
     {
         let start = tokio::time::Instant::now();
-        let output = self
-            .conductor_db
-            .write_async(move |txn| {
-                let state = txn
-                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                        row.get("blob")
-                    })
-                    .optional()?;
-                let state = match state {
-                    Some(state) => from_blob(state)?,
-                    None => ConductorState::default(),
-                };
-                let (new_state, output) = f(state)?;
-                mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
-                Result::<_, ConductorError>::Ok((new_state, output))
-            })
-            .await?;
 
-        log_elapsed([10, 100, 1000], start, "update_state_prime");
-        Ok(output)
+        timed!([1, 10, 1000], "update_state_prime", {
+            self.conductor_db
+                .write_async(move |txn| {
+                    let state = txn
+                        .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                            row.get("blob")
+                        })
+                        .optional()?;
+                    let state = match state {
+                        Some(state) => from_blob(state)?,
+                        None => ConductorState::default(),
+                    };
+                    let (new_state, output) = f(state)?;
+                    mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
+                    Result::<_, ConductorError>::Ok((new_state, output))
+                })
+                .await
+        })
     }
 
     /// Get something from every space
