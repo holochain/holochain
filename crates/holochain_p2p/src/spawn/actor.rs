@@ -23,8 +23,9 @@ use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::AgentInfoPut;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
+use std::iter;
 
 macro_rules! timing_trace {
     ($code:block $($rest:tt)*) => {{
@@ -639,14 +640,37 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         &mut self,
         input: kitsune_p2p::event::PutAgentInfoSignedEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>> {
-        let kitsune_p2p::event::PutAgentInfoSignedEvt { space, peer_data } = input;
-        let space = DnaHash::from_kitsune(&space);
+        let kitsune_p2p::event::PutAgentInfoSignedEvt { peer_data } = input;
+
+        let put_requests = peer_data
+            .into_iter()
+            .map(|agent| (DnaHash::from_kitsune(&agent.space), agent))
+            .fold(
+                HashMap::<DnaHash, Vec<AgentInfoSigned>>::new(),
+                |mut acc, (dna, agent)| {
+                    acc.entry(dna).or_default().push(agent);
+                    acc
+                },
+            );
+
         let evt_sender = self.evt_sender.clone();
-        Ok(
-            async move { Ok(evt_sender.put_agent_info_signed(space, peer_data).await?) }
-                .boxed()
-                .into(),
-        )
+        Ok(async move {
+            Ok(futures::future::join_all(
+                iter::repeat_with(|| evt_sender.clone())
+                    .zip(put_requests.into_iter())
+                    .map(|(evt_sender, (dna, agents))| async move {
+                        evt_sender.put_agent_info_signed(dna, agents).await
+                    }),
+            )
+            .await
+            .into_iter()
+            .collect::<HolochainP2pResult<Vec<AgentInfoPut>>>()?
+            .into_iter()
+            .flatten()
+            .collect())
+        }
+        .boxed()
+        .into())
     }
 
     /// We need to get previously stored agent info. A single kitusne agent query

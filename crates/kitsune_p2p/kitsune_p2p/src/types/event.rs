@@ -67,9 +67,8 @@ pub struct SignNetworkDataEvt {
 /// Store the AgentInfo as signed by the agent themselves.
 #[derive(Debug, Clone)]
 pub struct PutAgentInfoSignedEvt {
-    /// The "space" context.
-    pub space: KSpace,
-    /// A batch of signed agent info for this space.
+    /// A batch of signed agent info. Possibly from multiple spaces, see the space included
+    /// on each agent.
     pub peer_data: Vec<AgentInfoSigned>,
 }
 
