@@ -354,7 +354,6 @@ impl ConductorBuilder {
         info!("Conductor startup: scheduler task started.");
 
         tokio::task::spawn(p2p_event_task(p2p_evt, conductor.clone()));
-        dbg!();
 
         info!("Conductor startup: p2p event task started.");
 
@@ -370,7 +369,6 @@ impl ConductorBuilder {
             )
             .map(Ok)
         });
-        dbg!();
 
         let configs = config.admin_interfaces.clone().unwrap_or_default();
         let cell_startup_errors = conductor
@@ -385,7 +383,6 @@ impl ConductorBuilder {
                 ?cell_startup_errors
             );
         }
-        dbg!();
 
         // Install DPKI from DNA
         if let Some(dna) = dpki_dna_to_install {
@@ -399,7 +396,6 @@ impl ConductorBuilder {
             }
         }
 
-        dbg!();
         if !no_print_setup {
             conductor.print_setup();
         }
@@ -444,14 +440,12 @@ impl ConductorBuilder {
         let config = Arc::new(self.config);
         let spaces = Spaces::new(config.clone())?;
         let tag = spaces.get_state().await?.tag().clone();
-        dbg!();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();
         let _ = keystore
             .lair_client()
             .new_seed(tag_ed.clone(), None, false)
             .await;
-        dbg!();
 
         let network_config = config.network.clone();
         let strat = network_config.tuning_params.to_arq_strat();
@@ -465,7 +459,6 @@ impl ConductorBuilder {
             Some(tag_ed),
             Some(keystore.lair_client()),
         );
-        dbg!();
 
         // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
         let dpki_config = Some(
@@ -500,7 +493,6 @@ impl ConductorBuilder {
                 "We currently require DPKI to be used, but this may change in the future"
             ),
         };
-        dbg!();
 
         let network_compat = NetworkCompatParams { dpki_uuid };
 
@@ -508,7 +500,6 @@ impl ConductorBuilder {
                 holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host, network_compat)
                     .await?;
 
-        dbg!();
         let (post_commit_sender, post_commit_receiver) =
             tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
@@ -523,7 +514,6 @@ impl ConductorBuilder {
             post_commit_sender,
             outcome_tx,
         );
-        dbg!();
 
         let conductor = Self::update_fake_state(self.state, conductor).await?;
 
@@ -548,7 +538,6 @@ impl ConductorBuilder {
                 .await
                 .expect("Could not install DNA");
         }
-        dbg!();
 
         Self::finish(
             handle,

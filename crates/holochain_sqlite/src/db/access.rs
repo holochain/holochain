@@ -41,7 +41,7 @@ pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbRead<Kind>> {
 
 #[async_trait::async_trait]
 impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
-    #[tracing::instrument(skip(f))]
+    #[tracing::instrument(skip_all, fields(kind = ?self.kind))]
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -59,7 +59,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
 
 #[async_trait::async_trait]
 impl<Kind: DbKindT> ReadAccess<Kind> for DbRead<Kind> {
-    #[tracing::instrument(skip(f))]
+    #[tracing::instrument(skip_all, fields(kind = ?self.kind))]
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -117,7 +117,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     ///
     /// Note that it is not enforced that your closure runs read-only operations or that it finishes quickly so it is
     /// up to the caller to use this function as intended.
-    #[tracing::instrument(skip(f))]
+    #[tracing::instrument(skip_all, fields(kind = ?self.kind))]
     pub async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -129,7 +129,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
             .await?;
 
         let start = tokio::time::Instant::now();
-        let span = tracing::error_span!("spawn_blocking inner");
+        let span = tracing::info_span!("spawn_blocking inner");
 
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.
@@ -340,7 +340,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Ok(DbWrite(db_read))
     }
 
-    #[tracing::instrument(skip(f))]
+    #[tracing::instrument(skip_all, fields(kind = ?self.kind))]
     pub async fn write_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -352,7 +352,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         let mut conn = self.get_connection_from_pool()?;
 
         let start = tokio::time::Instant::now();
-        let span = tracing::error_span!("spawn_blocking inner");
+        let span = tracing::info_span!("spawn_blocking inner");
 
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.

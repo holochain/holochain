@@ -76,9 +76,7 @@ impl DpkiService {
     }
 
     pub async fn state(&self) -> tokio::sync::MutexGuard<Box<dyn DpkiState>> {
-        timed!([1, 10, 1000], "DPKI state lock", {
-            self.state.lock().await
-        })
+        timed!([1, 10, 1000], { self.state.lock().await })
     }
 }
 
