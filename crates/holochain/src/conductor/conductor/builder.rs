@@ -336,6 +336,7 @@ impl ConductorBuilder {
             .await;
     }
 
+    #[tracing::instrument(skip_all)]
     pub(crate) async fn finish(
         conductor: ConductorHandle,
         config: Arc<ConductorConfig>,

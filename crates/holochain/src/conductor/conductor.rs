@@ -2114,7 +2114,7 @@ mod app_status_impls {
 
             // Add agents to local agent store in kitsune
 
-            future::join_all(new_cells.iter().map(|(cell, _)| {
+            future::join_all(new_cells.iter().enumerate().map(|(i, (cell, _))| {
                 let sleuth_id = self.config.sleuth_id();
                 async move {
                     let p2p_agents_db = cell.p2p_agents_db().clone();
@@ -2159,7 +2159,7 @@ mod app_status_impls {
                             );
                         }
                     }
-                }
+                }.instrument(tracing::info_span!("network join task", ?i))
             }))
                 .await;
 
@@ -2176,7 +2176,7 @@ mod app_status_impls {
         ///     then set it to Running
         /// - If an app is Running but at least one of its (required) Cells are off,
         ///     then set it to Paused
-        #[tracing::instrument(skip_all)]
+        #[tracing::instrument(skip(self))]
         pub(crate) async fn reconcile_app_status_with_cell_status(
             &self,
             app_ids: Option<HashSet<InstalledAppId>>,
@@ -2198,7 +2198,6 @@ mod app_status_impls {
             let cell_ids: HashSet<CellId> = self.running_cell_ids();
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
-                    tracing::trace!("begin");
                     #[allow(deprecated)]
                     let apps =
                         state
@@ -2245,7 +2244,6 @@ mod app_status_impls {
                             }
                         })
                         .fold(AppStatusFx::default(), AppStatusFx::combine);
-                    tracing::trace!("end");
                     Ok((state, delta))
                 })
                 .await?;
@@ -2975,6 +2973,7 @@ impl Conductor {
                         db.write_async(|txn| -> DatabaseResult<usize> {
                             Ok(txn.execute("DELETE FROM Action", ())?)
                         })
+                        .instrument(tracing::info_span!("cleanup authored db", ?dna_hash))
                         .boxed()
                     }),
             )
@@ -2990,6 +2989,7 @@ impl Conductor {
                         .write_async(|txn| {
                             DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
                         })
+                        .in_current_span()
                         .boxed(),
                     self.spaces
                         .cache(dna_hash)
@@ -2997,6 +2997,7 @@ impl Conductor {
                         .write_async(|txn| {
                             DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
                         })
+                        .in_current_span()
                         .boxed(),
                     // TODO: also delete stale Wasms
                 ]
@@ -3068,6 +3069,7 @@ impl Conductor {
         let tasks = app_cells.difference(&on_cells).map(|cell_id| {
             self.clone()
                 .create_cell(cell_id.clone())
+                .in_current_span()
                 .map_err(|err| (cell_id.clone(), err))
         });
 
@@ -3078,7 +3080,7 @@ impl Conductor {
     }
 
     /// Deal with the side effects of an app status state transition
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip(self))]
     async fn process_app_status_fx(
         self: Arc<Self>,
         delta: AppStatusFx,

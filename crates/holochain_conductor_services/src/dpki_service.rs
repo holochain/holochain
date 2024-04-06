@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use holochain_types::prelude::*;
+use holochain_util::timed;
 
 pub mod derivation_paths;
 
@@ -75,7 +76,9 @@ impl DpkiService {
     }
 
     pub async fn state(&self) -> tokio::sync::MutexGuard<Box<dyn DpkiState>> {
-        holochain_util::timed!([1, 10, 1000], { self.state.lock().await })
+        timed!([1, 10, 1000], "DPKI state lock", {
+            self.state.lock().await
+        })
     }
 }
 

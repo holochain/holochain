@@ -7,7 +7,7 @@ use crate::db::pool::{
 };
 use crate::error::{DatabaseError, DatabaseResult};
 use derive_more::Into;
-use holochain_util::time::log_elapsed;
+use holochain_util::log_elapsed;
 use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
@@ -17,7 +17,7 @@ use std::time::Instant;
 use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
-use tracing::{Instrument, Span};
+use tracing::Instrument;
 
 use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric, UseTimeMetric};
 
@@ -41,7 +41,7 @@ pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbRead<Kind>> {
 
 #[async_trait::async_trait]
 impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip(f))]
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -59,7 +59,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
 
 #[async_trait::async_trait]
 impl<Kind: DbKindT> ReadAccess<Kind> for DbRead<Kind> {
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip(f))]
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -117,7 +117,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     ///
     /// Note that it is not enforced that your closure runs read-only operations or that it finishes quickly so it is
     /// up to the caller to use this function as intended.
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip(f))]
     pub async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -129,7 +129,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
             .await?;
 
         let start = tokio::time::Instant::now();
-        let span = tracing::error_span!("spawn_blocking");
+        let span = tracing::error_span!("spawn_blocking inner");
 
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.
@@ -141,7 +141,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
                 log_elapsed!([10, 100, 1000], start, "read_async:after-closure");
                 tracing::trace!("end spawn_blocking");
                 r
-            })).in_current_span().await.map_err(|e| {
+            }).in_current_span()).in_current_span().await.map_err(|e| {
                 tracing::error!("Failed to claim a thread to run the database read transaction. It's likely that the program is out of threads.");
                 DatabaseError::Timeout(e)
             })?.map_err(DatabaseError::from)?
@@ -152,7 +152,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     /// reason.
     ///
     /// A valid reason for this is holding read transactions across multiple databases as part of a cascade query.
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument]
     pub async fn get_read_txn(&self) -> DatabaseResult<PTxnGuard> {
         let conn = self
             .checkout_connection(self.long_read_semaphore.clone())
@@ -160,7 +160,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         Ok(conn.into())
     }
 
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument]
     async fn checkout_connection(&self, semaphore: Arc<Semaphore>) -> DatabaseResult<PConnGuard> {
         // TODO: use semaphore for this message
         let waiting = self.num_readers.fetch_add(1, Ordering::Relaxed);
@@ -190,7 +190,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
 
     /// Get a connection from the pool.
     /// TODO: We should eventually swap this for an async solution.
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument]
     fn get_connection_from_pool(&self) -> DatabaseResult<PConn> {
         let now = Instant::now();
         let r = Ok(PConn::new(self.connection_pool.get()?));
@@ -340,7 +340,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Ok(DbWrite(db_read))
     }
 
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip(f))]
     pub async fn write_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -352,7 +352,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         let mut conn = self.get_connection_from_pool()?;
 
         let start = tokio::time::Instant::now();
-        let span = tracing::error_span!("spawn_blocking");
+        let span = tracing::error_span!("spawn_blocking inner");
 
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.
@@ -364,7 +364,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             log_elapsed!([10, 100, 1000], start, "write_async:after-closure");
             tracing::trace!("end spawn_blocking");
             r
-        })).in_current_span().await.map_err(|e| {
+        }).in_current_span()).in_current_span().await.map_err(|e| {
             tracing::error!("Failed to claim a thread to run the database write transaction. It's likely that the program is out of threads.");
             DatabaseError::Timeout(e)
         })?.map_err(DatabaseError::from)?

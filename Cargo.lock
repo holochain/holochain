@@ -3173,6 +3173,7 @@ dependencies = [
  "serde",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -3566,6 +3567,7 @@ dependencies = [
  "sodoken",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

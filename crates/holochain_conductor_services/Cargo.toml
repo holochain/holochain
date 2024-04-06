@@ -21,6 +21,7 @@ must_future = "0.1"
 serde = "1.0"
 thiserror = "1.0"
 tokio = "1"
+tracing = "0.1"
 
 holochain_keystore = { version = "^0.3.0-beta-dev.33", path = "../holochain_keystore" }
 holochain_types = { version = "^0.3.0-beta-dev.39", path = "../holochain_types" }

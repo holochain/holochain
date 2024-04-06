@@ -84,7 +84,6 @@ impl SweetConductorBatch {
     {
         let rendezvous = crate::sweettest::SweetLocalRendezvous::new().await;
         let config = config.into();
-        dbg!(&config);
         let conductors = Self::new(
             future::join_all(
                 std::iter::repeat(config)

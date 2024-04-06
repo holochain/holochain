@@ -1011,17 +1011,20 @@ impl Cell {
     }
 
     /// Clean up long-running managed tasks.
+    #[tracing::instrument(skip_all, fields(cell_id = ?self.id()))]
     pub async fn cleanup(&self) -> CellResult<()> {
         use holochain_p2p::HolochainP2pDnaT;
         let shutdown = self
             .conductor_handle
             .task_manager()
             .stop_cell_tasks(self.id().clone())
-            .map(|r| CellResult::Ok(r?));
+            .map(|r| CellResult::Ok(r?))
+            .in_current_span();
         let leave = self
             .holochain_p2p_dna()
             .leave(self.id.agent_pubkey().clone())
-            .map(|r| CellResult::Ok(r?));
+            .map(|r| CellResult::Ok(r?))
+            .in_current_span();
         let (shutdown, leave) = futures::future::join(shutdown, leave).await;
         shutdown?;
         leave?;

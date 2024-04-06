@@ -35,7 +35,7 @@ holochain_sqlite = { version = "^0.3.0-beta-dev.39", path = "../holochain_sqlite
 holochain_serialized_bytes = "=0.0.53"
 holochain_state = { version = "^0.3.0-beta-dev.42", path = "../holochain_state" }
 holochain_types = { version = "^0.3.0-beta-dev.39", path = "../holochain_types" }
-holochain_util = { version = "^0.3.0-beta-dev.6", path = "../holochain_util", features = [ "pw" ] }
+holochain_util = { version = "^0.3.0-beta-dev.6", path = "../holochain_util" }
 holochain_wasmer_host = "=0.0.92"
 holochain_websocket = { version = "^0.3.0-beta-dev.18", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.32", path = "../holochain_zome_types", features = ["full"] }
