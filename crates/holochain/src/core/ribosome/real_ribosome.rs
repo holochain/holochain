@@ -85,6 +85,7 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
+use holochain_util::timed;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
@@ -319,8 +320,8 @@ impl RealRibosome {
     pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
         let wasm = &self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        let module_cache = self.wasmer_module_cache.write();
-        let module = module_cache.get(cache_key, wasm)?;
+        let module_cache = timed!([1, 10, 1000], self.wasmer_module_cache.write());
+        let module = timed!([1, 10, 1000], module_cache.get(cache_key, wasm)?);
         Ok(module)
     }
 

@@ -288,8 +288,6 @@ impl Spaces {
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
         O: Send + 'static,
     {
-        let start = tokio::time::Instant::now();
-
         timed!([1, 10, 1000], "update_state_prime", {
             self.conductor_db
                 .write_async(move |txn| {

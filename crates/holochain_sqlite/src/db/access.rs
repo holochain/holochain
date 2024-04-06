@@ -17,7 +17,7 @@ use std::time::Instant;
 use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
-use tracing::{error_span, Instrument, Span};
+use tracing::Instrument;
 
 use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric, UseTimeMetric};
 
