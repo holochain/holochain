@@ -129,7 +129,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
             .await?;
 
         let start = tokio::time::Instant::now();
-        let span = tracing::error_span!("spawn_blocking");
+        let span = tracing::info_span!("spawn_blocking");
 
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.
@@ -352,7 +352,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         let mut conn = self.get_connection_from_pool()?;
 
         let start = tokio::time::Instant::now();
-        let span = tracing::error_span!("spawn_blocking");
+        let span = tracing::info_span!("spawn_blocking");
 
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.
