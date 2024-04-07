@@ -82,11 +82,13 @@ correctness = "deny"
 dbg_macro = "deny"
 
 [profile.fast-test]
-inherits = "dev"
-debug = 1
+inherits = "release"
+opt-level = 3
+lto = true
 
 [profile.fast-test.package."*"]
 inherits = "release"
+opt-level = 3
 
 [profile.release]
 opt-level = "z"
