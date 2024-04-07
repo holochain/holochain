@@ -15,7 +15,7 @@ on:
         default: false
     secrets:
       GITHUB_ACCESS_TOKEN:
-        description: "A GitHub access toekn which can be used for cloning the project"
+        description: "A GitHub access token which can be used for cloning the project"
         required: true
       CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL:
         description: "The Cachix token for `holochain-ci-internal` to be used for caching Holochain CI runs"
@@ -100,10 +100,10 @@ jobs:
           nix build -L --show-trace \
             ${{ matrix.cmd.extra_arg }} \
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
-          
+
           # Don't exit if this fails so we can clean up the profile
           for i in result*; do
             cachix push holochain-ci-internal $i || true
           done
-          
+
           rm result*

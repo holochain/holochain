@@ -86,12 +86,7 @@ inherits = "dev"
 debug = 1
 
 [profile.fast-test.package."*"]
-opt-level = 3
-debug = 1
-debug-assertions = false
-overflow-checks = false
-incremental = false
-codegen-units = 16
+inherits = "release"
 
 [profile.release]
 opt-level = "z"
