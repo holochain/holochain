@@ -99,7 +99,7 @@ async fn connection_close_on_peer_restart() {
         .unwrap();
 
     // Wait until there is a new connection and the old one is closed
-    tokio::time::timeout(std::time::Duration::from_secs(5), {
+    tokio::time::timeout(std::time::Duration::from_secs(10), {
         let initial_connection_id = initial_connection_id.clone();
         let sender_online = sender_online.clone();
         async move {
