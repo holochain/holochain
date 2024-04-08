@@ -371,6 +371,23 @@ impl DhtOp {
         }
     }
 
+    /// Check if this represents a genesis op.
+    pub fn is_genesis(&self) -> bool {
+        // XXX: Not great encapsulation here, but hey, at least it's using
+        // a const value for the comparison.
+        match self {
+            DhtOp::StoreRecord(_, a, _) => a.is_genesis(),
+            DhtOp::StoreEntry(_, a, _) => a.action_seq() < POST_GENESIS_SEQ_THRESHOLD,
+            DhtOp::RegisterAgentActivity(_, a) => a.is_genesis(),
+            DhtOp::RegisterUpdatedContent(_, a, _) => a.action_seq < POST_GENESIS_SEQ_THRESHOLD,
+            DhtOp::RegisterUpdatedRecord(_, a, _) => a.action_seq < POST_GENESIS_SEQ_THRESHOLD,
+            DhtOp::RegisterDeletedBy(_, a) => a.action_seq < POST_GENESIS_SEQ_THRESHOLD,
+            DhtOp::RegisterDeletedEntryAction(_, a) => a.action_seq < POST_GENESIS_SEQ_THRESHOLD,
+            DhtOp::RegisterAddLink(_, a) => a.action_seq < POST_GENESIS_SEQ_THRESHOLD,
+            DhtOp::RegisterRemoveLink(_, a) => a.action_seq < POST_GENESIS_SEQ_THRESHOLD,
+        }
+    }
+
     /// Get the entry from this op, if one exists
     pub fn entry(&self) -> RecordEntryRef {
         match self {

@@ -159,6 +159,14 @@ impl NewEntryAction {
             | NewEntryAction::Update(Update { author, .. }) => author,
         }
     }
+
+    /// Get the action_seq of this action
+    pub fn action_seq(&self) -> u32 {
+        match self {
+            NewEntryAction::Create(Create { action_seq, .. })
+            | NewEntryAction::Update(Update { action_seq, .. }) => *action_seq,
+        }
+    }
 }
 
 impl From<NewEntryAction> for Action {

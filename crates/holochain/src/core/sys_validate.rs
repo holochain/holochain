@@ -379,22 +379,64 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
     }
 }
 
-/// Check that the agent was valid at the time of authoring according to the installed DPKI network
-pub async fn check_dpki_agent_validity(
+/// Check that the record is valid from the perspective of DPKI.
+pub async fn check_dpki_agent_validity_for_record(
+    dpki: &DpkiService,
+    record: &Record,
+) -> SysValidationResult<()> {
+    let author = record.action().author().clone();
+    let timestamp = if record.action().is_genesis() {
+        None
+    } else {
+        Some(record.action().timestamp())
+    };
+    check_dpki_agent_validity(dpki, author, timestamp).await
+}
+
+/// Check that the op is valid from the perspective of DPKI.
+pub async fn check_dpki_agent_validity_for_op(
+    dpki: &DpkiService,
+    op: &DhtOp,
+) -> SysValidationResult<()> {
+    let author = op.author().clone();
+    let timestamp = if op.is_genesis() {
+        None
+    } else {
+        Some(op.timestamp())
+    };
+    check_dpki_agent_validity(dpki, author, timestamp).await
+}
+
+/// Check that the agent is valid from the perspective of DPKI.
+///
+/// There are different rules for genesis actions and all other actions:
+/// - For genesis actions, we use None for the timestamp, and we only check that the key is the
+///   first key in the app's keyset, i.e. that key_index == 0.
+/// - For all other actions, we include the timestamp, and use `key_state` to check that the key
+///   is valid as-at that timestamp.
+async fn check_dpki_agent_validity(
     dpki: &DpkiService,
     author: AgentPubKey,
-    timestamp: Timestamp,
+    timestamp: Option<Timestamp>,
 ) -> SysValidationResult<()> {
-    let key_state = dpki
-        .state()
-        .await
-        .key_state(author.clone(), timestamp)
-        .await?;
+    if let Some(timestamp) = timestamp {
+        let key_state = dpki
+            .state()
+            .await
+            .key_state(author.clone(), timestamp)
+            .await?;
 
-    match key_state {
-        KeyState::Valid(_) => Ok(()),
-        KeyState::Invalid(_) => Err(ValidationOutcome::DpkiAgentInvalid(author, timestamp).into()),
-        KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(author).into()),
+        match key_state {
+            KeyState::Valid(_) => Ok(()),
+            KeyState::Invalid(_) => {
+                Err(ValidationOutcome::DpkiAgentInvalid(author, timestamp).into())
+            }
+            KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(author).into()),
+        }
+    } else {
+        // TODO: add check for key_index == 0 once updates are possible
+        tracing::info!("Skipping DPKI check for genesis action until updates are possible");
+        Ok(())
     }
 }
 

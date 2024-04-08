@@ -8,7 +8,7 @@ use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
-use crate::core::check_dpki_agent_validity;
+use crate::core::check_dpki_agent_validity_for_record;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
@@ -260,15 +260,14 @@ where
         if dpki.should_run(workspace.source_chain().cell_id().dna_hash()) {
             // Check the validity of the author as-at the first and the last record to be committed.
             // If these are valid, then the author is valid for the entire commit.
-            let author = workspace.source_chain().agent_pubkey().clone();
             let first = records.first();
             let last = records.last();
             if let Some(r) = first {
-                check_dpki_agent_validity(&dpki, author.clone(), r.action().timestamp()).await?;
+                check_dpki_agent_validity_for_record(&dpki, r).await?;
             }
             if let Some(r) = last {
                 if first != last {
-                    check_dpki_agent_validity(&dpki, author, r.action().timestamp()).await?;
+                    check_dpki_agent_validity_for_record(&dpki, r).await?;
                 }
             }
         }
