@@ -1038,8 +1038,8 @@ impl MetaNet {
                                     }
                                     Err(err) => {
                                         tracing::error!(?err, "decoding error");
-                                        if let Err(e) = ep_hnd2.close(peer_url) {
-                                            tracing::info!(?e, "could not close peer connection");
+                                        if let Err(e) = ep_hnd2.ban(peer_url.id().unwrap(), tuning_params2.tx5_ban_time()) {
+                                            tracing::debug!(?e, "could not ban peer");
                                         }
                                     }
                                 }
@@ -1087,8 +1087,8 @@ impl MetaNet {
                                     }
                                     Err(err) => {
                                         tracing::error!(?err, "decoding error");
-                                        if let Err(e) = ep_hnd2.close(peer_url) {
-                                            tracing::info!(?e, "could not close peer connection");
+                                        if let Err(e) = ep_hnd2.ban(peer_url.id().unwrap(), tuning_params2.tx5_ban_time()) {
+                                            tracing::debug!(?e, "could not ban peer");
                                         }
                                     }
                                 }
@@ -1101,7 +1101,9 @@ impl MetaNet {
                                         }
                                         Err(err) => {
                                             tracing::error!(?err, "decoding error");
-                                            // TODO - drop connection??
+                                            if let Err(e) = ep_hnd2.ban(peer_url.id().unwrap(), tuning_params2.tx5_ban_time()) {
+                                                tracing::debug!(?e, "could not ban peer");
+                                            }
                                         }
                                     }
                                 } else {
@@ -1110,8 +1112,8 @@ impl MetaNet {
                             }
                             Err(err) => {
                                 tracing::error!(?err, "decoding error");
-                                if let Err(e) = ep_hnd2.close(peer_url) {
-                                    tracing::info!(?e, "could not close peer connection");
+                                if let Err(e) = ep_hnd2.ban(peer_url.id().unwrap(), tuning_params2.tx5_ban_time()) {
+                                    tracing::debug!(?e, "could not ban peer");
                                 }
                                 continue;
                             }

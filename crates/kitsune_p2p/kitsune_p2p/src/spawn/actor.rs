@@ -516,7 +516,7 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
             for removed_url in puts.iter().flat_map(|r| r.removed_urls.clone()) {
                 tracing::debug!(?removed_url, "peer URL changed, closing connection");
                 if let Err(e) = ep_hnd.close_peer_con(removed_url.clone()) {
-                    tracing::info!(?e, ?removed_url, "could not close peer connection");
+                    tracing::debug!(?e, ?removed_url, "could not close peer connection");
                 }
             }
 
