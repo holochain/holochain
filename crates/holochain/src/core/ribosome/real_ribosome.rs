@@ -812,10 +812,7 @@ impl RibosomeT for RealRibosome {
                 .as_ref()
                 .map(|source_chain| source_chain.agent_pubkey().to_string())
         }) {
-            otel_info.push(opentelemetry_api::KeyValue::new(
-                "source_chain",
-                agent_pubkey,
-            ));
+            otel_info.push(opentelemetry_api::KeyValue::new("agent", agent_pubkey));
         }
 
         let call_context = CallContext {
