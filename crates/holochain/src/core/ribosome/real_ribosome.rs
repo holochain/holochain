@@ -109,7 +109,6 @@ use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
 use opentelemetry_api::global::meter_with_version;
 use opentelemetry_api::metrics::Counter;
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
