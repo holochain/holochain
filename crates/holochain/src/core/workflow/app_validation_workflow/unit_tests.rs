@@ -1,7 +1,10 @@
 use crate::{
     conductor::space::TestSpace,
     core::{
-        ribosome::{real_ribosome::RealRibosome, ZomesToInvoke},
+        ribosome::{
+            guest_callback::validate::ValidateInvocation, real_ribosome::RealRibosome,
+            ZomesToInvoke,
+        },
         workflow::app_validation_workflow::{
             put_integrated, run_validation_callback, Outcome, ValidationDependencies,
         },
@@ -105,10 +108,12 @@ async fn validation_callback_must_get_action() {
         original_entry: None,
     });
 
+    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
+
     // action has not been written to a database yet
     // validation should indicate it is awaiting create action hash
     let outcome = run_validation_callback(
-        &delete_action_op,
+        invocation.clone(),
         &delete_action_op_hash.clone(),
         &ribosome,
         workspace.clone(),
@@ -128,7 +133,7 @@ async fn validation_callback_must_get_action() {
 
     // the same validation should now successfully validate the op
     let outcome = run_validation_callback(
-        &delete_action_op,
+        invocation,
         &delete_action_op_hash,
         &ribosome,
         workspace,
@@ -246,11 +251,12 @@ async fn validation_callback_awaiting_deps_hashes() {
         }
     });
 
+    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback(
-        &delete_action_op,
+        invocation.clone(),
         &delete_action_op_hash,
         &ribosome,
         workspace.clone(),
@@ -267,7 +273,7 @@ async fn validation_callback_awaiting_deps_hashes() {
     // app validation outcome should be accepted, now that the missing record
     // has been fetched
     let outcome = run_validation_callback(
-        &delete_action_op,
+        invocation,
         &delete_action_op_hash,
         &ribosome,
         workspace,
@@ -333,11 +339,12 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 
     let dna_hash = dna_file.dna_hash().clone();
     let network = test_network(Some(dna_hash.clone()), Some(alice.clone())).await;
+    let invocation = ValidateInvocation::new(zomes_to_invoke, &action_op).unwrap();
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback(
-        &action_op,
+        invocation.clone(),
         &dht_op_hash,
         &ribosome,
         workspace.clone(),
@@ -363,7 +370,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     // app validation outcome should be accepted, now that the missing agent
     // activity is available
     let outcome = run_validation_callback(
-        &action_op,
+        invocation,
         &dht_op_hash,
         &ribosome,
         workspace,
@@ -485,11 +492,12 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
         }
     });
 
+    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // run two op validations that depend on the same record in parallel
     let validate_1 = run_validation_callback(
-        &delete_action_op,
+        invocation.clone(),
         &delete_action_op_hash,
         &ribosome,
         workspace.clone(),
@@ -497,7 +505,7 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
         validation_dependencies.clone(),
     );
     let validate_2 = run_validation_callback(
-        &delete_action_op,
+        invocation,
         &delete_action_op_hash,
         &ribosome,
         workspace,

@@ -488,8 +488,17 @@ pub async fn validate_op(
         .await
         .map_err(AppValidationError::SysValidationError)?;
 
+    let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, &network, ribosome)
+        .await
+        .map_err(|e| {
+            eprintln!("zomes to invoke error {e:?}");
+            AppValidationError::CascadeError(CascadeError::ActionError(ActionError::NotNewEntry))
+        })?;
+    let invocation = ValidateInvocation::new(zomes_to_invoke, op)
+        .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
+
     let outcome = run_validation_callback(
-        &op,
+        invocation,
         &dht_op_hash,
         ribosome,
         workspace,
@@ -685,21 +694,21 @@ async fn store_record_zomes_to_invoke(
 }
 
 async fn run_validation_callback(
-    op: &Op,
+    invocation: ValidateInvocation,
     dht_op_hash: &DhtOpHash,
     ribosome: &impl RibosomeT,
     workspace: HostFnWorkspaceRead,
     network: HolochainP2pDna,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> AppValidationResult<Outcome> {
-    let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, &network, ribosome)
-        .await
-        .map_err(|e| {
-            eprintln!("zomes to invoke error {e:?}");
-            AppValidationError::CascadeError(CascadeError::ActionError(ActionError::NotNewEntry))
-        })?;
-    let invocation = ValidateInvocation::new(zomes_to_invoke, op)
-        .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
+    // let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, &network, ribosome)
+    //     .await
+    //     .map_err(|e| {
+    //         eprintln!("zomes to invoke error {e:?}");
+    //         AppValidationError::CascadeError(CascadeError::ActionError(ActionError::NotNewEntry))
+    //     })?;
+    // let invocation = ValidateInvocation::new(zomes_to_invoke, op)
+    //     .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
 
     let validate_result = ribosome.run_validate(
         ValidateHostAccess::new(workspace.clone(), network.clone()),
