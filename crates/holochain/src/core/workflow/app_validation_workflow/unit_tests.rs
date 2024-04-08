@@ -1,7 +1,7 @@
 use crate::{
     conductor::space::TestSpace,
     core::{
-        ribosome::real_ribosome::RealRibosome,
+        ribosome::{real_ribosome::RealRibosome, ZomesToInvoke},
         workflow::app_validation_workflow::{
             put_integrated, run_validation_callback, Outcome, ValidationDependencies,
         },
@@ -11,7 +11,7 @@ use crate::{
     test_utils::{test_network, test_network_with_events},
 };
 use fixt::fixt;
-use holo_hash::{AgentPubKey, DhtOpHash, HashableContentExtSync};
+use holo_hash::{AgentPubKey, HashableContentExtSync};
 use holochain_p2p::{event::HolochainP2pEvent, HolochainP2pDnaFixturator};
 use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, mutations::insert_op};
 use holochain_types::{
@@ -83,7 +83,7 @@ async fn validation_callback_must_get_action() {
     } = TestCase::new(zomes).await;
 
     let network = fixt!(HolochainP2pDna);
-    let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // a create by alice
     let mut create = fixt!(Create);
@@ -94,21 +94,26 @@ async fn validation_callback_must_get_action() {
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
+    let delete_dht_op = DhtOp::RegisterDeletedBy(
+        delete_action_signed_hashed.signature.clone(),
+        delete.clone(),
+    );
+    let delete_action_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
         original_action: EntryCreationAction::Create(create.clone()),
         original_entry: None,
     });
-    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
     // action has not been written to a database yet
     // validation should indicate it is awaiting create action hash
     let outcome = run_validation_callback(
-        invocation.clone(),
+        &delete_action_op,
+        &delete_action_op_hash.clone(),
         &ribosome,
         workspace.clone(),
         network.clone(),
-        fetched_dependencies.clone(),
+        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -123,11 +128,12 @@ async fn validation_callback_must_get_action() {
 
     // the same validation should now successfully validate the op
     let outcome = run_validation_callback(
-        invocation,
+        &delete_action_op,
+        &delete_action_op_hash,
         &ribosome,
         workspace,
         network,
-        fetched_dependencies.clone(),
+        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -181,12 +187,16 @@ async fn validation_callback_awaiting_deps_hashes() {
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
+    let dht_op = DhtOp::RegisterDeletedBy(
+        delete_action_signed_hashed.signature.clone(),
+        delete.clone(),
+    );
+    let delete_action_op_hash = dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
         original_action: EntryCreationAction::Create(create.clone()),
         original_entry: None,
     });
-    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
     let dna_hash = dna_file.dna_hash().clone();
 
@@ -236,15 +246,16 @@ async fn validation_callback_awaiting_deps_hashes() {
         }
     });
 
-    let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback(
-        invocation.clone(),
+        &delete_action_op,
+        &delete_action_op_hash,
         &ribosome,
         workspace.clone(),
         network.dna_network(),
-        fetched_dependencies.clone(),
+        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -256,11 +267,12 @@ async fn validation_callback_awaiting_deps_hashes() {
     // app validation outcome should be accepted, now that the missing record
     // has been fetched
     let outcome = run_validation_callback(
-        invocation,
+        &delete_action_op,
+        &delete_action_op_hash,
         &ribosome,
         workspace,
         network.dna_network(),
-        fetched_dependencies.clone(),
+        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -316,19 +328,21 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         action: action_signed_hashed.clone(),
         cached_entry: None,
     });
+    let dht_op = DhtOp::RegisterAgentActivity(action_signed_hashed.signature, action.clone());
+    let dht_op_hash = dht_op.to_hash();
 
     let dna_hash = dna_file.dna_hash().clone();
     let network = test_network(Some(dna_hash.clone()), Some(alice.clone())).await;
-    let invocation = ValidateInvocation::new(zomes_to_invoke, &action_op).unwrap();
-    let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback(
-        invocation.clone(),
+        &action_op,
+        &dht_op_hash,
         &ribosome,
         workspace.clone(),
         network.dna_network(),
-        fetched_dependencies.clone(),
+        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -337,22 +351,24 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     // alice is an authority for bob, so must_get_agent_activity will not go to
     // the network and return IncompleteChain instead
     // therefore write the op manually to alice's cache db
-    let dht_op = DhtOp::RegisterAgentActivity(action_signed_hashed.signature, action.clone());
-    let dht_op_hash = DhtOpHash::with_data_sync(&dht_op);
     let dht_op_hashed = DhtOpHashed::with_pre_hashed(dht_op, dht_op_hash.clone());
-    test_space.space.cache_db.test_write(move |txn| {
-        insert_op(txn, &dht_op_hashed).unwrap();
-        put_integrated(txn, &dht_op_hash, ValidationStatus::Valid).unwrap();
+    test_space.space.cache_db.test_write({
+        let dht_op_hash = dht_op_hash.clone();
+        move |txn| {
+            insert_op(txn, &dht_op_hashed).unwrap();
+            put_integrated(txn, &dht_op_hash, ValidationStatus::Valid).unwrap();
+        }
     });
 
     // app validation outcome should be accepted, now that the missing agent
     // activity is available
     let outcome = run_validation_callback(
-        invocation,
+        &action_op,
+        &dht_op_hash,
         &ribosome,
         workspace,
         network.dna_network(),
-        fetched_dependencies.clone(),
+        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -408,12 +424,16 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
+    let dht_op = DhtOp::RegisterDeletedBy(
+        delete_action_signed_hashed.signature.clone(),
+        delete.clone(),
+    );
+    let delete_action_op_hash = dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
         original_action: EntryCreationAction::Create(create.clone()),
         original_entry: None,
     });
-    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
     // handle only Get events
     let filter_events = |evt: &_| match evt {
@@ -465,22 +485,24 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
         }
     });
 
-    let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // run two op validations that depend on the same record in parallel
     let validate_1 = run_validation_callback(
-        invocation.clone(),
+        &delete_action_op,
+        &delete_action_op_hash,
         &ribosome,
         workspace.clone(),
         network.dna_network(),
-        fetched_dependencies.clone(),
+        validation_dependencies.clone(),
     );
     let validate_2 = run_validation_callback(
-        invocation,
+        &delete_action_op,
+        &delete_action_op_hash,
         &ribosome,
         workspace,
         network.dna_network(),
-        fetched_dependencies.clone(),
+        validation_dependencies.clone(),
     );
     futures::future::join_all([validate_1, validate_2]).await;
 
@@ -489,11 +511,11 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
 
     assert_eq!(times_same_hash_is_fetched.load(Ordering::Relaxed), 1);
     // after successfully fetching dependencies, the set should be empty
-    assert_eq!(fetched_dependencies.lock().missing_hashes.len(), 0);
+    assert_eq!(validation_dependencies.lock().missing_hashes.len(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn hashes_missing_for_op_is_updated_with_unresolved_deps() {}
+async fn hashes_missing_for_op_is_updated_with_unresolved_and_fetched_deps() {}
 
 // test case with alice and bob, a create by alice and a delete by bob that
 // references alice's create

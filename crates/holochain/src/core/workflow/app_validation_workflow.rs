@@ -129,12 +129,12 @@ async fn app_validation_workflow_inner(
     // filter out ops that have missing dependencies
     let sorted_ops: Vec<_> = sorted_ops
         .into_iter()
-        .filter(|op| {
-            validation_dependencies
-                .lock()
-                .hashes_missing_for_op
-                .contains_key(op.as_hash())
-        })
+        // .filter(|op| {
+        //     validation_dependencies
+        //         .lock()
+        //         .hashes_missing_for_op
+        //         .contains_key(op.as_hash())
+        // })
         .collect();
     let num_ops_to_validate = sorted_ops.len();
     tracing::debug!("validating {num_ops_to_validate} ops");
@@ -167,6 +167,7 @@ async fn app_validation_workflow_inner(
                 });
 
                 // Validate this op
+                let dht_op_hash = op.to_hash();
                 let cascade = Arc::new(workspace.full_cascade(network.clone()));
                 let validation_outcome = match dhtop_to_op(op, cascade).await {
                     Ok(op) => {
@@ -174,6 +175,7 @@ async fn app_validation_workflow_inner(
                         validate_op_outer(
                             dna_hash,
                             &op,
+                            &dht_op_hash,
                             &conductor,
                             &workspace,
                             &network,
@@ -293,7 +295,7 @@ pub async fn record_to_op(
     record: Record,
     op_type: DhtOpType,
     cascade: Arc<impl Cascade>,
-) -> AppValidationOutcome<(Op, Option<Entry>)> {
+) -> AppValidationOutcome<(Op, DhtOpHash, Option<Entry>)> {
     use DhtOpType::*;
 
     // Hide private data where appropriate
@@ -318,7 +320,12 @@ pub async fn record_to_op(
         hidden_entry = entry.take().or(hidden_entry);
     }
     let dht_op = DhtOp::from_type(op_type, action, entry)?;
-    Ok((dhtop_to_op(dht_op, cascade).await?, hidden_entry))
+    let dht_op_hash = dht_op.clone().to_hash();
+    Ok((
+        dhtop_to_op(dht_op, cascade).await?,
+        dht_op_hash,
+        hidden_entry,
+    ))
 }
 
 async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
@@ -442,6 +449,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutc
 async fn validate_op_outer(
     dna_hash: Arc<DnaHash>,
     op: &Op,
+    dht_op_hash: &DhtOpHash,
     conductor_handle: &ConductorHandle,
     workspace: &AppValidationWorkspace,
     network: &HolochainP2pDna,
@@ -457,6 +465,7 @@ async fn validate_op_outer(
 
     validate_op(
         op,
+        dht_op_hash,
         host_fn_workspace,
         network,
         &ribosome,
@@ -468,18 +477,20 @@ async fn validate_op_outer(
 
 pub async fn validate_op(
     op: &Op,
+    dht_op_hash: &DhtOpHash,
     workspace: HostFnWorkspaceRead,
     network: &HolochainP2pDna,
     ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> AppValidationOutcome<Outcome> {
-    check_entry_def(op, &network.dna_hash(), conductor_handle)
+    check_entry_def(&op, &network.dna_hash(), conductor_handle)
         .await
         .map_err(AppValidationError::SysValidationError)?;
 
     let outcome = run_validation_callback(
-        op,
+        &op,
+        &dht_op_hash,
         ribosome,
         workspace,
         network.clone(),
@@ -675,6 +686,7 @@ async fn store_record_zomes_to_invoke(
 
 async fn run_validation_callback(
     op: &Op,
+    dht_op_hash: &DhtOpHash,
     ribosome: &impl RibosomeT,
     workspace: HostFnWorkspaceRead,
     network: HolochainP2pDna,
@@ -688,6 +700,7 @@ async fn run_validation_callback(
         })?;
     let invocation = ValidateInvocation::new(zomes_to_invoke, op)
         .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
+
     let validate_result = ribosome.run_validate(
         ValidateHostAccess::new(workspace.clone(), network.clone()),
         invocation.clone(),

@@ -261,14 +261,15 @@ where
             let op =
                 app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;
 
-            let (op, omitted_entry) = match op {
+            let (op, dht_op_hash, omitted_entry) = match op {
                 Ok(op) => op,
                 Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
             };
-            let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+            let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
             let outcome = app_validation_workflow::validate_op(
                 &op,
+                &dht_op_hash,
                 workspace.clone().into(),
                 &network,
                 &ribosome,
