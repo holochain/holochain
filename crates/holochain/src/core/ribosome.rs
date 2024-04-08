@@ -172,15 +172,20 @@ impl From<&HostContext> for HostFnAccess {
 impl HostContext {
     /// Get the workspace, panics if none was provided
     pub fn workspace(&self) -> HostFnWorkspaceRead {
+        self.maybe_workspace().expect(
+            "Gave access to a host function that uses the workspace without providing a workspace",
+        )
+    }
+
+    /// Get the workspace if it was provided.
+    pub fn maybe_workspace(&self) -> Option<HostFnWorkspaceRead> {
         match self.clone() {
             Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
             | Self::Init(InitHostAccess { workspace, .. })
             | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
-            | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace.into(),
-            Self::Validate(ValidateHostAccess { workspace, .. }) => workspace,
-            _ => panic!(
-                "Gave access to a host function that uses the workspace without providing a workspace"
-            ),
+            | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => Some(workspace.into()),
+            Self::Validate(ValidateHostAccess { workspace, .. }) => Some(workspace),
+            _ => None,
         }
     }
 
