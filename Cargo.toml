@@ -83,6 +83,7 @@ dbg_macro = "deny"
 
 [profile.fast-test]
 inherits = "release"
+debug = true
 opt-level = 3
 lto = true
 
