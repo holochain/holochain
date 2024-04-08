@@ -232,12 +232,25 @@ pub struct ListApps {
 }
 
 #[doc(hidden)]
-pub async fn call(holochain_path: &Path, req: Call, structured: Output) -> anyhow::Result<()> {
+pub async fn call(
+    holochain_path: &Path,
+    req: Call,
+    force_admin_ports: Vec<u16>,
+    structured: Output,
+) -> anyhow::Result<()> {
     let Call {
         existing,
         running,
         call,
     } = req;
+    // Force admin ports takes precedence over running. They both specify the same thing but force admin ports
+    // is used across other sandbox calls so this makes `call` consistent with others.
+    let running = if force_admin_ports.is_empty() {
+        running
+    } else {
+        force_admin_ports
+    };
+
     let cmds = if running.is_empty() {
         let paths = if existing.is_empty() {
             crate::save::load(std::env::current_dir()?)?
@@ -384,13 +397,15 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                 writeln!(out, "This DNA {:?} is {:?}", this_dna.0, this_dna.1)?;
 
                 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-                let duration = Duration::milliseconds(info.signed_at_ms as i64);
+                let duration = Duration::try_milliseconds(info.signed_at_ms as i64)
+                    .ok_or_else(|| anyhow!("Agent info timestamp out of range"))?;
                 let s = duration.num_seconds();
                 let n = duration.clone().to_std().unwrap().subsec_nanos();
                 // TODO FIXME
                 #[allow(deprecated)]
                 let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-                let duration = Duration::milliseconds(info.expires_at_ms as i64);
+                let duration = Duration::try_milliseconds(info.expires_at_ms as i64)
+                    .ok_or_else(|| anyhow!("Agent info timestamp out of range"))?;
                 let s = duration.num_seconds();
                 let n = duration.clone().to_std().unwrap().subsec_nanos();
                 // TODO FIXME

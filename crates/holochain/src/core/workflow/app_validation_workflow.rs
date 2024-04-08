@@ -54,17 +54,31 @@ mod types;
 /// Dependencies required for app validating an op.
 pub struct ValidationDependencies {
     /// Missing hashes that are being fetched.
-    pub missing_hashes: HashSet<AnyDhtHash>,
+    missing_hashes: HashSet<AnyDhtHash>,
     /// Dependencies that are missing to app validate an op.
-    pub hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
+    _hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
+}
+
+impl Default for ValidationDependencies {
+    fn default() -> Self {
+        ValidationDependencies::new()
+    }
 }
 
 impl ValidationDependencies {
     pub fn new() -> Self {
         Self {
             missing_hashes: HashSet::new(),
-            hashes_missing_for_op: HashMap::new(),
+            _hashes_missing_for_op: HashMap::new(),
         }
+    }
+
+    pub fn insert_missing_hash(&mut self, hash: AnyDhtHash) -> bool {
+        self.missing_hashes.insert(hash)
+    }
+
+    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) -> bool {
+        self.missing_hashes.remove(hash)
     }
 }
 
@@ -79,11 +93,11 @@ impl ValidationDependencies {
 pub async fn app_validation_workflow(
     dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
-    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     trigger_integration: TriggerSender,
     conductor_handle: ConductorHandle,
     network: HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
+    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> WorkflowResult<WorkComplete> {
     let complete = app_validation_workflow_inner(
         dna_hash,
@@ -723,7 +737,7 @@ async fn run_validation_callback(
                     // keep track of which dependencies are being fetched to
                     // prevent multiple fetches of the same hash
                     let is_new_dependency =
-                        validation_deps.lock().missing_hashes.insert(hash.clone());
+                        validation_deps.lock().insert_missing_hash(hash.clone());
                     is_new_dependency
                 })
                 .map(move |hash| {
@@ -741,7 +755,7 @@ async fn run_validation_callback(
                         // in case of an error the hash is still removed from
                         // the collection so that it will be tried again to be
                         // fetched in the subsequent workflow run
-                        validation_dependencies.lock().missing_hashes.remove(&hash);
+                        validation_dependencies.lock().remove_missing_hash(&hash);
                     }
                 });
             // await all fetches in a separate task in the background
@@ -766,8 +780,7 @@ async fn run_validation_callback(
             let validation_dependencies = validation_dependencies.clone();
             let is_new_dependency = validation_dependencies
                 .lock()
-                .missing_hashes
-                .insert(author.clone().into());
+                .insert_missing_hash(author.clone().into());
             // fetch dependency if it is not being fetched yet
             if is_new_dependency {
                 tokio::spawn({
@@ -788,8 +801,7 @@ async fn run_validation_callback(
                         // fetched in the subsequent workflow run
                         validation_dependencies
                             .lock()
-                            .missing_hashes
-                            .remove(&author.into());
+                            .remove_missing_hash(&author.into());
                     }
                 });
             }

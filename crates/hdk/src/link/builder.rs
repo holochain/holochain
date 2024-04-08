@@ -3,12 +3,50 @@ use holo_hash::{AgentPubKey, AnyLinkableHash};
 use holochain_wasmer_guest::WasmError;
 use holochain_zome_types::prelude::*;
 
-/// A builder to streamline creating a `GetLinksInput`
+/// A builder to streamline creating a `GetLinksInput`.
+///
+/// Example: Get links of any time from a given base address.
+/// ```rust,no_run
+/// use hdk::prelude::*;
+///
+/// # fn main() -> ExternResult<()> {
+///     let my_base = ActionHash::from_raw_36(vec![0; 36]); // Some base address, this is a dummy address created for the example!
+///     let links = get_links(GetLinksInputBuilder::try_new(my_base, ..)?.build())?;
+/// #   Ok(())
+/// # }
+/// ```
+///
+/// Example: Get links of a specific type from a given base address.
+/// ```rust,no_run
+/// use hdk::prelude::*;
+///
+/// #[hdk_link_types]
+/// pub enum LinkTypes {
+///     Example,
+/// }
+///
+/// # fn main() -> ExternResult<()> {
+///     let my_base = ActionHash::from_raw_36(vec![0; 36]); // Some base address, this is a dummy address created for the example!
+///     let links = get_links(GetLinksInputBuilder::try_new(my_base, LinkTypes::Example)?.build())?;
+/// #   Ok(())
+/// # }
+/// ```
+///
+/// You can add additional filters using the functions defined on the builder.
+/// For example, to only fetch links that are available locally, without going to the network:
+/// ```rust,no_run
+/// use hdk::prelude::*;
+///
+/// # fn main() -> ExternResult<()> {
+///     let my_base = ActionHash::from_raw_36(vec![0; 36]); // Some base address, this is a dummy address created for the example!
+///     let links = get_links(GetLinksInputBuilder::try_new(my_base, ..)?.get_options(GetStrategy::Local).build())?;
+/// #   Ok(())
+/// # }
 #[derive(PartialEq, Clone, Debug)]
 pub struct GetLinksInputBuilder(GetLinksInput);
 
 impl GetLinksInputBuilder {
-    /// Create a new `GetLinksInputBuilder` from the required fields for a `GetLinksInput`
+    /// Create a new `GetLinksInputBuilder` from the required fields for a `GetLinksInput`.
     pub fn try_new(
         base_address: impl Into<AnyLinkableHash>,
         link_type: impl LinkTypeFilterExt,
@@ -54,7 +92,7 @@ impl GetLinksInputBuilder {
         self
     }
 
-    /// Construct the result of the builder
+    /// Construct the result of the builder.
     pub fn build(self) -> GetLinksInput {
         self.0
     }

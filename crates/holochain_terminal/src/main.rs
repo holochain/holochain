@@ -22,7 +22,7 @@ fn main() -> anyhow::Result<()> {
     args.validate()?;
 
     let (admin_client, app_client) = if let Some(admin_url) = &args.admin_url {
-        match block_on(
+        let connect_clients_result = block_on(
             async {
                 let addr = if let url::Origin::Tuple(_, host, port) = admin_url.origin() {
                     match tokio::net::lookup_host((host.to_string(), port)).await {
@@ -44,7 +44,8 @@ fn main() -> anyhow::Result<()> {
                 Ok((admin_client, app_client))
             },
             Duration::from_secs(10),
-        ) {
+        );
+        match connect_clients_result {
             Ok(Ok((admin_client, app_client))) => (Some(admin_client), Some(app_client)),
             Ok(Err(e)) => {
                 return Err(e);

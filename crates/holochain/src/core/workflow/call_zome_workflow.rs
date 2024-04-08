@@ -265,7 +265,7 @@ where
                 Ok(op) => op,
                 Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
             };
-            let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+            let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
             let outcome = app_validation_workflow::validate_op(
                 &op,
