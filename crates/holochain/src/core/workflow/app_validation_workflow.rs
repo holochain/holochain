@@ -92,27 +92,88 @@ impl ValidationDependencies {
 pub async fn app_validation_workflow(
     dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
-    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
     trigger_integration: TriggerSender,
     conductor_handle: ConductorHandle,
     network: HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
 ) -> WorkflowResult<WorkComplete> {
-    let complete = app_validation_workflow_inner(
+    let outcome_summary = app_validation_workflow_inner(
         dna_hash,
         workspace,
         conductor_handle,
         &network,
         dht_query_cache,
-        validation_dependencies,
+        fetched_dependencies,
     )
     .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-    // trigger other workflows
-    trigger_integration.trigger(&"app_validation_workflow");
+    // if ops have been accepted or rejected, trigger integration
+    if outcome_summary.validated > 0 {
+        trigger_integration.trigger(&"app_validation_workflow");
+    }
 
-    Ok(complete)
+    Ok(
+        if outcome_summary.validated < outcome_summary.num_ops_to_validate {
+            // trigger app validation workflow again in 10 seconds
+            WorkComplete::Incomplete(Some(Duration::from_secs(10)))
+        } else {
+            WorkComplete::Complete
+        },
+    )
+}
+
+mod missing_dep_expiration {
+
+    fn all_missing_dep_fetches_expired(
+        fetched_dependencies: HashMap<AnyDhtHash, Timestamp>,
+    ) -> bool {
+        fetched_dependencies.into_iter().all(|fetched_dep| {
+        let one_minute_ago = Timestamp::from_micros(Timestamp::now().as_micros() - 60 * 1_000_000);
+        let one_minute_before_timestamp = Timestamp::from_micros(fetched_dep.1.as_micros() - 60 * 1_000_000);
+        println!("one_minute_ago {one_minute_ago:?} one_minute_before_timestamp {one_minute_before_timestamp:?}");
+        one_minute_before_timestamp <= one_minute_ago
+    })
+    }
+
+    #[cfg(test)]
+    mod fetch_miss_tests {
+        use ::fixt::fixt;
+        use holo_hash::{fixt::ActionHashFixturator, ActionHash};
+        use holochain_zome_types::timestamp::Timestamp;
+        use std::{collections::HashMap, time::Instant};
+
+        use super::all_missing_dep_fetches_expired;
+
+        #[test]
+        fn empty() {
+            let fetched_dependencies = HashMap::new();
+            assert_eq!(all_missing_dep_fetches_expired(fetched_dependencies), true);
+        }
+
+        #[test]
+        fn all_expired() {
+            let mut fetched_dependencies = HashMap::new();
+            let hash = fixt!(ActionHash).into();
+            fetched_dependencies.insert(
+                hash,
+                Timestamp::from_micros(Timestamp::now().as_micros() - 60 * 1_000_000),
+            );
+            assert_eq!(all_missing_dep_fetches_expired(fetched_dependencies), true);
+        }
+
+        #[test]
+        fn some_missing_dep_fetches_expired() {
+            let mut fetched_dependencies = HashMap::new();
+            fetched_dependencies.insert(
+                fixt!(ActionHash).into(),
+                Timestamp::from_micros(Timestamp::now().as_micros() - 60 * 1_000_000),
+            );
+            fetched_dependencies.insert(fixt!(ActionHash).into(), Timestamp::now());
+            assert_eq!(all_missing_dep_fetches_expired(fetched_dependencies), false);
+        }
+    }
 }
 
 async fn app_validation_workflow_inner(
