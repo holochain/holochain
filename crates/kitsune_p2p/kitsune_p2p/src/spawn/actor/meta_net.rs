@@ -1038,7 +1038,10 @@ impl MetaNet {
                                     }
                                     Err(err) => {
                                         tracing::error!(?err, "decoding error");
-                                        ep_hnd2.ban(peer_url.id().unwrap(), tuning_params2.tx5_ban_time());
+                                        ep_hnd2.ban(
+                                            peer_url.id().unwrap(),
+                                            tuning_params2.tx5_ban_time(),
+                                        );
                                     }
                                 }
                             }
@@ -1085,7 +1088,10 @@ impl MetaNet {
                                     }
                                     Err(err) => {
                                         tracing::error!(?err, "decoding error");
-                                        ep_hnd2.ban(peer_url.id().unwrap(), tuning_params2.tx5_ban_time());
+                                        ep_hnd2.ban(
+                                            peer_url.id().unwrap(),
+                                            tuning_params2.tx5_ban_time(),
+                                        );
                                     }
                                 }
                             }
@@ -1097,7 +1103,10 @@ impl MetaNet {
                                         }
                                         Err(err) => {
                                             tracing::error!(?err, "decoding error");
-                                            ep_hnd2.ban(peer_url.id().unwrap(), tuning_params2.tx5_ban_time());
+                                            ep_hnd2.ban(
+                                                peer_url.id().unwrap(),
+                                                tuning_params2.tx5_ban_time(),
+                                            );
                                         }
                                     }
                                 } else {
