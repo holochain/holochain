@@ -44,7 +44,7 @@ impl ShardedGossipLocal {
         agents: &[Arc<AgentInfoSigned>],
     ) -> KitsuneResult<()> {
         // Add the agents to the stores.
-        store::put_agent_info(&self.host_api, &self.space, agents).await?;
+        store::put_agent_info(&self.host_api, agents).await?;
         Ok(())
     }
 }
