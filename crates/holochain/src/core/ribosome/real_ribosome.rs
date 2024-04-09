@@ -251,7 +251,7 @@ impl RealRibosome {
 
         // Collect the number of entry and link types
         // for each integrity zome.
-        let iter = futures::future::join_all(ribosome.dna_def().integrity_zomes.iter().map(
+        let items = futures::future::join_all(ribosome.dna_def().integrity_zomes.iter().map(
             |(name, zome)| async {
                 let zome = Zome::new(name.clone(), zome.clone().erase_type());
 
@@ -283,7 +283,7 @@ impl RealRibosome {
         .collect::<RibosomeResult<Vec<_>>>()?;
 
         // Create the global zome types from the totals.
-        let map = GlobalZomeTypes::from_ordered_iterator(iter.into_iter());
+        let map = GlobalZomeTypes::from_ordered_iterator(items.into_iter());
 
         ribosome.zome_types = Arc::new(map?);
 
@@ -869,11 +869,6 @@ impl RibosomeT for RealRibosome {
                     let result = self
                         .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store.clone())
                         .map(Some);
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> spike/app-install-timing
 
                     {
                         let mut store_lock = instance_with_store.store.lock();
@@ -886,10 +881,6 @@ impl RibosomeT for RealRibosome {
                         self.usage_meter.add(points_used, &otel_info);
                     }
 
-<<<<<<< HEAD
-=======
->>>>>>> origin/develop
->>>>>>> spike/app-install-timing
                     // remove context from map after call
                     {
                         CONTEXT_MAP.lock().remove(&context_key);
