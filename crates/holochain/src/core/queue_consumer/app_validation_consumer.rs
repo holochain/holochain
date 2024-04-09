@@ -32,11 +32,11 @@ pub fn spawn_app_validation_consumer(
             app_validation_workflow(
                 dna_hash.clone(),
                 workspace.clone(),
-                validation_dependencies.clone(),
                 trigger_integration.clone(),
                 conductor.clone(),
                 network.clone(),
                 dht_query_cache.clone(),
+                validation_dependencies.clone(),
             )
         },
     );

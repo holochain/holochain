@@ -17,6 +17,7 @@ use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
 pub use error::*;
 use holo_hash::DhtOpHash;
+use holochain_cascade::error::CascadeError;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
@@ -31,7 +32,6 @@ use parking_lot::Mutex;
 use rusqlite::Transaction;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::convert::TryInto;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
@@ -51,53 +51,22 @@ mod unit_tests;
 mod error;
 mod types;
 
-/// Dependencies required for app validating an op.
-pub struct ValidationDependencies {
-    /// Missing hashes that are being fetched.
-    missing_hashes: HashSet<AnyDhtHash>,
-    /// Dependencies that are missing to app validate an op.
-    _hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
-}
-
-impl Default for ValidationDependencies {
-    fn default() -> Self {
-        ValidationDependencies::new()
-    }
-}
-
-impl ValidationDependencies {
-    pub fn new() -> Self {
-        Self {
-            missing_hashes: HashSet::new(),
-            _hashes_missing_for_op: HashMap::new(),
-        }
-    }
-
-    pub fn insert_missing_hash(&mut self, hash: AnyDhtHash) -> bool {
-        self.missing_hashes.insert(hash)
-    }
-
-    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) -> bool {
-        self.missing_hashes.remove(hash)
-    }
-}
-
 #[instrument(skip(
     workspace,
-    validation_dependencies,
     trigger_integration,
     conductor_handle,
     network,
-    dht_query_cache
+    dht_query_cache,
+    validation_dependencies,
 ))]
 pub async fn app_validation_workflow(
     dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
-    fetched_dependencies: Arc<Mutex<HashSet<AnyDhtHash>>>,
     trigger_integration: TriggerSender,
     conductor_handle: ConductorHandle,
     network: HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
+    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> WorkflowResult<WorkComplete> {
     let outcome_summary = app_validation_workflow_inner(
         dna_hash,
@@ -187,6 +156,10 @@ async fn app_validation_workflow_inner(
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
+    // filter out ops that have missing dependencies
+    let sorted_ops = validation_dependencies
+        .lock()
+        .filter_ops_missing_dependencies(sorted_ops);
     let num_ops_to_validate = sorted_ops.len();
     tracing::debug!("validating {num_ops_to_validate} ops");
     let sleuth_id = conductor.config.sleuth_id();
@@ -218,16 +191,19 @@ async fn app_validation_workflow_inner(
                 });
 
                 // Validate this op
+                let dht_op_hash = op.to_hash();
                 let cascade = Arc::new(workspace.full_cascade(network.clone()));
                 let validation_outcome = match dhtop_to_op(op, cascade).await {
                     Ok(op) => {
+                        let validation_dependencies = validation_dependencies.clone();
                         validate_op_outer(
                             dna_hash,
                             &op,
+                            &dht_op_hash,
                             &conductor,
                             &workspace,
-                            validation_dependencies,
                             &network,
+                            validation_dependencies,
                         )
                         .await
                     }
@@ -343,7 +319,7 @@ pub async fn record_to_op(
     record: Record,
     op_type: DhtOpType,
     cascade: Arc<impl Cascade>,
-) -> AppValidationOutcome<(Op, Option<Entry>)> {
+) -> AppValidationOutcome<(Op, DhtOpHash, Option<Entry>)> {
     use DhtOpType::*;
 
     // Hide private data where appropriate
@@ -368,7 +344,12 @@ pub async fn record_to_op(
         hidden_entry = entry.take().or(hidden_entry);
     }
     let dht_op = DhtOp::from_type(op_type, action, entry)?;
-    Ok((dhtop_to_op(dht_op, cascade).await?, hidden_entry))
+    let dht_op_hash = dht_op.clone().to_hash();
+    Ok((
+        dhtop_to_op(dht_op, cascade).await?,
+        dht_op_hash,
+        hidden_entry,
+    ))
 }
 
 async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
@@ -492,10 +473,11 @@ async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutc
 async fn validate_op_outer(
     dna_hash: Arc<DnaHash>,
     op: &Op,
+    dht_op_hash: &DhtOpHash,
     conductor_handle: &ConductorHandle,
     workspace: &AppValidationWorkspace,
-    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     network: &HolochainP2pDna,
+    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
     let host_fn_workspace = workspace.validation_workspace().await?;
@@ -507,36 +489,63 @@ async fn validate_op_outer(
 
     validate_op(
         op,
+        dht_op_hash,
         host_fn_workspace,
-        validation_dependencies,
         network,
         &ribosome,
         conductor_handle,
+        validation_dependencies,
     )
     .await
 }
 
-pub async fn validate_op<R>(
+pub async fn validate_op(
     op: &Op,
+    dht_op_hash: &DhtOpHash,
     workspace: HostFnWorkspaceRead,
-    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     network: &HolochainP2pDna,
-    ribosome: &R,
+    ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
-) -> AppValidationOutcome<Outcome>
-where
-    R: RibosomeT,
-{
+    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+) -> AppValidationOutcome<Outcome> {
     check_entry_def(op, &network.dna_hash(), conductor_handle)
         .await
         .map_err(AppValidationError::SysValidationError)?;
 
-    let zomes_to_invoke = match op {
-        Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => ZomesToInvoke::AllIntegrity,
+    let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, network, ribosome)
+        .await
+        .map_err(|e| {
+            eprintln!("zomes to invoke error {e:?}");
+            AppValidationError::CascadeError(CascadeError::ActionError(ActionError::NotNewEntry))
+        })?;
+    let invocation = ValidateInvocation::new(zomes_to_invoke, op)
+        .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
+
+    let outcome = run_validation_callback(
+        invocation,
+        dht_op_hash,
+        ribosome,
+        workspace,
+        Arc::new(network.clone()),
+        validation_dependencies,
+    )
+    .await?;
+
+    Ok(outcome)
+}
+
+async fn get_zomes_to_invoke(
+    op: &Op,
+    workspace: &HostFnWorkspaceRead,
+    network: &HolochainP2pDna,
+    ribosome: &impl RibosomeT,
+) -> AppValidationOutcome<ZomesToInvoke> {
+    match op {
+        Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => Ok(ZomesToInvoke::AllIntegrity),
         Op::StoreRecord(StoreRecord { record }) => {
             let cascade =
-                CascadeImpl::from_workspace_and_network(&workspace, Arc::new(network.clone()));
-            store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await?
+                CascadeImpl::from_workspace_and_network(workspace, Arc::new(network.clone()));
+            store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await
         }
         Op::StoreEntry(StoreEntry {
             action:
@@ -548,13 +557,13 @@ where
                     ..
                 },
             ..
-        }) => entry_creation_zomes_to_invoke(action, ribosome)?,
+        }) => entry_creation_zomes_to_invoke(action, ribosome),
         Op::RegisterUpdate(RegisterUpdate {
             original_action, ..
         })
         | Op::RegisterDelete(RegisterDelete {
             original_action, ..
-        }) => entry_creation_zomes_to_invoke(original_action, ribosome)?,
+        }) => entry_creation_zomes_to_invoke(original_action, ribosome),
         Op::RegisterCreateLink(RegisterCreateLink {
             create_link:
                 SignedHashed {
@@ -565,25 +574,12 @@ where
                     ..
                 },
             ..
-        }) => create_link_zomes_to_invoke(action, ribosome)?,
+        }) => create_link_zomes_to_invoke(action, ribosome),
         Op::RegisterDeleteLink(RegisterDeleteLink {
             create_link: action,
             ..
-        }) => create_link_zomes_to_invoke(action, ribosome)?,
-    };
-
-    let invocation = ValidateInvocation::new(zomes_to_invoke, op)
-        .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
-    let outcome = run_validation_callback(
-        invocation,
-        ribosome,
-        workspace,
-        Arc::new(network.clone()),
-        validation_dependencies,
-    )
-    .await?;
-
-    Ok(outcome)
+        }) => create_link_zomes_to_invoke(action, ribosome),
+    }
 }
 
 /// Check the AppEntryDef is valid for the zome.
@@ -724,13 +720,14 @@ async fn store_record_zomes_to_invoke(
 
 async fn run_validation_callback(
     invocation: ValidateInvocation,
+    dht_op_hash: &DhtOpHash,
     ribosome: &impl RibosomeT,
-    workspace_read: HostFnWorkspaceRead,
+    workspace: HostFnWorkspaceRead,
     network: GenericNetwork,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> AppValidationResult<Outcome> {
     let validate_result = ribosome.run_validate(
-        ValidateHostAccess::new(workspace_read.clone(), network.clone()),
+        ValidateHostAccess::new(workspace.clone(), network.clone()),
         invocation.clone(),
     )?;
     match validate_result {
@@ -738,12 +735,21 @@ async fn run_validation_callback(
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(hashes)) => {
             // fetch all missing hashes in the background without awaiting them
-            let cascade_workspace = workspace_read.clone();
+            let cascade_workspace = workspace.clone();
             let cascade =
                 CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
+
+            // add hashes missing to validate an op to hash map
+            hashes.iter().for_each(|hash| {
+                validation_dependencies
+                    .lock()
+                    .insert_hash_missing_for_op(dht_op_hash.clone(), hash.clone());
+            });
+
             // build a collection of futures to fetch the individual missing
             // hashes
             let validation_deps = validation_dependencies.clone();
+            let dht_op_hash = dht_op_hash.clone();
             let fetches = hashes
                 .clone()
                 .into_iter()
@@ -757,6 +763,7 @@ async fn run_validation_callback(
                 .map(move |hash| {
                     let cascade = cascade.clone();
                     let validation_dependencies = validation_dependencies.clone();
+                    let dht_op_hash = dht_op_hash.clone();
                     async move {
                         let result = cascade
                             .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
@@ -764,12 +771,17 @@ async fn run_validation_callback(
                         if let Err(err) = result {
                             tracing::warn!("error fetching dependent hash {hash:?}: {err}");
                         }
-                        // dependency has been fetched and added to the cache
-                        // or an error occurred along the way;
-                        // in case of an error the hash is still removed from
+                        // Dependency has been fetched and added to the cache
+                        // or an error occurred along the way.
+                        // In case of an error the hash is still removed from
                         // the collection so that it will be tried again to be
-                        // fetched in the subsequent workflow run
+                        // fetched in the subsequent workflow run.
                         validation_dependencies.lock().remove_missing_hash(&hash);
+                        // Secondly remove the just fetched hash from the set
+                        // of missing hashes for the op
+                        validation_dependencies
+                            .lock()
+                            .remove_hash_missing_for_op(dht_op_hash, &hash);
                     }
                 });
             // await all fetches in a separate task in the background
@@ -781,7 +793,7 @@ async fn run_validation_callback(
             filter,
         )) => {
             // fetch missing agent activities in the background without awaiting them
-            let cascade_workspace = workspace_read.clone();
+            let cascade_workspace = workspace.clone();
             let author = author.clone();
             let cascade =
                 CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
@@ -818,6 +830,73 @@ async fn run_validation_callback(
             }
             Ok(Outcome::AwaitingDeps(vec![author.into()]))
         }
+    }
+}
+
+/// Dependencies required for app validating an op.
+pub struct ValidationDependencies {
+    /// Missing hashes that are being fetched.
+    missing_hashes: HashSet<AnyDhtHash>,
+    /// Dependencies that are missing to app validate an op.
+    hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
+}
+
+impl Default for ValidationDependencies {
+    fn default() -> Self {
+        ValidationDependencies::new()
+    }
+}
+
+impl ValidationDependencies {
+    pub fn new() -> Self {
+        Self {
+            missing_hashes: HashSet::new(),
+            hashes_missing_for_op: HashMap::new(),
+        }
+    }
+
+    pub fn insert_missing_hash(&mut self, hash: AnyDhtHash) -> bool {
+        self.missing_hashes.insert(hash)
+    }
+
+    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) -> bool {
+        self.missing_hashes.remove(hash)
+    }
+
+    pub fn insert_hash_missing_for_op(&mut self, dht_op_hash: DhtOpHash, hash: AnyDhtHash) {
+        self.hashes_missing_for_op
+            .entry(dht_op_hash)
+            .and_modify(|hashes| {
+                hashes.insert(hash.clone());
+            })
+            .or_insert_with(|| {
+                let mut set = HashSet::new();
+                set.insert(hash.clone());
+                set
+            });
+    }
+
+    pub fn remove_hash_missing_for_op(&mut self, dht_op_hash: DhtOpHash, hash: &AnyDhtHash) {
+        self.hashes_missing_for_op
+            .entry(dht_op_hash.clone())
+            .and_modify(|hashes| {
+                hashes.remove(hash);
+            });
+
+        // if there are no hashes left for this dht op hash,
+        // remove the entry
+        if let Some(hashes) = self.hashes_missing_for_op.get(&dht_op_hash) {
+            if hashes.is_empty() {
+                self.hashes_missing_for_op.remove(&dht_op_hash);
+            }
+        }
+    }
+
+    // filter out ops that have missing dependencies
+    pub fn filter_ops_missing_dependencies(&self, ops: Vec<DhtOpHashed>) -> Vec<DhtOpHashed> {
+        ops.into_iter()
+            .filter(|op| !self.hashes_missing_for_op.contains_key(op.as_hash()))
+            .collect()
     }
 }
 
