@@ -96,15 +96,9 @@ async fn app_validation_workflow_inner(
     let db = workspace.dht_db.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
     // filter out ops that have missing dependencies
-    let sorted_ops: Vec<_> = sorted_ops
-        .into_iter()
-        // .filter(|op| {
-        //     validation_dependencies
-        //         .lock()
-        //         .hashes_missing_for_op
-        //         .contains_key(op.as_hash())
-        // })
-        .collect();
+    let sorted_ops = validation_dependencies
+        .lock()
+        .filter_ops_missing_dependencies(sorted_ops);
     let num_ops_to_validate = sorted_ops.len();
     tracing::debug!("validating {num_ops_to_validate} ops");
     let sleuth_id = conductor.config.sleuth_id();
@@ -830,6 +824,12 @@ impl ValidationDependencies {
             .and_modify(|hashes| {
                 hashes.remove(hash);
             });
+    }
+
+    pub fn filter_ops_missing_dependencies(&self, ops: Vec<DhtOpHash>) -> Vec<DhtOpHash> {
+        ops.into_iter()
+            .filter(|op| self.hashes_missing_for_op.contains_key(op))
+            .collect()
     }
 }
 
