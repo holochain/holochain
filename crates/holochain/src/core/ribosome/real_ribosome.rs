@@ -89,7 +89,8 @@ use holochain_util::timed;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
-use parking_lot::RwLock;
+use tokio::sync::RwLock;
+use tracing::Instrument;
 use wasmer::AsStoreMut;
 use wasmer::Exports;
 use wasmer::Function;
@@ -214,7 +215,7 @@ impl HostFnBuilder {
 impl RealRibosome {
     /// Create a new instance
     #[tracing::instrument(skip_all)]
-    pub fn new(
+    pub async fn new(
         dna_file: DnaFile,
         wasmer_module_cache: Arc<RwLock<ModuleCache>>,
     ) -> RibosomeResult<Self> {
@@ -227,24 +228,22 @@ impl RealRibosome {
 
         // Collect the number of entry and link types
         // for each integrity zome.
-        let iter = ribosome
-            .dna_def()
-            .integrity_zomes
-            .iter()
-            .map(|(name, zome)| {
+        let iter = futures::future::join_all(ribosome.dna_def().integrity_zomes.iter().map(
+            |(name, zome)| async {
                 let zome = Zome::new(name.clone(), zome.clone().erase_type());
 
                 // Call the const functions that return the number of types.
-                let num_entry_types = match ribosome.get_const_fn(&zome, "__num_entry_types")? {
-                    Some(i) => {
-                        let i: u8 = i
-                            .try_into()
-                            .map_err(|_| ZomeTypesError::EntryTypeIndexOverflow)?;
-                        EntryDefIndex(i)
-                    }
-                    None => EntryDefIndex(0),
-                };
-                let num_link_types = match ribosome.get_const_fn(&zome, "__num_link_types")? {
+                let num_entry_types =
+                    match ribosome.get_const_fn(&zome, "__num_entry_types").await? {
+                        Some(i) => {
+                            let i: u8 = i
+                                .try_into()
+                                .map_err(|_| ZomeTypesError::EntryTypeIndexOverflow)?;
+                            EntryDefIndex(i)
+                        }
+                        None => EntryDefIndex(0),
+                    };
+                let num_link_types = match ribosome.get_const_fn(&zome, "__num_link_types").await? {
                     Some(i) => {
                         let i: u8 = i
                             .try_into()
@@ -254,11 +253,14 @@ impl RealRibosome {
                     None => LinkType(0),
                 };
                 RibosomeResult::Ok((num_entry_types, num_link_types))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+            },
+        ))
+        .await
+        .into_iter()
+        .collect::<RibosomeResult<Vec<_>>>()?;
 
         // Create the global zome types from the totals.
-        let map = GlobalZomeTypes::from_ordered_iterator(iter);
+        let map = GlobalZomeTypes::from_ordered_iterator(iter.into_iter());
 
         ribosome.zome_types = Arc::new(map?);
 
@@ -319,12 +321,41 @@ impl RealRibosome {
     }
 
     #[tracing::instrument(skip(self))]
-    pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
+    pub async fn runtime_compiled_module(
+        &self,
+        zome_name: &ZomeName,
+    ) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
-        let wasm = &self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        let module_cache = timed!([1, 10, 1000], self.wasmer_module_cache.write());
-        let module = timed!([1, 10, 1000], module_cache.get(cache_key, wasm)?);
-        Ok(module)
+        if let Some(module) = timed!(
+            [1, 10, 1000],
+            self.wasmer_module_cache
+                .write()
+                .instrument(tracing::info_span!("lock write 1"))
+                .await
+        )
+        .read(&cache_key)
+        {
+            Ok(module)
+        } else {
+            // Wasm compilation routinely takes over 1 second in release builds,
+            // so we have to spawn a new thread.
+            let cache_lock = self.wasmer_module_cache.clone();
+            let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.code();
+            Ok(tokio::task::spawn_blocking(move || {
+                let lock = timed!(
+                    [1, 10, 1000],
+                    tokio_helper::run_on(
+                        cache_lock
+                            .write()
+                            .instrument(tracing::info_span!("lock write 2"))
+                    )
+                );
+                // cache_lock.write().await.get(cache_key, &wasm)
+                timed!([1, 1000, 10_000], lock.get(cache_key, &wasm))
+            })
+            .instrument(tracing::info_span!("compile wasm"))
+            .await??)
+        }
     }
 
     // Create a key for module cache.
@@ -340,14 +371,14 @@ impl RealRibosome {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn get_module_for_zome(&self, zome: &Zome<ZomeDef>) -> RibosomeResult<Arc<Module>> {
+    pub async fn get_module_for_zome(&self, zome: &Zome<ZomeDef>) -> RibosomeResult<Arc<Module>> {
         match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
                 if let Some(path) = wasm_zome.preserialized_path.as_ref() {
                     let module = holochain_wasmer_host::module::get_ios_module_from_file(path)?;
                     Ok(Arc::new(module))
                 } else {
-                    self.runtime_compiled_module(zome.zome_name())
+                    self.runtime_compiled_module(zome.zome_name()).await
                 }
             }
             _ => RibosomeResult::Err(RibosomeError::DnaError(DnaError::ZomeError(
@@ -433,7 +464,8 @@ impl RealRibosome {
         let empty_ribosome = RealRibosome::new(
             empty_dna_file,
             Arc::new(RwLock::new(ModuleCache::new(None))),
-        )?;
+        )
+        .await?;
         let context_key = RealRibosome::next_context_key();
         let mut store = Store::default();
         // We just leave this Env uninitialized as default because we never make it
@@ -709,6 +741,7 @@ impl RealRibosome {
     }
 }
 
+#[async_trait::async_trait]
 impl RibosomeT for RealRibosome {
     fn dna_def(&self) -> &DnaDefHashed {
         self.dna_file.dna()
@@ -763,7 +796,9 @@ impl RibosomeT for RealRibosome {
                                 path,
                             )?)
                         } else {
-                            self.runtime_compiled_module(zome.zome_name())?
+                            tokio_helper::block_forever_on(
+                                self.runtime_compiled_module(zome.zome_name()),
+                            )?
                         };
                         self.get_extern_fns_for_wasm(module.clone())
                     }
@@ -776,7 +811,7 @@ impl RibosomeT for RealRibosome {
 
     /// call a function in a zome for an invocation if it exists
     /// if it does not exist, then return Ok(None)
-    fn maybe_call<I: Invocation>(
+    async fn maybe_call<I: Invocation>(
         &self,
         host_context: HostContext,
         invocation: &I,
@@ -792,7 +827,8 @@ impl RibosomeT for RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
-                let module = self.get_module_for_zome(zome)?;
+                // let module: Arc<Module> = todo!();
+                let module = self.get_module_for_zome(zome).await?;
                 if module.info().exports.contains_key(fn_name.as_ref()) {
                     // there is a corresponding zome fn
                     let context_key = Self::next_context_key();
@@ -830,10 +866,10 @@ impl RibosomeT for RealRibosome {
     }
 
     #[tracing::instrument(skip_all)]
-    fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError> {
+    async fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError> {
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
-                let module = self.get_module_for_zome(zome)?;
+                let module = self.get_module_for_zome(zome).await?;
                 if module.exports().functions().any(|f| {
                     f.name() == name
                         && f.ty().params().is_empty()

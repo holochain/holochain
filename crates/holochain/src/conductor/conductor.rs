@@ -46,9 +46,9 @@ use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holochain_wasmer_host::module::ModuleCache;
 use itertools::Itertools;
-use parking_lot::RwLock;
 use rusqlite::Transaction;
 use tokio::sync::mpsc::error::SendError;
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing::*;
 
@@ -659,7 +659,8 @@ mod dna_impls {
             // try to join all the tasks and return the list of dna files
             let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
                 let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
-                let ribosome = RealRibosome::new(dna_file, self.wasmer_module_cache.clone())?;
+                let ribosome =
+                    RealRibosome::new(dna_file, self.wasmer_module_cache.clone()).await?;
                 ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
             });
             let dnas = futures::future::try_join_all(wasms).await?;
@@ -790,7 +791,7 @@ mod dna_impls {
             }
 
             dbg!();
-            let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone())?;
+            let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone()).await?;
 
             dbg!("HERE");
             let entry_defs = self.register_dna_wasm(ribosome.clone()).await?;

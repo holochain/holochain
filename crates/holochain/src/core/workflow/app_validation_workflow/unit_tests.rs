@@ -42,7 +42,7 @@ use holochain_zome_types::{
 };
 use kitsune_p2p_types::ok_fut;
 use matches::assert_matches;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use std::{
     sync::{
         atomic::{AtomicI8, Ordering},
@@ -50,6 +50,7 @@ use std::{
     },
     time::Duration,
 };
+use tokio::sync::RwLock;
 
 // test app validation with a must get action where the original action of
 // a delete is not in the cache db and then added to it
@@ -519,6 +520,7 @@ impl TestCase {
             dna_file.clone(),
             Arc::new(RwLock::new(ModuleCache::new(None))),
         )
+        .await
         .unwrap();
         let test_space = TestSpace::new(dna_hash.clone());
         let alice = fixt!(AgentPubKey);

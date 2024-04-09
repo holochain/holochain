@@ -8,8 +8,8 @@ use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_state::prelude::*;
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::action;
-use parking_lot::RwLock;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
@@ -48,7 +48,9 @@ async fn test_cell_handle_publish() {
     handle.register_dna(dna_file.clone()).await.unwrap();
     let wasmer_module_cache = Arc::new(RwLock::new(ModuleCache::new(Some(db_dir))));
 
-    let ribosome = RealRibosome::new(dna_file, wasmer_module_cache).unwrap();
+    let ribosome = RealRibosome::new(dna_file, wasmer_module_cache)
+        .await
+        .unwrap();
 
     super::Cell::genesis(
         cell_id.clone(),

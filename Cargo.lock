@@ -2858,7 +2858,7 @@ dependencies = [
  "futures",
  "holochain_serialized_bytes",
  "holochain_util",
- "holochain_wasmer_common",
+ "holochain_wasmer_common 0.0.92 (registry+https://github.com/rust-lang/crates.io-index)",
  "kitsune_p2p_dht_arc",
  "must_future",
  "proptest",
@@ -3583,6 +3583,18 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.92"
+dependencies = [
+ "holochain_serialized_bytes",
+ "serde",
+ "serde_bytes",
+ "test-fuzz",
+ "thiserror",
+ "wasmer",
+]
+
+[[package]]
+name = "holochain_wasmer_common"
+version = "0.0.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72007fd2a72d77e76ffa494e5847bf6e893e25e73fe1d1de902e1b8d5033a64e"
 dependencies = [
@@ -3601,7 +3613,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c429e84a19ee446f47541a6fed10e1a4376a8a8ba6d3dbff7d07e4a7bb4c85f"
 dependencies = [
  "holochain_serialized_bytes",
- "holochain_wasmer_common",
+ "holochain_wasmer_common 0.0.92 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot 0.12.1",
  "paste",
  "serde",
@@ -3611,14 +3623,12 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_host"
 version = "0.0.92"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4951f6e1ac6d294631b3d38b8584c84ff510057ac6adca04d1e244b30c2e0b6b"
 dependencies = [
  "bimap",
  "bytes",
  "hex",
  "holochain_serialized_bytes",
- "holochain_wasmer_common",
+ "holochain_wasmer_common 0.0.92",
  "parking_lot 0.12.1",
  "rand 0.8.5",
  "serde",
@@ -3648,6 +3658,7 @@ name = "holochain_zome_types"
 version = "0.3.0-beta-dev.32"
 dependencies = [
  "arbitrary",
+ "async-trait",
  "contrafact",
  "derive_builder",
  "derive_more",
@@ -3657,7 +3668,7 @@ dependencies = [
  "holochain_nonce",
  "holochain_secure_primitive",
  "holochain_serialized_bytes",
- "holochain_wasmer_common",
+ "holochain_wasmer_common 0.0.92 (registry+https://github.com/rust-lang/crates.io-index)",
  "holochain_zome_types",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_block",
