@@ -882,7 +882,6 @@ impl RibosomeT for RealRibosome {
         host_context: HostContext,
         invocation: I,
     ) -> CallIterator<Self, I> {
-
         CallIterator::new(host_context, self.clone(), invocation)
     }
 

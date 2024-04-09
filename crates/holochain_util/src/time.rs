@@ -93,7 +93,7 @@ async fn test_timed() {
     });
     assert!(logs.get().contains("MID"));
     assert!(logs.get().contains("from_millis(2001)"));
-    
+
     timed!([1, 2, 3], {
         tokio::time::advance(tokio::time::Duration::from_millis(3)).await;
     });
