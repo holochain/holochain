@@ -447,11 +447,11 @@ pub async fn validate_op(
     conductor_handle: &ConductorHandle,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> AppValidationOutcome<Outcome> {
-    check_entry_def(&op, &network.dna_hash(), conductor_handle)
+    check_entry_def(op, &network.dna_hash(), conductor_handle)
         .await
         .map_err(AppValidationError::SysValidationError)?;
 
-    let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, &network, ribosome)
+    let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, network, ribosome)
         .await
         .map_err(|e| {
             eprintln!("zomes to invoke error {e:?}");
@@ -462,7 +462,7 @@ pub async fn validate_op(
 
     let outcome = run_validation_callback(
         invocation,
-        &dht_op_hash,
+        dht_op_hash,
         ribosome,
         workspace,
         Arc::new(network.clone()),
@@ -483,7 +483,7 @@ async fn get_zomes_to_invoke(
         Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => Ok(ZomesToInvoke::AllIntegrity),
         Op::StoreRecord(StoreRecord { record }) => {
             let cascade =
-                CascadeImpl::from_workspace_and_network(&workspace, Arc::new(network.clone()));
+                CascadeImpl::from_workspace_and_network(workspace, Arc::new(network.clone()));
             store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await
         }
         Op::StoreEntry(StoreEntry {
