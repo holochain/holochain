@@ -726,7 +726,14 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
         None
     );
 
-    let outcome = run_validation_callback(
+    // filtering out ops with missing dependencies should not filter anything
+    let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
+    let filtered_ops_to_validate = validation_dependencies
+        .lock()
+        .filter_ops_missing_dependencies(ops_to_validate.clone());
+    assert_eq!(filtered_ops_to_validate, ops_to_validate);
+
+    let _ = run_validation_callback(
         invocation.clone(),
         &delete_dht_op_hash,
         &ribosome,
@@ -750,12 +757,17 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
         vec![create_action_signed_hashed.as_hash().clone().into()]
     );
 
-    // await while missing record is being fetched in background task
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    // filtering out ops with missing dependencies should filter out delete
+    let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
+    let filtered_ops_to_validate = validation_dependencies
+        .lock()
+        .filter_ops_missing_dependencies(ops_to_validate.clone());
+    assert_eq!(filtered_ops_to_validate, vec![]);
 
-    // hashes missing for delete dht op should be empty again after create
-    // has been fetched
-    let outcome = run_validation_callback(
+    // await while missing record is being fetched in background task
+    tokio::time::sleep(Duration::from_millis(10)).await;
+
+    let _ = run_validation_callback(
         invocation,
         &delete_dht_op_hash,
         &ribosome,
@@ -765,17 +777,23 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     )
     .await
     .unwrap();
+
+    // hashes missing for delete dht op should be empty again after create
+    // has been fetched
     assert_eq!(
         validation_dependencies
             .lock()
             .hashes_missing_for_op
-            .get(&delete_dht_op_hash)
-            .unwrap()
-            .clone()
-            .into_iter()
-            .collect::<Vec<AnyDhtHash>>(),
-        vec![]
+            .get(&delete_dht_op_hash),
+        None
     );
+
+    // filtering out ops with missing dependencies should not filter anything
+    let ops_to_validate = vec![delete_dht_op.into_hashed()];
+    let filtered_ops_to_validate = validation_dependencies
+        .lock()
+        .filter_ops_missing_dependencies(ops_to_validate.clone());
+    assert_eq!(filtered_ops_to_validate, ops_to_validate);
 }
 
 // test case with alice and bob, a create by alice and a delete by bob that
