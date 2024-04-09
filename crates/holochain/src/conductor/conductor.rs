@@ -583,7 +583,7 @@ mod dna_impls {
                 .dna_def()
                 .all_zomes()
                 .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
-            dbg!("HERE");
+
             // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
             if is_full_wasm_dna {
                 Ok(self.put_wasm(ribosome).await?)
@@ -731,9 +731,8 @@ mod dna_impls {
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
             let dna_def = ribosome.dna_def().clone();
             let code = ribosome.dna_file().code().clone().into_values();
-            dbg!("HERE");
+
             let zome_defs = get_entry_defs(ribosome).await?;
-            dbg!();
             self.put_wasm_code(dna_def, code, zome_defs).await
         }
 
@@ -747,7 +746,6 @@ mod dna_impls {
             // TODO: PERF: This loop might be slow
             let wasms = futures::future::join_all(code.map(DnaWasmHashed::from_content)).await;
 
-            dbg!();
             self.spaces
                 .wasm_db
                 .write_async({
@@ -771,7 +769,6 @@ mod dna_impls {
                 })
                 .await?;
 
-            dbg!();
             Ok(zome_defs)
         }
 
@@ -792,19 +789,14 @@ mod dna_impls {
                 return Ok(());
             }
 
-            dbg!();
             let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone()).await?;
 
-            dbg!("HERE");
             let entry_defs = self.register_dna_wasm(ribosome.clone()).await?;
 
-            dbg!();
             self.register_dna_entry_defs(entry_defs);
 
-            dbg!();
             self.add_ribosome_to_store(ribosome);
 
-            dbg!();
             Ok(())
         }
     }
@@ -1433,8 +1425,6 @@ mod app_impls {
         ) -> ConductorResult<StoppedApp> {
             let dpki = self.running_services().dpki.clone();
 
-            dbg!();
-
             let mut dpki = if let Some(d) = dpki.as_ref() {
                 let lock = d.state().await;
                 Some((d.clone(), lock))
@@ -1442,7 +1432,6 @@ mod app_impls {
                 None
             };
 
-            dbg!();
             let (agent_key, derivation_details): (AgentPubKey, Option<DerivationDetailsInput>) =
                 if let Some(agent_key) = agent_key {
                     if dpki.is_some() {
@@ -1483,7 +1472,6 @@ mod app_impls {
                     }
                 };
 
-            dbg!();
             let cells_to_create = ops.cells_to_create(agent_key.clone());
 
             // check if cells_to_create contains a cell identical to an existing one
@@ -1502,12 +1490,10 @@ mod app_impls {
                 ));
             };
 
-            dbg!();
             for (dna, _) in ops.dnas_to_register {
                 self.clone().register_dna(dna).await?;
             }
 
-            dbg!();
             let cell_ids: Vec<_> = cells_to_create
                 .iter()
                 .map(|(cell_id, _)| cell_id.clone())
@@ -2304,9 +2290,8 @@ mod service_impls {
             enable: bool,
         ) -> ConductorResult<()> {
             let dna_hash = dna.dna_hash().clone();
-            dbg!("HERE");
+
             self.register_dna(dna.clone()).await?;
-            dbg!();
 
             // FIXME: This "device seed" should be derived from the master seed and passed in here,
             //        not just generated like this. This is a placeholder.
@@ -2318,7 +2303,6 @@ mod service_impls {
                     .await?;
                 tag
             };
-            dbg!();
 
             let (derivation_path, dst_tag) =
                 derivation_path_for_dpki_instance(0, &device_seed_lair_tag);
@@ -2333,7 +2317,6 @@ mod service_impls {
                     derivation_path,
                 )
                 .await?;
-            dbg!();
 
             // The initial agent key is the first derivation from the device seed.
             // Updated DPKI agent keys are sequential derivations from the same device seed.
@@ -2343,7 +2326,6 @@ mod service_impls {
             self.clone()
                 .install_app_minimal(DPKI_APP_ID.into(), Some(agent), &[(dna, None)])
                 .await?;
-            dbg!();
 
             // In multi-conductor tests, we often want to delay enabling DPKI until all conductors
             // have exchanged peer info, so that the initial DPKI publish can go more smoothly.

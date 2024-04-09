@@ -22,7 +22,7 @@ async fn conductors_call_remote(num_conductors: usize) {
                 .with_line_number(true)
                 .with_target(true)
                 // .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
-                .with_span_events(tracing_subscriber::fmt::format::FmtSpan::FULL)
+                // .with_span_events(tracing_subscriber::fmt::format::FmtSpan::FULL)
                 .with_filter(holochain_trace::standard_filter().unwrap()),
         )
         .init();
