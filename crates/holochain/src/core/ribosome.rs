@@ -82,6 +82,7 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::*;
 use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
@@ -171,15 +172,20 @@ impl From<&HostContext> for HostFnAccess {
 impl HostContext {
     /// Get the workspace, panics if none was provided
     pub fn workspace(&self) -> HostFnWorkspaceRead {
+        self.maybe_workspace().expect(
+            "Gave access to a host function that uses the workspace without providing a workspace",
+        )
+    }
+
+    /// Get the workspace if it was provided.
+    pub fn maybe_workspace(&self) -> Option<HostFnWorkspaceRead> {
         match self.clone() {
             Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
             | Self::Init(InitHostAccess { workspace, .. })
             | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
-            | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace.into(),
-            Self::Validate(ValidateHostAccess { workspace, .. }) => workspace,
-            _ => panic!(
-                "Gave access to a host function that uses the workspace without providing a workspace"
-            ),
+            | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => Some(workspace.into()),
+            Self::Validate(ValidateHostAccess { workspace, .. }) => Some(workspace),
+            _ => None,
         }
     }
 
@@ -209,12 +215,12 @@ impl HostContext {
     }
 
     /// Get the network, panics if none was provided
-    pub fn network(&self) -> &HolochainP2pDna {
+    pub fn network(&self) -> Arc<dyn HolochainP2pDnaT> {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
-            | Self::PostCommit(PostCommitHostAccess { network, .. })
-            | Self::Validate(ValidateHostAccess { network, .. }) => network,
+            | Self::PostCommit(PostCommitHostAccess { network, .. }) => Arc::new(network.clone()),
+            Self::Validate(ValidateHostAccess { network, .. }) => network.clone(),
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),
