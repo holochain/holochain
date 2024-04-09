@@ -869,6 +869,11 @@ impl RibosomeT for RealRibosome {
                     let result = self
                         .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store.clone())
                         .map(Some);
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> spike/app-install-timing
 
                     {
                         let mut store_lock = instance_with_store.store.lock();
@@ -881,6 +886,10 @@ impl RibosomeT for RealRibosome {
                         self.usage_meter.add(points_used, &otel_info);
                     }
 
+<<<<<<< HEAD
+=======
+>>>>>>> origin/develop
+>>>>>>> spike/app-install-timing
                     // remove context from map after call
                     {
                         CONTEXT_MAP.lock().remove(&context_key);
