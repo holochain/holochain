@@ -235,7 +235,7 @@ where
 {
     let cascade = Arc::new(holochain_cascade::CascadeImpl::from_workspace_and_network(
         &workspace,
-        network.clone(),
+        Arc::new(network.clone()),
     ));
 
     let to_app_validate = {

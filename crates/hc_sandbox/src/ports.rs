@@ -1,5 +1,6 @@
 //! Helpers for working with websockets and ports.
 
+use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -57,9 +58,14 @@ pub(crate) async fn get_admin_api(
 async fn websocket_client_by_port(
     port: u16,
 ) -> std::io::Result<(WebsocketSender, tokio::task::JoinHandle<()>)> {
-    let req = holochain_websocket::ConnectRequest::new(([127, 0, 0, 1], port).into())
-        .try_set_header("Origin", "hc_sandbox")
-        .expect("Failed to set `Origin` header for websocket connection request");
+    let req = holochain_websocket::ConnectRequest::new(
+        format!("localhost:{port}")
+            .to_socket_addrs()?
+            .next()
+            .ok_or_else(|| std::io::Error::other("Could not resolve localhost"))?,
+    )
+    .try_set_header("Origin", "hc_sandbox")
+    .expect("Failed to set `Origin` header for websocket connection request");
 
     let (send, mut recv) = ws::connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), req).await?;
     let task = tokio::task::spawn(async move {
