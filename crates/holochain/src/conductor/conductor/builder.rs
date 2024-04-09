@@ -306,7 +306,7 @@ impl ConductorBuilder {
 
         info!("Conductor startup: scheduler task started.");
 
-        tokio::task::spawn(p2p_event_task(p2p_evt, conductor.clone()));
+        tokio::task::spawn(p2p_event_task(p2p_evt, conductor.clone()).in_current_span());
 
         info!("Conductor startup: p2p event task started.");
 

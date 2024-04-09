@@ -40,12 +40,16 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
             Some(zome) => {
                 match self.remaining_components.next() {
                     Some(to_call) => {
-                        match self.ribosome.maybe_call(
+                        let to_call = to_call.into();
+                        // TODO: some day maybe we can remove this CallIterator fanciness and let this
+                        // be truly async. Or at least make it a CallStream?
+                        let r = tokio_helper::block_forever_on(self.ribosome.maybe_call(
                             self.host_context.clone(),
                             &self.invocation,
                             zome,
-                            &to_call.into(),
-                        ) {
+                            &to_call,
+                        ));
+                        match r {
                             Ok(Some(result)) => Some((zome.clone(), result)),
                             Ok(None) => self.next()?,
                             Err(e) => return Err((zome.clone(), e)),

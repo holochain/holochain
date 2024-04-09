@@ -3633,6 +3633,7 @@ name = "holochain_zome_types"
 version = "0.3.0-beta-dev.32"
 dependencies = [
  "arbitrary",
+ "async-trait",
  "contrafact",
  "derive_builder",
  "derive_more",

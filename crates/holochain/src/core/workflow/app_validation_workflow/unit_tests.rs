@@ -2,7 +2,8 @@ use crate::{
     conductor::space::TestSpace,
     core::{
         ribosome::{
-            guest_callback::validate::ValidateInvocation, real_ribosome::RealRibosome,
+            guest_callback::validate::ValidateInvocation,
+            real_ribosome::{ModuleCacheLock, RealRibosome},
             ZomesToInvoke,
         },
         workflow::app_validation_workflow::{
@@ -35,7 +36,7 @@ use holochain_zome_types::{
     Action,
 };
 use matches::assert_matches;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use std::{
     collections::HashSet,
     sync::{
@@ -628,8 +629,9 @@ impl TestCase {
         let dna_hash = dna_file.dna_hash().clone();
         let ribosome = RealRibosome::new(
             dna_file.clone(),
-            Arc::new(RwLock::new(ModuleCache::new(None))),
+            Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         )
+        .await
         .unwrap();
         let test_space = TestSpace::new(dna_hash.clone());
         let alice = fixt!(AgentPubKey);
