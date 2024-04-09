@@ -31,7 +31,6 @@ use parking_lot::Mutex;
 use rusqlite::Transaction;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::convert::TryInto;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
@@ -826,7 +825,7 @@ impl ValidationDependencies {
             });
     }
 
-    pub fn filter_ops_missing_dependencies(&self, ops: Vec<DhtOpHash>) -> Vec<DhtOpHash> {
+    pub fn filter_ops_missing_dependencies(&self, ops: Vec<DhtOpHashed>) -> Vec<DhtOpHashed> {
         ops.into_iter()
             .filter(|op| self.hashes_missing_for_op.contains_key(op))
             .collect()
