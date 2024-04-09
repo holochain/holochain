@@ -1,6 +1,5 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
-#![deny(warnings)]
 
 //! Kitsune P2p Fetch Queue Logic
 
