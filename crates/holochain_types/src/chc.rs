@@ -24,7 +24,7 @@ pub trait ChainHeadCoordinator {
     /// The CHC will do some integrity checks, which may fail.
     /// All signatures and hashes need to line up properly.
     /// If the records added would result in a fork, then a [`ChcError::OutOfSync`] will be returned
-    /// along with the current
+    /// along with the current chain top.
     // If there is an out-of-sync error, it will return a hash, designating the point of fork.
     async fn add_records_request(&self, request: AddRecordsRequest) -> ChcResult<()>;
 

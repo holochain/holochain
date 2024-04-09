@@ -827,7 +827,7 @@ impl ValidationDependencies {
 
     pub fn filter_ops_missing_dependencies(&self, ops: Vec<DhtOpHashed>) -> Vec<DhtOpHashed> {
         ops.into_iter()
-            .filter(|op| self.hashes_missing_for_op.contains_key(op))
+            .filter(|op| self.hashes_missing_for_op.contains_key(op.as_hash()))
             .collect()
     }
 }

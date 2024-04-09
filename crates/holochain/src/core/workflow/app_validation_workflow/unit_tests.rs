@@ -523,7 +523,7 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn hashes_missing_for_op_are_updated_with_unresolved_and_fetched_deps() {
+async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     holochain_trace::test_run().unwrap();
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
