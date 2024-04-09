@@ -1,3 +1,4 @@
+use std::net::ToSocketAddrs;
 use std::sync::Arc;
 
 use holochain::sweettest::{
@@ -36,7 +37,13 @@ async fn send_signal_after_conductor_restart() {
     // connect app websocket
     let (_, mut app_ws_rx_1) = holochain_websocket::connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], app_interface_port_1).into()),
+        ConnectRequest::new(
+            format!("localhost:{app_interface_port_1}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        ),
     )
     .await
     .unwrap();
@@ -97,7 +104,13 @@ async fn send_signal_after_conductor_restart() {
     // reconnect app websocket
     let (_, mut app_ws_rx_1) = holochain_websocket::connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], app_interface_port_1).into()),
+        ConnectRequest::new(
+            format!("localhost:{app_interface_port_1}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        ),
     )
     .await
     .unwrap();
