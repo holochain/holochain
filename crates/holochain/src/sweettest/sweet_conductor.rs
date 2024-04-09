@@ -1,7 +1,6 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
-use std::net::ToSocketAddrs;
 use super::{
     DynSweetRendezvous, SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig,
     SweetConductorHandle,
@@ -21,6 +20,7 @@ use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_websocket::*;
 use rand::Rng;
+use std::net::ToSocketAddrs;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -660,7 +660,10 @@ pub async fn websocket_client_by_port(
 ) -> std::io::Result<(WebsocketSender, WebsocketReceiver)> {
     holochain_websocket::connect(
         Arc::new(WebsocketConfig::default()),
-        format!("localhost:{port}").to_socket_addrs()?.next().ok_or_else(|| std::io::Error::other("Could not resolve localhost"))?,
+        format!("localhost:{port}")
+            .to_socket_addrs()?
+            .next()
+            .ok_or_else(|| std::io::Error::other("Could not resolve localhost"))?,
     )
     .await
 }

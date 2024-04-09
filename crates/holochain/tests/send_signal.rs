@@ -36,7 +36,11 @@ async fn send_signal_after_conductor_restart() {
     // connect app websocket
     let (_, mut app_ws_rx_1) = holochain_websocket::connect(
         Arc::new(WebsocketConfig::default()),
-        format!("localhost:{app_interface_port_1}").to_socket_addrs().unwrap().next().unwrap(),
+        format!("localhost:{app_interface_port_1}")
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap(),
     )
     .await
     .unwrap();
@@ -97,7 +101,11 @@ async fn send_signal_after_conductor_restart() {
     // reconnect app websocket
     let (_, mut app_ws_rx_1) = holochain_websocket::connect(
         Arc::new(WebsocketConfig::default()),
-        format!("localhost:{app_interface_port_1}").to_socket_addrs().unwrap().next().unwrap()
+        format!("localhost:{app_interface_port_1}")
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap(),
     )
     .await
     .unwrap();

@@ -1,4 +1,3 @@
-use std::net::ToSocketAddrs;
 use ::fixt::prelude::*;
 use anyhow::Result;
 use futures::future;
@@ -16,6 +15,7 @@ use holochain::{
     },
     fixt::*,
 };
+use std::net::ToSocketAddrs;
 
 use holochain_types::{
     prelude::*,
@@ -520,7 +520,11 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
             default_request_timeout: std::time::Duration::from_secs(1),
             ..Default::default()
         }),
-        format!("localhost:{port}").to_socket_addrs().unwrap().next().unwrap(),
+        format!("localhost:{port}")
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap(),
     )
     .await?;
     let _rx = PollRecv::new::<AdminResponse>(rx);
@@ -560,7 +564,11 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
             default_request_timeout: std::time::Duration::from_secs(1),
             ..Default::default()
         }),
-        format!("localhost:{port}").to_socket_addrs().unwrap().next().unwrap(),
+        format!("localhost:{port}")
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap(),
     )
     .await?;
 
@@ -617,7 +625,11 @@ async fn connection_limit_is_respected() {
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
 
-    let addr = format!("localhost:{port}").to_socket_addrs().unwrap().next().unwrap();
+    let addr = format!("localhost:{port}")
+        .to_socket_addrs()
+        .unwrap()
+        .next()
+        .unwrap();
     let cfg = Arc::new(WebsocketConfig::default());
 
     // Retain handles so that the test can control when to disconnect clients

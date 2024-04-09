@@ -67,7 +67,11 @@ async fn new_websocket_client_for_port(
 ) -> anyhow::Result<(WebsocketSender, WebsocketReceiver)> {
     Ok(ws::connect(
         Arc::new(WebsocketConfig::default()),
-        format!("localhost:{port}").to_socket_addrs().unwrap().next().unwrap(),
+        format!("localhost:{port}")
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap(),
     )
     .await?)
 }
