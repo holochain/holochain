@@ -48,7 +48,6 @@ use holochain_wasmer_host::module::ModuleCache;
 use itertools::Itertools;
 use rusqlite::Transaction;
 use tokio::sync::mpsc::error::SendError;
-use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing::*;
 
@@ -93,6 +92,7 @@ use crate::core::queue_consumer::QueueTriggers;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
+use crate::core::ribosome::real_ribosome::ModuleCacheLock;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::ZomeCallResult;
 use crate::{
@@ -244,7 +244,7 @@ pub struct Conductor {
 
     /// File system and in-memory cache for wasmer modules.
     // Used in ribosomes but kept here as a single instance.
-    pub(crate) wasmer_module_cache: Arc<RwLock<ModuleCache>>,
+    pub(crate) wasmer_module_cache: Arc<ModuleCacheLock>,
 }
 
 impl Conductor {
@@ -294,7 +294,9 @@ mod startup_shutdown_impls {
                 holochain_p2p,
                 post_commit,
                 running_services: RwShare::new(ConductorServices::default()),
-                wasmer_module_cache: Arc::new(RwLock::new(ModuleCache::new(maybe_data_root_path))),
+                wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
+                    maybe_data_root_path,
+                ))),
             }
         }
 

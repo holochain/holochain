@@ -14,8 +14,6 @@ use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCh
 use crate::core::ribosome::guest_callback::genesis_self_check::{
     GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation, GenesisSelfCheckResult,
 };
-use crate::core::SysValidationError;
-use crate::core::ValidationOutcome;
 use crate::{conductor::api::CellConductorApiT, core::ribosome::RibosomeT};
 use derive_more::Constructor;
 use holochain_p2p::ChcImpl;

@@ -89,8 +89,6 @@ use holochain_util::timed;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
-use tokio::sync::RwLock;
-use tracing::Instrument;
 use wasmer::AsStoreMut;
 use wasmer::Exports;
 use wasmer::Function;
@@ -112,6 +110,8 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
+pub type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
+
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone, Debug)]
@@ -129,7 +129,7 @@ pub struct RealRibosome {
     pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
 
     /// File system and in-memory cache for wasm modules.
-    pub wasmer_module_cache: Arc<RwLock<ModuleCache>>,
+    pub wasmer_module_cache: Arc<ModuleCacheLock>,
 }
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
@@ -217,7 +217,7 @@ impl RealRibosome {
     #[tracing::instrument(skip_all)]
     pub async fn new(
         dna_file: DnaFile,
-        wasmer_module_cache: Arc<RwLock<ModuleCache>>,
+        wasmer_module_cache: Arc<ModuleCacheLock>,
     ) -> RibosomeResult<Self> {
         let mut ribosome = Self {
             dna_file,
@@ -316,7 +316,7 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            wasmer_module_cache: Arc::new(RwLock::new(ModuleCache::new(None))),
+            wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         }
     }
 
@@ -326,35 +326,13 @@ impl RealRibosome {
         zome_name: &ZomeName,
     ) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
-        if let Some(module) = timed!(
-            [1, 10, 1000],
-            self.wasmer_module_cache
-                .write()
-                .instrument(tracing::info_span!("lock 1"))
-                .await
-        )
-        .read(&cache_key)
-        {
-            Ok(module)
-        } else {
-            // Wasm compilation routinely takes over 1 second in release builds,
-            // so we have to spawn a new thread.
-            let cache_lock = self.wasmer_module_cache.clone();
-            let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.code();
-            let inner_span = tracing::info_span!("lock 2");
-            Ok(tokio::task::spawn_blocking(move || {
-                let lock = timed!(
-                    [1, 10, 1000],
-                    "lock 2",
-                    tokio::task::block_in_place(|| tokio::runtime::Handle::current()
-                        .block_on(cache_lock.write().instrument(inner_span)))
-                );
-                tracing::trace!("got lock 2");
-                timed!([1, 1000, 10_000], lock.get(cache_key, &wasm))
-            })
-            .in_current_span()
-            .await??)
-        }
+        let cache_lock = self.wasmer_module_cache.clone();
+        let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.code();
+        tokio::task::spawn_blocking(move || {
+            let cache = timed!([1, 10, 1000], cache_lock.write());
+            Ok(timed!([1, 1000, 10_000], cache.get(cache_key, &wasm))?)
+        })
+        .await?
     }
 
     // Create a key for module cache.
@@ -462,7 +440,7 @@ impl RealRibosome {
         let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
         let empty_ribosome = RealRibosome::new(
             empty_dna_file,
-            Arc::new(RwLock::new(ModuleCache::new(None))),
+            Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         )
         .await?;
         let context_key = RealRibosome::next_context_key();

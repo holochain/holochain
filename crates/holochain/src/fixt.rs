@@ -12,6 +12,7 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
+use crate::core::ribosome::real_ribosome::ModuleCacheLock;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
@@ -40,7 +41,6 @@ use rand::Rng;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
-use tokio::sync::RwLock;
 
 pub use holochain_types::fixt::*;
 
@@ -63,7 +63,7 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
 
         let ribosome = tokio_helper::block_forever_on(RealRibosome::new(
             dna_file,
-            Arc::new(RwLock::new(ModuleCache::new(None))),
+            Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         ))
         .unwrap();
 

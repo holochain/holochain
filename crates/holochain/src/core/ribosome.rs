@@ -625,6 +625,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
 
+    #[tracing::instrument(skip_all)]
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
         dbg!();
         match zomes_to_invoke {

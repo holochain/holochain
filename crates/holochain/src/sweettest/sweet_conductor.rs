@@ -2,7 +2,7 @@
 // TODO [ B-03669 ] move to own crate
 
 use super::{
-    DynSweetRendezvous, SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig,
+    DynSweetRendezvous, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig,
     SweetConductorHandle, NUM_CREATED,
 };
 use crate::conductor::state::AppInterfaceId;

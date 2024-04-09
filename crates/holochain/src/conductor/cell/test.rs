@@ -1,6 +1,6 @@
 use crate::conductor::space::TestSpaces;
 use crate::conductor::Conductor;
-use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::ribosome::real_ribosome::{ModuleCacheLock, RealRibosome};
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::test_utils::{fake_valid_dna_file, test_network};
 use holo_hash::HasHash;
@@ -46,7 +46,7 @@ async fn test_cell_handle_publish() {
         .await
         .unwrap();
     handle.register_dna(dna_file.clone()).await.unwrap();
-    let wasmer_module_cache = Arc::new(RwLock::new(ModuleCache::new(Some(db_dir))));
+    let wasmer_module_cache = Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(db_dir))));
 
     let ribosome = RealRibosome::new(dna_file, wasmer_module_cache)
         .await

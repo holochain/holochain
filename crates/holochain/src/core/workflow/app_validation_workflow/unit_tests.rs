@@ -2,7 +2,8 @@ use crate::{
     conductor::space::TestSpace,
     core::{
         ribosome::{
-            guest_callback::validate::ValidateInvocation, real_ribosome::RealRibosome,
+            guest_callback::validate::ValidateInvocation,
+            real_ribosome::{ModuleCacheLock, RealRibosome},
             ZomesToInvoke,
         },
         workflow::app_validation_workflow::{
@@ -50,7 +51,6 @@ use std::{
     },
     time::Duration,
 };
-use tokio::sync::RwLock;
 
 // test app validation with a must get action where the original action of
 // a delete is not in the cache db and then added to it
@@ -518,7 +518,7 @@ impl TestCase {
         let dna_hash = dna_file.dna_hash().clone();
         let ribosome = RealRibosome::new(
             dna_file.clone(),
-            Arc::new(RwLock::new(ModuleCache::new(None))),
+            Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         )
         .await
         .unwrap();
