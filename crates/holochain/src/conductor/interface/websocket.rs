@@ -38,7 +38,7 @@ pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketLis
     trace!("Initializing Admin interface");
     let listener = WebsocketListener::bind(
         Arc::new(WebsocketConfig::default()),
-        format!("127.0.0.1:{}", port),
+        format!("localhost:{}", port),
     )
     .await?;
     trace!("LISTENING AT: {}", listener.local_addr()?);
@@ -113,7 +113,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     trace!("Initializing App interface");
     let listener = WebsocketListener::bind(
         Arc::new(WebsocketConfig::default()),
-        format!("127.0.0.1:{}", port),
+        format!("localhost:{}", port),
     )
     .await?;
     let addr = listener.local_addr()?;

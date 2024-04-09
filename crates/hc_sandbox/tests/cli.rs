@@ -6,6 +6,7 @@ use holochain_websocket::{self as ws, WebsocketConfig, WebsocketReceiver, Websoc
 use matches::assert_matches;
 use once_cell::sync::Lazy;
 use std::future::Future;
+use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -66,7 +67,7 @@ async fn new_websocket_client_for_port(
 ) -> anyhow::Result<(WebsocketSender, WebsocketReceiver)> {
     Ok(ws::connect(
         Arc::new(WebsocketConfig::default()),
-        ([127, 0, 0, 1], port).into(),
+        format!("localhost:{port}").to_socket_addrs().unwrap().next().unwrap(),
     )
     .await?)
 }

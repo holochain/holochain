@@ -1,5 +1,6 @@
 //! Helpers for working with websockets and ports.
 
+use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -56,7 +57,10 @@ async fn websocket_client_by_port(
 ) -> std::io::Result<(WebsocketSender, tokio::task::JoinHandle<()>)> {
     let (send, mut recv) = ws::connect(
         Arc::new(WebsocketConfig::default()),
-        ([127, 0, 0, 1], port).into(),
+        format!("localhost:{port}")
+            .to_socket_addrs()?
+            .next()
+            .ok_or_else(|| std::io::Error::other("Could not resolve localhost"))?,
     )
     .await?;
     let task = tokio::task::spawn(async move {
