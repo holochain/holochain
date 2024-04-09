@@ -1,7 +1,7 @@
-use std::net::ToSocketAddrs;
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::Criterion;
+use std::net::ToSocketAddrs;
 
 use holochain_serialized_bytes::prelude::*;
 use holochain_websocket::*;
