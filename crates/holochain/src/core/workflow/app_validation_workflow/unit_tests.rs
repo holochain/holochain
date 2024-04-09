@@ -14,7 +14,7 @@ use crate::{
     test_utils::{test_network, test_network_with_events},
 };
 use fixt::fixt;
-use holo_hash::{AgentPubKey, HashableContentExtSync};
+use holo_hash::{AgentPubKey, AnyDhtHash, HashableContentExtSync};
 use holochain_p2p::{event::HolochainP2pEvent, HolochainP2pDnaFixturator};
 use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, mutations::insert_op};
 use holochain_types::{
@@ -101,7 +101,7 @@ async fn validation_callback_must_get_action() {
         delete_action_signed_hashed.signature.clone(),
         delete.clone(),
     );
-    let delete_action_op_hash = delete_dht_op.to_hash();
+    let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
         original_action: EntryCreationAction::Create(create.clone()),
@@ -114,7 +114,7 @@ async fn validation_callback_must_get_action() {
     // validation should indicate it is awaiting create action hash
     let outcome = run_validation_callback(
         invocation.clone(),
-        &delete_action_op_hash.clone(),
+        &delete_dht_op_hash,
         &ribosome,
         workspace.clone(),
         network.clone(),
@@ -134,7 +134,7 @@ async fn validation_callback_must_get_action() {
     // the same validation should now successfully validate the op
     let outcome = run_validation_callback(
         invocation,
-        &delete_action_op_hash,
+        &delete_dht_op_hash,
         &ribosome,
         workspace,
         network,
@@ -192,11 +192,11 @@ async fn validation_callback_awaiting_deps_hashes() {
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
-    let dht_op = DhtOp::RegisterDeletedBy(
+    let delete_dht_op = DhtOp::RegisterDeletedBy(
         delete_action_signed_hashed.signature.clone(),
         delete.clone(),
     );
-    let delete_action_op_hash = dht_op.to_hash();
+    let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
         original_action: EntryCreationAction::Create(create.clone()),
@@ -257,7 +257,7 @@ async fn validation_callback_awaiting_deps_hashes() {
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback(
         invocation.clone(),
-        &delete_action_op_hash,
+        &delete_dht_op_hash,
         &ribosome,
         workspace.clone(),
         network.dna_network(),
@@ -274,7 +274,7 @@ async fn validation_callback_awaiting_deps_hashes() {
     // has been fetched
     let outcome = run_validation_callback(
         invocation,
-        &delete_action_op_hash,
+        &delete_dht_op_hash,
         &ribosome,
         workspace,
         network.dna_network(),
@@ -431,11 +431,11 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
-    let dht_op = DhtOp::RegisterDeletedBy(
+    let delete_dht_op = DhtOp::RegisterDeletedBy(
         delete_action_signed_hashed.signature.clone(),
         delete.clone(),
     );
-    let delete_action_op_hash = dht_op.to_hash();
+    let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
         original_action: EntryCreationAction::Create(create.clone()),
@@ -498,7 +498,7 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
     // run two op validations that depend on the same record in parallel
     let validate_1 = run_validation_callback(
         invocation.clone(),
-        &delete_action_op_hash,
+        &delete_dht_op_hash,
         &ribosome,
         workspace.clone(),
         network.dna_network(),
@@ -506,7 +506,7 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
     );
     let validate_2 = run_validation_callback(
         invocation,
-        &delete_action_op_hash,
+        &delete_dht_op_hash,
         &ribosome,
         workspace,
         network.dna_network(),
@@ -523,7 +523,173 @@ async fn validation_callback_prevent_multiple_identical_fetches() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn hashes_missing_for_op_is_updated_with_unresolved_and_fetched_deps() {}
+async fn hashes_missing_for_op_is_updated_with_unresolved_and_fetched_deps() {
+    holochain_trace::test_run().unwrap();
+
+    let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
+        move |api, op: Op| {
+            if let Op::RegisterDelete(RegisterDelete {
+                original_action, ..
+            }) = op
+            {
+                let result = api.must_get_action(MustGetActionInput(original_action.to_hash()));
+                if result.is_ok() {
+                    Ok(ValidateCallbackResult::Valid)
+                } else {
+                    Ok(ValidateCallbackResult::UnresolvedDependencies(
+                        UnresolvedDependencies::Hashes(vec![original_action.to_hash().into()]),
+                    ))
+                }
+            } else {
+                unreachable!()
+            }
+        }
+    });
+
+    let TestCase {
+        dna_file,
+        zomes_to_invoke,
+        ribosome,
+        alice,
+        workspace,
+        bob,
+        ..
+    } = TestCase::new(zomes).await;
+
+    // a create by alice
+    let mut create = fixt!(Create);
+    create.author = alice.clone();
+    let create_action = Action::Create(create.clone());
+    let create_action_signed_hashed =
+        SignedHashed::new_unchecked(create_action.clone(), fixt!(Signature));
+    // a delete by bob that references alice's create
+    let mut delete = fixt!(Delete);
+    delete.author = bob.clone();
+    delete.deletes_address = create_action.clone().to_hash();
+    let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
+    let delete_dht_op = DhtOp::RegisterDeletedBy(
+        delete_action_signed_hashed.signature.clone(),
+        delete.clone(),
+    );
+    let delete_dht_op_hash = delete_dht_op.to_hash();
+    let delete_action_op = Op::RegisterDelete(RegisterDelete {
+        delete: delete_action_signed_hashed.clone(),
+        original_action: EntryCreationAction::Create(create.clone()),
+        original_entry: None,
+    });
+
+    let dna_hash = dna_file.dna_hash().clone();
+
+    // handle only Get events
+    let filter_events = |evt: &_| match evt {
+        holochain_p2p::event::HolochainP2pEvent::Get { .. } => true,
+        _ => false,
+    };
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+    let network = test_network_with_events(
+        Some(dna_hash.clone()),
+        Some(alice.clone()),
+        filter_events,
+        tx,
+    )
+    .await;
+
+    // respond to Get request with action plus delete
+    tokio::spawn({
+        let action = create_action.clone();
+        let create_action_signed_hashed = create_action_signed_hashed.clone();
+        async move {
+            let action_hash = action.clone().to_hash();
+            while let Some(evt) = rx.recv().await {
+                if let HolochainP2pEvent::Get {
+                    dht_hash, respond, ..
+                } = evt
+                {
+                    assert_eq!(dht_hash, action_hash.clone().into());
+
+                    respond.r(ok_fut(Ok(WireOps::Record(WireRecordOps {
+                        action: Some(Judged::new(
+                            create_action_signed_hashed.clone().into(),
+                            ValidationStatus::Valid,
+                        )),
+                        deletes: vec![Judged::new(
+                            WireDelete {
+                                delete: delete.clone(),
+                                signature: fixt!(Signature),
+                            },
+                            ValidationStatus::Valid,
+                        )],
+                        updates: vec![],
+                        entry: None,
+                    }))))
+                }
+            }
+        }
+    });
+
+    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
+    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+
+    // hashes missing for delete dht op should be empty
+    assert_eq!(
+        validation_dependencies
+            .lock()
+            .hashes_missing_for_op
+            .get(&delete_dht_op_hash),
+        None
+    );
+
+    let outcome = run_validation_callback(
+        invocation.clone(),
+        &delete_dht_op_hash,
+        &ribosome,
+        workspace.clone(),
+        network.dna_network(),
+        validation_dependencies.clone(),
+    )
+    .await
+    .unwrap();
+
+    // hashes missing for delete dht op should contain the missing create hash
+    assert_eq!(
+        validation_dependencies
+            .lock()
+            .hashes_missing_for_op
+            .get(&delete_dht_op_hash)
+            .unwrap()
+            .clone()
+            .into_iter()
+            .collect::<Vec<AnyDhtHash>>(),
+        vec![create_action_signed_hashed.as_hash().clone().into()]
+    );
+
+    // await while missing record is being fetched in background task
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // hashes missing for delete dht op should be empty again after create
+    // has been fetched
+    let outcome = run_validation_callback(
+        invocation,
+        &delete_dht_op_hash,
+        &ribosome,
+        workspace,
+        network.dna_network(),
+        validation_dependencies.clone(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        validation_dependencies
+            .lock()
+            .hashes_missing_for_op
+            .get(&delete_dht_op_hash)
+            .unwrap()
+            .clone()
+            .into_iter()
+            .collect::<Vec<AnyDhtHash>>(),
+        vec![]
+    );
+}
 
 // test case with alice and bob, a create by alice and a delete by bob that
 // references alice's create

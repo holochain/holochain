@@ -51,37 +51,6 @@ mod unit_tests;
 mod error;
 mod types;
 
-/// Dependencies required for app validating an op.
-pub struct ValidationDependencies {
-    /// Missing hashes that are being fetched.
-    missing_hashes: HashSet<AnyDhtHash>,
-    /// Dependencies that are missing to app validate an op.
-    _hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
-}
-
-impl Default for ValidationDependencies {
-    fn default() -> Self {
-        ValidationDependencies::new()
-    }
-}
-
-impl ValidationDependencies {
-    pub fn new() -> Self {
-        Self {
-            missing_hashes: HashSet::new(),
-            _hashes_missing_for_op: HashMap::new(),
-        }
-    }
-
-    pub fn insert_missing_hash(&mut self, hash: AnyDhtHash) -> bool {
-        self.missing_hashes.insert(hash)
-    }
-
-    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) -> bool {
-        self.missing_hashes.remove(hash)
-    }
-}
-
 #[instrument(skip(
     workspace,
     trigger_integration,
@@ -701,15 +670,6 @@ async fn run_validation_callback(
     network: HolochainP2pDna,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> AppValidationResult<Outcome> {
-    // let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, &network, ribosome)
-    //     .await
-    //     .map_err(|e| {
-    //         eprintln!("zomes to invoke error {e:?}");
-    //         AppValidationError::CascadeError(CascadeError::ActionError(ActionError::NotNewEntry))
-    //     })?;
-    // let invocation = ValidateInvocation::new(zomes_to_invoke, op)
-    //     .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
-
     let validate_result = ribosome.run_validate(
         ValidateHostAccess::new(workspace.clone(), network.clone()),
         invocation.clone(),
@@ -723,35 +683,18 @@ async fn run_validation_callback(
             let cascade_workspace = workspace.clone();
             let cascade =
                 CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
-            // temporarily hash op and use as key in hash map until the initial
-            // conversion DhtOp to Op is refactored away
 
             // add hashes missing to validate an op to hash map
-            // hashes.iter().for_each(|hash| {
-            //     validation_dependencies
-            //         .lock()
-            //         .hashes_missing_for_op
-            //         .entry(op_hash)
-            //         .and_modify(|hashes| {
-            //             hashes.insert(hash.clone());
-            //         })
-            //         .or_insert_with(|| {
-            //             let mut set = HashSet::new();
-            //             set.insert(hash.clone());
-            //             set
-            //         });
-            // });
-            // } else if let Ok(Outcome::Accepted) = &r {
-            //     // remove op that possibly had hashes missing for validation
-            //     // from hash map
-            //     validation_dependencies
-            //         .lock()
-            //         .hashes_missing_for_op
-            //         .remove(&op_hash);
-            // }
+            hashes.iter().for_each(|hash| {
+                validation_dependencies
+                    .lock()
+                    .insert_hash_missing_for_op(dht_op_hash.clone(), hash.clone());
+            });
+
             // build a collection of futures to fetch the individual missing
             // hashes
             let validation_deps = validation_dependencies.clone();
+            let dht_op_hash = dht_op_hash.clone();
             let fetches = hashes
                 .clone()
                 .into_iter()
@@ -765,6 +708,7 @@ async fn run_validation_callback(
                 .map(move |hash| {
                     let cascade = cascade.clone();
                     let validation_dependencies = validation_dependencies.clone();
+                    let dht_op_hash = dht_op_hash.clone();
                     async move {
                         let result = cascade
                             .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
@@ -772,12 +716,17 @@ async fn run_validation_callback(
                         if let Err(err) = result {
                             tracing::warn!("error fetching dependent hash {hash:?}: {err}");
                         }
-                        // dependency has been fetched and added to the cache
-                        // or an error occurred along the way;
-                        // in case of an error the hash is still removed from
+                        // Dependency has been fetched and added to the cache
+                        // or an error occurred along the way.
+                        // In case of an error the hash is still removed from
                         // the collection so that it will be tried again to be
-                        // fetched in the subsequent workflow run
+                        // fetched in the subsequent workflow run.
                         validation_dependencies.lock().remove_missing_hash(&hash);
+                        // Secondly remove the just fetched hash from the set
+                        // of missing hashes for the op
+                        validation_dependencies
+                            .lock()
+                            .remove_hash_missing_for_op(dht_op_hash, &hash);
                     }
                 });
             // await all fetches in a separate task in the background
@@ -829,6 +778,58 @@ async fn run_validation_callback(
             }
             Ok(Outcome::AwaitingDeps(vec![author.into()]))
         }
+    }
+}
+
+/// Dependencies required for app validating an op.
+pub struct ValidationDependencies {
+    /// Missing hashes that are being fetched.
+    missing_hashes: HashSet<AnyDhtHash>,
+    /// Dependencies that are missing to app validate an op.
+    hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
+}
+
+impl Default for ValidationDependencies {
+    fn default() -> Self {
+        ValidationDependencies::new()
+    }
+}
+
+impl ValidationDependencies {
+    pub fn new() -> Self {
+        Self {
+            missing_hashes: HashSet::new(),
+            hashes_missing_for_op: HashMap::new(),
+        }
+    }
+
+    pub fn insert_missing_hash(&mut self, hash: AnyDhtHash) -> bool {
+        self.missing_hashes.insert(hash)
+    }
+
+    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) -> bool {
+        self.missing_hashes.remove(hash)
+    }
+
+    pub fn insert_hash_missing_for_op(&mut self, dht_op_hash: DhtOpHash, hash: AnyDhtHash) {
+        self.hashes_missing_for_op
+            .entry(dht_op_hash)
+            .and_modify(|hashes| {
+                hashes.insert(hash.clone());
+            })
+            .or_insert_with(|| {
+                let mut set = HashSet::new();
+                set.insert(hash.clone());
+                set
+            });
+    }
+
+    pub fn remove_hash_missing_for_op(&mut self, dht_op_hash: DhtOpHash, hash: &AnyDhtHash) {
+        self.hashes_missing_for_op
+            .entry(dht_op_hash)
+            .and_modify(|hashes| {
+                hashes.remove(hash);
+            });
     }
 }
 
