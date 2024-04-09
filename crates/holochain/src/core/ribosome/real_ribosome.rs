@@ -330,7 +330,7 @@ impl RealRibosome {
             [1, 10, 1000],
             self.wasmer_module_cache
                 .write()
-                .instrument(tracing::info_span!("lock write 1"))
+                .instrument(tracing::info_span!("lock 1"))
                 .await
         )
         .read(&cache_key)
@@ -341,19 +341,18 @@ impl RealRibosome {
             // so we have to spawn a new thread.
             let cache_lock = self.wasmer_module_cache.clone();
             let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.code();
+            let inner_span = tracing::info_span!("lock 2");
             Ok(tokio::task::spawn_blocking(move || {
                 let lock = timed!(
                     [1, 10, 1000],
-                    tokio_helper::run_on(
-                        cache_lock
-                            .write()
-                            .instrument(tracing::info_span!("lock write 2"))
-                    )
+                    "lock 2",
+                    tokio::task::block_in_place(|| tokio::runtime::Handle::current()
+                        .block_on(cache_lock.write().instrument(inner_span)))
                 );
-                // cache_lock.write().await.get(cache_key, &wasm)
+                tracing::trace!("got lock 2");
                 timed!([1, 1000, 10_000], lock.get(cache_key, &wasm))
             })
-            .instrument(tracing::info_span!("compile wasm"))
+            .in_current_span()
             .await??)
         }
     }

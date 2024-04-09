@@ -3513,7 +3513,7 @@ fn query_dht_ops_from_statement(
     Ok(r)
 }
 
-// #[instrument(skip(p2p_evt, handle))]
+#[instrument(skip(p2p_evt, handle))]
 async fn p2p_event_task(
     p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,
