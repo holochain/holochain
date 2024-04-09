@@ -44,7 +44,7 @@ pub async fn spawn_websocket_listener(
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::bind(Arc::new(config), format!("127.0.0.1:{}", port)).await?;
+    let listener = WebsocketListener::bind(Arc::new(config), format!("localhost:{}", port)).await?;
     trace!("LISTENING AT: {}", listener.local_addr()?);
     Ok(listener)
 }
@@ -120,7 +120,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::bind(Arc::new(config), format!("127.0.0.1:{}", port)).await?;
+    let listener = WebsocketListener::bind(Arc::new(config), format!("localhost:{}", port)).await?;
     let addr = listener.local_addr()?;
     trace!("LISTENING AT: {}", addr);
     let port = addr.port();
