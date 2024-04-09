@@ -9,24 +9,8 @@ use test_case::test_case;
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn conductors_call_remote(num_conductors: usize) {
-    use tracing_subscriber::layer::SubscriberExt;
-    use tracing_subscriber::util::SubscriberInitExt;
-    use tracing_subscriber::Layer;
 
-    tracing_subscriber::Registry::default()
-        .with(
-            tracing_subscriber::fmt::Layer::default()
-                .with_test_writer()
-                .with_writer(std::io::stderr)
-                .with_file(true)
-                .with_line_number(true)
-                .with_target(true)
-                .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
-                .with_filter(holochain_trace::standard_filter().unwrap()),
-        )
-        .init();
-
-    // holochain_trace::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
@@ -34,24 +18,19 @@ async fn conductors_call_remote(num_conductors: usize) {
     // let config = SweetConductorConfig::standard();
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(num_conductors, config).await;
-    dbg!();
 
     let apps = conductors.setup_app("app", [&dna]).await.unwrap();
-    dbg!();
     let cells: Vec<_> = apps
         .into_inner()
         .into_iter()
         .map(|c| c.into_cells().into_iter().next().unwrap())
         .collect();
 
-    dbg!();
     conductors.exchange_peer_info().await;
-    dbg!();
 
     // Make sure that genesis records are integrated now that conductors have discovered each other. This makes it
     // more likely that Kitsune knows about all the agents in the network to be able to make remote calls to them.
     await_consistency(60, cells.iter()).await.unwrap();
-    dbg!();
 
     let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
 

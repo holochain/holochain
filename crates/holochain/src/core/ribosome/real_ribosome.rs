@@ -653,10 +653,7 @@ macro_rules! do_callback {
     ( $self:ident, $access:ident, $invocation:ident, $callback_result:ty ) => {{
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
         // fallible iterator syntax instead of for loop
-        dbg!("1");
-        dbg!(&$access);
         let mut call_iterator = $self.call_iterator($access.into(), $invocation);
-        dbg!("2");
         loop {
             let (zome_name, callback_result): (ZomeName, $callback_result) =
                 match call_iterator.next() {
@@ -678,13 +675,11 @@ macro_rules! do_callback {
                 };
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
-            dbg!("3");
             if callback_result.is_definitive() {
                 return Ok(vec![(zome_name, callback_result)].into());
             }
             results.push((zome_name, callback_result));
         }
-        dbg!("4");
         // fold all the non-definitive callbacks down into a single overall result
         Ok(results.into())
     }};
