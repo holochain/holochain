@@ -146,6 +146,7 @@ pub(crate) async fn countersigning_workflow(
 }
 
 /// An incoming countersigning session success.
+#[tracing::instrument(skip_all)]
 pub(crate) async fn countersigning_success(
     space: Space,
     network: &HolochainP2pDna,

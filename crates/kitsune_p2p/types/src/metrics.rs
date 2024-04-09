@@ -162,7 +162,7 @@ where
     let task = async move {
         let _counter = counter;
         let res = f
-            .instrument(tracing::error_span!("kitsune metric task", scope = scope))
+            .instrument(tracing::info_span!("kitsune metric task", scope = scope))
             .await;
         if let Err(e) = &res {
             ghost_actor::dependencies::tracing::error!(?e, "METRIC TASK ERROR");
