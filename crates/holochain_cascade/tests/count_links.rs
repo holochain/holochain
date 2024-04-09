@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use holochain_cascade::test_utils::*;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::MockHolochainP2pDnaT;
@@ -59,7 +61,7 @@ async fn count_links_authority() {
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(true));
-    let mock = MockNetwork::new(mock);
+    let mock = Arc::new(mock);
 
     // Cascade
     let cascade = CascadeImpl::empty()
@@ -113,7 +115,7 @@ async fn count_links_authoring() {
     mock.expect_authority_for_hash().returning(|_| Ok(false));
     mock.expect_count_links()
         .returning(|_| Ok(CountLinksResponse::new(vec![action_hash(&[1, 2, 3])])));
-    let mock = MockNetwork::new(mock);
+    let mock = Arc::new(mock);
 
     // Cascade
     let cascade = CascadeImpl::empty()
@@ -198,6 +200,6 @@ async fn count_links_with_filters() {
     assert_eq!(td.links.len(), execute_query(&cascade, query).await);
 }
 
-async fn execute_query(cascade: &CascadeImpl<PassThroughNetwork>, query: WireLinkQuery) -> usize {
+async fn execute_query(cascade: &CascadeImpl, query: WireLinkQuery) -> usize {
     cascade.dht_count_links(query).await.unwrap()
 }

@@ -85,6 +85,7 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_conductor_api::conductor::ConductorConfig;
+use holochain_p2p::GenericNetwork;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
@@ -122,7 +123,7 @@ mod validate_op_tests;
     network,
     config
 ))]
-pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static>(
+pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     trigger_app_validation: TriggerSender,
@@ -146,7 +147,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static
     }
 
     // Now go to the network to try to fetch missing dependencies
-    let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
+    let network_cascade = Arc::new(workspace.network_and_cache_cascade(Arc::new(network)));
     let missing_action_hashes = current_validation_dependencies.lock().get_missing_hashes();
     let num_fetched: usize = futures::stream::iter(missing_action_hashes.into_iter().map(|hash| {
         let network_cascade = network_cascade.clone();
@@ -1094,10 +1095,7 @@ impl SysValidationWorkspace {
         }
     }
 
-    pub fn network_and_cache_cascade<Network: HolochainP2pDnaT>(
-        &self,
-        network: Network,
-    ) -> CascadeImpl<Network> {
+    pub fn network_and_cache_cascade(&self, network: GenericNetwork) -> CascadeImpl {
         CascadeImpl::empty().with_network(network, self.cache.clone())
     }
 

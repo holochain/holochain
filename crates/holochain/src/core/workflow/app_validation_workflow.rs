@@ -21,6 +21,7 @@ use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
+use holochain_p2p::GenericNetwork;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -533,7 +534,8 @@ where
     let zomes_to_invoke = match op {
         Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => ZomesToInvoke::AllIntegrity,
         Op::StoreRecord(StoreRecord { record }) => {
-            let cascade = CascadeImpl::from_workspace_and_network(&workspace, network.clone());
+            let cascade =
+                CascadeImpl::from_workspace_and_network(&workspace, Arc::new(network.clone()));
             store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await?
         }
         Op::StoreEntry(StoreEntry {
@@ -576,7 +578,7 @@ where
         invocation,
         ribosome,
         workspace,
-        network.clone(),
+        Arc::new(network.clone()),
         validation_dependencies,
     )
     .await?;
@@ -724,7 +726,7 @@ async fn run_validation_callback(
     invocation: ValidateInvocation,
     ribosome: &impl RibosomeT,
     workspace_read: HostFnWorkspaceRead,
-    network: HolochainP2pDna,
+    network: GenericNetwork,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> AppValidationResult<Outcome> {
     let validate_result = ribosome.run_validate(
@@ -735,7 +737,6 @@ async fn run_validation_callback(
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(hashes)) => {
-            tracing::debug!("unresolved dependencies: hashes {hashes:?}");
             // fetch all missing hashes in the background without awaiting them
             let cascade_workspace = workspace_read.clone();
             let cascade =
@@ -779,9 +780,6 @@ async fn run_validation_callback(
             author,
             filter,
         )) => {
-            tracing::debug!(
-                "unresolved dependencies: agent activity of {author:?} with filter {filter:?}"
-            );
             // fetch missing agent activities in the background without awaiting them
             let cascade_workspace = workspace_read.clone();
             let author = author.clone();
@@ -864,14 +862,11 @@ impl AppValidationWorkspace {
         .await?)
     }
 
-    pub fn full_cascade<Network: HolochainP2pDnaT + Clone + 'static + Send>(
-        &self,
-        network: Network,
-    ) -> CascadeImpl<Network> {
+    pub fn full_cascade<Network: HolochainP2pDnaT>(&self, network: Network) -> CascadeImpl {
         CascadeImpl::empty()
             .with_authored(self.authored_db.clone())
             .with_dht(self.dht_db.clone().into())
-            .with_network(network, self.cache.clone())
+            .with_network(Arc::new(network), self.cache.clone())
     }
 }
 

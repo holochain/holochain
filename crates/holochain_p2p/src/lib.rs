@@ -5,6 +5,7 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
+use mockall::automock;
 use std::sync::Arc;
 
 mod types;
@@ -26,11 +27,12 @@ pub use test::HolochainP2pDnaFixturator;
 
 pub use kitsune_p2p;
 
+#[automock]
 #[allow(clippy::too_many_arguments)]
 #[async_trait::async_trait]
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
 /// I.e. a sender that is tied to a specific cell.
-pub trait HolochainP2pDnaT: Send + Sync {
+pub trait HolochainP2pDnaT: Send + Sync + 'static {
     /// owned getter
     fn dna_hash(&self) -> DnaHash;
 
@@ -166,115 +168,6 @@ pub trait HolochainP2pDnaT: Send + Sync {
     fn chc(&self) -> Option<ChcImpl>;
 }
 
-// TODO Refactor so that HolochainP2pDna is passed as an Arc rather than being Clone so that this can
-//      go back to being derived rather than hand written.
-#[cfg(feature = "test_utils")]
-mockall::mock! {
-    pub HolochainP2pDnaT {}
-    #[async_trait::async_trait]
-    impl HolochainP2pDnaT for HolochainP2pDnaT {
-        fn dna_hash(&self) -> DnaHash;
-        async fn join(
-            &self,
-            agent: AgentPubKey,
-            maybe_agent_info: Option<AgentInfoSigned>,
-            initial_arc: Option<crate::dht_arc::DhtArc>,
-        ) -> actor::HolochainP2pResult<()>;
-        async fn leave(&self, agent: AgentPubKey) -> actor::HolochainP2pResult<()>;
-        #[allow(clippy::too_many_arguments)]
-        async fn call_remote(
-            &self,
-            from_agent: AgentPubKey,
-            from_signature: Signature,
-            to_agent: AgentPubKey,
-            zome_name: ZomeName,
-            fn_name: FunctionName,
-            cap_secret: Option<CapSecret>,
-            payload: ExternIO,
-            nonce: Nonce256Bits,
-            expires_at: Timestamp,
-        ) -> actor::HolochainP2pResult<SerializedBytes>;
-        #[allow(clippy::too_many_arguments)]
-        async fn send_remote_signal(
-            &self,
-            from_agent: AgentPubKey,
-            to_agent_list: Vec<(Signature, AgentPubKey)>,
-            zome_name: ZomeName,
-            fn_name: FunctionName,
-            cap: Option<CapSecret>,
-            payload: ExternIO,
-            nonce: Nonce256Bits,
-            expires_at: Timestamp,
-        ) -> actor::HolochainP2pResult<()>;
-        #[allow(clippy::too_many_arguments)]
-        async fn publish(
-            &self,
-            request_validation_receipt: bool,
-            countersigning_session: bool,
-            basis_hash: holo_hash::OpBasis,
-            source: AgentPubKey,
-            op_hash_list: Vec<OpHashSized>,
-            timeout_ms: Option<u64>,
-            reflect_ops: Option<Vec<DhtOp>>,
-        ) -> actor::HolochainP2pResult<()>;
-        async fn publish_countersign(
-            &self,
-            flag: bool,
-            basis_hash: holo_hash::OpBasis,
-            op: DhtOp,
-        ) -> actor::HolochainP2pResult<()>;
-        async fn get(
-            &self,
-            dht_hash: holo_hash::AnyDhtHash,
-            options: actor::GetOptions,
-        ) -> actor::HolochainP2pResult<Vec<WireOps>>;
-        async fn get_meta(
-            &self,
-            dht_hash: holo_hash::AnyDhtHash,
-            options: actor::GetMetaOptions,
-        ) -> actor::HolochainP2pResult<Vec<MetadataSet>>;
-        async fn get_links(
-            &self,
-            link_key: WireLinkKey,
-            options: actor::GetLinksOptions,
-        ) -> actor::HolochainP2pResult<Vec<WireLinkOps>>;
-        async fn count_links(
-            &self,
-            query: WireLinkQuery,
-        ) -> actor::HolochainP2pResult<CountLinksResponse>;
-        async fn get_agent_activity(
-            &self,
-            agent: AgentPubKey,
-            query: ChainQueryFilter,
-            options: actor::GetActivityOptions,
-        ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>>;
-        async fn must_get_agent_activity(
-            &self,
-            author: AgentPubKey,
-            filter: holochain_zome_types::chain::ChainFilter,
-        ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>>;
-        async fn send_validation_receipts(
-            &self,
-            to_agent: AgentPubKey,
-            receipts: ValidationReceiptBundle,
-        ) -> actor::HolochainP2pResult<()>;
-        async fn authority_for_hash(
-            &self,
-            basis: holo_hash::OpBasis,
-        ) -> actor::HolochainP2pResult<bool>;
-        async fn countersigning_session_negotiation(
-            &self,
-            agents: Vec<AgentPubKey>,
-            message: event::CountersigningSessionNegotiationMessage,
-        ) -> actor::HolochainP2pResult<()>;
-        async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()>;
-        fn chc(&self) -> Option<ChcImpl>;
-    }
-    impl Clone for HolochainP2pDnaT {
-        fn clone(&self) -> Self;
-    }
-}
-
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
 /// I.e. a sender that is tied to a specific cell.
 #[derive(Clone)]
@@ -282,6 +175,12 @@ pub struct HolochainP2pDna {
     sender: ghost_actor::GhostSender<actor::HolochainP2p>,
     dna_hash: Arc<DnaHash>,
     chc: Option<ChcImpl>,
+}
+
+impl From<HolochainP2pDna> for GenericNetwork {
+    fn from(value: HolochainP2pDna) -> Self {
+        Arc::new(value)
+    }
 }
 
 /// A CHC implementation

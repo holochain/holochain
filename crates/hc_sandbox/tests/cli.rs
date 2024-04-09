@@ -8,6 +8,7 @@ use holochain_websocket::{
 use matches::assert_matches;
 use once_cell::sync::Lazy;
 use std::future::Future;
+use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -66,9 +67,16 @@ static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
 async fn new_websocket_client_for_port(
     port: u16,
 ) -> anyhow::Result<(WebsocketSender, WebsocketReceiver)> {
+    println!("Client for address: {:?}", format!("localhost:{port}"));
     Ok(ws::connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], port).into()),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        ),
     )
     .await?)
 }
