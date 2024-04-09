@@ -158,7 +158,6 @@ pub(crate) fn search_and_discover_peer_connect(
                                     .host_api
                                     .legacy
                                     .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                        space: inner.space.clone(),
                                         peer_data: vec![agent_info_signed.clone()],
                                     })
                                     .await
@@ -386,7 +385,6 @@ pub(crate) fn search_remotes_covering_basis(
                                 .host_api
                                 .legacy
                                 .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                    space: inner.space.clone(),
                                     peer_data: peer_list,
                                 })
                                 .await
