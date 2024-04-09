@@ -610,8 +610,8 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
 #[tokio::test(flavor = "multi_thread")]
 async fn hashes_missing_for_op_is_updated_with_unresolved_deps() {}
 
-// test case with alice and bob, a create by alice and a delete by bob that
-// references alice's create
+// test case with alice and bob agent keys
+// test space created by alice
 struct TestCase {
     zomes_to_invoke: ZomesToInvoke,
     test_space: TestSpace,
