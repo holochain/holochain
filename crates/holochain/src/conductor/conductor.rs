@@ -591,7 +591,6 @@ mod dna_impls {
                 .dna_def()
                 .all_zomes()
                 .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
-            dbg!("HERE");
             // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
             if is_full_wasm_dna {
                 Ok(self.put_wasm(ribosome).await?)
@@ -738,9 +737,7 @@ mod dna_impls {
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
             let dna_def = ribosome.dna_def().clone();
             let code = ribosome.dna_file().code().clone().into_values();
-            dbg!("HERE");
             let zome_defs = get_entry_defs(ribosome).await?;
-            dbg!();
             self.put_wasm_code(dna_def, code, zome_defs).await
         }
 
@@ -754,7 +751,6 @@ mod dna_impls {
             // TODO: PERF: This loop might be slow
             let wasms = futures::future::join_all(code.map(DnaWasmHashed::from_content)).await;
 
-            dbg!();
             self.spaces
                 .wasm_db
                 .write_async({
@@ -778,7 +774,6 @@ mod dna_impls {
                 })
                 .await?;
 
-            dbg!();
             Ok(zome_defs)
         }
 
@@ -799,19 +794,14 @@ mod dna_impls {
                 return Ok(());
             }
 
-            dbg!();
             let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone())?;
 
-            dbg!("HERE");
             let entry_defs = self.register_dna_wasm(ribosome.clone()).await?;
 
-            dbg!();
             self.register_dna_entry_defs(entry_defs);
 
-            dbg!();
             self.add_ribosome_to_store(ribosome);
 
-            dbg!();
             Ok(())
         }
     }
@@ -2695,6 +2685,7 @@ impl Conductor {
     /// Returns a Result for each attempt so that successful creations can be
     /// handled alongside the failures.
     #[tracing::instrument(skip_all)]
+    #[allow(clippy::complexity)]
     async fn create_cells_for_running_apps(
         self: Arc<Self>,
         app_id: Option<&InstalledAppId>,

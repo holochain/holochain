@@ -22,7 +22,6 @@ pub struct CallIterator<R: RibosomeT, I: Invocation> {
 
 impl<R: RibosomeT, I: Invocation> CallIterator<R, I> {
     pub fn new(host_context: HostContext, ribosome: R, invocation: I) -> Self {
-        dbg!();
         Self {
             host_context,
             remaining_zomes: ribosome.zomes_to_invoke(invocation.zomes()),
@@ -41,7 +40,6 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
             Some(zome) => {
                 match self.remaining_components.next() {
                     Some(to_call) => {
-                        dbg!(&to_call);
                         match self.ribosome.maybe_call(
                             self.host_context.clone(),
                             &self.invocation,

@@ -590,9 +590,7 @@ impl RealRibosome {
         let fn_name = fn_name.clone();
         let instance = instance_with_store.instance.clone();
         let mut store_lock = instance_with_store.store.lock();
-        dbg!();
         let mut store_mut = store_lock.as_store_mut();
-        dbg!();
         let result = holochain_wasmer_host::guest::call(
             &mut store_mut,
             instance,
@@ -602,7 +600,6 @@ impl RealRibosome {
             // @todo - is this a problem for large payloads like entries?
             invocation.to_owned().host_input()?,
         );
-        dbg!();
         if let Err(runtime_error) = &result {
             tracing::error!(?runtime_error, ?zome, ?fn_name);
         }
@@ -791,37 +788,29 @@ impl RibosomeT for RealRibosome {
             host_context,
             auth: invocation.auth(),
         };
-        dbg!();
 
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
-                dbg!();
                 let module = self.get_module_for_zome(zome)?;
-                dbg!();
                 if module.info().exports.contains_key(fn_name.as_ref()) {
                     // there is a corresponding zome fn
                     let context_key = Self::next_context_key();
-                    dbg!();
                     let instance_with_store =
                         self.build_instance_with_store(module, context_key)?;
-                    dbg!();
                     // add call context to map for the following call
                     {
                         CONTEXT_MAP
                             .lock()
                             .insert(context_key, Arc::new(call_context));
                     }
-                    dbg!();
 
                     let result = self
                         .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store)
                         .map(Some);
-                    dbg!();
                     // remove context from map after call
                     {
                         CONTEXT_MAP.lock().remove(&context_key);
                     }
-                    dbg!();
                     result
                 } else {
                     // the callback fn does not exist
@@ -893,7 +882,6 @@ impl RibosomeT for RealRibosome {
         host_context: HostContext,
         invocation: I,
     ) -> CallIterator<Self, I> {
-        dbg!();
 
         CallIterator::new(host_context, self.clone(), invocation)
     }
