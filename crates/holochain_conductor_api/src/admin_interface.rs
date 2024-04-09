@@ -182,6 +182,14 @@ pub enum AdminRequest {
         ///
         /// Connections from any origin which is not permitted by this config will be rejected.
         allowed_origins: AllowedOrigins,
+
+        /// Optionally bind this app interface to a specific installed app.
+        ///
+        /// If this is `None` then the interface can be used to establish a connection for any app.
+        ///
+        /// If this is `Some` then the interface will only accept connections for the specified app.
+        /// Those connections will only be able to make calls to and receive signals from that app.
+        installed_app_id: Option<InstalledAppId>,
     },
 
     /// List all the app interfaces currently attached with [`AttachAppInterface`].
