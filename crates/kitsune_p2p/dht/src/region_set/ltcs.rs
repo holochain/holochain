@@ -9,7 +9,7 @@ use super::{Region, RegionCoords, RegionData, RegionDataConstraints};
 
 /// A compact representation of a set of [`RegionCoords`].
 /// The [`TelescopingTimes`] generates all relevant [`TimeSegment`]s, and the
-/// [`SpaceSegment`]s are implied by the [`ArqBoundsSet`].
+/// [`SpaceSegment`]s are implied by the [`ArqSet`].
 ///
 /// LTCS stands for Logarithmic Time, Constant Space.
 #[derive(

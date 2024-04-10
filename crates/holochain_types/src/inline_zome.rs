@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 /// A set of inline integrity and coordinator zomes.
 pub struct InlineZomeSet {
     /// The set of inline zomes that will be installed as the integrity zomes.
-    /// Only these affect the [`DnaHash`](holo_hash::DnaHash).
+    /// Only these affect the [`DnaHash`].
     pub integrity_zomes: HashMap<&'static str, InlineIntegrityZome>,
     /// The order of the integrity zomes.
     pub integrity_order: Vec<&'static str>,
