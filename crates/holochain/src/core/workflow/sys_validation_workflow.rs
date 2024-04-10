@@ -124,7 +124,7 @@ mod validate_op_tests;
     network,
     config
 ))]
-pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static>(
+pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: ValDeps,
     trigger_app_validation: TriggerSender,
