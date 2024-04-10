@@ -30,7 +30,7 @@ impl GlobalZomeTypes {
     /// # Correct Usage
     /// You must use an iterator with a deterministic order.
     ///
-    /// For example [`HashMap`](std::collections::HashMap) does not produce
+    /// For example [`HashMap`] does not produce
     /// deterministic iterators so should not be used as the source.
     pub fn from_ordered_iterator<I>(ordered_iterator: I) -> ZomeTypesResult<GlobalZomeTypes>
     where
