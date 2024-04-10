@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_services"
-version = "0.2.0-beta-dev.13"
+version = "0.2.0-beta-dev.14"
 description = "Holochain Conductor Services types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -20,8 +20,8 @@ must_future = "0.1"
 serde = "1.0"
 thiserror = "1.0"
 
-holochain_keystore = { version = "^0.3.0-beta-dev.33", path = "../holochain_keystore" }
-holochain_types = { version = "^0.3.0-beta-dev.39", path = "../holochain_types" }
+holochain_keystore = { version = "^0.3.0-beta-dev.34", path = "../holochain_keystore" }
+holochain_types = { version = "^0.3.0-beta-dev.40", path = "../holochain_types" }
 
 [lints]
 workspace = true
