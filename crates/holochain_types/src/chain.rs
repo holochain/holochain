@@ -108,7 +108,7 @@ impl ChainItem for SignedActionHashed {
 /// - Ignore any ops that are not a direct ancestor to the starting position.
 /// - Stop at the first gap in the chain.
 /// - Take no **more** then the [`take`]. It may return less.
-/// - Stop at (including) the [`ActionHash`](holo_hash::ActionHash) in [`until`]. But not if this hash is not in the chain.
+/// - Stop at (including) the [`ActionHash`] in [`until`]. But not if this hash is not in the chain.
 ///
 /// [`take`]: ChainFilter::take
 /// [`until`]: ChainFilter::until

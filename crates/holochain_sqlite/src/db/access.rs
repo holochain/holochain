@@ -129,17 +129,15 @@ impl<Kind: DbKindT> DbRead<Kind> {
             .await?;
 
         let start = tokio::time::Instant::now();
-        let span = tracing::info_span!("spawn_blocking inner");
+        let span = tracing::info_span!("spawn_blocking");
 
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
                 let _s = span.enter();
-                tracing::trace!("start spawn_blocking");
                 log_elapsed!([10, 100, 1000], start, "read_async:before-closure");
                 let r = conn.execute_in_read_txn(f);
                 log_elapsed!([10, 100, 1000], start, "read_async:after-closure");
-                tracing::trace!("end spawn_blocking");
                 r
             }).in_current_span()).in_current_span().await.map_err(|e| {
                 tracing::error!("Failed to claim a thread to run the database read transaction. It's likely that the program is out of threads.");
@@ -352,17 +350,15 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         let mut conn = self.get_connection_from_pool()?;
 
         let start = tokio::time::Instant::now();
-        let span = tracing::info_span!("spawn_blocking inner");
+        let span = tracing::info_span!("spawn_blocking");
 
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
             let _s = span.enter();
-            tracing::trace!("start spawn_blocking");
             log_elapsed!([10, 100, 1000], start, "write_async:before-closure");
             let r = conn.execute_in_exclusive_rw_txn(f);
             log_elapsed!([10, 100, 1000], start, "write_async:after-closure");
-            tracing::trace!("end spawn_blocking");
             r
         }).in_current_span()).in_current_span().await.map_err(|e| {
             tracing::error!("Failed to claim a thread to run the database write transaction. It's likely that the program is out of threads.");

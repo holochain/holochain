@@ -5,7 +5,6 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCall;
 use futures::future::join_all;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;

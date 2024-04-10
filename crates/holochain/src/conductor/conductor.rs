@@ -5,7 +5,7 @@
 //!
 //! A Conductor can be managed:
 //! - externally, via an [`AppInterfaceApi`](super::api::AppInterfaceApi)
-//! - from within a [`Cell`](super::Cell), via [`CellConductorApi`](super::api::CellConductorApi)
+//! - from within a [`Cell`], via [`CellConductorApi`](super::api::CellConductorApi)
 //!
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
@@ -545,17 +545,17 @@ mod dna_impls {
             hashes
         }
 
-        /// Get a [`DnaDef`](holochain_types::prelude::DnaDef) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
+        /// Get a [`DnaDef`] from the [`RibosomeStore`]
         pub fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
             self.ribosome_store().share_ref(|ds| ds.get_dna_def(hash))
         }
 
-        /// Get a [`DnaFile`](holochain_types::dna::DnaFile) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
+        /// Get a [`DnaFile`] from the [`RibosomeStore`]
         pub fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
             self.ribosome_store().share_ref(|ds| ds.get_dna_file(hash))
         }
 
-        /// Get an [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
+        /// Get an [`EntryDef`](holochain_integrity_types::prelude::EntryDef) from the [`EntryDefBufferKey`]
         pub fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
             self.ribosome_store().share_ref(|ds| ds.get_entry_def(key))
         }
@@ -583,7 +583,7 @@ mod dna_impls {
                 .dna_def()
                 .all_zomes()
                 .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
-
+            
             // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
             if is_full_wasm_dna {
                 Ok(self.put_wasm(ribosome).await?)
@@ -731,7 +731,6 @@ mod dna_impls {
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
             let dna_def = ribosome.dna_def().clone();
             let code = ribosome.dna_file().code().clone().into_values();
-
             let zome_defs = get_entry_defs(ribosome).await?;
             self.put_wasm_code(dna_def, code, zome_defs).await
         }
@@ -782,7 +781,7 @@ mod dna_impls {
             Ok(())
         }
 
-        /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
+        /// Install a [`DnaFile`] in this Conductor
         pub async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
             if self.get_ribosome(dna.dna_hash()).is_ok() {
                 // ribosome for dna is already registered in store
@@ -3017,6 +3016,7 @@ impl Conductor {
     /// Returns a Result for each attempt so that successful creations can be
     /// handled alongside the failures.
     #[tracing::instrument(skip_all)]
+    #[allow(clippy::complexity)]
     async fn create_cells_for_running_apps(
         self: Arc<Self>,
         app_id: Option<&InstalledAppId>,

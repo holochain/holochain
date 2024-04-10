@@ -15,6 +15,7 @@ use holochain::{
     },
     fixt::*,
 };
+use std::net::ToSocketAddrs;
 
 use holochain_conductor_api::{AdminInterfaceConfig, AppRequest, InterfaceDriver};
 use holochain_types::{
@@ -487,7 +488,13 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     ws_config.default_request_timeout = Duration::from_secs(1);
     let (client, rx): (WebsocketSender, WebsocketReceiver) = connect(
         Arc::new(ws_config),
-        ConnectRequest::new(([127, 0, 0, 1], port).into()),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        ),
     )
     .await?;
     let _rx = PollRecv::new::<AdminResponse>(rx);
@@ -526,7 +533,13 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     ws_config.default_request_timeout = Duration::from_secs(1);
     let (client, mut rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
         Arc::new(ws_config),
-        ConnectRequest::new(([127, 0, 0, 1], port).into()),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        ),
     )
     .await?;
 
@@ -583,7 +596,11 @@ async fn connection_limit_is_respected() {
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
 
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    let addr = format!("localhost:{port}")
+        .to_socket_addrs()
+        .unwrap()
+        .next()
+        .unwrap();
     let cfg = Arc::new(WebsocketConfig::CLIENT_DEFAULT);
 
     // Retain handles so that the test can control when to disconnect clients
@@ -803,18 +820,32 @@ async fn admin_allowed_origins() {
         .await
         .unwrap();
 
+    let port = *ports.first().unwrap();
     assert!(connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], *ports.first().unwrap()).into())
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
     )
     .await
     .is_err());
 
+    let port = *ports.first().unwrap();
     let (client, rx) = connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], *ports.first().unwrap()).into())
-            .try_set_header("origin", "http://localhost:3000")
-            .unwrap(),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .try_set_header("origin", "http://localhost:3000")
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -842,7 +873,13 @@ async fn app_allowed_origins() {
 
     assert!(connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], port).into())
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
     )
     .await
     .is_err());
@@ -878,18 +915,30 @@ async fn app_allowed_origins_independence() {
 
     assert!(connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], port_1).into())
-            .try_set_header("origin", "http://localhost:3002")
-            .unwrap()
+        ConnectRequest::new(
+            format!("localhost:{port_1}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+        .try_set_header("origin", "http://localhost:3002")
+        .unwrap()
     )
     .await
     .is_err());
 
     assert!(connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], port_2).into())
-            .try_set_header("origin", "http://localhost:3001")
-            .unwrap()
+        ConnectRequest::new(
+            format!("localhost:{port_2}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+        .try_set_header("origin", "http://localhost:3001")
+        .unwrap()
     )
     .await
     .is_err());
@@ -903,9 +952,15 @@ async fn app_allowed_origins_independence() {
 async fn check_app_port(port: u16, origin: &str) {
     let (client, rx) = connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], port).into())
-            .try_set_header("origin", origin)
-            .unwrap(),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .try_set_header("origin", origin)
+        .unwrap(),
     )
     .await
     .unwrap();

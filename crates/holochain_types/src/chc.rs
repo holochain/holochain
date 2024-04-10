@@ -24,7 +24,7 @@ pub trait ChainHeadCoordinator {
     /// The CHC will do some integrity checks, which may fail.
     /// All signatures and hashes need to line up properly.
     /// If the records added would result in a fork, then a [`ChcError::OutOfSync`] will be returned
-    /// along with the current
+    /// along with the current chain top.
     // If there is an out-of-sync error, it will return a hash, designating the point of fork.
     async fn add_records_request(&self, request: AddRecordsRequest) -> ChcResult<()>;
 
@@ -265,7 +265,7 @@ pub enum ChcError {
     /// that can't be remedied other than by fixing the programming mistake
     /// (which would be on the Holochain side)
     /// Examples include:
-    /// - Vec<AddRecordPayload> must be sorted by `seq_number`
+    /// - `Vec<AddRecordPayload>` must be sorted by `seq_number`
     /// - There is a gap between the first action and the current CHC head
     /// - The `Vec<AddRecordPayload>` does not constitute a valid chain (prev_action must be correct)
     #[error("Invalid `add_records` payload. Seq number: {0}")]

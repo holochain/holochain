@@ -746,7 +746,7 @@ async fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
     .unwrap()
 }
 
-/// Get all [`DhtOps`] integrated by this node
+/// Get all [`DhtOps`](holochain_types::prelude::DhtOp) integrated by this node
 pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp> {
     db.read_async(move |txn| -> StateQueryResult<Vec<DhtOp>> {
         txn.prepare(

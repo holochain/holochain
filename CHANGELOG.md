@@ -14,6 +14,62 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240410.004338
+
+## [hcterm-0.3.0-beta-dev.20](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.20)
+
+## [holochain\_cli-0.3.0-beta-dev.44](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.44)
+
+## [holochain-0.3.0-beta-dev.45](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.45)
+
+- App validation workflow: Mock network in unit tests using new type `GenericNetwork` to properly test `must_get_agent_activity`. Previously that was not possible, as all peers in a test case were authorities for each other and `must_get_agent_activity` would therefore not send requests to the network.
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.41](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.44](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.44)
+
+## [holochain\_cascade-0.3.0-beta-dev.44](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.44)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.44](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.44)
+
+## [holochain\_conductor\_services-0.2.0-beta-dev.14](crates/holochain_conductor_services/CHANGELOG.md#0.2.0-beta-dev.14)
+
+## [holochain\_metrics-0.3.0-beta-dev.11](crates/holochain_metrics/CHANGELOG.md#0.3.0-beta-dev.11)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.38](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.38)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.42](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.42)
+
+## [holochain\_websocket-0.3.0-beta-dev.19](crates/holochain_websocket/CHANGELOG.md#0.3.0-beta-dev.19)
+
+## [hdk-0.3.0-beta-dev.38](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.38)
+
+## [holochain\_state-0.3.0-beta-dev.43](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.43)
+
+## [hdi-0.4.0-beta-dev.34](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.34)
+
+## [holochain\_p2p-0.3.0-beta-dev.43](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.43)
+
+- Add `GenericNetwork` type that allows for mocking a network using \[`MockHolochainP2pDnaT`\].
+
+## [hc\_sleuth-0.2.0-beta-dev.14](crates/hc_sleuth/CHANGELOG.md#0.2.0-beta-dev.14)
+
+## [hdk\_derive-0.3.0-beta-dev.32](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.32)
+
+## [holochain\_state\_types-0.3.0-beta-dev.38](crates/holochain_state_types/CHANGELOG.md#0.3.0-beta-dev.38)
+
+## [holochain\_types-0.3.0-beta-dev.40](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [kitsune\_p2p-0.3.0-beta-dev.37](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.37)
+
+## [holochain\_keystore-0.3.0-beta-dev.34](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.34)
+
+## [holochain\_sqlite-0.3.0-beta-dev.40](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [holochain\_zome\_types-0.3.0-beta-dev.33](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.33)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.31](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.31)
+
 # 20240403.160133
 
 ## [hcterm-0.3.0-beta-dev.19](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.19)

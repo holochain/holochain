@@ -102,15 +102,21 @@ use wasmer::Store;
 use wasmer::Type;
 
 use crate::core::ribosome::host_fn::count_links::count_links;
+use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
+use opentelemetry_api::global::meter_with_version;
+use opentelemetry_api::metrics::Counter;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use wasmer_middlewares::metering::get_remaining_points;
+use wasmer_middlewares::metering::set_remaining_points;
+use wasmer_middlewares::metering::MeteringPoints;
 
-pub type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
+pub(crate) type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -127,6 +133,8 @@ pub struct RealRibosome {
 
     /// Dependencies for every zome.
     pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
+
+    pub usage_meter: Arc<Counter<u64>>,
 
     /// File system and in-memory cache for wasm modules.
     pub wasmer_module_cache: Arc<ModuleCacheLock>,
@@ -213,6 +221,19 @@ impl HostFnBuilder {
 }
 
 impl RealRibosome {
+    pub fn standard_usage_meter() -> Arc<Counter<u64>> {
+        meter_with_version(
+            "hc.ribosome.wasm",
+            Some("0"),
+            None::<&'static str>,
+            Some(vec![]),
+        )
+        .u64_counter("hc.ribosome.wasm.usage")
+        .with_description("The metered usage of a wasm ribosome.")
+        .init()
+        .into()
+    }
+
     /// Create a new instance
     #[tracing::instrument(skip_all)]
     pub async fn new(
@@ -223,12 +244,14 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
+            usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache,
         };
 
         // Collect the number of entry and link types
         // for each integrity zome.
-        let iter = futures::future::join_all(ribosome.dna_def().integrity_zomes.iter().map(
+        // TODO: should this be in parallel? Are they all beholden to the same lock?
+        let items = futures::future::join_all(ribosome.dna_def().integrity_zomes.iter().map(
             |(name, zome)| async {
                 let zome = Zome::new(name.clone(), zome.clone().erase_type());
 
@@ -260,7 +283,7 @@ impl RealRibosome {
         .collect::<RibosomeResult<Vec<_>>>()?;
 
         // Create the global zome types from the totals.
-        let map = GlobalZomeTypes::from_ordered_iterator(iter.into_iter());
+        let map = GlobalZomeTypes::from_ordered_iterator(items.into_iter());
 
         ribosome.zome_types = Arc::new(map?);
 
@@ -316,6 +339,7 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
+            usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         }
     }
@@ -604,6 +628,7 @@ impl RealRibosome {
     ) -> Result<ExternIO, RibosomeError> {
         let fn_name = fn_name.clone();
         let instance = instance_with_store.instance.clone();
+
         let mut store_lock = instance_with_store.store.lock();
         let mut store_mut = store_lock.as_store_mut();
         let result = holochain_wasmer_host::guest::call(
@@ -795,6 +820,21 @@ impl RibosomeT for RealRibosome {
         zome: &Zome,
         fn_name: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
+        let mut otel_info = vec![
+            opentelemetry_api::KeyValue::new("dna", self.dna_file.dna().hash.to_string()),
+            opentelemetry_api::KeyValue::new("zome", zome.zome_name().to_string()),
+            opentelemetry_api::KeyValue::new("fn", fn_name.to_string()),
+        ];
+
+        if let Some(agent_pubkey) = host_context.maybe_workspace().and_then(|workspace| {
+            workspace
+                .source_chain()
+                .as_ref()
+                .map(|source_chain| source_chain.agent_pubkey().to_string())
+        }) {
+            otel_info.push(opentelemetry_api::KeyValue::new("agent", agent_pubkey));
+        }
+
         let call_context = CallContext {
             zome: zome.clone(),
             function_name: fn_name.clone(),
@@ -818,9 +858,32 @@ impl RibosomeT for RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
+                    let instance = instance_with_store.instance.clone();
+                    {
+                        let mut store_lock = instance_with_store.store.lock();
+                        let mut store_mut = store_lock.as_store_mut();
+                        set_remaining_points(
+                            &mut store_mut,
+                            instance.as_ref(),
+                            WASM_METERING_LIMIT,
+                        );
+                    }
+
                     let result = self
-                        .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store)
+                        .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store.clone())
                         .map(Some);
+
+                    {
+                        let mut store_lock = instance_with_store.store.lock();
+                        let mut store_mut = store_lock.as_store_mut();
+                        let points_used =
+                            match get_remaining_points(&mut store_mut, instance.as_ref()) {
+                                MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
+                                MeteringPoints::Exhausted => WASM_METERING_LIMIT,
+                            };
+                        self.usage_meter.add(points_used, &otel_info);
+                    }
+
                     // remove context from map after call
                     {
                         CONTEXT_MAP.lock().remove(&context_key);

@@ -353,7 +353,7 @@ where
         Output::LogTimed => Registry::default()
             .with(
                 standard_layer_unfiltered(writer)?
-                    .with_span_events(FmtSpan::CLOSE)
+                    .with_span_events(FmtSpan::FULL)
                     .with_filter(filter),
             )
             .init(),

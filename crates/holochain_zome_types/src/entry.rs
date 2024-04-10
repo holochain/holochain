@@ -29,10 +29,10 @@ pub enum EntryDefLocation {
     /// App defined entries always have a unique [`u8`] index
     /// within the Dna.
     App(AppEntryDefLocation),
-    /// [`crate::EntryDefId::CapClaim`] is committed to and
+    /// [`CapClaim`](holochain_integrity_types::EntryDefId::CapClaim) is committed to and
     /// validated by all integrity zomes in the dna.
     CapClaim,
-    /// [`crate::EntryDefId::CapGrant`] is committed to and
+    /// [`CapGrant`](holochain_integrity_types::EntryDefId::CapGrant) is committed to and
     /// validated by all integrity zomes in the dna.
     CapGrant,
 }

@@ -86,6 +86,7 @@ use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_services::DpkiImpl;
+use holochain_p2p::GenericNetwork;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
@@ -115,7 +116,14 @@ mod unit_tests;
 mod validate_op_tests;
 
 /// The sys validation worfklow. It is described in the module level documentation.
-#[instrument(skip_all)]
+#[instrument(skip(
+    workspace,
+    current_validation_dependencies,
+    trigger_app_validation,
+    trigger_self,
+    network,
+    config
+))]
 pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static>(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: ValDeps,
@@ -140,7 +148,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static
     }
 
     // Now go to the network to try to fetch missing dependencies
-    let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
+    let network_cascade = Arc::new(workspace.network_and_cache_cascade(Arc::new(network)));
     let missing_action_hashes = current_validation_dependencies
         .same_dht
         .lock()
@@ -1089,10 +1097,7 @@ impl SysValidationWorkspace {
         }
     }
 
-    pub fn network_and_cache_cascade<Network: HolochainP2pDnaT>(
-        &self,
-        network: Network,
-    ) -> CascadeImpl<Network> {
+    pub fn network_and_cache_cascade(&self, network: GenericNetwork) -> CascadeImpl {
         CascadeImpl::empty().with_network(network, self.cache.clone())
     }
 

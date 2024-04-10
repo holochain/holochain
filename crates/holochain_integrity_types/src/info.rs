@@ -48,7 +48,7 @@ impl ZomeInfo {
     }
 }
 
-/// Placeholder for a real network seed type. See [`DnaDef`].
+/// Placeholder for a real network seed type. See [`DnaModifiers`].
 pub type NetworkSeed = String;
 
 #[derive(Debug, Serialize, Deserialize)]

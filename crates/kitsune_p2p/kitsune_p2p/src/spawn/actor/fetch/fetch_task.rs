@@ -13,7 +13,7 @@ pub struct FetchTask {
 
 impl FetchTask {
     pub fn spawn(
-        config: KitsuneP2pConfig,
+        _config: KitsuneP2pConfig,
         fetch_pool: FetchPool,
         host: HostApiLegacy,
         internal_sender: GhostSender<Internal>,

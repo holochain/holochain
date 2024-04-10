@@ -32,46 +32,21 @@ async fn conductors_call_remote(num_conductors: usize) {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
     let config = SweetConductorConfig::standard();
-    // let config = SweetConductorConfig::standard().no_dpki();
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(num_conductors, config).await;
-    dbg!();
-
-    // tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-    // return;
-
-    //////////////////   //////////////////   //////////////////   //////////////////   //////////////////
-    /////////////////   /////////////////   /////////////////   /////////////////   /////////////////
-    ////////////////   ////////////////   ////////////////   ////////////////   ////////////////
-    ///////////////   ///////////////   ///////////////   ///////////////   ///////////////
-    //////////////   //////////////   //////////////   //////////////   //////////////
-    /////////////   /////////////   /////////////   /////////////   /////////////
-    ////////////   ////////////   ////////////   ////////////   ////////////
-    ///////////   ///////////   ///////////   ///////////   ///////////
-    //////////   //////////   //////////   //////////   //////////
-    /////////   /////////   /////////   /////////   /////////
-    ////////   ////////   ////////   ////////   ////////
-    ///////   ///////   ///////   ///////   ///////
-    //////   //////   //////   //////   //////
-    /////   /////   /////   /////   /////
-    ////   ////   ////   ////   ////
 
     let apps = conductors.setup_app("app", [&dna]).await.unwrap();
-    dbg!();
     let cells: Vec<_> = apps
         .into_inner()
         .into_iter()
         .map(|c| c.into_cells().into_iter().next().unwrap())
         .collect();
 
-    dbg!();
     conductors.exchange_peer_info().await;
-    dbg!();
 
     // Make sure that genesis records are integrated now that conductors have discovered each other. This makes it
     // more likely that Kitsune knows about all the agents in the network to be able to make remote calls to them.
     await_consistency(60, cells.iter()).await.unwrap();
-    dbg!();
 
     let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
 

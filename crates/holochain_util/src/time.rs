@@ -37,6 +37,9 @@ macro_rules! timed {
     }};
 
     ($intervals:expr, $what:expr, $block:expr) => {{
+        #[cfg(feature = "tokio")]
+        let start = tokio::time::Instant::now();
+        #[cfg(not(feature = "tokio"))]
         let start = std::time::Instant::now();
 
         let result = $block;
