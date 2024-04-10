@@ -621,7 +621,7 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome)
 #[automock]
-#[async_trait::async_trait]
+#[allow(async_fn_in_trait)]
 pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     fn dna_def(&self) -> &DnaDefHashed;
 

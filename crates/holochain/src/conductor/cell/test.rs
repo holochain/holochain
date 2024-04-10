@@ -9,7 +9,6 @@ use holochain_state::prelude::*;
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::action;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {

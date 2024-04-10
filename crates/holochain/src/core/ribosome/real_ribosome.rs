@@ -743,7 +743,6 @@ impl RealRibosome {
     }
 }
 
-#[async_trait::async_trait]
 impl RibosomeT for RealRibosome {
     fn dna_def(&self) -> &DnaDefHashed {
         self.dna_file.dna()
@@ -844,7 +843,6 @@ impl RibosomeT for RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
-                // let module: Arc<Module> = todo!();
                 let module = self.get_module_for_zome(zome).await?;
                 if module.info().exports.contains_key(fn_name.as_ref()) {
                     // there is a corresponding zome fn
