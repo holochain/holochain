@@ -297,6 +297,7 @@ async fn private_entries_dont_leak() {
     check_for_private_entries(conductors[1].get_cache_db(bobbo.cell_id()).await.unwrap()).await;
 }
 
+#[tracing::instrument(skip_all)]
 async fn check_for_private_entries<Kind: DbKindT>(env: DbWrite<Kind>) {
     let count: usize = env.read_async(move |txn| -> DatabaseResult<usize> {
         Ok(txn.query_row(
