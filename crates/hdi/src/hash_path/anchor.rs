@@ -2,7 +2,7 @@ use crate::hash_path::path::Component;
 use crate::hash_path::path::Path;
 use holochain_wasmer_guest::*;
 
-/// This is the root of the [ `Path` ] tree.
+/// This is the root of the [`Path`] tree.
 ///
 /// Forms the entry point to all anchors so that agents can navigate down the tree from here.
 pub const ROOT: &[u8; 2] = &[0x00, 0x00];
@@ -10,10 +10,10 @@ pub const ROOT: &[u8; 2] = &[0x00, 0x00];
 #[derive(PartialEq, SerializedBytes, serde::Serialize, serde::Deserialize, Debug, Clone)]
 /// An anchor can only be 1 or 2 levels deep as "type" and "text".
 ///
-/// The second level is optional and the Strings use the standard [ `TryInto` ] for path [ `Component` ] internally.
+/// The second level is optional and the Strings use the standard [`TryInto`] for path [`Component`] internally.
 ///
-/// __Anchors are required to be included in an application's [ `entry_defs` ]__ callback and so implement all the standard methods.
-/// Technically the [ `Anchor` ] entry definition is the [ `Path` ] definition.
+/// __Anchors are required to be included in an application's [`entry_defs`](crate::prelude::entry_types)__ callback and so implement all the standard methods.
+/// Technically the [`Anchor`] entry definition is the [`Path`] definition.
 ///
 /// e.g. `entry_defs![Anchor::entry_def()]`
 ///
