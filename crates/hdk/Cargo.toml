@@ -1,6 +1,6 @@
 [package]
 name = "hdk"
-version = "0.3.0-beta-dev.37"
+version = "0.3.0-beta-dev.38"
 description = "The Holochain HDK"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
@@ -12,13 +12,13 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-hdi = { version = "=0.4.0-beta-dev.33", path = "../hdi", features = ["trace"] }
-hdk_derive = { version = "^0.3.0-beta-dev.31", path = "../hdk_derive" }
+hdi = { version = "=0.4.0-beta-dev.34", path = "../hdi", features = ["trace"] }
+hdk_derive = { version = "^0.3.0-beta-dev.32", path = "../hdk_derive" }
 holo_hash = { version = "^0.3.0-beta-dev.26", path = "../holo_hash" }
 holochain_wasmer_guest = { version = "=0.0.92" }
 # it's important that we depend on holochain_zome_types with no default
 # features, both here AND in hdk_derive, to reduce code bloat
-holochain_zome_types = { version = "^0.3.0-beta-dev.32", path = "../holochain_zome_types", default-features = false }
+holochain_zome_types = { version = "^0.3.0-beta-dev.33", path = "../holochain_zome_types", default-features = false }
 paste = "1.0"
 serde = "1.0"
 serde_bytes = "0.11"
