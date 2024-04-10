@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Removed `DnaCompatParams` which was never fully hooked up and didn't do anything.
+
 ## 0.3.0-beta-dev.31
 
 ## 0.3.0-beta-dev.30

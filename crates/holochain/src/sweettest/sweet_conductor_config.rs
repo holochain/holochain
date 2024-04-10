@@ -83,7 +83,10 @@ impl SweetConductorConfig {
             })
     }
 
-    /// Disable DPKI, which is on by default
+    /// Disable DPKI, which is on by default.
+    /// You would want to disable DPKI in situations where you're testing unusual situations
+    /// such as tests which disable networking, tests which use pregenerated agent keys,
+    /// or any situation where it's known that DPKI is irrelevant.
     pub fn no_dpki(mut self) -> Self {
         self.dpki = Some(holochain_conductor_api::conductor::DpkiConfig::disabled());
         self

@@ -83,11 +83,6 @@ impl DpkiService {
 #[async_trait::async_trait]
 #[mockall::automock]
 pub trait DpkiState: Send + Sync {
-    // fn uuid(&self) -> [u8; 32];
-
-    // /// If the service is backed by a cell, return the CellId
-    // fn cell_id(&self) -> Option<CellId>;
-
     async fn next_derivation_details(
         &self,
         app_name: InstalledAppId,

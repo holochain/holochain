@@ -26,14 +26,6 @@ pub struct DeepkeyState {
 
 #[async_trait::async_trait]
 impl DpkiState for DeepkeyState {
-    // fn uuid(&self) -> [u8; 32] {
-    //     self.cell_id.dna_hash().get_raw_32().try_into().unwrap()
-    // }
-
-    // fn cell_id(&self) -> Option<CellId> {
-    //     Some(self.cell_id.clone())
-    // }
-
     async fn next_derivation_details(
         &self,
         app_name: InstalledAppId,

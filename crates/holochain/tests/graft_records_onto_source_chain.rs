@@ -216,22 +216,13 @@ async fn grafting() {
     )
     .await;
 
-    let records = conductor
+    let _records = conductor
         .get_chc(alice.cell_id())
         .unwrap()
         .clone()
         .get_record_data(None)
         .await
         .unwrap();
-
-    // let records = holochain::conductor::chc::CHC_LOCAL_MAP
-    //     .lock()
-    //     .get(&alice.cell_id())
-    //     .unwrap()
-    //     .clone()
-    //     .get_record_data(None)
-    //     .await
-    //     .unwrap();
 
     // This results in an error since the CHC already contains genesis, but this
     // is just to create the necessary cell for grafting onto.

@@ -583,7 +583,7 @@ mod dna_impls {
                 .dna_def()
                 .all_zomes()
                 .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
-            
+
             // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
             if is_full_wasm_dna {
                 Ok(self.put_wasm(ribosome).await?)
@@ -1522,16 +1522,6 @@ mod app_impls {
                         .sign_raw(&self.keystore, dpki_agent.get_raw_39().into())
                         .await
                         .map_err(|e| DpkiServiceError::Lair(e.into()))?;
-
-                    // #[cfg(test)]
-                    // assert_eq!(
-                    //     hdk::prelude::verify_signature_raw(
-                    //         agent_key.clone(),
-                    //         signature.clone(),
-                    //         dpki_agent.get_raw_39().to_vec()
-                    //     ),
-                    //     Ok(true)
-                    // );
 
                     let dna_hashes = cell_ids.iter().map(|c| c.dna_hash().clone()).collect();
 
