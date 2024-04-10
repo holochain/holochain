@@ -51,6 +51,28 @@ mod unit_tests;
 mod error;
 mod types;
 
+struct OutcomeSummary {
+    accepted: usize,
+    missing: usize,
+    rejected: usize,
+}
+
+impl OutcomeSummary {
+    fn new() -> Self {
+        OutcomeSummary {
+            accepted: 0,
+            missing: 0,
+            rejected: 0,
+        }
+    }
+}
+
+impl Default for OutcomeSummary {
+    fn default() -> Self {
+        OutcomeSummary::new()
+    }
+}
+
 #[instrument(skip(
     workspace,
     trigger_integration,
@@ -153,7 +175,7 @@ async fn app_validation_workflow_inner(
     network: &HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
-) -> WorkflowResult<WorkComplete> {
+) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
     // filter out ops that have missing dependencies
@@ -307,12 +329,12 @@ async fn app_validation_workflow_inner(
     ops_validated += rejected_ops;
     tracing::debug!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected.");
 
-    Ok(if ops_validated < num_ops_to_validate {
-        // trigger app validation workflow again in 10 seconds
-        WorkComplete::Incomplete(Some(Duration::from_secs(10)))
-    } else {
-        WorkComplete::Complete
-    })
+    let outcome_summary = OutcomeSummary {
+        accepted: accepted_ops,
+        missing: awaiting_ops,
+        rejected: rejected_ops,
+    };
+    Ok(outcome_summary)
 }
 
 pub async fn record_to_op(
