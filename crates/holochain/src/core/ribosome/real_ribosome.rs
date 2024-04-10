@@ -109,7 +109,6 @@ use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
 use opentelemetry_api::global::meter_with_version;
 use opentelemetry_api::metrics::Counter;
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -340,7 +339,7 @@ impl RealRibosome {
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
-            wasmer_module_cache: Arc::new(RwLock::new(ModuleCache::new(None))),
+            wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         }
     }
 
