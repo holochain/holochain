@@ -21,11 +21,11 @@ macro_rules! log_elapsed {
         if elapsed_ms < intervals[0] {
             // tracing::trace!(?elapsed, "(quick) {what}");
         } else if elapsed_ms < intervals[1] {
-            tracing::info!(?elapsed, ?intervals, "{what}exceeded LOW time threshold");
+            tracing::info!(?elapsed, ?intervals, "{what}exceeded LOW time threshold",);
         } else if elapsed_ms < intervals[2] {
-            tracing::warn!(?elapsed, ?intervals, "{what}exceeded MID time threshold");
+            tracing::warn!(?elapsed, ?intervals, "{what}exceeded MID time threshold",);
         } else {
-            tracing::error!(?elapsed, ?intervals, "{what}exceeded HIGH time threshold");
+            tracing::error!(?elapsed, ?intervals, "{what}exceeded HIGH time threshold",);
         }
     }};
 }
@@ -37,6 +37,9 @@ macro_rules! timed {
     }};
 
     ($intervals:expr, $what:expr, $block:expr) => {{
+        #[cfg(feature = "tokio")]
+        let start = tokio::time::Instant::now();
+        #[cfg(not(feature = "tokio"))]
         let start = std::time::Instant::now();
 
         let result = $block;
