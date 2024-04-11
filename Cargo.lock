@@ -2614,6 +2614,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "hc_deepkey_types"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "hdi 0.4.0-beta-dev.34 (registry+https://github.com/rust-lang/crates.io-index)",
+ "holo_hash",
+ "serde",
+]
+
+[[package]]
 name = "hc_demo_cli"
 version = "0.2.0-beta-rc.0"
 dependencies = [
@@ -2621,7 +2631,7 @@ dependencies = [
  "clap 4.5.4",
  "flate2",
  "getrandom 0.2.14",
- "hdi",
+ "hdi 0.4.0-beta-dev.34",
  "hdk",
  "holochain",
  "holochain_keystore",
@@ -2716,7 +2726,7 @@ dependencies = [
  "arbitrary",
  "fixt",
  "getrandom 0.2.14",
- "hdk_derive",
+ "hdk_derive 0.3.0-beta-dev.32",
  "holo_hash",
  "holochain_integrity_types",
  "holochain_wasmer_guest",
@@ -2731,13 +2741,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "hdi"
+version = "0.4.0-beta-dev.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efe35d8a7150f89f54d6a2c61320bfaf70af9d5d0dd5726b2ce68e802fcab2e4"
+dependencies = [
+ "getrandom 0.2.14",
+ "hdk_derive 0.3.0-beta-dev.32 (registry+https://github.com/rust-lang/crates.io-index)",
+ "holo_hash",
+ "holochain_integrity_types",
+ "holochain_wasmer_guest",
+ "paste",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
 name = "hdk"
 version = "0.3.0-beta-dev.38"
 dependencies = [
  "fixt",
  "getrandom 0.2.14",
- "hdi",
- "hdk_derive",
+ "hdi 0.4.0-beta-dev.34",
+ "hdk_derive 0.3.0-beta-dev.32",
  "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
@@ -2754,6 +2780,22 @@ dependencies = [
 [[package]]
 name = "hdk_derive"
 version = "0.3.0-beta-dev.32"
+dependencies = [
+ "darling 0.14.4",
+ "heck 0.4.1",
+ "holochain_integrity_types",
+ "paste",
+ "proc-macro-error",
+ "proc-macro2 1.0.79",
+ "quote 1.0.36",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "hdk_derive"
+version = "0.3.0-beta-dev.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a5e5079e25d0a796ec6c36e413f8e478fe30d3379a1f6007589cc95a098d0c0"
 dependencies = [
  "darling 0.14.4",
  "heck 0.4.1",
@@ -3008,7 +3050,7 @@ dependencies = [
  "futures",
  "ghost_actor",
  "hdk",
- "hdk_derive",
+ "hdk_derive 0.3.0-beta-dev.32",
  "holo_hash",
  "holochain_cascade",
  "holochain_nonce",
@@ -3164,6 +3206,7 @@ dependencies = [
  "derive_more",
  "futures",
  "hdk",
+ "holochain_deepkey_dna",
  "holochain_keystore",
  "holochain_types",
  "holochain_util",
@@ -3178,9 +3221,10 @@ dependencies = [
 
 [[package]]
 name = "holochain_deepkey_dna"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53a64f7295b2aff0c1b1c45948e2bcfec197c16b437689f45fa70d5c79f94d07"
+version = "0.0.3"
+dependencies = [
+ "hc_deepkey_types",
+]
 
 [[package]]
 name = "holochain_diagnostics"
@@ -3267,7 +3311,7 @@ dependencies = [
 name = "holochain_mock_hdi"
 version = "0.0.1"
 dependencies = [
- "hdi",
+ "hdi 0.4.0-beta-dev.34",
  "mockall",
 ]
 

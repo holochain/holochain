@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
+pub use holochain_deepkey_dna::types::*;
 use holochain_types::prelude::*;
 use holochain_util::timed;
 
 pub mod derivation_paths;
-
-pub(crate) mod zome_types;
-
-pub use zome_types::*;
 
 mod deepkey;
 pub use deepkey::*;

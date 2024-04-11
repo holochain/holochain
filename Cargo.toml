@@ -98,7 +98,11 @@ opt-level = "z"
 lto = true
 
 [patch.crates-io]
-# holochain_deepkey_dna = { path = "../deepkey/crates/holochain_deepkey_dna" }
+holochain_deepkey_dna = { path = "../deepkey/crates/holochain_deepkey_dna" }
+
+holo_hash = { path = "crates/holo_hash" }
+holochain_integrity_types = { path = "crates/holochain_integrity_types" }
+
 # task-motel = { path = "../task-motel" }
 # proptest = { path = "/home/michael/gitfork/proptest/proptest" }
 # proptest = { git = "https://github.com/maackle/proptest", branch = "arbitrary-pathbuf" }
