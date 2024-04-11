@@ -69,9 +69,9 @@ pub struct FullIntegrationStateDump {
 pub struct P2pAgentsDump {
     /// The info of this agents cell.
     pub this_agent_info: Option<AgentInfoDump>,
-    /// The dna as a [`DnaHash`] and [`kitsune_p2p_types::KitsuneSpace`].
+    /// The dna as a [`DnaHash`] and [`KitsuneSpace`].
     pub this_dna: Option<(DnaHash, KitsuneSpace)>,
-    /// The agent as [`AgentPubKey`] and [`kitsune_p2p_types::KitsuneAgent`].
+    /// The agent as [`AgentPubKey`] and [`KitsuneAgent`].
     pub this_agent: Option<(AgentPubKey, KitsuneAgent)>,
     /// All other agent info.
     pub peers: Vec<AgentInfoDump>,

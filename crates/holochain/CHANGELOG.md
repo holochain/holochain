@@ -6,6 +6,9 @@ default_semver_increment_mode: !pre_minor beta-dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## 0.3.0-beta-dev.45
+
 - App validation workflow: Mock network in unit tests using new type `GenericNetwork` to properly test `must_get_agent_activity`. Previously that was not possible, as all peers in a test case were authorities for each other and `must_get_agent_activity` would therefore not send requests to the network.
 - App validation workflow: Skip ops that have missing dependencies. If an op is awaiting dependencies to be fetched, it will be excluded from app validation.
 - App validation workflow: Integration workflow is only triggered when ops have been validated (either accepted or rejected).

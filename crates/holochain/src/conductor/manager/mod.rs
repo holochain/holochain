@@ -53,11 +53,12 @@ pub enum TaskOutcome {
 
 /// Spawn a task which performs some action after each task has completed,
 /// as recieved by the outcome channel produced by the task manager.
+#[tracing::instrument(skip_all)]
 pub fn spawn_task_outcome_handler(
     conductor: ConductorHandle,
     mut outcomes: OutcomeReceiver,
 ) -> JoinHandle<TaskManagerResult> {
-    let span = tracing::error_span!(
+    let span = tracing::info_span!(
         "spawn_task_outcome_handler",
         scope = conductor.get_config().tracing_scope()
     );
@@ -276,7 +277,7 @@ pub struct TaskManagerClient {
 impl TaskManagerClient {
     /// Construct the TaskManager and the outcome channel receiver
     pub fn new(tx: OutcomeSender, scope: String) -> Self {
-        let span = tracing::error_span!("managed task", scope = scope);
+        let span = tracing::info_span!("managed task", scope = scope);
         let tm = task_motel::TaskManager::new_instrumented(span, tx, |g| match g {
             TaskGroup::Conductor => None,
             TaskGroup::Dna(_) => Some(TaskGroup::Conductor),

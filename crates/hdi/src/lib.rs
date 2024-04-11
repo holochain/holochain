@@ -54,7 +54,7 @@
 //! All of these validation rules are declared in the `validate` callback. It
 //! is executed for a new action by each validation authority.
 //!
-//! There's a helper type called [`FlatOp`](crate::prelude::holochain_integrity_types::FlatOp) available for easy
+//! There's a helper type called [`FlatOp`](crate::flat_op::FlatOp) available for easy
 //! access to all link and entry variants when validating an operation. In many cases, this type can
 //! be easier to work with than the bare [`Op`](crate::prelude::holochain_integrity_types::Op).
 //! `FlatOp` contains the same information as `Op` but with a flatter, more accessible data structure
