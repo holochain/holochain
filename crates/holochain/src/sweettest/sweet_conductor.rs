@@ -546,18 +546,6 @@ impl SweetConductor {
         D: std::fmt::Debug,
         SerializedBytes: TryInto<D, Error = SerializedBytesError>,
     {
-        let (admin_sender, _admin_rx) = self.admin_ws_client::<D>().await;
-        let token_response: AdminResponse = admin_sender
-            .request(AdminRequest::IssueAppAuthenticationToken(
-                installed_app_id.into(),
-            ))
-            .await
-            .unwrap();
-        let token = match token_response {
-            AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
-            _ => panic!("unexpected response"),
-        };
-
         let port = self
             .raw_handle()
             .add_app_interface(either::Either::Left(0), AllowedOrigins::Any, None)
@@ -565,9 +553,7 @@ impl SweetConductor {
             .expect("Couldn't create app interface");
         let (tx, rx) = websocket_client_by_port(port).await.unwrap();
 
-        tx.authenticate(AppAuthenticationRequest { token })
-            .await
-            .unwrap();
+        authenticate_app_ws_client(self.raw_handle(), tx.clone(), installed_app_id).await;
 
         (tx, WsPollRecv::new::<D>(rx))
     }
@@ -826,6 +812,28 @@ pub async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, Web
         ),
     )
     .await
+}
+
+/// Create an authentication token for an app client and authenticate the connection.
+pub async fn authenticate_app_ws_client(conductor: ConductorHandle, app_sender: WebsocketSender, installed_app_id: InstalledAppId) {
+    let admin_port = conductor.get_arbitrary_admin_websocket_port().expect("No admin port on this conductor");
+    let (admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _admin_rx = WsPollRecv::new::<AdminResponse>(admin_rx);
+
+    let token_response: AdminResponse = admin_tx
+        .request(AdminRequest::IssueAppAuthenticationToken(
+            installed_app_id.into(),
+        ))
+        .await
+        .unwrap();
+    let token = match token_response {
+        AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
+        _ => panic!("unexpected response"),
+    };
+
+    app_sender.authenticate(AppAuthenticationRequest { token })
+        .await
+        .unwrap();
 }
 
 impl Drop for SweetConductor {

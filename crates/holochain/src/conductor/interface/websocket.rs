@@ -11,6 +11,7 @@ use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
+use crate::sweettest::WsPollRecv;
 
 use holochain_types::websocket::AllowedOrigins;
 use std::sync::Arc;
@@ -398,7 +399,7 @@ pub mod test {
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
-    use crate::sweettest::app_bundle_from_dnas;
+    use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
     use crate::sweettest::websocket_client_by_port;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
@@ -438,26 +439,6 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn signal_in_post_commit() {
-        struct PollRecv(tokio::task::JoinHandle<()>);
-
-        impl Drop for PollRecv {
-            fn drop(&mut self) {
-                self.0.abort();
-            }
-        }
-
-        impl PollRecv {
-            pub fn new<D>(mut rx: WebsocketReceiver) -> Self
-            where
-                D: std::fmt::Debug,
-                SerializedBytes: TryInto<D, Error = SerializedBytesError>,
-            {
-                Self(tokio::task::spawn(async move {
-                    while rx.recv::<D>().await.is_ok() {}
-                }))
-            }
-        }
-
         holochain_trace::test_run().ok();
         let db_dir = test_db_dir();
         let conductor_handle = ConductorBuilder::new()
@@ -479,7 +460,7 @@ pub mod test {
             .unwrap();
 
         let (admin_tx, rx) = websocket_client_by_port(admin_port).await.unwrap();
-        let _rx = PollRecv::new::<AdminResponse>(rx);
+        let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
         let agent_key = conductor_handle
             .keystore()
@@ -539,6 +520,7 @@ pub mod test {
                 s_send.send(s).unwrap();
             }
         });
+        authenticate_app_ws_client(conductor_handle.clone(), app_tx.clone(), app_info.installed_app_id).await;
 
         // Call Zome
         let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
