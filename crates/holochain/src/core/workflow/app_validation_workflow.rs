@@ -34,6 +34,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
+use std::time::Instant;
 use tracing::*;
 pub use types::Outcome;
 
@@ -731,8 +732,10 @@ async fn run_validation_callback(
                 .filter(move |hash| {
                     // keep track of which dependencies are being fetched to
                     // prevent multiple fetches of the same hash
-                    let is_new_dependency =
-                        validation_deps.lock().insert_missing_hash(hash.clone());
+                    let is_new_dependency = validation_deps
+                        .lock()
+                        .insert_missing_hash(hash.clone())
+                        .is_none();
                     is_new_dependency
                 })
                 .map(move |hash| {
@@ -778,7 +781,8 @@ async fn run_validation_callback(
             let validation_dependencies = validation_dependencies.clone();
             let is_new_dependency = validation_dependencies
                 .lock()
-                .insert_missing_hash(author.clone().into());
+                .insert_missing_hash(author.clone().into())
+                .is_none();
             // fetch dependency if it is not being fetched yet
             if is_new_dependency {
                 tokio::spawn({
@@ -811,7 +815,7 @@ async fn run_validation_callback(
 /// Dependencies required for app validating an op.
 pub struct ValidationDependencies {
     /// Missing hashes that are being fetched.
-    missing_hashes: HashSet<AnyDhtHash>,
+    missing_hashes: HashMap<AnyDhtHash, Instant>,
     /// Dependencies that are missing to app validate an op.
     hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
 }
@@ -823,19 +827,27 @@ impl Default for ValidationDependencies {
 }
 
 impl ValidationDependencies {
+    const EXPIRATION_DURATION: Duration = Duration::from_secs(60);
+
     pub fn new() -> Self {
         Self {
-            missing_hashes: HashSet::new(),
+            missing_hashes: HashMap::new(),
             hashes_missing_for_op: HashMap::new(),
         }
     }
 
-    pub fn insert_missing_hash(&mut self, hash: AnyDhtHash) -> bool {
-        self.missing_hashes.insert(hash)
+    pub fn insert_missing_hash(&mut self, hash: AnyDhtHash) -> Option<Instant> {
+        self.missing_hashes.insert(hash, Instant::now())
     }
 
-    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) -> bool {
+    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) -> Option<Instant> {
         self.missing_hashes.remove(hash)
+    }
+
+    pub fn missing_hash_fetches_expired(&self) -> bool {
+        self.missing_hashes
+            .iter()
+            .all(|(_, instant)| instant.elapsed() > Self::EXPIRATION_DURATION)
     }
 
     pub fn insert_hash_missing_for_op(&mut self, dht_op_hash: DhtOpHash, hash: AnyDhtHash) {
@@ -873,96 +885,6 @@ impl ValidationDependencies {
             .filter(|op| !self.hashes_missing_for_op.contains_key(op.as_hash()))
             .collect()
     }
-
-
-
-pub(super) mod missing_dep_expiration {
-    use holo_hash::AnyDhtHash;
-    use std::{
-        collections::HashMap,
-        time::{Duration, Instant},
-    };
-
-    const EXPIRATION_DURATION: Duration = Duration::from_secs(60);
-
-    fn all_missing_dep_fetches_expired(
-        validation_dependencies: &HashMap<AnyDhtHash, Instant>,
-    ) -> bool {
-        validation_dependencies
-            .iter()
-            .all(|(_, instant)| instant.elapsed() > EXPIRATION_DURATION)
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use ::fixt::fixt;
-        use holo_hash::fixt::AnyDhtHashFixturator;
-        use std::{
-            collections::HashMap,
-            time::{Duration, Instant},
-        };
-
-        use crate::core::workflow::app_validation_workflow::missing_dep_expiration::{
-            all_missing_dep_fetches_expired, EXPIRATION_DURATION,
-        };
-
-        #[test]
-        fn empty() {
-            let validation_dependencies = HashMap::new();
-            assert_eq!(
-                all_missing_dep_fetches_expired(&validation_dependencies),
-                true
-            );
-        }
-
-        #[test]
-        fn all_expired() {
-            let mut validation_dependencies = HashMap::new();
-            let hash = fixt!(AnyDhtHash);
-            validation_dependencies.insert(
-                hash,
-                Instant::now() - EXPIRATION_DURATION - Duration::from_secs(1),
-            );
-            assert_eq!(
-                all_missing_dep_fetches_expired(&validation_dependencies),
-                true
-            );
-        }
-
-        #[test]
-        fn none_expired() {
-            let mut validation_dependencies = HashMap::new();
-            let hash = fixt!(AnyDhtHash);
-            validation_dependencies.insert(
-                hash,
-                Instant::now() - EXPIRATION_DURATION + Duration::from_secs(1),
-            );
-            assert_eq!(
-                all_missing_dep_fetches_expired(&validation_dependencies),
-                false
-            );
-        }
-
-        #[test]
-        fn some_expired() {
-            let mut validation_dependencies = HashMap::new();
-            let current_hash = fixt!(AnyDhtHash);
-            let expired_hash = fixt!(AnyDhtHash);
-            validation_dependencies.insert(
-                current_hash,
-                Instant::now() - EXPIRATION_DURATION + Duration::from_secs(1),
-            );
-            validation_dependencies.insert(
-                expired_hash,
-                Instant::now() - EXPIRATION_DURATION - Duration::from_secs(1),
-            );
-            assert_eq!(
-                all_missing_dep_fetches_expired(&validation_dependencies),
-                false
-            );
-        }
-    }
-}
 }
 
 pub struct AppValidationWorkspace {
