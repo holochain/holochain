@@ -75,7 +75,7 @@ pub async fn app_validation_workflow(
         conductor_handle,
         &network,
         dht_query_cache,
-        validation_dependencies,
+        validation_dependencies.clone(),
     )
     .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
@@ -792,6 +792,9 @@ async fn run_validation_callback(
     }
 }
 
+// accepted, missing and rejected are only used in tests
+#[allow(dead_code)]
+#[derive(Debug)]
 struct OutcomeSummary {
     ops_to_validate: usize,
     validated: usize,

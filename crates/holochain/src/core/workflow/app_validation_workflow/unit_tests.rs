@@ -849,10 +849,7 @@ impl TestCase {
 mod fetches_expiry_tests {
     use ::fixt::fixt;
     use holo_hash::fixt::AnyDhtHashFixturator;
-    use std::{
-        collections::HashMap,
-        time::{Duration, Instant},
-    };
+    use std::time::{Duration, Instant};
 
     use crate::core::workflow::app_validation_workflow::ValidationDependencies;
 

@@ -1,5 +1,4 @@
 use crate::conductor::{Conductor, ConductorHandle};
-use crate::core::queue_consumer::WorkComplete;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::app_validation_workflow::{
@@ -196,7 +195,7 @@ async fn main_loop_app_validation_workflow() {
     assert_matches!(
         outcome_summary,
         OutcomeSummary {
-            ops_to_validate,
+            ops_to_validate: ops_to_validate,
             validated: 1,
             accepted: 1,
             rejected: 0,
