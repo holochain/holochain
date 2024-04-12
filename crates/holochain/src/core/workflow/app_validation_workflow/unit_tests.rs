@@ -856,7 +856,10 @@ mod fetches_expiry_tests {
     #[test]
     fn empty() {
         let validation_dependencies = ValidationDependencies::default();
-        assert_eq!(validation_dependencies.missing_hash_fetches_expired(), true);
+        assert_eq!(
+            validation_dependencies.fetch_missing_hashes_timed_out(),
+            true
+        );
     }
 
     #[test]
@@ -865,9 +868,12 @@ mod fetches_expiry_tests {
         let hash = fixt!(AnyDhtHash);
         validation_dependencies.missing_hashes.insert(
             hash,
-            Instant::now() - ValidationDependencies::EXPIRATION_DURATION - Duration::from_secs(1),
+            Instant::now() - ValidationDependencies::FETCH_TIMEOUT - Duration::from_secs(1),
         );
-        assert_eq!(validation_dependencies.missing_hash_fetches_expired(), true);
+        assert_eq!(
+            validation_dependencies.fetch_missing_hashes_timed_out(),
+            true
+        );
     }
 
     #[test]
@@ -876,10 +882,10 @@ mod fetches_expiry_tests {
         let hash = fixt!(AnyDhtHash);
         validation_dependencies.missing_hashes.insert(
             hash,
-            Instant::now() - ValidationDependencies::EXPIRATION_DURATION + Duration::from_secs(1),
+            Instant::now() - ValidationDependencies::FETCH_TIMEOUT + Duration::from_secs(1),
         );
         assert_eq!(
-            validation_dependencies.missing_hash_fetches_expired(),
+            validation_dependencies.fetch_missing_hashes_timed_out(),
             false
         );
     }
@@ -891,14 +897,14 @@ mod fetches_expiry_tests {
         let expired_hash = fixt!(AnyDhtHash);
         validation_dependencies.missing_hashes.insert(
             unexpired_hash,
-            Instant::now() - ValidationDependencies::EXPIRATION_DURATION + Duration::from_secs(1),
+            Instant::now() - ValidationDependencies::FETCH_TIMEOUT + Duration::from_secs(1),
         );
         validation_dependencies.missing_hashes.insert(
             expired_hash,
-            Instant::now() - ValidationDependencies::EXPIRATION_DURATION - Duration::from_secs(1),
+            Instant::now() - ValidationDependencies::FETCH_TIMEOUT - Duration::from_secs(1),
         );
         assert_eq!(
-            validation_dependencies.missing_hash_fetches_expired(),
+            validation_dependencies.fetch_missing_hashes_timed_out(),
             false
         );
     }

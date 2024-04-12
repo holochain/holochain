@@ -92,7 +92,7 @@ pub async fn app_validation_workflow(
         if outcome_summary.validated < outcome_summary.ops_to_validate
             && !validation_dependencies
                 .lock()
-                .missing_hash_fetches_expired()
+                .fetch_missing_hashes_timed_out()
         {
             // trigger app validation workflow again in 10 seconds
             WorkComplete::Incomplete(Some(Duration::from_secs(10)))
@@ -836,7 +836,7 @@ impl Default for ValidationDependencies {
 }
 
 impl ValidationDependencies {
-    const EXPIRATION_DURATION: Duration = Duration::from_secs(60);
+    const FETCH_TIMEOUT: Duration = Duration::from_secs(60);
 
     pub fn new() -> Self {
         Self {
@@ -853,10 +853,10 @@ impl ValidationDependencies {
         self.missing_hashes.remove(hash)
     }
 
-    pub fn missing_hash_fetches_expired(&self) -> bool {
+    pub fn fetch_missing_hashes_timed_out(&self) -> bool {
         self.missing_hashes
             .iter()
-            .all(|(_, instant)| instant.elapsed() > Self::EXPIRATION_DURATION)
+            .all(|(_, instant)| instant.elapsed() > Self::FETCH_TIMEOUT)
     }
 
     pub fn insert_hash_missing_for_op(&mut self, dht_op_hash: DhtOpHash, hash: AnyDhtHash) {
