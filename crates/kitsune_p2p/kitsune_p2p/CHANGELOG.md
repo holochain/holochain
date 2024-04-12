@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   an agent has changed. If there is an open connection to the old peer URL then it will be closed. Secondly, when if a message from a
   peer fails to decode. This is likely sign that communication between two conductors is not going to work so the connection is closed.
 
+## 0.3.0-beta-dev.37
+
 ## 0.3.0-beta-dev.36
 
 ## 0.3.0-beta-dev.35

@@ -22,6 +22,7 @@ use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::*;
 use nanoid::nanoid;
 use rand::Rng;
+use std::net::ToSocketAddrs;
 use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -739,7 +740,12 @@ impl SweetConductor {
 pub async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, WebsocketReceiver)> {
     connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], port).into()),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()?
+                .next()
+                .ok_or_else(|| Error::other("Could not resolve localhost"))?,
+        ),
     )
     .await
 }

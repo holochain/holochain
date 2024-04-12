@@ -47,6 +47,7 @@ pub async fn inject_agent_infos<'iter, I: IntoIterator<Item = &'iter AgentInfoSi
 }
 
 /// Inject multiple agent info entries into the peer store in batches.
+#[tracing::instrument(skip_all)]
 pub async fn p2p_put_all_batch(
     env: DbWrite<DbKindP2pAgents>,
     rx: tokio::sync::mpsc::Receiver<P2pBatch>,

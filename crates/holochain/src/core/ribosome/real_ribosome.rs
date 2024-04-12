@@ -85,6 +85,7 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
+use holochain_util::timed;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
@@ -109,7 +110,6 @@ use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
 use opentelemetry_api::global::meter_with_version;
 use opentelemetry_api::metrics::Counter;
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -343,8 +343,8 @@ impl RealRibosome {
     pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
         let wasm = &self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        let module_cache = self.wasmer_module_cache.write();
-        let module = module_cache.get(cache_key, wasm)?;
+        let module_cache = timed!([1, 10, 1000], self.wasmer_module_cache.write());
+        let module = timed!([1, 10, 1000], module_cache.get(cache_key, wasm)?);
         Ok(module)
     }
 
@@ -624,7 +624,6 @@ impl RealRibosome {
             // @todo - is this a problem for large payloads like entries?
             invocation.to_owned().host_input()?,
         );
-
         if let Err(runtime_error) = &result {
             tracing::error!(?runtime_error, ?zome, ?fn_name);
         }
@@ -694,7 +693,9 @@ macro_rules! do_callback {
                             .map_err(|e| -> RuntimeError { e.into() })?,
                     ),
                     Err((_zome, other_error)) => return Err(other_error),
-                    Ok(None) => break,
+                    Ok(None) => {
+                        break;
+                    }
                 };
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
@@ -830,7 +831,6 @@ impl RibosomeT for RealRibosome {
                     let context_key = Self::next_context_key();
                     let instance_with_store =
                         self.build_instance_with_store(module, context_key)?;
-
                     // add call context to map for the following call
                     {
                         CONTEXT_MAP
@@ -868,7 +868,6 @@ impl RibosomeT for RealRibosome {
                     {
                         CONTEXT_MAP.lock().remove(&context_key);
                     }
-
                     result
                 } else {
                     // the callback fn does not exist

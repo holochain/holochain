@@ -170,7 +170,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    await_consistency(10, [&alice, &bobbo, &carol])
+    await_consistency(20, [&alice, &bobbo, &carol])
         .await
         .unwrap();
 

@@ -11,7 +11,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 chashmap = "2.2"
-colored = "2"
+colored = "2.1"
 futures = "0.3"
 holochain_diagnostics = { path = "../holochain_diagnostics" }
 holochain_trace = { version = "^0.3.0-beta-dev.9", path = "../holochain_trace" }

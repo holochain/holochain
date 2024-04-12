@@ -20,7 +20,7 @@ impl FetchTask {
     ) -> Arc<RwLock<Self>> {
         let this = Arc::new(RwLock::new(FetchTask { is_finished: false }));
 
-        let span = tracing::error_span!("FetchTask::spawn", scope = config.tracing_scope);
+        let span = tracing::info_span!("FetchTask::spawn", scope = config.tracing_scope);
 
         tokio::spawn({
             let this = this.clone();
