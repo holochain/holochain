@@ -493,7 +493,7 @@ async fn two_nodes_gossip_agent_info() {
         }
     })
     .await
-    .unwrap();
+    .ok(); // Don't fail on timeout, let the assertion report the issue
 
     assert_eq!(4, harness_b.agent_store().read().len());
 }
