@@ -63,9 +63,9 @@ impl WireMessage {
 
     /// Create a new authenticate message.
     fn authenticate<S>(s: S) -> Result<Message>
-        where
-            S: std::fmt::Debug,
-            SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
+    where
+        S: std::fmt::Debug,
+        SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
     {
         let s1 = SerializedBytes::try_from(s).map_err(Error::other)?;
         let s2 = Self::Authenticate {
@@ -431,7 +431,9 @@ impl WebsocketReceiver {
                         Message::Frame(_) => return Err(Error::other("UnexpectedRawFrame")),
                     };
                     match WireMessage::try_from_bytes(msg)? {
-                        WireMessage::Authenticate { data } => Ok(Some(ReceiveMessage::Authenticate(data))),
+                        WireMessage::Authenticate { data } => {
+                            Ok(Some(ReceiveMessage::Authenticate(data)))
+                        }
                         WireMessage::Request { id, data } => {
                             let resp = WebsocketRespond {
                                 id,
@@ -473,18 +475,18 @@ pub struct WebsocketSender(WsCoreSync, std::time::Duration);
 impl WebsocketSender {
     /// Authenticate with the remote using the default configured timeout.
     pub async fn authenticate<S>(&self, s: S) -> Result<()>
-        where
-            S: std::fmt::Debug,
-            SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
+    where
+        S: std::fmt::Debug,
+        SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
     {
         self.authenticate_timeout(s, self.1).await
     }
 
     /// Authenticate with the remote.
     pub async fn authenticate_timeout<S>(&self, s: S, timeout: std::time::Duration) -> Result<()>
-        where
-            S: std::fmt::Debug,
-            SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
+    where
+        S: std::fmt::Debug,
+        SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
     {
         use futures::sink::SinkExt;
         self.0
@@ -494,8 +496,8 @@ impl WebsocketSender {
                     core.send.lock().await.send(s).await.map_err(Error::other)?;
                     Ok(())
                 })
-                    .await
-                    .map_err(Error::other)?
+                .await
+                .map_err(Error::other)?
             })
             .await
     }

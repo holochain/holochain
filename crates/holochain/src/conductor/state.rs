@@ -240,7 +240,11 @@ pub struct AppInterfaceConfig {
 
 impl AppInterfaceConfig {
     /// Create config for a websocket interface
-    pub fn websocket(port: u16, allowed_origins: AllowedOrigins, installed_app_id: Option<InstalledAppId>) -> Self {
+    pub fn websocket(
+        port: u16,
+        allowed_origins: AllowedOrigins,
+        installed_app_id: Option<InstalledAppId>,
+    ) -> Self {
         Self {
             signal_subscriptions: HashMap::new(),
             installed_app_id,

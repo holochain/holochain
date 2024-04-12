@@ -1,10 +1,10 @@
+use holochain_conductor_api::AppAuthenticationToken;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::time::SystemTime;
-use holochain_conductor_api::AppAuthenticationToken;
 
-use holochain_types::prelude::InstalledAppId;
 use crate::conductor::error::{ConductorError, ConductorResult};
+use holochain_types::prelude::InstalledAppId;
 
 pub struct AppAuthTokenStore {
     issued_tokens: HashMap<AppAuthenticationToken, TokenMeta>,
@@ -28,7 +28,8 @@ impl AppAuthTokenStore {
         single_use: bool,
     ) -> (AppAuthenticationToken, Option<SystemTime>) {
         let token = nanoid::nanoid!().into_bytes();
-        let expires_at = SystemTime::now().checked_add(std::time::Duration::from_secs(expiry_seconds));
+        let expires_at =
+            SystemTime::now().checked_add(std::time::Duration::from_secs(expiry_seconds));
         self.issued_tokens.insert(
             token.clone(),
             TokenMeta {
@@ -47,7 +48,11 @@ impl AppAuthTokenStore {
     /// If `app_id_restriction` is provided, the token will only be valid for the specified `InstalledAppId`.
     /// This is useful when an app interface is restricted to a single app and tokens that would
     /// otherwise be valid, are not valid for connecting to this app interface.
-    pub fn authenticate_token(&mut self, token: AppAuthenticationToken, app_id_restriction: Option<InstalledAppId>) -> ConductorResult<InstalledAppId> {
+    pub fn authenticate_token(
+        &mut self,
+        token: AppAuthenticationToken,
+        app_id_restriction: Option<InstalledAppId>,
+    ) -> ConductorResult<InstalledAppId> {
         self.remove_expired_tokens();
 
         match self.issued_tokens.entry(token) {
@@ -60,7 +65,10 @@ impl AppAuthTokenStore {
 
                 if let Some(app_id_restriction) = app_id_restriction {
                     if &app_id_restriction != &meta.installed_app_id {
-                        return Err(ConductorError::FailedAuthenticationError("Attempt to use token in the context of another application".to_string()));
+                        return Err(ConductorError::FailedAuthenticationError(
+                            "Attempt to use token in the context of another application"
+                                .to_string(),
+                        ));
                     }
                 }
 
@@ -68,9 +76,9 @@ impl AppAuthTokenStore {
 
                 Ok(app_id)
             }
-            Entry::Vacant(_) => {
-                Err(ConductorError::FailedAuthenticationError("Invalid token".to_string()))
-            },
+            Entry::Vacant(_) => Err(ConductorError::FailedAuthenticationError(
+                "Invalid token".to_string(),
+            )),
         }
     }
 
@@ -90,7 +98,11 @@ impl AppAuthTokenStore {
     #[cfg(test)]
     fn age_tokens(&mut self) {
         self.issued_tokens.iter_mut().for_each(|(_, meta)| {
-            meta.expires_at = Some(SystemTime::now().checked_sub(std::time::Duration::from_secs(10)).unwrap());
+            meta.expires_at = Some(
+                SystemTime::now()
+                    .checked_sub(std::time::Duration::from_secs(10))
+                    .unwrap(),
+            );
         });
     }
 

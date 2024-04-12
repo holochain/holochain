@@ -4,6 +4,7 @@
 use super::error::InterfaceResult;
 use crate::conductor::interface::*;
 use crate::conductor::manager::TaskManagerClient;
+use crate::sweettest::WsPollRecv;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::signal::Signal;
 use holochain_websocket::ReceiveMessage;
@@ -11,7 +12,6 @@ use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
-use crate::sweettest::WsPollRecv;
 
 use holochain_types::app::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;

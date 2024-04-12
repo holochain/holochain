@@ -77,6 +77,7 @@ use holochain_zome_types::prelude::ClonedCell;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
 use crate::conductor::cell::Cell;
+use crate::conductor::conductor::app_connection_auth::AppAuthTokenStore;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::metrics::create_p2p_event_duration_metric;
@@ -95,7 +96,6 @@ use crate::core::workflow::ZomeCallResult;
 use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
-use crate::conductor::conductor::app_connection_auth::AppAuthTokenStore;
 
 use super::api::RealAppInterfaceApi;
 use super::api::ZomeCall;
@@ -398,8 +398,8 @@ mod startup_shutdown_impls {
 
 /// Methods related to conductor interfaces
 mod interface_impls {
-    use holochain_conductor_api::AppInterfaceInfo;
     use super::*;
+    use holochain_conductor_api::AppInterfaceInfo;
     use holochain_types::websocket::AllowedOrigins;
 
     impl Conductor {
@@ -526,12 +526,10 @@ mod interface_impls {
                 .await?
                 .app_interfaces
                 .values()
-                .map(|config| {
-                    AppInterfaceInfo {
-                        port: config.driver.port(),
-                        allowed_origins: config.driver.allowed_origins().clone(),
-                        installed_app_id: config.installed_app_id.clone(),
-                    }
+                .map(|config| AppInterfaceInfo {
+                    port: config.driver.port(),
+                    allowed_origins: config.driver.allowed_origins().clone(),
+                    installed_app_id: config.installed_app_id.clone(),
                 })
                 .collect())
         }
@@ -2568,18 +2566,29 @@ mod accessor_impls {
 
 mod authenticate_token_impls {
     use super::*;
-    use holochain_conductor_api::{AppAuthenticationTokenIssued, IssueAppAuthenticationTokenPayload};
+    use holochain_conductor_api::{
+        AppAuthenticationTokenIssued, IssueAppAuthenticationTokenPayload,
+    };
 
     impl Conductor {
         /// Issue a new app interface authentication token for the given `installed_app_id`.
-        pub fn issue_app_authentication_token(&self, payload: IssueAppAuthenticationTokenPayload) -> ConductorResult<AppAuthenticationTokenIssued> {
+        pub fn issue_app_authentication_token(
+            &self,
+            payload: IssueAppAuthenticationTokenPayload,
+        ) -> ConductorResult<AppAuthenticationTokenIssued> {
             let (token, expires_at) = self.app_connection_auth.share_mut(|app_connection_auth| {
-                app_connection_auth.issue_token(payload.installed_app_id, payload.expiry_seconds, payload.single_use)
+                app_connection_auth.issue_token(
+                    payload.installed_app_id,
+                    payload.expiry_seconds,
+                    payload.single_use,
+                )
             });
 
             Ok(AppAuthenticationTokenIssued {
                 token,
-                expires_at: expires_at.and_then(|i| i.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| Timestamp::saturating_from_dur(&d)),
+                expires_at: expires_at
+                    .and_then(|i| i.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| Timestamp::saturating_from_dur(&d)),
             })
         }
 
@@ -2587,7 +2596,11 @@ mod authenticate_token_impls {
         /// have been issued for a specific `app_id`.
         ///
         /// Returns the [InstalledAppid] that the token was issued for.
-        pub fn authenticate_app_token(&self, token: Vec<u8>, app_id: Option<InstalledAppId>) -> ConductorResult<InstalledAppId> {
+        pub fn authenticate_app_token(
+            &self,
+            token: Vec<u8>,
+            app_id: Option<InstalledAppId>,
+        ) -> ConductorResult<InstalledAppId> {
             self.app_connection_auth.share_mut(|app_connection_auth| {
                 app_connection_auth.authenticate_token(token, app_id)
             })

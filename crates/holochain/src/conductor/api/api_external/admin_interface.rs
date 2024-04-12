@@ -228,7 +228,11 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let port = self
                     .conductor_handle
                     .clone()
-                    .add_app_interface(either::Either::Left(port), allowed_origins, installed_app_id)
+                    .add_app_interface(
+                        either::Either::Left(port),
+                        allowed_origins,
+                        installed_app_id,
+                    )
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
@@ -299,7 +303,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 self.conductor_handle.storage_info().await?,
             )),
             IssueAppAuthenticationToken(payload) => {
-                Ok(AdminResponse::AppAuthenticationTokenIssued(self.conductor_handle.issue_app_authentication_token(payload)?))
+                Ok(AdminResponse::AppAuthenticationTokenIssued(
+                    self.conductor_handle
+                        .issue_app_authentication_token(payload)?,
+                ))
             }
         }
     }
@@ -312,7 +319,9 @@ impl InterfaceApi for RealAdminInterfaceApi {
     type ApiResponse = AdminResponse;
 
     async fn auth(&self, _auth: Self::Auth) -> InterfaceResult<InstalledAppId> {
-        Err(InterfaceError::Other("Admin interface does not support authentication".to_string()))
+        Err(InterfaceError::Other(
+            "Admin interface does not support authentication".to_string(),
+        ))
     }
 
     async fn handle_request(

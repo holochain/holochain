@@ -30,10 +30,7 @@ pub trait InterfaceApi: 'static + Send + Sync + Clone {
         + std::fmt::Debug;
 
     /// Authentication a connection request.
-    async fn auth(
-        &self,
-        auth: Self::Auth,
-    ) -> InterfaceResult<InstalledAppId>;
+    async fn auth(&self, auth: Self::Auth) -> InterfaceResult<InstalledAppId>;
 
     /// Handle a request on this API
     async fn handle_request(
