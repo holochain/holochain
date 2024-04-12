@@ -14,9 +14,7 @@ use crate::conductor::{
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
-use holochain_conductor_api::{
-    AdminRequest, AdminResponse, AppAuthenticationRequest,
-};
+use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest};
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
@@ -553,7 +551,13 @@ impl SweetConductor {
             .expect("Couldn't create app interface");
         let (tx, rx) = websocket_client_by_port(port).await.unwrap();
 
-        authenticate_app_ws_client(self.raw_handle(), tx.clone(), installed_app_id).await;
+        authenticate_app_ws_client(
+            tx.clone(),
+            self.get_arbitrary_admin_websocket_port()
+                .expect("No admin ports on this conductor"),
+            installed_app_id,
+        )
+        .await;
 
         (tx, WsPollRecv::new::<D>(rx))
     }
@@ -815,8 +819,11 @@ pub async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, Web
 }
 
 /// Create an authentication token for an app client and authenticate the connection.
-pub async fn authenticate_app_ws_client(conductor: ConductorHandle, app_sender: WebsocketSender, installed_app_id: InstalledAppId) {
-    let admin_port = conductor.get_arbitrary_admin_websocket_port().expect("No admin port on this conductor");
+pub async fn authenticate_app_ws_client(
+    app_sender: WebsocketSender,
+    admin_port: u16,
+    installed_app_id: InstalledAppId,
+) {
     let (admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
     let _admin_rx = WsPollRecv::new::<AdminResponse>(admin_rx);
 
@@ -831,7 +838,8 @@ pub async fn authenticate_app_ws_client(conductor: ConductorHandle, app_sender: 
         _ => panic!("unexpected response"),
     };
 
-    app_sender.authenticate(AppAuthenticationRequest { token })
+    app_sender
+        .authenticate(AppAuthenticationRequest { token })
         .await
         .unwrap();
 }

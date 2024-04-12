@@ -13,12 +13,12 @@ use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 use crate::sweettest::WsPollRecv;
 
+use holochain_types::app::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::*;
-use holochain_types::app::InstalledAppId;
 
 /// Concurrency count for websocket message processing.
 /// This could represent a significant memory investment for
@@ -237,11 +237,18 @@ fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication
                     // Already logged, continue to drop connection
                 }
                 Ok(Ok(auth_payload)) => {
-                    let payload: AppAuthenticationRequest = SerializedBytes::from(holochain_serialized_bytes::UnsafeBytes::from(auth_payload)).try_into().unwrap();
-                    match api.auth(AppAuthentication {
-                        token: payload.token,
-                        installed_app_id,
-                    }).await {
+                    let payload: AppAuthenticationRequest = SerializedBytes::from(
+                        holochain_serialized_bytes::UnsafeBytes::from(auth_payload),
+                    )
+                    .try_into()
+                    .unwrap();
+                    match api
+                        .auth(AppAuthentication {
+                            token: payload.token,
+                            installed_app_id,
+                        })
+                        .await
+                    {
                         Ok(installed_app_id) => {
                             spawn_recv_incoming_msgs_and_outgoing_signals(
                                 task_list,
@@ -399,10 +406,10 @@ pub mod test {
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
-    use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
     use crate::sweettest::websocket_client_by_port;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
     use holochain_keystore::test_keystore;
@@ -520,7 +527,14 @@ pub mod test {
                 s_send.send(s).unwrap();
             }
         });
-        authenticate_app_ws_client(conductor_handle.clone(), app_tx.clone(), app_info.installed_app_id).await;
+        authenticate_app_ws_client(
+            app_tx.clone(),
+            conductor_handle
+                .get_arbitrary_admin_websocket_port()
+                .expect("No admin port on this conductor"),
+            app_info.installed_app_id,
+        )
+        .await;
 
         // Call Zome
         let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();

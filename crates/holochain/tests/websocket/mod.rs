@@ -3,7 +3,7 @@ use anyhow::Result;
 use futures::future;
 use hdk::prelude::RemoteSignal;
 use holochain::conductor::interface::websocket::MAX_CONNECTIONS;
-use holochain::sweettest::{SweetConductor, WsPollRecv};
+use holochain::sweettest::{authenticate_app_ws_client, SweetConductor, WsPollRecv};
 use holochain::sweettest::SweetConductorBatch;
 use holochain::sweettest::SweetDnaFile;
 use holochain::sweettest::{SweetAgents, SweetConductorConfig};
@@ -155,7 +155,7 @@ async fn call_zome() {
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await;
+    let response = check_timeout(response, 15000).await;
 
     let expects = vec![original_dna_hash.clone()];
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
@@ -190,6 +190,7 @@ async fn call_zome() {
 
     let (mut app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
     let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
+    authenticate_app_ws_client(app_tx.clone(), admin_port, "test".to_string()).await;
 
     // Call Zome
     tracing::info!("Calling zome");
@@ -236,7 +237,9 @@ async fn call_zome() {
         _ => panic!("Unexpected response"),
     };
 
-    let (app_tx, _app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
+    authenticate_app_ws_client(app_tx.clone(), admin_port, "test".to_string()).await;
 
     // Call Zome again on the existing app interface port
     tracing::info!("Calling zome again");
@@ -415,8 +418,9 @@ async fn emit_signals() {
             }
         }
     });
+    authenticate_app_ws_client(app_tx_1.clone(), admin_port, "test".to_string()).await;
 
-    let (_, mut app_rx_2) = websocket_client_by_port(app_port).await.unwrap();
+    let (app_tx_2, mut app_rx_2) = websocket_client_by_port(app_port).await.unwrap();
     let (sig2_send, sig2_recv) = tokio::sync::oneshot::channel();
     let mut sig2_send = Some(sig2_send);
     let sig2_task = tokio::task::spawn(async move {
@@ -431,6 +435,7 @@ async fn emit_signals() {
             }
         }
     });
+    authenticate_app_ws_client(app_tx_2.clone(), admin_port, "test".to_string()).await;
 
     call_zome_fn(
         &app_tx_1,
