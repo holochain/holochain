@@ -80,9 +80,11 @@ impl DpkiService {
 #[async_trait::async_trait]
 #[mockall::automock]
 pub trait DpkiState: Send + Sync {
+    /// If agent key is none, we're registering a new key.
+    /// If some, we're about to update an existing key.
     async fn next_derivation_details(
         &self,
-        app_name: InstalledAppId,
+        agent_key: Option<AgentPubKey>,
     ) -> DpkiServiceResult<DerivationDetailsInput>;
 
     async fn register_key(

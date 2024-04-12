@@ -1440,9 +1440,7 @@ mod app_impls {
                     (agent_key, None)
                 } else {
                     if let Some((dpki, state)) = &mut dpki {
-                        let derivation_details = state
-                            .next_derivation_details(installed_app_id.clone())
-                            .await?;
+                        let derivation_details = state.next_derivation_details(None).await?;
 
                         let dst_tag = format!(
                             "DPKI-{:04}-{:04}",

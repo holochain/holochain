@@ -28,13 +28,16 @@ pub struct DeepkeyState {
 impl DpkiState for DeepkeyState {
     async fn next_derivation_details(
         &self,
-        app_name: InstalledAppId,
+        agent_key: Option<AgentPubKey>,
     ) -> DpkiServiceResult<DerivationDetailsInput> {
         let cell_id = self.cell_id.clone();
         let provenance = cell_id.agent_pubkey().clone();
         let zome_name: ZomeName = "deepkey_csr".into();
         let fn_name: FunctionName = "next_derivation_details".into();
-        let payload = ExternIO::encode(app_name.clone())?;
+        let agent_bytes = agent_key.map(|agent_key| {
+            serde_bytes::ByteArray::<32>::new(agent_key.get_raw_32().try_into().unwrap())
+        });
+        let payload = ExternIO::encode(agent_bytes)?;
         let cap_secret = None;
         self.runner
             .call_zome(

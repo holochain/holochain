@@ -3214,6 +3214,7 @@ dependencies = [
  "must_future",
  "nanoid 0.4.0",
  "serde",
+ "serde_bytes",
  "thiserror",
  "tokio",
  "tracing",
