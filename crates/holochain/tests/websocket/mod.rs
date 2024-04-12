@@ -3,9 +3,9 @@ use anyhow::Result;
 use futures::future;
 use hdk::prelude::RemoteSignal;
 use holochain::conductor::interface::websocket::MAX_CONNECTIONS;
-use holochain::sweettest::{authenticate_app_ws_client, SweetConductor, WsPollRecv};
 use holochain::sweettest::SweetConductorBatch;
 use holochain::sweettest::SweetDnaFile;
+use holochain::sweettest::{authenticate_app_ws_client, SweetConductor, WsPollRecv};
 use holochain::sweettest::{SweetAgents, SweetConductorConfig};
 use holochain::{
     conductor::{
@@ -760,7 +760,11 @@ async fn network_stats() {
     let _ = batch.setup_app("app", &[dna_file]).await.unwrap();
     batch.exchange_peer_info().await;
 
-    let (client, _rx) = batch.get(0).unwrap().admin_ws_client::<AdminResponse>().await;
+    let (client, _rx) = batch
+        .get(0)
+        .unwrap()
+        .admin_ws_client::<AdminResponse>()
+        .await;
 
     #[cfg(feature = "tx5")]
     const EXPECT: &str = "go-pion";

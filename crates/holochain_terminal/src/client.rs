@@ -1,10 +1,13 @@
 use anyhow::{anyhow, Context};
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppAuthenticationToken, AppInfo, AppInterfaceInfo, AppRequest, AppResponse, CellInfo, NetworkInfo};
+use holochain_conductor_api::{
+    AdminRequest, AdminResponse, AppAuthenticationRequest, AppAuthenticationToken, AppInfo,
+    AppInterfaceInfo, AppRequest, AppResponse, CellInfo, NetworkInfo,
+};
 use holochain_types::prelude::{InstalledAppId, NetworkInfoRequestPayload};
+use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketSender};
 use std::sync::Arc;
-use holochain_types::websocket::AllowedOrigins;
 
 pub struct AppClient {
     tx: WebsocketSender,
@@ -19,7 +22,10 @@ impl Drop for AppClient {
 
 impl AppClient {
     /// Creates a App websocket client which can send messages but ignores any incoming messages
-    async fn connect(addr: std::net::SocketAddr, token: AppAuthenticationToken) -> anyhow::Result<Self> {
+    async fn connect(
+        addr: std::net::SocketAddr,
+        token: AppAuthenticationToken,
+    ) -> anyhow::Result<Self> {
         let (tx, mut rx) = connect(
             Arc::new(WebsocketConfig::CLIENT_DEFAULT),
             ConnectRequest::new(addr).try_set_header("origin", HC_TERM_ORIGIN)?,
@@ -28,9 +34,9 @@ impl AppClient {
 
         let rx = tokio::task::spawn(async move { while rx.recv::<AppResponse>().await.is_ok() {} });
 
-        tx.authenticate(AppAuthenticationRequest {
-            token,
-        }).await.context("Failed to authenticate app client")?;
+        tx.authenticate(AppAuthenticationRequest { token })
+            .await
+            .context("Failed to authenticate app client")?;
 
         Ok(AppClient { tx, rx })
     }
@@ -125,10 +131,15 @@ impl AdminClient {
         Ok(AdminClient { tx, rx, addr })
     }
 
-    pub async fn connect_app_client(&mut self, installed_app_id: InstalledAppId) -> anyhow::Result<AppClient> {
+    pub async fn connect_app_client(
+        &mut self,
+        installed_app_id: InstalledAppId,
+    ) -> anyhow::Result<AppClient> {
         let app_interfaces = self.list_app_interfaces().await?;
 
-        let app_port = if let Some(interface) = Self::select_usable_app_interface(app_interfaces, installed_app_id.clone()) {
+        let app_port = if let Some(interface) =
+            Self::select_usable_app_interface(app_interfaces, installed_app_id.clone())
+        {
             interface.port
         } else {
             self.attach_app_interface(0).await?
@@ -136,13 +147,15 @@ impl AdminClient {
 
         let app_addr = (self.addr.ip(), app_port).into();
 
-        let issue_token_response = self.tx.request(AdminRequest::IssueAppAuthenticationToken(installed_app_id.into())).await?;
+        let issue_token_response = self
+            .tx
+            .request(AdminRequest::IssueAppAuthenticationToken(
+                installed_app_id.into(),
+            ))
+            .await?;
         let token = match issue_token_response {
-            AdminResponse::AppAuthenticationTokenIssued(issued) => {
-                issued.token
-            }
-            _ =>
-                anyhow::bail!("Unexpected response {:?}", issue_token_response),
+            AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
+            _ => anyhow::bail!("Unexpected response {:?}", issue_token_response),
         };
 
         AppClient::connect(app_addr, token).await
@@ -170,9 +183,13 @@ impl AdminClient {
         }
     }
 
-    fn select_usable_app_interface(interfaces: impl IntoIterator<Item=AppInterfaceInfo>, installed_app_id: InstalledAppId) -> Option<AppInterfaceInfo> {
+    fn select_usable_app_interface(
+        interfaces: impl IntoIterator<Item = AppInterfaceInfo>,
+        installed_app_id: InstalledAppId,
+    ) -> Option<AppInterfaceInfo> {
         interfaces.into_iter().find(|interface| {
-            let can_use_app_id = interface.installed_app_id.is_none() || interface.installed_app_id.clone().unwrap() == installed_app_id;
+            let can_use_app_id = interface.installed_app_id.is_none()
+                || interface.installed_app_id.clone().unwrap() == installed_app_id;
 
             let can_use_origin = match interface.allowed_origins {
                 AllowedOrigins::Any => true,

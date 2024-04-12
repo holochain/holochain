@@ -136,7 +136,8 @@ impl InterfaceApi for RealAppInterfaceApi {
     type ApiResponse = AppResponse;
 
     async fn auth(&self, auth: Self::Auth) -> InterfaceResult<InstalledAppId> {
-        self.conductor_handle.authenticate_app_token(auth.token, auth.installed_app_id)
+        self.conductor_handle
+            .authenticate_app_token(auth.token, auth.installed_app_id)
             .map_err(Box::new)
             .map_err(InterfaceError::RequestHandler)
     }
