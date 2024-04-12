@@ -61,6 +61,7 @@ pub async fn run(
             AddAppWs {
                 port: Some(app_port),
                 allowed_origins: AllowedOrigins::Any,
+                installed_app_id: None,
             },
         )
         .await?;
