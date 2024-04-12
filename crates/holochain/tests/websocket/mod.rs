@@ -225,7 +225,8 @@ async fn call_zome() {
     let (_holochain, admin_port) = start_holochain(config_path).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (admin_tx, _admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let (admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _admin_rx = WsPollRecv::new::<AdminResponse>(admin_rx);
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
@@ -692,7 +693,8 @@ async fn concurrent_install_dna() {
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (client, _rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let (client, rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
     // let before = std::time::Instant::now();
 
@@ -914,7 +916,9 @@ async fn app_allowed_origins() {
     .await
     .is_err());
 
-    check_app_port(port, "http://localhost:3000", vec![]).await;
+    let token = create_multi_use_token(&conductor).await;
+
+    check_app_port(port, "http://localhost:3000", token).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -923,19 +927,7 @@ async fn app_allowed_origins_independence() {
 
     let conductor = SweetConductor::from_standard_config().await;
 
-    let (admin_sender, _admin_rx) = conductor.admin_ws_client::<AdminResponse>().await;
-
-    let token_response: AdminResponse = admin_sender
-        .request(AdminRequest::IssueAppAuthenticationToken(
-            IssueAppAuthenticationTokenPayload::for_installed_app_id("test_app".into())
-                .single_use(false),
-        ))
-        .await
-        .unwrap();
-    let token = match token_response {
-        AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
-        _ => panic!("unexpected response"),
-    };
+    let token = create_multi_use_token(&conductor).await;
 
     let port_1 = conductor
         .clone()
@@ -993,6 +985,24 @@ async fn app_allowed_origins_independence() {
 
     check_app_port(port_1, "http://localhost:3001", token.clone()).await;
     check_app_port(port_2, "http://localhost:3002", token).await;
+}
+
+async fn create_multi_use_token(conductor: &SweetConductor) -> AppAuthenticationToken {
+    let (admin_sender, _admin_rx) = conductor.admin_ws_client::<AdminResponse>().await;
+
+    let token_response: AdminResponse = admin_sender
+        .request(AdminRequest::IssueAppAuthenticationToken(
+            IssueAppAuthenticationTokenPayload::for_installed_app_id("test_app".into())
+                .single_use(false),
+        ))
+        .await
+        .unwrap();
+    let token = match token_response {
+        AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
+        _ => panic!("unexpected response"),
+    };
+
+    token
 }
 
 async fn check_app_port(port: u16, origin: &str, token: AppAuthenticationToken) {

@@ -4,7 +4,6 @@
 use super::error::InterfaceResult;
 use crate::conductor::interface::*;
 use crate::conductor::manager::TaskManagerClient;
-use crate::sweettest::WsPollRecv;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::signal::Signal;
 use holochain_websocket::ReceiveMessage;
@@ -409,6 +408,7 @@ pub mod test {
     use crate::sweettest::websocket_client_by_port;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::WsPollRecv;
     use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;

@@ -2,9 +2,11 @@ use std::net::ToSocketAddrs;
 use std::sync::Arc;
 
 use holochain::sweettest::{
-    SweetConductor, SweetConductorConfig, SweetDnaFile, SweetLocalRendezvous,
+    authenticate_app_ws_client, SweetConductor, SweetConductorConfig, SweetDnaFile,
+    SweetLocalRendezvous,
 };
 use holochain_conductor_api::AppResponse;
+use holochain_types::prelude::InstalledAppId;
 use holochain_types::signal::Signal;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_wasm_test_utils::TestWasm;
@@ -23,7 +25,11 @@ async fn send_signal_after_conductor_restart() {
         Default::default(),
     )
     .await;
-    let app = conductor.setup_app("app_id", &[dna_file]).await.unwrap();
+    let installed_app_id: InstalledAppId = "app_id".into();
+    let app = conductor
+        .setup_app(&installed_app_id, &[dna_file])
+        .await
+        .unwrap();
     let alice = app.agent();
     let alice_cell_id = app.cells()[0].cell_id().to_owned();
 
@@ -35,7 +41,7 @@ async fn send_signal_after_conductor_restart() {
         .unwrap();
 
     // connect app websocket
-    let (_, mut app_ws_rx_1) = holochain_websocket::connect(
+    let (app_ws_tx_1, mut app_ws_rx_1) = holochain_websocket::connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
         ConnectRequest::new(
             format!("localhost:{app_interface_port_1}")
@@ -47,6 +53,14 @@ async fn send_signal_after_conductor_restart() {
     )
     .await
     .unwrap();
+    authenticate_app_ws_client(
+        app_ws_tx_1,
+        conductor
+            .get_arbitrary_admin_websocket_port()
+            .expect("No admin port on this conductor"),
+        installed_app_id.clone(),
+    )
+    .await;
 
     // emit a signal
     let _: () = conductor
@@ -102,7 +116,7 @@ async fn send_signal_after_conductor_restart() {
     let app_interface_port_1 = app_interfaces[0].port;
 
     // reconnect app websocket
-    let (_, mut app_ws_rx_1) = holochain_websocket::connect(
+    let (app_ws_tx_1, mut app_ws_rx_1) = holochain_websocket::connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
         ConnectRequest::new(
             format!("localhost:{app_interface_port_1}")
@@ -114,6 +128,14 @@ async fn send_signal_after_conductor_restart() {
     )
     .await
     .unwrap();
+    authenticate_app_ws_client(
+        app_ws_tx_1,
+        conductor
+            .get_arbitrary_admin_websocket_port()
+            .expect("No admin port on this conductor"),
+        installed_app_id,
+    )
+    .await;
 
     // add a second app interface without websocket connection
     let _ = (*conductor)
