@@ -26,18 +26,18 @@ pub fn render_network_info_widget<B: Backend>(
     frame: &mut Frame<B>,
     rect: Rect,
 ) {
-    let app_client = match app_client {
-        Some(b) => b,
-        None => {
-            show_message("No admin URL configured, to use this screen please re-run the terminal with `--admin-url <my-url> --app-id <my-app-id>`", frame, rect);
-            return;
-        }
-    };
-
     let app_id = match &args.app_id {
         Some(b) => b.clone(),
         None => {
             show_message("No app ID configured, to use this screen please re-run the terminal with `--admin-url <my-url> --app-id <my-app-id>`", frame, rect);
+            return;
+        }
+    };
+
+    let app_client = match app_client {
+        Some(b) => b,
+        None => {
+            show_message("No admin URL configured, to use this screen please re-run the terminal with `--admin-url <my-url> --app-id <my-app-id>`", frame, rect);
             return;
         }
     };
