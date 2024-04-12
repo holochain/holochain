@@ -14,6 +14,9 @@ use crate::conductor::{
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
+use holochain_conductor_api::{
+    AdminRequest, AdminResponse, AppAuthenticationRequest,
+};
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
@@ -520,22 +523,53 @@ impl SweetConductor {
     /// Get a new websocket client which can send requests over the admin
     /// interface. It presupposes that an admin interface has been configured.
     /// (The standard_config includes an admin interface at port 0.)
-    pub async fn admin_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
+    pub async fn admin_ws_client<D>(&self) -> (WebsocketSender, WsPollRecv)
+    where
+        D: std::fmt::Debug,
+        SerializedBytes: TryInto<D, Error = SerializedBytesError>,
+    {
         let port = self
             .get_arbitrary_admin_websocket_port()
             .expect("No admin port open on conductor");
-        websocket_client_by_port(port).await.unwrap()
+        let (tx, rx) = websocket_client_by_port(port).await.unwrap();
+
+        (tx, WsPollRecv::new::<D>(rx))
     }
 
     /// Create a new app interface and get a websocket client which can send requests
     /// to it.
-    pub async fn app_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
+    pub async fn app_ws_client<D>(
+        &self,
+        installed_app_id: InstalledAppId,
+    ) -> (WebsocketSender, WsPollRecv)
+    where
+        D: std::fmt::Debug,
+        SerializedBytes: TryInto<D, Error = SerializedBytesError>,
+    {
+        let (admin_sender, _admin_rx) = self.admin_ws_client::<D>().await;
+        let token_response: AdminResponse = admin_sender
+            .request(AdminRequest::IssueAppAuthenticationToken(
+                installed_app_id.into(),
+            ))
+            .await
+            .unwrap();
+        let token = match token_response {
+            AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
+            _ => panic!("unexpected response"),
+        };
+
         let port = self
             .raw_handle()
-            .add_app_interface(either::Either::Left(0), AllowedOrigins::Any)
+            .add_app_interface(either::Either::Left(0), AllowedOrigins::Any, None)
             .await
             .expect("Couldn't create app interface");
-        websocket_client_by_port(port).await.unwrap()
+        let (tx, rx) = websocket_client_by_port(port).await.unwrap();
+
+        tx.authenticate(AppAuthenticationRequest { token })
+            .await
+            .unwrap();
+
+        (tx, WsPollRecv::new::<D>(rx))
     }
 
     /// Shutdown this conductor.
@@ -736,7 +770,51 @@ impl SweetConductor {
     }
 }
 
-/// Get a websocket client on localhost at the specified port
+/// You do not need to do anything with this type. While it is held it will keep polling a websocket
+/// receiver.
+pub struct WsPollRecv(tokio::task::JoinHandle<()>);
+
+impl Drop for WsPollRecv {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
+impl WsPollRecv {
+    /// Create a new [WsPollRecv] that will poll the given [WebsocketReceiver] for messages.
+    /// The type of the messages being received must be specified. For example
+    ///
+    /// ```no_run
+    /// # #[tokio::main]
+    /// # async fn main() -> anyhow::Result<()>
+    /// # {
+    ///
+    /// use holochain::sweettest::{websocket_client_by_port, WsPollRecv};
+    /// use holochain_conductor_api::AdminResponse;
+    ///
+    /// let (tx, rx) = websocket_client_by_port(3000).await?;
+    /// let _rx = WsPollRecv::new::<AdminResponse>(rx);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new<D>(mut rx: WebsocketReceiver) -> Self
+    where
+        D: std::fmt::Debug,
+        SerializedBytes: TryInto<D, Error = SerializedBytesError>,
+    {
+        Self(tokio::task::spawn(async move {
+            while rx.recv::<D>().await.is_ok() {}
+        }))
+    }
+}
+
+/// Connect to a websocket server at the given port.
+///
+/// Note that the [WebsocketReceiver] returned by this function will need to be polled. This can be
+/// done with a [WsPollRecv].
+/// If this is an app client, you will need to authenticate the connection before you can send any
+/// other requests.
 pub async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, WebsocketReceiver)> {
     connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),

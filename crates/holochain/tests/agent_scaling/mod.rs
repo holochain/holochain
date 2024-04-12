@@ -205,8 +205,9 @@ async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
     let mut conductor = SweetConductor::from_standard_config().await;
 
     let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
+    let installed_app_id: InstalledAppId = "app".into();
     let apps = conductor
-        .setup_app_for_agents("app", &agents, &[dna_file])
+        .setup_app_for_agents(&installed_app_id, &agents, &[dna_file])
         .await
         .unwrap();
     let cells = apps.cells_flattened();
@@ -215,7 +216,7 @@ async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
         .map(|c| c.zome(TestWasm::MultipleCalls))
         .collect();
     let mut clients: Vec<_> =
-        future::join_all((0..NUM_AGENTS).map(|_| conductor.app_ws_client().map(|(tx, _)| tx)))
+        future::join_all((0..NUM_AGENTS).map(|_| conductor.app_ws_client::<AppResponse>(installed_app_id.clone()).map(|(tx, _)| tx)))
             .await;
 
     async fn all_call(
