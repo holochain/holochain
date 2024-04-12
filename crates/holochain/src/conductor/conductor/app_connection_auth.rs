@@ -34,7 +34,7 @@ impl AppAuthTokenStore {
             token.clone(),
             TokenMeta {
                 installed_app_id,
-                expires_at: expires_at.clone(),
+                expires_at,
                 single_use,
             },
         );
@@ -64,7 +64,7 @@ impl AppAuthTokenStore {
                 }
 
                 if let Some(app_id_restriction) = app_id_restriction {
-                    if &app_id_restriction != &meta.installed_app_id {
+                    if app_id_restriction != meta.installed_app_id {
                         return Err(ConductorError::FailedAuthenticationError(
                             "Attempt to use token in the context of another application"
                                 .to_string(),

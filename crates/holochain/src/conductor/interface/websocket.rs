@@ -212,7 +212,7 @@ fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication
         let task_list = task_list.clone();
         async move {
             let auth_payload_result = tokio::time::timeout(std::time::Duration::from_secs(10), async {
-                while let Ok(msg) = rx_from_iface.recv::<A::ApiRequest>().await {
+                if let Ok(msg) = rx_from_iface.recv::<A::ApiRequest>().await {
                     return match msg {
                         ReceiveMessage::Authenticate(auth_payload) => {
                             Ok(auth_payload)
