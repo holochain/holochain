@@ -118,7 +118,7 @@ impl Drop for AdminClient {
     }
 }
 
-const HC_TERM_ORIGIN: &'static str = "hcterm";
+const HC_TERM_ORIGIN: &str = "hcterm";
 
 impl AdminClient {
     /// Creates an Admin websocket client which can send messages but ignores any incoming messages
