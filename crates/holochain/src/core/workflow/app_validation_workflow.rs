@@ -52,33 +52,6 @@ mod unit_tests;
 mod error;
 mod types;
 
-#[derive(Debug)]
-struct OutcomeSummary {
-    ops_to_validate: usize,
-    validated: usize,
-    accepted: usize,
-    missing: usize,
-    rejected: usize,
-}
-
-impl OutcomeSummary {
-    fn new() -> Self {
-        OutcomeSummary {
-            ops_to_validate: 0,
-            validated: 0,
-            accepted: 0,
-            missing: 0,
-            rejected: 0,
-        }
-    }
-}
-
-impl Default for OutcomeSummary {
-    fn default() -> Self {
-        OutcomeSummary::new()
-    }
-}
-
 #[instrument(skip(
     workspace,
     trigger_integration,
@@ -113,7 +86,14 @@ pub async fn app_validation_workflow(
     }
 
     Ok(
-        if outcome_summary.validated < outcome_summary.ops_to_validate {
+        // if not all ops have been validated
+        // and fetching missing hashes has not passed expiration,
+        // trigger app validation workflow again
+        if outcome_summary.validated < outcome_summary.ops_to_validate
+            && !validation_dependencies
+                .lock()
+                .missing_hash_fetches_expired()
+        {
             // trigger app validation workflow again in 10 seconds
             WorkComplete::Incomplete(Some(Duration::from_secs(10)))
         } else {
@@ -809,6 +789,32 @@ async fn run_validation_callback(
             }
             Ok(Outcome::AwaitingDeps(vec![author.into()]))
         }
+    }
+}
+
+struct OutcomeSummary {
+    ops_to_validate: usize,
+    validated: usize,
+    accepted: usize,
+    missing: usize,
+    rejected: usize,
+}
+
+impl OutcomeSummary {
+    fn new() -> Self {
+        OutcomeSummary {
+            ops_to_validate: 0,
+            validated: 0,
+            accepted: 0,
+            missing: 0,
+            rejected: 0,
+        }
+    }
+}
+
+impl Default for OutcomeSummary {
+    fn default() -> Self {
+        OutcomeSummary::new()
     }
 }
 
