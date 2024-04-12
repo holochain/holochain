@@ -22,6 +22,7 @@ use holochain_trace::tracing::warn;
 use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::iter;
@@ -51,7 +52,7 @@ impl WrapEvtSender {
         &self,
         dna_hash: DnaHash,
         peer_data: Vec<AgentInfoSigned>,
-    ) -> impl Future<Output = HolochainP2pResult<()>> + 'static + Send {
+    ) -> impl Future<Output = HolochainP2pResult<Vec<AgentInfoPut>>> + 'static + Send {
         timing_trace!(
             { self.0.put_agent_info_signed(dna_hash, peer_data) },
             "(hp2p:handle) put_agent_info_signed",
@@ -638,7 +639,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     fn handle_put_agent_info_signed(
         &mut self,
         input: kitsune_p2p::event::PutAgentInfoSignedEvt,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>> {
         let kitsune_p2p::event::PutAgentInfoSignedEvt { peer_data } = input;
 
         let put_requests = peer_data
@@ -654,7 +655,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
 
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
-            futures::future::join_all(
+            Ok(futures::future::join_all(
                 iter::repeat_with(|| evt_sender.clone())
                     .zip(put_requests.into_iter())
                     .map(|(evt_sender, (dna, agents))| async move {
@@ -663,9 +664,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             )
             .await
             .into_iter()
-            .collect::<HolochainP2pResult<Vec<()>>>()?;
-
-            Ok(())
+            .collect::<HolochainP2pResult<Vec<Vec<AgentInfoPut>>>>()?
+            .into_iter()
+            .flatten()
+            .collect())
         }
         .boxed()
         .into())

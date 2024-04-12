@@ -148,7 +148,7 @@ ghost_actor::ghost_chan! {
     pub chan HolochainP2pEvent<super::HolochainP2pError> {
 
         /// We need to store signed agent info.
-        fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> ();
+        fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> Vec<kitsune_p2p_types::bootstrap::AgentInfoPut>;
 
         /// We need to get previously stored agent info.
         /// The optional `agents` parameter is an include filter. This can be thought of as a way to filter a held list of agents against the current state of the store.
