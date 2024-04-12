@@ -119,10 +119,28 @@ impl AppInterfaceApi for RealAppInterfaceApi {
     }
 }
 
+/// TODO document me please
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct AppAuthentication {
+    /// TODO ME TOO!
+    pub token: Vec<u8>,
+
+    /// TODO ME TOO!
+    pub installed_app_id: Option<InstalledAppId>,
+}
+
 #[async_trait::async_trait]
 impl InterfaceApi for RealAppInterfaceApi {
+    type Auth = AppAuthentication;
     type ApiRequest = AppRequest;
     type ApiResponse = AppResponse;
+
+    async fn auth(&self, auth: Self::Auth) -> InterfaceResult<InstalledAppId> {
+        self.conductor_handle.authenticate_app_token(auth.token, auth.installed_app_id)
+            .map_err(Box::new)
+            .map_err(InterfaceError::RequestHandler)
+    }
+
     async fn handle_request(
         &self,
         request: Result<Self::ApiRequest, SerializedBytesError>,

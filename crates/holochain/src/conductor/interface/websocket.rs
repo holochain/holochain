@@ -17,6 +17,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::*;
+use holochain_types::app::InstalledAppId;
 
 /// Concurrency count for websocket message processing.
 /// This could represent a significant memory investment for
@@ -49,13 +50,15 @@ pub async fn spawn_websocket_listener(
     Ok(listener)
 }
 
+type TaskListInner = Arc<parking_lot::Mutex<Vec<JoinHandle<()>>>>;
+
 /// Abort tokio tasks on Drop.
-#[derive(Default)]
-struct TaskList(pub Vec<JoinHandle<()>>);
+#[derive(Default, Clone)]
+struct TaskList(pub TaskListInner);
 impl Drop for TaskList {
     fn drop(&mut self) {
         debug!("TaskList Dropped!");
-        for h in self.0.iter() {
+        for h in self.0.lock().iter() {
             h.abort();
         }
     }
@@ -64,7 +67,7 @@ impl Drop for TaskList {
 impl TaskList {
     /// Clean up already closed tokio tasks.
     pub fn prune(&mut self) {
-        self.0.retain_mut(|h| !h.is_finished());
+        self.0.lock().retain(|h| !h.is_finished());
     }
 }
 
@@ -84,7 +87,7 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
                 match listener.accept().await {
                     Ok((_, rx_from_iface)) => {
                         task_list.prune();
-                        let conn_count = task_list.0.len();
+                        let conn_count = task_list.0.lock().len();
                         if conn_count >= MAX_CONNECTIONS {
                             warn!("Connection limit reached, dropping newly opened connection. num_connections={}", conn_count);
                             // Max connections so drop this connection
@@ -92,7 +95,7 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
                             continue;
                         };
                         debug!("Accepting new connection with number of existing connections {}", conn_count);
-                        task_list.0.push(tokio::task::spawn(recv_incoming_admin_msgs(
+                        task_list.0.lock().push(tokio::task::spawn(recv_incoming_admin_msgs(
                             api.clone(),
                             rx_from_iface,
                         )));
@@ -108,10 +111,11 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
 
 /// Create an App Interface, which includes the ability to receive signals
 /// from Cells via a broadcast channel
-pub async fn spawn_app_interface_task<A: InterfaceApi>(
+pub async fn spawn_app_interface_task<A: InterfaceApi<Auth = AppAuthentication>>(
     tm: TaskManagerClient,
     port: u16,
     allowed_origins: AllowedOrigins,
+    installed_app_id: Option<InstalledAppId>,
     api: A,
     signal_broadcaster: broadcast::Sender<Signal>,
 ) -> InterfaceResult<u16> {
@@ -127,18 +131,21 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
 
     tm.add_conductor_task_ignored("app interface new connection handler", move || {
         async move {
-            let mut task_list = TaskList::default();
+            let task_list = TaskList::default();
             // establish a new connection to a client
             loop {
                 match listener.accept().await {
                     Ok((tx_to_iface, rx_from_iface)) => {
+                        // TODO need to rework here so that connections are identifiable and not just run anon
+                        //      with access into Holochain
                         let rx_from_cell = signal_broadcaster.subscribe();
-                        spawn_recv_incoming_msgs_and_outgoing_signals(
-                            &mut task_list,
+                        authenticate_incoming_app_connection(
+                            task_list.0.clone(),
                             api.clone(),
                             rx_from_iface,
                             rx_from_cell,
                             tx_to_iface,
+                            installed_app_id.clone(),
                             port,
                         );
                     }
@@ -157,6 +164,8 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
 async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: WebsocketReceiver) {
     use futures::stream::StreamExt;
 
+    tracing::info!("Starting admin listener");
+
     let rx_from_iface =
         futures::stream::unfold(rx_from_iface, move |mut rx_from_iface| async move {
             match rx_from_iface.recv().await {
@@ -173,19 +182,93 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: Websoc
         .for_each_concurrent(CONCURRENCY_COUNT, move |msg| {
             let api = api.clone();
             async move {
+                tracing::info!("got an admin message");
                 if let Err(e) = handle_incoming_message(msg, api.clone()).await {
                     error!(error = &e as &dyn std::error::Error)
                 }
             }
         })
         .await;
+
+    info!("Admin listener finished");
+}
+
+/// Takes an open connection and waits for an authentication message to complete the connection
+/// registration. If the connection is not authenticated within 10s or any other content is sent
+/// then the connection is dropped.
+///
+/// If the authentication succeeds then message handling tasks are spawned to handle normal
+/// communication with the client.
+fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication>>(
+    task_list: TaskListInner,
+    api: A,
+    mut rx_from_iface: WebsocketReceiver,
+    rx_from_cell: broadcast::Receiver<Signal>,
+    tx_to_iface: WebsocketSender,
+    installed_app_id: Option<InstalledAppId>,
+    port: u16,
+) {
+    let join_handle = tokio::task::spawn({
+        let task_list = task_list.clone();
+        async move {
+            let auth_payload_result = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                while let Ok(msg) = rx_from_iface.recv::<A::ApiRequest>().await {
+                    return match msg {
+                        ReceiveMessage::Authenticate(auth_payload) => {
+                            Ok(auth_payload)
+                        }
+                        _ => {
+                            warn!("Connection to Holochain app port {port} tried to send a message before authenticating. Dropping connection.");
+                            Err(())
+                        }
+                    }
+                }
+
+                warn!("Could not receive authentication message, the client either disconnected or sent a message that didn't decode to an authentication request. Dropping connection.");
+                Err(())
+            }).await;
+
+            match auth_payload_result {
+                Err(_) => {
+                    warn!("Connection to Holochain app port {port} timed out while waiting authenticating. Dropping connection.");
+                }
+                Ok(Err(_)) => {
+                    // Already logged, continue to drop connection
+                }
+                Ok(Ok(auth_payload)) => {
+                    let payload: AppAuthenticationRequest = SerializedBytes::from(holochain_serialized_bytes::UnsafeBytes::from(auth_payload)).try_into().unwrap();
+                    match api.auth(AppAuthentication {
+                        token: payload.token,
+                        installed_app_id,
+                    }).await {
+                        Ok(installed_app_id) => {
+                            spawn_recv_incoming_msgs_and_outgoing_signals(
+                                task_list,
+                                api,
+                                rx_from_iface,
+                                rx_from_cell,
+                                tx_to_iface,
+                                port,
+                            );
+                        }
+                        Err(e) => {
+                            warn!("Connection to Holochain app port {port} failed to authenticate: {e}. Dropping connection.");
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    let mut task_list_lock = task_list.lock();
+    task_list_lock.push(join_handle);
 }
 
 /// Polls for messages coming in from the external client while simultaneously
 /// polling for signals being broadcast from the Cells associated with this
 /// App interface.
 fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
-    task_list: &mut TaskList,
+    task_list: TaskListInner,
     api: A,
     rx_from_iface: WebsocketReceiver,
     rx_from_cell: broadcast::Receiver<Signal>,
@@ -215,7 +298,7 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
 
     // TODO - metrics to indicate if we're getting overloaded here.
     task_list
-        .0
+        .lock()
         .push(tokio::task::spawn(rx_from_cell.for_each_concurrent(
             CONCURRENCY_COUNT,
             move |signal| {
@@ -247,7 +330,7 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
 
     // TODO - metrics to indicate if we're getting overloaded here.
     task_list
-        .0
+        .lock()
         .push(tokio::task::spawn(rx_from_iface.for_each_concurrent(
             CONCURRENCY_COUNT,
             move |msg| {
@@ -272,6 +355,10 @@ where
     match ws_msg {
         ReceiveMessage::Signal(_) => {
             warn!("Unexpected Signal From Client!");
+            Ok(())
+        }
+        ReceiveMessage::Authenticate(_) => {
+            warn!("Unexpected Authenticate From Client!");
             Ok(())
         }
         ReceiveMessage::Request(data, respond) => {
@@ -437,6 +524,7 @@ pub mod test {
         let request = AdminRequest::AttachAppInterface {
             port: None,
             allowed_origins: AllowedOrigins::Any,
+            installed_app_id: None,
         };
         let response: AdminResponse = admin_tx.request(request).await.unwrap();
         let app_port = match response {
@@ -983,6 +1071,7 @@ pub mod test {
         let msg = AdminRequest::AttachAppInterface {
             port: None,
             allowed_origins: AllowedOrigins::Any,
+            installed_app_id: None,
         };
         let msg = msg.try_into().unwrap();
         let respond = |response: AdminResponse| {
