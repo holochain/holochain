@@ -46,6 +46,7 @@ use opentelemetry_api::metrics::Histogram;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tx5::PeerUrl;
 
 use crate::spawn::actor::UNAUTHORIZED_DISCONNECT_CODE;
 use crate::spawn::actor::UNAUTHORIZED_DISCONNECT_REASON;
@@ -1037,7 +1038,10 @@ impl MetaNet {
                                     }
                                     Err(err) => {
                                         tracing::error!(?err, "decoding error");
-                                        // TODO - drop connection??
+                                        ep_hnd2.ban(
+                                            peer_url.id().unwrap(),
+                                            tuning_params2.tx5_ban_time(),
+                                        );
                                     }
                                 }
                             }
@@ -1084,7 +1088,10 @@ impl MetaNet {
                                     }
                                     Err(err) => {
                                         tracing::error!(?err, "decoding error");
-                                        // TODO - drop connection??
+                                        ep_hnd2.ban(
+                                            peer_url.id().unwrap(),
+                                            tuning_params2.tx5_ban_time(),
+                                        );
                                     }
                                 }
                             }
@@ -1096,7 +1103,10 @@ impl MetaNet {
                                         }
                                         Err(err) => {
                                             tracing::error!(?err, "decoding error");
-                                            // TODO - drop connection??
+                                            ep_hnd2.ban(
+                                                peer_url.id().unwrap(),
+                                                tuning_params2.tx5_ban_time(),
+                                            );
                                         }
                                     }
                                 } else {
@@ -1105,7 +1115,7 @@ impl MetaNet {
                             }
                             Err(err) => {
                                 tracing::error!(?err, "decoding error");
-                                // TODO - drop connection??
+                                ep_hnd2.ban(peer_url.id().unwrap(), tuning_params2.tx5_ban_time());
                                 continue;
                             }
                         }
@@ -1204,6 +1214,24 @@ impl MetaNet {
         }
 
         // TODO - currently no way to shutdown tx5
+    }
+
+    pub fn close_peer_con(&self, peer_url: TxUrl) -> KitsuneResult<()> {
+        // Not supported for tx2
+
+        #[cfg(feature = "tx5")]
+        {
+            // Even if tx5 is enabled, check that the peer_url is a ws or wss url to the signal server
+            if peer_url.scheme() == "ws" || peer_url.scheme() == "wss" {
+                if let MetaNet::Tx5 { ep, .. } = self {
+                    let peer_url =
+                        PeerUrl::new(peer_url.to_string()).map_err(KitsuneError::other)?;
+                    ep.close(peer_url).map_err(KitsuneError::other)?;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn get_connection(

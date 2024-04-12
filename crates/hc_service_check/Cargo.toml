@@ -9,8 +9,8 @@ license = "Apache-2.0"
 clap = { version = "4.5.3", features = [ "derive", "wrap_help" ] }
 tokio = { version = "1.36.0", features = [ "full" ] }
 kitsune_p2p_bootstrap_client = { version = "^0.3.0-beta-dev.31", path = "../kitsune_p2p/bootstrap_client" }
-tx5-go-pion = { version = "0.0.8-alpha" }
-tx5-signal = { version = "0.0.8-alpha" }
+tx5-go-pion = { version = "0.0.9-alpha" }
+tx5-signal = { version = "0.0.9-alpha" }
 url2 = "0.0.6"
 
 [lints]
