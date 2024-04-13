@@ -97,11 +97,6 @@ where
     /// This operation registers an update from
     /// the original [`Entry`].
     Entry {
-        /// The original [`Create`] or [`Update`] [`Action`].
-        original_action: EntryCreationAction,
-        /// The app defined entry type with the deserialized
-        /// [`Entry`] data of the original entry.
-        original_app_entry: ET,
         /// The app defined entry type with the deserialized
         /// [`Entry`] data of the new entry.
         app_entry: ET,
@@ -113,9 +108,6 @@ where
     PrivateEntry {
         /// The hash of the original original [`Action`].
         original_action_hash: ActionHash,
-        /// The unit version of the app defined entry type
-        /// for the original entry.
-        original_app_entry_type: <ET as UnitEnum>::Unit,
         /// The unit version of the app defined entry type
         /// for the new entry.
         app_entry_type: <ET as UnitEnum>::Unit,

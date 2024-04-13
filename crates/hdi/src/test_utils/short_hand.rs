@@ -72,15 +72,8 @@ pub fn s_entry(action: EntryCreationAction, entry: Entry) -> Op {
 }
 
 /// Create [`Op::RegisterUpdate`].
-pub fn r_update(
-    original_action: EntryCreationAction,
-    original_entry: Option<Entry>,
-    update: Update,
-    new_entry: Option<Entry>,
-) -> Op {
+pub fn r_update(update: Update, new_entry: Option<Entry>) -> Op {
     Op::RegisterUpdate(RegisterUpdate {
-        original_action,
-        original_entry,
         update: SignedHashed {
             hashed: HoloHashed {
                 content: update,

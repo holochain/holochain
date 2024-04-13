@@ -330,32 +330,9 @@ async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutc
                 },
                 _ => None,
             };
-            let original_entry = if let EntryVisibility::Public = update.entry_type.visibility() {
-                Some(
-                    cascade
-                        .retrieve_entry(update.original_entry_address.clone(), Default::default())
-                        .await?
-                        .map(|(e, _)| e.into_content())
-                        .ok_or_else(|| Outcome::awaiting(&update.original_entry_address))?,
-                )
-            } else {
-                None
-            };
-
-            let original_action = cascade
-                .retrieve_action(update.original_action_address.clone(), Default::default())
-                .await?
-                .and_then(|(sh, _)| {
-                    NewEntryAction::try_from(sh.hashed.content)
-                        .ok()
-                        .map(|h| h.into())
-                })
-                .ok_or_else(|| Outcome::awaiting(&update.original_action_address))?;
             Op::RegisterUpdate(RegisterUpdate {
                 update: SignedHashed::new_unchecked(update, signature),
                 new_entry,
-                original_action,
-                original_entry,
             })
         }
         DhtOp::RegisterDeletedBy(signature, delete)
@@ -482,6 +459,20 @@ async fn get_zomes_to_invoke(
     match op {
         Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => Ok(ZomesToInvoke::AllIntegrity),
         Op::StoreRecord(StoreRecord { record }) => {
+            // if let Some(EntryType::App(app_entry_def)) = record.action().entry_type() {
+            //     let zome = ribosome
+            //         .get_integrity_zome(&app_entry_def.zome_index())
+            //         .ok_or_else(|| {
+            //             tracing::error!("No integrity zome found to validate op {op:?}");
+            //             Outcome::rejected(format!(
+            //                 "Zome does not exist for {zome_index:?}",
+            //                 app_entry_def.zome_index()
+            //             ))
+            //         })?;
+            //     Ok(ZomesToInvoke::OneIntegrity(zome))
+            // } else {
+            //     Ok(ZomesToInvoke::AllIntegrity)
+            // }
             let cascade =
                 CascadeImpl::from_workspace_and_network(workspace, Arc::new(network.clone()));
             store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await
@@ -497,10 +488,27 @@ async fn get_zomes_to_invoke(
                 },
             ..
         }) => entry_creation_zomes_to_invoke(action, ribosome),
-        Op::RegisterUpdate(RegisterUpdate {
-            original_action, ..
-        })
-        | Op::RegisterDelete(RegisterDelete {
+        Op::RegisterUpdate(RegisterUpdate { update, new_entry }) => {
+            if new_entry.is_some() {
+                if let EntryType::App(app_entry_def) = &update.hashed.entry_type {
+                    let zome = ribosome
+                        .get_integrity_zome(&app_entry_def.zome_index())
+                        .ok_or_else(|| {
+                            tracing::error!("No integrity zome found to validate op {op:?}");
+                            Outcome::rejected(format!(
+                                "Zome does not exist for {:?}",
+                                app_entry_def.zome_index()
+                            ))
+                        })?;
+                    Ok(ZomesToInvoke::OneIntegrity(zome))
+                } else {
+                    Ok(ZomesToInvoke::AllIntegrity)
+                }
+            } else {
+                Ok(ZomesToInvoke::AllIntegrity)
+            }
+        }
+        Op::RegisterDelete(RegisterDelete {
             original_action, ..
         }) => entry_creation_zomes_to_invoke(original_action, ribosome),
         Op::RegisterCreateLink(RegisterCreateLink {
