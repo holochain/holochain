@@ -823,7 +823,8 @@ impl Default for OutcomeSummary {
 
 /// Dependencies required for app validating an op.
 pub struct ValidationDependencies {
-    /// Missing hashes that are being fetched.
+    /// Missing hashes that are being fetched, along with
+    /// the last Instant a fetch was attempted
     missing_hashes: HashMap<AnyDhtHash, Instant>,
     /// Dependencies that are missing to app validate an op.
     hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
