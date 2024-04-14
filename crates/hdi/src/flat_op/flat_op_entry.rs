@@ -146,56 +146,7 @@ where
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Data specific to the [`Op::RegisterDelete`] operation.
-pub enum OpDelete<ET>
-where
-    ET: UnitEnum,
-{
-    /// This operation registers a deletion to the
-    /// original [`Entry`].
-    Entry {
-        /// The entries original [`Create`] or [`Update`] [`Action`].
-        original_action: EntryCreationAction,
-        /// The app defined entry type with the deserialized
-        /// [`Entry`] data from the deleted entry.
-        original_app_entry: ET,
-        /// The [`Delete`] action that deletes this entry
-        action: Delete,
-    },
-    /// This operation registers a deletion to the
-    /// original private [`Entry`].
-    PrivateEntry {
-        /// The entries original [`EntryCreationAction`].
-        original_action: EntryCreationAction,
-        /// The unit version of the app defined entry type
-        /// of the deleted entry.
-        original_app_entry_type: <ET as UnitEnum>::Unit,
-        /// The [`Delete`] action that deletes this entry
-        action: Delete,
-    },
-    /// This operation registers a deletion to an
-    /// [`AgentPubKey`].
-    Agent {
-        /// The deleted [`AgentPubKey`].
-        original_key: AgentPubKey,
-        /// The hash of the deleted keys [`Action`].
-        original_action: EntryCreationAction,
-        /// The [`Delete`] action that deletes this entry
-        action: Delete,
-    },
-    /// This operation registers a deletion to a
-    /// Capability Claim.
-    CapClaim {
-        /// The deleted Capability Claim's [`Action`].
-        original_action: EntryCreationAction,
-        /// The [`Delete`] action that deletes this entry
-        action: Delete,
-    },
-    /// This operation registers a deletion to a
-    /// Capability Grant.
-    CapGrant {
-        /// The deleted Capability Claim's [`Action`].
-        original_action: EntryCreationAction,
-        /// The [`Delete`] action that deletes this entry
-        action: Delete,
-    },
+pub struct OpDelete {
+    /// The [`Delete`] action that deletes this entry
+    pub action: Delete,
 }

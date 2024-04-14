@@ -86,7 +86,7 @@ pub fn r_update(update: Update, new_entry: Option<Entry>) -> Op {
 }
 
 /// Create [`Op::RegisterDelete`].
-pub fn r_delete(original_entry_type: EntryType, original_entry: Option<Entry>) -> Op {
+pub fn r_delete() -> Op {
     Op::RegisterDelete(RegisterDelete {
         delete: SignedHashed {
             hashed: HoloHashed {
@@ -103,8 +103,6 @@ pub fn r_delete(original_entry_type: EntryType, original_entry: Option<Entry>) -
             },
             signature: Signature([0u8; 64]),
         },
-        original_action: EntryCreationAction::Create(c(original_entry_type)),
-        original_entry,
     })
 }
 

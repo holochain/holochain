@@ -337,33 +337,8 @@ async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutc
         }
         DhtOp::RegisterDeletedBy(signature, delete)
         | DhtOp::RegisterDeletedEntryAction(signature, delete) => {
-            let original_action: EntryCreationAction = cascade
-                .retrieve_action(delete.deletes_address.clone(), Default::default())
-                .await?
-                .and_then(|(sh, _)| {
-                    NewEntryAction::try_from(sh.hashed.content)
-                        .ok()
-                        .map(|h| h.into())
-                })
-                .ok_or_else(|| Outcome::awaiting(&delete.deletes_address))?;
-
-            let original_entry = if let EntryVisibility::Public =
-                original_action.entry_type().visibility()
-            {
-                Some(
-                    cascade
-                        .retrieve_entry(delete.deletes_entry_address.clone(), Default::default())
-                        .await?
-                        .map(|(e, _)| e.into_content())
-                        .ok_or_else(|| Outcome::awaiting(&delete.deletes_entry_address))?,
-                )
-            } else {
-                None
-            };
             Op::RegisterDelete(RegisterDelete {
                 delete: SignedHashed::new_unchecked(delete, signature),
-                original_action,
-                original_entry,
             })
         }
         DhtOp::RegisterAddLink(signature, create_link) => {
@@ -508,9 +483,24 @@ async fn get_zomes_to_invoke(
                 Ok(ZomesToInvoke::AllIntegrity)
             }
         }
-        Op::RegisterDelete(RegisterDelete {
-            original_action, ..
-        }) => entry_creation_zomes_to_invoke(original_action, ribosome),
+        Op::RegisterDelete(RegisterDelete { delete }) => {
+            if let Some(EntryType::App(app_entry_def)) =
+                (*delete.hashed).clone().into_action().entry_type()
+            {
+                let zome = ribosome
+                    .get_integrity_zome(&app_entry_def.zome_index())
+                    .ok_or_else(|| {
+                        tracing::error!("No integrity zome found to validate op {op:?}");
+                        Outcome::rejected(format!(
+                            "Zome does not exist for {:?}",
+                            app_entry_def.zome_index()
+                        ))
+                    })?;
+                Ok(ZomesToInvoke::OneIntegrity(zome))
+            } else {
+                Ok(ZomesToInvoke::AllIntegrity)
+            }
+        }
         Op::RegisterCreateLink(RegisterCreateLink {
             create_link:
                 SignedHashed {

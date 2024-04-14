@@ -28,7 +28,7 @@ use holochain_zome_types::{
     entry::MustGetActionInput,
     fixt::{AgentPubKeyFixturator, CreateFixturator, DeleteFixturator, SignatureFixturator},
     judged::Judged,
-    op::{EntryCreationAction, Op, RegisterAgentActivity, RegisterDelete},
+    op::{Op, RegisterAgentActivity, RegisterDelete},
     record::{SignedActionHashed, SignedHashed},
     validate::ValidationStatus,
     Action,
@@ -50,16 +50,18 @@ use std::{
 async fn validation_callback_must_get_action() {
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete {
-                original_action, ..
-            }) = op
-            {
-                let result = api.must_get_action(MustGetActionInput(original_action.to_hash()));
+            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+                let result =
+                    api.must_get_action(MustGetActionInput(delete.hashed.deletes_address.clone()));
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![original_action.to_hash().into()]),
+                        UnresolvedDependencies::Hashes(vec![delete
+                            .hashed
+                            .deletes_address
+                            .clone()
+                            .into()]),
                     ))
                 }
             } else {
@@ -97,8 +99,6 @@ async fn validation_callback_must_get_action() {
     let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
-        original_action: EntryCreationAction::Create(create.clone()),
-        original_entry: None,
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
@@ -146,16 +146,18 @@ async fn validation_callback_awaiting_deps_hashes() {
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete {
-                original_action, ..
-            }) = op
-            {
-                let result = api.must_get_action(MustGetActionInput(original_action.to_hash()));
+            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+                let result =
+                    api.must_get_action(MustGetActionInput(delete.hashed.deletes_address.clone()));
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![original_action.to_hash().into()]),
+                        UnresolvedDependencies::Hashes(vec![delete
+                            .hashed
+                            .deletes_address
+                            .clone()
+                            .into()]),
                     ))
                 }
             } else {
@@ -191,8 +193,6 @@ async fn validation_callback_awaiting_deps_hashes() {
     let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
-        original_action: EntryCreationAction::Create(create.clone()),
-        original_entry: None,
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
@@ -252,15 +252,10 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete {
-                delete,
-                original_action,
-                ..
-            }) = op
-            {
+            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
                 // chain filter with delete as chain top and create as chain bottom
                 let mut filter_hashes = HashSet::new();
-                filter_hashes.insert(original_action.to_hash().clone());
+                filter_hashes.insert(delete.hashed.deletes_address.clone().clone());
                 let chain_filter = ChainFilter {
                     chain_top: delete.as_hash().clone(),
                     filters: ChainFilters::Until(filter_hashes),
@@ -319,8 +314,6 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: SignedHashed::new_unchecked(delete.clone(), fixt!(Signature)),
-        original_action: EntryCreationAction::Create(create.clone()),
-        original_entry: None,
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
@@ -398,16 +391,18 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete {
-                original_action, ..
-            }) = op
-            {
-                let result = api.must_get_action(MustGetActionInput(original_action.to_hash()));
+            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+                let result =
+                    api.must_get_action(MustGetActionInput(delete.hashed.deletes_address.clone()));
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![original_action.to_hash().into()]),
+                        UnresolvedDependencies::Hashes(vec![delete
+                            .hashed
+                            .deletes_address
+                            .clone()
+                            .into()]),
                     ))
                 }
             } else {
@@ -443,8 +438,6 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
     let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
-        original_action: EntryCreationAction::Create(create.clone()),
-        original_entry: None,
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
@@ -508,15 +501,10 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete {
-                delete,
-                original_action,
-                ..
-            }) = op
-            {
+            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
                 // chain filter with delete as chain top and create as chain bottom
                 let mut filter_hashes = HashSet::new();
-                filter_hashes.insert(original_action.to_hash().clone());
+                filter_hashes.insert(delete.hashed.deletes_address.clone());
                 let chain_filter = ChainFilter {
                     chain_top: delete.as_hash().clone(),
                     filters: ChainFilters::Until(filter_hashes),
@@ -575,8 +563,6 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: SignedHashed::new_unchecked(delete.clone(), fixt!(Signature)),
-        original_action: EntryCreationAction::Create(create.clone()),
-        original_entry: None,
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
@@ -646,16 +632,18 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete {
-                original_action, ..
-            }) = op
-            {
-                let result = api.must_get_action(MustGetActionInput(original_action.to_hash()));
+            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+                let result =
+                    api.must_get_action(MustGetActionInput(delete.hashed.deletes_address.clone()));
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![original_action.to_hash().into()]),
+                        UnresolvedDependencies::Hashes(vec![delete
+                            .hashed
+                            .deletes_address
+                            .clone()
+                            .into()]),
                     ))
                 }
             } else {
@@ -691,8 +679,6 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
-        original_action: EntryCreationAction::Create(create.clone()),
-        original_entry: None,
     });
 
     // mock network that returns the requested create action

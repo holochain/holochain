@@ -168,13 +168,6 @@ pub struct RegisterUpdate {
 pub struct RegisterDelete {
     /// The signed and hashed [`Action::Delete`] that registers the deletion.
     pub delete: SignedHashed<Delete>,
-    /// The original [`EntryCreationAction`] that created
-    /// the original [`Entry`].
-    pub original_action: EntryCreationAction,
-    /// The original [`Entry`] that is being deleted.
-    /// This will be [`None`] when the [`Entry`] being
-    /// deleted is [`EntryVisibility::Private`](crate::entry_def::EntryVisibility::Private).
-    pub original_entry: Option<Entry>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]

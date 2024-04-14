@@ -44,17 +44,19 @@ async fn main_loop_app_validation_workflow() {
 
     let zomes =
         SweetInlineZomes::new(vec![], 0).integrity_function("validate", move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete {
-                original_action, ..
-            }) = op
-            {
-                let result =
-                    api.must_get_action(MustGetActionInput::new(original_action.to_hash()));
+            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+                let result = api.must_get_action(MustGetActionInput::new(
+                    delete.hashed.deletes_address.clone(),
+                ));
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![original_action.to_hash().into()]),
+                        UnresolvedDependencies::Hashes(vec![delete
+                            .hashed
+                            .deletes_address
+                            .clone()
+                            .into()]),
                     ))
                 }
             } else {

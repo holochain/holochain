@@ -533,51 +533,9 @@ impl OpHelper for Op {
                     action: delete_link.hashed.content.clone(),
                 })
             }
-            Op::RegisterDelete(RegisterDelete {
-                delete,
-                original_action,
-                original_entry: orig_entry,
-            }) => {
-                let Delete {
-                    deletes_entry_address: original_entry_hash,
-                    ..
-                } = &delete.hashed.content;
-                let r = match original_action.entry_type() {
-                    EntryType::AgentPubKey => OpDelete::Agent {
-                        original_action: original_action.clone(),
-                        original_key: original_entry_hash.clone().into(),
-                        action: delete.hashed.content.clone(),
-                    },
-                    EntryType::App(original_entry_type) => {
-                        match get_app_entry_type_for_record_authority::<ET>(
-                            original_entry_type,
-                            orig_entry.as_ref(),
-                        )? {
-                            UnitEnumEither::Enum(original_app_entry) => OpDelete::Entry {
-                                original_action: original_action.clone(),
-                                original_app_entry,
-                                action: delete.hashed.content.clone(),
-                            },
-                            UnitEnumEither::Unit(original_app_entry_type) => {
-                                OpDelete::PrivateEntry {
-                                    original_action: original_action.clone(),
-                                    original_app_entry_type,
-                                    action: delete.hashed.content.clone(),
-                                }
-                            }
-                        }
-                    }
-                    EntryType::CapClaim => OpDelete::CapClaim {
-                        original_action: original_action.clone(),
-                        action: delete.hashed.content.clone(),
-                    },
-                    EntryType::CapGrant => OpDelete::CapGrant {
-                        original_action: original_action.clone(),
-                        action: delete.hashed.content.clone(),
-                    },
-                };
-                Ok(FlatOp::RegisterDelete(r))
-            }
+            Op::RegisterDelete(RegisterDelete { delete }) => Ok(FlatOp::RegisterDelete(OpDelete {
+                action: delete.hashed.content.clone(),
+            })),
         }
     }
 }

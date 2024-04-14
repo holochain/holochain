@@ -63,20 +63,11 @@ pub enum LinkTypes {
 #[test_case(s_entry(c(EntryType::CapGrant).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
 // RegisterUpdate
 #[test_case(r_update(
-    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
-    => matches WasmErrorInner::Serialize(_) ; "Register Update: original entry fails to deserialize")]
-#[test_case(r_update(
     u(EntryType::App(public_app_entry_def(0, 0))), Some(e(D::default())))
     => matches WasmErrorInner::Serialize(_) ; "Register Update: new entry fails to deserialize")]
 #[test_case(r_update(
-    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
-    => matches WasmErrorInner::Guest(_) ; "Register Update: original entry is missing")]
-#[test_case(r_update(
     u(EntryType::App(public_app_entry_def(0, 0))), None)
     => matches WasmErrorInner::Guest(_) ; "Register Update: new entry is missing")]
-#[test_case(r_update(
-    u(EntryType::App(private_app_entry_def(0, 0))), None)
-    => matches WasmErrorInner::Guest(_) ; "Register Update: original entry is private but also present")]
 #[test_case(r_update(
     u(EntryType::App(private_app_entry_def(0, 0))), Some(e(A{})))
     => matches WasmErrorInner::Guest(_) ; "Register Update: new entry is private but also present")]
@@ -86,18 +77,6 @@ pub enum LinkTypes {
 #[test_case(r_update(
     u(EntryType::App(public_app_entry_def(100, 0))), Some(e(A{})))
     => matches WasmErrorInner::Host(_) ; "Register Update: zome id is out of range")]
-#[test_case(r_update(
-    u(EntryType::App(private_app_entry_def(0, 0))), None)
-    => matches WasmErrorInner::Guest(_) ; "Register Update: public to private type mismatch")]
-#[test_case(r_update(
-    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
-    => matches WasmErrorInner::Guest(_) ; "Register Update: private to public type mismatch")]
-#[test_case(r_update(
-    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
-    => matches WasmErrorInner::Guest(_) ; "Register Update: agent to app mismatch")]
-#[test_case(r_update(
-    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
-    => matches WasmErrorInner::Guest(_) ; "Register Update: entry type mismatch")]
 #[test_case(r_create_link(0, 100) => matches WasmErrorInner::Guest(_) ; "Register Create Link: link type out of range")]
 #[test_case(r_create_link(100, 0) => matches WasmErrorInner::Host(_) ; "Register Create Link: zome id out of range")]
 #[test_case(r_delete_link(0, 100) => matches WasmErrorInner::Guest(_) ; "Register Delete Link: link type out of range")]
@@ -170,17 +149,13 @@ fn op_errors(op: Op) -> WasmErrorInner {
 // // Error Cases
 // // #[test_case(FlatOp::StoreEntry(OpEntry::CreateEntry {entry_hash: eh(0), entry_type: EntryTypes::B(B{}) }))]
 // Register Update
-#[test_case(FlatOp::RegisterUpdate(OpUpdate::Entry { action: u(EntryType::App(public_app_entry_def(0, 0))), app_entry: EntryTypes::A(A{}), }))]
-#[test_case(FlatOp::RegisterUpdate(OpUpdate::PrivateEntry { action: u(EntryType::App(private_app_entry_def(0, 0))),  original_action_hash: ah(1), app_entry_type: UnitEntryTypes::A,  }))]
+#[test_case(FlatOp::RegisterUpdate(OpUpdate::Entry { action: u(EntryType::App(public_app_entry_def(0, 0))), app_entry: EntryTypes::A(A{}) }))]
+#[test_case(FlatOp::RegisterUpdate(OpUpdate::PrivateEntry { action: u(EntryType::App(private_app_entry_def(0, 0))),  original_action_hash: ah(1), app_entry_type: UnitEntryTypes::A }))]
 #[test_case(FlatOp::RegisterUpdate(OpUpdate::Agent { action: u(EntryType::AgentPubKey), original_key: ak(1), new_key: ak(0), original_action_hash: ah(1) }))]
 #[test_case(FlatOp::RegisterUpdate(OpUpdate::CapClaim { action: u(EntryType::CapClaim), original_action_hash: ah(1) }))]
 #[test_case(FlatOp::RegisterUpdate(OpUpdate::CapGrant { action: u(EntryType::CapGrant), original_action_hash: ah(1) }))]
 // Register Delete
-#[test_case(FlatOp::RegisterDelete(OpDelete::Entry { action: d(ah(0)), original_action: EntryCreationAction::Create(c(EntryType::App(public_app_entry_def(0, 0)))), original_app_entry: EntryTypes::A(A{}) }))]
-#[test_case(FlatOp::RegisterDelete(OpDelete::PrivateEntry { action: d(ah(0)), original_action: EntryCreationAction::Create(c(EntryType::App(private_app_entry_def(0, 0)))), original_app_entry_type: UnitEntryTypes::A }))]
-#[test_case(FlatOp::RegisterDelete(OpDelete::Agent { action: d(ah(1)), original_key: ak(0), original_action: EntryCreationAction::Create(c(EntryType::AgentPubKey)) }))]
-#[test_case(FlatOp::RegisterDelete(OpDelete::CapClaim { action: d(ah(1)), original_action: EntryCreationAction::Create(c(EntryType::CapClaim)) }))]
-#[test_case(FlatOp::RegisterDelete(OpDelete::CapGrant { action: d(ah(1)), original_action: EntryCreationAction::Create(c(EntryType::CapGrant))  }))]
+#[test_case(FlatOp::RegisterDelete(OpDelete { action: d(ah(0)) }))]
 // Register Create Link
 #[test_case(FlatOp::RegisterCreateLink { action: cl(0, 0), base_address: lh(0), target_address: lh(1), tag: ().into(), link_type: LinkTypes::A })]
 #[test_case(FlatOp::RegisterCreateLink { action: cl(0, 1), base_address: lh(0), target_address: lh(1), tag: ().into(), link_type: LinkTypes::B })]
@@ -393,69 +368,11 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
                 new_entry: None,
             })
         }
-        FlatOp::RegisterDelete(OpDelete::Entry {
-            original_action,
-            original_app_entry: original_et,
-            action,
-        }) => {
-            let original_entry = Entry::try_from(&original_et).unwrap();
-            Op::RegisterDelete(RegisterDelete {
-                delete: SignedHashed {
-                    hashed: HoloHashed::from_content_sync(action),
-                    signature: Signature::arbitrary(&mut ud).unwrap(),
-                },
-                original_action,
-                original_entry: Some(original_entry),
-            })
-        }
-        FlatOp::RegisterDelete(OpDelete::Agent {
-            original_action,
-            original_key,
-            action,
-        }) => {
-            let original_entry = Entry::Agent(original_key.clone());
-            Op::RegisterDelete(RegisterDelete {
-                delete: SignedHashed {
-                    hashed: HoloHashed::from_content_sync(action),
-                    signature: Signature::arbitrary(&mut ud).unwrap(),
-                },
-                original_action,
-                original_entry: Some(original_entry),
-            })
-        }
-        FlatOp::RegisterDelete(OpDelete::PrivateEntry {
-            original_action,
-            original_app_entry_type: _,
-            action,
-        }) => Op::RegisterDelete(RegisterDelete {
+        FlatOp::RegisterDelete(OpDelete { action }) => Op::RegisterDelete(RegisterDelete {
             delete: SignedHashed {
                 hashed: HoloHashed::from_content_sync(action),
                 signature: Signature::arbitrary(&mut ud).unwrap(),
             },
-            original_action,
-            original_entry: None,
-        }),
-        FlatOp::RegisterDelete(OpDelete::CapClaim {
-            original_action,
-            action,
-        }) => Op::RegisterDelete(RegisterDelete {
-            delete: SignedHashed {
-                hashed: HoloHashed::from_content_sync(action),
-                signature: Signature::arbitrary(&mut ud).unwrap(),
-            },
-            original_action,
-            original_entry: None,
-        }),
-        FlatOp::RegisterDelete(OpDelete::CapGrant {
-            original_action,
-            action,
-        }) => Op::RegisterDelete(RegisterDelete {
-            delete: SignedHashed {
-                hashed: HoloHashed::from_content_sync(action),
-                signature: Signature::arbitrary(&mut ud).unwrap(),
-            },
-            original_action,
-            original_entry: None,
         }),
         FlatOp::RegisterAgentActivity(activity) => {
             let r = match activity {

@@ -46,5 +46,6 @@ default = []
 trace = ["tracing", "tracing-core", "holochain_integrity_types/tracing"]
 mock = ["hdk_derive/mock", "mockall"]
 test_utils = [
-    "holochain_integrity_types/test_utils"
+    "holochain_integrity_types/fuzzing",
+    "holochain_integrity_types/test_utils",
 ]
