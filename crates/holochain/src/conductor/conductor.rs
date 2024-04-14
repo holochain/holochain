@@ -77,7 +77,7 @@ use holochain_zome_types::prelude::ClonedCell;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
 use crate::conductor::cell::Cell;
-use crate::conductor::conductor::app_connection_auth::AppAuthTokenStore;
+use crate::conductor::conductor::app_auth_token_store::AppAuthTokenStore;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::metrics::create_p2p_event_duration_metric;
@@ -130,6 +130,13 @@ mod builder;
 mod chc;
 
 mod graft_records_onto_source_chain;
+
+mod app_auth_token_store;
+
+mod app_broadcast;
+
+#[cfg(test)]
+pub mod tests;
 
 /// How long we should attempt to achieve a "network join" when first activating a cell,
 /// before moving on and letting the network health activity go on in the background.
@@ -245,7 +252,7 @@ pub struct Conductor {
     // Used in ribosomes but kept here as a single instance.
     pub(crate) wasmer_module_cache: Arc<RwLock<ModuleCache>>,
 
-    app_connection_auth: RwShare<AppAuthTokenStore>,
+    app_auth_token_store: RwShare<AppAuthTokenStore>,
 }
 
 impl Conductor {
@@ -302,7 +309,7 @@ mod startup_shutdown_impls {
                 post_commit,
                 services: RwShare::new(None),
                 wasmer_module_cache: Arc::new(RwLock::new(ModuleCache::new(maybe_data_root_path))),
-                app_connection_auth: RwShare::default(),
+                app_auth_token_store: RwShare::default(),
             }
         }
 
@@ -2576,7 +2583,7 @@ mod authenticate_token_impls {
             &self,
             payload: IssueAppAuthenticationTokenPayload,
         ) -> ConductorResult<AppAuthenticationTokenIssued> {
-            let (token, expires_at) = self.app_connection_auth.share_mut(|app_connection_auth| {
+            let (token, expires_at) = self.app_auth_token_store.share_mut(|app_connection_auth| {
                 app_connection_auth.issue_token(
                     payload.installed_app_id,
                     payload.expiry_seconds,
@@ -2601,7 +2608,7 @@ mod authenticate_token_impls {
             token: Vec<u8>,
             app_id: Option<InstalledAppId>,
         ) -> ConductorResult<InstalledAppId> {
-            self.app_connection_auth.share_mut(|app_connection_auth| {
+            self.app_auth_token_store.share_mut(|app_connection_auth| {
                 app_connection_auth.authenticate_token(token, app_id)
             })
         }
@@ -3253,8 +3260,3 @@ async fn p2p_event_task(
 
     tracing::info!("p2p_event_task has ended");
 }
-
-#[cfg(test)]
-pub mod tests;
-
-mod app_connection_auth;
