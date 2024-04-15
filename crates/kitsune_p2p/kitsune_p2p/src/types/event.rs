@@ -67,9 +67,8 @@ pub struct SignNetworkDataEvt {
 /// Store the AgentInfo as signed by the agent themselves.
 #[derive(Debug, Clone)]
 pub struct PutAgentInfoSignedEvt {
-    /// The "space" context.
-    pub space: KSpace,
-    /// A batch of signed agent info for this space.
+    /// A batch of signed agent info. Possibly from multiple spaces, see the space included
+    /// on each agent.
     pub peer_data: Vec<AgentInfoSigned>,
 }
 
@@ -175,7 +174,7 @@ ghost_actor::ghost_chan! {
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
 
         /// We need to store signed agent info.
-        fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
+        fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> Vec<kitsune_p2p_types::bootstrap::AgentInfoPut>;
 
         /// We need to get previously stored agent info.
         fn query_agents(input: QueryAgentsEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;

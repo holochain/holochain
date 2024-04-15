@@ -3,15 +3,14 @@
 use crate::prelude::*;
 use crate::sql::*;
 use holochain_util::hex::many_bytes_string;
-use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dht_arc::DhtArcRange;
-use kitsune_p2p::dht_arc::DhtArcSet;
-use kitsune_p2p::KitsuneAgent;
-use kitsune_p2p_bin_data::KitsuneSpace;
+use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSpace};
+use kitsune_p2p_dht_arc::{DhtArcRange, DhtArcSet};
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rusqlite::*;
-use std::collections::{hash_map, HashMap};
+use std::collections::{hash_map, HashMap, HashSet};
 use std::sync::Arc;
 
 #[cfg(test)]
@@ -122,6 +121,8 @@ impl AgentStore {
         Ok(Self(Arc::new(Mutex::new(map))))
     }
 
+    /// Prune all expired AgentInfoSigned records from the store.
+    /// Local agents provided as input are never removed.
     fn prune(&self, now: u64, local_agents: &[Arc<KitsuneAgent>]) -> DatabaseResult<()> {
         let mut lock = self.0.lock();
 
@@ -137,18 +138,40 @@ impl AgentStore {
         Ok(())
     }
 
-    fn put(&self, agent_info: AgentInfoSigned) -> DatabaseResult<()> {
+    fn put(&self, agent_info: AgentInfoSigned) -> DatabaseResult<AgentInfoPut> {
         let mut lock = self.0.lock();
 
-        if let Some(a) = lock.get(&agent_info.agent) {
+        // If we already have an info then this is an updated info
+        let removed_urls = if let Some(a) = lock.get(&agent_info.agent) {
+            // Check whether we already have a newer info for this agent.
             if a.signed_at_ms >= agent_info.signed_at_ms {
-                return Ok(());
+                return Ok(AgentInfoPut::default());
             }
-        }
+
+            let old_url_list: HashSet<_> = a.url_list.iter().collect();
+            let new_url_list: HashSet<_> = agent_info.url_list.iter().collect();
+
+            // Find URLs that were in the old list but AREN'T in the new list
+            let removed_urls: HashSet<_> = old_url_list
+                .difference(&new_url_list)
+                .map(|&u| u.clone())
+                .collect();
+            if !removed_urls.is_empty() {
+                tracing::info!(
+                    ?agent_info,
+                    "Agent URLs changed, no longer advertising at: {:?}",
+                    removed_urls
+                );
+            }
+
+            removed_urls
+        } else {
+            HashSet::with_capacity(0)
+        };
 
         lock.insert(agent_info.agent.clone(), agent_info);
 
-        Ok(())
+        Ok(AgentInfoPut { removed_urls })
     }
 
     fn remove(&self, agent: &KitsuneAgent) -> DatabaseResult<()> {
@@ -292,6 +315,7 @@ impl AgentStoreByPath {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     async fn get_async(&self, db: &DbRead<DbKindP2pAgents>) -> DatabaseResult<AgentStore> {
         let store_key = db.clone().into();
         {
@@ -329,6 +353,7 @@ async fn cache_get_async(db: &DbRead<DbKindP2pAgents>) -> DatabaseResult<AgentSt
 }
 
 /// Put an AgentInfoSigned record into the p2p_store
+#[tracing::instrument(skip_all)]
 pub async fn p2p_put(
     db: &DbWrite<DbKindP2pAgents>,
     signed: &AgentInfoSigned,
@@ -338,10 +363,11 @@ pub async fn p2p_put(
 }
 
 /// Put an iterator of AgentInfoSigned records into the p2p_store
+#[tracing::instrument(skip_all)]
 pub async fn p2p_put_all(
     db: &DbWrite<DbKindP2pAgents>,
     signed: impl Iterator<Item = &AgentInfoSigned>,
-) -> DatabaseResult<()> {
+) -> DatabaseResult<Vec<AgentInfoPut>> {
     let mut records = Vec::new();
     let mut ns = Vec::new();
     for s in signed {
@@ -350,14 +376,16 @@ pub async fn p2p_put_all(
     }
     let space = db.kind().0.clone();
     db.write_async(move |txn| {
+        let mut responses = Vec::new();
         for s in ns {
-            cache_get(space.clone(), &*txn)?.put(s)?;
+            responses.push(cache_get(space.clone(), &*txn)?.put(s)?);
         }
 
         for record in records {
             tx_p2p_put(txn, record)?;
         }
-        Ok(())
+
+        Ok(responses)
     })
     .await
 }
@@ -367,10 +395,11 @@ pub fn p2p_put_single(
     space: Arc<KitsuneSpace>,
     txn: &mut Transaction<'_>,
     signed: &AgentInfoSigned,
-) -> DatabaseResult<()> {
-    cache_get(space, &*txn)?.put(signed.clone())?;
+) -> DatabaseResult<AgentInfoPut> {
+    let agent_info_put = cache_get(space, &*txn)?.put(signed.clone())?;
     let record = P2pRecord::from_signed(signed)?;
-    tx_p2p_put(txn, record)
+    tx_p2p_put(txn, record)?;
+    Ok(agent_info_put)
 }
 
 fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
@@ -395,6 +424,7 @@ fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
 }
 
 /// Prune all expired AgentInfoSigned records from the p2p_store
+#[tracing::instrument(skip_all)]
 pub async fn p2p_prune(
     db: &DbWrite<DbKindP2pAgents>,
     local_agents: Vec<Arc<KitsuneAgent>>,
@@ -424,6 +454,7 @@ pub async fn p2p_prune(
                 ":agent_list": agent_list,
             },
         )?;
+
         DatabaseResult::Ok(())
     })
     .await?;
@@ -464,6 +495,7 @@ impl AsP2pStateReadExt for DbRead<DbKindP2pAgents> {
         cache_get_async(self).await?.query_near_basis(basis, limit)
     }
 
+    #[tracing::instrument(skip_all)]
     async fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
         self.read_async(|txn| txn.p2p_extrapolated_coverage(dht_arc_set))
             .await
@@ -472,6 +504,7 @@ impl AsP2pStateReadExt for DbRead<DbKindP2pAgents> {
 
 #[async_trait::async_trait]
 impl AsP2pStateWriteExt for DbWrite<DbKindP2pAgents> {
+    #[tracing::instrument(skip_all)]
     async fn p2p_remove_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
         let space = self.kind().0.clone();
         let agent = agent.clone();

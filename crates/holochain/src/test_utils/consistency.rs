@@ -49,7 +49,9 @@ pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Dura
                 space[i] = Some((p2p_agents_db, Vec::new()));
             }
             space[i].as_mut().unwrap().1.push((
-                c.get_authored_db(cell_id.dna_hash()).unwrap().into(),
+                c.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
+                    .unwrap()
+                    .into(),
                 c.get_dht_db(cell_id.dna_hash()).unwrap().into(),
                 cell_id.agent_pubkey().to_kitsune(),
             ));
@@ -594,6 +596,7 @@ async fn check_agents<'iter>(
 }
 
 /// Check the op hashes we are meant to be holding.
+#[tracing::instrument(skip_all)]
 async fn check_hashes(
     dht_db: &DbRead<DbKindDht>,
     expected_hashes: &mut Vec<KitsuneOpHash>,

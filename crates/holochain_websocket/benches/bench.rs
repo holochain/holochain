@@ -7,11 +7,6 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_websocket::*;
 use tokio::runtime::Builder;
 use tokio::runtime::Runtime;
-use tokio::task::JoinHandle;
-
-use std::convert::TryInto;
-use tokio_stream::StreamExt;
-use url2::prelude::*;
 
 criterion_group!(benches, simple_bench);
 
@@ -25,8 +20,8 @@ fn simple_bench(bench: &mut Criterion) {
 
     let runtime = rt();
 
-    let (listener, listener_address, jh) = runtime.block_on(setup());
-    let (mut send, mut recv) = runtime.block_on(setup_client(listener_address));
+    let (listener_address, jh) = runtime.block_on(setup());
+    let (mut send, mut recv, cjh) = runtime.block_on(setup_client(listener_address));
 
     let mut group = bench.benchmark_group("simple_bench");
     // group.sample_size(100);
@@ -45,12 +40,10 @@ fn simple_bench(bench: &mut Criterion) {
             runtime.block_on(client_response(&mut recv));
         });
     });
-    runtime.block_on(async move {
-        listener.close();
-        drop(send);
-        drop(recv);
-        jh.await.unwrap();
-    });
+    drop(send);
+    drop(recv);
+    cjh.abort();
+    jh.abort();
 }
 
 async fn client_request(send: &mut WebsocketSender) {
@@ -58,7 +51,7 @@ async fn client_request(send: &mut WebsocketSender) {
     // Make a request and get the echoed response
     let rsp: TestMessage = send.request(msg).await.unwrap();
 
-    assert_eq!("echo: test", &rsp.0,);
+    assert_eq!("echo: test", &rsp.0);
 }
 
 async fn client_signal(send: &mut WebsocketSender) {
@@ -67,37 +60,36 @@ async fn client_signal(send: &mut WebsocketSender) {
     send.signal(msg).await.unwrap();
 }
 
-async fn client_response(recv: &mut WebsocketReceiver) {
-    let (msg, resp) = recv.next().await.unwrap();
-    let msg: TestMessage = msg.try_into().unwrap();
-    if resp.is_request() {
+async fn client_response(recv: &mut tokio::sync::mpsc::Receiver<ReceiveMessage<TestMessage>>) {
+    if let ReceiveMessage::Request(msg, resp) = recv.recv().await.unwrap() {
         let msg = TestMessage(format!("client: {}", msg.0));
-        resp.respond(msg.try_into().unwrap()).await.unwrap();
+        resp.respond(msg).await.unwrap();
     }
 }
 
-async fn setup() -> (ListenerHandle, Url2, JoinHandle<()>) {
+async fn setup() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
     // Create a new server listening for connections
-    let (handle, mut listener) = WebsocketListener::bind_with_handle(
-        url2!("ws://127.0.0.1:0"),
-        std::sync::Arc::new(WebsocketConfig::default()),
+    let listener = WebsocketListener::bind(
+        std::sync::Arc::new(WebsocketConfig::LISTENER_DEFAULT),
+        "localhost:0",
     )
     .await
     .unwrap();
 
+    // Get the address of the server
+    let addr = listener.local_addr().unwrap();
+
     let jh = tokio::task::spawn(async move {
         let mut jhs = Vec::new();
         // Handle new connections
-        while let Some(Ok((mut send, mut recv))) = listener.next().await {
+        while let Ok((send, mut recv)) = listener.accept().await {
             let jh = tokio::task::spawn(async move {
                 // Receive a message and echo it back
-                while let Some((msg, resp)) = recv.next().await {
-                    // Deserialize the message
-                    let msg: TestMessage = msg.try_into().unwrap();
+                while let Ok(msg) = recv.recv::<TestMessage>().await {
                     // If this message is a request then we can respond
-                    if resp.is_request() {
+                    if let ReceiveMessage::Request(msg, resp) = msg {
                         let msg = TestMessage(format!("echo: {}", msg.0));
-                        resp.respond(msg.try_into().unwrap()).await.unwrap();
+                        resp.respond(msg).await.unwrap();
                     }
                 }
                 tracing::info!("Server recv closed");
@@ -107,7 +99,7 @@ async fn setup() -> (ListenerHandle, Url2, JoinHandle<()>) {
                 let msg = TestMessage("test".to_string());
                 // Make a request and get the echoed response
                 while let Ok(rsp) = send.request::<_, TestMessage>(msg.clone()).await {
-                    assert_eq!("client: test", &rsp.0,);
+                    assert_eq!("client: test", &rsp.0);
                 }
 
                 tracing::info!("Server send closed");
@@ -120,16 +112,30 @@ async fn setup() -> (ListenerHandle, Url2, JoinHandle<()>) {
         tracing::info!("Server closed");
     });
 
-    // Get the address of the server
-    let addr = handle.local_addr().clone();
-    (handle, addr, jh)
+    (addr, jh)
 }
 
-async fn setup_client(binding: Url2) -> (WebsocketSender, WebsocketReceiver) {
+async fn setup_client(
+    addr: std::net::SocketAddr,
+) -> (
+    WebsocketSender,
+    tokio::sync::mpsc::Receiver<ReceiveMessage<TestMessage>>,
+    tokio::task::JoinHandle<()>,
+) {
+    let (r_send, r_recv) = tokio::sync::mpsc::channel(32);
+
     // Connect the client to the server
-    connect(binding, std::sync::Arc::new(WebsocketConfig::default()))
+    let (send, mut recv) = connect(std::sync::Arc::new(WebsocketConfig::CLIENT_DEFAULT), addr)
         .await
-        .unwrap()
+        .unwrap();
+
+    let jh = tokio::task::spawn(async move {
+        while let Ok(r) = recv.recv().await {
+            r_send.send(r).await.unwrap();
+        }
+    });
+
+    (send, r_recv, jh)
 }
 
 pub fn rt() -> Runtime {

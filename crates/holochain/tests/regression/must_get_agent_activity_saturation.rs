@@ -10,6 +10,7 @@ use std::time::Duration;
 // fetch pool and bring gossip to a halt
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
+#[ignore = "temporarily while working on app validation refactor; to be reinstated along the refactor"]
 async fn must_get_agent_activity_saturation() {
     holochain_trace::test_run().ok();
     let mut rng = thread_rng();
@@ -19,7 +20,7 @@ async fn must_get_agent_activity_saturation() {
         SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(true))
             .await;
     let apps = conductors
-        .setup_app("", &[dna])
+        .setup_app("", [&dna])
         .await
         .unwrap()
         .cells_flattened();

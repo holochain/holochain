@@ -18,15 +18,10 @@ async fn signed_zome_call() {
 
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let role_name: RoleName = "dna".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent_pub_key = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent(
-            "app",
-            agent_pub_key.clone(),
-            [&(role_name.clone(), dna.clone())],
-        )
+        .setup_app_for_agent("app", agent_pub_key.clone(), [&dna])
         .await
         .unwrap();
     let cell_id = app.cells()[0].cell_id();
@@ -66,7 +61,9 @@ async fn signed_zome_call() {
         .unwrap();
 
     // create a source chain read to query for the cap grant
-    let authored_db = conductor.get_authored_db(cell_id.dna_hash()).unwrap();
+    let authored_db = conductor
+        .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
+        .unwrap();
     let dht_db = conductor.get_dht_db(cell_id.dna_hash()).unwrap();
     let dht_db_cache = conductor.get_dht_db_cache(cell_id.dna_hash()).unwrap();
 
@@ -178,15 +175,10 @@ async fn signed_zome_call_wildcard() {
 
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let role_name: RoleName = "dna".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent_pub_key = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent(
-            "app",
-            agent_pub_key.clone(),
-            [&(role_name.clone(), dna.clone())],
-        )
+        .setup_app_for_agent("app", agent_pub_key.clone(), [&dna])
         .await
         .unwrap();
     let cell_id = app.cells()[0].cell_id();
@@ -224,7 +216,9 @@ async fn signed_zome_call_wildcard() {
         .unwrap();
 
     // create a source chain read to query for the cap grant
-    let authored_db = conductor.get_authored_db(cell_id.dna_hash()).unwrap();
+    let authored_db = conductor
+        .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
+        .unwrap();
     let dht_db = conductor.get_dht_db(cell_id.dna_hash()).unwrap();
     let dht_db_cache = conductor.get_dht_db_cache(cell_id.dna_hash()).unwrap();
 

@@ -39,7 +39,7 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 
 #[instrument(skip(db, network, trigger_self))]
 pub async fn publish_dht_ops_workflow(
     db: DbWrite<DbKindAuthored>,
-    network: Arc<impl HolochainP2pDnaT + Send + Sync>,
+    network: Arc<impl HolochainP2pDnaT>,
     trigger_self: TriggerSender,
     agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
@@ -221,7 +221,6 @@ mod tests {
         // Receive events and increment count
         let recv_task = tokio::task::spawn({
             async move {
-                // use tokio_stream::StreamExt;
                 let mut tx_complete = Some(tx_complete);
                 while let Some(evt) = recv.recv().await {
                     use holochain_p2p::event::HolochainP2pEvent::*;

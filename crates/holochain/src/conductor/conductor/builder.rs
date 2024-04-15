@@ -58,6 +58,7 @@ impl ConductorBuilder {
     }
 
     /// Initialize a "production" Conductor
+    #[tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope))]
     pub async fn build(self) -> ConductorResult<ConductorHandle> {
         tracing::debug!(?self.config);
 
@@ -170,14 +171,25 @@ impl ConductorBuilder {
             Some(keystore.lair_client()),
         );
 
-        let (holochain_p2p, p2p_evt) =
-            match holochain_p2p::spawn_holochain_p2p(network_config, tls_config, host).await {
-                Ok(r) => r,
-                Err(err) => {
-                    tracing::error!(?err, "Error spawning networking");
-                    return Err(err.into());
-                }
-            };
+        let network_compat = crate::conductor::space::query_conductor_state(&spaces.conductor_db)
+            .await?
+            .map(|s| s.get_network_compat())
+            .unwrap_or_default();
+
+        let (holochain_p2p, p2p_evt) = match holochain_p2p::spawn_holochain_p2p(
+            network_config,
+            tls_config,
+            host,
+            network_compat,
+        )
+        .await
+        {
+            Ok(r) => r,
+            Err(err) => {
+                tracing::error!(?err, "Error spawning networking");
+                return Err(err.into());
+            }
+        };
 
         info!("Conductor startup: networking started.");
 
@@ -290,8 +302,8 @@ impl ConductorBuilder {
     ) -> ConductorResult<ConductorHandle> {
         conductor
             .clone()
-            .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL)
-            .await;
+            .start_scheduler(SCHEDULER_INTERVAL)
+            .await?;
 
         info!("Conductor startup: scheduler task started.");
 
@@ -348,6 +360,7 @@ impl ConductorBuilder {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
+    #[tracing::instrument(skip_all)]
     pub(crate) async fn update_fake_state(
         state: Option<ConductorState>,
         conductor: Conductor,
@@ -360,7 +373,10 @@ impl ConductorBuilder {
 
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
+    #[tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope))]
     pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
+        use holochain_p2p::NetworkCompatParams;
+
         let keystore = self
             .keystore
             .unwrap_or_else(holochain_keystore::test_keystore);
@@ -387,9 +403,10 @@ impl ConductorBuilder {
             Some(tag_ed),
             Some(keystore.lair_client()),
         );
+        let network_compat = NetworkCompatParams::default();
 
         let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
+                holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host, network_compat)
                     .await?;
 
         let (post_commit_sender, post_commit_receiver) =

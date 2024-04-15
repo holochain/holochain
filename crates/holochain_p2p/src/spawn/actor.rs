@@ -10,6 +10,7 @@ use kitsune_p2p::event::*;
 use kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics;
 use kitsune_p2p::KOp;
 use kitsune_p2p::KitsuneOpData;
+use kitsune_p2p::PreflightUserData;
 use kitsune_p2p_fetch::FetchContext;
 
 use crate::types::AgentPubKeyExt;
@@ -21,8 +22,10 @@ use holochain_trace::tracing::warn;
 use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use std::collections::HashSet;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
+use std::iter;
 
 macro_rules! timing_trace {
     ($code:block $($rest:tt)*) => {{
@@ -49,7 +52,7 @@ impl WrapEvtSender {
         &self,
         dna_hash: DnaHash,
         peer_data: Vec<AgentInfoSigned>,
-    ) -> impl Future<Output = HolochainP2pResult<()>> + 'static + Send {
+    ) -> impl Future<Output = HolochainP2pResult<Vec<AgentInfoPut>>> + 'static + Send {
         timing_trace!(
             { self.0.put_agent_info_signed(dna_hash, peer_data) },
             "(hp2p:handle) put_agent_info_signed",
@@ -356,9 +359,44 @@ impl HolochainP2pActor {
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
         host: kitsune_p2p::HostApi,
+        compat: NetworkCompatParams,
     ) -> HolochainP2pResult<Self> {
-        let (kitsune_p2p, kitsune_p2p_events) =
-            kitsune_p2p::spawn_kitsune_p2p(config.clone(), tls_config, host.clone()).await?;
+        let mut bytes = vec![];
+        kitsune_p2p_types::codec::rmp_encode(&mut bytes, &compat)
+            .map_err(HolochainP2pError::other)?;
+
+        let preflight_user_data = PreflightUserData {
+            bytes: bytes.clone(),
+            comparator: Box::new(move |url, mut recvd_bytes| {
+                if bytes.as_slice() != recvd_bytes {
+                    let common = "Cannot complete preflight handshake with peer because network compatibility params don't match";
+                    Err(
+                        match kitsune_p2p_types::codec::rmp_decode::<_, NetworkCompatParams>(
+                            &mut recvd_bytes,
+                        ) {
+                            Ok(theirs) => {
+                                format!("{common}. ours={compat:?}, theirs={theirs:?}, url={url}")
+                            }
+                            Err(err) => {
+                                format!(
+                                "{common}. (Can't decode peer's sent hash.) url={url}, err={err}"
+                            )
+                            }
+                        },
+                    )
+                } else {
+                    Ok(())
+                }
+            }),
+        };
+
+        let (kitsune_p2p, kitsune_p2p_events) = kitsune_p2p::spawn_kitsune_p2p(
+            config.clone(),
+            tls_config,
+            host.clone(),
+            preflight_user_data,
+        )
+        .await?;
 
         channel_factory.attach_receiver(kitsune_p2p_events).await?;
 
@@ -601,15 +639,38 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     fn handle_put_agent_info_signed(
         &mut self,
         input: kitsune_p2p::event::PutAgentInfoSignedEvt,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
-        let kitsune_p2p::event::PutAgentInfoSignedEvt { space, peer_data } = input;
-        let space = DnaHash::from_kitsune(&space);
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>> {
+        let kitsune_p2p::event::PutAgentInfoSignedEvt { peer_data } = input;
+
+        let put_requests = peer_data
+            .into_iter()
+            .map(|agent| (DnaHash::from_kitsune(&agent.space), agent))
+            .fold(
+                HashMap::<DnaHash, Vec<AgentInfoSigned>>::new(),
+                |mut acc, (dna, agent)| {
+                    acc.entry(dna).or_default().push(agent);
+                    acc
+                },
+            );
+
         let evt_sender = self.evt_sender.clone();
-        Ok(
-            async move { Ok(evt_sender.put_agent_info_signed(space, peer_data).await?) }
-                .boxed()
-                .into(),
-        )
+        Ok(async move {
+            Ok(futures::future::join_all(
+                iter::repeat_with(|| evt_sender.clone())
+                    .zip(put_requests.into_iter())
+                    .map(|(evt_sender, (dna, agents))| async move {
+                        evt_sender.put_agent_info_signed(dna, agents).await
+                    }),
+            )
+            .await
+            .into_iter()
+            .collect::<HolochainP2pResult<Vec<Vec<AgentInfoPut>>>>()?
+            .into_iter()
+            .flatten()
+            .collect())
+        }
+        .boxed()
+        .into())
     }
 
     /// We need to get previously stored agent info. A single kitusne agent query

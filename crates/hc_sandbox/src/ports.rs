@@ -1,5 +1,6 @@
 //! Helpers for working with websockets and ports.
 
+use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -7,9 +8,8 @@ use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::{
     config::conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver,
 };
-use holochain_websocket::{self as ws, WebsocketConfig, WebsocketReceiver, WebsocketSender};
-use url2::prelude::*;
-use ws::WebsocketResult;
+use holochain_types::websocket::AllowedOrigins;
+use holochain_websocket::{self as ws, WebsocketConfig, WebsocketSender};
 
 use crate::config::read_config;
 use crate::config::write_config;
@@ -35,7 +35,7 @@ pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
         if let Some(config) = read_config(ConfigRootPath::from(p))? {
             if let Some(ai) = config.admin_interfaces {
                 if let Some(AdminInterfaceConfig {
-                    driver: InterfaceDriver::Websocket { port },
+                    driver: InterfaceDriver::Websocket { port, .. },
                 }) = ai.first()
                 {
                     ports.push(*port)
@@ -46,25 +46,42 @@ pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
     Ok(ports)
 }
 
-pub(crate) async fn get_admin_api(port: u16) -> WebsocketResult<WebsocketSender> {
+/// Creates a [`WebsocketSender`] along with a task which simply consumes and discards
+/// all messages on the receiving side
+pub(crate) async fn get_admin_api(
+    port: u16,
+) -> std::io::Result<(WebsocketSender, tokio::task::JoinHandle<()>)> {
     tracing::debug!(port);
-    websocket_client_by_port(port).await.map(|p| p.0)
+    websocket_client_by_port(port).await
 }
 
 async fn websocket_client_by_port(
     port: u16,
-) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
-    ws::connect(
-        url2!("ws://127.0.0.1:{}", port),
-        Arc::new(WebsocketConfig::default()),
+) -> std::io::Result<(WebsocketSender, tokio::task::JoinHandle<()>)> {
+    let req = holochain_websocket::ConnectRequest::new(
+        format!("localhost:{port}")
+            .to_socket_addrs()?
+            .next()
+            .ok_or_else(|| std::io::Error::other("Could not resolve localhost"))?,
     )
-    .await
+    .try_set_header("Origin", "hc_sandbox")
+    .expect("Failed to set `Origin` header for websocket connection request");
+
+    let (send, mut recv) = ws::connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), req).await?;
+    let task = tokio::task::spawn(async move {
+        while recv
+            .recv::<holochain_conductor_api::AdminResponse>()
+            .await
+            .is_ok()
+        {}
+    });
+    Ok((send, task))
 }
 
 pub(crate) fn random_admin_port(config: &mut ConductorConfig) {
     match config.admin_interfaces.as_mut().and_then(|i| i.first_mut()) {
         Some(AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port },
+            driver: InterfaceDriver::Websocket { port, .. },
         }) => {
             if *port != 0 {
                 *port = 0;
@@ -73,7 +90,10 @@ pub(crate) fn random_admin_port(config: &mut ConductorConfig) {
         None => {
             let port = 0;
             config.admin_interfaces = Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port },
+                driver: InterfaceDriver::Websocket {
+                    port,
+                    allowed_origins: AllowedOrigins::Any,
+                },
             }]);
         }
     }
@@ -82,7 +102,10 @@ pub(crate) fn random_admin_port(config: &mut ConductorConfig) {
 pub(crate) fn set_admin_port(config: &mut ConductorConfig, port: u16) {
     let p = port;
     let port = AdminInterfaceConfig {
-        driver: InterfaceDriver::Websocket { port },
+        driver: InterfaceDriver::Websocket {
+            port,
+            allowed_origins: AllowedOrigins::Any,
+        },
     };
     match config
         .admin_interfaces

@@ -240,7 +240,7 @@ mod tests {
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();
-        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("app", [&dna]).await.unwrap();
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 
@@ -272,7 +272,7 @@ mod tests {
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::InitFail]).await;
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();
-        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("app", [&dna]).await.unwrap();
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 
@@ -318,7 +318,7 @@ mod tests {
 
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();
-        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("app", [&dna]).await.unwrap();
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 

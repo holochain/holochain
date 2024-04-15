@@ -1,6 +1,6 @@
 [package]
 name = "holochain_keystore"
-version = "0.3.0-beta-dev.28"
+version = "0.3.0-beta-dev.34"
 description = "keystore for libsodium keypairs"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -10,26 +10,27 @@ keywords = [ "holochain", "holo", "nacl", "libsodium", "cryptography" ]
 categories = [ "cryptography" ]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
 base64 = "0.13.0"
-futures = "0.3.23"
-holo_hash = { version = "^0.3.0-beta-dev.22", path = "../holo_hash", features = ["full"] }
-holochain_serialized_bytes = { workspace = true }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.27"}
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.21", path = "../kitsune_p2p/types" }
-holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "../holochain_secure_primitive"}
-holochain_util = { version = "^0.3.0-beta-dev.4", path = "../holochain_util" }
-lair_keystore = { workspace = true, default-features = false }
+futures = "0.3"
+holo_hash = { version = "^0.3.0-beta-dev.26", path = "../holo_hash", features = ["full"] }
+holochain_serialized_bytes = "=0.0.53"
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.33"}
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.25", path = "../kitsune_p2p/types" }
+holochain_secure_primitive = { version = "^0.3.0-beta-dev.23", path = "../holochain_secure_primitive"}
+holochain_util = { version = "^0.3.0-beta-dev.6", path = "../holochain_util" }
+lair_keystore = { version = "0.4.4", default-features = false }
 must_future = "0.1.2"
 nanoid = "0.4.0"
 one_err = "0.0.8"
 parking_lot = "0.11"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
-sodoken = { workspace = true }
+sodoken = "=0.0.11"
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = [ "full" ] }
-tracing = { workspace = true }
+tracing = "0.1"
 shrinkwraprs = "0.3"
 derive_more = "0.99"
 
@@ -37,6 +38,9 @@ derive_more = "0.99"
 assert_cmd = "2.0.4"
 serde_yaml = "0.9.10"
 tempdir = "0.3.7"
+
+[lints]
+workspace = true
 
 [features]
 default = [ "sqlite" ]

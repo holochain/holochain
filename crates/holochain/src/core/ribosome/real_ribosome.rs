@@ -3,6 +3,9 @@ use super::guest_callback::init::InitHostAccess;
 use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
 use super::guest_callback::post_commit::PostCommitHostAccess;
 use super::guest_callback::validate::ValidateHostAccess;
+use super::host_fn::delete_clone_cell::delete_clone_cell;
+use super::host_fn::disable_clone_cell::disable_clone_cell;
+use super::host_fn::enable_clone_cell::enable_clone_cell;
 use super::host_fn::get_agent_activity::get_agent_activity;
 use super::host_fn::HostFnApi;
 use super::HostContext;
@@ -34,12 +37,15 @@ use crate::core::ribosome::host_fn::capability_claims::capability_claims;
 use crate::core::ribosome::host_fn::capability_grants::capability_grants;
 use crate::core::ribosome::host_fn::capability_info::capability_info;
 use crate::core::ribosome::host_fn::create::create;
+use crate::core::ribosome::host_fn::create_clone_cell::create_clone_cell;
 use crate::core::ribosome::host_fn::create_link::create_link;
 use crate::core::ribosome::host_fn::create_x25519_keypair::create_x25519_keypair;
 use crate::core::ribosome::host_fn::delete::delete;
 use crate::core::ribosome::host_fn::delete_link::delete_link;
 use crate::core::ribosome::host_fn::dna_info_1::dna_info_1;
 use crate::core::ribosome::host_fn::dna_info_2::dna_info_2;
+use crate::core::ribosome::host_fn::ed_25519_x_salsa20_poly1305_decrypt::ed_25519_x_salsa20_poly1305_decrypt;
+use crate::core::ribosome::host_fn::ed_25519_x_salsa20_poly1305_encrypt::ed_25519_x_salsa20_poly1305_encrypt;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
@@ -79,6 +85,7 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
+use holochain_util::timed;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
@@ -96,13 +103,19 @@ use wasmer::Store;
 use wasmer::Type;
 
 use crate::core::ribosome::host_fn::count_links::count_links;
+use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
+use opentelemetry_api::global::meter_with_version;
+use opentelemetry_api::metrics::Counter;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use wasmer_middlewares::metering::get_remaining_points;
+use wasmer_middlewares::metering::set_remaining_points;
+use wasmer_middlewares::metering::MeteringPoints;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -119,6 +132,8 @@ pub struct RealRibosome {
 
     /// Dependencies for every zome.
     pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
+
+    pub usage_meter: Arc<Counter<u64>>,
 
     /// File system and in-memory cache for wasm modules.
     pub wasmer_module_cache: Arc<RwLock<ModuleCache>>,
@@ -205,6 +220,19 @@ impl HostFnBuilder {
 }
 
 impl RealRibosome {
+    pub fn standard_usage_meter() -> Arc<Counter<u64>> {
+        meter_with_version(
+            "hc.ribosome.wasm",
+            Some("0"),
+            None::<&'static str>,
+            Some(vec![]),
+        )
+        .u64_counter("hc.ribosome.wasm.usage")
+        .with_description("The metered usage of a wasm ribosome.")
+        .init()
+        .into()
+    }
+
     /// Create a new instance
     pub fn new(
         dna_file: DnaFile,
@@ -214,6 +242,7 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
+            usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache,
         };
 
@@ -306,6 +335,7 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
+            usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache: Arc::new(RwLock::new(ModuleCache::new(None))),
         }
     }
@@ -313,8 +343,8 @@ impl RealRibosome {
     pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
         let wasm = &self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        let module_cache = self.wasmer_module_cache.write();
-        let module = module_cache.get(cache_key, wasm)?;
+        let module_cache = timed!([1, 10, 1000], self.wasmer_module_cache.write());
+        let module = timed!([1, 10, 1000], module_cache.get(cache_key, wasm)?);
         Ok(module)
     }
 
@@ -507,6 +537,16 @@ impl RealRibosome {
                 "__hc__x_25519_x_salsa20_poly1305_decrypt_1",
                 x_25519_x_salsa20_poly1305_decrypt,
             )
+            .with_host_function(
+                &mut ns,
+                "__hc__ed_25519_x_salsa20_poly1305_encrypt_1",
+                ed_25519_x_salsa20_poly1305_encrypt,
+            )
+            .with_host_function(
+                &mut ns,
+                "__hc__ed_25519_x_salsa20_poly1305_decrypt_1",
+                ed_25519_x_salsa20_poly1305_decrypt,
+            )
             .with_host_function(&mut ns, "__hc__zome_info_1", zome_info)
             .with_host_function(&mut ns, "__hc__dna_info_1", dna_info_1)
             .with_host_function(&mut ns, "__hc__dna_info_2", dna_info_2)
@@ -545,7 +585,11 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__update_1", update)
             .with_host_function(&mut ns, "__hc__delete_1", delete)
             .with_host_function(&mut ns, "__hc__schedule_1", schedule)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent);
+            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
+            .with_host_function(&mut ns, "__hc__create_clone_cell_1", create_clone_cell)
+            .with_host_function(&mut ns, "__hc__disable_clone_cell_1", disable_clone_cell)
+            .with_host_function(&mut ns, "__hc__enable_clone_cell_1", enable_clone_cell)
+            .with_host_function(&mut ns, "__hc__delete_clone_cell_1", delete_clone_cell);
 
         imports.register_namespace("env", ns);
 
@@ -568,6 +612,7 @@ impl RealRibosome {
     ) -> Result<ExternIO, RibosomeError> {
         let fn_name = fn_name.clone();
         let instance = instance_with_store.instance.clone();
+
         let mut store_lock = instance_with_store.store.lock();
         let mut store_mut = store_lock.as_store_mut();
         let result = holochain_wasmer_host::guest::call(
@@ -579,7 +624,6 @@ impl RealRibosome {
             // @todo - is this a problem for large payloads like entries?
             invocation.to_owned().host_input()?,
         );
-
         if let Err(runtime_error) = &result {
             tracing::error!(?runtime_error, ?zome, ?fn_name);
         }
@@ -649,7 +693,9 @@ macro_rules! do_callback {
                             .map_err(|e| -> RuntimeError { e.into() })?,
                     ),
                     Err((_zome, other_error)) => return Err(other_error),
-                    Ok(None) => break,
+                    Ok(None) => {
+                        break;
+                    }
                 };
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
@@ -755,6 +801,21 @@ impl RibosomeT for RealRibosome {
         zome: &Zome,
         fn_name: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
+        let mut otel_info = vec![
+            opentelemetry_api::KeyValue::new("dna", self.dna_file.dna().hash.to_string()),
+            opentelemetry_api::KeyValue::new("zome", zome.zome_name().to_string()),
+            opentelemetry_api::KeyValue::new("fn", fn_name.to_string()),
+        ];
+
+        if let Some(agent_pubkey) = host_context.maybe_workspace().and_then(|workspace| {
+            workspace
+                .source_chain()
+                .as_ref()
+                .map(|source_chain| source_chain.agent_pubkey().to_string())
+        }) {
+            otel_info.push(opentelemetry_api::KeyValue::new("agent", agent_pubkey));
+        }
+
         let call_context = CallContext {
             zome: zome.clone(),
             function_name: fn_name.clone(),
@@ -770,7 +831,6 @@ impl RibosomeT for RealRibosome {
                     let context_key = Self::next_context_key();
                     let instance_with_store =
                         self.build_instance_with_store(module, context_key)?;
-
                     // add call context to map for the following call
                     {
                         CONTEXT_MAP
@@ -778,15 +838,36 @@ impl RibosomeT for RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
+                    let instance = instance_with_store.instance.clone();
+                    {
+                        let mut store_lock = instance_with_store.store.lock();
+                        let mut store_mut = store_lock.as_store_mut();
+                        set_remaining_points(
+                            &mut store_mut,
+                            instance.as_ref(),
+                            WASM_METERING_LIMIT,
+                        );
+                    }
+
                     let result = self
-                        .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store)
+                        .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store.clone())
                         .map(Some);
+
+                    {
+                        let mut store_lock = instance_with_store.store.lock();
+                        let mut store_mut = store_lock.as_store_mut();
+                        let points_used =
+                            match get_remaining_points(&mut store_mut, instance.as_ref()) {
+                                MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
+                                MeteringPoints::Exhausted => WASM_METERING_LIMIT,
+                            };
+                        self.usage_meter.add(points_used, &otel_info);
+                    }
 
                     // remove context from map after call
                     {
                         CONTEXT_MAP.lock().remove(&context_key);
                     }
-
                     result
                 } else {
                     // the callback fn does not exist
@@ -1041,29 +1122,41 @@ pub mod wasm_test {
             let zome_call_1 = tokio::spawn({
                 let conductor = conductor.clone();
                 let zome = zome.clone();
+                let now = tokio::time::Instant::now();
                 async move {
                     tokio::select! {
-                        _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {true}
-                        _ = tokio::time::sleep(Duration::from_millis(10)) => {false}
+                        _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {now.elapsed()}
+                        _ = tokio::time::sleep(Duration::from_millis(100)) => {now.elapsed()}
                     }
                 }
             });
             let zome_call_2 = tokio::spawn({
                 let conductor = conductor.clone();
                 let zome = zome.clone();
+                let now = tokio::time::Instant::now();
                 async move {
                     tokio::select! {
-                        _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {true}
-                        _ = tokio::time::sleep(Duration::from_millis(10)) => {false}
+                        _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {now.elapsed()}
+                        _ = tokio::time::sleep(Duration::from_millis(100)) => {now.elapsed()}
                     }
                 }
             });
-            let results: Result<Vec<bool>, _> =
-                futures::future::join_all([zome_call_1, zome_call_2])
-                    .await
-                    .into_iter()
-                    .collect();
-            assert_eq!(results.unwrap(), [true, true]);
+            let results = futures::future::join_all([zome_call_1, zome_call_2])
+                .await
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+
+            assert!(
+                results[0] <= Duration::from_millis(10),
+                "{:?} > 10ms",
+                results[0]
+            );
+            assert!(
+                results[1] <= Duration::from_millis(10),
+                "{:?} > 10ms",
+                results[1]
+            );
         }
 
         // make sure the context map does not retain items
@@ -1084,7 +1177,7 @@ pub mod wasm_test {
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let apps = conductor
-            .setup_app_for_agents("app-", &[alice_pubkey.clone(), bob_pubkey], [&dna_file])
+            .setup_app_for_agents("app-", &[alice_pubkey.clone(), bob_pubkey], &[dna_file])
             .await
             .unwrap();
 
@@ -1148,13 +1241,19 @@ pub mod wasm_test {
                 "__hc__capability_info_1",
                 "__hc__count_links_1",
                 "__hc__create_1",
+                "__hc__create_clone_cell_1",
                 "__hc__create_link_1",
                 "__hc__create_x25519_keypair_1",
                 "__hc__delete_1",
+                "__hc__delete_clone_cell_1",
                 "__hc__delete_link_1",
+                "__hc__disable_clone_cell_1",
                 "__hc__dna_info_1",
                 "__hc__dna_info_2",
+                "__hc__ed_25519_x_salsa20_poly1305_decrypt_1",
+                "__hc__ed_25519_x_salsa20_poly1305_encrypt_1",
                 "__hc__emit_signal_1",
+                "__hc__enable_clone_cell_1",
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
                 "__hc__get_details_1",

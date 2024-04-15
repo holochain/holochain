@@ -12,6 +12,8 @@ use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
+use holochain_state::query::StateQueryError;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -23,7 +25,7 @@ pub struct P2pBatch {
     /// Agent information to be committed.
     pub peer_data: Vec<AgentInfoSigned>,
     /// The result of this commit.
-    pub result_sender: tokio::sync::oneshot::Sender<Result<(), P2pBatchError>>,
+    pub result_sender: tokio::sync::oneshot::Sender<Result<Vec<AgentInfoPut>, P2pBatchError>>,
 }
 
 #[derive(Debug, Error)]
@@ -40,10 +42,12 @@ pub async fn inject_agent_infos<'iter, I: IntoIterator<Item = &'iter AgentInfoSi
     env: DbWrite<DbKindP2pAgents>,
     iter: I,
 ) -> StateMutationResult<()> {
-    Ok(p2p_put_all(&env, iter.into_iter()).await?)
+    p2p_put_all(&env, iter.into_iter()).await?;
+    Ok(())
 }
 
 /// Inject multiple agent info entries into the peer store in batches.
+#[tracing::instrument(skip_all)]
 pub async fn p2p_put_all_batch(
     env: DbWrite<DbKindP2pAgents>,
     rx: tokio::sync::mpsc::Receiver<P2pBatch>,
@@ -63,16 +67,17 @@ pub async fn p2p_put_all_batch(
                         result_sender: response,
                     } in batch
                     {
+                        let mut put_infos = Vec::with_capacity(batch.len());
                         for info in batch {
                             match p2p_put_single(space.clone(), txn, &info) {
-                                Ok(_) => (),
+                                Ok(put_info) => put_infos.push(put_info),
                                 Err(e) => {
                                     responses.push((Err(e), response));
                                     continue 'batch;
                                 }
                             }
                         }
-                        responses.push((Ok(()), response));
+                        responses.push((Ok(put_infos), response));
                     }
                     tx.send(responses).map_err(|_| {
                         DatabaseError::Other(anyhow::anyhow!(
@@ -296,13 +301,17 @@ pub async fn dump_state(
         let mut dump = String::new();
 
         use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-        let duration = Duration::milliseconds(info.signed_at_ms as i64);
+        let duration = Duration::try_milliseconds(info.signed_at_ms as i64).ok_or_else(|| {
+            StateQueryError::Other("Agent info timestamp out of range".to_string())
+        })?;
         let s = duration.num_seconds();
         let n = duration.clone().to_std().unwrap().subsec_nanos();
         // TODO FIXME
         #[allow(deprecated)]
         let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-        let duration = Duration::milliseconds(info.expires_at_ms as i64);
+        let duration = Duration::try_milliseconds(info.expires_at_ms as i64).ok_or_else(|| {
+            StateQueryError::Other("Agent info timestamp out of range".to_string())
+        })?;
         let s = duration.num_seconds();
         let n = duration.clone().to_std().unwrap().subsec_nanos();
         // TODO FIXME

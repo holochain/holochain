@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pDnaT;
 
 use crate::prelude::*;
 

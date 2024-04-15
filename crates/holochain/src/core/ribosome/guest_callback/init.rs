@@ -236,9 +236,10 @@ mod slow_tests {
     use crate::test_utils::host_fn_caller::Post;
     use ::fixt::prelude::*;
     use holo_hash::ActionHash;
-    use holochain_types::app::{CloneCellId, DisableCloneCellPayload};
+    use holochain_types::app::DisableCloneCellPayload;
     use holochain_types::prelude::CreateCloneCellPayload;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::clone::CloneCellId;
     use holochain_zome_types::prelude::*;
     use std::time::Duration;
 

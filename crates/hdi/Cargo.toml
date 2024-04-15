@@ -1,6 +1,6 @@
 [package]
 name = "hdi"
-version = "0.4.0-beta-dev.27"
+version = "0.4.0-beta-dev.34"
 description = "The HDI"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdi"
@@ -10,13 +10,14 @@ keywords = ["holochain", "holo", "integrity"]
 categories = ["cryptography"]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-hdk_derive = { version = "^0.3.0-beta-dev.26", path = "../hdk_derive" }
-holo_hash = { version = "^0.3.0-beta-dev.22", path = "../holo_hash" }
-holochain_wasmer_guest = { workspace = true }
+hdk_derive = { version = "^0.3.0-beta-dev.32", path = "../hdk_derive" }
+holo_hash = { version = "^0.3.0-beta-dev.26", path = "../holo_hash" }
+holochain_wasmer_guest = { version = "=0.0.92" }
 # it's important that we depend on holochain_integrity_types with no default
 # features, both here AND in hdk_derive, to reduce code bloat
-holochain_integrity_types = { version = "^0.3.0-beta-dev.26", path = "../holochain_integrity_types", default-features = false }
+holochain_integrity_types = { version = "^0.3.0-beta-dev.31", path = "../holochain_integrity_types", default-features = false }
 paste = "1.0"
 serde = "1.0"
 serde_bytes = "0.11"
@@ -25,11 +26,20 @@ tracing = { version = "0.1", optional = true }
 tracing-core = { version = "0.1", optional = true }
 mockall = { version = "0.11.3", optional = true }
 
+# When building for the WASM target, we need to configure getrandom
+# to use the host system for the source of crypto-secure randomness.
+# NOTE: This needs to be kept in sync with what is actually being pulled in via holo_hash and holochain_wasmer_guest
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.2", features = ["custom"] }
+
 [dev-dependencies]
 fixt = { path = "../fixt" }
 test-case = "2.1"
 arbitrary = { version = "1.0", features = ["derive"] }
 subtle-encoding = "0.5"
+
+[lints]
+workspace = true
 
 [features]
 default = []

@@ -1,6 +1,6 @@
 [package]
 name = "holochain_trace"
-version = "0.3.0-beta-dev.6"
+version = "0.3.0-beta-dev.9"
 authors = ["freesig <tom.gowan@holo.host>", "Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "tracing helpers"
@@ -15,9 +15,10 @@ default = []
 # opentelemetry-on = ["opentelemetry", "tracing-opentelemetry", "holochain_serialized_bytes", "serde", "serde_bytes"]
 channels = ["tokio", "shrinkwraprs"]
 
+# reminder - do not use workspace deps
 [dependencies]
 chrono = "0.4.24"
-derive_more = { workspace = true }
+derive_more = "0.99"
 inferno = "0.11.15"
 serde_json = { version = "1.0.94", features = [ "preserve_order" ] }
 thiserror = "1.0.39"
@@ -38,3 +39,6 @@ once_cell = "1.5"
 [dev-dependencies]
 tokio = { version = "1.27", features = [ "full" ] }
 tracing-futures = "0.2.5"
+
+[lints]
+workspace = true

@@ -4,7 +4,6 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::access::Permission;
 use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::CellId;
@@ -172,7 +171,7 @@ mod tests {
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome)).await;
 
         let apps = conductors
-            .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])
+            .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone()])
             .await
             .unwrap();
 

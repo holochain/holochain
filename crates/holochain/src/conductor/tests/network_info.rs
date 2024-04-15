@@ -3,7 +3,7 @@ use holochain_types::prelude::{InstalledAppId, NetworkInfoRequestPayload};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::Timestamp;
 
-use crate::sweettest::{consistency_10s, SweetConductorBatch, SweetDnaFile, SweetZome};
+use crate::sweettest::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn network_info() {
@@ -11,7 +11,8 @@ async fn network_info() {
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let number_of_peers = 3;
-    let mut conductors = SweetConductorBatch::from_standard_config(number_of_peers).await;
+    let config = SweetConductorConfig::standard();
+    let mut conductors = SweetConductorBatch::from_config(number_of_peers, config).await;
     let app_id: InstalledAppId = "app".into();
     let app_batch = conductors.setup_app(&app_id, &[dna.clone()]).await.unwrap();
     let cells = app_batch.cells_flattened();
@@ -54,7 +55,7 @@ async fn network_info() {
     );
     let _: ActionHash = conductors[0].call(&zome, "create_entry", ()).await;
 
-    consistency_10s(&cells).await;
+    await_consistency(10, &cells).await.unwrap();
 
     // wait_for_integration(
     //     &conductors[1].get_dht_db(dna.dna_hash()).unwrap(),
