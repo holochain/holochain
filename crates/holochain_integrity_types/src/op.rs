@@ -211,8 +211,6 @@ pub struct RegisterCreateLink {
 pub struct RegisterDeleteLink {
     /// The signed and hashed [`Action::DeleteLink`] that registers the deletion.
     pub delete_link: SignedHashed<DeleteLink>,
-    /// The link that is being deleted.
-    pub create_link: CreateLink,
 }
 
 impl Op {

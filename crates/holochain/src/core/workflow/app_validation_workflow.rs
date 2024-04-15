@@ -346,14 +346,8 @@ async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutc
             })
         }
         DhtOp::RegisterRemoveLink(signature, delete_link) => {
-            let create_link = cascade
-                .retrieve_action(delete_link.link_add_address.clone(), Default::default())
-                .await?
-                .and_then(|(sh, _)| CreateLink::try_from(sh.hashed.content).ok())
-                .ok_or_else(|| Outcome::awaiting(&delete_link.link_add_address))?;
             Op::RegisterDeleteLink(RegisterDeleteLink {
                 delete_link: SignedHashed::new_unchecked(delete_link, signature),
-                create_link,
             })
         }
     };

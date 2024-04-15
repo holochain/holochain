@@ -530,9 +530,9 @@ pub struct DeleteLink {
     pub action_seq: u32,
     pub prev_action: ActionHash,
 
-    /// this is redundant with the `CreateLink` action but needs to be included to facilitate DHT ops
-    /// this is NOT exposed to wasm developers and is validated by the subconscious to ensure that
-    /// it always matches the `base_address` of the `CreateLink`
+    /// This is redundant with the `CreateLink` action and needs to be included
+    /// to facilitate DHT ops. It is validated by the subconscious to ensure
+    /// that it always matches the `base_address` of the `CreateLink`.
     pub base_address: AnyLinkableHash,
     /// The address of the `CreateLink` being reversed
     pub link_add_address: ActionHash,

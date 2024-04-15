@@ -511,25 +511,9 @@ impl OpHelper for Op {
                     action: create_link.hashed.content.clone(),
                 })
             }
-            Op::RegisterDeleteLink(RegisterDeleteLink {
-                delete_link,
-                create_link,
-            }) => {
-                let CreateLink {
-                    base_address,
-                    target_address,
-                    zome_index,
-                    link_type,
-                    tag,
-                    ..
-                } = create_link;
-                let link_type = in_scope_link_type(*zome_index, *link_type)?;
+            Op::RegisterDeleteLink(RegisterDeleteLink { delete_link }) => {
                 Ok(FlatOp::RegisterDeleteLink {
-                    original_action: create_link.clone(),
-                    base_address: base_address.clone(),
-                    target_address: target_address.clone(),
-                    tag: tag.clone(),
-                    link_type,
+                    base_address: delete_link.hashed.base_address.clone(),
                     action: delete_link.hashed.content.clone(),
                 })
             }
