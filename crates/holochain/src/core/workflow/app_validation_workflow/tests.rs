@@ -18,7 +18,7 @@ use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, 
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_sqlite::error::DatabaseResult;
-use holochain_state::mutations::{insert_entry, insert_op};
+use holochain_state::mutations::insert_op;
 use holochain_state::prelude::{from_blob, StateQueryResult};
 use holochain_state::test_utils::test_db_dir;
 use holochain_state::validation_db::ValidationStage;
@@ -26,9 +26,7 @@ use holochain_types::dht_op::{DhtOp, DhtOpHashed};
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::{TestWasm, TestWasmPair, TestZomes};
-use holochain_zome_types::fixt::{
-    CreateFixturator, DeleteFixturator, EntryFixturator, SignatureFixturator,
-};
+use holochain_zome_types::fixt::{CreateFixturator, DeleteFixturator, SignatureFixturator};
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
 use matches::assert_matches;
@@ -96,23 +94,15 @@ async fn main_loop_app_validation_workflow() {
     assert_eq!(ops_to_validate.len(), 0);
 
     // create op that following delete op depends on
-    let entry = fixt!(Entry);
-    let mut create = fixt!(Create);
-    create.entry_hash = entry.clone().to_hash();
-    create.entry_type = EntryType::App(AppEntryDef {
-        entry_index: 0.into(),
-        zome_index: 0.into(),
-        visibility: EntryVisibility::Public,
-    });
-    let create_op = Action::Create(create);
-    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
+    let create = fixt!(Create);
+    let create_action = Action::Create(create);
+    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
 
     // create op that depends on previous create
     let mut delete = fixt!(Delete);
-    delete.author = create_op.author().clone();
-    delete.deletes_address = create_op.clone().to_hash();
-    delete.deletes_entry_address = create_op.entry_hash().unwrap().clone();
+    delete.author = create_action.author().clone();
+    delete.deletes_address = create_action.clone().to_hash();
     let dht_delete_op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
@@ -130,7 +120,7 @@ async fn main_loop_app_validation_workflow() {
             .unwrap();
     assert_eq!(ops_to_validate.len(), 1);
 
-    let fetched_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // run validation workflow
     // outcome should be incomplete - delete op is missing the dependent create op
@@ -143,7 +133,7 @@ async fn main_loop_app_validation_workflow() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
-        fetched_dependencies.clone(),
+        validation_dependencies.clone(),
     )
     .await;
     assert_matches!(app_validation_result, Ok(WorkComplete::Incomplete(_)));
@@ -152,7 +142,6 @@ async fn main_loop_app_validation_workflow() {
     // as cascade would do with fetched dependent ops
     app_validation_workspace.cache.test_write(move |txn| {
         insert_op(txn, &dht_create_op_hashed).unwrap();
-        insert_entry(txn, &entry.clone().to_hash(), &entry).unwrap();
         put_validation_limbo(
             txn,
             &dht_create_op_hashed.hash,
@@ -161,7 +150,9 @@ async fn main_loop_app_validation_workflow() {
         .unwrap();
     });
 
-    // there is still only the 1 delete op to be validated
+    // there is still the 1 delete op to be validated
+    // but this op will be filtered out in the workflow, because it is being
+    // awaited
     let ops_to_validate =
         validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
             .await
@@ -169,7 +160,8 @@ async fn main_loop_app_validation_workflow() {
     assert_eq!(ops_to_validate.len(), 1);
 
     // run validation workflow
-    // outcome should be complete
+    // outcome should be complete as op to be validated is missing
+    // dependent hashes and is filtered out
     let app_validation_result = app_validation_workflow_inner(
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
@@ -179,12 +171,38 @@ async fn main_loop_app_validation_workflow() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
-        fetched_dependencies.clone(),
+        validation_dependencies.clone(),
     )
     .await;
     assert_matches!(app_validation_result, Ok(WorkComplete::Complete));
 
-    // check ops to validate is also 0
+    // remove op with missing hash from validation dependency filter
+    validation_dependencies.lock().hashes_missing_for_op.clear();
+
+    // unchanged 1 delete op to be validated
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap();
+    assert_eq!(ops_to_validate.len(), 1);
+
+    // run validation workflow
+    // outcome should still be complete, but op should have been actually validated
+    let app_validation_result = app_validation_workflow_inner(
+        Arc::new(dna_hash.clone()),
+        app_validation_workspace.clone(),
+        conductor.raw_handle(),
+        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        conductor
+            .get_or_create_space(&dna_hash)
+            .unwrap()
+            .dht_query_cache,
+        validation_dependencies.clone(),
+    )
+    .await;
+    assert_matches!(app_validation_result, Ok(WorkComplete::Complete));
+
+    // check ops to validate is 0 now after having been validated
     let ops_to_validate =
         validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
             .await

@@ -156,7 +156,6 @@ async fn app_validation_workflow_inner(
 
     let validation_results = futures::future::join_all(iter).await;
 
-    tracing::debug!("Committing {} ops", validation_results.len());
     let mut ops_validated = 0;
     let sleuth_id = sleuth_id.clone();
     let (accepted_ops, awaiting_ops, rejected_ops, activity) = workspace
