@@ -6,7 +6,6 @@ use super::error::WorkflowResult;
 use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeResult;
@@ -23,6 +22,7 @@ use holochain_types::prelude::*;
 use holochain_zome_types::record::Record;
 use parking_lot::Mutex;
 use std::sync::Arc;
+use tokio::sync::broadcast;
 use tracing::instrument;
 
 #[cfg(test)]
@@ -34,7 +34,7 @@ pub type ZomeCallResult = RibosomeResult<ZomeCallResponse>;
 pub struct CallZomeWorkflowArgs<RibosomeT> {
     pub ribosome: RibosomeT,
     pub invocation: ZomeCallInvocation,
-    pub signal_tx: SignalBroadcaster,
+    pub signal_tx: broadcast::Sender<Signal>,
     pub conductor_handle: ConductorHandle,
     pub is_root_zome_call: bool,
     pub cell_id: CellId,
@@ -66,6 +66,7 @@ where
         .ok();
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
+    let signal_tx = args.signal_tx.clone();
     let result =
         call_zome_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
@@ -110,6 +111,7 @@ where
                             keystore,
                             flushed_actions,
                             vec![coordinator_zome],
+                            signal_tx,
                         )
                         .await?;
                     }

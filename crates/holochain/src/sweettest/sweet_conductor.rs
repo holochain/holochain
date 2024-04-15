@@ -5,7 +5,6 @@ use super::{
     DynSweetRendezvous, SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig,
     SweetConductorHandle, NUM_CREATED,
 };
-use crate::conductor::state::AppInterfaceId;
 use crate::conductor::ConductorHandle;
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, space::Spaces,
@@ -56,7 +55,6 @@ pub struct SweetConductor {
     pub(crate) spaces: Spaces,
     config: Arc<ConductorConfig>,
     dnas: Vec<DnaFile>,
-    signal_stream: Option<SignalStream>,
     rendezvous: Option<DynSweetRendezvous>,
 }
 
@@ -127,13 +125,10 @@ impl SweetConductor {
         rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
         // Automatically add a test app interface
-        handle
-            .add_test_app_interface(AppInterfaceId::default())
-            .await
-            .expect("Couldn't set up test app interface");
-
-        // Get a stream of all signals since conductor startup
-        let signal_stream = handle.signal_broadcaster().subscribe_merged();
+        // handle
+        //     .add_test_app_interface(AppInterfaceId::default())
+        //     .await
+        //     .expect("Couldn't set up test app interface");
 
         // XXX: this is a bit wonky.
         // We create a Spaces instance here purely because it's easier to initialize
@@ -152,7 +147,6 @@ impl SweetConductor {
             spaces,
             config,
             dnas: Vec::new(),
-            signal_stream: Some(Box::new(signal_stream)),
             rendezvous,
         }
     }
@@ -505,17 +499,6 @@ impl SweetConductor {
         let dna_file = self.get_dna_file(clone.cell_id.dna_hash()).unwrap();
         self.dnas.push(dna_file);
         Ok(clone)
-    }
-
-    /// Get a stream of all Signals emitted on the "sweet-interface" AppInterface.
-    ///
-    /// This is designed to crash if called more than once, because as currently
-    /// implemented, creating multiple signal streams would simply cause multiple
-    /// consumers of the same underlying streams, not a fresh subscription
-    pub fn signals(&mut self) -> SignalStream {
-        self.signal_stream
-            .take()
-            .expect("Can't take the SweetConductor signal stream twice")
     }
 
     /// Get a new websocket client which can send requests over the admin

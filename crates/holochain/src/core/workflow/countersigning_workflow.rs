@@ -9,8 +9,8 @@ use holochain_state::mutations;
 use holochain_state::prelude::*;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use rusqlite::{named_params, Transaction};
+use tokio::sync::broadcast;
 
-use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
 use crate::core::ribosome::weigh_placeholder;
@@ -153,7 +153,7 @@ pub(crate) async fn countersigning_success(
     author: AgentPubKey,
     signed_actions: Vec<SignedAction>,
     trigger: QueueTriggers,
-    mut signal: SignalBroadcaster,
+    signal: broadcast::Sender<Signal>,
 ) -> WorkflowResult<()> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
     let dht_db = space.dht_db;
@@ -300,10 +300,12 @@ pub(crate) async fn countersigning_success(
                 );
             }
         }
+
         // Signal to the UI.
+        // If there are no active connections this won't emit anything.
         signal.send(Signal::System(SystemSignal::SuccessfulCountersigning(
             entry_hash,
-        )))?;
+        ))).ok();
 
         publish_trigger.trigger(&"publish countersigning_success");
     }

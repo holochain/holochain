@@ -96,6 +96,7 @@ use crate::core::workflow::ZomeCallResult;
 use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
+use crate::conductor::conductor::app_broadcast::AppBroadcast;
 
 use super::api::RealAppInterfaceApi;
 use super::api::ZomeCall;
@@ -107,9 +108,6 @@ use super::interface::error::InterfaceResult;
 use super::interface::websocket::spawn_admin_interface_tasks;
 use super::interface::websocket::spawn_app_interface_task;
 use super::interface::websocket::spawn_websocket_listener;
-use super::interface::websocket::SIGNAL_BUFFER_SIZE;
-use super::interface::AppInterfaceRuntime;
-use super::interface::SignalBroadcaster;
 use super::manager::TaskManagerResult;
 use super::p2p_agent_store;
 use super::p2p_agent_store::P2pBatch;
@@ -133,7 +131,7 @@ mod graft_records_onto_source_chain;
 
 mod app_auth_token_store;
 
-mod app_broadcast;
+pub(crate) mod app_broadcast;
 
 #[cfg(test)]
 pub mod tests;
@@ -222,9 +220,6 @@ pub struct Conductor {
     /// the dynamically allocated port later.
     admin_websocket_ports: RwShare<Vec<u16>>,
 
-    /// Collection app interface data, keyed by id
-    app_interfaces: RwShare<HashMap<AppInterfaceId, AppInterfaceRuntime>>,
-
     /// The interface to the task manager
     task_manager: TaskManagerClient,
 
@@ -253,6 +248,9 @@ pub struct Conductor {
     pub(crate) wasmer_module_cache: Arc<RwLock<ModuleCache>>,
 
     app_auth_token_store: RwShare<AppAuthTokenStore>,
+
+    /// Container to connect app signals to app interfaces, by installed app id.
+    app_broadcast: AppBroadcast,
 }
 
 impl Conductor {
@@ -297,7 +295,6 @@ mod startup_shutdown_impls {
                 running_cells: RwShare::new(HashMap::new()),
                 config,
                 shutting_down: Arc::new(AtomicBool::new(false)),
-                app_interfaces: RwShare::new(HashMap::new()),
                 task_manager: TaskManagerClient::new(outcome_sender, tracing_scope),
                 // Must be initialized later, since it requires an Arc<Conductor>
                 outcomes_task: RwShare::new(None),
@@ -310,6 +307,7 @@ mod startup_shutdown_impls {
                 services: RwShare::new(None),
                 wasmer_module_cache: Arc::new(RwLock::new(ModuleCache::new(maybe_data_root_path))),
                 app_auth_token_store: RwShare::default(),
+                app_broadcast: AppBroadcast::default(),
             }
         }
 
@@ -480,9 +478,6 @@ mod interface_impls {
             let port = interface_id.port();
             tracing::debug!("Attaching interface {}", port);
             let app_api = RealAppInterfaceApi::new(self.clone());
-            // This receiver is thrown away because we can produce infinite new
-            // receivers from the Sender
-            let (signal_tx, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
 
             let tm = self.task_manager();
 
@@ -493,29 +488,24 @@ mod interface_impls {
                 allowed_origins.clone(),
                 installed_app_id.clone(),
                 app_api,
-                signal_tx.clone(),
+                self.app_broadcast.clone(),
             )
             .await
             .map_err(Box::new)?;
-            let interface = AppInterfaceRuntime::Websocket { signal_tx };
 
-            self.app_interfaces.share_mut(|app_interfaces| {
-                if app_interfaces.contains_key(&interface_id) {
+            let config = AppInterfaceConfig::websocket(port, allowed_origins, installed_app_id);
+            self.update_state(|mut state| {
+                if state.app_interfaces.contains_key(&interface_id) {
                     return Err(ConductorError::AppInterfaceIdCollision(
                         interface_id.clone(),
                     ));
                 }
 
-                app_interfaces.insert(interface_id.clone(), interface);
-                Ok(())
-            })?;
-            let config = AppInterfaceConfig::websocket(port, allowed_origins, installed_app_id);
-            self.update_state(|mut state| {
                 state.app_interfaces.insert(interface_id, config);
                 Ok(state)
             })
             .await?;
-            tracing::debug!("App interface added at port: {}", port);
+            debug!("App interface added at port: {}", port);
             Ok(port)
         }
 
@@ -2311,6 +2301,8 @@ mod misc_impls {
                 state: ConductorState,
             }
 
+            let conductor_state = self.get_state().await?;
+
             let conductor = ConductorSerialized {
                 running_cells: self.running_cells.share_ref(|c| {
                     c.clone()
@@ -2323,14 +2315,13 @@ mod misc_impls {
                 }),
                 shutting_down: self.shutting_down.load(Ordering::SeqCst),
                 admin_websocket_ports: self.admin_websocket_ports.share_ref(|p| p.clone()),
-                app_interfaces: self
-                    .app_interfaces
-                    .share_ref(|i| i.keys().cloned().collect()),
+                app_interfaces: conductor_state
+                    .app_interfaces.keys().cloned().collect(),
             };
 
             let dump = ConductorDump {
                 conductor,
-                state: self.get_state().await?,
+                state: conductor_state,
             };
 
             let out = serde_json::to_string_pretty(&dump)?;
@@ -2461,6 +2452,7 @@ mod misc_impls {
 
 /// Pure accessor methods
 mod accessor_impls {
+    use tokio::sync::broadcast;
     use super::*;
 
     impl Conductor {
@@ -2472,13 +2464,13 @@ mod accessor_impls {
             self.spaces.queue_consumer_map.clone()
         }
 
-        /// Access to the signal broadcast channel, to create
-        /// new subscriptions
-        pub fn signal_broadcaster(&self) -> SignalBroadcaster {
-            let senders = self
-                .app_interfaces
-                .share_ref(|ai| ai.values().map(|i| i.signal_tx()).cloned().collect());
-            SignalBroadcaster::new(senders)
+        /// Get a signal broadcast sender for a cell.
+        pub async fn get_signal_tx(&self, cell_id: &CellId) -> ConductorResult<broadcast::Sender<Signal>> {
+            let app = self.find_app_containing_cell(cell_id).await?.ok_or_else(|| {
+                ConductorError::CellMissing(cell_id.clone())
+            })?;
+
+            Ok(self.app_broadcast.create_send_handle(app.id().clone()))
         }
 
         /// Instantiate a Ribosome for use with a DNA
@@ -2971,6 +2963,7 @@ impl Conductor {
 #[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
 mod test_utils_impls {
+    use tokio::sync::broadcast;
     use super::*;
 
     impl Conductor {
@@ -2978,19 +2971,8 @@ mod test_utils_impls {
             self.get_state().await
         }
 
-        pub async fn add_test_app_interface<I: Into<AppInterfaceId>>(
-            &self,
-            id: I,
-        ) -> ConductorResult<()> {
-            let id = id.into();
-            let (signal_tx, _r) = tokio::sync::broadcast::channel(1000);
-            self.app_interfaces.share_mut(|app_interfaces| {
-                if app_interfaces.contains_key(&id) {
-                    return Err(ConductorError::AppInterfaceIdCollision(id));
-                }
-                let _ = app_interfaces.insert(id, AppInterfaceRuntime::Test { signal_tx });
-                Ok(())
-            })
+        pub fn subscribe_to_app_signals(&self, installed_app_id: InstalledAppId) -> broadcast::Receiver<Signal> {
+            self.app_broadcast.subscribe(installed_app_id)
         }
 
         pub fn get_dht_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>> {

@@ -1,5 +1,4 @@
 use crate::conductor::api::CellConductorReadHandle;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
@@ -9,6 +8,7 @@ use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
+use tokio::sync::broadcast;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
 
@@ -28,7 +28,7 @@ pub struct InitHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
     pub network: HolochainP2pDna,
-    pub signal_tx: SignalBroadcaster,
+    pub signal_tx: broadcast::Sender<Signal>,
     pub call_zome_handle: CellConductorReadHandle,
 }
 

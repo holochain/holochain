@@ -3,7 +3,6 @@
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::api::CellConductorReadHandle;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::host_fn;
 use crate::core::ribosome::real_ribosome::RealRibosome;
@@ -27,6 +26,7 @@ use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasmPair;
 use std::sync::Arc;
+use tokio::sync::broadcast;
 use unwrap_to::unwrap_to;
 
 // Commit entry types //
@@ -93,7 +93,7 @@ pub struct HostFnCaller {
     pub zome_path: ZomePath,
     pub network: HolochainP2pDna,
     pub keystore: MetaLairClient,
-    pub signal_tx: SignalBroadcaster,
+    pub signal_tx: broadcast::Sender<Signal>,
     pub call_zome_handle: CellConductorReadHandle,
 }
 
@@ -138,7 +138,7 @@ impl HostFnCaller {
         )
             .into();
         let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
-        let signal_tx = handle.signal_broadcaster();
+        let signal_tx = handle.get_signal_tx(&cell_id).await.unwrap();
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
         HostFnCaller {

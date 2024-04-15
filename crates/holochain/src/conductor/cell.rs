@@ -12,6 +12,7 @@ use futures::future::FutureExt;
 use holochain_serialized_bytes::SerializedBytes;
 use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
+use tokio::sync::broadcast;
 use tracing::*;
 use tracing_futures::Instrument;
 
@@ -50,7 +51,6 @@ use crate::core::workflow::ZomeCallResult;
 use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
 
 use super::api::CellConductorHandle;
-use super::interface::SignalBroadcaster;
 use super::space::Space;
 use super::ConductorHandle;
 
@@ -105,6 +105,7 @@ pub struct Cell {
     space: Space,
     holochain_p2p_cell: HolochainP2pDna,
     queue_triggers: QueueTriggers,
+    signal_tx: broadcast::Sender<Signal>,
     init_mutex: tokio::sync::Mutex<()>,
 }
 
@@ -143,6 +144,8 @@ impl Cell {
             )
             .await?;
 
+            let signal_tx = conductor_handle.get_signal_tx(&id).await.map_err(Box::new)?;
+
             Ok((
                 Self {
                     id,
@@ -151,6 +154,7 @@ impl Cell {
                     space,
                     holochain_p2p_cell,
                     queue_triggers,
+                    signal_tx,
                     init_mutex: Default::default(),
                 },
                 initial_queue_triggers,
@@ -237,10 +241,6 @@ impl Cell {
     /// Access a network sender that is partially applied to this cell's DnaHash/AgentPubKey
     pub fn holochain_p2p_dna(&self) -> &holochain_p2p::HolochainP2pDna {
         &self.holochain_p2p_cell
-    }
-
-    fn signal_broadcaster(&self) -> SignalBroadcaster {
-        self.conductor_api.signal_broadcaster()
     }
 
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
@@ -618,7 +618,7 @@ impl Cell {
                     self.id.agent_pubkey().clone(),
                     signed_actions,
                     self.queue_triggers.clone(),
-                    self.conductor_api.signal_broadcaster(),
+                    self.signal_tx.clone(),
                 )
                 .await
                 .map_err(Box::new)?)
@@ -906,7 +906,6 @@ impl Cell {
         let keystore = self.conductor_api.keystore().clone();
 
         let conductor_handle = self.conductor_handle.clone();
-        let signal_tx = self.signal_broadcaster();
         let ribosome = self.get_ribosome()?;
         let invocation =
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
@@ -935,7 +934,7 @@ impl Cell {
             cell_id: self.id.clone(),
             ribosome,
             invocation,
-            signal_tx,
+            signal_tx: self.signal_tx.clone(),
             conductor_handle,
             is_root_zome_call,
         };
@@ -990,13 +989,11 @@ impl Cell {
         }
         trace!("running init");
 
-        let signal_tx = self.signal_broadcaster();
-
         // Run the workflow
         let args = InitializeZomesWorkflowArgs {
             ribosome,
             conductor_handle,
-            signal_tx,
+            signal_tx: self.signal_tx.clone(),
             cell_id: self.id.clone(),
             integrate_dht_ops_trigger: self.queue_triggers.integrate_dht_ops.clone(),
         };

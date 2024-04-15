@@ -2,8 +2,8 @@
 //! i.e. those configured with `InterfaceDriver::Websocket`
 
 use super::error::InterfaceResult;
-use crate::conductor::interface::*;
 use crate::conductor::manager::TaskManagerClient;
+use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::signal::Signal;
 use holochain_websocket::ReceiveMessage;
@@ -18,20 +18,15 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::*;
+use holochain_conductor_api::AppAuthenticationRequest;
+use crate::conductor::api::{AppAuthentication, InterfaceApi};
 
 /// Concurrency count for websocket message processing.
 /// This could represent a significant memory investment for
 /// e.g. app installations, but we also need enough buffer
-/// to accomodate interdependent operations.
+/// to accommodate interdependent operations.
 const CONCURRENCY_COUNT: usize = 128;
 
-// TODO: This is arbitrary, choose reasonable size.
-// ERROR TODO XXX (david.b): There is no such thing as backpressure in
-//                           broadcast queues! It'll just start deleting
-//                           items, and giving "Lagged" errors on receivers.
-/// Number of signals in buffer before applying
-/// back pressure.
-pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
 /// The maximum number of connections allowed to the admin interface
 pub const MAX_CONNECTIONS: usize = 400;
 
@@ -117,7 +112,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi<Auth = AppAuthentication>>
     allowed_origins: AllowedOrigins,
     installed_app_id: Option<InstalledAppId>,
     api: A,
-    signal_broadcaster: broadcast::Sender<Signal>,
+    app_broadcast: AppBroadcast,
 ) -> InterfaceResult<u16> {
     trace!("Initializing App interface");
 
@@ -138,12 +133,12 @@ pub async fn spawn_app_interface_task<A: InterfaceApi<Auth = AppAuthentication>>
                     Ok((tx_to_iface, rx_from_iface)) => {
                         // TODO need to rework here so that connections are identifiable and not just run anon
                         //      with access into Holochain
-                        let rx_from_cell = signal_broadcaster.subscribe();
+
                         authenticate_incoming_app_connection(
                             task_list.0.clone(),
                             api.clone(),
                             rx_from_iface,
-                            rx_from_cell,
+                            app_broadcast.clone(),
                             tx_to_iface,
                             installed_app_id.clone(),
                             port,
@@ -203,7 +198,7 @@ fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication
     task_list: TaskListInner,
     api: A,
     mut rx_from_iface: WebsocketReceiver,
-    rx_from_cell: broadcast::Receiver<Signal>,
+    app_broadcast: AppBroadcast,
     tx_to_iface: WebsocketSender,
     installed_app_id: Option<InstalledAppId>,
     port: u16,
@@ -249,6 +244,10 @@ fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication
                         .await
                     {
                         Ok(installed_app_id) => {
+                            // Once authentication passes we know which app this connection is for,
+                            // so we can subscribe to app signals now.
+                            let rx_from_cell = app_broadcast.subscribe(installed_app_id.clone());
+
                             spawn_recv_incoming_msgs_and_outgoing_signals(
                                 task_list,
                                 api,
@@ -396,6 +395,9 @@ pub use crate::test_utils::setup_app_in_new_conductor;
 #[cfg(test)]
 pub mod test {
     use super::*;
+    use crate::conductor::interface::*;
+    use holochain_conductor_api::*;
+    use crate::conductor::api::RealAppInterfaceApi;
     use crate::conductor::api::error::ExternalApiWireError;
     use crate::conductor::api::AdminRequest;
     use crate::conductor::api::AdminResponse;

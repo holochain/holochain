@@ -181,7 +181,7 @@ mod tests {
 
         let mut signals = Vec::new();
         for h in conductors.iter() {
-            signals.push(h.signal_broadcaster().subscribe_merged())
+            signals.push(h.subscribe_to_app_signals("app".to_string()))
         }
 
         let _: () = conductors[0]
@@ -191,7 +191,7 @@ mod tests {
         crate::assert_eq_retry_10s!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);
 
         for mut signal in signals {
-            signal.next().await.expect("Failed to recv signal");
+            signal.recv().await.expect("Failed to recv signal");
         }
 
         Ok(())

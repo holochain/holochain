@@ -59,7 +59,6 @@ mod check_clone_access;
 use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::ZomeCall;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
@@ -93,6 +92,7 @@ use holochain_zome_types::block::BlockTargetId;
 use mockall::automock;
 use std::iter::Iterator;
 use std::sync::Arc;
+use tokio::sync::broadcast;
 
 use self::guest_callback::{
     entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
@@ -228,7 +228,7 @@ impl HostContext {
     }
 
     /// Get the signal broadcaster, panics if none was provided
-    pub fn signal_tx(&mut self) -> &mut SignalBroadcaster {
+    pub fn signal_tx(&mut self) -> &mut broadcast::Sender<Signal> {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { signal_tx, .. })
             | Self::Init(InitHostAccess { signal_tx, .. })
@@ -596,7 +596,7 @@ pub struct ZomeCallHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
     pub network: HolochainP2pDna,
-    pub signal_tx: SignalBroadcaster,
+    pub signal_tx: broadcast::Sender<Signal>,
     pub call_zome_handle: CellConductorReadHandle,
 }
 
