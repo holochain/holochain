@@ -294,7 +294,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let mut rxs = Vec::new();
     for h in conductors.iter() {
-        rxs.extend(h.subscribe_to_app_signals("app".to_string()))
+        rxs.push(h.subscribe_to_app_signals("app".to_string()))
     }
 
     let signal = fixt!(ExternIo);

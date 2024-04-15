@@ -395,7 +395,6 @@ pub use crate::test_utils::setup_app_in_new_conductor;
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use crate::conductor::interface::*;
     use holochain_conductor_api::*;
     use crate::conductor::api::RealAppInterfaceApi;
     use crate::conductor::api::error::ExternalApiWireError;

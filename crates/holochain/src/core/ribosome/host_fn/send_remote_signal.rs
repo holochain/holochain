@@ -111,7 +111,6 @@ mod tests {
     use crate::sweettest::*;
     use futures::future;
     use hdk::prelude::*;
-    use tokio_stream::StreamExt;
 
     fn test_zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineIntegrityZome {
         let entry_def = EntryDef::default_from_id("entrydef");
