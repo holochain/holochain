@@ -424,7 +424,7 @@ async fn get_zomes_to_invoke(
         Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => None,
         Op::StoreRecord(StoreRecord { record }) => {
             if let Some(EntryType::App(app_entry_def)) = record.action().entry_type() {
-                Some(app_entry_def.zome_index()
+                Some(app_entry_def.zome_index())
             } else {
                 None
             }
@@ -435,7 +435,7 @@ async fn get_zomes_to_invoke(
             .map(|app_entry_def| app_entry_def.zome_index().clone()),
         Op::RegisterUpdate(RegisterUpdate { update, .. }) => {
             if let EntryType::App(app_entry_def) = &update.hashed.entry_type {
-                Some(app_entry_def.zome_index()
+                Some(app_entry_def.zome_index())
             } else {
                 None
             }
@@ -444,7 +444,7 @@ async fn get_zomes_to_invoke(
             if let Some(EntryType::App(app_entry_def)) =
                 (*delete.hashed).clone().into_action().entry_type()
             {
-                Some(app_entry_def.zome_index()
+                Some(app_entry_def.zome_index())
             } else {
                 None
             }
