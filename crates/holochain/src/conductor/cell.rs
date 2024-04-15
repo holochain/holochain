@@ -144,7 +144,10 @@ impl Cell {
             )
             .await?;
 
-            let signal_tx = conductor_handle.get_signal_tx(&id).await.map_err(Box::new)?;
+            let signal_tx = conductor_handle
+                .get_signal_tx(&id)
+                .await
+                .map_err(Box::new)?;
 
             Ok((
                 Self {

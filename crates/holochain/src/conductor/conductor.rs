@@ -78,6 +78,7 @@ use kitsune_p2p::agent_store::AgentInfoSigned;
 
 use crate::conductor::cell::Cell;
 use crate::conductor::conductor::app_auth_token_store::AppAuthTokenStore;
+use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::metrics::create_p2p_event_duration_metric;
@@ -96,7 +97,6 @@ use crate::core::workflow::ZomeCallResult;
 use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
-use crate::conductor::conductor::app_broadcast::AppBroadcast;
 
 use super::api::RealAppInterfaceApi;
 use super::api::ZomeCall;
@@ -2310,8 +2310,7 @@ mod misc_impls {
                 }),
                 shutting_down: self.shutting_down.load(Ordering::SeqCst),
                 admin_websocket_ports: self.admin_websocket_ports.share_ref(|p| p.clone()),
-                app_interfaces: conductor_state
-                    .app_interfaces.keys().cloned().collect(),
+                app_interfaces: conductor_state.app_interfaces.keys().cloned().collect(),
             };
 
             let dump = ConductorDump {
@@ -2447,8 +2446,8 @@ mod misc_impls {
 
 /// Pure accessor methods
 mod accessor_impls {
-    use tokio::sync::broadcast;
     use super::*;
+    use tokio::sync::broadcast;
 
     impl Conductor {
         pub(crate) fn ribosome_store(&self) -> &RwShare<RibosomeStore> {
@@ -2460,10 +2459,14 @@ mod accessor_impls {
         }
 
         /// Get a signal broadcast sender for a cell.
-        pub async fn get_signal_tx(&self, cell_id: &CellId) -> ConductorResult<broadcast::Sender<Signal>> {
-            let app = self.find_app_containing_cell(cell_id).await?.ok_or_else(|| {
-                ConductorError::CellMissing(cell_id.clone())
-            })?;
+        pub async fn get_signal_tx(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<broadcast::Sender<Signal>> {
+            let app = self
+                .find_app_containing_cell(cell_id)
+                .await?
+                .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
 
             Ok(self.app_broadcast.create_send_handle(app.id().clone()))
         }
@@ -2959,15 +2962,18 @@ impl Conductor {
 #[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
 mod test_utils_impls {
-    use tokio::sync::broadcast;
     use super::*;
+    use tokio::sync::broadcast;
 
     impl Conductor {
         pub async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
             self.get_state().await
         }
 
-        pub fn subscribe_to_app_signals(&self, installed_app_id: InstalledAppId) -> broadcast::Receiver<Signal> {
+        pub fn subscribe_to_app_signals(
+            &self,
+            installed_app_id: InstalledAppId,
+        ) -> broadcast::Receiver<Signal> {
             self.app_broadcast.subscribe(installed_app_id)
         }
 

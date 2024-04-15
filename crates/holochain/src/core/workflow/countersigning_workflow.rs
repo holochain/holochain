@@ -303,9 +303,11 @@ pub(crate) async fn countersigning_success(
 
         // Signal to the UI.
         // If there are no active connections this won't emit anything.
-        signal.send(Signal::System(SystemSignal::SuccessfulCountersigning(
-            entry_hash,
-        ))).ok();
+        signal
+            .send(Signal::System(SystemSignal::SuccessfulCountersigning(
+                entry_hash,
+            )))
+            .ok();
 
         publish_trigger.trigger(&"publish countersigning_success");
     }

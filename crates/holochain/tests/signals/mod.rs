@@ -72,8 +72,18 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
     // Check that Bob and Carol receive all the signals.
     tokio::time::timeout(Duration::from_secs(60), async move {
         for i in 0..6 {
-            let msg_1 = conductor_1_signal_rx.recv().await.map(to_signal_message).unwrap().value;
-            let msg_2 = conductor_2_signal_rx.recv().await.map(to_signal_message).unwrap().value;
+            let msg_1 = conductor_1_signal_rx
+                .recv()
+                .await
+                .map(to_signal_message)
+                .unwrap()
+                .value;
+            let msg_2 = conductor_2_signal_rx
+                .recv()
+                .await
+                .map(to_signal_message)
+                .unwrap()
+                .value;
 
             assert_eq!(msg_1, format!("message {}", i));
             assert_eq!(msg_1, msg_2);

@@ -2,8 +2,8 @@
 //! i.e. those configured with `InterfaceDriver::Websocket`
 
 use super::error::InterfaceResult;
-use crate::conductor::manager::TaskManagerClient;
 use crate::conductor::conductor::app_broadcast::AppBroadcast;
+use crate::conductor::manager::TaskManagerClient;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::signal::Signal;
 use holochain_websocket::ReceiveMessage;
@@ -12,14 +12,14 @@ use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 
+use crate::conductor::api::{AppAuthentication, InterfaceApi};
+use holochain_conductor_api::AppAuthenticationRequest;
 use holochain_types::app::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::*;
-use holochain_conductor_api::AppAuthenticationRequest;
-use crate::conductor::api::{AppAuthentication, InterfaceApi};
 
 /// Concurrency count for websocket message processing.
 /// This could represent a significant memory investment for
@@ -395,12 +395,11 @@ pub use crate::test_utils::setup_app_in_new_conductor;
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use holochain_conductor_api::*;
-    use crate::conductor::api::RealAppInterfaceApi;
     use crate::conductor::api::error::ExternalApiWireError;
     use crate::conductor::api::AdminRequest;
     use crate::conductor::api::AdminResponse;
     use crate::conductor::api::RealAdminInterfaceApi;
+    use crate::conductor::api::RealAppInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
     use crate::conductor::state::ConductorState;
     use crate::conductor::Conductor;
@@ -413,6 +412,7 @@ pub mod test {
     use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
+    use holochain_conductor_api::*;
     use holochain_keystore::test_keystore;
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;

@@ -1,9 +1,9 @@
+use holochain_types::app::InstalledAppId;
+use holochain_types::prelude::Signal;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use holochain_types::app::InstalledAppId;
-use holochain_types::prelude::Signal;
 
 // TODO: This is arbitrary, choose reasonable size.
 // ERROR TODO XXX (david.b): There is no such thing as backpressure in
@@ -21,7 +21,7 @@ pub struct AppBroadcast {
 impl AppBroadcast {
     pub(crate) fn new() -> Self {
         Self {
-            channels: Arc::new(parking_lot::Mutex::new(HashMap::new()))
+            channels: Arc::new(parking_lot::Mutex::new(HashMap::new())),
         }
     }
 
@@ -29,14 +29,13 @@ impl AppBroadcast {
     ///
     /// The app does not actually need to be installed to call this and it does not need to be
     /// called before subscribing to signals.
-    pub(crate) fn create_send_handle(&self, installed_app_id: InstalledAppId) -> broadcast::Sender<Signal> {
+    pub(crate) fn create_send_handle(
+        &self,
+        installed_app_id: InstalledAppId,
+    ) -> broadcast::Sender<Signal> {
         match self.channels.lock().entry(installed_app_id) {
-            Entry::Occupied(e) => {
-                e.get().clone()
-            }
-            Entry::Vacant(e) => {
-                e.insert(broadcast::channel(SIGNAL_BUFFER_SIZE).0).clone()
-            }
+            Entry::Occupied(e) => e.get().clone(),
+            Entry::Vacant(e) => e.insert(broadcast::channel(SIGNAL_BUFFER_SIZE).0).clone(),
         }
     }
 
@@ -44,11 +43,12 @@ impl AppBroadcast {
     ///
     /// The app does not actually need to be installed to call this and the sdner does not need to
     /// be created before subscribing.
-    pub(crate) fn subscribe(&self, installed_app_id: InstalledAppId) -> broadcast::Receiver<Signal> {
+    pub(crate) fn subscribe(
+        &self,
+        installed_app_id: InstalledAppId,
+    ) -> broadcast::Receiver<Signal> {
         match self.channels.lock().entry(installed_app_id) {
-            Entry::Occupied(e) => {
-                e.get().subscribe()
-            }
+            Entry::Occupied(e) => e.get().subscribe(),
             Entry::Vacant(e) => {
                 let (tx, rx) = broadcast::channel(SIGNAL_BUFFER_SIZE);
                 e.insert(tx);
@@ -61,7 +61,9 @@ impl AppBroadcast {
     /// Given a list of currently installed apps, retain only the channels for those apps.
     /// This is useful for cleaning up channels for apps that have been uninstalled.
     pub(crate) fn retain(&self, installed_apps: HashSet<InstalledAppId>) {
-        self.channels.lock().retain(|k, _| installed_apps.contains(k));
+        self.channels
+            .lock()
+            .retain(|k, _| installed_apps.contains(k));
     }
 
     #[cfg(test)]
@@ -79,11 +81,11 @@ impl Default for AppBroadcast {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fixt::prelude::*;
-    use holochain_zome_types::signal::AppSignal;
     use crate::core::ExternIO;
-    use hdk::prelude::ZomeNameFixturator;
+    use fixt::prelude::*;
     use hdk::prelude::CellIdFixturator;
+    use hdk::prelude::ZomeNameFixturator;
+    use holochain_zome_types::signal::AppSignal;
 
     #[tokio::test]
     async fn create_send_handle_and_broadcast() {
@@ -97,7 +99,11 @@ mod tests {
         let mut rx = app_broadcast.subscribe(installed_app_id.clone());
 
         // Send and receive the signal
-        let signal = Signal::App { cell_id: fixt!(CellId), zome_name: fixt!(ZomeName), signal: AppSignal::new(ExternIO::from(vec![])) };
+        let signal = Signal::App {
+            cell_id: fixt!(CellId),
+            zome_name: fixt!(ZomeName),
+            signal: AppSignal::new(ExternIO::from(vec![])),
+        };
         tx.send(signal.clone()).unwrap();
         let received_signal = rx.recv().await.unwrap();
 
@@ -116,7 +122,11 @@ mod tests {
         let tx = app_broadcast.create_send_handle(installed_app_id.clone());
 
         // Send and receive the signal
-        let signal = Signal::App { cell_id: fixt!(CellId), zome_name: fixt!(ZomeName), signal: AppSignal::new(ExternIO::from(vec![])) };
+        let signal = Signal::App {
+            cell_id: fixt!(CellId),
+            zome_name: fixt!(ZomeName),
+            signal: AppSignal::new(ExternIO::from(vec![])),
+        };
         tx.send(signal.clone()).unwrap();
         let received_signal = rx.recv().await.unwrap();
 
@@ -136,7 +146,11 @@ mod tests {
         let tx_2 = app_broadcast.create_send_handle(installed_app_id.clone());
         let mut rx_2 = app_broadcast.subscribe(installed_app_id.clone());
 
-        let signal_1 = Signal::App { cell_id: fixt!(CellId), zome_name: fixt!(ZomeName), signal: AppSignal::new(ExternIO::from(vec![])) };
+        let signal_1 = Signal::App {
+            cell_id: fixt!(CellId),
+            zome_name: fixt!(ZomeName),
+            signal: AppSignal::new(ExternIO::from(vec![])),
+        };
         tx_1.send(signal_1.clone()).unwrap();
 
         let signal_1_rcv_1 = rx_1.recv().await.unwrap();
@@ -144,7 +158,11 @@ mod tests {
         assert_eq!(signal_1, signal_1_rcv_1);
         assert_eq!(signal_1, signal_1_rcv_2);
 
-        let signal_2 = Signal::App { cell_id: fixt!(CellId), zome_name: fixt!(ZomeName), signal: AppSignal::new(ExternIO::from(vec![])) };
+        let signal_2 = Signal::App {
+            cell_id: fixt!(CellId),
+            zome_name: fixt!(ZomeName),
+            signal: AppSignal::new(ExternIO::from(vec![])),
+        };
         tx_2.send(signal_2.clone()).unwrap();
 
         let signal_2_rcv_1 = rx_1.recv().await.unwrap();
