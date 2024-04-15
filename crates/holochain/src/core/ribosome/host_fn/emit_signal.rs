@@ -38,9 +38,9 @@ pub fn emit_signal(
                 .host_context()
                 .signal_tx()
                 .send(signal)
-                .map_err(|interface_error| {
-                    wasm_error!(WasmErrorInner::Host(interface_error.to_string()))
-                })?;
+                // Only possible error here is a `SendError` which is expected if no clients are
+                // connected and listening.
+                .ok();
             Ok(())
         }
         _ => Err(wasm_error!(WasmErrorInner::Host(

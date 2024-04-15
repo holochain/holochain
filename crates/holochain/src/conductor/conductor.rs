@@ -476,7 +476,7 @@ mod interface_impls {
                 either::Either::Right(id) => id,
             };
             let port = interface_id.port();
-            tracing::debug!("Attaching interface {}", port);
+            debug!("Attaching interface {}", port);
             let app_api = RealAppInterfaceApi::new(self.clone());
 
             let tm = self.task_manager();
@@ -495,13 +495,8 @@ mod interface_impls {
 
             let config = AppInterfaceConfig::websocket(port, allowed_origins, installed_app_id);
             self.update_state(|mut state| {
-                if state.app_interfaces.contains_key(&interface_id) {
-                    return Err(ConductorError::AppInterfaceIdCollision(
-                        interface_id.clone(),
-                    ));
-                }
-
                 state.app_interfaces.insert(interface_id, config);
+
                 Ok(state)
             })
             .await?;
@@ -2788,6 +2783,7 @@ impl Conductor {
                     .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))
                     .map_err(|err| (cell_id.clone(), err))?;
 
+                tracing::info!(?cell_id, "Creating a cell");
                 Cell::create(cell_id.clone(), handle, space, holochain_p2p_cell)
                     .await
                     .map_err(|err| (cell_id.clone(), err))

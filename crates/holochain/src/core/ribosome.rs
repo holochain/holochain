@@ -227,7 +227,7 @@ impl HostContext {
         }
     }
 
-    /// Get the signal broadcaster, panics if none was provided
+    /// Get the signal sender, panics if none was provided
     pub fn signal_tx(&mut self) -> &mut broadcast::Sender<Signal> {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { signal_tx, .. })
