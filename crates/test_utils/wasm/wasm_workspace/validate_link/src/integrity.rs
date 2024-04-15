@@ -49,10 +49,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 _ => ValidateCallbackResult::Invalid("base never validates".to_string()),
             })
         }
-        Op::RegisterDeleteLink(RegisterDeleteLink { create_link, .. }) => {
+        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link }) => {
             let base: MaybeLinkable = must_get_entry(
-                create_link
+                delete_link
+                    .hashed
                     .base_address
+                    .clone()
                     .into_entry_hash()
                     .expect("must be entry hash"),
             )?
