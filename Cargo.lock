@@ -3465,7 +3465,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url2",
- "uuid 0.7.4",
+ "uuid 1.8.0",
 ]
 
 [[package]]
@@ -7629,10 +7629,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a3417fc93d76740d974a01654a09777cb500428cc874ca9f45edfe0c4d4cd18"
 dependencies = [
  "heck 0.4.1",
- "proc-macro2 1.0.78",
- "quote 1.0.35",
+ "proc-macro2 1.0.80",
+ "quote 1.0.36",
  "rustversion",
- "syn 2.0.48",
+ "syn 2.0.59",
 ]
 
 [[package]]
