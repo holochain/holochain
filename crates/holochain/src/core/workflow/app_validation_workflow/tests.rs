@@ -89,8 +89,9 @@ async fn main_loop_app_validation_workflow() {
     let ops_to_validate =
         validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
             .await
-            .unwrap();
-    assert_eq!(ops_to_validate.len(), 0);
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 0);
 
     // create op that following delete op depends on
     let create = fixt!(Create);
@@ -140,7 +141,7 @@ async fn main_loop_app_validation_workflow() {
     assert_matches!(
         outcome_summary,
         OutcomeSummary {
-            ops_to_validate,
+            ops_to_validate: 1,
             validated: 0,
             accepted: 0,
             rejected: 0,
@@ -186,7 +187,7 @@ async fn main_loop_app_validation_workflow() {
     assert_matches!(
         outcome_summary,
         OutcomeSummary {
-            ops_to_validate: ops_to_validate,
+            ops_to_validate: 1,
             validated: 1,
             accepted: 1,
             rejected: 0,
