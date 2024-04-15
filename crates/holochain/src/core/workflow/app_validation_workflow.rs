@@ -113,11 +113,14 @@ async fn app_validation_workflow_inner(
     let db = workspace.dht_db.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
     // filter out ops that have missing dependencies
+    tracing::debug!("number of ops to validate {:?}", sorted_ops.len());
     let sorted_ops = validation_dependencies
         .lock()
         .filter_ops_missing_dependencies(sorted_ops);
     let num_ops_to_validate = sorted_ops.len();
-    tracing::debug!("validating {num_ops_to_validate} ops");
+    tracing::debug!(
+        "number of ops to validate after filtering out ops missing hashes {num_ops_to_validate}"
+    );
     let sleuth_id = conductor.config.sleuth_id();
 
     // Build an iterator of all op validations
@@ -850,8 +853,8 @@ impl ValidationDependencies {
         self.missing_hashes.insert(hash, Instant::now())
     }
 
-    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) -> Option<Instant> {
-        self.missing_hashes.remove(hash)
+    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) {
+        self.missing_hashes.remove(hash);
     }
 
     pub fn fetch_missing_hashes_timed_out(&self) -> bool {
