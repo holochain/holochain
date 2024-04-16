@@ -453,7 +453,7 @@ async fn get_zomes_to_invoke(
         Op::StoreEntry(StoreEntry { action, .. }) => action
             .hashed
             .app_entry_def()
-            .map(|app_entry_def| app_entry_def.zome_index().clone()),
+            .map(|app_entry_def| app_entry_def.zome_index()),
         Op::RegisterUpdate(RegisterUpdate { update, .. }) => {
             if let EntryType::App(app_entry_def) = &update.hashed.entry_type {
                 Some(app_entry_def.zome_index())
