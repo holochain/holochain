@@ -1,5 +1,4 @@
 use crate::conductor::api::error::ConductorApiResult;
-use crate::conductor::api::error::ExternalApiWireError;
 use crate::conductor::api::error::SerializationError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;

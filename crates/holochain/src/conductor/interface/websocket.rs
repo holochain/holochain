@@ -12,7 +12,7 @@ use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 
-use crate::conductor::api::{AdminInterfaceApi, AppAuthentication, AppInterfaceApi, InterfaceApi};
+use crate::conductor::api::{AdminInterfaceApi, AppAuthentication, AppInterfaceApi};
 use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest, AppResponse,
 };

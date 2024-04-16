@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use super::InterfaceApi;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::api::error::SerializationError;
@@ -15,10 +14,6 @@ use mr_bundle::Bundle;
 
 use tracing::*;
 
-use holochain_conductor_api::AdminRequest::{
-    DumpConductorState, DumpNetworkStats, GenerateAgentPubKey, ListAppInterfaces, ListCellIds,
-    ListDnas, StorageInfo,
-};
 pub use holochain_conductor_api::*;
 
 /// The admin interface that external connections
