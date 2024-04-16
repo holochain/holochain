@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod data;
 mod harness;
 mod test_host;

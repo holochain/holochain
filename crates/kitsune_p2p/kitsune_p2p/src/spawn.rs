@@ -48,7 +48,7 @@ pub async fn spawn_kitsune_p2p(
         &config,
         tls_config,
         internal_sender.clone(),
-        self_host_api,
+        self_host_api.clone(),
         preflight_user_data,
     )
     .await?;
@@ -60,6 +60,7 @@ pub async fn spawn_kitsune_p2p(
                 channel_factory,
                 internal_sender,
                 host,
+                self_host_api,
                 ep_hnd,
                 ep_evt,
                 bootstrap_net,

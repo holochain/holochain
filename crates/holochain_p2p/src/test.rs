@@ -293,7 +293,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
                         let view = test_peer_view();
@@ -375,7 +375,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
                         let view = test_peer_view();
@@ -453,7 +453,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
@@ -560,7 +560,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
@@ -654,7 +654,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
                         let view = test_peer_view();
