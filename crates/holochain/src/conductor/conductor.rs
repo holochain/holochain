@@ -2797,7 +2797,7 @@ impl Conductor {
                     .map_err(|err| (cell_id.clone(), err))?;
 
                 let signal_tx = handle
-                    .get_signal_tx(&cell_id)
+                    .get_signal_tx(cell_id)
                     .await
                     .map_err(|err| (cell_id.clone(), CellError::ConductorError(Box::new(err))))?;
 
