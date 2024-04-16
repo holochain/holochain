@@ -46,7 +46,7 @@ impl AppClient {
         app_id: InstalledAppId,
     ) -> anyhow::Result<(AgentPubKey, Vec<(String, DnaHash)>)> {
         let app_info = self
-            .app_info(app_id.clone())
+            .app_info()
             .await?
             .ok_or(anyhow!("App not found {}", app_id))?;
 
@@ -85,10 +85,8 @@ impl AppClient {
         }
     }
 
-    async fn app_info(&mut self, app_id: InstalledAppId) -> anyhow::Result<Option<AppInfo>> {
-        let msg = AppRequest::AppInfo {
-            installed_app_id: app_id,
-        };
+    async fn app_info(&mut self) -> anyhow::Result<Option<AppInfo>> {
+        let msg = AppRequest::AppInfo;
         let response = self.send(msg).await?;
         match response {
             AppResponse::AppInfo(app_info) => Ok(app_info),

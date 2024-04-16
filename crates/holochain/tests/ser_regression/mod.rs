@@ -96,7 +96,7 @@ async fn ser_regression_test() {
     let app_api = RealAppInterfaceApi::new(conductors[0].clone());
     let request = Box::new(invocation.clone());
     let request = AppRequest::CallZome(request).try_into().unwrap();
-    let response = app_api.handle_app_request(request).await;
+    let response = app_api.handle_app_request("".to_string(), request).await;
 
     let _channel_hash: EntryHash = match response {
         AppResponse::ZomeCalled(r) => r.decode().unwrap(),
@@ -140,7 +140,7 @@ async fn ser_regression_test() {
 
     let request = Box::new(invocation.clone());
     let request = AppRequest::CallZome(request).try_into().unwrap();
-    let response = app_api.handle_app_request(request).await;
+    let response = app_api.handle_app_request("".to_string(), request).await;
 
     let _msg_hash: EntryHash = match response {
         AppResponse::ZomeCalled(r) => r.decode().unwrap(),

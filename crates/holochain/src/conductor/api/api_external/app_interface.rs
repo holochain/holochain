@@ -1,4 +1,3 @@
-use super::InterfaceApi;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::api::error::ExternalApiWireError;
 use crate::conductor::api::error::SerializationError;
@@ -18,16 +17,24 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     /// Call an admin function to modify this Conductor's behavior
     async fn handle_app_request_inner(
         &self,
+        installed_app_id: InstalledAppId,
         request: AppRequest,
     ) -> ConductorApiResult<AppResponse>;
 
     // -- provided -- //
 
     /// Deal with error cases produced by `handle_app_request_inner`
-    async fn handle_app_request(&self, request: AppRequest) -> AppResponse {
+    async fn handle_app_request(
+        &self,
+        installed_app_id: InstalledAppId,
+        request: AppRequest,
+    ) -> AppResponse {
         tracing::debug!("app request: {:?}", request);
 
-        let res = match self.handle_app_request_inner(request).await {
+        let res = match self
+            .handle_app_request_inner(installed_app_id, request)
+            .await
+        {
             Ok(response) => response,
             Err(e) => AppResponse::Error(e.into()),
         };
@@ -48,6 +55,35 @@ impl RealAppInterfaceApi {
     pub fn new(conductor_handle: ConductorHandle) -> Self {
         Self { conductor_handle }
     }
+
+    /// Check an authentication request and return the app that access has been granted
+    /// for on success.
+    pub async fn auth(&self, auth: AppAuthentication) -> InterfaceResult<InstalledAppId> {
+        self.conductor_handle
+            .authenticate_app_token(auth.token, auth.installed_app_id)
+            .map_err(Box::new)
+            .map_err(InterfaceError::RequestHandler)
+    }
+
+    /// Handle an [AppRequest] in the context of an [InstalledAppId], and return an [AppResponse].
+    pub async fn handle_request(
+        &self,
+        installed_app_id: InstalledAppId,
+        request: Result<AppRequest, SerializedBytesError>,
+    ) -> InterfaceResult<AppResponse> {
+        {
+            self.conductor_handle
+                .check_running()
+                .map_err(Box::new)
+                .map_err(InterfaceError::RequestHandler)?;
+        }
+        match request {
+            Ok(request) => {
+                Ok(AppInterfaceApi::handle_app_request(self, installed_app_id, request).await)
+            }
+            Err(e) => Ok(AppResponse::Error(SerializationError::from(e).into())),
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -55,10 +91,11 @@ impl AppInterfaceApi for RealAppInterfaceApi {
     /// Routes the [AppRequest] to the [AppResponse]
     async fn handle_app_request_inner(
         &self,
+        installed_app_id: InstalledAppId,
         request: AppRequest,
     ) -> ConductorApiResult<AppResponse> {
         match request {
-            AppRequest::AppInfo { installed_app_id } => Ok(AppResponse::AppInfo(
+            AppRequest::AppInfo => Ok(AppResponse::AppInfo(
                 self.conductor_handle
                     .get_app_info(&installed_app_id)
                     .await?,
@@ -127,34 +164,4 @@ pub struct AppAuthentication {
 
     /// TODO ME TOO!
     pub installed_app_id: Option<InstalledAppId>,
-}
-
-#[async_trait::async_trait]
-impl InterfaceApi for RealAppInterfaceApi {
-    type Auth = AppAuthentication;
-    type ApiRequest = AppRequest;
-    type ApiResponse = AppResponse;
-
-    async fn auth(&self, auth: Self::Auth) -> InterfaceResult<InstalledAppId> {
-        self.conductor_handle
-            .authenticate_app_token(auth.token, auth.installed_app_id)
-            .map_err(Box::new)
-            .map_err(InterfaceError::RequestHandler)
-    }
-
-    async fn handle_request(
-        &self,
-        request: Result<Self::ApiRequest, SerializedBytesError>,
-    ) -> InterfaceResult<Self::ApiResponse> {
-        {
-            self.conductor_handle
-                .check_running()
-                .map_err(Box::new)
-                .map_err(InterfaceError::RequestHandler)?;
-        }
-        match request {
-            Ok(request) => Ok(AppInterfaceApi::handle_app_request(self, request).await),
-            Err(e) => Ok(AppResponse::Error(SerializationError::from(e).into())),
-        }
-    }
 }

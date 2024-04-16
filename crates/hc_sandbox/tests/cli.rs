@@ -113,9 +113,7 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
         .await
         .unwrap();
 
-    let request = AppRequest::AppInfo {
-        installed_app_id: "Stub".to_string(),
-    };
+    let request = AppRequest::AppInfo;
     let response = app_tx.request(request);
     let r: AppResponse = check_timeout(response).await;
     assert_matches!(r, AppResponse::AppInfo(None));
