@@ -71,9 +71,17 @@ where
     /// on the DHT and is returned when the authority receives a request
     /// on the base [`AnyLinkableHash`] for the link that is being deleted.
     RegisterDeleteLink {
+        /// The original [`CreateLink`] [`Action`] that created the link.
+        original_action: CreateLink,
         /// The base address where this link is stored.
         /// This is the base address of the link that is being deleted.
         base_address: AnyLinkableHash,
+        /// The target address of the link being deleted.
+        target_address: AnyLinkableHash,
+        /// The deleted links tag data.
+        tag: LinkTag,
+        /// The app defined link type of the deleted link.
+        link_type: LT,
         /// The [`DeleteLink`] action that deletes the link
         action: DeleteLink,
     },

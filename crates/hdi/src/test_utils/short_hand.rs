@@ -120,7 +120,7 @@ pub fn r_create_link(zome_index: u8, link_type: u8) -> Op {
 }
 
 /// Create [`Op::RegisterDeleteLink`].
-pub fn r_delete_link() -> Op {
+pub fn r_delete_link(zome_index: u8, link_type: u8) -> Op {
     Op::RegisterDeleteLink(RegisterDeleteLink {
         delete_link: SignedHashed {
             hashed: HoloHashed {
@@ -136,6 +136,7 @@ pub fn r_delete_link() -> Op {
             },
             signature: Signature([0u8; 64]),
         },
+        create_link: cl(zome_index, link_type),
     })
 }
 

@@ -79,6 +79,8 @@ pub enum LinkTypes {
     => matches WasmErrorInner::Host(_) ; "Register Update: zome id is out of range")]
 #[test_case(r_create_link(0, 100) => matches WasmErrorInner::Guest(_) ; "Register Create Link: link type out of range")]
 #[test_case(r_create_link(100, 0) => matches WasmErrorInner::Host(_) ; "Register Create Link: zome id out of range")]
+#[test_case(r_delete_link(0, 100) => matches WasmErrorInner::Guest(_) ; "Register Delete Link: link type out of range")]
+#[test_case(r_delete_link(100, 0) => matches WasmErrorInner::Host(_) ; "Register Delete Link: zome id out of range")]
 fn op_errors(op: Op) -> WasmErrorInner {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
     op.flattened::<EntryTypes, LinkTypes>().unwrap_err().error
@@ -158,7 +160,8 @@ fn op_errors(op: Op) -> WasmErrorInner {
 #[test_case(FlatOp::RegisterCreateLink { action: cl(0, 0), base_address: lh(0), target_address: lh(1), tag: ().into(), link_type: LinkTypes::A })]
 #[test_case(FlatOp::RegisterCreateLink { action: cl(0, 1), base_address: lh(0), target_address: lh(1), tag: ().into(), link_type: LinkTypes::B })]
 // Register Delete Link
-#[test_case(FlatOp::RegisterDeleteLink { action: dl(ah(0)), base_address: eh(0).into() })]
+#[test_case(FlatOp::RegisterDeleteLink { action: dl(ah(0)), original_action: cl(0, 0), base_address: eh(0).into(), target_address: eh(1).into(), tag: ().into(), link_type: LinkTypes::A })]
+#[test_case(FlatOp::RegisterDeleteLink { action: dl(ah(0)), original_action: cl(0, 2), base_address: eh(0).into(), target_address: eh(1).into(), tag: ().into(), link_type: LinkTypes::C })]
 fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
     let data = vec![0u8; 2000];
@@ -301,11 +304,16 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
                 signature: Signature::arbitrary(&mut ud).unwrap(),
             },
         }),
-        FlatOp::RegisterDeleteLink { action, .. } => Op::RegisterDeleteLink(RegisterDeleteLink {
+        FlatOp::RegisterDeleteLink {
+            original_action,
+            action,
+            ..
+        } => Op::RegisterDeleteLink(RegisterDeleteLink {
             delete_link: SignedHashed {
                 hashed: HoloHashed::from_content_sync(action),
                 signature: Signature::arbitrary(&mut ud).unwrap(),
             },
+            create_link: original_action,
         }),
         FlatOp::RegisterUpdate(OpUpdate::Entry {
             app_entry: et,
@@ -575,7 +583,18 @@ fn op_match_sanity() {
             LinkTypes::B => (),
             LinkTypes::C => (),
         },
-        FlatOp::RegisterDeleteLink { .. } => (),
+        FlatOp::RegisterDeleteLink {
+            original_action: _,
+            base_address: _,
+            target_address: _,
+            tag: _,
+            link_type,
+            action: _,
+        } => match link_type {
+            LinkTypes::A => (),
+            LinkTypes::B => (),
+            LinkTypes::C => (),
+        },
         FlatOp::RegisterUpdate(_) => (),
         FlatOp::RegisterDelete(_) => (),
     }
