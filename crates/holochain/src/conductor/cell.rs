@@ -123,6 +123,7 @@ impl Cell {
         conductor_handle: ConductorHandle,
         space: Space,
         holochain_p2p_cell: HolochainP2pDna,
+        signal_tx: broadcast::Sender<Signal>,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
         let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
         let authored_db = space.get_or_create_authored_db(id.agent_pubkey().clone())?;
@@ -143,11 +144,6 @@ impl Cell {
                 conductor_handle.clone(),
             )
             .await?;
-
-            let signal_tx = conductor_handle
-                .get_signal_tx(&id)
-                .await
-                .map_err(Box::new)?;
 
             Ok((
                 Self {

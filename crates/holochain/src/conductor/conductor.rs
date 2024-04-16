@@ -2796,10 +2796,21 @@ impl Conductor {
                     .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))
                     .map_err(|err| (cell_id.clone(), err))?;
 
-                tracing::info!(?cell_id, "Creating a cell");
-                Cell::create(cell_id.clone(), handle, space, holochain_p2p_cell)
+                let signal_tx = handle
+                    .get_signal_tx(&cell_id)
                     .await
-                    .map_err(|err| (cell_id.clone(), err))
+                    .map_err(|err| (cell_id.clone(), CellError::ConductorError(Box::new(err))))?;
+
+                tracing::info!(?cell_id, "Creating a cell");
+                Cell::create(
+                    cell_id.clone(),
+                    handle,
+                    space,
+                    holochain_p2p_cell,
+                    signal_tx,
+                )
+                .await
+                .map_err(|err| (cell_id.clone(), err))
             }
         });
 

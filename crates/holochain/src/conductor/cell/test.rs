@@ -10,6 +10,7 @@ use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::action;
 use parking_lot::RwLock;
 use std::sync::Arc;
+use tokio::sync::broadcast;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
@@ -63,6 +64,7 @@ async fn test_cell_handle_publish() {
         handle.clone(),
         spaces.test_spaces[&dna].space.clone(),
         holochain_p2p_cell,
+        broadcast::channel(10).0,
     )
     .await
     .unwrap();
