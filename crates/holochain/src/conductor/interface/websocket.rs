@@ -189,8 +189,6 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: Websoc
             }
         })
         .await;
-
-    info!("Admin listener finished");
 }
 
 /// Takes an open connection and waits for an authentication message to complete the connection
