@@ -47,8 +47,10 @@ async fn main_loop_app_validation_workflow() {
                 original_action, ..
             }) = op
             {
+                println!("must getting action");
                 let result =
                     api.must_get_action(MustGetActionInput::new(original_action.to_hash()));
+                println!("result {result:?}");
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
@@ -94,7 +96,14 @@ async fn main_loop_app_validation_workflow() {
     assert_eq!(ops_to_validate, 0);
 
     // create op that following delete op depends on
-    let create = fixt!(Create);
+    let entry = fixt!(Entry);
+    let mut create = fixt!(Create);
+    create.entry_hash = entry.clone().to_hash();
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let create_op = Action::Create(create);
     let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
@@ -103,6 +112,7 @@ async fn main_loop_app_validation_workflow() {
     let mut delete = fixt!(Delete);
     delete.author = create_op.author().clone();
     delete.deletes_address = create_op.clone().to_hash();
+    delete.deletes_entry_address = create_op.entry_hash().unwrap().clone();
     let dht_delete_op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
@@ -153,6 +163,7 @@ async fn main_loop_app_validation_workflow() {
     // as cascade would do with fetched dependent ops
     app_validation_workspace.cache.test_write(move |txn| {
         insert_op(txn, &dht_create_op_hashed).unwrap();
+        insert_entry(txn, &entry.clone().to_hash(), &entry).unwrap();
         put_validation_limbo(
             txn,
             &dht_create_op_hashed.hash,
