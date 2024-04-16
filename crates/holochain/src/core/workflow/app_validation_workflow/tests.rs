@@ -1,10 +1,9 @@
 use crate::conductor::{Conductor, ConductorHandle};
-use crate::core::queue_consumer::WorkComplete;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::app_validation_workflow::{
     app_validation_workflow_inner, check_app_entry_def, put_validation_limbo,
-    AppValidationWorkspace, ValidationDependencies,
+    AppValidationWorkspace, OutcomeSummary, ValidationDependencies,
 };
 use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
@@ -90,8 +89,9 @@ async fn main_loop_app_validation_workflow() {
     let ops_to_validate =
         validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
             .await
-            .unwrap();
-    assert_eq!(ops_to_validate.len(), 0);
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 0);
 
     // create op that following delete op depends on
     let create = fixt!(Create);
@@ -117,14 +117,15 @@ async fn main_loop_app_validation_workflow() {
     let ops_to_validate =
         validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
             .await
-            .unwrap();
-    assert_eq!(ops_to_validate.len(), 1);
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 1);
 
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // run validation workflow
     // outcome should be incomplete - delete op is missing the dependent create op
-    let app_validation_result = app_validation_workflow_inner(
+    let outcome_summary = app_validation_workflow_inner(
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
@@ -135,8 +136,18 @@ async fn main_loop_app_validation_workflow() {
             .dht_query_cache,
         validation_dependencies.clone(),
     )
-    .await;
-    assert_matches!(app_validation_result, Ok(WorkComplete::Incomplete(_)));
+    .await
+    .unwrap();
+    assert_matches!(
+        outcome_summary,
+        OutcomeSummary {
+            ops_to_validate: 1,
+            validated: 0,
+            accepted: 0,
+            rejected: 0,
+            missing: 1,
+        }
+    );
 
     // insert dependent create op in dht cache db
     // as cascade would do with fetched dependent ops
@@ -156,13 +167,13 @@ async fn main_loop_app_validation_workflow() {
     let ops_to_validate =
         validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
             .await
-            .unwrap();
-    assert_eq!(ops_to_validate.len(), 1);
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 1);
 
     // run validation workflow
-    // outcome should be complete as op to be validated is missing
-    // dependent hashes and is filtered out
-    let app_validation_result = app_validation_workflow_inner(
+    // outcome should be complete
+    let outcome_summary = app_validation_workflow_inner(
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
@@ -173,8 +184,18 @@ async fn main_loop_app_validation_workflow() {
             .dht_query_cache,
         validation_dependencies.clone(),
     )
-    .await;
-    assert_matches!(app_validation_result, Ok(WorkComplete::Complete));
+    .await
+    .unwrap();
+    assert_matches!(
+        outcome_summary,
+        OutcomeSummary {
+            ops_to_validate: 0,
+            validated: 0,
+            accepted: 0,
+            rejected: 0,
+            missing: 0,
+        }
+    );
 
     // remove op with missing hash from validation dependency filter
     validation_dependencies.lock().hashes_missing_for_op.clear();
@@ -183,12 +204,13 @@ async fn main_loop_app_validation_workflow() {
     let ops_to_validate =
         validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
             .await
-            .unwrap();
-    assert_eq!(ops_to_validate.len(), 1);
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 1);
 
     // run validation workflow
     // outcome should still be complete, but op should have been actually validated
-    let app_validation_result = app_validation_workflow_inner(
+    let outcome_summary = app_validation_workflow_inner(
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
@@ -199,15 +221,26 @@ async fn main_loop_app_validation_workflow() {
             .dht_query_cache,
         validation_dependencies.clone(),
     )
-    .await;
-    assert_matches!(app_validation_result, Ok(WorkComplete::Complete));
+    .await
+    .unwrap();
+    assert_matches!(
+        outcome_summary,
+        OutcomeSummary {
+            ops_to_validate: 1,
+            validated: 1,
+            accepted: 1,
+            rejected: 0,
+            missing: 0,
+        }
+    );
 
     // check ops to validate is 0 now after having been validated
     let ops_to_validate =
         validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
             .await
-            .unwrap();
-    assert_eq!(ops_to_validate.len(), 0);
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
