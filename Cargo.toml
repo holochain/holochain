@@ -98,6 +98,8 @@ opt-level = "z"
 lto = true
 
 [patch.crates-io]
+hdi = { path = "crates/hdi" }
+hdk = { path = "crates/hdk" }
 holochain_deepkey_dna = { path = "../deepkey/crates/holochain_deepkey_dna" }
 
 holo_hash = { path = "crates/holo_hash" }

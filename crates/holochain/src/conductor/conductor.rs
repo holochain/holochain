@@ -1447,6 +1447,12 @@ mod app_impls {
                             derivation_details.app_index, derivation_details.key_index
                         );
 
+                        let derivation_path = derivation_details.to_derivation_path();
+                        let derivation_bytes = derivation_path
+                            .iter()
+                            .flat_map(|c| c.to_be_bytes())
+                            .collect();
+
                         let info = self
                             .keystore
                             .lair_client()
@@ -1455,15 +1461,20 @@ mod app_impls {
                                 None,
                                 dst_tag.into(),
                                 None,
-                                derivation_details.to_derivation_path().into_boxed_slice(),
+                                derivation_path.into_boxed_slice(),
                             )
                             .await
                             .map_err(|e| DpkiServiceError::Lair(e.into()))?;
+                        let seed = info.ed25519_pub_key.0.to_vec();
 
-                        (
-                            AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec()),
-                            Some(derivation_details),
-                        )
+                        let derivation = DerivationDetailsInput {
+                            app_index: derivation_details.app_index,
+                            key_index: derivation_details.key_index,
+                            derivation_seed: seed.clone(),
+                            derivation_bytes,
+                        };
+
+                        (AgentPubKey::from_raw_32(seed), Some(derivation))
                     } else {
                         (self.keystore.new_sign_keypair_random().await?, None)
                     }
@@ -1511,8 +1522,7 @@ mod app_impls {
                 // Update the db
                 let stopped_app = self.add_disabled_app_to_db(app).await?;
 
-                if let (Some((dpki, state)), Some(derivation_details)) = (dpki, derivation_details)
-                {
+                if let (Some((dpki, state)), Some(derivation)) = (dpki, derivation_details) {
                     let dpki_agent = dpki.cell_id.agent_pubkey();
 
                     // This is the signature Deepkey requires
@@ -1532,8 +1542,9 @@ mod app_impls {
                             app_name: installed_app_id.clone(),
                             installed_app_id,
                             dna_hashes,
+                            metadata: Default::default(), // TODO: pass in necessary metadata
                         },
-                        derivation_details,
+                        derivation_details: Some(derivation),
                     };
 
                     state.register_key(input).await?;

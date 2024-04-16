@@ -29,7 +29,7 @@ impl DpkiState for DeepkeyState {
     async fn next_derivation_details(
         &self,
         agent_key: Option<AgentPubKey>,
-    ) -> DpkiServiceResult<DerivationDetailsInput> {
+    ) -> DpkiServiceResult<DerivationDetails> {
         let cell_id = self.cell_id.clone();
         let provenance = cell_id.agent_pubkey().clone();
         let zome_name: ZomeName = "deepkey_csr".into();

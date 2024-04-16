@@ -29,7 +29,7 @@ fn make_mock_dpki_impl(u: &mut Unstructured<'_>, state: DpkiKeyState) -> DpkiImp
     dpki.expect_next_derivation_details().returning(move |_| {
         let app_index = AtomicU32::new(0);
         async move {
-            Ok(DerivationDetailsInput {
+            Ok(DerivationDetails {
                 app_index: app_index.fetch_add(1, Ordering::Relaxed),
                 key_index: 0,
             })
@@ -361,7 +361,7 @@ async fn mock_dpki_preflight_check() {
         // exchange all key states
         let pairs = ks
             .iter()
-            .flat_map(|h| (*h).clone().into_iter())
+            .flat_map(|h| (**h).clone().into_iter())
             .collect::<Vec<_>>();
 
         ks[0..=1].iter_mut().for_each(|h| {

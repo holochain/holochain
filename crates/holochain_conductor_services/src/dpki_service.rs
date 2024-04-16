@@ -85,7 +85,7 @@ pub trait DpkiState: Send + Sync {
     async fn next_derivation_details(
         &self,
         agent_key: Option<AgentPubKey>,
-    ) -> DpkiServiceResult<DerivationDetailsInput>;
+    ) -> DpkiServiceResult<DerivationDetails>;
 
     async fn register_key(
         &self,
