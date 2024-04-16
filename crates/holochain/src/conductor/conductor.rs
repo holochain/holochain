@@ -1515,7 +1515,13 @@ mod app_impls {
                 .process_app_status_fx(AppStatusFx::SpinDown, None)
                 .await?;
 
-            let installed_app_ids = self.get_state().await?.installed_apps().iter().map(|(app_id, _)| app_id.clone()).collect::<HashSet<_>>();
+            let installed_app_ids = self
+                .get_state()
+                .await?
+                .installed_apps()
+                .iter()
+                .map(|(app_id, _)| app_id.clone())
+                .collect::<HashSet<_>>();
             self.app_broadcast.retain(installed_app_ids);
 
             Ok(())
