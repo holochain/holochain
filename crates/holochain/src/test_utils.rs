@@ -278,7 +278,7 @@ where
                     respond.r(ok_fut(Ok([0; 64].into())));
                 }
                 PutAgentInfoSigned { respond, .. } => {
-                    respond.r(ok_fut(Ok(())));
+                    respond.r(ok_fut(Ok(vec![])));
                 }
                 QueryAgentInfoSigned { respond, .. } => {
                     respond.r(ok_fut(Ok(vec![])));

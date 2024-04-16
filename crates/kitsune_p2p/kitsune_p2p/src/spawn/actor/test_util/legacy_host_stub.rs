@@ -65,7 +65,7 @@ impl LegacyHostStub {
 
                             respond
                                 .unwrap()
-                                .respond(Ok(async move { Ok(()) }.boxed().into()));
+                                .respond(Ok(async move { Ok(vec![]) }.boxed().into()));
                         }
                         KitsuneP2pEvent::Call {
                             payload, respond, ..
