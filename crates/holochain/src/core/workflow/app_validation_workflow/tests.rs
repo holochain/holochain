@@ -47,10 +47,8 @@ async fn main_loop_app_validation_workflow() {
                 original_action, ..
             }) = op
             {
-                println!("must getting action");
                 let result =
                     api.must_get_action(MustGetActionInput::new(original_action.to_hash()));
-                println!("result {result:?}");
                 if result.is_ok() {
                     Ok(ValidateCallbackResult::Valid)
                 } else {
