@@ -331,7 +331,7 @@ impl InvocationAuth {
     }
 }
 
-pub trait Invocation: Clone {
+pub trait Invocation: Clone + Send + Sync {
     /// Some invocations call into a single zome and some call into many or all zomes.
     /// An example of an invocation that calls across all zomes is init. Init must pass for every
     /// zome in order for the Dna overall to successfully init.
@@ -621,6 +621,7 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome)
 #[automock]
+#[allow(async_fn_in_trait)]
 pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     fn dna_def(&self) -> &DnaDefHashed;
 
@@ -630,6 +631,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
 
+    #[tracing::instrument(skip_all)]
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
         match zomes_to_invoke {
             ZomesToInvoke::AllIntegrity => self
@@ -668,7 +670,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         invocation: I,
     ) -> CallIterator<Self, I>;
 
-    fn maybe_call<I: Invocation + 'static>(
+    async fn maybe_call<I: Invocation + 'static>(
         &self,
         host_context: HostContext,
         invocation: &I,
@@ -684,7 +686,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     /// This allows getting values from wasm without the need for any translation.
     /// The same technique can be used with the wasmer cli to validate these
     /// values without needing to make holochain a dependency.
-    fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError>;
+    async fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError>;
 
     /// @todo list out all the available callbacks and maybe cache them somewhere
     fn list_callbacks(&self) {
