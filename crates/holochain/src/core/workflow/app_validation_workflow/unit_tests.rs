@@ -796,8 +796,8 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     assert_eq!(filtered_ops_to_validate, ops_to_validate);
 }
 
-// test case with alice and bob, a create by alice and a delete by bob that
-// references alice's create
+// test case with alice and bob agent keys
+// test space created by alice
 struct TestCase {
     zomes_to_invoke: ZomesToInvoke,
     test_space: TestSpace,
@@ -843,5 +843,69 @@ impl TestCase {
             bob,
             workspace,
         }
+    }
+}
+
+mod fetches_expiry_tests {
+    use ::fixt::fixt;
+    use holo_hash::fixt::AnyDhtHashFixturator;
+    use std::time::{Duration, Instant};
+
+    use crate::core::workflow::app_validation_workflow::ValidationDependencies;
+
+    #[test]
+    fn empty() {
+        let validation_dependencies = ValidationDependencies::default();
+        assert_eq!(
+            validation_dependencies.fetch_missing_hashes_timed_out(),
+            true
+        );
+    }
+
+    #[test]
+    fn all_expired() {
+        let mut validation_dependencies = ValidationDependencies::default();
+        let hash = fixt!(AnyDhtHash);
+        validation_dependencies.missing_hashes.insert(
+            hash,
+            Instant::now() - ValidationDependencies::FETCH_TIMEOUT - Duration::from_secs(1),
+        );
+        assert_eq!(
+            validation_dependencies.fetch_missing_hashes_timed_out(),
+            true
+        );
+    }
+
+    #[test]
+    fn none_expired() {
+        let mut validation_dependencies = ValidationDependencies::default();
+        let hash = fixt!(AnyDhtHash);
+        validation_dependencies.missing_hashes.insert(
+            hash,
+            Instant::now() - ValidationDependencies::FETCH_TIMEOUT + Duration::from_secs(1),
+        );
+        assert_eq!(
+            validation_dependencies.fetch_missing_hashes_timed_out(),
+            false
+        );
+    }
+
+    #[test]
+    fn some_expired() {
+        let mut validation_dependencies = ValidationDependencies::default();
+        let unexpired_hash = fixt!(AnyDhtHash);
+        let expired_hash = fixt!(AnyDhtHash);
+        validation_dependencies.missing_hashes.insert(
+            unexpired_hash,
+            Instant::now() - ValidationDependencies::FETCH_TIMEOUT + Duration::from_secs(1),
+        );
+        validation_dependencies.missing_hashes.insert(
+            expired_hash,
+            Instant::now() - ValidationDependencies::FETCH_TIMEOUT - Duration::from_secs(1),
+        );
+        assert_eq!(
+            validation_dependencies.fetch_missing_hashes_timed_out(),
+            false
+        );
     }
 }
