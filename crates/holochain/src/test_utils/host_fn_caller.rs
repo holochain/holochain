@@ -138,7 +138,7 @@ impl HostFnCaller {
         )
             .into();
         let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
-        let signal_tx = handle.get_signal_tx(&cell_id).await.unwrap();
+        let signal_tx = handle.get_signal_tx(cell_id).await.unwrap();
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
         HostFnCaller {
