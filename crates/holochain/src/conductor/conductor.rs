@@ -98,7 +98,7 @@ use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
 
-use super::api::RealAppInterfaceApi;
+use super::api::AppInterfaceApi;
 use super::api::ZomeCall;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
@@ -119,7 +119,7 @@ use super::state::AppInterfaceConfig;
 use super::state::AppInterfaceId;
 use super::state::ConductorState;
 use super::CellError;
-use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
+use super::{api::AdminInterfaceApi, manager::TaskManagerClient};
 
 pub use self::share::RwShare;
 
@@ -415,7 +415,7 @@ mod interface_impls {
             self: Arc<Self>,
             configs: Vec<AdminInterfaceConfig>,
         ) -> ConductorResult<Vec<u16>> {
-            let admin_api = RealAdminInterfaceApi::new(self.clone());
+            let admin_api = AdminInterfaceApi::new(self.clone());
             let tm = self.task_manager();
 
             // Closure to process each admin config item
@@ -477,7 +477,7 @@ mod interface_impls {
             };
             let port = interface_id.port();
             debug!("Attaching interface {}", port);
-            let app_api = RealAppInterfaceApi::new(self.clone());
+            let app_api = AppInterfaceApi::new(self.clone());
 
             let tm = self.task_manager();
 

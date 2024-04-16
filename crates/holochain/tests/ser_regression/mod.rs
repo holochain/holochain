@@ -4,7 +4,6 @@ use hdk::prelude::*;
 use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
-use holochain::conductor::api::RealAppInterfaceApi;
 use holochain::conductor::api::ZomeCall;
 use holochain::sweettest::*;
 use holochain_nonce::fresh_nonce;
@@ -93,10 +92,13 @@ async fn ser_regression_test() {
     .await
     .unwrap();
 
-    let app_api = RealAppInterfaceApi::new(conductors[0].clone());
+    let app_api = AppInterfaceApi::new(conductors[0].clone());
     let request = Box::new(invocation.clone());
     let request = AppRequest::CallZome(request).try_into().unwrap();
-    let response = app_api.handle_app_request("".to_string(), request).await;
+    let response = app_api
+        .handle_request("".to_string(), Ok(request))
+        .await
+        .unwrap();
 
     let _channel_hash: EntryHash = match response {
         AppResponse::ZomeCalled(r) => r.decode().unwrap(),
@@ -140,7 +142,10 @@ async fn ser_regression_test() {
 
     let request = Box::new(invocation.clone());
     let request = AppRequest::CallZome(request).try_into().unwrap();
-    let response = app_api.handle_app_request("".to_string(), request).await;
+    let response = app_api
+        .handle_request("".to_string(), Ok(request))
+        .await
+        .unwrap();
 
     let _msg_hash: EntryHash = match response {
         AppResponse::ZomeCalled(r) => r.decode().unwrap(),

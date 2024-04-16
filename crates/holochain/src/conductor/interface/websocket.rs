@@ -12,9 +12,7 @@ use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 
-use crate::conductor::api::{
-    AppAuthentication, InterfaceApi, RealAdminInterfaceApi, RealAppInterfaceApi,
-};
+use crate::conductor::api::{AdminInterfaceApi, AppAuthentication, AppInterfaceApi, InterfaceApi};
 use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest, AppResponse,
 };
@@ -75,7 +73,7 @@ impl TaskList {
 pub fn spawn_admin_interface_tasks(
     tm: TaskManagerClient,
     listener: WebsocketListener,
-    api: RealAdminInterfaceApi,
+    api: AdminInterfaceApi,
     port: u16,
 ) {
     tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), move || {
@@ -115,7 +113,7 @@ pub async fn spawn_app_interface_task(
     port: u16,
     allowed_origins: AllowedOrigins,
     installed_app_id: Option<InstalledAppId>,
-    api: RealAppInterfaceApi,
+    api: AppInterfaceApi,
     app_broadcast: AppBroadcast,
 ) -> InterfaceResult<u16> {
     trace!("Initializing App interface");
@@ -157,7 +155,7 @@ pub async fn spawn_app_interface_task(
 
 /// Polls for messages coming in from the external client.
 /// Used by Admin interface.
-async fn recv_incoming_admin_msgs(api: RealAdminInterfaceApi, rx_from_iface: WebsocketReceiver) {
+async fn recv_incoming_admin_msgs(api: AdminInterfaceApi, rx_from_iface: WebsocketReceiver) {
     use futures::stream::StreamExt;
 
     tracing::info!("Starting admin listener");
@@ -196,7 +194,7 @@ async fn recv_incoming_admin_msgs(api: RealAdminInterfaceApi, rx_from_iface: Web
 /// communication with the client.
 fn authenticate_incoming_app_connection(
     task_list: TaskListInner,
-    api: RealAppInterfaceApi,
+    api: AppInterfaceApi,
     mut rx_from_iface: WebsocketReceiver,
     app_broadcast: AppBroadcast,
     tx_to_iface: WebsocketSender,
@@ -333,7 +331,7 @@ fn spawn_app_signals_handler(
 /// client via `tx_to_iface`.
 fn spawn_recv_incoming_app_msgs(
     task_list: TaskListInner,
-    api: RealAppInterfaceApi,
+    api: AppInterfaceApi,
     rx_from_iface: WebsocketReceiver,
     installed_app_id: InstalledAppId,
 ) {
@@ -373,7 +371,7 @@ fn spawn_recv_incoming_app_msgs(
 /// Handles messages on admin interfaces
 async fn handle_incoming_admin_message(
     ws_msg: ReceiveMessage<AdminRequest>,
-    api: RealAdminInterfaceApi,
+    api: AdminInterfaceApi,
 ) -> InterfaceResult<()> {
     match ws_msg {
         ReceiveMessage::Signal(_) => {
@@ -409,7 +407,7 @@ async fn handle_incoming_admin_message(
 async fn handle_incoming_app_message(
     ws_msg: ReceiveMessage<AppRequest>,
     installed_app_id: InstalledAppId,
-    api: RealAppInterfaceApi,
+    api: AppInterfaceApi,
 ) -> InterfaceResult<()> {
     match ws_msg {
         ReceiveMessage::Signal(_) => {
@@ -449,10 +447,10 @@ pub use crate::test_utils::setup_app_in_new_conductor;
 pub mod test {
     use super::*;
     use crate::conductor::api::error::ExternalApiWireError;
+    use crate::conductor::api::AdminInterfaceApi;
     use crate::conductor::api::AdminRequest;
     use crate::conductor::api::AdminResponse;
-    use crate::conductor::api::RealAdminInterfaceApi;
-    use crate::conductor::api::RealAppInterfaceApi;
+    use crate::conductor::api::AppInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
     use crate::conductor::state::ConductorState;
     use crate::conductor::Conductor;
@@ -491,7 +489,7 @@ pub mod test {
     async fn test_handle_incoming_admin_message(
         msg: AdminRequest,
         respond: impl FnOnce(AdminResponse) + 'static + Send,
-        api: RealAdminInterfaceApi,
+        api: AdminInterfaceApi,
     ) -> InterfaceResult<()> {
         let result: AdminResponse = api.handle_request(Ok(msg)).await?;
         respond(result);
@@ -502,7 +500,7 @@ pub mod test {
         installed_app_id: InstalledAppId,
         msg: AppRequest,
         respond: impl FnOnce(AppResponse) + 'static + Send,
-        api: RealAppInterfaceApi,
+        api: AppInterfaceApi,
     ) -> InterfaceResult<()> {
         let result: AppResponse = api.handle_request(installed_app_id, Ok(msg)).await?;
         respond(result);
@@ -721,7 +719,7 @@ pub mod test {
             "".to_string(),
             msg,
             respond,
-            RealAppInterfaceApi::new(conductor_handle.clone()),
+            AppInterfaceApi::new(conductor_handle.clone()),
         )
         .await
         .unwrap();
@@ -733,7 +731,7 @@ pub mod test {
     async fn invalid_request() {
         holochain_trace::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
+        let admin_api = AdminInterfaceApi::new(conductor_handle.clone());
         let dna_payload = InstallAppDnaPayload::hash_only(fake_dna_hash(1), "".to_string());
         let agent_key = fake_agent_pubkey_1();
         let payload = todo!("Use new payload struct");
@@ -935,13 +933,9 @@ pub mod test {
             }
             other => panic!("unexpected response {:?}", other),
         };
-        test_handle_incoming_admin_message(
-            msg,
-            respond,
-            RealAdminInterfaceApi::new(handle.clone()),
-        )
-        .await
-        .unwrap();
+        test_handle_incoming_admin_message(msg, respond, AdminInterfaceApi::new(handle.clone()))
+            .await
+            .unwrap();
 
         handle.shutdown().await.unwrap().unwrap();
     }
@@ -989,7 +983,7 @@ pub mod test {
         test_handle_incoming_admin_message(
             msg,
             respond,
-            RealAdminInterfaceApi::new(conductor_handle.clone()),
+            AdminInterfaceApi::new(conductor_handle.clone()),
         )
         .await
         .unwrap();
@@ -1058,7 +1052,7 @@ pub mod test {
         test_handle_incoming_admin_message(
             msg,
             respond,
-            RealAdminInterfaceApi::new(conductor_handle.clone()),
+            AdminInterfaceApi::new(conductor_handle.clone()),
         )
         .await
         .unwrap();
@@ -1103,7 +1097,7 @@ pub mod test {
         test_handle_incoming_admin_message(
             msg,
             respond,
-            RealAdminInterfaceApi::new(conductor_handle.clone()),
+            AdminInterfaceApi::new(conductor_handle.clone()),
         )
         .await
         .unwrap();
@@ -1133,7 +1127,7 @@ pub mod test {
     async fn attach_app_interface() {
         holochain_trace::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
+        let admin_api = AdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface {
             port: None,
             allowed_origins: AllowedOrigins::Any,
@@ -1170,7 +1164,7 @@ pub mod test {
         // Get state
         let expected = conductor_handle.dump_cell_state(&cell_id).await.unwrap();
 
-        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
+        let admin_api = AdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::DumpState {
             cell_id: Box::new(cell_id),
         };
@@ -1259,7 +1253,7 @@ pub mod test {
         expect.push(k1.clone());
         expect.sort();
 
-        let admin_api = RealAdminInterfaceApi::new(handle.clone());
+        let admin_api = AdminInterfaceApi::new(handle.clone());
 
         // - Add the agent infos
         let req = AdminRequest::AddAgentInfo { agent_infos };
@@ -1292,7 +1286,7 @@ pub mod test {
     }
 
     async fn make_req(
-        admin_api: RealAdminInterfaceApi,
+        admin_api: AdminInterfaceApi,
         req: AdminRequest,
     ) -> tokio::sync::oneshot::Receiver<AdminResponse> {
         let msg = req.try_into().unwrap();

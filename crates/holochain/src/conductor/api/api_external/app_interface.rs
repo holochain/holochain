@@ -11,46 +11,14 @@ use holochain_types::prelude::*;
 
 pub use holochain_conductor_api::*;
 
-/// The interface that a Conductor exposes to the outside world.
-#[async_trait::async_trait]
-pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
-    /// Call an admin function to modify this Conductor's behavior
-    async fn handle_app_request_inner(
-        &self,
-        installed_app_id: InstalledAppId,
-        request: AppRequest,
-    ) -> ConductorApiResult<AppResponse>;
-
-    // -- provided -- //
-
-    /// Deal with error cases produced by `handle_app_request_inner`
-    async fn handle_app_request(
-        &self,
-        installed_app_id: InstalledAppId,
-        request: AppRequest,
-    ) -> AppResponse {
-        tracing::debug!("app request: {:?}", request);
-
-        let res = match self
-            .handle_app_request_inner(installed_app_id, request)
-            .await
-        {
-            Ok(response) => response,
-            Err(e) => AppResponse::Error(e.into()),
-        };
-        tracing::debug!("app response: {:?}", res);
-        res
-    }
-}
-
 /// The Conductor lives inside an Arc<RwLock<_>> which is shared with all
 /// other Api references
 #[derive(Clone)]
-pub struct RealAppInterfaceApi {
+pub struct AppInterfaceApi {
     conductor_handle: ConductorHandle,
 }
 
-impl RealAppInterfaceApi {
+impl AppInterfaceApi {
     /// Create a new instance from a shared Conductor reference
     pub fn new(conductor_handle: ConductorHandle) -> Self {
         Self { conductor_handle }
@@ -78,16 +46,27 @@ impl RealAppInterfaceApi {
                 .map_err(InterfaceError::RequestHandler)?;
         }
         match request {
-            Ok(request) => {
-                Ok(AppInterfaceApi::handle_app_request(self, installed_app_id, request).await)
-            }
+            Ok(request) => Ok(self.handle_app_request(installed_app_id, request).await),
             Err(e) => Ok(AppResponse::Error(SerializationError::from(e).into())),
         }
     }
-}
 
-#[async_trait::async_trait]
-impl AppInterfaceApi for RealAppInterfaceApi {
+    /// Deal with error cases produced by `handle_app_request_inner`
+    async fn handle_app_request(
+        &self,
+        installed_app_id: InstalledAppId,
+        request: AppRequest,
+    ) -> AppResponse {
+        tracing::debug!("app request: {:?}", request);
+
+        let res = self
+            .handle_app_request_inner(installed_app_id, request)
+            .await
+            .unwrap_or_else(|e| AppResponse::Error(e.into()));
+        tracing::debug!("app response: {:?}", res);
+        res
+    }
+
     /// Routes the [AppRequest] to the [AppResponse]
     async fn handle_app_request_inner(
         &self,
@@ -156,12 +135,14 @@ impl AppInterfaceApi for RealAppInterfaceApi {
     }
 }
 
-/// TODO document me please
+/// The payload for authenticating an app interface connection
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppAuthentication {
-    /// TODO ME TOO!
+    /// The token received from the admin interface, demonstrating that the app is allowed
+    /// to connect.
     pub token: Vec<u8>,
 
-    /// TODO ME TOO!
+    /// If the app interface is bound to an installed app, this is the ID of that app. This field
+    /// must be provided by Holochain and not the client.
     pub installed_app_id: Option<InstalledAppId>,
 }
