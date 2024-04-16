@@ -220,15 +220,21 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Expose create_clone_cell functionality to zomes.
     async fn create_clone_cell(
         &self,
+        installed_app_id: &InstalledAppId,
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<ClonedCell>;
 
     /// Expose disable_clone_cell functionality to zomes.
-    async fn disable_clone_cell(&self, payload: DisableCloneCellPayload) -> ConductorResult<()>;
+    async fn disable_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: DisableCloneCellPayload,
+    ) -> ConductorResult<()>;
 
     /// Expose enable_clone_cell functionality to zomes.
     async fn enable_clone_cell(
         &self,
+        installed_app_id: &InstalledAppId,
         payload: EnableCloneCellPayload,
     ) -> ConductorResult<ClonedCell>;
 
@@ -309,28 +315,34 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     async fn create_clone_cell(
         &self,
+        installed_app_id: &InstalledAppId,
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<ClonedCell> {
         self.conductor_handle
             .clone()
-            .create_clone_cell(payload)
+            .create_clone_cell(installed_app_id, payload)
             .await
     }
 
-    async fn disable_clone_cell(&self, payload: DisableCloneCellPayload) -> ConductorResult<()> {
+    async fn disable_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: DisableCloneCellPayload,
+    ) -> ConductorResult<()> {
         self.conductor_handle
             .clone()
-            .disable_clone_cell(&payload)
+            .disable_clone_cell(installed_app_id, &payload)
             .await
     }
 
     async fn enable_clone_cell(
         &self,
+        installed_app_id: &InstalledAppId,
         payload: EnableCloneCellPayload,
     ) -> ConductorResult<ClonedCell> {
         self.conductor_handle
             .clone()
-            .enable_clone_cell(&payload)
+            .enable_clone_cell(installed_app_id, &payload)
             .await
     }
 

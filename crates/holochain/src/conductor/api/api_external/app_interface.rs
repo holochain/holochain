@@ -105,14 +105,14 @@ impl AppInterfaceApi {
                 let clone_cell = self
                     .conductor_handle
                     .clone()
-                    .create_clone_cell(*payload)
+                    .create_clone_cell(&installed_app_id, *payload)
                     .await?;
                 Ok(AppResponse::CloneCellCreated(clone_cell))
             }
             AppRequest::DisableCloneCell(payload) => {
                 self.conductor_handle
                     .clone()
-                    .disable_clone_cell(&payload)
+                    .disable_clone_cell(&installed_app_id, &payload)
                     .await?;
                 Ok(AppResponse::CloneCellDisabled)
             }
@@ -120,7 +120,7 @@ impl AppInterfaceApi {
                 let enabled_cell = self
                     .conductor_handle
                     .clone()
-                    .enable_clone_cell(&payload)
+                    .enable_clone_cell(&installed_app_id, &payload)
                     .await?;
                 Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }

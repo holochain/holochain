@@ -1695,15 +1695,16 @@ mod clone_cell_impls {
         /// A struct with the created cell's clone id and cell id.
         pub async fn create_clone_cell(
             self: Arc<Self>,
+            installed_app_id: &InstalledAppId,
             payload: CreateCloneCellPayload,
         ) -> ConductorResult<ClonedCell> {
             let CreateCloneCellPayload {
-                app_id,
                 role_name,
                 modifiers,
                 membrane_proof,
                 name,
             } = payload;
+
             if !modifiers.has_some_option_set() {
                 return Err(ConductorError::CloneCellError(
                     "neither network_seed nor properties nor origin_time provided for clone cell"
@@ -1714,7 +1715,7 @@ mod clone_cell_impls {
             // add cell to app
             let clone_cell = self
                 .add_clone_cell_to_app(
-                    app_id.clone(),
+                    installed_app_id.clone(),
                     role_name.clone(),
                     modifiers.serialized()?,
                     name,
@@ -1724,7 +1725,7 @@ mod clone_cell_impls {
             // run genesis on cloned cell
             let cells = vec![(clone_cell.cell_id.clone(), membrane_proof)];
             crate::conductor::conductor::genesis_cells(self.clone(), cells).await?;
-            self.create_and_add_initialized_cells_for_running_apps(Some(&app_id))
+            self.create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
                 .await?;
             Ok(clone_cell)
         }
@@ -1733,14 +1734,12 @@ mod clone_cell_impls {
         #[tracing::instrument(skip_all)]
         pub(crate) async fn disable_clone_cell(
             &self,
-            DisableCloneCellPayload {
-                app_id,
-                clone_cell_id,
-            }: &DisableCloneCellPayload,
+            installed_app_id: &InstalledAppId,
+            DisableCloneCellPayload { clone_cell_id }: &DisableCloneCellPayload,
         ) -> ConductorResult<()> {
             let (_, removed_cell_id) = self
                 .update_state_prime({
-                    let app_id = app_id.to_owned();
+                    let app_id = installed_app_id.clone();
                     let clone_cell_id = clone_cell_id.to_owned();
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
@@ -1759,12 +1758,13 @@ mod clone_cell_impls {
         #[tracing::instrument(skip_all)]
         pub async fn enable_clone_cell(
             self: Arc<Self>,
+            installed_app_id: &InstalledAppId,
             payload: &EnableCloneCellPayload,
         ) -> ConductorResult<ClonedCell> {
             let conductor = self.clone();
             let (_, enabled_cell) = self
                 .update_state_prime({
-                    let app_id = payload.app_id.to_owned();
+                    let app_id = installed_app_id.clone();
                     let clone_cell_id = payload.clone_cell_id.to_owned();
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
@@ -1789,7 +1789,7 @@ mod clone_cell_impls {
                 })
                 .await?;
 
-            self.create_and_add_initialized_cells_for_running_apps(Some(&payload.app_id))
+            self.create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
                 .await?;
             Ok(enabled_cell)
         }
