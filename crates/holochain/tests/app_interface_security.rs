@@ -1,7 +1,13 @@
 use either::Either;
 
-use holochain::sweettest::{SweetAgents, SweetConductor, SweetConductorHandle, SweetDnaFile, websocket_client_by_port, WsPollRecv};
-use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppAuthenticationToken, AppRequest, AppResponse};
+use holochain::sweettest::{
+    websocket_client_by_port, SweetAgents, SweetConductor, SweetConductorHandle, SweetDnaFile,
+    WsPollRecv,
+};
+use holochain_conductor_api::{
+    AdminRequest, AdminResponse, AppAuthenticationRequest, AppAuthenticationToken, AppRequest,
+    AppResponse,
+};
 use holochain_types::prelude::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_wasm_test_utils::TestWasm;
@@ -14,33 +20,49 @@ async fn app_interface_requires_auth() {
     let conductor = SweetConductor::from_standard_config().await;
 
     // App interface with no restrictions, but should still require auth
-    let app_port = conductor.clone().add_app_interface(Either::Left(0), AllowedOrigins::Any, None).await.unwrap();
+    let app_port = conductor
+        .clone()
+        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .await
+        .unwrap();
 
     let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
     let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
 
     // Try to send a request before authenticating, results in connection closed
-    let err = app_tx.request::<_, AppResponse>(AppRequest::AppInfo).await.unwrap_err();
+    let err = app_tx
+        .request::<_, AppResponse>(AppRequest::AppInfo)
+        .await
+        .unwrap_err();
     assert_eq!("ConnectionClosed", err.to_string());
 
     let token = create_token(&conductor, "test-app".into()).await;
 
     // Try to authenticate against the connection which is supposed to be closed
-    let err = app_tx.authenticate(AppAuthenticationRequest {
-        token: token.clone(),
-    }).await.unwrap_err();
+    let err = app_tx
+        .authenticate(AppAuthenticationRequest {
+            token: token.clone(),
+        })
+        .await
+        .unwrap_err();
     assert_eq!("WebsocketClosed", err.to_string());
 
     // Token didn't get used above, so create a new connection and try to use it
     let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
     let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
 
-    app_tx.authenticate(AppAuthenticationRequest {
-        token: token.clone(),
-    }).await.unwrap();
+    app_tx
+        .authenticate(AppAuthenticationRequest {
+            token: token.clone(),
+        })
+        .await
+        .unwrap();
 
     // Authentication should have worked, so now we can make requests
-    let response: AppResponse = app_tx.request(AppRequest::ListWasmHostFunctions).await.unwrap();
+    let response: AppResponse = app_tx
+        .request(AppRequest::ListWasmHostFunctions)
+        .await
+        .unwrap();
     assert!(matches!(response, AppResponse::ListWasmHostFunctions(_)));
 }
 
@@ -51,7 +73,15 @@ async fn app_interfaces_can_be_bound_to_apps() {
     let conductor = SweetConductor::from_standard_config().await;
 
     // App interface with an app restriction
-    let app_port = conductor.clone().add_app_interface(Either::Left(0), AllowedOrigins::Any, Some("test-app".to_string())).await.unwrap();
+    let app_port = conductor
+        .clone()
+        .add_app_interface(
+            Either::Left(0),
+            AllowedOrigins::Any,
+            Some("test-app".to_string()),
+        )
+        .await
+        .unwrap();
 
     let token = create_token(&conductor, "other-app".into()).await;
 
@@ -61,11 +91,17 @@ async fn app_interfaces_can_be_bound_to_apps() {
 
     // Authentication fails and connection closes but we don't get an error here, have to try to use
     // the connection to see that it's closed.
-    app_tx.authenticate(AppAuthenticationRequest {
-        token: token.clone(),
-    }).await.unwrap();
+    app_tx
+        .authenticate(AppAuthenticationRequest {
+            token: token.clone(),
+        })
+        .await
+        .unwrap();
 
-    let err = app_tx.request::<_, AppResponse>(AppRequest::ListWasmHostFunctions).await.unwrap_err();
+    let err = app_tx
+        .request::<_, AppResponse>(AppRequest::ListWasmHostFunctions)
+        .await
+        .unwrap_err();
     assert_eq!("ConnectionClosed", err.to_string());
 
     // Now create a token for the correct app and try again
@@ -74,12 +110,18 @@ async fn app_interfaces_can_be_bound_to_apps() {
     let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
     let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
 
-    app_tx.authenticate(AppAuthenticationRequest {
-        token: token.clone(),
-    }).await.unwrap();
+    app_tx
+        .authenticate(AppAuthenticationRequest {
+            token: token.clone(),
+        })
+        .await
+        .unwrap();
 
     // This authentication should have worked, so make a request to demonstrate that.
-    let response: AppResponse = app_tx.request(AppRequest::ListWasmHostFunctions).await.unwrap();
+    let response: AppResponse = app_tx
+        .request(AppRequest::ListWasmHostFunctions)
+        .await
+        .unwrap();
     assert!(matches!(response, AppResponse::ListWasmHostFunctions(_)));
 }
 
@@ -110,7 +152,15 @@ async fn signals_are_not_sent_until_after_auth() {
         .unwrap();
 
     // App interface with an app restriction
-    let app_port = conductor.clone().add_app_interface(Either::Left(0), AllowedOrigins::Any, Some("test-app".to_string())).await.unwrap();
+    let app_port = conductor
+        .clone()
+        .add_app_interface(
+            Either::Left(0),
+            AllowedOrigins::Any,
+            Some("test-app".to_string()),
+        )
+        .await
+        .unwrap();
 
     let (app_tx, mut app_rx) = websocket_client_by_port(app_port).await.unwrap();
 
@@ -118,21 +168,28 @@ async fn signals_are_not_sent_until_after_auth() {
     tokio::time::timeout(std::time::Duration::from_millis(10), async {
         let receive = app_rx.recv::<AppResponse>().await.unwrap();
         panic!("Should not have received anything but got {:?}", receive);
-    }).await.unwrap_err();
+    })
+    .await
+    .unwrap_err();
 
     // Now create a token and authenticate
     let token = create_token(&conductor, "test-app".into()).await;
 
     // Only after authenticating should we be subscribed to signals
-    app_tx.authenticate(AppAuthenticationRequest {
-        token: token.clone(),
-    }).await.unwrap();
+    app_tx
+        .authenticate(AppAuthenticationRequest {
+            token: token.clone(),
+        })
+        .await
+        .unwrap();
 
     // The original signal is gone, we weren't subscribed yet
     tokio::time::timeout(std::time::Duration::from_millis(10), async {
         let receive = app_rx.recv::<AppResponse>().await.unwrap();
         panic!("Should not have received anything but got {:?}", receive);
-    }).await.unwrap_err();
+    })
+    .await
+    .unwrap_err();
 
     // emit another signal
     let _: () = conductor
@@ -174,13 +231,33 @@ async fn signals_are_restricted_by_app() {
         .unwrap();
 
     // App interface with an app restriction for app 1
-    let app_1_port = conductor.clone().add_app_interface(Either::Left(0), AllowedOrigins::Any, Some("test-app-1".to_string())).await.unwrap();
+    let app_1_port = conductor
+        .clone()
+        .add_app_interface(
+            Either::Left(0),
+            AllowedOrigins::Any,
+            Some("test-app-1".to_string()),
+        )
+        .await
+        .unwrap();
 
     // App interface with an app restriction for app 2
-    let app_2_port = conductor.clone().add_app_interface(Either::Left(0), AllowedOrigins::Any, Some("test-app-2".to_string())).await.unwrap();
+    let app_2_port = conductor
+        .clone()
+        .add_app_interface(
+            Either::Left(0),
+            AllowedOrigins::Any,
+            Some("test-app-2".to_string()),
+        )
+        .await
+        .unwrap();
 
     // App interface without an app restriction
-    let app_3_port = conductor.clone().add_app_interface(Either::Left(0), AllowedOrigins::Any, None).await.unwrap();
+    let app_3_port = conductor
+        .clone()
+        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .await
+        .unwrap();
 
     // Create connections to each interface, with two connections to the interface without an app restriction
     let (app_1_tx, mut app_1_rx) = websocket_client_by_port(app_1_port).await.unwrap();
@@ -193,24 +270,36 @@ async fn signals_are_restricted_by_app() {
 
     // Authenticate each connection with the appropriate app
     let token_1 = create_token(&conductor, "test-app-1".into()).await;
-    app_1_tx.authenticate(AppAuthenticationRequest {
-        token: token_1.clone(),
-    }).await.unwrap();
+    app_1_tx
+        .authenticate(AppAuthenticationRequest {
+            token: token_1.clone(),
+        })
+        .await
+        .unwrap();
 
     let token_2 = create_token(&conductor, "test-app-2".into()).await;
-    app_2_tx.authenticate(AppAuthenticationRequest {
-        token: token_2.clone(),
-    }).await.unwrap();
+    app_2_tx
+        .authenticate(AppAuthenticationRequest {
+            token: token_2.clone(),
+        })
+        .await
+        .unwrap();
 
     let token_3 = create_token(&conductor, "test-app-1".into()).await;
-    app_3_tx_app_1.authenticate(AppAuthenticationRequest {
-        token: token_3.clone(),
-    }).await.unwrap();
+    app_3_tx_app_1
+        .authenticate(AppAuthenticationRequest {
+            token: token_3.clone(),
+        })
+        .await
+        .unwrap();
 
     let token_4 = create_token(&conductor, "test-app-2".into()).await;
-    app_3_tx_app_2.authenticate(AppAuthenticationRequest {
-        token: token_4.clone(),
-    }).await.unwrap();
+    app_3_tx_app_2
+        .authenticate(AppAuthenticationRequest {
+            token: token_4.clone(),
+        })
+        .await
+        .unwrap();
 
     // Emit a signal from app 1
     let _: () = conductor
@@ -238,7 +327,9 @@ async fn signals_are_restricted_by_app() {
     tokio::time::timeout(std::time::Duration::from_millis(10), async {
         let receive = app_2_rx.recv::<AppResponse>().await.unwrap();
         panic!("Should not have received anything but got {:?}", receive);
-    }).await.unwrap_err();
+    })
+    .await
+    .unwrap_err();
 
     // app_3_rx_app_1 is connected to the app_3 which has no restriction but the connection is for
     // app_1 so should see the signal
@@ -253,12 +344,22 @@ async fn signals_are_restricted_by_app() {
     tokio::time::timeout(std::time::Duration::from_millis(10), async {
         let receive = app_3_rx_app_2.recv::<AppResponse>().await.unwrap();
         panic!("Should not have received anything but got {:?}", receive);
-    }).await.unwrap_err();
+    })
+    .await
+    .unwrap_err();
 }
 
-async fn create_token(conductor: &SweetConductor, for_installed_app_id: InstalledAppId) -> AppAuthenticationToken {
+async fn create_token(
+    conductor: &SweetConductor,
+    for_installed_app_id: InstalledAppId,
+) -> AppAuthenticationToken {
     let (admin_tx, _admin_rx) = conductor.admin_ws_client::<AdminResponse>().await;
-    let issued: AdminResponse = admin_tx.request(AdminRequest::IssueAppAuthenticationToken(for_installed_app_id.into())).await.unwrap();
+    let issued: AdminResponse = admin_tx
+        .request(AdminRequest::IssueAppAuthenticationToken(
+            for_installed_app_id.into(),
+        ))
+        .await
+        .unwrap();
 
     let token = match issued {
         AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
