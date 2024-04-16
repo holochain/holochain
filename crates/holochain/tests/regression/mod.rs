@@ -5,7 +5,7 @@ use holochain_wasm_test_utils::TestWasm;
 // Intended to keep https://github.com/holochain/holochain/issues/2868 fixed.
 #[tokio::test(flavor = "multi_thread")]
 async fn zome_with_no_entry_types_does_not_prevent_deletes() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
 
@@ -40,7 +40,7 @@ async fn zome_with_no_entry_types_does_not_prevent_deletes() {
 // Intended to keep https://github.com/holochain/holochain/issues/2868 fixed.
 #[tokio::test(flavor = "multi_thread")]
 async fn zome_with_no_link_types_does_not_prevent_delete_links() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
 

@@ -34,7 +34,7 @@ const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let zomes = vec![TestWasm::Create];
     let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
@@ -315,7 +315,7 @@ async fn get_agent_activity_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_host_fn_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let zomes = vec![TestWasm::Create];
     let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;

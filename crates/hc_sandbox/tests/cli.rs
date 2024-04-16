@@ -165,7 +165,7 @@ async fn generate_sandbox_and_connect() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
 
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -203,7 +203,7 @@ async fn generate_sandbox_and_call_list_dna() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
 
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(

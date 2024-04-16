@@ -211,7 +211,7 @@ async fn assert_can_retrieve(td_entry: &EntryTestData, cascade: &CascadeImpl, op
 
 #[tokio::test(flavor = "multi_thread")]
 async fn entry_not_authority_or_authoring() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -234,7 +234,7 @@ async fn entry_not_authority_or_authoring() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn entry_authoring() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -272,7 +272,7 @@ async fn entry_authoring() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn entry_authority() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -300,7 +300,7 @@ async fn entry_authority() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn content_not_authority_or_authoring() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -328,7 +328,7 @@ async fn content_not_authority_or_authoring() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn content_authoring() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -366,7 +366,7 @@ async fn content_authoring() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn content_authority() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -392,7 +392,7 @@ async fn content_authority() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn rejected_ops() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -414,7 +414,7 @@ async fn rejected_ops() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_can_handle_rejected_ops_in_cache() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -458,7 +458,7 @@ async fn check_all_queries_still_work_with_scratch() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_pending_data_isnt_returned() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();

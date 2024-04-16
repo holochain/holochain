@@ -7,7 +7,7 @@ use crate::sweettest::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn network_info() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let number_of_peers = 3;

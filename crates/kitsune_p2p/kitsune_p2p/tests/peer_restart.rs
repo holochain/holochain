@@ -16,7 +16,7 @@ use kitsune_p2p::fixt::KitsuneSpaceFixturator;
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn connection_close_on_peer_restart() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;

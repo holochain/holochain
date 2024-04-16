@@ -358,7 +358,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let test_db = test_p2p_agents_db();
         let db = test_db.to_db();
@@ -374,7 +374,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_to_db() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let t_db = test_p2p_agents_db();
         let db = t_db.to_db();
 

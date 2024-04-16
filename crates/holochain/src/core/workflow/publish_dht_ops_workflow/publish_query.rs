@@ -160,7 +160,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn publish_query() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let agent = fixt!(AgentPubKey);
         let db = test_authored_db();

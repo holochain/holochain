@@ -75,7 +75,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn via. a wasm call
     async fn ribosome_random_bytes_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::RandomBytes).await;
@@ -88,7 +88,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn via. a wasm call
     async fn ribosome_rand_random_bytes_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::RandomBytes).await;
