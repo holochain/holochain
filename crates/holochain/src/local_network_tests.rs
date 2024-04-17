@@ -9,25 +9,7 @@ use test_case::test_case;
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn conductors_call_remote(num_conductors: usize) {
-    use tracing_subscriber::layer::SubscriberExt;
-    use tracing_subscriber::util::SubscriberInitExt;
-    use tracing_subscriber::Layer;
-
-    tracing_subscriber::Registry::default()
-        .with(
-            tracing_subscriber::fmt::Layer::default()
-                .with_test_writer()
-                .with_writer(std::io::stderr)
-                .with_file(true)
-                .with_line_number(true)
-                .with_target(true)
-                // .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
-                // .with_span_events(tracing_subscriber::fmt::format::FmtSpan::FULL)
-                .with_filter(holochain_trace::standard_filter().unwrap()),
-        )
-        .init();
-
-    // holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
@@ -264,7 +246,7 @@ async fn conductors_gossip_inner(
     network: KitsuneP2pConfig,
     share_peers: bool,
 ) {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let network_seed = nanoid::nanoid!().to_string();
 
     let zomes = vec![TestWasm::Create];

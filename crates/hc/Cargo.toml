@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli"
-version = "0.3.0-beta-dev.44"
+version = "0.3.0-beta-dev.45"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
@@ -22,12 +22,11 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.0", features = [ "derive", "cargo" ] }
-futures = "0.3"
 lazy_static = "1.4"
-holochain_cli_bundle = { path = "../hc_bundle", version = "^0.3.0-beta-dev.41"}
-holochain_cli_sandbox = { path = "../hc_sandbox", version = "^0.3.0-beta-dev.44"}
-holochain_cli_run_local_services = { path = "../hc_run_local_services", version = "^0.3.0-beta-dev.26"}
-holochain_trace = { version = "^0.3.0-beta-dev.9", path = "../holochain_trace" }
+holochain_cli_bundle = { path = "../hc_bundle", version = "^0.3.0-beta-dev.42"}
+holochain_cli_sandbox = { path = "../hc_sandbox", version = "^0.3.0-beta-dev.45"}
+holochain_cli_run_local_services = { path = "../hc_run_local_services", version = "^0.3.0-beta-dev.27"}
+holochain_trace = { version = "^0.3.0-beta-dev.10", path = "../holochain_trace" }
 tokio = { version = "1.36.0", features = ["full"] }
 
 [lints]

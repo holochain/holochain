@@ -1092,7 +1092,7 @@ pub mod wasm_test {
     // guard to assure that response time to zome calls and concurrent zome calls
     // is not increasing disproportionally
     async fn concurrent_zome_call_response_time_guard() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let mut conductor = SweetConductor::from_config_rendezvous(
             SweetConductorConfig::rendezvous(true),
             SweetLocalRendezvous::new().await,
@@ -1184,7 +1184,7 @@ pub mod wasm_test {
     /// Basic checks that we can call externs internally and externally the way we want using the
     /// hdk macros rather than low level rust extern syntax.
     async fn ribosome_extern_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern]).await;
@@ -1240,7 +1240,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn wasm_tooling_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         assert_eq!(
             vec![
@@ -1309,7 +1309,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn the_incredible_halt_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::TheIncredibleHalt).await;

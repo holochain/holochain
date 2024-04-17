@@ -5,7 +5,7 @@ use holochain_wasm_test_utils::TestWasm;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
@@ -46,7 +46,7 @@ async fn create_clone_cell() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn disable_enable_and_delete_clone_cell() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
@@ -137,7 +137,7 @@ async fn disable_enable_and_delete_clone_cell() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn prevents_cross_app_clone_operations() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
@@ -246,7 +246,7 @@ async fn prevents_cross_app_clone_operations() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_from_a_clone() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
@@ -301,7 +301,7 @@ async fn create_clone_cell_from_a_clone() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_of_another_cell_in_same_app() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;

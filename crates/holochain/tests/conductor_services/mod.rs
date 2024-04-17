@@ -6,7 +6,7 @@ use holochain_types::prelude::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn initialize_dpki() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut config = SweetConductorConfig::standard();
     config.dpki = Some(DpkiConfig::new(None, "TODO".to_string()));
@@ -31,7 +31,7 @@ async fn initialize_dpki() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "TODO fix this"]
 async fn validate_with_dpki() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let rendezvous = SweetLocalRendezvous::new().await;
     let mut config = SweetConductorConfig::rendezvous(true);

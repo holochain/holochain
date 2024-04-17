@@ -126,7 +126,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn sys_validation_query() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db = test_dht_db();
         let expected = create_test_data(&db.to_db().into()).await;
         let ops = get_ops_to_sys_validate(&db.to_db().into()).await.unwrap();
@@ -142,7 +142,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn app_validation_query() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db = test_dht_db();
         let expected = create_test_data(&db.to_db().into()).await;
         let ops = get_ops_to_app_validate(&db.to_db().into()).await.unwrap();
@@ -159,7 +159,7 @@ mod tests {
     /// Make sure both workflows can't pull in the same ops.
     #[tokio::test(flavor = "multi_thread")]
     async fn workflows_are_exclusive() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db = test_dht_db();
         create_test_data(&db.to_db().into()).await;
         let app_validation_ops = get_ops_to_app_validate(&db.to_db().into()).await.unwrap();

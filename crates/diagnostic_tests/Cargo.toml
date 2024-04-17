@@ -15,7 +15,7 @@ colored = "2.1"
 futures = "0.3"
 kitsune_p2p = { version = "^0.3.0-beta-dev.32", path = "../kitsune_p2p/kitsune_p2p" }
 holochain_diagnostics = { path = "../holochain_diagnostics" }
-holochain_trace = { version = "^0.3.0-beta-dev.9", path = "../holochain_trace" }
+holochain_trace = { version = "^0.3.0-beta-dev.10", path = "../holochain_trace" }
 tokio = { version = "1.36.0", features = ["full"] }
 tokio-stream = "0.1"
 

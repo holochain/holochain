@@ -1,6 +1,5 @@
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use arbitrary::{Arbitrary, Unstructured};
-use holochain_conductor_services::DerivationDetailsInput;
 use parking_lot::Mutex;
 
 use super::*;
@@ -108,7 +107,7 @@ async fn get_key_state(conductor: &SweetConductor, agent: &AgentPubKey) -> KeySt
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn mock_dpki_validation_limbo() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut u = unstructured_noise();
 
@@ -220,7 +219,7 @@ async fn mock_dpki_validation_limbo() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn mock_dpki_invalid_key_state() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut u = unstructured_noise();
 
@@ -300,7 +299,7 @@ async fn mock_dpki_invalid_key_state() {
 /// validate actions, due to preflight check failure.
 #[tokio::test(flavor = "multi_thread")]
 async fn mock_dpki_preflight_check() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut u = unstructured_noise();
 

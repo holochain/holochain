@@ -9,7 +9,7 @@ use kitsune_p2p_types::config::TransportConfig;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn gossip_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let config = SweetConductorConfig::standard().no_publish();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
@@ -38,7 +38,7 @@ async fn gossip_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn signature_smoke_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let rendezvous = SweetLocalRendezvous::new().await;
 
@@ -59,7 +59,7 @@ async fn signature_smoke_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_info_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let config = SweetConductorConfig::standard().no_publish().no_dpki();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 

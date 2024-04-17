@@ -259,7 +259,7 @@ mod tests {
     // TODO: run this remotely too
     #[tokio::test(flavor = "multi_thread")]
     async fn multi_conductor_chc_sync() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let mut config = SweetConductorConfig::standard().no_dpki();
         // config.chc_url = Some(url2::Url2::parse("http://127.0.0.1:40845/"));

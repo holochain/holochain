@@ -61,7 +61,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut conductor = SweetConductor::from_standard_config().await;
 
     let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -149,7 +149,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 // I can't remember what this test was for? Should we just delete?
 #[ignore = "Needs to be completed when HolochainP2pEvents is accessible"]
 async fn invalid_cell() -> anyhow::Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut conductor = SweetConductor::from_standard_config().await;
 
     let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -177,7 +177,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn get_deleted() -> anyhow::Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // Bundle the single zome into a DnaFile
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
@@ -246,7 +246,7 @@ async fn get_deleted() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn signal_subscription() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     const N: usize = 10;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -348,7 +348,7 @@ async fn simple_validation() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_call_real_zomes_too() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let (mut integrity, mut coordinator) = simple_crud_zome().into_zomes();

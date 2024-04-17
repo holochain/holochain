@@ -25,6 +25,7 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use matches::assert_matches;
+use rand::rngs::OsRng;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -55,7 +56,7 @@ impl PollRecv {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn call_admin() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -118,7 +119,7 @@ how_many: 42
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn call_zome() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
@@ -166,9 +167,9 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair
-    let mut rng = rand_dalek::thread_rng();
-    let signing_keypair = ed25519_dalek::Keypair::generate(&mut rng);
-    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+    let mut rng = OsRng;
+    let signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
 
     // Grant zome call capability for agent
     let zome_name = TestWasm::Foo.coordinator_zome_name();
@@ -255,7 +256,7 @@ async fn call_zome() {
 #[cfg(feature = "slow_tests")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn remote_signals() -> anyhow::Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 2;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
@@ -327,7 +328,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn emit_signals() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -365,9 +366,9 @@ async fn emit_signals() {
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair
-    let mut rng = rand_dalek::thread_rng();
-    let signing_keypair = ed25519_dalek::Keypair::generate(&mut rng);
-    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+    let mut rng = OsRng;
+    let signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
 
     // Grant zome call capability for agent
     let zome_name = TestWasm::EmitSignal.coordinator_zome_name();
@@ -450,7 +451,7 @@ async fn emit_signals() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
@@ -475,7 +476,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn list_app_interfaces_succeeds() -> Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
@@ -520,7 +521,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 }
 
 async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
@@ -588,7 +589,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn connection_limit_is_respected() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
@@ -659,7 +660,7 @@ async fn concurrent_install_dna() {
     static NUM_CONCURRENT_INSTALLS: u8 = 10;
     static REQ_TIMEOUT_MS: u64 = 15000;
 
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -727,7 +728,7 @@ async fn concurrent_install_dna() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore)]
 async fn network_stats() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut batch =
         SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(true))
@@ -760,7 +761,7 @@ async fn network_stats() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn full_state_dump_cursor_works() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
 
@@ -805,7 +806,7 @@ async fn full_state_dump_cursor_works() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn admin_allowed_origins() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let conductor = SweetConductor::from_standard_config().await;
 
@@ -858,7 +859,7 @@ async fn admin_allowed_origins() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_allowed_origins() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let conductor = SweetConductor::from_standard_config().await;
 
@@ -889,7 +890,7 @@ async fn app_allowed_origins() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_allowed_origins_independence() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let conductor = SweetConductor::from_standard_config().await;
 

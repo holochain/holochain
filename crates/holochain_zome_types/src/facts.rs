@@ -336,6 +336,7 @@ pub fn action_and_entry_match<'a>(must_be_public: bool) -> impl Fact<'a, Pair> {
 mod tests {
     use super::*;
     use crate::facts;
+    use holo_hash::fixt::AgentPubKeyFixturator;
 
     proptest::proptest! {
         #[test]

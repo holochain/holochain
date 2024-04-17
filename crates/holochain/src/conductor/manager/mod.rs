@@ -437,7 +437,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn unrecoverable_error() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db_dir = test_db_dir();
         let handle = Conductor::builder()
             .with_data_root_path(db_dir.path().to_path_buf().into())
@@ -470,7 +470,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "panics in tokio break other tests, this test is here to confirm behavior but cannot be run on ci"]
     async fn unrecoverable_panic() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db_dir = test_db_dir();
         let handle = Conductor::builder()
             .with_data_root_path(db_dir.as_ref().to_path_buf().into())

@@ -17,7 +17,7 @@ use holochain_diagnostics::*;
 
 #[tokio::main]
 async fn main() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let start = Instant::now();
 
     // let config = config_no_networking();

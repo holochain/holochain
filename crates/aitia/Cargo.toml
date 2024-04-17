@@ -1,6 +1,6 @@
 [package]
 name = "aitia"
-version = "0.2.0-beta-dev.7"
+version = "0.2.0-beta-dev.8"
 description = "Library for making sense of events in terms of causal graphs"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,8 +13,8 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 derive_more = "0.99"
-holochain_trace = { version = "^0.3.0-beta-dev.9", path = "../holochain_trace" }
-parking_lot = "0.10"
+holochain_trace = { version = "^0.3.0-beta-dev.10", path = "../holochain_trace" }
+parking_lot = "0.12"
 petgraph = "0.6"
 regex = "1"
 tracing = "0.1"
@@ -28,7 +28,7 @@ tracing-subscriber = { version = "0.3", optional = true }
 [dev-dependencies]
 maplit = "1"
 pretty_assertions = "1.4"
-test-case = "2.1"
+test-case = "3.3"
 
 [lints]
 workspace = true

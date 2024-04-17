@@ -36,7 +36,7 @@ async fn app_bundle_fixture(modifiers: DnaModifiersOpt<YamlProperties>) -> (AppB
 /// Test that an app with a single Created cell can be provisioned
 #[tokio::test]
 async fn provisioning_1_create() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let modifiers = DnaModifiersOpt {
         properties: Some(app_manifest_properties_fixture()),
         network_seed: Some("network_seed".into()),

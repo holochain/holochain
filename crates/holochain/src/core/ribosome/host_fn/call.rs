@@ -236,7 +236,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let test_wasm = TestWasm::WhoAmI;
         let (dna_file_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
@@ -285,7 +285,7 @@ pub mod wasm_test {
     /// when they are both writing (moving the source chain forward)
     #[tokio::test(flavor = "multi_thread")]
     async fn call_the_same_cell() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let zomes = vec![TestWasm::WhoAmI, TestWasm::Create];
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(zomes).await;
@@ -340,7 +340,7 @@ pub mod wasm_test {
     //        not be supported.
     #[tokio::test(flavor = "multi_thread")]
     async fn bridge_call() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
@@ -384,7 +384,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can call a fn on a remote
     async fn call_remote_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,

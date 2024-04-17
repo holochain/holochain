@@ -16,7 +16,7 @@ criterion_main!(benches);
 struct TestMessage(String);
 
 fn full_connect(bench: &mut Criterion) {
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
 
     let runtime = rt();
 

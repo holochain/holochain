@@ -2067,7 +2067,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());

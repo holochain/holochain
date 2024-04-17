@@ -15,7 +15,7 @@ struct AppString(String);
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn dpki_publish() {
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
 
     let config = SweetConductorConfig::standard();
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
@@ -30,7 +30,7 @@ async fn dpki_publish() {
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn dpki_no_publish() {
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
 
     let config = SweetConductorConfig::standard().no_publish();
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
@@ -52,7 +52,7 @@ async fn test_publish() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
     use kitsune_p2p_types::config::KitsuneP2pConfig;
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut tuning =
@@ -110,7 +110,7 @@ async fn test_publish() -> anyhow::Result<()> {
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     const NUM_CONDUCTORS: usize = 3;
 
@@ -175,7 +175,7 @@ async fn sharded_consistency() {
         consistency::local_machine_session, inline_zomes::simple_create_read_zome,
     };
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 3;
     const NUM_CELLS: usize = 5;
 
@@ -226,7 +226,7 @@ async fn private_entries_dont_leak() {
     use holochain::sweettest::SweetInlineZomes;
     use holochain_types::inline_zome::InlineZomeSet;
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
     let mut entry_def = EntryDef::default_from_id("entrydef");
     entry_def.visibility = EntryVisibility::Private;
 
