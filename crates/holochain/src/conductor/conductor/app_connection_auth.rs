@@ -1,8 +1,8 @@
 use holochain_conductor_api::AppAuthenticationToken;
+use rand::RngCore;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::time::SystemTime;
-use rand::RngCore;
 
 use crate::conductor::error::{ConductorError, ConductorResult};
 use holochain_types::prelude::InstalledAppId;
