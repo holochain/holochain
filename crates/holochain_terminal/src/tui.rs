@@ -68,10 +68,7 @@ fn render(app: &mut App, frame: &mut Frame) {
         .constraints([Constraint::Length(2), Constraint::Min(0)])
         .split(frame.size());
 
-    let titles = ["Network", "Bootstrap"]
-        .iter()
-        .cloned()
-        .map(Line::from);
+    let titles = ["Network", "Bootstrap"].iter().cloned().map(Line::from);
     let tabs = Tabs::new(titles)
         .select(app.tab_index())
         .block(

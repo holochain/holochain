@@ -1,5 +1,7 @@
 //! Helpers for unit tests
 
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::Statement;
@@ -12,8 +14,6 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use tempfile::TempDir;
 
 pub mod mutations_helpers;

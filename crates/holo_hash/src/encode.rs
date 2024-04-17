@@ -6,10 +6,10 @@ use crate::PrimitiveHashType;
 use crate::HOLO_HASH_CORE_LEN;
 use crate::HOLO_HASH_FULL_LEN;
 use crate::HOLO_HASH_PREFIX_LEN;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use std::convert::TryFrom;
 use std::convert::TryInto;
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
 impl<P: PrimitiveHashType> TryFrom<&str> for HoloHash<P> {
     type Error = HoloHashError;

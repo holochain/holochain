@@ -1,5 +1,5 @@
-use std::sync::OnceLock;
 use opentelemetry_api::{global::meter_with_version, metrics::*};
+use std::sync::OnceLock;
 
 pub type CascadeDurationMetric = Histogram<f64>;
 

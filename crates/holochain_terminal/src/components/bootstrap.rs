@@ -9,8 +9,8 @@ use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneSpace};
 use kitsune_p2p_bootstrap_client::{random, BootstrapNet};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::{RandomLimit, RandomQuery};
-use std::sync::OnceLock;
 use ratatui::{prelude::*, widgets::*};
+use std::sync::OnceLock;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
@@ -156,7 +156,9 @@ pub fn render_bootstrap_widget(
         };
     }
 
-    let agents = get_agents().read().expect("Should have been able to read agents");
+    let agents = get_agents()
+        .read()
+        .expect("Should have been able to read agents");
 
     let screen_layout = Layout::default()
         .direction(Direction::Vertical)
