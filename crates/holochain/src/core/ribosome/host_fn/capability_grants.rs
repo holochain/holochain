@@ -26,7 +26,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_capability_secret_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Capability).await;
@@ -36,7 +36,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_transferable_cap_grant() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Capability).await;
@@ -61,7 +61,7 @@ pub mod wasm_test {
     // MAYBE: [ B-03669 ] can move this to an integration test (may need to switch to using a RibosomeStore)
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_authorized_call() -> anyhow::Result<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,

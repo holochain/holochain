@@ -19,7 +19,7 @@ pub struct Opt {
 
 #[tokio::main]
 async fn main() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     if let Err(e) = inner().await {
         eprintln!("{:?}", e);

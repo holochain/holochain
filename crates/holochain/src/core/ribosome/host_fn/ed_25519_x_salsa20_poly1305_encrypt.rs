@@ -66,7 +66,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn invoke_import_ed_25519_x_salsa20_poly1305_encrypt_decrypt_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, alice_pubkey, bob_pubkey, ..
         } = RibosomeTestFixture::new(TestWasm::XSalsa20Poly1305).await;

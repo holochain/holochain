@@ -7,7 +7,7 @@ use holochain_keystore::AgentPubKeyExt;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_to_limbo() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let space = TestSpace::new(fixt!(DnaHash));
     let env = space.space.dht_db.clone();
@@ -52,7 +52,7 @@ async fn incoming_ops_to_limbo() {
 // reprocessing.
 #[tokio::test(flavor = "multi_thread")]
 async fn can_retry_failed_op() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let space = TestSpace::new(fixt!(DnaHash));
     let env = space.space.dht_db.clone();
@@ -104,7 +104,7 @@ async fn can_retry_failed_op() {
 // Verifies that an op which has been republished will allow a new validation receipt to be requested.
 #[tokio::test(flavor = "multi_thread")]
 async fn republish_to_request_validation_receipt() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let space = TestSpace::new(fixt!(DnaHash));
     let env = space.space.dht_db.clone();

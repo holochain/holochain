@@ -167,7 +167,7 @@ async fn can_set_fake_state() {
             Keeping the test here to highlight the intention, 
             though it will have to be removed or totally rewritten some day."]
 async fn test_list_running_apps_for_dependent_cell_id() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mk_dna = |name: &'static str| async move {
         let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
@@ -255,7 +255,7 @@ async fn common_genesis_test_app(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_uninstall_app() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let (dna, _, _) = mk_dna(simple_crud_zome()).await;
     let mut conductor = SweetConductor::from_standard_config().await;
 
@@ -345,7 +345,7 @@ async fn test_uninstall_app() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reconciliation_idempotency() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
     let mut conductor = SweetConductor::from_standard_config().await;
     common_genesis_test_app(&mut conductor, ("custom", zome))
@@ -369,7 +369,7 @@ async fn test_reconciliation_idempotency() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_signing_error_during_genesis() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let bad_keystore = spawn_crude_mock_keystore(|| "test error".into()).await;
 
     let db_dir = test_db_dir();
@@ -455,7 +455,7 @@ async fn test_signing_error_during_genesis() {
 // @todo fix test by using new InstallApp call
 // #[tokio::test(flavor = "multi_thread")]
 // async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
-//     holochain_trace::test_run().ok();
+//     holochain_trace::test_run();
 //     let (keystore, keystore_control) = spawn_real_or_mock_keystore(|_| Err("test error".into()))
 //         .await
 //         .unwrap();
@@ -550,7 +550,7 @@ pub(crate) fn simple_create_entry_zome() -> InlineIntegrityZome {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_enable_disable_enable_app() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let zome = simple_create_entry_zome();
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = common_genesis_test_app(&mut conductor, ("zome", zome))
@@ -634,7 +634,7 @@ async fn test_enable_disable_enable_app() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_enable_disable_enable_clone_cell() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let zome = simple_create_entry_zome();
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = common_genesis_test_app(&mut conductor, ("zome", zome))
@@ -729,7 +729,7 @@ async fn test_enable_disable_enable_clone_cell() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn name_has_no_effect_on_dna_hash() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut conductor = SweetConductor::from_standard_config().await;
     let (agent1, agent2, agent3) = SweetAgents::three(conductor.keystore()).await;
     let dna = SweetDnaFile::unique_empty().await;
@@ -791,7 +791,7 @@ fn unwrap_cell_info_clone(cell_info: CellInfo) -> holochain_zome_types::clone::C
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_installation_fails_if_genesis_self_check_is_invalid() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let bad_zome = InlineZomeSet::new_unique_single("integrity", "custom", Vec::new(), 0).function(
         "integrity",
         "genesis_self_check",
@@ -818,7 +818,7 @@ async fn test_installation_fails_if_genesis_self_check_is_invalid() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let unit_entry_def = EntryDef::default_from_id("unit");
     let bad_zome =
         InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
@@ -877,7 +877,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "need to figure out how to write this test, i.e. to make genesis panic"]
 async fn test_apps_disable_on_panic_after_genesis() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let unit_entry_def = EntryDef::default_from_id("unit");
     let bad_zome =
         InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
@@ -928,7 +928,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_app_status_states() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let zome = simple_create_entry_zome();
     let mut conductor = SweetConductor::from_standard_config().await;
     common_genesis_test_app(&mut conductor, ("zome", zome))
@@ -1001,7 +1001,7 @@ async fn test_app_status_states_multi_app() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_and_app_status_reconciliation() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     use AppStatusFx::*;
     use AppStatusKind::*;
     let mk_zome = || ("zome", InlineIntegrityZome::new_unique(Vec::new(), 0));
@@ -1058,7 +1058,7 @@ async fn test_cell_and_app_status_reconciliation() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_app_status_filters() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
     let dnas = [mk_dna(("dna", zome)).await.0];
 
@@ -1126,7 +1126,7 @@ async fn test_app_status_filters() {
 /// concurrent initial zome function calls
 #[tokio::test(flavor = "multi_thread")]
 async fn test_init_concurrency() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let num_inits = Arc::new(AtomicU32::new(0));
     let num_calls = Arc::new(AtomicU32::new(0));
     let num_inits_clone = num_inits.clone();

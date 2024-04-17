@@ -70,7 +70,7 @@ fn config() -> ConductorConfig {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // holochain_trace::test_run().ok();
+    // holochain_trace::test_run();
 
     let show_ui = std::env::var("NOUI").is_err();
 

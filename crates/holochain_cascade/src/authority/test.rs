@@ -16,7 +16,7 @@ fn options() -> holochain_p2p::event::GetOptions {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_entry() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let db = test_dht_db();
 
     let td = EntryTestData::create();
@@ -64,7 +64,7 @@ async fn get_entry() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_record() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let db = test_dht_db();
 
     let td = RecordTestData::create();
@@ -130,7 +130,7 @@ async fn get_record() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn retrieve_record() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let db = test_dht_db();
 
     let td = RecordTestData::create();
@@ -154,7 +154,7 @@ async fn retrieve_record() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_links() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let db = test_dht_db();
 
     let td = EntryTestData::create();
@@ -190,7 +190,7 @@ async fn get_links() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let db = test_dht_db();
 
     let td = ActivityTestData::valid_chain_scenario();

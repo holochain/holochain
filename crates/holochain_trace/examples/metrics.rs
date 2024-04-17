@@ -6,7 +6,7 @@ metrics!(MyMetric, CounterA, CounterB);
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     holochain_trace::metrics::init();
     let span = debug_span!("span a");
     let _g = span.enter();
