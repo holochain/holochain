@@ -71,7 +71,7 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
             let url = format!("{}?net={}", url.as_str(), net.value());
 
             let res = CLIENT
-                .get_or_init(|| reqwest::Client::new())
+                .get_or_init(reqwest::Client::new)
                 .post(url.as_str())
                 .body(body_data)
                 .header(OP_HEADER, op)
