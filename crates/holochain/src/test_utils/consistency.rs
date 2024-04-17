@@ -596,6 +596,7 @@ async fn check_agents<'iter>(
 }
 
 /// Check the op hashes we are meant to be holding.
+#[tracing::instrument(skip_all)]
 async fn check_hashes(
     dht_db: &DbRead<DbKindDht>,
     expected_hashes: &mut Vec<KitsuneOpHash>,

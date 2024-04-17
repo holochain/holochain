@@ -7,11 +7,12 @@ use crate::sweettest::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn network_info() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let number_of_peers = 3;
-    let mut conductors = SweetConductorBatch::from_standard_config(number_of_peers).await;
+    let config = SweetConductorConfig::standard();
+    let mut conductors = SweetConductorBatch::from_config(number_of_peers, config).await;
     let app_id: InstalledAppId = "app".into();
     let app_batch = conductors.setup_app(&app_id, &[dna.clone()]).await.unwrap();
     let cells = app_batch.cells_flattened();

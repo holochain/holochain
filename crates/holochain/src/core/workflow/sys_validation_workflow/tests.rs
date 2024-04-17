@@ -19,7 +19,7 @@ use std::time::Duration;
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn sys_validation_workflow_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 

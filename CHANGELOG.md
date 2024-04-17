@@ -14,6 +14,90 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240417.004246
+
+## [hcterm-0.3.0-beta-dev.21](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [holochain\_cli-0.3.0-beta-dev.45](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.45)
+
+## [holochain-0.3.0-beta-dev.46](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.46)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.42](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.42)
+
+## [holochain\_cli\_run\_local\_services-0.3.0-beta-dev.27](crates/holochain_cli_run_local_services/CHANGELOG.md#0.3.0-beta-dev.27)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.45](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.45)
+
+## [holochain\_cascade-0.3.0-beta-dev.45](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.45)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.45](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.45)
+
+## [holochain\_conductor\_services-0.2.0-beta-dev.15](crates/holochain_conductor_services/CHANGELOG.md#0.2.0-beta-dev.15)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.39](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.39)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.43](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.43)
+
+## [holochain\_websocket-0.3.0-beta-dev.20](crates/holochain_websocket/CHANGELOG.md#0.3.0-beta-dev.20)
+
+## [hdk-0.3.0-beta-dev.39](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.39)
+
+## [holochain\_state-0.3.0-beta-dev.44](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.44)
+
+## [hdi-0.4.0-beta-dev.35](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.35)
+
+## [holochain\_p2p-0.3.0-beta-dev.44](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.44)
+
+## [hc\_sleuth-0.2.0-beta-dev.15](crates/hc_sleuth/CHANGELOG.md#0.2.0-beta-dev.15)
+
+## [hdk\_derive-0.3.0-beta-dev.33](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.33)
+
+## [aitia-0.2.0-beta-dev.8](crates/aitia/CHANGELOG.md#0.2.0-beta-dev.8)
+
+## [holochain\_state\_types-0.3.0-beta-dev.39](crates/holochain_state_types/CHANGELOG.md#0.3.0-beta-dev.39)
+
+## [holochain\_types-0.3.0-beta-dev.41](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [kitsune\_p2p-0.3.0-beta-dev.38](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.38)
+
+- Kitsune will now close connections in two cases. Firstly, when receiving an updated agent info that indicates that the peer URL for an agent has changed. If there is an open connection to the old peer URL then it will be closed. Secondly, when if a message from a peer fails to decode. This is likely sign that communication between two conductors is not going to work so the connection is closed.
+
+## [holochain\_keystore-0.3.0-beta-dev.35](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.35)
+
+## [holochain\_sqlite-0.3.0-beta-dev.41](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.41)
+
+## [kitsune\_p2p\_bootstrap\_client-0.3.0-beta-dev.32](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.3.0-beta-dev.32)
+
+## [kitsune\_p2p\_fetch-0.3.0-beta-dev.29](crates/kitsune_p2p_fetch/CHANGELOG.md#0.3.0-beta-dev.29)
+
+## [kitsune\_p2p\_proxy-0.3.0-beta-dev.26](crates/kitsune_p2p_proxy/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [mr\_bundle-0.3.0-beta-dev.9](crates/mr_bundle/CHANGELOG.md#0.3.0-beta-dev.9)
+
+## [holochain\_zome\_types-0.3.0-beta-dev.34](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.34)
+
+## [kitsune\_p2p\_bootstrap-0.2.0-beta-dev.26](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.2.0-beta-dev.26)
+
+## [kitsune\_p2p\_transport\_quic-0.3.0-beta-dev.26](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.32](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.32)
+
+## [kitsune\_p2p\_block-0.3.0-beta-dev.22](crates/kitsune_p2p_block/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [kitsune\_p2p\_types-0.3.0-beta-dev.26](crates/kitsune_p2p_types/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holo\_hash-0.3.0-beta-dev.27](crates/holo_hash/CHANGELOG.md#0.3.0-beta-dev.27)
+
+## [kitsune\_p2p\_bin\_data-0.3.0-beta-dev.20](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.3.0-beta-dev.20)
+
+## [kitsune\_p2p\_dht-0.3.0-beta-dev.22](crates/kitsune_p2p_dht/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [holochain\_util-0.3.0-beta-dev.7](crates/holochain_util/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [kitsune\_p2p\_dht\_arc-0.3.0-beta-dev.19](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.3.0-beta-dev.19)
+
+## [holochain\_trace-0.3.0-beta-dev.10](crates/holochain_trace/CHANGELOG.md#0.3.0-beta-dev.10)
+
 # 20240410.004338
 
 ## [hcterm-0.3.0-beta-dev.20](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.20)

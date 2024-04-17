@@ -713,7 +713,7 @@ async fn initiate_after_target_is_set() {
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 /// Test the initiates timeout after the round timeout has elapsed.
 async fn initiate_times_out() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let agents = agents_with_infos(3).await;
     let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();

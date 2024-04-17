@@ -8,7 +8,7 @@ async fn migrate_unencrypted() {
     use rusqlite::Connection;
     use std::fs::create_dir_all;
 
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
     create_dir_all(tmp_dir.path().join("conductor")).unwrap();

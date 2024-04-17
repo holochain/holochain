@@ -82,8 +82,7 @@ impl MetaNetTask {
 
         tokio::task::spawn({
             let tuning_params = self.config.tuning_params.clone();
-            let span =
-                tracing::error_span!("MetaNetTask::spawn", scope = self.config.tracing_scope);
+            let span = tracing::info_span!("MetaNetTask::spawn", scope = self.config.tracing_scope);
             let span_outer = span.clone();
             async move {
                 let ep_evt = self
@@ -1890,7 +1889,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_push_op_data_fails_independently_on_receive_ops_error() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
 
         let (mut ep_evt_send, _, _, host_receiver_stub, _, _, fetch_pool, _) = setup().await;
 

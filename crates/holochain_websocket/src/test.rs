@@ -4,7 +4,7 @@ use crate::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sanity() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq)]
     enum TestMsg {
@@ -70,7 +70,7 @@ async fn sanity() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn blocks_connect_with_mismatched_origin() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let (addr_s, addr_r) = tokio::sync::oneshot::channel();
 
@@ -119,7 +119,7 @@ async fn blocks_connect_with_mismatched_origin() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn blocks_connect_without_origin() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let (addr_s, addr_r) = tokio::sync::oneshot::channel();
 
@@ -166,7 +166,7 @@ async fn blocks_connect_without_origin() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn origin_is_required_on_listener() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = None;

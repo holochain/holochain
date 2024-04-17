@@ -22,7 +22,7 @@ async fn test_publish() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
     use kitsune_p2p_types::config::KitsuneP2pConfig;
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut tuning =
@@ -79,7 +79,7 @@ async fn test_publish() -> anyhow::Result<()> {
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     const NUM_CONDUCTORS: usize = 3;
 
@@ -141,7 +141,7 @@ async fn sharded_consistency() {
         consistency::local_machine_session, inline_zomes::simple_create_read_zome,
     };
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 3;
     const NUM_CELLS: usize = 5;
 
@@ -192,7 +192,7 @@ async fn private_entries_dont_leak() {
     use holochain::sweettest::SweetInlineZomes;
     use holochain_types::inline_zome::InlineZomeSet;
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
     let mut entry_def = EntryDef::default_from_id("entrydef");
     entry_def.visibility = EntryVisibility::Private;
 
@@ -297,6 +297,7 @@ async fn private_entries_dont_leak() {
     check_for_private_entries(conductors[1].get_cache_db(bobbo.cell_id()).await.unwrap()).await;
 }
 
+#[tracing::instrument(skip_all)]
 async fn check_for_private_entries<Kind: DbKindT>(env: DbWrite<Kind>) {
     let count: usize = env.read_async(move |txn| -> DatabaseResult<usize> {
         Ok(txn.query_row(

@@ -13,6 +13,7 @@ use holochain_p2p::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_state::query::StateQueryError;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -24,7 +25,7 @@ pub struct P2pBatch {
     /// Agent information to be committed.
     pub peer_data: Vec<AgentInfoSigned>,
     /// The result of this commit.
-    pub result_sender: tokio::sync::oneshot::Sender<Result<(), P2pBatchError>>,
+    pub result_sender: tokio::sync::oneshot::Sender<Result<Vec<AgentInfoPut>, P2pBatchError>>,
 }
 
 #[derive(Debug, Error)]
@@ -41,10 +42,12 @@ pub async fn inject_agent_infos<'iter, I: IntoIterator<Item = &'iter AgentInfoSi
     env: DbWrite<DbKindP2pAgents>,
     iter: I,
 ) -> StateMutationResult<()> {
-    Ok(p2p_put_all(&env, iter.into_iter()).await?)
+    p2p_put_all(&env, iter.into_iter()).await?;
+    Ok(())
 }
 
 /// Inject multiple agent info entries into the peer store in batches.
+#[tracing::instrument(skip_all)]
 pub async fn p2p_put_all_batch(
     env: DbWrite<DbKindP2pAgents>,
     rx: tokio::sync::mpsc::Receiver<P2pBatch>,
@@ -64,16 +67,17 @@ pub async fn p2p_put_all_batch(
                         result_sender: response,
                     } in batch
                     {
+                        let mut put_infos = Vec::with_capacity(batch.len());
                         for info in batch {
                             match p2p_put_single(space.clone(), txn, &info) {
-                                Ok(_) => (),
+                                Ok(put_info) => put_infos.push(put_info),
                                 Err(e) => {
                                     responses.push((Err(e), response));
                                     continue 'batch;
                                 }
                             }
                         }
-                        responses.push((Ok(()), response));
+                        responses.push((Ok(put_infos), response));
                     }
                     tx.send(responses).map_err(|_| {
                         DatabaseError::Other(anyhow::anyhow!(
@@ -354,7 +358,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let test_db = test_p2p_agents_db();
         let db = test_db.to_db();
@@ -370,7 +374,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_to_db() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let t_db = test_p2p_agents_db();
         let db = t_db.to_db();
 

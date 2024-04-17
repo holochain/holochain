@@ -6,6 +6,8 @@ use crate::PrimitiveHashType;
 use crate::HOLO_HASH_CORE_LEN;
 use crate::HOLO_HASH_FULL_LEN;
 use crate::HOLO_HASH_PREFIX_LEN;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 
@@ -39,7 +41,7 @@ impl<T: HashType> std::fmt::Display for HoloHash<T> {
 
 /// internal REPR for holo hash
 pub fn holo_hash_encode(data: &[u8]) -> String {
-    format!("u{}", base64::encode_config(data, base64::URL_SAFE_NO_PAD),)
+    format!("u{}", URL_SAFE_NO_PAD.encode(data),)
 }
 
 /// internal PARSE for holo hash REPR
@@ -47,7 +49,7 @@ pub fn holo_hash_decode_unchecked(s: &str) -> Result<Vec<u8>, HoloHashError> {
     if &s[..1] != "u" {
         return Err(HoloHashError::NoU);
     }
-    let b = match base64::decode_config(&s[1..], base64::URL_SAFE_NO_PAD) {
+    let b = match URL_SAFE_NO_PAD.decode(&s[1..]) {
         Err(_) => return Err(HoloHashError::BadBase64),
         Ok(s) => s,
     };
@@ -70,7 +72,7 @@ pub fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError
     if &s[..1] != "u" {
         return Err(HoloHashError::NoU);
     }
-    let b = match base64::decode_config(&s[1..], base64::URL_SAFE_NO_PAD) {
+    let b = match URL_SAFE_NO_PAD.decode(&s[1..]) {
         Err(_) => return Err(HoloHashError::BadBase64),
         Ok(s) => s,
     };

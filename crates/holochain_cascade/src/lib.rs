@@ -425,6 +425,7 @@ impl CascadeImpl {
         Ok(())
     }
 
+    #[tracing::instrument(skip_all)]
     async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
         cache
@@ -439,6 +440,7 @@ impl CascadeImpl {
         Ok(())
     }
 
+    #[tracing::instrument(skip_all)]
     async fn merge_link_ops_into_cache(
         &self,
         responses: Vec<WireLinkOps>,
@@ -458,6 +460,7 @@ impl CascadeImpl {
     }
 
     /// Add new activity to the Cache.
+    #[tracing::instrument(skip_all)]
     async fn add_activity_into_cache(
         &self,
         responses: Vec<MustGetAgentActivityResponse>,

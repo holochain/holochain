@@ -119,7 +119,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validation_receipts_db_populate_and_list() -> StateMutationResult<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let test_db = crate::test_utils::test_authored_db();
         let env = test_db.to_db();
@@ -184,7 +184,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn no_pending_receipts() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let env = crate::test_utils::test_dht_db().to_db();
 
@@ -234,7 +234,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn filter_for_pending_validation_receipts() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let test_db = crate::test_utils::test_dht_db();
         let env = test_db.to_db();

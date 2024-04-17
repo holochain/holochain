@@ -143,7 +143,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn agent_activity_query() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let test_db = test_dht_db();
         let db = test_db.to_db();
         let entry_type_1 = fixt!(EntryType);
