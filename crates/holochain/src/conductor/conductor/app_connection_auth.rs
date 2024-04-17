@@ -2,6 +2,7 @@ use holochain_conductor_api::AppAuthenticationToken;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::time::SystemTime;
+use rand::RngCore;
 
 use crate::conductor::error::{ConductorError, ConductorResult};
 use holochain_types::prelude::InstalledAppId;
@@ -27,7 +28,10 @@ impl AppAuthTokenStore {
         expiry_seconds: u64,
         single_use: bool,
     ) -> (AppAuthenticationToken, Option<SystemTime>) {
-        let token = nanoid::nanoid!().into_bytes();
+        let mut token = [0u8; 64];
+        rand::thread_rng().fill_bytes(&mut token);
+        let token = token.to_vec();
+
         let expires_at =
             SystemTime::now().checked_add(std::time::Duration::from_secs(expiry_seconds));
         self.issued_tokens.insert(
