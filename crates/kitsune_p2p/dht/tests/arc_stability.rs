@@ -41,7 +41,6 @@ fn pass_redundancy(stats: &Stats, redundancy_target: f64) {
 /// Equilibrium test for a single distribution
 #[test]
 fn stability_test_case_near_ideal() {
-    std::env::set_var("RUST_LOG", "debug");
     holochain_trace::test_run().ok();
 
     let topo = Topology::standard_zero();
@@ -63,7 +62,6 @@ fn stability_test_case_near_ideal() {
 
 #[test]
 fn stability_test_case_messy() {
-    std::env::set_var("RUST_LOG", "debug");
     holochain_trace::test_run().ok();
 
     let topo = Topology::standard_zero();

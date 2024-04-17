@@ -8,7 +8,6 @@ use std::sync::{
     atomic::{AtomicU64, AtomicUsize, Ordering},
     Arc, Once,
 };
-use sysinfo::{NetworkExt, NetworksExt, ProcessExt, SystemExt};
 
 static SYS_INFO: Once = Once::new();
 
@@ -232,9 +231,9 @@ pub fn init_sys_info_poll() {
         metric_task(async move {
             let mut system = sysinfo::System::new_with_specifics(
                 sysinfo::RefreshKind::new()
-                    .with_networks()
-                    .with_networks_list(),
+                    .with_processes(sysinfo::ProcessRefreshKind::new().with_memory().with_cpu()),
             );
+            let mut networks = sysinfo::Networks::new();
 
             let pid = sysinfo::get_current_pid().unwrap();
             let mut tx_avg = FiveAvg::new();
@@ -246,7 +245,7 @@ pub fn init_sys_info_poll() {
 
             loop {
                 system.refresh_process(pid);
-                system.networks_mut().refresh();
+                networks.refresh_list();
 
                 let proc = system.process(pid).unwrap();
 
@@ -258,7 +257,7 @@ pub fn init_sys_info_poll() {
 
                 let mut tx = 0;
                 let mut rx = 0;
-                for (_n, network) in system.networks().iter() {
+                for (_n, network) in networks.iter() {
                     tx += network.transmitted();
                     rx += network.received();
                 }

@@ -9,20 +9,39 @@ use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneSpace};
 use kitsune_p2p_bootstrap_client::{random, BootstrapNet};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::{RandomLimit, RandomQuery};
-use once_cell::sync::Lazy;
 use ratatui::{prelude::*, widgets::*};
+use std::sync::OnceLock;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-static NETWORK_TYPE: Lazy<RwLock<BootstrapNet>> = Lazy::new(|| RwLock::new(BootstrapNet::Tx5));
-static AGENTS: Lazy<RwLock<Vec<AgentInfoSigned>>> = Lazy::new(|| RwLock::new(vec![]));
-static LAST_REFRESH_AT: Lazy<RwLock<Option<Instant>>> = Lazy::new(|| RwLock::new(None));
-static SELECTED: Lazy<RwLock<usize>> = Lazy::new(|| RwLock::new(0));
+fn get_network_type() -> &'static RwLock<BootstrapNet> {
+    static NETWORK_TYPE: OnceLock<RwLock<BootstrapNet>> = OnceLock::new();
 
-pub fn render_bootstrap_widget<B: Backend>(
+    NETWORK_TYPE.get_or_init(|| RwLock::new(BootstrapNet::Tx5))
+}
+
+fn get_agents() -> &'static RwLock<Vec<AgentInfoSigned>> {
+    static AGENTS: OnceLock<RwLock<Vec<AgentInfoSigned>>> = OnceLock::new();
+
+    AGENTS.get_or_init(|| RwLock::new(vec![]))
+}
+
+fn get_last_refresh_at() -> &'static RwLock<Option<Instant>> {
+    static LAST_REFRESH_AT: OnceLock<RwLock<Option<Instant>>> = OnceLock::new();
+
+    LAST_REFRESH_AT.get_or_init(|| RwLock::new(None))
+}
+
+fn get_selected() -> &'static RwLock<usize> {
+    static SELECTED: OnceLock<RwLock<usize>> = OnceLock::new();
+
+    SELECTED.get_or_init(|| RwLock::new(0))
+}
+
+pub fn render_bootstrap_widget(
     args: &Args,
     events: Vec<ScreenEvent>,
-    frame: &mut Frame<B>,
+    frame: &mut Frame,
     rect: Rect,
 ) {
     let bootstrap_url = match &args.bootstrap_url {
@@ -50,7 +69,7 @@ pub fn render_bootstrap_widget<B: Backend>(
                 // Assume the refresh is permitted and clear it if not
                 refresh = true;
 
-                let mut last_refresh = LAST_REFRESH_AT.write().unwrap();
+                let mut last_refresh = get_last_refresh_at().write().unwrap();
                 if let Some(lr) = last_refresh.as_ref() {
                     if lr.elapsed().as_millis() < 10000 {
                         refresh = false;
@@ -66,18 +85,18 @@ pub fn render_bootstrap_widget<B: Backend>(
             ScreenEvent::SwitchNetwork => {
                 switch_network = true;
                 refresh = true; // Always refresh when switching network
-                *LAST_REFRESH_AT.write().unwrap() = Some(Instant::now()); // Reset the refresh timer
+                *get_last_refresh_at().write().unwrap() = Some(Instant::now()); // Reset the refresh timer
             }
             ScreenEvent::NavDown => {
-                let mut selected = SELECTED.write().unwrap();
-                let agents = AGENTS.read().unwrap();
+                let mut selected = get_selected().write().unwrap();
+                let agents = get_agents().read().unwrap();
 
                 if *selected < agents.len() - 1 {
                     *selected += 1;
                 }
             }
             ScreenEvent::NavUp => {
-                let mut selected = SELECTED.write().unwrap();
+                let mut selected = get_selected().write().unwrap();
 
                 if *selected > 0 {
                     *selected -= 1;
@@ -87,7 +106,7 @@ pub fn render_bootstrap_widget<B: Backend>(
     }
 
     if switch_network {
-        let mut network_type = NETWORK_TYPE
+        let mut network_type = get_network_type()
             .write()
             .expect("Should have been able to read network type");
 
@@ -100,11 +119,11 @@ pub fn render_bootstrap_widget<B: Backend>(
     }
 
     if refresh {
-        *SELECTED.write().unwrap() = 0;
+        *get_selected().write().unwrap() = 0;
 
         let query_random_result = block_on(
             async {
-                let network_type = { *NETWORK_TYPE.read().unwrap() };
+                let network_type = { *get_network_type().read().unwrap() };
                 random(
                     Some(bootstrap_url.into()),
                     RandomQuery {
@@ -120,7 +139,7 @@ pub fn render_bootstrap_widget<B: Backend>(
         );
         match query_random_result {
             Ok(Ok(agents)) => {
-                *AGENTS.write().unwrap() = agents;
+                *get_agents().write().unwrap() = agents;
             }
             Ok(Err(e)) => {
                 show_message(
@@ -137,7 +156,9 @@ pub fn render_bootstrap_widget<B: Backend>(
         };
     }
 
-    let agents = AGENTS.read().expect("Should have been able to read agents");
+    let agents = get_agents()
+        .read()
+        .expect("Should have been able to read agents");
 
     let screen_layout = Layout::default()
         .direction(Direction::Vertical)
@@ -159,7 +180,7 @@ pub fn render_bootstrap_widget<B: Backend>(
         .style(Style::default().fg(Color::White))
         .highlight_symbol(">> ");
 
-    let selected = *SELECTED.read().unwrap();
+    let selected = *get_selected().read().unwrap();
     let selected = if !agents.is_empty() && selected < agents.len() {
         let detail_line = List::new(vec![
             ListItem::new(format!(
@@ -196,7 +217,7 @@ pub fn render_bootstrap_widget<B: Backend>(
     );
 
     let timeout_remaining = 10
-        - (*LAST_REFRESH_AT.read().unwrap())
+        - (*get_last_refresh_at().read().unwrap())
             .map(|i| i.elapsed().as_secs())
             .unwrap_or(10) as i64;
     let refresh_timeout_message = if timeout_remaining > 0 {
@@ -218,7 +239,7 @@ pub fn render_bootstrap_widget<B: Backend>(
         ),
         Span::raw(format!(
             ": network type ({:?})",
-            NETWORK_TYPE
+            get_network_type()
                 .read()
                 .expect("Should have been able to read network type")
         )),

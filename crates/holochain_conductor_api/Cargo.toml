@@ -10,7 +10,6 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-directories = "2.0.2"
 derive_more = "0.99"
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.26", path = "../kitsune_p2p/types" }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.20", path = "../kitsune_p2p/bin_data" }
@@ -20,9 +19,7 @@ holochain_serialized_bytes = "=0.0.53"
 holochain_types = { version = "^0.3.0-beta-dev.41", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.34", path = "../holochain_zome_types" }
 serde = { version = "1.0", features = [ "derive" ] }
-serde_derive = "1.0"
 serde_yaml = "0.9"
-structopt = "0.3"
 tracing = "0.1.26"
 thiserror = "1.0.22"
 url2 = "0.0.6"

@@ -25,6 +25,7 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use matches::assert_matches;
+use rand::rngs::OsRng;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -186,9 +187,9 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair
-    let mut rng = rand_dalek::thread_rng();
-    let signing_keypair = ed25519_dalek::Keypair::generate(&mut rng);
-    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+    let mut rng = OsRng;
+    let signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
 
     // Grant zome call capability for agent
     let zome_name = TestWasm::Foo.coordinator_zome_name();
@@ -397,9 +398,9 @@ async fn emit_signals() {
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair
-    let mut rng = rand_dalek::thread_rng();
-    let signing_keypair = ed25519_dalek::Keypair::generate(&mut rng);
-    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+    let mut rng = OsRng;
+    let signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
 
     // Grant zome call capability for agent
     let zome_name = TestWasm::EmitSignal.coordinator_zome_name();

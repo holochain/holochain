@@ -12,9 +12,6 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 anyhow = "1.0"
-# pinned here with = to fix a compilation issue in a dependent crate.
-# feel free to drop the = if it causes problems in the future.
-chashmap = "=2.2.0"
 derive_more = "0.99"
 fallible-iterator = "0.2.0"
 futures = "0.3"
@@ -31,13 +28,12 @@ kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.9", path = "../kitsune_p2p/
 nanoid = "0.4"
 once_cell = "1.4.1"
 num_cpus = "1.13.0"
-parking_lot = "0.10"
+parking_lot = "0.12"
 r2d2 = "0.8"
 r2d2_sqlite = { version = "0.1", package = "r2d2_sqlite_neonphog" }
 rmp-serde = "=0.15.5"
 scheduled-thread-pool = "0.2"
 serde = "1.0"
-serde_derive = "1.0"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 shrinkwraprs = "0.3.0"
 tempfile = "3.3"
@@ -67,10 +63,10 @@ rand = "0.8.5"
 
 [build-dependencies]
 pretty_assertions = "1.4"
-sqlformat = "0.1.6"
+sqlformat = "0.2"
 
 [target.'cfg(loom)'.dev-dependencies]
-loom = { version = "0.6", features = ["futures", "checkpoint"] }
+loom = { version = "0.7", features = ["futures", "checkpoint"] }
 holochain_sqlite = { path = ".", default-features = false, features = ["test_utils"] }
 
 [lints]

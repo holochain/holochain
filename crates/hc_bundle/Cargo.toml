@@ -29,17 +29,15 @@ holochain_util = { path = "../holochain_util", features = ["backtrace"], version
 holochain_serialized_bytes = "=0.0.53"
 holochain_types = { version = "^0.3.0-beta-dev.41", path = "../holochain_types" }
 mr_bundle = {version = "^0.3.0-beta-dev.9", path = "../mr_bundle"}
-serde = { version = "1.0", features = [ "derive" ] }
-serde_bytes = "0.11"
 serde_yaml = "0.9"
 thiserror = "1.0.22"
 tracing = "0.1"
 tokio = { version = "1.27", features = [ "full" ] }
 
 [dev-dependencies]
-assert_cmd = "1.0"
+assert_cmd = "2.0"
 matches = "0.1"
-predicates = "1.0"
+predicates = "3.0"
 tempfile = "3"
 serde_json = "1.0"
 jsonschema = "0.17"
