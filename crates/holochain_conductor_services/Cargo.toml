@@ -16,11 +16,8 @@ async-trait = "0.1"
 derive_more = "0.99"
 futures = "0.3"
 mockall = "0.11"
-must_future = "0.1"
-serde = "1.0"
 thiserror = "1.0"
 
-holochain_util = { version = "^0.3.0-beta-dev.7", path = "../holochain_util", features = ["time"] }
 holochain_keystore = { version = "^0.3.0-beta-dev.35", path = "../holochain_keystore" }
 holochain_types = { version = "^0.3.0-beta-dev.41", path = "../holochain_types" }
 

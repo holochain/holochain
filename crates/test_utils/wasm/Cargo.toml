@@ -26,5 +26,5 @@ strum_macros = "0.18.0"
 holochain_util = { version = "^0.3.0-beta-dev.7", path = "../../holochain_util" }
 
 [build-dependencies]
-toml = "0.5"
+toml = "0.8"
 walkdir = "2.3.1"

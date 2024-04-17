@@ -12,6 +12,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use tempfile::TempDir;
 
 pub mod mutations_helpers;
@@ -388,7 +390,7 @@ pub fn dump_db(txn: &Transaction) {
                         tracing::debug!(?column, row = ?String::from_utf8_lossy(text));
                     }
                     holochain_sqlite::rusqlite::types::ValueRef::Blob(blob) => {
-                        let blob = base64::encode_config(blob, base64::URL_SAFE_NO_PAD);
+                        let blob = URL_SAFE_NO_PAD.encode(blob);
                         tracing::debug!("column: {:?} row:{}", column, blob);
                     }
                 }

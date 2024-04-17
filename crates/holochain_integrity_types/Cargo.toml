@@ -15,7 +15,6 @@ holo_hash = { version = "^0.3.0-beta-dev.27", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.53"
 holochain_util = { version = "^0.3.0-beta-dev.7", path = "../holochain_util", default-features = false }
 holochain_secure_primitive = { version = "^0.3.0-beta-dev.23", path = "../holochain_secure_primitive"}
-paste = "1.0"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 
@@ -27,7 +26,7 @@ kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.9", path = "../kitsune_p2p/
 subtle = "2"
 
 # full-dna-def dependencies
-derive_builder = { version = "0.9", optional = true }
+derive_builder = { version = "0.20", optional = true }
 
 # Optional
 arbitrary = { version = "1.0", features = ["derive"], optional = true }

@@ -21,7 +21,7 @@ tracing = "0.1"
 
 [dev-dependencies]
 holochain_trace = { version = "^0.3.0-beta-dev.10", path = "../holochain_trace" }
-criterion = "0.3.4"
+criterion = "0.5"
 
 [lints]
 workspace = true

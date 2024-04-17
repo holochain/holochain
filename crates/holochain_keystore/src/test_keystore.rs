@@ -4,6 +4,8 @@ use crate::*;
 use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::prelude::*;
 use std::sync::Arc;
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
 /// First Test Agent Pub Key
 pub const TEST_AGENT_PK_1: &str = "uhCAkJCuynkgVdMn_bzZ2ZYaVfygkn0WCuzfFspczxFnZM1QAyXoo";
@@ -22,7 +24,7 @@ pub const TEST_AGENT_PK_4: &str = "uhCAkQHMlYam1PRiYJCzAwQ0AUxIMwOoOvxgXS67N_YPO
 const SEED_4: &str = "2o79pTXHaK1FTPZeBiJo2lCgXW_P0ULjX_5Div_2qxU";
 
 fn r(s: &str) -> Vec<u8> {
-    base64::decode_config(s, base64::URL_SAFE_NO_PAD).unwrap()
+    URL_SAFE_NO_PAD.decode(s).unwrap()
 }
 
 fn s(s: &str) -> [u8; 32] {
