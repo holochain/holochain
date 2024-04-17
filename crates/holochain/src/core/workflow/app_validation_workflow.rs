@@ -423,10 +423,14 @@ pub async fn validate_op(
         .await
         .map_err(AppValidationError::SysValidationError)?;
 
-    let zomes_to_invoke = get_zomes_to_invoke(op, ribosome).await.map_err(|e| {
-        eprintln!("zomes to invoke error {e:?}");
-        AppValidationError::CascadeError(CascadeError::ActionError(ActionError::NotNewEntry))
-    })?;
+    let network = Arc::new(network.clone());
+
+    let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, network.clone(), ribosome)
+        .await
+        .map_err(|e| {
+            tracing::error!("could not get zomes to invoke to validate op {op:?} - {e:?}");
+            AppValidationError::CascadeError(CascadeError::ActionError(ActionError::NotNewEntry))
+        })?;
     let invocation = ValidateInvocation::new(zomes_to_invoke, op)
         .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
 
@@ -435,7 +439,7 @@ pub async fn validate_op(
         dht_op_hash,
         ribosome,
         workspace,
-        Arc::new(network.clone()),
+        network,
         validation_dependencies,
     )
     .await?;
@@ -445,52 +449,56 @@ pub async fn validate_op(
 
 async fn get_zomes_to_invoke(
     op: &Op,
+    workspace: &HostFnWorkspaceRead,
+    network: GenericNetwork,
     ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
-    let maybe_zome_index = match op {
-        Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => None,
+    match op {
+        Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => Ok(ZomesToInvoke::AllIntegrity),
         Op::StoreRecord(StoreRecord { record }) => {
-            if let Some(EntryType::App(app_entry_def)) = record.action().entry_type() {
-                Some(app_entry_def.zome_index())
-            } else {
-                None
-            }
+            let cascade = CascadeImpl::from_workspace_and_network(workspace, network.clone());
+            store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await
         }
-        Op::StoreEntry(StoreEntry { action, .. }) => action
-            .hashed
-            .app_entry_def()
-            .map(|app_entry_def| app_entry_def.zome_index()),
-        Op::RegisterUpdate(RegisterUpdate { update, .. }) => {
-            if let EntryType::App(app_entry_def) = &update.hashed.entry_type {
-                Some(app_entry_def.zome_index())
-            } else {
-                None
-            }
+        Op::StoreEntry(StoreEntry { action, .. }) => {
+            entry_creation_zomes_to_invoke(&action.hashed.content, ribosome)
         }
+        Op::RegisterUpdate(RegisterUpdate { update, .. }) => match &update.hashed.entry_type {
+            EntryType::App(app_entry_def) => {
+                let zome = ribosome
+                    .get_integrity_zome(&app_entry_def.zome_index())
+                    .ok_or_else(|| {
+                        tracing::error!(
+                            "No integrity zome with index {:?} found to validate op {op:?}",
+                            app_entry_def.zome_index()
+                        );
+                        Outcome::rejected(format!(
+                            "No integrity zome with index {:?} found to validate op {op:?}",
+                            app_entry_def.zome_index()
+                        ))
+                    })?;
+                Ok(ZomesToInvoke::OneIntegrity(zome))
+            }
+            _ => unreachable!("entries other than app entries must not be updated"),
+        },
         Op::RegisterDelete(RegisterDelete { delete }) => {
-            if let Some(EntryType::App(app_entry_def)) =
-                (*delete.hashed).clone().into_action().entry_type()
-            {
-                Some(app_entry_def.zome_index())
-            } else {
-                None
-            }
+            todo!()
+            // entry_creation_zomes_to_invoke(original_action, ribosome)
         }
-        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => {
-            Some(create_link.hashed.content.zome_index)
-        }
-        Op::RegisterDeleteLink(RegisterDeleteLink { .. }) => None,
-    };
-    if let Some(zome_index) = maybe_zome_index {
-        let zome = ribosome.get_integrity_zome(&zome_index).ok_or_else(|| {
-            tracing::error!(
-                "No integrity zome with index {zome_index:?} found to validate op {op:?}"
-            );
-            Outcome::rejected(format!("Zome does not exist for {:?}", zome_index))
-        })?;
-        Ok(ZomesToInvoke::OneIntegrity(zome))
-    } else {
-        Ok(ZomesToInvoke::AllIntegrity)
+        Op::RegisterCreateLink(RegisterCreateLink {
+            create_link:
+                SignedHashed {
+                    hashed:
+                        HoloHashed {
+                            content: action, ..
+                        },
+                    ..
+                },
+            ..
+        }) => create_link_zomes_to_invoke(action, ribosome),
+        Op::RegisterDeleteLink(RegisterDeleteLink {
+            create_link: action,
+            ..
+        }) => create_link_zomes_to_invoke(action, ribosome),
     }
 }
 
@@ -540,6 +548,93 @@ pub async fn check_app_entry_def(
             }
         }
         None => Err(ValidationOutcome::EntryDefId(app_entry_def.clone()).into()),
+    }
+}
+
+fn entry_creation_zomes_to_invoke(
+    action: &EntryCreationAction,
+    ribosome: &impl RibosomeT,
+) -> AppValidationOutcome<ZomesToInvoke> {
+    match action {
+        EntryCreationAction::Create(Create {
+            entry_type: EntryType::App(app_entry_def),
+            ..
+        })
+        | EntryCreationAction::Update(Update {
+            entry_type: EntryType::App(app_entry_def),
+            ..
+        }) => {
+            let zome = ribosome
+                .get_integrity_zome(&app_entry_def.zome_index())
+                .ok_or_else(|| {
+                    Outcome::rejected(format!(
+                        "Zome does not exist for {:?}",
+                        app_entry_def.zome_index()
+                    ))
+                })?;
+            Ok(ZomesToInvoke::OneIntegrity(zome))
+        }
+        _ => Ok(ZomesToInvoke::AllIntegrity),
+    }
+}
+
+fn create_link_zomes_to_invoke(
+    create_link: &CreateLink,
+    ribosome: &impl RibosomeT,
+) -> AppValidationOutcome<ZomesToInvoke> {
+    let zome = ribosome
+        .get_integrity_zome(&create_link.zome_index)
+        .ok_or_else(|| {
+            Outcome::rejected(format!(
+                "Zome does not exist for {:?}",
+                create_link.link_type
+            ))
+        })?;
+    Ok(ZomesToInvoke::One(zome.erase_type()))
+}
+
+/// Get the zomes to invoke for an [`Op::StoreRecord`].
+async fn store_record_zomes_to_invoke(
+    action: &Action,
+    ribosome: &impl RibosomeT,
+    cascade: &(impl Cascade + Send + Sync),
+) -> AppValidationOutcome<ZomesToInvoke> {
+    // For deletes there is no entry type to check, so we get the previous action to see if that
+    // was a create or a delete for an app entry type.
+    let action = match action {
+        Action::Delete(Delete {
+            deletes_address, ..
+        })
+        | Action::DeleteLink(DeleteLink {
+            link_add_address: deletes_address,
+            ..
+        }) => {
+            let (deletes_action, _) = cascade
+                .retrieve_action(deletes_address.clone(), NetworkGetOptions::default())
+                .await?
+                .ok_or_else(|| Outcome::awaiting(deletes_address))?;
+
+            deletes_action.action().clone()
+        }
+        _ => action.clone(),
+    };
+
+    match action {
+        Action::CreateLink(create_link) => create_link_zomes_to_invoke(&create_link, ribosome),
+        Action::Create(Create {
+            entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
+            ..
+        })
+        | Action::Update(Update {
+            entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
+            ..
+        }) => {
+            let zome = ribosome.get_integrity_zome(&zome_index).ok_or_else(|| {
+                Outcome::rejected(format!("Zome does not exist for {:?}", zome_index))
+            })?;
+            Ok(ZomesToInvoke::OneIntegrity(zome))
+        }
+        _ => Ok(ZomesToInvoke::AllIntegrity),
     }
 }
 
