@@ -193,7 +193,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());

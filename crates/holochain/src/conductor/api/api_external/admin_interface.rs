@@ -357,7 +357,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_list_dna_app() -> Result<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let env_dir = test_db_dir();
         let handle = Conductor::builder()
             .with_data_root_path(env_dir.path().to_path_buf().into())
@@ -487,7 +487,7 @@ mod test {
     // @todo fix test by using new InstallApp call
     // #[tokio::test(flavor = "multi_thread")]
     // async fn install_list_dna_app() {
-    // holochain_trace::test_run().ok();
+    // holochain_trace::test_run();
     // let db_dir = test_db_dir();
     // let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
     // let shutdown = handle.take_shutdown_handle().unwrap();

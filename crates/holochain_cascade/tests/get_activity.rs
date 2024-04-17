@@ -13,7 +13,7 @@ use test_case::test_case;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_activity() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();

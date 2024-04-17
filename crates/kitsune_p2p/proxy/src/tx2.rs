@@ -1076,7 +1076,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_route_err() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let t = KitsuneTimeout::from_millis(5000);
         let mut all_tasks = Vec::new();
 
@@ -1109,7 +1109,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_proxy() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let t = KitsuneTimeout::from_millis(5000);
 

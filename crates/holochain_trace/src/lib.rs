@@ -157,12 +157,16 @@ impl FromStr for Output {
 /// Run logging in a unit test.
 ///
 /// RUST_LOG must be set or this is a no-op.
-pub fn test_run() -> Result<(), errors::TracingError> {
+pub fn test_run() {
     if std::env::var_os("RUST_LOG").is_none() {
-        return Ok(());
+        return;
     }
 
-    init_fmt(Output::Log)
+    static INIT_ONCE: std::sync::Once = std::sync::Once::new();
+
+    INIT_ONCE.call_once(|| {
+        init_fmt(Output::Log).unwrap();
+    });
 }
 
 /// Run tracing in a test that uses open telemetry to
@@ -325,6 +329,8 @@ where
     W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
 {
     let filter = standard_filter()?;
+
+    println!("Initialising formatting with args {:?}", output);
 
     match output {
         Output::Json => Registry::default()

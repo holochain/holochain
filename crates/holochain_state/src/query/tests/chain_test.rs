@@ -9,7 +9,7 @@ use holochain_zome_types::test_utils::fake_agent_pubkey_1;
 use ChainStatus::*;
 
 fn setup() -> (TestEnv, MetadataBuf, Create, Create, AgentPubKey) {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let test_db = test_cell_db();
     let meta_buf = MetadataBuf::vault(test_db.env().into()).unwrap();
     let agent_pubkey = fake_agent_pubkey_1();

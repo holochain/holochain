@@ -166,7 +166,7 @@ impl Expected {
 /// Test that all ops are created and the correct zomes
 /// are called for each op.
 async fn app_validation_ops() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let entry_def_a = EntryDef::default_from_id("a");
     let entry_def_b = EntryDef::default_from_id("b");
     let call_back_a = |_zome_name: &'static str| {

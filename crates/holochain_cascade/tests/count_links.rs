@@ -9,7 +9,7 @@ use holochain_types::test_utils::chain::action_hash;
 // Checks that links can be counted by asking a remote peer who is an authority on the base for the count
 #[tokio::test(flavor = "multi_thread")]
 async fn count_links_not_authority() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -46,7 +46,7 @@ async fn count_links_not_authority() {
 // Checks that network access is not required for an authority, the agent can count links locally
 #[tokio::test(flavor = "multi_thread")]
 async fn count_links_authority() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -89,7 +89,7 @@ async fn count_links_authority() {
 // seen by the agent doing the publish
 #[tokio::test(flavor = "multi_thread")]
 async fn count_links_authoring() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -152,7 +152,7 @@ async fn count_links_authoring() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn count_links_with_filters() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();

@@ -60,7 +60,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
     async fn xsalsa20_poly1305_shared_secret_round_trip() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         // we need two conductors and two x25519 pub keys to do a round trip
 

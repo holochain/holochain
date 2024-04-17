@@ -2,7 +2,8 @@ use crate::{
     conductor::space::TestSpace,
     core::{
         ribosome::{
-            guest_callback::validate::ValidateInvocation, real_ribosome::RealRibosome,
+            guest_callback::validate::ValidateInvocation,
+            real_ribosome::{ModuleCacheLock, RealRibosome},
             ZomesToInvoke,
         },
         workflow::app_validation_workflow::{
@@ -34,7 +35,7 @@ use holochain_zome_types::{
     Action,
 };
 use matches::assert_matches;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use std::{
     collections::HashSet,
     sync::{
@@ -142,7 +143,7 @@ async fn validation_callback_must_get_action() {
 // instead of explicitly writing the missing op to the cache
 #[tokio::test(flavor = "multi_thread")]
 async fn validation_callback_awaiting_deps_hashes() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
@@ -248,7 +249,7 @@ async fn validation_callback_awaiting_deps_hashes() {
 // test that unresolved dependencies of an agent's chain are fetched
 #[tokio::test(flavor = "multi_thread")]
 async fn validation_callback_awaiting_deps_agent_activity() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
@@ -394,7 +395,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 // they are an authority of
 #[tokio::test(flavor = "multi_thread")]
 async fn validation_callback_prevent_multiple_identical_hash_fetches() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
@@ -504,7 +505,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validation_callback_prevent_multiple_identical_agent_activity_fetches() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
@@ -642,7 +643,7 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
 
 #[tokio::test(flavor = "multi_thread")]
 async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
@@ -814,8 +815,9 @@ impl TestCase {
         let dna_hash = dna_file.dna_hash().clone();
         let ribosome = RealRibosome::new(
             dna_file.clone(),
-            Arc::new(RwLock::new(ModuleCache::new(None))),
+            Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         )
+        .await
         .unwrap();
         let test_space = TestSpace::new(dna_hash.clone());
         let alice = fixt!(AgentPubKey);

@@ -15,7 +15,7 @@ use holochain_zome_types::prelude::*;
 /// - Bob commits the entry and it is now in their authored store
 #[tokio::test(flavor = "multi_thread")]
 async fn authored_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // Check if the correct number of ops are integrated
     // every 100 ms for a maximum of 10 seconds but early exit
     // if they are there.
