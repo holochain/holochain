@@ -605,8 +605,12 @@ async fn store_record_zomes_to_invoke(
     ribosome: &impl RibosomeT,
     cascade: &(impl Cascade + Send + Sync),
 ) -> AppValidationOutcome<ZomesToInvoke> {
-    // For deletes there is no entry type to check, so we get the previous action to see if that
-    // was a create or a delete for an app entry type.
+    // For deletes there is no entry type to check, so we get the previous action.
+    // In theory this can be yet another delete, in which case all integrity
+    // zomes are returned for invocation.
+    // Instead the delete could be followed up the chain to find the original
+    // create, but since deleting a delete does not have much practical use,
+    // it is neglected here.
     let action = match action {
         Action::Delete(Delete {
             deletes_address, ..
@@ -640,10 +644,7 @@ async fn store_record_zomes_to_invoke(
             })?;
             Ok(ZomesToInvoke::OneIntegrity(zome))
         }
-        _ => {
-            println!("we end up here");
-            Ok(ZomesToInvoke::AllIntegrity)
-        }
+        _ => Ok(ZomesToInvoke::AllIntegrity),
     }
 }
 
