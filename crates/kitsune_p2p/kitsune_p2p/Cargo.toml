@@ -68,7 +68,6 @@ kitsune_p2p_bootstrap = { path = "../bootstrap", features = ["sqlite"] }
 kitsune_p2p_timestamp = { path = "../timestamp", features = ["now", "arbitrary"] }
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 maplit = "1"
-mockall = "0.11.3"
 pretty_assertions = "1.4.0"
 test-case = "3.3"
 tokio = { version = "1.11", features = ["full", "test-util"] }
