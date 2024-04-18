@@ -61,7 +61,7 @@ impl From<DateTime> for Timestamp {
 
 impl From<&DateTime> for Timestamp {
     fn from(t: &DateTime) -> Self {
-        let t = t.naive_utc();
+        let t = t.naive_utc().and_utc();
         Timestamp(t.timestamp() * MM + t.timestamp_subsec_nanos() as i64 / 1000)
     }
 }
