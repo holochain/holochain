@@ -11,7 +11,7 @@ use rusqlite::Transaction;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky, doesn't take into account timing or retries"]
 async fn test_validation_receipt() {
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
@@ -129,7 +129,7 @@ macro_rules! wait_until {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_block_invalid_receipt() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let unit_entry_def = EntryDef::default_from_id("unit");
     let integrity_name = "integrity";
     let coordinator_name = "coordinator";

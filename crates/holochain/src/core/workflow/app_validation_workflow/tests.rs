@@ -37,7 +37,7 @@ use std::time::Duration;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn main_loop_app_validation_workflow() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let zomes =
         SweetInlineZomes::new(vec![], 0).integrity_function("validate", move |api, op: Op| {
@@ -246,7 +246,7 @@ async fn main_loop_app_validation_workflow() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "deal with the invalid data that leads to blocks being enforced"]
 async fn app_validation_workflow_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![
         TestWasm::Validate,
@@ -285,7 +285,7 @@ async fn app_validation_workflow_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_private_entries_are_passed_to_validation_only_when_authored_with_full_entry() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     #[hdk_entry_helper]
     pub struct Post(String);
@@ -438,7 +438,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
 #[tokio::test(flavor = "multi_thread")]
 async fn check_app_entry_def_test() {
     let mut u = unstructured_noise();
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let TestWasmPair::<DnaWasm> {
         integrity,
         coordinator,

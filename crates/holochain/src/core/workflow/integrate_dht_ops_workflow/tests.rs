@@ -513,7 +513,7 @@ fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 // This runs the above tests
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ops_state() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let test_db = test_dht_db();
     let env = test_db.to_db();
 

@@ -1,4 +1,4 @@
-use futures_util::{self, pin_mut, stream::StreamExt};
+use futures::{pin_mut, StreamExt};
 use kitsune_p2p_mdns::*;
 
 #[tokio::main]

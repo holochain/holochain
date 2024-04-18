@@ -6,12 +6,11 @@ use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketSender,
 };
 use matches::assert_matches;
-use once_cell::sync::Lazy;
 use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdout, Command};
@@ -19,50 +18,58 @@ use which::which;
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
 
-static HC_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
-    let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_path.push("../hc/Cargo.toml");
+fn get_hc_built_path() -> &'static PathBuf {
+    static HC_BUILT_PATH: OnceLock<PathBuf> = OnceLock::new();
 
-    println!("@@ Warning, Building `hc` binary!");
+    HC_BUILT_PATH.get_or_init(|| {
+        let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        manifest_path.push("../hc/Cargo.toml");
 
-    let out = escargot::CargoBuild::new()
-        .bin("hc")
-        .current_target()
-        .current_release()
-        .manifest_path(manifest_path)
-        // Not defined on CI
-        .target_dir(PathBuf::from(
-            option_env!("CARGO_TARGET_DIR").unwrap_or("./target"),
-        ))
-        .run()
-        .unwrap();
+        println!("@@ Warning, Building `hc` binary!");
 
-    println!("@@ `hc` binary built");
+        let out = escargot::CargoBuild::new()
+            .bin("hc")
+            .current_target()
+            .current_release()
+            .manifest_path(manifest_path)
+            // Not defined on CI
+            .target_dir(PathBuf::from(
+                option_env!("CARGO_TARGET_DIR").unwrap_or("./target"),
+            ))
+            .run()
+            .unwrap();
 
-    out.path().to_path_buf()
-});
+        println!("@@ `hc` binary built");
 
-static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
-    let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_path.push("../holochain/Cargo.toml");
+        out.path().to_path_buf()
+    })
+}
 
-    println!("@@ Warning, Building `holochain` binary!");
+fn get_holochain_built_path() -> &'static PathBuf {
+    static HOLOCHAIN_BUILT_PATH: OnceLock<PathBuf> = OnceLock::new();
 
-    let out = escargot::CargoBuild::new()
-        .bin("holochain")
-        .current_target()
-        .current_release()
-        .manifest_path(manifest_path)
-        .target_dir(PathBuf::from(
-            option_env!("CARGO_TARGET_DIR").unwrap_or("./target"),
-        ))
-        .run()
-        .unwrap();
+    HOLOCHAIN_BUILT_PATH.get_or_init(|| {
+        let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        manifest_path.push("../holochain/Cargo.toml");
 
-    println!("@@ `holochain` binary built");
+        println!("@@ Warning, Building `holochain` binary!");
 
-    out.path().to_path_buf()
-});
+        let out = escargot::CargoBuild::new()
+            .bin("holochain")
+            .current_target()
+            .current_release()
+            .manifest_path(manifest_path)
+            .target_dir(PathBuf::from(
+                option_env!("CARGO_TARGET_DIR").unwrap_or("./target"),
+            ))
+            .run()
+            .unwrap();
+
+        println!("@@ `holochain` binary built");
+
+        out.path().to_path_buf()
+    })
+}
 
 async fn new_websocket_client_for_port(
     port: u16,
@@ -158,7 +165,7 @@ async fn generate_sandbox_and_connect() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
 
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -196,7 +203,7 @@ async fn generate_sandbox_and_call_list_dna() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
 
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -236,17 +243,11 @@ async fn generate_sandbox_and_call_list_dna() {
 }
 
 fn get_hc_command() -> Command {
-    Command::new(match which("hc") {
-        Ok(p) => p,
-        Err(_) => HC_BUILT_PATH.clone(),
-    })
+    Command::new(which("hc").unwrap_or_else(|_| get_hc_built_path().clone()))
 }
 
 fn get_holochain_bin_path() -> PathBuf {
-    match which("holochain") {
-        Ok(p) => p,
-        Err(_) => HOLOCHAIN_BUILT_PATH.clone(),
-    }
+    which("holochain").unwrap_or_else(|_| get_holochain_built_path().clone())
 }
 
 fn get_sandbox_command() -> Command {

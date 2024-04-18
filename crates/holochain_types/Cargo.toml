@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.3.0-beta-dev.40"
+version = "0.3.0-beta-dev.41"
 description = "Holochain common types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -9,42 +9,33 @@ readme = "README.md"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 # reminder - do not use workspace deps
 [dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
 automap = { version = "0.1", features = ["serde"] }
 backtrace = "0.3.27"
-base64 = "0.13"
-cfg-if = "0.1"
-chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
-derive_builder = "0.9.0"
+derive_builder = "0.20"
 derive_more = "0.99"
-either = "1.5"
 fixt = { path = "../fixt", version = "^0.3.0-beta-dev.3"}
 flate2 = "1.0.14"
 futures = "0.3"
 getrandom = { version = "0.2.7" }
 one_err = "0.0.8"
-holo_hash = { version = "^0.3.0-beta-dev.26", path = "../holo_hash", features = ["encoding"] }
-holochain_keystore = { version = "^0.3.0-beta-dev.34", path = "../holochain_keystore" }
+holo_hash = { version = "^0.3.0-beta-dev.27", path = "../holo_hash", features = ["encoding"] }
+holochain_keystore = { version = "^0.3.0-beta-dev.35", path = "../holochain_keystore" }
 holochain_nonce = {version = "^0.3.0-beta-dev.26", path = "../holochain_nonce"}
 holochain_serialized_bytes = "=0.0.53"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.40"}
-holochain_wasmer_host = "=0.0.92"
-holochain_util = { version = "^0.3.0-beta-dev.6", path = "../holochain_util", features = ["backtrace"] }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.33", features = ["full"] }
-itertools = { version = "0.10" }
-kitsune_p2p_dht = { version = "^0.3.0-beta-dev.21", path = "../kitsune_p2p/dht" }
-lazy_static = "1.4.0"
-mockall = "0.11.3"
-mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.3.0-beta-dev.8"}
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.41"}
+holochain_util = { version = "^0.3.0-beta-dev.7", path = "../holochain_util", features = ["backtrace"] }
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.34", features = ["full"] }
+itertools = { version = "0.12" }
+kitsune_p2p_dht = { version = "^0.3.0-beta-dev.22", path = "../kitsune_p2p/dht" }
+mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.3.0-beta-dev.9"}
 must_future = "0.1.1"
-nanoid = "0.3"
-holochain_trace = { version = "^0.3.0-beta-dev.9", path = "../holochain_trace" }
-parking_lot = "0.10"
+nanoid = "0.4"
+holochain_trace = { version = "^0.3.0-beta-dev.10", path = "../holochain_trace" }
+parking_lot = "0.12"
 rand = "0.8.5"
 regex = "1.4"
 rusqlite = { version = "0.29" }
@@ -52,7 +43,7 @@ serde = { version = "1.0", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"
 serde_derive = "1.0"
 serde_json = "1.0"
-serde_with = "1.12.0"
+serde_with = "3.7.0"
 serde_yaml = "0.9"
 shrinkwraprs = "0.3.0"
 strum = "0.18.0"
@@ -79,7 +70,7 @@ maplit = "1"
 matches = "0.1"
 pretty_assertions = "1.4"
 serde_json = "1.0"
-test-case = "2.1.0"
+test-case = "3.3"
 tokio = { version = "1.11", features = [ "full" ] }
 
 [lints]

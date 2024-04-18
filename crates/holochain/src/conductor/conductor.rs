@@ -43,7 +43,6 @@ use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holochain_wasmer_host::module::ModuleCache;
 use itertools::Itertools;
-use parking_lot::RwLock;
 use rusqlite::Transaction;
 use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
@@ -90,6 +89,7 @@ use crate::core::queue_consumer::QueueTriggers;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
+use crate::core::ribosome::real_ribosome::ModuleCacheLock;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::ZomeCallResult;
 use crate::{
@@ -242,7 +242,7 @@ pub struct Conductor {
 
     /// File system and in-memory cache for wasmer modules.
     // Used in ribosomes but kept here as a single instance.
-    pub(crate) wasmer_module_cache: Arc<RwLock<ModuleCache>>,
+    pub(crate) wasmer_module_cache: Arc<ModuleCacheLock>,
 }
 
 impl Conductor {
@@ -298,7 +298,9 @@ mod startup_shutdown_impls {
                 holochain_p2p,
                 post_commit,
                 services: RwShare::new(None),
-                wasmer_module_cache: Arc::new(RwLock::new(ModuleCache::new(maybe_data_root_path))),
+                wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
+                    maybe_data_root_path,
+                ))),
             }
         }
 
@@ -668,7 +670,8 @@ mod dna_impls {
             // try to join all the tasks and return the list of dna files
             let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
                 let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
-                let ribosome = RealRibosome::new(dna_file, self.wasmer_module_cache.clone())?;
+                let ribosome =
+                    RealRibosome::new(dna_file, self.wasmer_module_cache.clone()).await?;
                 ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
             });
             let dnas = futures::future::try_join_all(wasms).await?;
@@ -793,9 +796,7 @@ mod dna_impls {
                 // ribosome for dna is already registered in store
                 return Ok(());
             }
-
-            let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone())?;
-
+            let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone()).await?;
             let entry_defs = self.register_dna_wasm(ribosome.clone()).await?;
 
             self.register_dna_entry_defs(entry_defs);
@@ -3134,7 +3135,7 @@ fn query_dht_ops_from_statement(
     Ok(r)
 }
 
-// #[instrument(skip(p2p_evt, handle))]
+#[instrument(skip(p2p_evt, handle))]
 async fn p2p_event_task(
     p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,

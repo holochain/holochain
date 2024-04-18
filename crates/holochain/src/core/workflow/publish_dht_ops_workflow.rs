@@ -284,7 +284,7 @@ mod tests {
     #[ignore = "(david.b) tests should be re-written using mock network"]
     fn test_sent_to_r_nodes(num_agents: u32, num_hash: u32) {
         tokio_helper::block_forever_on(async {
-            holochain_trace::test_run().ok();
+            holochain_trace::test_run();
 
             // Create test db
             let test_db = test_authored_db();
@@ -350,7 +350,7 @@ mod tests {
     fn test_private_entries(num_agents: u32) {
         tokio_helper::block_forever_on(
             async {
-                holochain_trace::test_run().ok();
+                holochain_trace::test_run();
 
                 // Create test db
                 let test_db = test_authored_db();

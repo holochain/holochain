@@ -1,5 +1,5 @@
 mod fetches_expiry_tests {
-    use ::fixt::fixt;
+    use fixt::fixt;
     use holo_hash::fixt::AnyDhtHashFixturator;
     use std::time::{Duration, Instant};
 

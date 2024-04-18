@@ -18,7 +18,7 @@ use std::time::{Duration, SystemTime};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn no_ops_to_publish() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let test_db = holochain_state::test_utils::test_authored_db();
     let vault = test_db.to_db();
@@ -39,7 +39,7 @@ async fn no_ops_to_publish() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn workflow_incomplete_on_routing_error() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let test_db = holochain_state::test_utils::test_authored_db();
     let vault = test_db.to_db();
@@ -71,7 +71,7 @@ async fn workflow_incomplete_on_routing_error() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn workflow_handles_publish_errors() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let test_db = holochain_state::test_utils::test_authored_db();
     let vault = test_db.to_db();
@@ -103,7 +103,7 @@ async fn workflow_handles_publish_errors() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_publish_until_receipts_received() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let test_db = holochain_state::test_utils::test_authored_db();
     let vault = test_db.to_db();
@@ -148,7 +148,7 @@ async fn retry_publish_until_receipts_received() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn loop_resumes_on_new_data() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let test_db = holochain_state::test_utils::test_authored_db();
     let vault = test_db.to_db();
@@ -187,7 +187,7 @@ async fn loop_resumes_on_new_data() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn ignores_data_by_other_authors() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let test_db = holochain_state::test_utils::test_authored_db();
     let vault = test_db.to_db();
