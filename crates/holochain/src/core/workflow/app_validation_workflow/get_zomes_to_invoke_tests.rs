@@ -14,7 +14,9 @@ use holochain_state::mutations::insert_op;
 use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
 use holochain_types::rate_limit::{EntryRateWeight, RateWeight};
-use holochain_zome_types::action::{AppEntryDef, Create, Delete, EntryType, Update, ZomeIndex};
+use holochain_zome_types::action::{
+    AppEntryDef, Create, CreateLink, Delete, EntryType, Update, ZomeIndex,
+};
 use holochain_zome_types::fixt::{
     ActionFixturator, ActionHashFixturator, AgentPubKeyFixturator, CreateFixturator,
     CreateLinkFixturator, DeleteFixturator, DeleteLinkFixturator, EntryFixturator,
@@ -304,7 +306,7 @@ async fn store_entry_update_non_app_entry() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn store_record_create_entry() {
+async fn store_record_create_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
@@ -461,7 +463,53 @@ async fn store_record_create_wrong_entry() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn store_record_update_entry() {
+async fn store_record_create_link() {
+    let zomes = SweetInlineZomes::new(vec![], 0);
+    let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let zome = &integrity_zomes[0];
+    let zome_index = ZomeIndex(0);
+    let mut ribosome = MockRibosomeT::new();
+    ribosome.expect_get_integrity_zome().return_once({
+        let zome = zome.clone();
+        move |index| {
+            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
+            Some(zome)
+        }
+    });
+
+    let mut create_link = fixt!(CreateLink);
+    create_link.zome_index = zome_index.clone();
+    let action = Action::CreateLink(create_link);
+    let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
+    let record = Record::new(action.clone(), None);
+    let op = Op::StoreRecord(StoreRecord { record });
+
+    let test_space = TestSpace::new(dna_file.dna_hash().clone());
+    let workspace = HostFnWorkspaceRead::new(
+        test_space
+            .space
+            .get_or_create_authored_db(fixt!(AgentPubKey))
+            .unwrap()
+            .into(),
+        test_space.space.dht_db.clone().into(),
+        test_space.space.dht_query_cache.clone(),
+        test_space.space.cache_db.clone().into(),
+        fixt!(MetaLairClient),
+        None,
+        Arc::new(dna_file.dna_def().clone()),
+    )
+    .await
+    .unwrap();
+    let network = Arc::new(MockHolochainP2pDnaT::new());
+
+    let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
+        .await
+        .unwrap();
+    assert_matches!(zomes_to_invoke, ZomesToInvoke::OneIntegrity(z) if z.name == zome.name);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn store_record_update_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
@@ -525,7 +573,54 @@ async fn store_record_update_entry() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn store_record_update_of_update_entry() {
+async fn store_record_update_non_app_entry() {
+    let zomes = SweetInlineZomes::new(vec![], 0);
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let ribosome = MockRibosomeT::new();
+
+    let mut create = fixt!(Create);
+    create.entry_type = EntryType::CapGrant;
+    let action = Action::Update(Update {
+        action_seq: 0,
+        author: fixt!(AgentPubKey),
+        entry_hash: fixt!(EntryHash),
+        entry_type: EntryType::AgentPubKey,
+        original_action_address: create.to_hash(),
+        original_entry_address: create.entry_hash.clone(),
+        prev_action: fixt!(ActionHash),
+        timestamp: Timestamp::now(),
+        weight: EntryRateWeight::default(),
+    });
+    let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
+    let record = Record::new(action.clone(), None);
+    let op = Op::StoreRecord(StoreRecord { record });
+
+    let test_space = TestSpace::new(dna_file.dna_hash().clone());
+    let workspace = HostFnWorkspaceRead::new(
+        test_space
+            .space
+            .get_or_create_authored_db(fixt!(AgentPubKey))
+            .unwrap()
+            .into(),
+        test_space.space.dht_db.clone().into(),
+        test_space.space.dht_query_cache.clone(),
+        test_space.space.cache_db.clone().into(),
+        fixt!(MetaLairClient),
+        None,
+        Arc::new(dna_file.dna_def().clone()),
+    )
+    .await
+    .unwrap();
+    let network = Arc::new(MockHolochainP2pDnaT::new());
+
+    let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
+        .await
+        .unwrap();
+    assert_matches!(zomes_to_invoke, ZomesToInvoke::AllIntegrity);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn store_record_update_of_update_app_entry() {
     let zomes = SweetInlineZomes::new(vec![], 0);
     let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let zome = &integrity_zomes[0];
@@ -728,6 +823,66 @@ async fn store_record_delete_non_app_entry() {
         .await
         .unwrap();
     assert_matches!(zomes_to_invoke, ZomesToInvoke::AllIntegrity);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn store_record_delete_link() {
+    let zomes = SweetInlineZomes::new(vec![], 0);
+    let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let zome = &integrity_zomes[0];
+    let zome_index = ZomeIndex(0);
+    let mut ribosome = MockRibosomeT::new();
+    ribosome.expect_get_integrity_zome().return_once({
+        let zome = zome.clone();
+        move |index| {
+            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
+            Some(zome)
+        }
+    });
+
+    let mut create_link = fixt!(CreateLink);
+    create_link.zome_index = zome_index.clone();
+    let original_action = Action::CreateLink(create_link.clone());
+    let mut delete_link = fixt!(DeleteLink);
+    delete_link.link_add_address = original_action.to_hash();
+    let action = Action::DeleteLink(delete_link);
+    let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
+    let record = Record::new(action.clone(), None);
+    let op = Op::StoreRecord(StoreRecord { record });
+
+    let test_space = TestSpace::new(dna_file.dna_hash().clone());
+    let workspace = HostFnWorkspaceRead::new(
+        test_space
+            .space
+            .get_or_create_authored_db(fixt!(AgentPubKey))
+            .unwrap()
+            .into(),
+        test_space.space.dht_db.clone().into(),
+        test_space.space.dht_query_cache.clone(),
+        test_space.space.cache_db.clone().into(),
+        fixt!(MetaLairClient),
+        None,
+        Arc::new(dna_file.dna_def().clone()),
+    )
+    .await
+    .unwrap();
+    let network = Arc::new(MockHolochainP2pDnaT::new());
+
+    // write original action to dht db
+    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+        fixt!(Signature),
+        original_action,
+        RecordEntry::NA,
+    ));
+    test_space.space.dht_db.test_write(move |txn| {
+        insert_op(txn, &dht_op).unwrap();
+        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
+    });
+
+    let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
+        .await
+        .unwrap();
+    assert_matches!(zomes_to_invoke, ZomesToInvoke::OneIntegrity(z) if z.name == zome.name);
 }
 
 // not a logical case that a delete is deleted, but valid nonetheless
