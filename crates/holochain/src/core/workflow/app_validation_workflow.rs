@@ -47,6 +47,12 @@ mod tests;
 mod validation_tests;
 
 #[cfg(test)]
+mod get_zomes_to_invoke_tests;
+
+#[cfg(test)]
+mod run_validation_callback_tests;
+
+#[cfg(test)]
 mod unit_tests;
 
 mod error;
@@ -634,7 +640,10 @@ async fn store_record_zomes_to_invoke(
             })?;
             Ok(ZomesToInvoke::OneIntegrity(zome))
         }
-        _ => Ok(ZomesToInvoke::AllIntegrity),
+        _ => {
+            println!("we end up here");
+            Ok(ZomesToInvoke::AllIntegrity)
+        }
     }
 }
 
