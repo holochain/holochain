@@ -484,7 +484,7 @@ async fn get_zomes_to_invoke(
                     })?;
                 Ok(ZomesToInvoke::OneIntegrity(zome))
             }
-            _ => unreachable!("entries other than app entries must not be updated"),
+            _ => Ok(ZomesToInvoke::AllIntegrity),
         },
         Op::RegisterDelete(RegisterDelete { delete }) => {
             todo!()
@@ -573,6 +573,10 @@ fn entry_creation_zomes_to_invoke(
             let zome = ribosome
                 .get_integrity_zome(&app_entry_def.zome_index())
                 .ok_or_else(|| {
+                    tracing::error!(
+                        "No zome with zome index {:?} found for action {action:?}",
+                        app_entry_def.zome_index()
+                    );
                     Outcome::rejected(format!(
                         "Zome does not exist for {:?}",
                         app_entry_def.zome_index()
@@ -584,21 +588,6 @@ fn entry_creation_zomes_to_invoke(
     }
 }
 
-fn create_link_zomes_to_invoke(
-    create_link: &CreateLink,
-    ribosome: &impl RibosomeT,
-) -> AppValidationOutcome<ZomesToInvoke> {
-    let zome = ribosome
-        .get_integrity_zome(&create_link.zome_index)
-        .ok_or_else(|| {
-            Outcome::rejected(format!(
-                "Zome does not exist for {:?}",
-                create_link.link_type
-            ))
-        })?;
-    Ok(ZomesToInvoke::One(zome.erase_type()))
-}
-
 /// Get the zomes to invoke for an [`Op::StoreRecord`].
 async fn store_record_zomes_to_invoke(
     action: &Action,
@@ -606,8 +595,8 @@ async fn store_record_zomes_to_invoke(
     cascade: &(impl Cascade + Send + Sync),
 ) -> AppValidationOutcome<ZomesToInvoke> {
     // For deletes there is no entry type to check, so we get the previous action.
-    // In theory this can be yet another delete, in which case all integrity
-    // zomes are returned for invocation.
+    // In theory this can be yet another delete and so forth, in which case all
+    // integrity zomes are returned for invocation.
     // Instead the delete could be followed up the chain to find the original
     // create, but since deleting a delete does not have much practical use,
     // it is neglected here.
@@ -640,12 +629,30 @@ async fn store_record_zomes_to_invoke(
             ..
         }) => {
             let zome = ribosome.get_integrity_zome(&zome_index).ok_or_else(|| {
+                tracing::error!(
+                    "No zome with zome index {zome_index:?} found for action {action:?}"
+                );
                 Outcome::rejected(format!("Zome does not exist for {:?}", zome_index))
             })?;
             Ok(ZomesToInvoke::OneIntegrity(zome))
         }
         _ => Ok(ZomesToInvoke::AllIntegrity),
     }
+}
+
+fn create_link_zomes_to_invoke(
+    create_link: &CreateLink,
+    ribosome: &impl RibosomeT,
+) -> AppValidationOutcome<ZomesToInvoke> {
+    let zome = ribosome
+        .get_integrity_zome(&create_link.zome_index)
+        .ok_or_else(|| {
+            Outcome::rejected(format!(
+                "Zome does not exist for {:?}",
+                create_link.link_type
+            ))
+        })?;
+    Ok(ZomesToInvoke::One(zome.erase_type()))
 }
 
 async fn run_validation_callback(
