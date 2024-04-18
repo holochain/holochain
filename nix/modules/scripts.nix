@@ -58,7 +58,7 @@
         fi
 
         if [[ "$VERSIONS_DIR" == "$DEFAULT_VERSIONS_DIR" ]]; then
-          ¢ TODO, once the Nix version on CI supports it -> nix flake update versions
+          # TODO, once the Nix version on CI supports it -> nix flake update versions
           nix flake lock --tarball-ttl 0 --update-input versions --override-input versions "path:$VERSIONS_DIR"
         fi
 
