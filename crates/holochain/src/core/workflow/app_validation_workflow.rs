@@ -470,25 +470,28 @@ async fn get_zomes_to_invoke(
         }
         Op::RegisterUpdate(RegisterUpdate { update, .. }) => match &update.hashed.entry_type {
             EntryType::App(app_entry_def) => {
-                let zome = ribosome
-                    .get_integrity_zome(&app_entry_def.zome_index())
-                    .ok_or_else(|| {
-                        tracing::error!(
-                            "No integrity zome with index {:?} found to validate op {op:?}",
-                            app_entry_def.zome_index()
-                        );
-                        Outcome::rejected(format!(
-                            "No integrity zome with index {:?} found to validate op {op:?}",
-                            app_entry_def.zome_index()
-                        ))
-                    })?;
-                Ok(ZomesToInvoke::OneIntegrity(zome))
+                zomes_to_invoke_from_ribosome(&app_entry_def.zome_index, ribosome)
             }
             _ => Ok(ZomesToInvoke::AllIntegrity),
         },
         Op::RegisterDelete(RegisterDelete { delete }) => {
-            todo!()
-            // entry_creation_zomes_to_invoke(original_action, ribosome)
+            let cascade = CascadeImpl::from_workspace_and_network(workspace, network.clone());
+            let deletes_address = &delete.hashed.deletes_address;
+            let (deleted_action, _) = cascade
+                .retrieve_action(deletes_address.clone(), NetworkGetOptions::default())
+                .await?
+                .ok_or_else(|| Outcome::awaiting(deletes_address))?;
+            match deleted_action.hashed.content {
+                Action::Create(Create {
+                    entry_type: EntryType::App(app_entry_def),
+                    ..
+                })
+                | Action::Update(Update {
+                    entry_type: EntryType::App(app_entry_def),
+                    ..
+                }) => zomes_to_invoke_from_ribosome(&app_entry_def.zome_index, ribosome),
+                _ => Ok(ZomesToInvoke::AllIntegrity),
+            }
         }
         Op::RegisterCreateLink(RegisterCreateLink {
             create_link:
@@ -500,11 +503,11 @@ async fn get_zomes_to_invoke(
                     ..
                 },
             ..
-        }) => create_link_zomes_to_invoke(action, ribosome),
-        Op::RegisterDeleteLink(RegisterDeleteLink {
+        })
+        | Op::RegisterDeleteLink(RegisterDeleteLink {
             create_link: action,
             ..
-        }) => create_link_zomes_to_invoke(action, ribosome),
+        }) => zomes_to_invoke_from_ribosome(&action.zome_index, ribosome),
     }
 }
 
@@ -619,7 +622,9 @@ async fn store_record_zomes_to_invoke(
     };
 
     match action {
-        Action::CreateLink(create_link) => create_link_zomes_to_invoke(&create_link, ribosome),
+        Action::CreateLink(create_link) => {
+            zomes_to_invoke_from_ribosome(&create_link.zome_index, ribosome)
+        }
         Action::Create(Create {
             entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
             ..
@@ -640,23 +645,15 @@ async fn store_record_zomes_to_invoke(
     }
 }
 
-fn create_link_zomes_to_invoke(
-    create_link: &CreateLink,
+fn zomes_to_invoke_from_ribosome(
+    zome_index: &ZomeIndex,
     ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
-    let zome = ribosome
-        .get_integrity_zome(&create_link.zome_index)
-        .ok_or_else(|| {
-            tracing::error!(
-                "No integrity zome with link type {:?} found",
-                create_link.link_type
-            );
-            Outcome::rejected(format!(
-                "No integrity zome with link type {:?} found",
-                create_link.link_type
-            ))
-        })?;
-    Ok(ZomesToInvoke::One(zome.erase_type()))
+    let zome = ribosome.get_integrity_zome(zome_index).ok_or_else(|| {
+        tracing::error!("No integrity zome with index {zome_index:?} found");
+        Outcome::rejected(format!("No integrity zome with index {zome_index:?} found"))
+    })?;
+    Ok(ZomesToInvoke::OneIntegrity(zome))
 }
 
 async fn run_validation_callback(
