@@ -61,7 +61,7 @@ impl From<DateTime> for Timestamp {
 
 impl From<&DateTime> for Timestamp {
     fn from(t: &DateTime) -> Self {
-        let t = t.naive_utc();
+        let t = t.naive_utc().and_utc();
         Timestamp(t.timestamp() * MM + t.timestamp_subsec_nanos() as i64 / 1000)
     }
 }
@@ -83,9 +83,7 @@ impl TryFrom<&Timestamp> for DateTime {
 
     fn try_from(t: &Timestamp) -> Result<Self, Self::Error> {
         let (secs, nsecs) = t.as_seconds_and_nanos();
-        let t = chrono::naive::NaiveDateTime::from_timestamp_opt(secs, nsecs)
-            .ok_or(TimestampError::Overflow)?;
-        Ok(chrono::DateTime::from_naive_utc_and_offset(t, chrono::Utc))
+        Ok(chrono::DateTime::from_timestamp(secs, nsecs).ok_or(TimestampError::Overflow)?)
     }
 }
 
