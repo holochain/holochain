@@ -38,7 +38,10 @@ pub async fn websocket_stress() {
     let data_root_path = tmp_dir.path().to_path_buf();
     let config = ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port: 0, allowed_origins: AllowedOrigins::Any },
+            driver: InterfaceDriver::Websocket {
+                port: 0,
+                allowed_origins: AllowedOrigins::Any,
+            },
         }]),
         data_root_path: Some(data_root_path.into()),
         keystore: KeystoreConfig::DangerTestKeystore,
