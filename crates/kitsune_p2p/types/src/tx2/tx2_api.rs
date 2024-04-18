@@ -911,7 +911,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_api() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         tracing::trace!("bob");
 
         let t = KitsuneTimeout::from_millis(5000);

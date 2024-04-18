@@ -15,6 +15,7 @@ use holochain::{
     },
     fixt::*,
 };
+use std::net::ToSocketAddrs;
 
 use holochain_conductor_api::{AdminInterfaceConfig, AppRequest, InterfaceDriver};
 use holochain_types::{
@@ -24,6 +25,7 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use matches::assert_matches;
+use rand::rngs::OsRng;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -54,7 +56,7 @@ impl PollRecv {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn call_admin() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -125,7 +127,7 @@ how_many: 42
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn call_zome() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
@@ -185,9 +187,9 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair
-    let mut rng = rand_dalek::thread_rng();
-    let signing_keypair = ed25519_dalek::Keypair::generate(&mut rng);
-    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+    let mut rng = OsRng;
+    let signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
 
     // Grant zome call capability for agent
     let zome_name = TestWasm::Foo.coordinator_zome_name();
@@ -274,7 +276,7 @@ async fn call_zome() {
 #[cfg(feature = "slow_tests")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn remote_signals() -> anyhow::Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 2;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
@@ -346,7 +348,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn emit_signals() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -396,9 +398,9 @@ async fn emit_signals() {
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair
-    let mut rng = rand_dalek::thread_rng();
-    let signing_keypair = ed25519_dalek::Keypair::generate(&mut rng);
-    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+    let mut rng = OsRng;
+    let signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
 
     // Grant zome call capability for agent
     let zome_name = TestWasm::EmitSignal.coordinator_zome_name();
@@ -481,7 +483,7 @@ async fn emit_signals() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
@@ -506,7 +508,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn list_app_interfaces_succeeds() -> Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
@@ -519,7 +521,13 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     ws_config.default_request_timeout = Duration::from_secs(1);
     let (client, rx): (WebsocketSender, WebsocketReceiver) = connect(
         Arc::new(ws_config),
-        ConnectRequest::new(([127, 0, 0, 1], port).into()),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        ),
     )
     .await?;
     let _rx = PollRecv::new::<AdminResponse>(rx);
@@ -545,7 +553,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 }
 
 async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
@@ -558,7 +566,13 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     ws_config.default_request_timeout = Duration::from_secs(1);
     let (client, mut rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
         Arc::new(ws_config),
-        ConnectRequest::new(([127, 0, 0, 1], port).into()),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        ),
     )
     .await?;
 
@@ -607,7 +621,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn connection_limit_is_respected() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
@@ -615,7 +629,11 @@ async fn connection_limit_is_respected() {
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
 
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    let addr = format!("localhost:{port}")
+        .to_socket_addrs()
+        .unwrap()
+        .next()
+        .unwrap();
     let cfg = Arc::new(WebsocketConfig::CLIENT_DEFAULT);
 
     // Retain handles so that the test can control when to disconnect clients
@@ -674,7 +692,7 @@ async fn concurrent_install_dna() {
     static NUM_CONCURRENT_INSTALLS: u8 = 10;
     static REQ_TIMEOUT_MS: u64 = 15000;
 
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -747,7 +765,7 @@ async fn concurrent_install_dna() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore)]
 async fn network_stats() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut batch =
         SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(true))
@@ -780,7 +798,7 @@ async fn network_stats() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn full_state_dump_cursor_works() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
 
@@ -830,7 +848,7 @@ async fn full_state_dump_cursor_works() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn admin_allowed_origins() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let conductor = SweetConductor::from_standard_config().await;
 
@@ -845,18 +863,32 @@ async fn admin_allowed_origins() {
         .await
         .unwrap();
 
+    let port = *ports.first().unwrap();
     assert!(connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], *ports.first().unwrap()).into())
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
     )
     .await
     .is_err());
 
+    let port = *ports.first().unwrap();
     let (client, rx) = connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], *ports.first().unwrap()).into())
-            .try_set_header("origin", "http://localhost:3000")
-            .unwrap(),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .try_set_header("origin", "http://localhost:3000")
+        .unwrap(),
     )
     .await
     .unwrap();
@@ -869,7 +901,7 @@ async fn admin_allowed_origins() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_allowed_origins() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let conductor = SweetConductor::from_standard_config().await;
 
@@ -884,7 +916,13 @@ async fn app_allowed_origins() {
 
     assert!(connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], port).into())
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
     )
     .await
     .is_err());
@@ -894,7 +932,7 @@ async fn app_allowed_origins() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_allowed_origins_independence() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let conductor = SweetConductor::from_standard_config().await;
 
@@ -920,18 +958,30 @@ async fn app_allowed_origins_independence() {
 
     assert!(connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], port_1).into())
-            .try_set_header("origin", "http://localhost:3002")
-            .unwrap()
+        ConnectRequest::new(
+            format!("localhost:{port_1}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+        .try_set_header("origin", "http://localhost:3002")
+        .unwrap()
     )
     .await
     .is_err());
 
     assert!(connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], port_2).into())
-            .try_set_header("origin", "http://localhost:3001")
-            .unwrap()
+        ConnectRequest::new(
+            format!("localhost:{port_2}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+        .try_set_header("origin", "http://localhost:3001")
+        .unwrap()
     )
     .await
     .is_err());
@@ -945,9 +995,15 @@ async fn app_allowed_origins_independence() {
 async fn check_app_port(port: u16, origin: &str) {
     let (client, rx) = connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(([127, 0, 0, 1], port).into())
-            .try_set_header("origin", origin)
-            .unwrap(),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .try_set_header("origin", origin)
+        .unwrap(),
     )
     .await
     .unwrap();

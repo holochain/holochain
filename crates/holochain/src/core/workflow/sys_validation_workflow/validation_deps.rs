@@ -42,7 +42,7 @@ impl ValidationDependencies {
             .unwrap_or(false)
     }
 
-    /// Get the state of a given dependency. This should always return a value because we should know about the depdendency
+    /// Get the state of a given dependency. This should always return a value because we should know about the dependency
     /// by examining the ops that are being validated. However, the dependency may not be found on the DHT yet.
     pub fn get(&mut self, hash: &ActionHash) -> Option<&mut ValidationDependencyState> {
         match self.states.get_mut(hash) {

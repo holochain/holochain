@@ -43,6 +43,7 @@ use holochain_state::{
     prelude::*,
     query::{map_sql_dht_op_common, StateQueryError},
 };
+use holochain_util::timed;
 use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use kitsune_p2p_block::NodeId;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
@@ -141,6 +142,7 @@ impl Spaces {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
+
         let conductor_db =
             DbWrite::open_with_sync_level(root_db_dir.as_ref(), DbKindConductor, db_sync_level)?;
         let wasm_db =
@@ -254,17 +256,21 @@ impl Spaces {
     }
 
     /// Get the holochain conductor state
+    #[tracing::instrument(skip_all)]
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
-        match query_conductor_state(&self.conductor_db).await? {
-            Some(state) => Ok(state),
-            // update_state will again try to read the state. It's a little
-            // inefficient in the infrequent case where we haven't saved the
-            // state yet, but more atomic, so worth it.
-            None => self.update_state(Ok).await,
-        }
+        timed!([1, 10, 1000], "get_state", {
+            match query_conductor_state(&self.conductor_db).await? {
+                Some(state) => Ok(state),
+                // update_state will again try to read the state. It's a little
+                // inefficient in the infrequent case where we haven't saved the
+                // state yet, but more atomic, so worth it.
+                None => self.update_state(Ok).await,
+            }
+        })
     }
 
     /// Update the internal state with a pure function mapping old state to new
+    #[tracing::instrument(skip_all)]
     pub async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
     where
         F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
@@ -276,29 +282,30 @@ impl Spaces {
     /// Update the internal state with a pure function mapping old state to new,
     /// which may also produce an output value which will be the output of
     /// this function
+    #[tracing::instrument(skip_all)]
     pub async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
     where
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
         O: Send + 'static,
     {
-        let output = self
-            .conductor_db
-            .write_async(move |txn| {
-                let state = txn
-                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                        row.get("blob")
-                    })
-                    .optional()?;
-                let state = match state {
-                    Some(state) => from_blob(state)?,
-                    None => ConductorState::default(),
-                };
-                let (new_state, output) = f(state)?;
-                mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
-                Result::<_, ConductorError>::Ok((new_state, output))
-            })
-            .await?;
-        Ok(output)
+        timed!([1, 10, 1000], "update_state_prime", {
+            self.conductor_db
+                .write_async(move |txn| {
+                    let state = txn
+                        .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                            row.get("blob")
+                        })
+                        .optional()?;
+                    let state = match state {
+                        Some(state) => from_blob(state)?,
+                        None => ConductorState::default(),
+                    };
+                    let (new_state, output) = f(state)?;
+                    mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
+                    Result::<_, ConductorError>::Ok((new_state, output))
+                })
+                .await
+        })
     }
 
     /// Get something from every space
@@ -800,6 +807,7 @@ impl Space {
 }
 
 /// Get the holochain conductor state
+#[tracing::instrument(skip_all)]
 pub async fn query_conductor_state(
     db: &DbRead<DbKindConductor>,
 ) -> ConductorResult<Option<ConductorState>> {

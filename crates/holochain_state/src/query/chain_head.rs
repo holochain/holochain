@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn test_chain_head_query() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let mut conn = Connection::open_in_memory().unwrap();
         SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 

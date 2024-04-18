@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_config_complete_config() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let yaml = r#"---
     data_root_path: /path/to/env

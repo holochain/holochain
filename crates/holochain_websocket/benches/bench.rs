@@ -16,7 +16,7 @@ criterion_main!(benches);
 struct TestMessage(pub String);
 
 fn simple_bench(bench: &mut Criterion) {
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
 
     let runtime = rt();
 
@@ -70,8 +70,8 @@ async fn client_response(recv: &mut tokio::sync::mpsc::Receiver<ReceiveMessage<T
 async fn setup() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
     // Create a new server listening for connections
     let listener = WebsocketListener::bind(
-        std::sync::Arc::new(WebsocketConfig::default()),
-        "127.0.0.1:0",
+        std::sync::Arc::new(WebsocketConfig::LISTENER_DEFAULT),
+        "localhost:0",
     )
     .await
     .unwrap();
@@ -125,7 +125,7 @@ async fn setup_client(
     let (r_send, r_recv) = tokio::sync::mpsc::channel(32);
 
     // Connect the client to the server
-    let (send, mut recv) = connect(std::sync::Arc::new(WebsocketConfig::default()), addr)
+    let (send, mut recv) = connect(std::sync::Arc::new(WebsocketConfig::CLIENT_DEFAULT), addr)
         .await
         .unwrap();
 

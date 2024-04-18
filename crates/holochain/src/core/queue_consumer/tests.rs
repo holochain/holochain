@@ -30,7 +30,7 @@ async fn test_trigger_send() {
 
 #[tokio::test]
 async fn test_trigger_only_permits_single_trigger() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let (tx, mut rx) = TriggerSender::new();
     let jh = tokio::spawn(async move {

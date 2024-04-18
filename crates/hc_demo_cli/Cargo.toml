@@ -7,15 +7,16 @@ license = "Apache-2.0"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+# reminder - do not use workspace deps
 [dependencies]
-cfg-if = "0.1"
+cfg-if = "1.0"
 clap = { version = "4.2.2", features = [ "derive", "wrap_help" ], optional = true }
 flate2 = { version = "1.0.25", optional = true }
-hdi = { path = "../hdi", version = "^0.4.0-beta-dev.31", optional = true }
-hdk = { path = "../hdk", version = "^0.3.0-beta-dev.35", optional = true }
-holochain = { path = "../holochain", version = "^0.3.0-beta-dev.42", optional = true }
-holochain_types = { path = "../holochain_types", version = "^0.3.0-beta-dev.37", optional = true }
-holochain_keystore = { path = "../holochain_keystore", version = "^0.3.0-beta-dev.31", optional = true }
+hdi = { path = "../hdi", version = "^0.4.0-beta-dev.35", optional = true }
+hdk = { path = "../hdk", version = "^0.3.0-beta-dev.39", optional = true }
+holochain = { path = "../holochain", version = "^0.3.0-beta-dev.46", optional = true }
+holochain_types = { path = "../holochain_types", version = "^0.3.0-beta-dev.41", optional = true }
+holochain_keystore = { path = "../holochain_keystore", version = "^0.3.0-beta-dev.35", optional = true }
 rand = { version = "0.8.5", optional = true }
 rand-utf8 = { version = "0.0.1", optional = true }
 serde = { version = "1", optional = true }
@@ -34,7 +35,7 @@ getrandom = { version = "0.2", features = ["custom"] }
 # Special config for when we're in build_wasm mode
 [target.'cfg(build_wasm)'.build-dependencies]
 flate2 = "1.0.25"
-wasm-opt = "0.112.0"
+wasm-opt = "0.116"
 
 [lints]
 workspace = true

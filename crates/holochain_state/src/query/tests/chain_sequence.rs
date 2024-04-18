@@ -6,7 +6,7 @@ use matches::assert_matches;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let test_db = test_cell_db();
     let arc = test_db.env();
     {

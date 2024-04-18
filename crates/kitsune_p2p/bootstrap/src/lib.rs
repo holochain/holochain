@@ -70,9 +70,10 @@ pub async fn run_with_prune_freq(
         let _ = s.send(());
     });
 
-    match warp::serve(boot).try_bind_with_graceful_shutdown(addr, async move {
+    let bind_result = warp::serve(boot).try_bind_with_graceful_shutdown(addr, async move {
         let _ = r.await;
-    }) {
+    });
+    match bind_result {
         Ok((addr, server)) => {
             let driver = futures::future::FutureExt::boxed(server);
             Ok((driver, addr, shutdown))

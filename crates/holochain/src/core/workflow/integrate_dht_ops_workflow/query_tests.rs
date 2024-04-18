@@ -93,11 +93,10 @@ impl Scenario {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn integrate_query() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let db = test_dht_db();
     let expected = test_data(&db.to_db()).await;
     let (qt, _rx) = TriggerSender::new();
-    // dump_tmp(&db.db());
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.dna_network();
     integrate_dht_ops_workflow(db.to_db().into(), db.to_db().into(), qt, holochain_p2p_cell)

@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn intersect_arqs() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let topo = Topology::unit_zero();
         let a = Arq::new(27, 536870912u32.into(), 11.into());
         let b = Arq::new(27, 805306368u32.into(), 11.into());
@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn intersect_arqs_multi() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let topo = Topology::unit_zero();
 
         let pow = 26;

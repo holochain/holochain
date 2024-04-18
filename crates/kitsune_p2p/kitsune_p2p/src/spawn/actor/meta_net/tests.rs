@@ -291,9 +291,9 @@ write_test_struct! {
         }
     }
     KitsuneP2pEventHandler {
-        fn handle_put_agent_info_signed(&mut Self, input: PutAgentInfoSignedEvt,) -> KitsuneP2pEventHandlerResult<()>, KitsuneP2pEventHandlerResult<()> {
+        fn handle_put_agent_info_signed(&mut Self, input: PutAgentInfoSignedEvt,) -> KitsuneP2pEventHandlerResult<Vec<kitsune_p2p_types::bootstrap::AgentInfoPut>>, KitsuneP2pEventHandlerResult<Vec<kitsune_p2p_types::bootstrap::AgentInfoPut>> {
             Ok(futures::future::FutureExt::boxed(async move {
-                Ok(())
+                Ok(vec![])
             }).into())
         }
         fn handle_query_agents(&mut Self, input: QueryAgentsEvt,) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>>, KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
@@ -741,7 +741,7 @@ async fn preflight() {
         });
         test.handle_put_agent_info_signed = Arc::new(move |_| {
             recv_not.notify();
-            Ok(futures::future::FutureExt::boxed(async move { Ok(()) }).into())
+            Ok(futures::future::FutureExt::boxed(async move { Ok(vec![]) }).into())
         });
     }
 
@@ -781,7 +781,7 @@ async fn preflight_user_data_mismatch() {
         });
         test.handle_put_agent_info_signed = Arc::new(move |_| {
             recv_not.notify();
-            Ok(futures::future::FutureExt::boxed(async move { Ok(()) }).into())
+            Ok(futures::future::FutureExt::boxed(async move { Ok(vec![]) }).into())
         });
     }
 

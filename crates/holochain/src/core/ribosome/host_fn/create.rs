@@ -176,7 +176,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_create_entry_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Create).await;
@@ -206,7 +206,7 @@ pub mod wasm_test {
     fn ribosome_create_entry_network_test() {
         crate::big_stack_test!(
             async move {
-                holochain_trace::test_run().ok();
+                holochain_trace::test_run();
 
                 let mut network_topology = NetworkTopology::default();
 
@@ -310,7 +310,7 @@ pub mod wasm_test {
     async fn multiple_create_entry_limit_test() {
         const N: u32 = 50;
 
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         let mut conductor = SweetConductor::from_standard_config().await;
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await;
 
@@ -336,7 +336,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_serialize_bytes_hash() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         #[derive(Default, SerializedBytes, Serialize, Deserialize, Debug)]
         #[repr(transparent)]
         #[serde(transparent)]

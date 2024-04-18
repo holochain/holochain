@@ -8,5 +8,4 @@ WHERE
   DhtOp.type = :op_type
   AND DhtOp.when_integrated IS NOT NULL
   AND ACTION.author = :author
-  AND ACTION.seq BETWEEN :lower_seq
-  AND :upper_seq
+  AND ACTION.seq BETWEEN :lower_seq AND :upper_seq

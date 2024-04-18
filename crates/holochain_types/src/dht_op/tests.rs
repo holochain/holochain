@@ -198,7 +198,7 @@ impl RecordTest {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_all_ops() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut builder = RecordTest::new();
     let (record, expected) = builder.entry_create();
     let result = produce_ops_from_record(&record).unwrap();

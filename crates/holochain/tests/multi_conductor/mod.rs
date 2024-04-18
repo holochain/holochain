@@ -1,9 +1,7 @@
 use hdk::prelude::*;
 use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::SweetConductorConfig;
-use holochain::sweettest::{SweetConductor, SweetZome};
-use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
-use holochain::test_utils::consistency_10s;
+use holochain::sweettest::*;
 use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_sqlite::db::{DbKindT, DbWrite};
 use holochain_sqlite::prelude::DatabaseResult;
@@ -21,10 +19,10 @@ struct AppString(String);
 async fn test_publish() -> anyhow::Result<()> {
     use std::sync::Arc;
 
-    use holochain::test_utils::{consistency_10s, inline_zomes::simple_create_read_zome};
+    use holochain::test_utils::inline_zomes::simple_create_read_zome;
     use kitsune_p2p_types::config::KitsuneP2pConfig;
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut tuning =
@@ -55,7 +53,9 @@ async fn test_publish() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s([&alice, &bobbo, &carol]).await;
+    await_consistency(10, [&alice, &bobbo, &carol])
+        .await
+        .unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductors[1]
@@ -79,7 +79,7 @@ async fn test_publish() -> anyhow::Result<()> {
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     const NUM_CONDUCTORS: usize = 3;
 
@@ -105,7 +105,9 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s([&alice, &bobbo, &carol]).await;
+    await_consistency(10, [&alice, &bobbo, &carol])
+        .await
+        .unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductors[1]
@@ -139,7 +141,7 @@ async fn sharded_consistency() {
         consistency::local_machine_session, inline_zomes::simple_create_read_zome,
     };
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 3;
     const NUM_CELLS: usize = 5;
 
@@ -188,10 +190,9 @@ async fn sharded_consistency() {
 #[tokio::test(flavor = "multi_thread")]
 async fn private_entries_dont_leak() {
     use holochain::sweettest::SweetInlineZomes;
-    use holochain::test_utils::consistency_60s;
     use holochain_types::inline_zome::InlineZomeSet;
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
     let mut entry_def = EntryDef::default_from_id("entrydef");
     entry_def.visibility = EntryVisibility::Private;
 
@@ -228,12 +229,13 @@ async fn private_entries_dont_leak() {
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
     conductors.exchange_peer_info().await;
+
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    consistency_60s([&alice, &bobbo]).await;
+    await_consistency(60, [&alice, &bobbo]).await.unwrap();
 
     let entry_hash =
         EntryHash::with_data_sync(&Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap());
@@ -257,7 +259,7 @@ async fn private_entries_dont_leak() {
     let bob_hash: ActionHash = conductors[1]
         .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
-    consistency_60s([&alice, &bobbo]).await;
+    await_consistency(60, [&alice, &bobbo]).await.unwrap();
 
     check_all_gets_for_private_entry(
         &conductors[0],
@@ -295,6 +297,7 @@ async fn private_entries_dont_leak() {
     check_for_private_entries(conductors[1].get_cache_db(bobbo.cell_id()).await.unwrap()).await;
 }
 
+#[tracing::instrument(skip_all)]
 async fn check_for_private_entries<Kind: DbKindT>(env: DbWrite<Kind>) {
     let count: usize = env.read_async(move |txn| -> DatabaseResult<usize> {
         Ok(txn.query_row(

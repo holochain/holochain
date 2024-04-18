@@ -43,7 +43,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn zome_info_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::EntryDefs).await;

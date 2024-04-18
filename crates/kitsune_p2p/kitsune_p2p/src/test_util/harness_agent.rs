@@ -103,6 +103,7 @@ pub(crate) async fn spawn_test_agent(
 
 use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken;
 use kitsune_p2p_types::dht::prelude::RegionSetLtcs;
@@ -195,7 +196,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_put_agent_info_signed(
         &mut self,
         input: PutAgentInfoSignedEvt,
-    ) -> KitsuneP2pEventHandlerResult<()> {
+    ) -> KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>> {
         for info in input.peer_data {
             let info = Arc::new(info);
             self.agent_store.insert(info.agent.clone(), info.clone());
@@ -204,7 +205,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
                 agent_info: info,
             });
         }
-        Ok(async move { Ok(()) }.boxed().into())
+        Ok(async move { Ok(vec![]) }.boxed().into())
     }
 
     fn handle_query_agents(

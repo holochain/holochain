@@ -51,7 +51,7 @@ use kitsune_p2p_timestamp::Timestamp;
 ///
 /// They receive the [`Op::RegisterCreateLink`] and [`Op::RegisterDeleteLink`].
 /// This is where you can implement your own logic for checking that it is valid to
-/// place a link on a base [`Entry`].
+/// place a link on a link base.
 ///
 /// #### The Chain Authority
 /// This set of authorities receives the [`Op::RegisterAgentActivity`].
@@ -160,7 +160,7 @@ pub struct RegisterUpdate {
     pub new_entry: Option<Entry>,
     /// The original [`EntryCreationAction`] that created
     /// the original [`Entry`].
-    /// Note that the update points to a specific instance of the
+    /// Note that the update points to a specific instance
     /// of the original [`Entry`].
     pub original_action: EntryCreationAction,
     /// The original [`Entry`] that is being updated from.
