@@ -155,7 +155,7 @@ impl TestLegacyHost {
                                             return None;
                                         }
 
-                                        let interval = DhtArcRange::from(info.storage_arc);
+                                        let interval = DhtArcRange::from(info.storage_arc());
                                         if !arc_set.overlap(&interval.into()) {
                                             return None;
                                         }
@@ -193,7 +193,7 @@ impl TestLegacyHost {
                         KitsuneP2pEvent::QueryPeerDensity {
                             respond,
                             space,
-                            dht_arc,
+                            dht_arc: _,
                             ..
                         } => {
                             let cutoff = std::time::Duration::from_secs(60 * 15);
@@ -209,7 +209,7 @@ impl TestLegacyHost {
                                 .iter()
                                 .filter_map(|agent: &AgentInfoSigned| {
                                     if agent.space == space && now < agent.expires_at_ms {
-                                        Some(agent.storage_arc)
+                                        Some(agent.storage_arq)
                                     } else {
                                         None
                                     }
@@ -219,7 +219,7 @@ impl TestLegacyHost {
                             let strat = PeerStrat::Quantized(ArqStrat::standard(
                                 LocalStorageConfig::default(),
                             ));
-                            let view = strat.view(topology, dht_arc, &arcs);
+                            let view = strat.view(topology, &arcs);
 
                             respond.respond(Ok(async move { Ok(view) }.boxed().into()))
                         }

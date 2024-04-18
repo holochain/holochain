@@ -186,7 +186,7 @@ mod tests {
         futures::executor::block_on(AgentInfoSigned::sign(
             space,
             agent,
-            ArqSize::from_half_length(42),
+            ArqSize::from_half_len(42),
             vec![random_url(rng).into()],
             42,
             69,

@@ -956,7 +956,7 @@ async fn mock_network_sharded_gossip() {
 
                                         // If we have info for alice check the overlap.
                                         if let Some(alice) = &alice {
-                                            let a = alice.storage_arc;
+                                            let a = alice.storage_arc();
                                             let b = interval;
                                             debug!("{}\n{}", a.to_ascii(10), b.to_ascii(10));
                                             let a: DhtArcSet = a.inner().into();
@@ -1081,7 +1081,7 @@ async fn mock_network_sharded_gossip() {
                                             .as_ref()
                                             .map(|alice| {
                                                 let arc = data.agent_to_arc[&agent];
-                                                let a = alice.storage_arc;
+                                                let a = alice.storage_arc();
                                                 let b = arc;
                                                 let num_should_hold = this_agent_hashes
                                                     .iter()

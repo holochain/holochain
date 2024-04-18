@@ -18,6 +18,7 @@ use holochain_types::dht_op::{DhtOp, DhtOpHashed, DhtOpType};
 use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::dht::arq::ArqSize;
 use kitsune_p2p::{fixt::*, KitsuneAgent, KitsuneOpHash};
 use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneSpace};
 use kitsune_p2p_types::config::KitsuneP2pConfig;
@@ -104,7 +105,7 @@ impl MockNetworkData {
             .collect();
         let agent_to_arc = agent_to_info
             .iter()
-            .map(|(k, v)| (k.clone(), v.storage_arc))
+            .map(|(k, v)| (k.clone(), v.storage_arc()))
             .collect();
         Self {
             authored,
@@ -465,7 +466,7 @@ async fn reset_peer_data(peers: Vec<AgentInfoSigned>, dna_hash: &DnaHash) -> Vec
         let info = AgentInfoSigned::sign(
             space_hash.clone(),
             peer.agent.clone(),
-            ((u32::MAX / 2) as f64 * coverage) as u32,
+            ArqSize::from_half_len(((u32::MAX / 2) as f64 * coverage) as u32),
             vec![url2::url2!(
                 "kitsune-proxy://CIW6PxKxs{}MSmB7kLD8xyyj4mqcw/kitsune-quic/h/localhost/p/5778/-",
                 rand_string

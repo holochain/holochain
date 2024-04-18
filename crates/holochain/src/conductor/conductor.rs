@@ -1959,7 +1959,7 @@ mod app_status_impls {
                         Ok(maybe_info) => maybe_info,
                         _ => None,
                     };
-                    let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
+                    let maybe_initial_arq = maybe_agent_info.clone().map(|i| i.storage_arq);
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
                     let res = tokio::time::timeout(
@@ -1967,7 +1967,7 @@ mod app_status_impls {
                         cell.holochain_p2p_dna().clone().join(
                             agent_pubkey,
                             maybe_agent_info,
-                            maybe_initial_arc,
+                            maybe_initial_arq,
                         ),
                     )
                         .await;

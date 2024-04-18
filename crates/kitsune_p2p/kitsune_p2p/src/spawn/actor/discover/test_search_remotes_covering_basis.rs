@@ -12,7 +12,7 @@ async fn mk_agent_info(u: u8, covers: u32, offline: bool) -> AgentInfoSigned {
     AgentInfoSigned::sign(
         Arc::new(KitsuneSpace::new(vec![0x11; 32])),
         Arc::new(KitsuneAgent::new(vec![u; 32])),
-        ArqSize::from_half_length(covers),
+        ArqSize::from_half_len(covers),
         url_list,
         0,
         0,

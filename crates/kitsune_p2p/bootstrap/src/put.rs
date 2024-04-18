@@ -54,7 +54,7 @@ mod tests {
     use super::*;
     use ::fixt::prelude::*;
     use kitsune_p2p_bin_data::fixt::*;
-    use kitsune_p2p_types::{agent_info::agent_info_helper::AgentMetaInfoEncode, fixt::*};
+    use kitsune_p2p_types::{dht::arq::ArqSize, fixt::*};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_put() {
