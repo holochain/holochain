@@ -7,12 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.3.0-beta-dev.46
+
 ## 0.3.0-beta-dev.45
 
 - App validation workflow: Mock network in unit tests using new type `GenericNetwork` to properly test `must_get_agent_activity`. Previously that was not possible, as all peers in a test case were authorities for each other and `must_get_agent_activity` would therefore not send requests to the network.
 - App validation workflow: Skip ops that have missing dependencies. If an op is awaiting dependencies to be fetched, it will be excluded from app validation.
 - App validation workflow: Integration workflow is only triggered when some ops have been validated (either accepted or rejected).
-- App validation workflow: While op dependencies are missing and being fetched, the workflow is re-triggering itself periodically. It'll terminate this re-triggering after an interval in which no more missing dependencies could be fetched.
+- App validation workflow: While op dependencies are missing and being fetched, the workflow is re-triggering itself periodically. It’ll terminate this re-triggering after an interval in which no more missing dependencies could be fetched.
 
 ## 0.3.0-beta-dev.44
 

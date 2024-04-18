@@ -75,7 +75,7 @@ impl From<TestConfig> for SweetConductorConfig {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 2;
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(
@@ -131,7 +131,7 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     const NUM_CONDUCTORS: usize = 3;
     const NUM_OPS: usize = 100;
@@ -220,7 +220,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zero_arc_get_links() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Standard config with arc clamped to zero
     let mut tuning = make_tuning(true, true, true, None);
@@ -250,7 +250,7 @@ async fn test_zero_arc_get_links() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_zero_arc_no_gossip_2way() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Standard config
 
@@ -306,7 +306,7 @@ async fn test_zero_arc_no_gossip_2way() {
 async fn test_zero_arc_no_gossip_4way() {
     use futures::future::join_all;
 
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let configs = [
         // Standard config
@@ -455,7 +455,7 @@ async fn test_zero_arc_no_gossip_4way() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "deal with connections closing and banning for 10s"]
 async fn test_gossip_shutdown() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut conductors = SweetConductorBatch::from_config_rendezvous(
         2,
         TestConfig {
@@ -503,7 +503,7 @@ async fn test_gossip_shutdown() {
 #[ignore = "This test is potentially useful but uses sleeps and has never failed.
             Run it again in the future to see if it fails, and if so, rewrite it without sleeps."]
 async fn test_gossip_startup() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let config = || {
         SweetConductorConfig::standard().tune(|t| {
             t.danger_gossip_recent_threshold_secs = 1;
@@ -703,7 +703,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
 async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     use holochain::{sweettest::SweetConductor, test_utils::inline_zomes::simple_create_read_zome};
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_config_rendezvous(
         TestConfig {
@@ -791,7 +791,7 @@ async fn mock_network_sharded_gossip() {
     // Check if we should for new data to be generated even if it already exists.
     let force_new_data = std::env::var_os("FORCE_NEW_DATA").is_some();
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
 
     // Generate or use cached test data.
     let (data, mut conn) = generate_test_data(num_agents, min_ops, false, force_new_data).await;
@@ -1327,7 +1327,7 @@ async fn mock_network_sharding() {
     // Check if we should for new data to be generated even if it already exists.
     let force_new_data = std::env::var_os("FORCE_NEW_DATA").is_some();
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
 
     // Generate or use cached test data.
     let (data, mut conn) = generate_test_data(num_agents, min_ops, false, force_new_data).await;

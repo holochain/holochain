@@ -1,5 +1,7 @@
 //! Binary types, hashes, signatures, etc used by kitsune.
 
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use kitsune_p2p_dht_arc::DhtLocation;
 
 #[cfg(feature = "fixt")]
@@ -104,7 +106,7 @@ macro_rules! make_kitsune_bin_type {
 
             impl std::fmt::Display for $name {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    base64::encode_config(&self.0, base64::URL_SAFE_NO_PAD).fmt(f)
+                    URL_SAFE_NO_PAD.encode(&self.0).fmt(f)
                 }
             }
 

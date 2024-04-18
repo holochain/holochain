@@ -8,7 +8,7 @@ use holochain_wasm_test_utils::TestWasm;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "receipt completion is flaky, revise once integration logic is merged into app validation workflow"]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     // Need DEFAULT_RECEIPT_BUNDLE_SIZE peers to send validation receipts back
     const NUM_CONDUCTORS: usize =

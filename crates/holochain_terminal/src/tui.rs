@@ -62,17 +62,13 @@ impl<B: Backend> Tui<B> {
     }
 }
 
-fn render<B: Backend>(app: &mut App, frame: &mut Frame<B>) {
+fn render(app: &mut App, frame: &mut Frame) {
     let root_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(2), Constraint::Min(0)])
         .split(frame.size());
 
-    let titles = ["Network", "Bootstrap"]
-        .iter()
-        .cloned()
-        .map(Line::from)
-        .collect();
+    let titles = ["Network", "Bootstrap"].iter().cloned().map(Line::from);
     let tabs = Tabs::new(titles)
         .select(app.tab_index())
         .block(

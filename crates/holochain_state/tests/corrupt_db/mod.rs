@@ -12,7 +12,7 @@ use tempfile::TempDir;
 /// Checks a corrupt cache will be wiped on load.
 async fn corrupt_cache_creates_new_db() {
     let mut u = arbitrary::Unstructured::new(&holochain_zome_types::prelude::NOISE);
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let kind = DbKindCache(Arc::new(DnaHash::arbitrary(&mut u).unwrap()));
 
@@ -36,7 +36,7 @@ async fn corrupt_cache_creates_new_db() {
 #[tokio::test(flavor = "multi_thread")]
 async fn corrupt_source_chain_panics() {
     let mut u = arbitrary::Unstructured::new(&holochain_zome_types::prelude::NOISE);
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let kind = DbKindAuthored(Arc::new(CellId::arbitrary(&mut u).unwrap()));
 

@@ -6,11 +6,11 @@
 
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
 use crate::config;
 use holochain_conductor_api::conductor::paths::ConfigFilePath;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
-use once_cell::sync::Lazy;
 
 /// Save all sandboxes to the `.hc` file in the `hc_dir` directory.
 pub fn save(mut hc_dir: PathBuf, paths: Vec<ConfigRootPath>) -> anyhow::Result<()> {
@@ -114,8 +114,11 @@ pub fn list(hc_dir: PathBuf, verbose: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-static FILE_LOCKS: Lazy<tokio::sync::Mutex<Vec<usize>>> =
-    Lazy::new(|| tokio::sync::Mutex::new(Vec::new()));
+fn get_file_locks() -> &'static tokio::sync::Mutex<Vec<usize>> {
+    static FILE_LOCKS: OnceLock<tokio::sync::Mutex<Vec<usize>>> = OnceLock::new();
+
+    FILE_LOCKS.get_or_init(|| tokio::sync::Mutex::new(Vec::new()))
+}
 
 /// Lock this setup as running live and advertise the port.
 pub async fn lock_live(mut hc_dir: PathBuf, path: &Path, port: u16) -> anyhow::Result<()> {
@@ -134,7 +137,7 @@ pub async fn lock_live(mut hc_dir: PathBuf, path: &Path, port: u16) -> anyhow::R
     {
         Ok(mut file) => {
             writeln!(file, "{}", port)?;
-            let mut lock = FILE_LOCKS.lock().await;
+            let mut lock = get_file_locks().lock().await;
             lock.push(index);
         }
         Err(e) => match e.kind() {
@@ -192,7 +195,7 @@ pub fn find_ports(hc_dir: PathBuf, paths: &[PathBuf]) -> anyhow::Result<Vec<Opti
 
 /// Remove all lockfiles, releasing all locked ports.
 pub async fn release_ports(hc_dir: PathBuf) -> anyhow::Result<()> {
-    let files = FILE_LOCKS.lock().await;
+    let files = get_file_locks().lock().await;
     for file in files.iter() {
         let mut hc = hc_dir.clone();
         hc.push(format!(".hc_live_{}", file));

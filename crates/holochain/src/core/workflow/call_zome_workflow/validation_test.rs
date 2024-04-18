@@ -15,7 +15,7 @@ use std::convert::TryFrom;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn direct_validation_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let TestWasmPair::<DnaWasm> {
         integrity,

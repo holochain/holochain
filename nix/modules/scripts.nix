@@ -35,8 +35,15 @@
         set -xeuo pipefail
         trap "cd $PWD" EXIT
 
-        export VERSIONS_DIR="./versions/''${1}"
-        export DEFAULT_VERSIONS_DIR="$(nix flake metadata --no-write-lock-file --json | jq --raw-output '.locks.nodes.versions.locked.path')"
+        # Check the version of the format, otherwise processing the output might fail silently, like using jq again below
+        FLAKES_LOCK_VERSION=$(nix flake metadata --no-write-lock-file --json | jq --raw-output '.locks.version')
+        if [[ "$FLAKES_LOCK_VERSION" != "7" ]]; then
+          echo "Flakes lock version has changed, refusing to update"
+          exit 1
+        fi
+
+        export VERSIONS_DIR="versions/''${1}"
+        export DEFAULT_VERSIONS_DIR="$(nix flake metadata --no-write-lock-file --json | jq --raw-output '.locks.nodes.versions.locked.dir')"
 
         (
           cd "$VERSIONS_DIR"
@@ -51,6 +58,7 @@
         fi
 
         if [[ "$VERSIONS_DIR" == "$DEFAULT_VERSIONS_DIR" ]]; then
+          # TODO, once the Nix version on CI supports it -> nix flake update versions
           nix flake lock --tarball-ttl 0 --update-input versions --override-input versions "path:$VERSIONS_DIR"
         fi
 

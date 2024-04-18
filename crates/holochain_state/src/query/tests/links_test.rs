@@ -654,7 +654,7 @@ async fn multiple_links() {
 }
 #[tokio::test(flavor = "multi_thread")]
 async fn duplicate_links() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -716,7 +716,7 @@ async fn duplicate_links() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_base() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -808,7 +808,7 @@ async fn links_on_same_base() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_tag() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -885,7 +885,7 @@ async fn links_on_same_tag() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_type() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -950,7 +950,7 @@ async fn links_on_same_type() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn link_type_ranges() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 

@@ -44,7 +44,7 @@ use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_no_dependency() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -70,7 +70,7 @@ async fn validate_op_with_no_dependency() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_dependency_held_in_cache() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -121,7 +121,7 @@ async fn validate_op_with_dependency_held_in_cache() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_dependency_not_held() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -176,7 +176,7 @@ async fn validate_op_with_dependency_not_held() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_dependency_not_found_on_the_dht() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -225,7 +225,7 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_app_validation() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
