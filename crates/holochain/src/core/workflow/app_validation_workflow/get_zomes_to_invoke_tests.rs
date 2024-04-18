@@ -17,11 +17,12 @@ use holochain_types::rate_limit::{EntryRateWeight, RateWeight};
 use holochain_zome_types::action::{AppEntryDef, Create, Delete, EntryType, Update, ZomeIndex};
 use holochain_zome_types::fixt::{
     ActionFixturator, ActionHashFixturator, AgentPubKeyFixturator, CreateFixturator,
-    DeleteFixturator, EntryFixturator, EntryHashFixturator, SignatureFixturator, UpdateFixturator,
+    CreateLinkFixturator, DeleteFixturator, DeleteLinkFixturator, EntryFixturator,
+    EntryHashFixturator, SignatureFixturator, UpdateFixturator,
 };
 use holochain_zome_types::op::{
-    EntryCreationAction, Op, RegisterAgentActivity, RegisterDelete, RegisterUpdate, StoreEntry,
-    StoreRecord,
+    EntryCreationAction, Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete,
+    RegisterDeleteLink, RegisterUpdate, StoreEntry, StoreRecord,
 };
 use holochain_zome_types::record::{Record, RecordEntry, SignedActionHashed, SignedHashed};
 use holochain_zome_types::timestamp::Timestamp;
@@ -46,7 +47,7 @@ async fn register_agent_activity() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -106,7 +107,7 @@ async fn store_entry_create_app_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -162,7 +163,7 @@ async fn store_entry_create_non_app_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -224,7 +225,7 @@ async fn store_entry_update_app_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -282,7 +283,7 @@ async fn store_entry_update_non_app_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -339,7 +340,7 @@ async fn store_record_create_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -382,7 +383,7 @@ async fn store_record_create_non_app_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -438,7 +439,7 @@ async fn store_record_create_wrong_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -503,7 +504,7 @@ async fn store_record_update_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -582,7 +583,7 @@ async fn store_record_update_of_update_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -641,7 +642,7 @@ async fn store_record_delete_without_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -698,7 +699,7 @@ async fn store_record_delete_non_app_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -779,7 +780,7 @@ async fn store_record_delete_of_delete_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -857,7 +858,7 @@ async fn store_record_delete_of_delete_without_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(action.hashed.author().clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -926,7 +927,7 @@ async fn register_update_app_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(update.hashed.author.clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -974,7 +975,7 @@ async fn register_update_non_app_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(update.hashed.author.clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -1034,7 +1035,7 @@ async fn register_delete_create_app_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(delete.hashed.author.clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -1101,7 +1102,7 @@ async fn register_delete_create_non_app_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(delete.hashed.author.clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -1172,7 +1173,7 @@ async fn register_delete_update_app_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(delete.hashed.author.clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -1239,7 +1240,7 @@ async fn register_delete_update_non_app_entry() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(delete.hashed.author.clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -1296,7 +1297,7 @@ async fn register_delete_of_delete() {
     let workspace = HostFnWorkspaceRead::new(
         test_space
             .space
-            .get_or_create_authored_db(delete.hashed.author.clone())
+            .get_or_create_authored_db(fixt!(AgentPubKey))
             .unwrap()
             .into(),
         test_space.space.dht_db.clone().into(),
@@ -1327,4 +1328,97 @@ async fn register_delete_of_delete() {
     // there is no app entry def in a delete which would indicate the zome index,
     // therefore all integrity zomes are invoked for validation
     assert_matches!(zomes_to_invoke, ZomesToInvoke::AllIntegrity);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn register_create_link() {
+    let zomes = SweetInlineZomes::new(vec![], 0);
+    let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let zome = &integrity_zomes[0];
+    let zome_index = ZomeIndex(0);
+    let mut ribosome = MockRibosomeT::new();
+    ribosome.expect_get_integrity_zome().return_once({
+        let zome = zome.clone();
+        move |index| {
+            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
+            Some(zome)
+        }
+    });
+
+    let mut create_link = fixt!(CreateLink);
+    create_link.zome_index = zome_index.clone();
+    let create_link = SignedHashed::new_unchecked(create_link, fixt!(Signature));
+    let op = Op::RegisterCreateLink(RegisterCreateLink {
+        create_link: create_link.clone(),
+    });
+
+    let test_space = TestSpace::new(dna_file.dna_hash().clone());
+    let workspace = HostFnWorkspaceRead::new(
+        test_space
+            .space
+            .get_or_create_authored_db(fixt!(AgentPubKey))
+            .unwrap()
+            .into(),
+        test_space.space.dht_db.clone().into(),
+        test_space.space.dht_query_cache.clone(),
+        test_space.space.cache_db.clone().into(),
+        fixt!(MetaLairClient),
+        None,
+        Arc::new(dna_file.dna_def().clone()),
+    )
+    .await
+    .unwrap();
+    let network = Arc::new(MockHolochainP2pDnaT::new());
+
+    let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
+        .await
+        .unwrap();
+    assert_matches!(zomes_to_invoke, ZomesToInvoke::OneIntegrity(z) if z.name == zome.name);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn register_delete_link() {
+    let zomes = SweetInlineZomes::new(vec![], 0);
+    let (dna_file, integrity_zomes, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let zome = &integrity_zomes[0];
+    let zome_index = ZomeIndex(0);
+    let mut ribosome = MockRibosomeT::new();
+    ribosome.expect_get_integrity_zome().return_once({
+        let zome = zome.clone();
+        move |index| {
+            assert_eq!(index, &zome_index, "expected zome index {zome_index:?}");
+            Some(zome)
+        }
+    });
+
+    let mut create_link = fixt!(CreateLink);
+    create_link.zome_index = zome_index.clone();
+    let delete_link = SignedHashed::new_unchecked(fixt!(DeleteLink), fixt!(Signature));
+    let op = Op::RegisterDeleteLink(RegisterDeleteLink {
+        create_link: create_link.clone(),
+        delete_link,
+    });
+
+    let test_space = TestSpace::new(dna_file.dna_hash().clone());
+    let workspace = HostFnWorkspaceRead::new(
+        test_space
+            .space
+            .get_or_create_authored_db(fixt!(AgentPubKey))
+            .unwrap()
+            .into(),
+        test_space.space.dht_db.clone().into(),
+        test_space.space.dht_query_cache.clone(),
+        test_space.space.cache_db.clone().into(),
+        fixt!(MetaLairClient),
+        None,
+        Arc::new(dna_file.dna_def().clone()),
+    )
+    .await
+    .unwrap();
+    let network = Arc::new(MockHolochainP2pDnaT::new());
+
+    let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
+        .await
+        .unwrap();
+    assert_matches!(zomes_to_invoke, ZomesToInvoke::OneIntegrity(z) if z.name == zome.name);
 }
