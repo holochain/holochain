@@ -574,11 +574,11 @@ fn entry_creation_zomes_to_invoke(
                 .get_integrity_zome(&app_entry_def.zome_index())
                 .ok_or_else(|| {
                     tracing::error!(
-                        "No zome with zome index {:?} found for action {action:?}",
+                        "No integrity zome with zome index {:?} found for action {action:?}",
                         app_entry_def.zome_index()
                     );
                     Outcome::rejected(format!(
-                        "Zome does not exist for {:?}",
+                        "No integrity zome with index {:?} found",
                         app_entry_def.zome_index()
                     ))
                 })?;
@@ -630,9 +630,9 @@ async fn store_record_zomes_to_invoke(
         }) => {
             let zome = ribosome.get_integrity_zome(&zome_index).ok_or_else(|| {
                 tracing::error!(
-                    "No zome with zome index {zome_index:?} found for action {action:?}"
+                    "No integrity zome with zome index {zome_index:?} found for action {action:?}"
                 );
-                Outcome::rejected(format!("Zome does not exist for {:?}", zome_index))
+                Outcome::rejected(format!("No integrity zome with index {zome_index:?} found"))
             })?;
             Ok(ZomesToInvoke::OneIntegrity(zome))
         }
@@ -647,8 +647,12 @@ fn create_link_zomes_to_invoke(
     let zome = ribosome
         .get_integrity_zome(&create_link.zome_index)
         .ok_or_else(|| {
+            tracing::error!(
+                "No integrity zome with link type {:?} found",
+                create_link.link_type
+            );
             Outcome::rejected(format!(
-                "Zome does not exist for {:?}",
+                "No integrity zome with link type {:?} found",
                 create_link.link_type
             ))
         })?;
