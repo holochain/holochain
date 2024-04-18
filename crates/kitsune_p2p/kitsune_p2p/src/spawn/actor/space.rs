@@ -654,7 +654,8 @@ async fn update_arc_length(
     arq: &mut Arq,
 ) -> KitsuneP2pResult<()> {
     let dim = SpaceDimension::standard();
-    let view = evt_sender.query_peer_density(space.clone(), *arq).await?;
+    let arc = arq.to_dht_arc(dim);
+    let view = evt_sender.query_peer_density(space.clone(), arc).await?;
 
     let cov_before = arq.coverage(dim) * 100.0;
     tracing::trace!("Updating arc for space {:?}:", space);

@@ -6,6 +6,7 @@ use crate::*;
 use futures::future::FutureExt;
 use kitsune_p2p::actor::BroadcastData;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch;
+use kitsune_p2p::dht::Arq;
 use kitsune_p2p::event::*;
 use kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics;
 use kitsune_p2p::KOp;
@@ -1064,7 +1065,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             Ok(kitsune_p2p
-                .join(space, agent, maybe_agent_info, initial_arc)
+                .join(space, agent, maybe_agent_info, initial_arq)
                 .await?)
         }
         .boxed()

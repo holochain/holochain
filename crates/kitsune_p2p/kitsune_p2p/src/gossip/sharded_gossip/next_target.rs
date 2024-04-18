@@ -154,6 +154,7 @@ fn next_remote_node(
 #[cfg(test)]
 mod tests {
     use ::fixt::prelude::*;
+    use kitsune_p2p_types::dht::arq::ArqSize;
     use rand::distributions::Alphanumeric;
     use test_case::test_case;
 
@@ -185,7 +186,7 @@ mod tests {
         futures::executor::block_on(AgentInfoSigned::sign(
             space,
             agent,
-            42,
+            ArqSize::from_half_length(42),
             vec![random_url(rng).into()],
             42,
             69,

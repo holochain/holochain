@@ -537,7 +537,7 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_query_peer_density(
         &mut self,
         space: Arc<KitsuneSpace>,
-        arq: kitsune_p2p_types::dht::Arq,
+        arq: kitsune_p2p_types::dht_arc::DhtArc,
     ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
         Ok(self.host_api.legacy.query_peer_density(space, arq))
     }
@@ -940,7 +940,7 @@ mockall::mock! {
         fn handle_query_peer_density(
             &mut self,
             space: Arc<KitsuneSpace>,
-            arq: kitsune_p2p_types::dht::Arq,
+            arq: kitsune_p2p_types::dht_arc::DhtArc,
         ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView>;
 
         fn handle_call(

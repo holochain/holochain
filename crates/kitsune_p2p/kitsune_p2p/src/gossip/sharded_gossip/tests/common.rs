@@ -6,6 +6,7 @@ use ::fixt::prelude::*;
 use kitsune_p2p_bin_data::fixt::*;
 use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_types::box_fut;
+use kitsune_p2p_types::dht::arq::ArqSize;
 use kitsune_p2p_types::dht::prelude::{ArqSet, RegionCoordSetLtcs, RegionData};
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
 use kitsune_p2p_types::dht::ArqStrat;
@@ -252,7 +253,7 @@ pub async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
     AgentInfoSigned::sign(
         Arc::new(fixt!(KitsuneSpace)),
         agent,
-        MAX_HALF_LENGTH,
+        ArqSize::from_half_len(MAX_HALF_LENGTH),
         vec![url2::url2!(
             "kitsune-proxy://CIW6PxKxs{}cKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/localhost/p/5778/-",
             rand_string
