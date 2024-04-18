@@ -83,7 +83,7 @@ impl TryFrom<&Timestamp> for DateTime {
 
     fn try_from(t: &Timestamp) -> Result<Self, Self::Error> {
         let (secs, nsecs) = t.as_seconds_and_nanos();
-        Ok(chrono::DateTime::from_timestamp(secs, nsecs).ok_or(TimestampError::Overflow)?)
+        chrono::DateTime::from_timestamp(secs, nsecs).ok_or(TimestampError::Overflow)
     }
 }
 
