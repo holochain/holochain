@@ -426,7 +426,7 @@ mod interface_impls {
                             allowed_origins,
                         } => {
                             let listener = spawn_websocket_listener(port, allowed_origins).await?;
-                            let port = listener.local_addr()?.port();
+                            let port = listener.local_addrs()?[0].port();
                             spawn_admin_interface_tasks(
                                 tm.clone(),
                                 listener,

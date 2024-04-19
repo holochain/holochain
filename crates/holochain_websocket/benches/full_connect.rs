@@ -33,7 +33,7 @@ fn full_connect(bench: &mut Criterion) {
             let bind_addr = "localhost:0".to_socket_addrs().unwrap().next().unwrap();
             let l = WebsocketListener::bind(config.clone(), bind_addr).await.unwrap();
 
-            let port = l.local_addr().unwrap().port();
+            let port = l.local_addrs().unwrap().port();
 
             let b1 = std::sync::Arc::new(tokio::sync::Barrier::new(2));
             let b2 = b1.clone();

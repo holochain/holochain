@@ -6,8 +6,10 @@
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 pub use std::io::{Error, Result};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::ToSocketAddrs;
+use tokio::select;
 use tokio_tungstenite::tungstenite::handshake::client::Request;
 use tokio_tungstenite::tungstenite::handshake::server::{Callback, ErrorResponse, Response};
 use tokio_tungstenite::tungstenite::http::{HeaderMap, HeaderValue, StatusCode};
@@ -716,11 +718,50 @@ impl ConnectRequest {
     }
 }
 
+// TODO async_trait still needed for dynamic dispatch https://blog.rust-lang.org/2023/12/21/async-fn-rpit-in-traits.html#dynamic-dispatch
+#[async_trait::async_trait]
+trait TcpListener: Send + Sync {
+    async fn accept(&self) -> Result<(tokio::net::TcpStream, SocketAddr)>;
+
+    fn local_addrs(&self) -> Result<Vec<SocketAddr>>;
+}
+
+#[async_trait::async_trait]
+impl TcpListener for tokio::net::TcpListener {
+    async fn accept(&self) -> Result<(tokio::net::TcpStream, SocketAddr)> {
+        self.accept().await
+    }
+
+    fn local_addrs(&self) -> Result<Vec<SocketAddr>> {
+        Ok(vec![self.local_addr()?])
+    }
+}
+
+struct DualStackListener {
+    v4: tokio::net::TcpListener,
+    v6: tokio::net::TcpListener,
+}
+
+#[async_trait::async_trait]
+impl TcpListener for DualStackListener {
+    async fn accept(&self) -> Result<(tokio::net::TcpStream, SocketAddr)> {
+        let (stream, addr) = select! {
+            res = self.v4.accept() => res?,
+            res = self.v6.accept() => res?,
+        };
+        Ok((stream, addr))
+    }
+
+    fn local_addrs(&self) -> Result<Vec<SocketAddr>> {
+        Ok(vec![self.v4.local_addr()?, self.v6.local_addr()?])
+    }
+}
+
 /// A Holochain websocket listener.
 pub struct WebsocketListener {
     config: Arc<WebsocketConfig>,
     access_control: Arc<AllowedOrigins>,
-    listener: tokio::net::TcpListener,
+    listener: Box<dyn TcpListener>,
 }
 
 impl Drop for WebsocketListener {
@@ -731,7 +772,7 @@ impl Drop for WebsocketListener {
 
 impl WebsocketListener {
     /// Bind a new websocket listener.
-    pub async fn bind<A: ToSocketAddrs>(config: Arc<WebsocketConfig>, addr: A) -> Result<Self> {
+    pub async fn bind(config: Arc<WebsocketConfig>, addr: impl ToSocketAddrs) -> Result<Self> {
         let access_control = Arc::new(config.allowed_origins.clone().ok_or_else(|| {
             Error::other("WebsocketListener requires access control to be set in the config")
         })?);
@@ -744,13 +785,59 @@ impl WebsocketListener {
         Ok(Self {
             config,
             access_control,
-            listener,
+            listener: Box::new(listener),
+        })
+    }
+
+    /// Bind a new websocket listener on the same port using a v4 and a v6 socket.
+    pub async fn dual_bind(
+        config: Arc<WebsocketConfig>,
+        addr_v4: impl Into<SocketAddr>,
+        addr_v6: impl Into<SocketAddr>,
+    ) -> Result<Self> {
+        let access_control = Arc::new(config.allowed_origins.clone().ok_or_else(|| {
+            Error::other("WebsocketListener requires access control to be set in the config")
+        })?);
+
+        let mut addr_v4 = addr_v4.into();
+        let addr_v6 = addr_v6.into();
+
+        if !addr_v4.is_ipv4() {
+            return Err(Error::other("Expected an IPv4 address"));
+        }
+
+        if !addr_v6.is_ipv6() {
+            return Err(Error::other("Expected an IPv6 address"));
+        }
+
+        // Note that tokio binds to the stack matching the address type so we can re-use the port
+        // without needing to create the sockets ourselves to configure this.
+        let v6_listener = tokio::net::TcpListener::bind(addr_v6).await?;
+        addr_v4.set_port(v6_listener.local_addr()?.port());
+
+        let v4_listener = tokio::net::TcpListener::bind(addr_v4).await?;
+
+        let listener = DualStackListener {
+            v4: v4_listener,
+            v6: v6_listener,
+        };
+
+        let addr = listener.v4.local_addr()?;
+        tracing::info!(?addr, "WebsocketListener listening");
+
+        let addr = listener.v6.local_addr()?;
+        tracing::info!(?addr, "WebsocketListener listening");
+
+        Ok(Self {
+            config,
+            access_control,
+            listener: Box::new(listener),
         })
     }
 
     /// Get the bound local address of this listener.
-    pub fn local_addr(&self) -> Result<std::net::SocketAddr> {
-        self.listener.local_addr()
+    pub fn local_addrs(&self) -> Result<Vec<std::net::SocketAddr>> {
+        self.listener.local_addrs()
     }
 
     /// Accept an incoming connection.

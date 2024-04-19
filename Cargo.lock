@@ -3432,6 +3432,7 @@ dependencies = [
 name = "holochain_websocket"
 version = "0.3.0-beta-dev.20"
 dependencies = [
+ "async-trait",
  "criterion",
  "futures",
  "holochain_serialized_bytes",
