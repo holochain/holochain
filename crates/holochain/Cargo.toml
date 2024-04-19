@@ -41,7 +41,7 @@ holochain_zome_types = { version = "^0.3.0-beta-dev.34", path = "../holochain_zo
 holochain_nonce = { version = "^0.3.0-beta-dev.26", path = "../holochain_nonce" }
 holochain_secure_primitive = { version = "^0.3.0-beta-dev.23", path = "../holochain_secure_primitive" }
 holochain_conductor_services = { version = "^0.2.0-beta-dev.15", path = "../holochain_conductor_services" }
-human-panic = "1.0.3"
+human-panic = "2.0"
 itertools = { version = "0.12" }
 kitsune_p2p = { version = "^0.3.0-beta-dev.38", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.20", path = "../kitsune_p2p/bin_data" }
@@ -136,7 +136,7 @@ regex = "1.5"
 reqwest = "0.12"
 serial_test = "3.0"
 test-case = "3.3"
-tokio-tungstenite = "0.13"
+tokio-tungstenite = "0.21"
 
 [build-dependencies]
 hdk = { version = "^0.3.0-beta-dev.39", path = "../hdk"}
