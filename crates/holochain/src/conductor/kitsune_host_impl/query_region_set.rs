@@ -27,7 +27,7 @@ pub async fn query_region_set(
     arq_set: Arc<ArqSet>,
 ) -> ConductorResult<RegionSetLtcs> {
     let times = TelescopingTimes::historical(&topology);
-    let coords = RegionCoordSetLtcs::new(times, arq_set);
+    let coords = RegionCoordSetLtcs::new(times, (*arq_set).clone());
 
     let region_set = db
         .read_async(move |txn| {

@@ -12,6 +12,7 @@ use crate::types::event::KitsuneP2pEventSender;
 use crate::{HostApi, HostApiLegacy};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
+use kitsune_p2p_types::dht::Arq;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KitsuneAgent, KitsuneOpHash, KitsuneSpace},
@@ -66,18 +67,18 @@ impl AgentInfoSession {
             .collect()
     }
 
-    pub(super) fn local_agent_arcs(&self) -> Vec<(Arc<KitsuneAgent>, DhtArc)> {
+    pub(super) fn local_agent_arqs(&self) -> Vec<(Arc<KitsuneAgent>, Arq)> {
         self.local_agents
             .iter()
-            .map(|info| (info.agent.clone(), info.storage_arc()))
+            .map(|info| (info.agent.clone(), info.storage_arq.clone()))
             .collect()
     }
 
     // Get the arc intervals for locally joined agents.
-    pub(super) fn local_arcs(&self) -> Vec<DhtArc> {
+    pub(super) fn local_arqs(&self) -> Vec<Arq> {
         self.local_agents
             .iter()
-            .map(|info| info.storage_arc())
+            .map(|info| info.storage_arq.clone())
             .collect()
     }
 

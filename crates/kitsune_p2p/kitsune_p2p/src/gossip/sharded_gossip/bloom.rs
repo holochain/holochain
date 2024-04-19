@@ -16,9 +16,11 @@ impl ShardedGossipLocal {
         state: RoundState,
         agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Option<BloomFilter>> {
-        let RoundState { common_arc_set, .. } = state;
+        let RoundState { common_arq_set, .. } = state;
+
         // Get the time range for this gossip.
         // Get all the agent info that is within the common arc set.
+        let common_arc_set = Arc::new(common_arq_set.to_dht_arc_set_std());
         let agents_within_arc: Vec<_> = agent_info_session
             .agent_info_within_arc_set(&self.host_api, &self.space, common_arc_set)
             .await?;

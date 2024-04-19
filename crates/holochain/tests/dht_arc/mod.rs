@@ -41,7 +41,6 @@ async fn test_arc_redundancy() {
     let keystore = conductor.keystore();
     fn converge(peers: &mut Vec<Arq>) {
         let mut mature = false;
-        let dim = SpaceDimension::standard();
         for _ in 0..40 {
             for i in 0..peers.len() {
                 let p = peers.clone();
@@ -50,7 +49,7 @@ async fn test_arc_redundancy() {
                 view.update_arc(arc);
             }
 
-            let r = check_redundancy(peers.iter().map(|a| a.to_dht_arc(dim)).collect());
+            let r = check_redundancy(peers.iter().map(|a| a.to_dht_arc_std()).collect());
             if mature {
                 assert!(r >= DEFAULT_MIN_REDUNDANCY);
             } else if r >= DEFAULT_MIN_REDUNDANCY {

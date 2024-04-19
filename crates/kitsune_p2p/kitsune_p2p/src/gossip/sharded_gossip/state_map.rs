@@ -100,6 +100,7 @@ mod tests {
     use crate::gossip::sharded_gossip::{NodeCert, RoundState};
     use crate::NOISE;
     use arbitrary::{Arbitrary, Unstructured};
+    use kitsune_p2p_types::dht::arq::ArqSet;
     use kitsune_p2p_types::Tx2Cert;
     use std::collections::HashSet;
     use std::sync::Arc;
@@ -309,7 +310,7 @@ mod tests {
     fn test_round_state() -> RoundState {
         RoundState::new(
             vec![],
-            Arc::new(DhtArcSet::new_empty()),
+            Arc::new(ArqSet::empty()),
             None,
             Duration::from_millis(5),
         )

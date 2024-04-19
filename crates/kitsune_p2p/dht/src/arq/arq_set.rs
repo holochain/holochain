@@ -63,6 +63,16 @@ impl<S: ArqStart> ArqSet<S> {
         Self::new(vec![arq])
     }
 
+    /// Singleton set
+    #[cfg(feature = "test_utils")]
+    pub fn full_std() -> Self {
+        Self::new(vec![Arq::<S>::new_full_max(
+            SpaceDimension::standard(),
+            &ArqStrat::default(),
+            S::zero(),
+        )])
+    }
+
     /// Get a reference to the arq set's power.
     pub fn power(&self) -> u8 {
         self.power
@@ -71,6 +81,11 @@ impl<S: ArqStart> ArqSet<S> {
     /// Get a reference to the arq set's arqs.
     pub fn arqs(&self) -> &[Arq<S>] {
         self.arqs.as_ref()
+    }
+
+    /// Convert to a set of "continuous" arcs using standard topology
+    pub fn to_dht_arc_set_std(&self) -> DhtArcSet {
+        self.to_dht_arc_set(SpaceDimension::standard())
     }
 
     /// Convert to a set of "continuous" arcs

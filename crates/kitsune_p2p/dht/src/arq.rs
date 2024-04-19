@@ -53,6 +53,8 @@ pub trait ArqStart: Sized + Copy + std::fmt::Debug {
     fn requantize_up(&self, factor: u32) -> Option<Self>;
     /// Requantize to a lower power, using the precalculated multiplicative factor.
     fn requantize_down(&self, factor: u32) -> Self;
+    /// Zero value
+    fn zero() -> Self;
 }
 
 impl ArqStart for Loc {
@@ -71,6 +73,10 @@ impl ArqStart for Loc {
     fn requantize_down(&self, _factor: u32) -> Self {
         *self
     }
+
+    fn zero() -> Self {
+        0.into()
+    }
 }
 
 impl ArqStart for SpaceOffset {
@@ -88,6 +94,10 @@ impl ArqStart for SpaceOffset {
 
     fn requantize_down(&self, factor: u32) -> Self {
         *self * factor
+    }
+
+    fn zero() -> Self {
+        0.into()
     }
 }
 
@@ -183,6 +193,11 @@ impl<S: ArqStart> Arq<S> {
         len
     }
 
+    /// Convert to [`DhtArcRange`] using standard topology
+    pub fn to_dht_arc_range_std(&self) -> DhtArcRange {
+        self.to_dht_arc_range(SpaceDimension::standard())
+    }
+
     /// Convert to [`DhtArcRange`]
     pub fn to_dht_arc_range(&self, dim: impl SpaceDim) -> DhtArcRange {
         if is_full(dim, self.power, *self.count) {
@@ -246,6 +261,23 @@ impl<S: ArqStart> Arq<S> {
         })
     }
 
+    /// Construct a full arq at the given power.
+    /// The `count` is calculated accordingly.
+    pub fn new_full(dim: impl SpaceDim, start: S, power: u8) -> Self {
+        let count = pow2(32u8.saturating_sub(power + dim.get().quantum_power));
+        assert!(is_full(dim, power, count));
+        Self {
+            start,
+            power,
+            count: count.into(),
+        }
+    }
+
+    /// Construct a full arq at the maximum power.
+    pub fn new_full_max(dim: impl SpaceDim, strat: &ArqStrat, start: S) -> Self {
+        Self::new_full(dim, start, dim.get().max_power(strat))
+    }
+
     /// This arq has full coverage
     pub fn is_full(&self, dim: impl SpaceDim) -> bool {
         is_full(dim, self.power(), self.count())
@@ -265,23 +297,6 @@ impl Arq<Loc> {
             power: dim.get().min_power(),
             count: 0.into(),
         }
-    }
-
-    /// Construct a full arq at the given power.
-    /// The `count` is calculated accordingly.
-    pub fn new_full(dim: impl SpaceDim, start: Loc, power: u8) -> Self {
-        let count = pow2(32u8.saturating_sub(power + dim.get().quantum_power));
-        assert!(is_full(dim, power, count));
-        Self {
-            start,
-            power,
-            count: count.into(),
-        }
-    }
-
-    /// Construct a full arq at the maximum power.
-    pub fn new_full_max(dim: impl SpaceDim, strat: &ArqStrat, start: Loc) -> Self {
-        Self::new_full(dim, start, dim.get().max_power(strat))
     }
 
     /// Reduce the power by 1
@@ -308,6 +323,11 @@ impl Arq<Loc> {
         })
     }
 
+    /// Convert to the [`ArqBounds`] representation, which forgets about the
+    /// [`Loc`] associated with this arq. Uses standard topology.
+    pub fn to_bounds_std(&self) -> ArqBounds {
+        self.to_bounds(SpaceDimension::standard())
+    }
     /// Convert to the [`ArqBounds`] representation, which forgets about the
     /// [`Loc`] associated with this arq.
     pub fn to_bounds(&self, dim: impl SpaceDim) -> ArqBounds {
@@ -667,8 +687,8 @@ mod tests {
     #[test]
     fn test_full_intervals() {
         let topo = Topology::unit_zero();
-        let full1 = Arq::new_full(&topo, 0u32.into(), 29);
-        let full2 = Arq::new_full(&topo, 2u32.pow(31).into(), 25);
+        let full1 = Arq::<Loc>::new_full(&topo, 0u32.into(), 29);
+        let full2 = Arq::<Loc>::new_full(&topo, 2u32.pow(31).into(), 25);
         assert!(matches!(full1.to_dht_arc_range(&topo), DhtArcRange::Full));
         assert!(matches!(full2.to_dht_arc_range(&topo), DhtArcRange::Full));
     }
