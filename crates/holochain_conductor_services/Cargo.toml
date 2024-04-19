@@ -24,8 +24,8 @@ thiserror = "1.0"
 tokio = "1"
 tracing = "0.1"
 
-# holochain_deepkey_dna = "0.0.4"
-holochain_deepkey_dna = { path = "../../../deepkey/crates/holochain_deepkey_dna" }
+holochain_deepkey_dna = "0.0.4"
+# holochain_deepkey_dna = { path = "../../../deepkey/crates/holochain_deepkey_dna" }
 # holochain_deepkey_dna = { git = "https://github.com/maackle/deepkey", branch = "develop" }
 holochain_keystore = { version = "^0.3.0-beta-dev.35", path = "../holochain_keystore" }
 holochain_types = { version = "^0.3.0-beta-dev.41", path = "../holochain_types" }
