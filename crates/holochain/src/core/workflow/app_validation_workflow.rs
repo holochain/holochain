@@ -453,67 +453,9 @@ pub async fn validate_op(
     Ok(outcome)
 }
 
-async fn get_zomes_to_invoke(
-    op: &Op,
-    workspace: &HostFnWorkspaceRead,
-    network: GenericNetwork,
-    ribosome: &impl RibosomeT,
-) -> AppValidationOutcome<ZomesToInvoke> {
-    match op {
-        Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => Ok(ZomesToInvoke::AllIntegrity),
-        Op::StoreRecord(StoreRecord { record }) => {
-            let cascade = CascadeImpl::from_workspace_and_network(workspace, network.clone());
-            store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await
-        }
-        Op::StoreEntry(StoreEntry { action, .. }) => {
-            entry_creation_zomes_to_invoke(&action.hashed.content, ribosome)
-        }
-        Op::RegisterUpdate(RegisterUpdate { update, .. }) => match &update.hashed.entry_type {
-            EntryType::App(app_entry_def) => {
-                zomes_to_invoke_from_ribosome(&app_entry_def.zome_index, ribosome)
-            }
-            _ => Ok(ZomesToInvoke::AllIntegrity),
-        },
-        Op::RegisterDelete(RegisterDelete { delete }) => {
-            let cascade = CascadeImpl::from_workspace_and_network(workspace, network.clone());
-            let deletes_address = &delete.hashed.deletes_address;
-            let (deleted_action, _) = cascade
-                .retrieve_action(deletes_address.clone(), NetworkGetOptions::default())
-                .await?
-                .ok_or_else(|| Outcome::awaiting(deletes_address))?;
-            match deleted_action.hashed.content {
-                Action::Create(Create {
-                    entry_type: EntryType::App(app_entry_def),
-                    ..
-                })
-                | Action::Update(Update {
-                    entry_type: EntryType::App(app_entry_def),
-                    ..
-                }) => zomes_to_invoke_from_ribosome(&app_entry_def.zome_index, ribosome),
-                _ => Ok(ZomesToInvoke::AllIntegrity),
-            }
-        }
-        Op::RegisterCreateLink(RegisterCreateLink {
-            create_link:
-                SignedHashed {
-                    hashed:
-                        HoloHashed {
-                            content: action, ..
-                        },
-                    ..
-                },
-            ..
-        })
-        | Op::RegisterDeleteLink(RegisterDeleteLink {
-            create_link: action,
-            ..
-        }) => zomes_to_invoke_from_ribosome(&action.zome_index, ribosome),
-    }
-}
-
 /// Check the AppEntryDef is valid for the zome.
 /// Check the EntryDefId and ZomeIndex are in range.
-pub async fn check_entry_def(
+async fn check_entry_def(
     op: &Op,
     dna_hash: &DnaHash,
     conductor: &Conductor,
@@ -527,7 +469,7 @@ pub async fn check_entry_def(
 
 /// Check the AppEntryDef is valid for the zome.
 /// Check the EntryDefId and ZomeIndex are in range.
-pub async fn check_app_entry_def(
+async fn check_app_entry_def(
     app_entry_def: &AppEntryDef,
     dna_hash: &DnaHash,
     conductor: &Conductor,
@@ -560,92 +502,124 @@ pub async fn check_app_entry_def(
     }
 }
 
-fn entry_creation_zomes_to_invoke(
-    action: &EntryCreationAction,
+// Zomes to invoke for app validation are determined based on app entries'
+// zome index. Whenever an app entry is contained in the op, the zome index can
+// directly be known. For other cases like deletes, the deleted action is
+// retrieved with the expectation that it is the original create or an update,
+// which again include the app entry type that specifies the zome index of the
+// integrity zome.
+//
+// Special cases are non app entries like cap grants and claims and agent pub
+// keys. None of them have an entry definition or a zome index of the integrity
+// zome. Thus all integrity zomes are returned for validation invocation.
+async fn get_zomes_to_invoke(
+    op: &Op,
+    workspace: &HostFnWorkspaceRead,
+    network: GenericNetwork,
     ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
-    match action {
-        EntryCreationAction::Create(Create {
-            entry_type: EntryType::App(app_entry_def),
+    match op {
+        Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => Ok(ZomesToInvoke::AllIntegrity),
+        Op::StoreRecord(StoreRecord { record }) => {
+            // For deletes there is no entry type to check, so we get the previous action.
+            // In theory this can be yet another delete, in which case all
+            // integrity zomes are returned for invocation.
+            // Instead the delete could be followed up the chain to find the original
+            // create, but since deleting a delete does not have much practical use,
+            // it is neglected here.
+            let action = match record.action() {
+                Action::Delete(Delete {
+                    deletes_address, ..
+                })
+                | Action::DeleteLink(DeleteLink {
+                    link_add_address: deletes_address,
+                    ..
+                }) => {
+                    let deleted_action =
+                        retrieve_deleted_action(workspace, network, deletes_address).await?;
+                    deleted_action.action().clone()
+                }
+                _ => record.action().clone(),
+            };
+
+            match action {
+                Action::CreateLink(CreateLink { zome_index, .. })
+                | Action::Create(Create {
+                    entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
+                    ..
+                })
+                | Action::Update(Update {
+                    entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
+                    ..
+                }) => get_integrity_zome_from_ribosome(&zome_index, ribosome),
+                _ => Ok(ZomesToInvoke::AllIntegrity),
+            }
+        }
+        Op::StoreEntry(StoreEntry { action, .. }) => match &action.hashed.content {
+            EntryCreationAction::Create(Create {
+                entry_type: EntryType::App(app_entry_def),
+                ..
+            })
+            | EntryCreationAction::Update(Update {
+                entry_type: EntryType::App(app_entry_def),
+                ..
+            }) => get_integrity_zome_from_ribosome(&app_entry_def.zome_index, ribosome),
+            _ => Ok(ZomesToInvoke::AllIntegrity),
+        },
+        Op::RegisterUpdate(RegisterUpdate { update, .. }) => match &update.hashed.entry_type {
+            EntryType::App(app_entry_def) => {
+                get_integrity_zome_from_ribosome(&app_entry_def.zome_index, ribosome)
+            }
+            _ => Ok(ZomesToInvoke::AllIntegrity),
+        },
+        Op::RegisterDelete(RegisterDelete { delete }) => {
+            let deletes_address = &delete.hashed.deletes_address;
+            let deleted_action =
+                retrieve_deleted_action(workspace, network, deletes_address).await?;
+            match deleted_action.hashed.content {
+                Action::Create(Create {
+                    entry_type: EntryType::App(app_entry_def),
+                    ..
+                })
+                | Action::Update(Update {
+                    entry_type: EntryType::App(app_entry_def),
+                    ..
+                }) => get_integrity_zome_from_ribosome(&app_entry_def.zome_index, ribosome),
+                _ => Ok(ZomesToInvoke::AllIntegrity),
+            }
+        }
+        Op::RegisterCreateLink(RegisterCreateLink {
+            create_link:
+                SignedHashed {
+                    hashed:
+                        HoloHashed {
+                            content: action, ..
+                        },
+                    ..
+                },
             ..
         })
-        | EntryCreationAction::Update(Update {
-            entry_type: EntryType::App(app_entry_def),
+        | Op::RegisterDeleteLink(RegisterDeleteLink {
+            create_link: action,
             ..
-        }) => {
-            let zome = ribosome
-                .get_integrity_zome(&app_entry_def.zome_index())
-                .ok_or_else(|| {
-                    tracing::error!(
-                        "No integrity zome with zome index {:?} found for action {action:?}",
-                        app_entry_def.zome_index()
-                    );
-                    Outcome::rejected(format!(
-                        "No integrity zome with index {:?} found",
-                        app_entry_def.zome_index()
-                    ))
-                })?;
-            Ok(ZomesToInvoke::OneIntegrity(zome))
-        }
-        _ => Ok(ZomesToInvoke::AllIntegrity),
+        }) => get_integrity_zome_from_ribosome(&action.zome_index, ribosome),
     }
 }
 
-/// Get the zomes to invoke for an [`Op::StoreRecord`].
-async fn store_record_zomes_to_invoke(
-    action: &Action,
-    ribosome: &impl RibosomeT,
-    cascade: &(impl Cascade + Send + Sync),
-) -> AppValidationOutcome<ZomesToInvoke> {
-    // For deletes there is no entry type to check, so we get the previous action.
-    // In theory this can be yet another delete and so forth, in which case all
-    // integrity zomes are returned for invocation.
-    // Instead the delete could be followed up the chain to find the original
-    // create, but since deleting a delete does not have much practical use,
-    // it is neglected here.
-    let action = match action {
-        Action::Delete(Delete {
-            deletes_address, ..
-        })
-        | Action::DeleteLink(DeleteLink {
-            link_add_address: deletes_address,
-            ..
-        }) => {
-            let (deletes_action, _) = cascade
-                .retrieve_action(deletes_address.clone(), NetworkGetOptions::default())
-                .await?
-                .ok_or_else(|| Outcome::awaiting(deletes_address))?;
-
-            deletes_action.action().clone()
-        }
-        _ => action.clone(),
-    };
-
-    match action {
-        Action::CreateLink(create_link) => {
-            zomes_to_invoke_from_ribosome(&create_link.zome_index, ribosome)
-        }
-        Action::Create(Create {
-            entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
-            ..
-        })
-        | Action::Update(Update {
-            entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
-            ..
-        }) => {
-            let zome = ribosome.get_integrity_zome(&zome_index).ok_or_else(|| {
-                tracing::error!(
-                    "No integrity zome with zome index {zome_index:?} found for action {action:?}"
-                );
-                Outcome::rejected(format!("No integrity zome with index {zome_index:?} found"))
-            })?;
-            Ok(ZomesToInvoke::OneIntegrity(zome))
-        }
-        _ => Ok(ZomesToInvoke::AllIntegrity),
-    }
+async fn retrieve_deleted_action(
+    workspace: &HostFnWorkspaceRead,
+    network: GenericNetwork,
+    deletes_address: &ActionHash,
+) -> AppValidationOutcome<SignedActionHashed> {
+    let cascade = CascadeImpl::from_workspace_and_network(workspace, network.clone());
+    let (deleted_action, _) = cascade
+        .retrieve_action(deletes_address.clone(), NetworkGetOptions::default())
+        .await?
+        .ok_or_else(|| Outcome::awaiting(deletes_address))?;
+    Ok(deleted_action)
 }
 
-fn zomes_to_invoke_from_ribosome(
+fn get_integrity_zome_from_ribosome(
     zome_index: &ZomeIndex,
     ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
