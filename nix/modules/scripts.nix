@@ -50,7 +50,7 @@
         fi
 
         # Want to update the root flake.lock if we're updating the version that is currently the default.
-        if grep -q "dir=$VERSIONS_DIR" flake.nix; then
+        if grep -qE "versions\.url = \".+\?dir=${VERSIONS_DIR}\"" flake.nix; then
           # TODO, once the Nix version on CI supports it -> nix flake update versions
           nix flake lock --tarball-ttl 0 --update-input versions --override-input versions "path:$VERSIONS_DIR"
         fi
