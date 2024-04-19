@@ -17,7 +17,7 @@ use tokio::time::Instant;
 
 #[tokio::main]
 async fn main() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     const NUM: usize = 10;
     const MIN_WAIT_MS: Duration = Duration::from_millis(100);

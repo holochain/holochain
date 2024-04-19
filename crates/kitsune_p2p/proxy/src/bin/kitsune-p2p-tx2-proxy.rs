@@ -30,7 +30,7 @@ pub struct Opt {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     kitsune_p2p_types::metrics::init_sys_info_poll();
 
     if let Err(e) = inner().await {

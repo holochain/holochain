@@ -1,6 +1,7 @@
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::Criterion;
+use std::net::ToSocketAddrs;
 
 use holochain_serialized_bytes::prelude::*;
 use holochain_websocket::*;
@@ -15,11 +16,11 @@ criterion_main!(benches);
 struct TestMessage(String);
 
 fn full_connect(bench: &mut Criterion) {
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
 
     let runtime = rt();
 
-    let config = std::sync::Arc::new(WebsocketConfig::default());
+    let config = std::sync::Arc::new(WebsocketConfig::LISTENER_DEFAULT);
     let config = &config;
 
     let hello = TestMessage("hello".to_string());
@@ -29,7 +30,7 @@ fn full_connect(bench: &mut Criterion) {
 
     bench.bench_function("full_connect", |b| b.iter(|| {
         runtime.block_on(async move {
-            let bind_addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
+            let bind_addr = "localhost:0".to_socket_addrs().unwrap().next().unwrap();
             let l = WebsocketListener::bind(config.clone(), bind_addr).await.unwrap();
 
             let port = l.local_addr().unwrap().port();
@@ -48,7 +49,7 @@ fn full_connect(bench: &mut Criterion) {
                 }
                 b1.wait().await;
             }, async {
-                let (s, mut r) = connect(config.clone(), ([127, 0, 0, 1], port).into()).await.unwrap();
+                let (s, mut r) = connect(config.clone(), format!("localhost:{port}").to_socket_addrs().unwrap().next().unwrap()).await.unwrap();
                 tokio::select! {
                     _ = r.recv::<TestMessage>() => (),
                     _ = async {

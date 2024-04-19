@@ -7,6 +7,7 @@ use kitsune_p2p::event::{
 use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneOpData, KitsuneSignature, KitsuneSpace};
 use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     dependencies::lair_keystore_api::LairClient,
@@ -65,11 +66,40 @@ impl TestLegacyHost {
                     match evt {
                         KitsuneP2pEvent::PutAgentInfoSigned { respond, input, .. } => {
                             let mut store = agent_store.write();
-                            let incoming_agents: HashSet<_> =
-                                input.peer_data.iter().map(|p| p.agent.clone()).collect();
-                            store.retain(|p: &AgentInfoSigned| !incoming_agents.contains(&p.agent));
+                            let incoming_agents = input
+                                .peer_data
+                                .iter()
+                                .map(|p| (p.agent.clone(), p))
+                                .collect::<HashMap<_, _>>();
+
+                            let mut agent_info_puts = Vec::new();
+                            store.retain(|p: &AgentInfoSigned| {
+                                let keep = !incoming_agents.contains_key(&p.agent);
+
+                                // If we're not keeping it, we're replacing it so check for a URL change
+                                if !keep {
+                                    let existing_urls =
+                                        p.url_list.iter().cloned().collect::<HashSet<_>>();
+                                    let new_urls = incoming_agents
+                                        .get(&p.agent)
+                                        .unwrap()
+                                        .url_list
+                                        .iter()
+                                        .cloned()
+                                        .collect::<HashSet<_>>();
+
+                                    agent_info_puts.push(AgentInfoPut {
+                                        removed_urls: existing_urls
+                                            .difference(&new_urls)
+                                            .cloned()
+                                            .collect(),
+                                    });
+                                }
+
+                                keep
+                            });
                             store.extend(input.peer_data);
-                            respond.respond(Ok(async move { Ok(()) }.boxed().into()))
+                            respond.respond(Ok(async move { Ok(agent_info_puts) }.boxed().into()))
                         }
                         KitsuneP2pEvent::QueryAgents { respond, input, .. } => {
                             let kitsune_p2p::event::QueryAgentsEvt {
@@ -125,7 +155,7 @@ impl TestLegacyHost {
                                             return None;
                                         }
 
-                                        let interval = DhtArcRange::from(info.storage_arc);
+                                        let interval = DhtArcRange::from(info.storage_arc());
                                         if !arc_set.overlap(&interval.into()) {
                                             return None;
                                         }
@@ -163,7 +193,7 @@ impl TestLegacyHost {
                         KitsuneP2pEvent::QueryPeerDensity {
                             respond,
                             space,
-                            dht_arc,
+                            dht_arc: _,
                             ..
                         } => {
                             let cutoff = std::time::Duration::from_secs(60 * 15);
@@ -179,7 +209,7 @@ impl TestLegacyHost {
                                 .iter()
                                 .filter_map(|agent: &AgentInfoSigned| {
                                     if agent.space == space && now < agent.expires_at_ms {
-                                        Some(agent.storage_arc)
+                                        Some(agent.storage_arq)
                                     } else {
                                         None
                                     }
@@ -189,7 +219,7 @@ impl TestLegacyHost {
                             let strat = PeerStrat::Quantized(ArqStrat::standard(
                                 LocalStorageConfig::default(),
                             ));
-                            let view = strat.view(topology, dht_arc, &arcs);
+                            let view = strat.view(topology, &arcs);
 
                             respond.respond(Ok(async move { Ok(view) }.boxed().into()))
                         }
@@ -325,6 +355,12 @@ impl TestLegacyHost {
         });
 
         self.handle = Some(handle);
+    }
+
+    pub fn shutdown(&mut self) {
+        if let Some(handle) = self.handle.take() {
+            handle.abort();
+        }
     }
 
     pub async fn drain_events(&self) -> Vec<RecordedKitsuneP2pEvent> {

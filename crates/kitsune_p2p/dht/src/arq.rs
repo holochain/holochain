@@ -162,11 +162,11 @@ impl<S: ArqStart> Arq<S> {
             .quantum_chunk_width()
             .saturating_mul(dim.get().quantum)
             .min(u32::MAX / 2);
+        let max = u32::MAX / 4 + 2;
         // this really shouldn't ever be larger than MAX / 8
         debug_assert!(
-            len <= u32::MAX / 4 + 2,
-            "chunk width is much larger than expected: {}",
-            len
+            len <= max,
+            "chunk width is much larger than expected: {len} vs {max}",
         );
         len
     }

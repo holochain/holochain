@@ -6,19 +6,26 @@ use holochain_p2p::dht::PeerStrat;
 use holochain_p2p::dht_arc::DEFAULT_MIN_PEERS;
 use holochain_p2p::dht_arc::DEFAULT_MIN_REDUNDANCY;
 use holochain_p2p::dht_arc::MAX_HALF_LENGTH;
-use kitsune_p2p::dht_arc::DhtArc;
+use kitsune_p2p::dht::spacetime::SpaceDimension;
+use kitsune_p2p::dht::Arq;
+use kitsune_p2p::dht::ArqStrat;
 use kitsune_p2p::*;
 use kitsune_p2p_types::dht_arc::check_redundancy;
 
-async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> Vec<DhtArc> {
+async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> Vec<Arq> {
     let mut half_lens = half_lens.iter().cycle();
     let mut out = Vec::with_capacity(num);
 
     let agents = SweetAgents::get(keystore, num).await;
     for agent in agents {
         let agent = holochain_p2p::agent_holo_to_kit(agent);
-        let arc = DhtArc::from_start_and_half_len(agent.get_loc(), *half_lens.next().unwrap());
-        out.push(arc);
+        let arq = Arq::from_start_and_half_len_approximate(
+            SpaceDimension::standard(),
+            &ArqStrat::default(),
+            agent.get_loc(),
+            *half_lens.next().unwrap(),
+        );
+        out.push(arq);
     }
     out
 }
@@ -32,18 +39,18 @@ async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> V
 async fn test_arc_redundancy() {
     let conductor = SweetConductor::from_standard_config().await;
     let keystore = conductor.keystore();
-    fn converge(peers: &mut Vec<DhtArc>) {
+    fn converge(peers: &mut Vec<Arq>) {
         let mut mature = false;
+        let dim = SpaceDimension::standard();
         for _ in 0..40 {
             for i in 0..peers.len() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
-                let view =
-                    PeerStrat::default().view(Topology::standard_epoch_full(), *arc, p.as_slice());
+                let view = PeerStrat::default().view(Topology::standard_epoch_full(), p.as_slice());
                 view.update_arc(arc);
             }
 
-            let r = check_redundancy(peers.clone());
+            let r = check_redundancy(peers.iter().map(|a| a.to_dht_arc(dim)).collect());
             if mature {
                 assert!(r >= DEFAULT_MIN_REDUNDANCY);
             } else if r >= DEFAULT_MIN_REDUNDANCY {
@@ -79,29 +86,30 @@ async fn test_arc_redundancy() {
 async fn test_join_leave() {
     let conductor = SweetConductor::from_standard_config().await;
     let keystore = conductor.keystore();
+    let topo = Topology::standard_epoch_full();
 
     let num_peers = DEFAULT_MIN_PEERS;
 
     let coverages = vec![MAX_HALF_LENGTH];
-    let converge = |peers: &mut Vec<DhtArc>| {
+    let converge = |peers: &mut Vec<Arq>| {
         for i in 0..peers.len() {
             let p = peers.clone();
-            let arc = peers.get_mut(i).unwrap();
-            let view =
-                PeerStrat::default().view(Topology::standard_epoch_full(), *arc, p.as_slice());
-            view.update_arc(arc);
+            let arq = peers.get_mut(i).unwrap();
+            let view = PeerStrat::default().view(topo.clone(), p.as_slice());
+            view.update_arc(arq);
         }
     };
     let mut peers = get_peers(num_peers, &coverages, keystore.clone()).await;
     let delta_peers = num_peers / 2;
     let mut mature = false;
+
     for _ in 0..40 {
         let new_peers = get_peers(delta_peers, &coverages, keystore.clone()).await;
         for (o, n) in peers[..delta_peers].iter_mut().zip(new_peers.into_iter()) {
             *o = n;
         }
         converge(&mut peers);
-        let r = check_redundancy(peers.clone());
+        let r = check_redundancy(peers.iter().map(|a| a.to_dht_arc(&topo)).collect());
 
         if mature {
             assert!(r >= DEFAULT_MIN_REDUNDANCY);

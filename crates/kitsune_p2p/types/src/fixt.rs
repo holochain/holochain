@@ -46,7 +46,7 @@ fixturator!(
                 Arc::new(fixt!(KitsuneAgent, Empty)),
                 ArqSize {
                     count: 8.into(),
-                    power: 27
+                    power: 17
                 },
                 fixt!(UrlList, Empty),
                 0,
@@ -64,7 +64,7 @@ fixturator!(
                 Arc::new(fixt!(KitsuneAgent, Unpredictable)),
                 ArqSize {
                     count: 8.into(),
-                    power: 27,
+                    power: 17,
                 },
                 fixt!(UrlList, Unpredictable),
                 0,
@@ -82,7 +82,7 @@ fixturator!(
                 Arc::new(fixt!(KitsuneAgent, Predictable)),
                 ArqSize {
                     count: 8.into(),
-                    power: 27,
+                    power: 17,
                 },
                 fixt!(UrlList, Empty),
                 0,

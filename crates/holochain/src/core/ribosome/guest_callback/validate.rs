@@ -4,7 +4,7 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
-use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::GenericNetwork;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
@@ -33,7 +33,7 @@ impl ValidateInvocation {
 #[derive(Clone, Constructor)]
 pub struct ValidateHostAccess {
     pub workspace: HostFnWorkspaceRead,
-    pub network: HolochainP2pDna,
+    pub network: GenericNetwork,
 }
 
 impl std::fmt::Debug for ValidateHostAccess {
@@ -308,7 +308,7 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn pass_validate_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Validate).await;

@@ -4,7 +4,6 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::access::Permission;
 use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::CellId;
@@ -158,7 +157,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
     async fn remote_signal_test() -> anyhow::Result<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         const NUM_CONDUCTORS: usize = 5;
 
         let num_signals = Arc::new(AtomicUsize::new(0));

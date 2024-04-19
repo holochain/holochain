@@ -1,5 +1,7 @@
 //! Helpers for unit tests
 
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::Statement;
@@ -388,7 +390,7 @@ pub fn dump_db(txn: &Transaction) {
                         tracing::debug!(?column, row = ?String::from_utf8_lossy(text));
                     }
                     holochain_sqlite::rusqlite::types::ValueRef::Blob(blob) => {
-                        let blob = base64::encode_config(blob, base64::URL_SAFE_NO_PAD);
+                        let blob = URL_SAFE_NO_PAD.encode(blob);
                         tracing::debug!("column: {:?} row:{}", column, blob);
                     }
                 }

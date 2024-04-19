@@ -8,6 +8,7 @@ use criterion::Criterion;
 use ::fixt::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dependencies::url2::url2;
+use kitsune_p2p::dht::arq::ArqSize;
 use kitsune_p2p::fixt::*;
 use kitsune_p2p::KitsuneSpace;
 use kitsune_p2p_bootstrap::error::BootstrapClientError;

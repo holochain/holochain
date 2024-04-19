@@ -35,8 +35,7 @@ use holo_hash::EntryHash;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
-use holochain_p2p::HolochainP2pDna;
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::GenericNetwork;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -104,20 +103,17 @@ pub enum CascadeSource {
 ///
 /// See the module-level docs for more info.
 #[derive(Clone)]
-pub struct CascadeImpl<Network: Send + Sync = HolochainP2pDna> {
+pub struct CascadeImpl {
     authored: Option<DbRead<DbKindAuthored>>,
     dht: Option<DbRead<DbKindDht>>,
     cache: Option<DbWrite<DbKindCache>>,
     scratch: Option<SyncScratch>,
-    network: Option<Network>,
+    network: Option<GenericNetwork>,
     private_data: Option<Arc<AgentPubKey>>,
     duration_metric: &'static CascadeDurationMetric,
 }
 
-impl<Network> CascadeImpl<Network>
-where
-    Network: HolochainP2pDnaT + Clone + 'static + Send + Sync,
-{
+impl CascadeImpl {
     /// Add the authored env to the cascade.
     pub fn with_authored(self, authored: DbRead<DbKindAuthored>) -> Self {
         Self {
@@ -159,11 +155,11 @@ where
     }
 
     /// Add the network and cache to the cascade.
-    pub fn with_network<N: HolochainP2pDnaT>(
+    pub fn with_network(
         self,
-        network: N,
+        network: GenericNetwork,
         cache_db: DbWrite<DbKindCache>,
-    ) -> CascadeImpl<N> {
+    ) -> CascadeImpl {
         CascadeImpl {
             authored: self.authored,
             dht: self.dht,
@@ -174,9 +170,7 @@ where
             duration_metric: create_cascade_duration_metric(),
         }
     }
-}
 
-impl CascadeImpl<HolochainP2pDna> {
     /// Constructs an empty [Cascade].
     pub fn empty() -> Self {
         Self {
@@ -191,12 +185,11 @@ impl CascadeImpl<HolochainP2pDna> {
     }
 
     /// Construct a [Cascade] with network access
-    pub fn from_workspace_and_network<N, AuthorDb, DhtDb>(
+    pub fn from_workspace_and_network<AuthorDb, DhtDb>(
         workspace: &HostFnWorkspace<AuthorDb, DhtDb>,
-        network: N,
-    ) -> CascadeImpl<N>
+        network: GenericNetwork,
+    ) -> CascadeImpl
     where
-        N: HolochainP2pDnaT + Clone,
         AuthorDb: ReadAccess<DbKindAuthored>,
         DhtDb: ReadAccess<DbKindDht>,
     {
@@ -207,7 +200,7 @@ impl CascadeImpl<HolochainP2pDna> {
             scratch,
         } = workspace.stores();
         let private_data = workspace.author();
-        CascadeImpl::<N> {
+        CascadeImpl {
             authored: Some(authored),
             dht: Some(dht),
             cache: Some(cache),
@@ -268,10 +261,7 @@ pub trait Cascade {
 }
 
 #[async_trait::async_trait]
-impl<Network> Cascade for CascadeImpl<Network>
-where
-    Network: HolochainP2pDnaT + Clone + 'static + Send,
-{
+impl Cascade for CascadeImpl {
     async fn retrieve_entry(
         &self,
         hash: EntryHash,
@@ -376,10 +366,7 @@ where
     }
 }
 
-impl<Network> CascadeImpl<Network>
-where
-    Network: HolochainP2pDnaT + Clone + 'static + Send,
-{
+impl CascadeImpl {
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_rendered_op(txn: &mut Transaction, op: &RenderedOp) -> CascadeResult<()> {
         let RenderedOp {
@@ -438,6 +425,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip_all)]
     async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
         cache
@@ -452,6 +440,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip_all)]
     async fn merge_link_ops_into_cache(
         &self,
         responses: Vec<WireLinkOps>,
@@ -471,6 +460,7 @@ where
     }
 
     /// Add new activity to the Cache.
+    #[tracing::instrument(skip_all)]
     async fn add_activity_into_cache(
         &self,
         responses: Vec<MustGetAgentActivityResponse>,

@@ -31,7 +31,7 @@ use super::Spaces;
 async fn test_region_queries() {
     const NUM_OPS: usize = 100;
 
-    // let _g = holochain_trace::test_run().ok();
+    // let _g = holochain_trace::test_run();
 
     let mut g = random_generator();
 

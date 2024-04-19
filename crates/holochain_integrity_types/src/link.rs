@@ -174,3 +174,23 @@ impl From<(ZomeIndex, LinkType)> for ZomeIndex {
         z
     }
 }
+
+impl From<String> for LinkTag {
+    fn from(s: String) -> Self {
+        Self(s.into_bytes())
+    }
+}
+
+impl From<&str> for LinkTag {
+    fn from(s: &str) -> Self {
+        Self(s.as_bytes().to_vec())
+    }
+}
+
+impl TryInto<String> for LinkTag {
+    type Error = std::string::FromUtf8Error;
+
+    fn try_into(self) -> Result<String, Self::Error> {
+        String::from_utf8(self.0)
+    }
+}

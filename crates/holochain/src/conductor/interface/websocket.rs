@@ -44,7 +44,7 @@ pub async fn spawn_websocket_listener(
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::bind(Arc::new(config), format!("127.0.0.1:{}", port)).await?;
+    let listener = WebsocketListener::bind(Arc::new(config), format!("localhost:{}", port)).await?;
     trace!("LISTENING AT: {}", listener.local_addr()?);
     Ok(listener)
 }
@@ -120,7 +120,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::bind(Arc::new(config), format!("127.0.0.1:{}", port)).await?;
+    let listener = WebsocketListener::bind(Arc::new(config), format!("localhost:{}", port)).await?;
     let addr = listener.local_addr()?;
     trace!("LISTENING AT: {}", addr);
     let port = addr.port();
@@ -371,7 +371,7 @@ pub mod test {
             }
         }
 
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db_dir = test_db_dir();
         let conductor_handle = ConductorBuilder::new()
             .with_data_root_path(db_dir.path().to_path_buf().into())
@@ -581,7 +581,7 @@ pub mod test {
     #[ignore]
     #[allow(unreachable_code, unused_variables)]
     async fn invalid_request() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let dna_payload = InstallAppDnaPayload::hash_only(fake_dna_hash(1), "".to_string());
@@ -608,7 +608,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn websocket_call_zome_function() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -649,7 +649,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn gossip_info_request() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -704,7 +704,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn storage_info() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let uuid_1 = Uuid::new_v4();
         let dna_1 = fake_dna_zomes(
             &uuid_1.to_string(),
@@ -794,7 +794,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn enable_disable_enable_app() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let agent_key = fake_agent_pubkey_1();
         let mut dnas = Vec::new();
         for _i in 0..2 as u32 {
@@ -977,7 +977,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn attach_app_interface() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface {
@@ -996,7 +996,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dump_state() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -1061,7 +1061,7 @@ pub mod test {
     /// across the admin websocket.
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_via_admin() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let dnas = vec![
             make_dna("1", vec![TestWasm::Anchor]).await,
             make_dna("2", vec![TestWasm::Anchor]).await,

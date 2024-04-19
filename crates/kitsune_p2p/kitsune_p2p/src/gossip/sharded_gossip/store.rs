@@ -287,16 +287,12 @@ pub(super) async fn query_region_set<'a>(
 /// Add new agent info to the p2p store.
 pub(super) async fn put_agent_info(
     host_api: &HostApiLegacy,
-    space: &Arc<KitsuneSpace>,
     agents: &[Arc<AgentInfoSigned>],
 ) -> KitsuneResult<()> {
     let peer_data: Vec<_> = agents.iter().map(|i| (**i).clone()).collect();
     host_api
         .legacy
-        .put_agent_info_signed(PutAgentInfoSignedEvt {
-            space: space.clone(),
-            peer_data,
-        })
+        .put_agent_info_signed(PutAgentInfoSignedEvt { peer_data })
         .await
         .map_err(KitsuneError::other)?;
     Ok(())

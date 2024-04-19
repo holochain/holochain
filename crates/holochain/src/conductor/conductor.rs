@@ -5,7 +5,7 @@
 //!
 //! A Conductor can be managed:
 //! - externally, via an [`AppInterfaceApi`](super::api::AppInterfaceApi)
-//! - from within a [`Cell`](super::Cell), via [`CellConductorApi`](super::api::CellConductorApi)
+//! - from within a [`Cell`], via [`CellConductorApi`](super::api::CellConductorApi)
 //!
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
@@ -43,7 +43,6 @@ use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holochain_wasmer_host::module::ModuleCache;
 use itertools::Itertools;
-use parking_lot::RwLock;
 use rusqlite::Transaction;
 use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
@@ -90,6 +89,7 @@ use crate::core::queue_consumer::QueueTriggers;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
+use crate::core::ribosome::real_ribosome::ModuleCacheLock;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::ZomeCallResult;
 use crate::{
@@ -242,7 +242,7 @@ pub struct Conductor {
 
     /// File system and in-memory cache for wasmer modules.
     // Used in ribosomes but kept here as a single instance.
-    pub(crate) wasmer_module_cache: Arc<RwLock<ModuleCache>>,
+    pub(crate) wasmer_module_cache: Arc<ModuleCacheLock>,
 }
 
 impl Conductor {
@@ -298,7 +298,9 @@ mod startup_shutdown_impls {
                 holochain_p2p,
                 post_commit,
                 services: RwShare::new(None),
-                wasmer_module_cache: Arc::new(RwLock::new(ModuleCache::new(maybe_data_root_path))),
+                wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
+                    maybe_data_root_path,
+                ))),
             }
         }
 
@@ -338,6 +340,7 @@ mod startup_shutdown_impls {
             })
         }
 
+        #[tracing::instrument(skip_all, fields(scope=self.config.network.tracing_scope))]
         pub(crate) async fn initialize_conductor(
             self: Arc<Self>,
             outcome_rx: OutcomeReceiver,
@@ -399,6 +402,7 @@ mod interface_impls {
     impl Conductor {
         /// Spawn all admin interface tasks, register them with the TaskManager,
         /// and modify the conductor accordingly, based on the config passed in
+        #[tracing::instrument(skip_all)]
         pub async fn add_admin_interfaces(
             self: Arc<Self>,
             configs: Vec<AdminInterfaceConfig>,
@@ -452,6 +456,7 @@ mod interface_impls {
         /// and modify the conductor accordingly, based on the config passed in
         /// which is just a networking port number (or 0 to auto-select one).
         /// Returns the given or auto-chosen port number if giving an Ok Result
+        #[tracing::instrument(skip_all)]
         pub async fn add_app_interface(
             self: Arc<Self>,
             port: either::Either<u16, AppInterfaceId>,
@@ -509,6 +514,7 @@ mod interface_impls {
         }
 
         /// Give a list of networking ports taken up as running app interface tasks
+        #[tracing::instrument(skip_all)]
         pub async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {
             Ok(self
                 .get_state()
@@ -522,6 +528,7 @@ mod interface_impls {
         /// Start all app interfaces currently in state.
         /// This should only be run at conductor initialization.
         #[allow(irrefutable_let_patterns)]
+        #[tracing::instrument(skip_all)]
         pub(crate) async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()> {
             for (id, config) in &self.get_state().await?.app_interfaces {
                 debug!("Starting up app interface: {:?}", id);
@@ -548,17 +555,17 @@ mod dna_impls {
             self.ribosome_store().share_ref(|ds| ds.list())
         }
 
-        /// Get a [`DnaDef`](holochain_types::prelude::DnaDef) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
+        /// Get a [`DnaDef`] from the [`RibosomeStore`]
         pub fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
             self.ribosome_store().share_ref(|ds| ds.get_dna_def(hash))
         }
 
-        /// Get a [`DnaFile`](holochain_types::dna::DnaFile) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
+        /// Get a [`DnaFile`] from the [`RibosomeStore`]
         pub fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
             self.ribosome_store().share_ref(|ds| ds.get_dna_file(hash))
         }
 
-        /// Get an [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
+        /// Get an [`EntryDef`](holochain_integrity_types::prelude::EntryDef) from the [`EntryDefBufferKey`]
         pub fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
             self.ribosome_store().share_ref(|ds| ds.get_entry_def(key))
         }
@@ -586,7 +593,6 @@ mod dna_impls {
                 .dna_def()
                 .all_zomes()
                 .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
-
             // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
             if is_full_wasm_dna {
                 Ok(self.put_wasm(ribosome).await?)
@@ -664,7 +670,8 @@ mod dna_impls {
             // try to join all the tasks and return the list of dna files
             let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
                 let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
-                let ribosome = RealRibosome::new(dna_file, self.wasmer_module_cache.clone())?;
+                let ribosome =
+                    RealRibosome::new(dna_file, self.wasmer_module_cache.clone()).await?;
                 ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
             });
             let dnas = futures::future::try_join_all(wasms).await?;
@@ -702,6 +709,7 @@ mod dna_impls {
         }
 
         /// Restart every paused app
+        #[tracing::instrument(skip_all)]
         pub(crate) async fn start_paused_apps(&self) -> ConductorResult<AppStatusFx> {
             let (_, delta) = self
                 .update_state_prime(|mut state| {
@@ -736,6 +744,7 @@ mod dna_impls {
             self.put_wasm_code(dna_def, code, zome_defs).await
         }
 
+        #[tracing::instrument(skip_all)]
         pub(crate) async fn put_wasm_code(
             &self,
             dna: DnaDefHashed,
@@ -771,6 +780,7 @@ mod dna_impls {
             Ok(zome_defs)
         }
 
+        #[tracing::instrument(skip_all)]
         pub(crate) async fn load_dnas(&self) -> ConductorResult<()> {
             let (ribosomes, entry_defs) = self.load_wasms_into_dna_files().await?;
             self.ribosome_store().share_mut(|ds| {
@@ -780,16 +790,19 @@ mod dna_impls {
             Ok(())
         }
 
-        /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
+        /// Install a [`DnaFile`] in this Conductor
         pub async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
             if self.get_ribosome(dna.dna_hash()).is_ok() {
                 // ribosome for dna is already registered in store
                 return Ok(());
             }
-            let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone())?;
+            let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone()).await?;
             let entry_defs = self.register_dna_wasm(ribosome.clone()).await?;
+
             self.register_dna_entry_defs(entry_defs);
+
             self.add_ribosome_to_store(ribosome);
+
             Ok(())
         }
     }
@@ -1027,6 +1040,7 @@ mod network_impls {
             .collect::<Result<Vec<_>, _>>()
         }
 
+        #[tracing::instrument(skip_all)]
         pub(crate) async fn storage_info(&self) -> ConductorResult<StorageInfo> {
             let state = self.get_state().await?;
 
@@ -1393,6 +1407,7 @@ mod app_impls {
         }
 
         /// Install DNAs and set up Cells as specified by an AppBundle
+        #[tracing::instrument(skip_all)]
         pub async fn install_app_bundle(
             self: Arc<Self>,
             payload: InstallAppPayload,
@@ -1506,6 +1521,7 @@ mod app_impls {
         }
 
         /// List Apps with their information
+        #[tracing::instrument(skip_all)]
         pub async fn list_apps(
             &self,
             status_filter: Option<AppStatusFilter>,
@@ -1534,6 +1550,7 @@ mod app_impls {
         }
 
         /// Get the IDs of all active installed Apps which use this Cell
+        #[tracing::instrument(skip_all)]
         pub async fn list_running_apps_for_dependent_cell_id(
             &self,
             cell_id: &CellId,
@@ -1549,6 +1566,7 @@ mod app_impls {
         }
 
         /// Find the ID of the first active installed App which uses this Cell
+        #[tracing::instrument(skip_all)]
         pub async fn find_cell_with_role_alongside_cell(
             &self,
             cell_id: &CellId,
@@ -1570,6 +1588,7 @@ mod app_impls {
         }
 
         /// Get the IDs of all active installed Apps which use this Dna
+        #[tracing::instrument(skip_all)]
         pub async fn list_running_apps_for_dependent_dna_hash(
             &self,
             dna_hash: &DnaHash,
@@ -1698,6 +1717,7 @@ mod clone_cell_impls {
         }
 
         /// Disable a clone cell.
+        #[tracing::instrument(skip_all)]
         pub(crate) async fn disable_clone_cell(
             &self,
             DisableCloneCellPayload {
@@ -1723,6 +1743,7 @@ mod clone_cell_impls {
         }
 
         /// Enable a disabled clone cell.
+        #[tracing::instrument(skip_all)]
         pub async fn enable_clone_cell(
             self: Arc<Self>,
             payload: &EnableCloneCellPayload,
@@ -1761,6 +1782,7 @@ mod clone_cell_impls {
         }
 
         /// Delete a clone cell.
+        #[tracing::instrument(skip_all)]
         pub(crate) async fn delete_clone_cell(
             &self,
             DeleteCloneCellPayload {
@@ -1853,6 +1875,7 @@ mod app_status_impls {
         }
 
         /// Register an app as disabled in the database
+        #[tracing::instrument(skip_all)]
         pub(crate) async fn add_disabled_app_to_db(
             &self,
             app: InstalledAppCommon,
@@ -1901,6 +1924,7 @@ mod app_status_impls {
 
         /// Create any Cells which are missing for any running apps, then initialize
         /// and join them. (Joining could take a while.)
+        #[tracing::instrument(skip_all)]
         pub(crate) async fn create_and_add_initialized_cells_for_running_apps(
             self: Arc<Self>,
             app_id: Option<&InstalledAppId>,
@@ -1935,7 +1959,7 @@ mod app_status_impls {
                         Ok(maybe_info) => maybe_info,
                         _ => None,
                     };
-                    let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
+                    let maybe_initial_arq = maybe_agent_info.clone().map(|i| i.storage_arq);
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
                     let res = tokio::time::timeout(
@@ -1943,7 +1967,7 @@ mod app_status_impls {
                         cell.holochain_p2p_dna().clone().join(
                             agent_pubkey,
                             maybe_agent_info,
-                            maybe_initial_arc,
+                            maybe_initial_arq,
                         ),
                     )
                         .await;
@@ -1987,6 +2011,7 @@ mod app_status_impls {
         ///     then set it to Running
         /// - If an app is Running but at least one of its (required) Cells are off,
         ///     then set it to Paused
+        #[tracing::instrument(skip_all)]
         pub(crate) async fn reconcile_app_status_with_cell_status(
             &self,
             app_ids: Option<HashSet<InstalledAppId>>,
@@ -2008,6 +2033,7 @@ mod app_status_impls {
             let cell_ids: HashSet<CellId> = self.running_cell_ids();
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
+                    tracing::trace!("begin");
                     #[allow(deprecated)]
                     let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
                         app_ids
@@ -2050,6 +2076,7 @@ mod app_status_impls {
                             }
                         })
                         .fold(AppStatusFx::default(), AppStatusFx::combine);
+                    tracing::trace!("end");
                     Ok((state, delta))
                 })
                 .await?;
@@ -2063,11 +2090,13 @@ mod state_impls {
     use super::*;
 
     impl Conductor {
+        #[tracing::instrument(skip_all)]
         pub(crate) async fn get_state(&self) -> ConductorResult<ConductorState> {
             self.spaces.get_state().await
         }
 
         /// Update the internal state with a pure function mapping old state to new
+        #[tracing::instrument(skip_all)]
         pub(crate) async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
         where
             F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
@@ -2078,6 +2107,7 @@ mod state_impls {
         /// Update the internal state with a pure function mapping old state to new,
         /// which may also produce an output value which will be the output of
         /// this function
+        #[tracing::instrument(skip_all)]
         pub(crate) async fn update_state_prime<F, O>(
             &self,
             f: F,
@@ -2110,6 +2140,7 @@ mod scheduler_impls {
         /// - Delete/unschedule all ephemeral scheduled functions GLOBALLY
         /// - Add an interval that runs IN ADDITION to previous invocations
         /// So ideally this would be called ONCE per conductor lifecycle ONLY.
+        #[tracing::instrument(skip(self))]
         pub(crate) async fn start_scheduler(
             self: Arc<Self>,
             interval_period: std::time::Duration,
@@ -2219,6 +2250,7 @@ mod misc_impls {
         }
 
         /// Create a JSON dump of the cell's state
+        #[tracing::instrument(skip_all)]
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
             let cell = self.cell_by_id(cell_id).await?;
             let authored_db = cell.get_or_create_authored_db()?;
@@ -2507,6 +2539,7 @@ mod accessor_impls {
         }
 
         /// Find the app which contains the given cell by its [CellId].
+        #[tracing::instrument(skip_all)]
         pub async fn find_app_containing_cell(
             &self,
             cell_id: &CellId,
@@ -2528,6 +2561,7 @@ impl Conductor {
 
     /// Add fully constructed cells to the cell map in the Conductor
     #[allow(deprecated)]
+    #[tracing::instrument(skip_all)]
     fn add_and_initialize_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
         let (new_cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
         self.running_cells.share_mut(|cells| {
@@ -2550,6 +2584,7 @@ impl Conductor {
 
     /// Remove all Cells which are not referenced by any Enabled app.
     /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed)
+    #[tracing::instrument(skip_all)]
     async fn remove_dangling_cells(&self) -> ConductorResult<()> {
         let state = self.get_state().await?;
 
@@ -2650,6 +2685,8 @@ impl Conductor {
     ///
     /// Returns a Result for each attempt so that successful creations can be
     /// handled alongside the failures.
+    #[tracing::instrument(skip_all)]
+    #[allow(clippy::complexity)]
     async fn create_cells_for_running_apps(
         self: Arc<Self>,
         app_id: Option<&InstalledAppId>,
@@ -2704,12 +2741,13 @@ impl Conductor {
         });
 
         // Join on all apps and return a list of
-        // apps that had succelly created cells
+        // apps that had successfully created cells
         // and any apps that encounted errors
         Ok(futures::future::join_all(tasks).await)
     }
 
     /// Deal with the side effects of an app status state transition
+    #[tracing::instrument(skip_all)]
     async fn process_app_status_fx(
         self: Arc<Self>,
         delta: AppStatusFx,
@@ -2754,6 +2792,7 @@ impl Conductor {
     }
 
     /// Entirely remove an app from the database, returning the removed app.
+    #[tracing::instrument(skip_all)]
     async fn remove_app_from_db(&self, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
         let (_state, app) = self
             .update_state_prime({
@@ -2768,6 +2807,7 @@ impl Conductor {
     }
 
     /// Associate a new clone cell with an existing app.
+    #[tracing::instrument(skip_all)]
     async fn add_clone_cell_to_app(
         &self,
         app_id: InstalledAppId,
@@ -3095,7 +3135,7 @@ fn query_dht_ops_from_statement(
     Ok(r)
 }
 
-// #[instrument(skip(p2p_evt, handle))]
+#[instrument(skip(p2p_evt, handle))]
 async fn p2p_event_task(
     p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,

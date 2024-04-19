@@ -1,8 +1,7 @@
-use std::sync::Arc;
-
 use super::app_validation_workflow;
 use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
+use super::app_validation_workflow::ValidationDependencies;
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
@@ -20,9 +19,10 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::source_chain::SourceChainError;
-use holochain_zome_types::record::Record;
-
 use holochain_types::prelude::*;
+use holochain_zome_types::record::Record;
+use parking_lot::Mutex;
+use std::sync::Arc;
 use tracing::instrument;
 
 #[cfg(test)]
@@ -235,7 +235,7 @@ where
 {
     let cascade = Arc::new(holochain_cascade::CascadeImpl::from_workspace_and_network(
         &workspace,
-        network.clone(),
+        Arc::new(network.clone()),
     ));
 
     let to_app_validate = {
@@ -261,26 +261,65 @@ where
             let op =
                 app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;
 
-            let (op, omitted_entry) = match op {
+            let (op, dht_op_hash, omitted_entry) = match op {
                 Ok(op) => op,
                 Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
             };
+            let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
             let outcome = app_validation_workflow::validate_op(
                 &op,
+                &dht_op_hash,
                 workspace.clone().into(),
                 &network,
                 &ribosome,
                 &conductor_handle,
+                validation_dependencies.clone(),
             )
             .await;
             let outcome = outcome.or_else(Outcome::try_from);
             map_outcome(outcome)?;
-            chain_record = app_validation_workflow::op_to_record(op, omitted_entry);
+            chain_record = op_to_record(op, omitted_entry);
         }
     }
 
     Ok(())
+}
+
+fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
+    match op {
+        Op::StoreRecord(StoreRecord { mut record }) => {
+            if let Some(e) = omitted_entry {
+                // NOTE: this is only possible in this situation because we already removed
+                // this exact entry from this Record earlier. DON'T set entries on records
+                // anywhere else without recomputing hashes and signatures!
+                record.entry = RecordEntry::Present(e);
+            }
+            record
+        }
+        Op::StoreEntry(StoreEntry { action, entry }) => {
+            Record::new(SignedActionHashed::raw_from_same_hash(action), Some(entry))
+        }
+        Op::RegisterUpdate(RegisterUpdate {
+            update, new_entry, ..
+        }) => Record::new(SignedActionHashed::raw_from_same_hash(update), new_entry),
+        Op::RegisterDelete(RegisterDelete { delete, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(delete),
+            omitted_entry,
+        ),
+        Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(action),
+            omitted_entry,
+        ),
+        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(create_link),
+            omitted_entry,
+        ),
+        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(delete_link),
+            omitted_entry,
+        ),
+    }
 }
 
 fn map_outcome(

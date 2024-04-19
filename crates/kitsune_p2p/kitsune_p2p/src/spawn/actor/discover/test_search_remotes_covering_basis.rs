@@ -1,5 +1,5 @@
 use super::*;
-use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
+use kitsune_p2p_types::{dht::arq::ArqSize, tx2::tx2_utils::TxUrl};
 use SearchRemotesCoveringBasisLogicResult::*;
 
 async fn mk_agent_info(u: u8, covers: u32, offline: bool) -> AgentInfoSigned {
@@ -12,7 +12,7 @@ async fn mk_agent_info(u: u8, covers: u32, offline: bool) -> AgentInfoSigned {
     AgentInfoSigned::sign(
         Arc::new(KitsuneSpace::new(vec![0x11; 32])),
         Arc::new(KitsuneAgent::new(vec![u; 32])),
-        covers,
+        ArqSize::from_half_len(covers),
         url_list,
         0,
         0,

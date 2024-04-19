@@ -1,6 +1,6 @@
 [package]
 name = "holochain_util"
-version = "0.3.0-beta-dev.5"
+version = "0.3.0-beta-dev.7"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2021"
 description = "This crate is a collection of various utility functions that are used in the other crates in the holochain repository."
@@ -8,23 +8,28 @@ license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_util"
 
+# reminder - do not use workspace deps
 [dependencies]
+colored = "2.1"
 once_cell = "1.13.0"
 tokio = { version = "1.27", features = [ "full" ], optional = true }
-num_cpus = "1.8"
 futures = "0.3"
 backtrace = { version = "0.3", optional = true }
-cfg-if = "0.1"
-derive_more = { workspace = true }
+cfg-if = "1.0"
 dunce = "1.0"
 rpassword = { version = "7.0.0", optional = true }
-sodoken = { workspace = true, optional = true }
-getrandom = "0.2.7"
+sodoken = { version = "=0.0.11", optional = true }
+tracing = "0.1"
+
+[dev-dependencies]
+tracing-subscriber = "0.3"
+tokio = { version = "1.27", features = ["full", "test-util"] }
 
 [lints]
 workspace = true
 
 [features]
-default = [ "fs", "tokio" ]
+default = [ "fs", "pw", "time", "tokio" ]
 pw = [ "rpassword", "sodoken" ]
 fs = []
+time = [ "tokio" ]

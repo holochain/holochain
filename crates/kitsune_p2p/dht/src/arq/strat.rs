@@ -22,6 +22,7 @@ impl Default for PeerStrat {
 impl PeerStrat {
     /// Generate a view using this strategy.
     /// Ensures that only peers which are visible from `arc` are included.
+    // TODO: this can be a space dimension, not the full topology
     pub fn view(&self, topo: Topology, peers: &[Arq]) -> PeerView {
         match self {
             Self::Quantized(s) => PeerViewQ::new(topo, s.clone(), peers.to_vec()).into(),

@@ -25,7 +25,7 @@ mod tests {
     use ::fixt::prelude::*;
     use kitsune_p2p::{agent_store::AgentInfoSigned, KitsuneSpace};
     use kitsune_p2p_bin_data::fixt::*;
-    use kitsune_p2p_types::fixt::*;
+    use kitsune_p2p_types::{dht::arq::ArqSize, fixt::*};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_clear() {

@@ -1,19 +1,14 @@
 use crate::conductor::{Conductor, ConductorHandle};
-use crate::core::queue_consumer::WorkComplete;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::app_validation_workflow::{
     app_validation_workflow_inner, check_app_entry_def, put_validation_limbo,
-    AppValidationWorkspace,
+    AppValidationWorkspace, OutcomeSummary, ValidationDependencies,
 };
 use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
-use crate::sweettest::{
-    SweetConductor, SweetConductorBatch, SweetConductorConfig, SweetDnaFile, SweetLocalRendezvous,
-};
-use crate::test_utils::{
-    consistency_10s, host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration,
-};
+use crate::sweettest::*;
+use crate::test_utils::{host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration};
 use ::fixt::fixt;
 use arbitrary::Arbitrary;
 use hdk::hdi::test_utils::set_zome_types;
@@ -21,9 +16,8 @@ use hdk::prelude::*;
 use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, EntryHash};
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_p2p::actor::HolochainP2pRefToDna;
-use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
-use holochain_state::mutations::insert_op;
+use holochain_state::mutations::{insert_entry, insert_op};
 use holochain_state::prelude::{from_blob, StateQueryResult};
 use holochain_state::test_utils::test_db_dir;
 use holochain_state::validation_db::ValidationStage;
@@ -31,23 +25,43 @@ use holochain_types::dht_op::{DhtOp, DhtOpHashed};
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::{TestWasm, TestWasmPair, TestZomes};
-use holochain_zome_types::action::Dna;
-use holochain_zome_types::fixt::SignatureFixturator;
+use holochain_zome_types::fixt::{
+    CreateFixturator, DeleteFixturator, EntryFixturator, SignatureFixturator,
+};
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
 use matches::assert_matches;
-use rusqlite::params;
+use parking_lot::Mutex;
 use rusqlite::{named_params, Transaction};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 use std::time::Duration;
 
-#[cfg(test)]
 #[tokio::test(flavor = "multi_thread")]
 async fn main_loop_app_validation_workflow() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Validate]).await;
+    let zomes =
+        SweetInlineZomes::new(vec![], 0).integrity_function("validate", move |api, op: Op| {
+            if let Op::RegisterDelete(RegisterDelete {
+                original_action, ..
+            }) = op
+            {
+                let result =
+                    api.must_get_action(MustGetActionInput::new(original_action.to_hash()));
+                if result.is_ok() {
+                    Ok(ValidateCallbackResult::Valid)
+                } else {
+                    Ok(ValidateCallbackResult::UnresolvedDependencies(
+                        UnresolvedDependencies::Hashes(vec![original_action.to_hash().into()]),
+                    ))
+                }
+            } else {
+                Ok(ValidateCallbackResult::Valid)
+            }
+        });
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let dna_hash = dna_file.dna_hash().clone();
 
     let mut conductor = SweetConductor::from_config_rendezvous(
@@ -69,53 +83,57 @@ async fn main_loop_app_validation_workflow() {
         conductor.keystore(),
         Arc::new(dna_file.dna_def().clone()),
     ));
+
     // check there are no ops to app validate
     // genesis entries have already been validated at this stage
     let ops_to_validate =
         validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
             .await
-            .unwrap();
-    assert_eq!(ops_to_validate.len(), 0);
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 0);
 
-    // create ops to validate
-    let action = Action::Dna(Dna {
-        author: fixt!(AgentPubKey),
-        timestamp: Timestamp::now(),
-        hash: dna_hash.clone(),
+    // create op that following delete op depends on
+    let entry = fixt!(Entry);
+    let mut create = fixt!(Create);
+    create.entry_hash = entry.clone().to_hash();
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
     });
-    let dht_op = DhtOp::RegisterAgentActivity(fixt!(Signature), action.clone());
-    let dht_op_hash = DhtOpHash::with_data_sync(&dht_op);
-    let dht_op_hashed = DhtOpHashed::with_pre_hashed(dht_op, dht_op_hash.clone());
+    let create_op = Action::Create(create);
+    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
 
-    let dht_op_2 = DhtOp::StoreEntry(fixt!(Signature), fixt!(NewEntryAction), fixt!(Entry));
-    let dht_op_hash_2 = DhtOpHash::with_data_sync(&dht_op_2);
-    let dht_op_hashed_2 = DhtOpHashed::with_pre_hashed(dht_op_2, dht_op_hash_2.clone());
+    // create op that depends on previous create
+    let mut delete = fixt!(Delete);
+    delete.author = create_op.author().clone();
+    delete.deletes_address = create_op.clone().to_hash();
+    delete.deletes_entry_address = create_op.entry_hash().unwrap().clone();
+    let dht_delete_op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
+    let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
+    let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
 
-    app_validation_workspace
-        .dht_db
-        .write_async({
-            let dht_op_hash = dht_op_hash.clone();
-            let dht_op_hash_2 = dht_op_hash_2.clone();
-            move |txn| {
-                insert_op(txn, &dht_op_hashed).unwrap();
-                put_validation_limbo(txn, &dht_op_hash, ValidationStage::SysValidated).unwrap();
-                insert_op(txn, &dht_op_hashed_2).unwrap();
-                put_validation_limbo(txn, &dht_op_hash_2, ValidationStage::SysValidated)
-            }
-        })
-        .await
-        .unwrap();
+    // insert op in dht db and mark ready for app validation
+    app_validation_workspace.dht_db.test_write(move |txn| {
+        insert_op(txn, &dht_delete_op_hashed).unwrap();
+        put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
+    });
 
-    // check there is one op to validate now
+    // check delete op is now counted as op to validate
     let ops_to_validate =
         validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
             .await
-            .unwrap();
-    assert_eq!(ops_to_validate.len(), 2);
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 1);
+
+    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     // run validation workflow
-    // outcome should be complete - all ops should have been validated
-    let app_validation_result = app_validation_workflow_inner(
+    // outcome should be incomplete - delete op is missing the dependent create op
+    let outcome_summary = app_validation_workflow_inner(
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
@@ -124,47 +142,81 @@ async fn main_loop_app_validation_workflow() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
+        validation_dependencies.clone(),
     )
-    .await;
-    assert_matches!(app_validation_result, Ok(WorkComplete::Complete));
+    .await
+    .unwrap();
+    assert_matches!(
+        outcome_summary,
+        OutcomeSummary {
+            ops_to_validate: 1,
+            validated: 0,
+            accepted: 0,
+            rejected: 0,
+            missing: 1,
+        }
+    );
 
-    // check that previously inserted ops have been validated
-    // and are valid
-    let num_pending_ops: usize = app_validation_workspace
-        .dht_db
-        .read_async(move |txn| {
-            txn.query_row(
-                &format!(
-                    "SELECT count(*)
-                    from DhtOp
-                    WHERE validation_stage = NULL
-                    AND validation_status = 0
-                    AND (
-                        hash = ?1
-                        OR hash = ?2
-                    )"
-                ),
-                params![dht_op_hash, dht_op_hash_2],
-                |row| row.get(0),
-            )
-            .map_err(DatabaseError::SqliteError)
-        })
-        .await
+    // insert dependent create op in dht cache db
+    // as cascade would do with fetched dependent ops
+    app_validation_workspace.cache.test_write(move |txn| {
+        insert_op(txn, &dht_create_op_hashed).unwrap();
+        insert_entry(txn, &entry.clone().to_hash(), &entry).unwrap();
+        put_validation_limbo(
+            txn,
+            &dht_create_op_hashed.hash,
+            ValidationStage::SysValidated,
+        )
         .unwrap();
-    assert_eq!(num_pending_ops, 0);
+    });
+
+    // there is still only the 1 delete op to be validated
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 1);
+
+    // run validation workflow
+    // outcome should be complete
+    let outcome_summary = app_validation_workflow_inner(
+        Arc::new(dna_hash.clone()),
+        app_validation_workspace.clone(),
+        conductor.raw_handle(),
+        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        conductor
+            .get_or_create_space(&dna_hash)
+            .unwrap()
+            .dht_query_cache,
+        validation_dependencies.clone(),
+    )
+    .await
+    .unwrap();
+    assert_matches!(
+        outcome_summary,
+        OutcomeSummary {
+            ops_to_validate: 1,
+            validated: 1,
+            accepted: 1,
+            rejected: 0,
+            missing: 0,
+        }
+    );
 
     // check ops to validate is also 0
     let ops_to_validate =
         validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
             .await
-            .unwrap();
-    assert_eq!(ops_to_validate.len(), 0);
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "deal with the invalid data that leads to blocks being enforced"]
 async fn app_validation_workflow_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![
         TestWasm::Validate,
@@ -203,7 +255,7 @@ async fn app_validation_workflow_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_private_entries_are_passed_to_validation_only_when_authored_with_full_entry() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     #[hdk_entry_helper]
     pub struct Post(String);
@@ -290,7 +342,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
         .call(&alice.zome("coordinator"), "create", ())
         .await;
 
-    consistency_10s([&alice, &bob]).await;
+    await_consistency(10, [&alice, &bob]).await.unwrap();
 
     {
         let vfs = validation_failures.lock();
@@ -356,7 +408,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
 #[tokio::test(flavor = "multi_thread")]
 async fn check_app_entry_def_test() {
     let mut u = unstructured_noise();
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let TestWasmPair::<DnaWasm> {
         integrity,
         coordinator,

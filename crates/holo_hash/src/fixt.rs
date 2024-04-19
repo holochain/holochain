@@ -84,7 +84,7 @@ fixturator!(
     curve Predictable {
         // these agent keys match what the mock keystore spits out for the first two agents
         // don't mess with this unless you also update the keystore!!!
-        let agents = vec![
+        let agents = [
             AgentPubKey::try_from("uhCAkJCuynkgVdMn_bzZ2ZYaVfygkn0WCuzfFspczxFnZM1QAyXoo")
             .unwrap(),
             AgentPubKey::try_from("uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH")

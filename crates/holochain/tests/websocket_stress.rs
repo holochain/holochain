@@ -20,6 +20,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 static ID: AtomicU64 = AtomicU64::new(1);
 
 use holochain_serialized_bytes as hsb;
+use holochain_types::websocket::AllowedOrigins;
 
 const MINUTES_LONG_BEHAVED_COUNT: usize = 10;
 const MINUTES_LONG_BAD_COUNT: usize = 10;
@@ -37,7 +38,10 @@ pub async fn websocket_stress() {
     let data_root_path = tmp_dir.path().to_path_buf();
     let config = ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port: 0 },
+            driver: InterfaceDriver::Websocket {
+                port: 0,
+                allowed_origins: AllowedOrigins::Any,
+            },
         }]),
         data_root_path: Some(data_root_path.into()),
         keystore: KeystoreConfig::DangerTestKeystore,

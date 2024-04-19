@@ -142,10 +142,7 @@ impl BootstrapTask {
                         }
 
                         if let Err(err) = host_sender
-                            .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                space: space.clone(),
-                                peer_data,
-                            })
+                            .put_agent_info_signed(PutAgentInfoSignedEvt { peer_data })
                             .await
                         {
                             match err {
@@ -174,7 +171,6 @@ impl BootstrapTask {
 mod tests {
     use crate::event::PutAgentInfoSignedEvt;
     use crate::spawn::actor::space::bootstrap_task::{BootstrapService, BootstrapTask};
-    use crate::spawn::actor::space::DhtArc;
     use crate::spawn::actor::space::{
         KAgent, KBasis, KSpace, MaybeDelegate, OpHashList, Payload, SpaceInternal,
         SpaceInternalHandler, SpaceInternalHandlerResult, VecMXM, WireConHnd,
@@ -196,6 +192,7 @@ mod tests {
     use kitsune_p2p_fetch::FetchContext;
     use kitsune_p2p_types::agent_info::AgentInfoSigned;
     use kitsune_p2p_types::bootstrap::RandomQuery;
+    use kitsune_p2p_types::dht::Arq;
     use kitsune_p2p_types::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p_types::KOpHash;
     use parking_lot::RwLock;
@@ -601,7 +598,7 @@ mod tests {
         fn handle_update_agent_arc(
             &mut self,
             _agent: KAgent,
-            _arc: DhtArc,
+            _arq: Arq,
         ) -> SpaceInternalHandlerResult<()> {
             unreachable!()
         }

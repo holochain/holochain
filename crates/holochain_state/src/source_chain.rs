@@ -67,6 +67,7 @@ pub type SourceChainRead = SourceChain<DbRead<DbKindAuthored>, DbRead<DbKindDht>
 //       not the entire source chain!
 /// Writable functions for a source chain with write access.
 impl SourceChain {
+    #[tracing::instrument(skip_all)]
     pub async fn unlock_chain(&self) -> SourceChainResult<()> {
         self.vault
             .write_async({
@@ -78,6 +79,7 @@ impl SourceChain {
         Ok(())
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn accept_countersigning_preflight_request(
         &self,
         preflight_request: PreflightRequest,
@@ -295,7 +297,8 @@ impl SourceChain {
         // Write the entries, actions and ops to the database in one transaction.
         let author = self.author.clone();
         let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
-        match self
+
+        let chain_flush_result = self
             .vault
             .write_async(move |txn: &mut Transaction| {
                 let now = Timestamp::now();
@@ -357,8 +360,9 @@ impl SourceChain {
                 }
                 SourceChainResult::Ok(actions)
             })
-            .await
-        {
+            .await;
+
+        match chain_flush_result {
             Err(SourceChainError::HeadMoved(actions, entries, old_head, Some(new_head_info))) => {
                 let is_relaxed =
                     self.scratch
@@ -984,6 +988,7 @@ async fn rebase_actions_on(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[tracing::instrument(skip_all)]
 pub async fn genesis(
     authored: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
@@ -1236,6 +1241,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
 }
 
 /// dump the entire source chain as a pretty-printed json string
+#[tracing::instrument(skip_all)]
 pub async fn dump_state(
     vault: DbRead<DbKindAuthored>,
     author: AgentPubKey,
@@ -2059,7 +2065,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
