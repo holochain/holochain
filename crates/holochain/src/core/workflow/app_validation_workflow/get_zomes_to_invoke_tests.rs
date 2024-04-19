@@ -14,9 +14,7 @@ use holochain_state::mutations::insert_op;
 use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
 use holochain_types::rate_limit::{EntryRateWeight, RateWeight};
-use holochain_zome_types::action::{
-    AppEntryDef, Create, CreateLink, Delete, EntryType, Update, ZomeIndex,
-};
+use holochain_zome_types::action::{AppEntryDef, Create, Delete, EntryType, Update, ZomeIndex};
 use holochain_zome_types::fixt::{
     ActionFixturator, ActionHashFixturator, AgentPubKeyFixturator, CreateFixturator,
     CreateLinkFixturator, DeleteFixturator, DeleteLinkFixturator, EntryFixturator,
