@@ -28,7 +28,7 @@ fn to_signal_message(signal: Signal) -> SignalMessage {
 #[cfg(feature = "slow_tests")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn remote_signals_batch() -> anyhow::Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut conductors =
         SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous(true))

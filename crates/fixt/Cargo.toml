@@ -1,25 +1,29 @@
 [package]
 name = "fixt"
-version = "0.3.0-beta-dev.1"
+version = "0.3.0-beta-dev.3"
 description = "minimum viable fixtures"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/fixt"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "test", "fixture" ]
-categories = [ "fixtures" ]
+categories = [ "development-tools::testing" ]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-holochain_serialized_bytes = { workspace = true }
+holochain_serialized_bytes = "=0.0.53"
 lazy_static = "1.4"
-parking_lot = "0.10"
+parking_lot = "0.12"
 paste = "1.0.12"
 rand = "0.8.5"
 rand_core = "0.6"
 serde = { version = "1.0", features = [ "derive" ] }
 strum = "0.18.0"
 strum_macros = "0.18.0"
+
+[lints]
+workspace = true
 
 [features]
 fixt = [ ]

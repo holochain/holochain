@@ -19,7 +19,7 @@ use parking_lot::Mutex;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_dna_op() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -41,7 +41,7 @@ async fn validate_valid_dna_op() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_dna_op_mismatched_dna_hash() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -77,7 +77,7 @@ async fn validate_dna_op_mismatched_dna_hash() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_dna_op_before_origin_time() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -111,7 +111,7 @@ async fn validate_dna_op_before_origin_time() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn non_dna_op_as_first_action() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -153,7 +153,7 @@ async fn non_dna_op_as_first_action() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_agent_validation_package_op() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -191,7 +191,7 @@ async fn validate_valid_agent_validation_package_op() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_create_op() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -237,7 +237,7 @@ async fn validate_valid_create_op() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_create_op_with_prev_from_network() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -295,7 +295,7 @@ async fn validate_create_op_with_prev_from_network() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_create_op_with_prev_action_not_found() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -337,7 +337,7 @@ async fn validate_create_op_with_prev_action_not_found() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_create_op_author_mismatch_with_prev() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -397,7 +397,7 @@ async fn validate_create_op_author_mismatch_with_prev() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_create_op_with_timestamp_same_as_prev() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -437,7 +437,7 @@ async fn validate_create_op_with_timestamp_same_as_prev() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_create_op_with_timestamp_before_prev() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -494,7 +494,7 @@ async fn validate_create_op_with_timestamp_before_prev() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_create_op_seq_number_decrements() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -543,7 +543,7 @@ async fn validate_create_op_seq_number_decrements() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_create_op_seq_number_reused() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -592,7 +592,7 @@ async fn validate_create_op_seq_number_reused() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_create_op_not_preceeded_by_avp() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -647,7 +647,7 @@ async fn validate_create_op_not_preceeded_by_avp() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_avp_op_not_followed_by_create() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -702,7 +702,7 @@ async fn validate_avp_op_not_followed_by_create() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_store_record_with_no_entry() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -743,7 +743,7 @@ async fn validate_valid_store_record_with_no_entry() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_store_record_leaks_entry() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -787,7 +787,7 @@ async fn validate_store_record_leaks_entry() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_store_record_with_entry_having_wrong_entry_type() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -829,7 +829,7 @@ async fn validate_store_record_with_entry_having_wrong_entry_type() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_store_record_with_entry_having_wrong_entry_hash() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -886,7 +886,7 @@ async fn validate_store_record_with_entry_having_wrong_entry_hash() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_store_record_with_large_entry() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     use holochain_serialized_bytes::prelude::*;
     use serde::{Deserialize, Serialize};
@@ -946,7 +946,7 @@ async fn validate_store_record_with_large_entry() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_store_record_update() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1021,7 +1021,7 @@ async fn validate_valid_store_record_update() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_store_record_update_prev_which_is_not_updateable() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1081,7 +1081,7 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_store_record_update_changes_entry_type() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1162,7 +1162,7 @@ async fn validate_store_record_update_changes_entry_type() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_store_entry_with_entry_having_wrong_entry_type() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1205,7 +1205,7 @@ async fn validate_store_entry_with_entry_having_wrong_entry_type() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_store_entry_with_entry_having_wrong_entry_hash() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1262,7 +1262,7 @@ async fn validate_store_entry_with_entry_having_wrong_entry_hash() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_store_entry_with_large_entry() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     use holochain_serialized_bytes::prelude::*;
     use serde::{Deserialize, Serialize};
@@ -1322,7 +1322,7 @@ async fn validate_store_entry_with_large_entry() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_store_entry_update() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1393,7 +1393,7 @@ async fn validate_valid_store_entry_update() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_store_entry_update_prev_which_is_not_updateable() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1453,7 +1453,7 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_store_entry_update_changes_entry_type() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1538,7 +1538,7 @@ async fn validate_store_entry_update_changes_entry_type() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_register_updated_content() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1589,7 +1589,7 @@ async fn validate_valid_register_updated_content() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_register_updated_content_missing_updates_ref() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1645,7 +1645,7 @@ async fn validate_register_updated_content_missing_updates_ref() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_register_updated_record() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1696,7 +1696,7 @@ async fn validate_valid_register_updated_record() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_register_updated_record_missing_updates_ref() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1752,7 +1752,7 @@ async fn validate_register_updated_record_missing_updates_ref() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_register_deleted_by() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1790,7 +1790,7 @@ async fn validate_valid_register_deleted_by() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_register_deleted_by_with_missing_deletes_ref() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1834,7 +1834,7 @@ async fn validate_register_deleted_by_with_missing_deletes_ref() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_register_deleted_by_wrong_delete_target() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1866,7 +1866,7 @@ async fn validate_register_deleted_by_wrong_delete_target() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_register_deleted_entry_action() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1904,7 +1904,7 @@ async fn validate_valid_register_deleted_entry_action() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_register_deleted_entry_action_with_missing_deletes_ref() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1948,7 +1948,7 @@ async fn validate_register_deleted_entry_action_with_missing_deletes_ref() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_register_deleted_entry_action_wrong_delete_target() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1980,7 +1980,7 @@ async fn validate_register_deleted_entry_action_wrong_delete_target() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_add_link() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -1999,7 +1999,7 @@ async fn validate_valid_add_link() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_add_link_tag_too_large() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -2021,7 +2021,7 @@ async fn validate_add_link_tag_too_large() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_remove_link() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -2049,7 +2049,7 @@ async fn validate_valid_remove_link() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_remove_link_missing_link_add_ref() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -2091,7 +2091,7 @@ async fn validate_remove_link_missing_link_add_ref() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_remove_link_with_wrong_target_type() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -2126,7 +2126,7 @@ async fn validate_remove_link_with_wrong_target_type() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "TODO fix this test"]
 async fn crash_case() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let keystore = holochain_keystore::test_keystore();
 

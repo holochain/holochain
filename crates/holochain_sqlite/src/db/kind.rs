@@ -1,4 +1,5 @@
 use holo_hash::DnaHash;
+use holochain_zome_types::cell::CellId;
 use kitsune_p2p_bin_data::KitsuneSpace;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -7,8 +8,8 @@ use std::sync::Arc;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 pub enum DbKind {
     /// Specifies the environment used for authoring data by all cells on the same [`DnaHash`].
-    #[display(fmt = "authored-{:?}", "_0")]
-    Authored(Arc<DnaHash>),
+    #[display(fmt = "authored-{:?}-{:?}", "_0.dna_hash()", "_0.agent_pubkey()")]
+    Authored(Arc<CellId>),
     /// Specifies the environment used for dht data by all cells on the same [`DnaHash`].
     #[display(fmt = "dht-{:?}", "_0")]
     Dht(Arc<DnaHash>),
@@ -52,7 +53,7 @@ pub trait DbKindOp {}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used for authoring data by all cells on the same [`DnaHash`].
-pub struct DbKindAuthored(pub Arc<DnaHash>);
+pub struct DbKindAuthored(pub Arc<CellId>);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used for dht data by all cells on the same [`DnaHash`].
@@ -84,9 +85,12 @@ impl DbKindT for DbKindAuthored {
     }
 
     fn filename_inner(&self) -> PathBuf {
-        ["authored", &format!("authored-{}", self.0)]
-            .iter()
-            .collect()
+        [
+            "authored",
+            &format!("authored-{}-{}", self.0.dna_hash(), self.0.agent_pubkey()),
+        ]
+        .iter()
+        .collect()
     }
 
     fn if_corrupt_wipe(&self) -> bool {
@@ -98,10 +102,7 @@ impl DbKindOp for DbKindAuthored {}
 
 impl DbKindAuthored {
     pub fn dna_hash(&self) -> &DnaHash {
-        &self.0
-    }
-    pub fn to_dna_hash(&self) -> Arc<DnaHash> {
-        self.0.clone()
+        self.0.dna_hash()
     }
 }
 

@@ -5,7 +5,11 @@ use holochain::sweettest::*;
 use holochain::test_utils::inline_zomes::{
     batch_create_zome, simple_create_read_zome, simple_crud_zome,
 };
-use holochain::test_utils::{consistency_10s, consistency_60s, consistency_advanced, WaitFor};
+use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
+use holochain::test_utils::WaitFor;
+use holochain::{
+    conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
+};
 use holochain_p2p::*;
 use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
@@ -65,7 +69,7 @@ impl From<TestConfig> for SweetConductorConfig {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 2;
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(
@@ -97,7 +101,7 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_60s([&alice, &bobbo]).await;
+    await_consistency(60, [&alice, &bobbo]).await.unwrap();
     // let p2p = conductors[0].envs().p2p().lock().values().next().cloned().unwrap();
     // holochain_state::prelude::dump_tmp(&p2p);
     // holochain_state::prelude::dump_tmp(&alice.env());
@@ -121,7 +125,7 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     const NUM_CONDUCTORS: usize = 3;
     const NUM_OPS: usize = 100;
@@ -160,7 +164,9 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s([&alice, &bobbo, &carol]).await;
+    await_consistency(20, [&alice, &bobbo, &carol])
+        .await
+        .unwrap();
 
     let mut all_op_hashes = vec![];
 
@@ -208,7 +214,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zero_arc_get_links() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Standard config with arc clamped to zero
     let mut tuning = make_tuning(true, true, true, None);
@@ -238,7 +244,7 @@ async fn test_zero_arc_get_links() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_zero_arc_no_gossip_2way() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Standard config
 
@@ -294,7 +300,7 @@ async fn test_zero_arc_no_gossip_2way() {
 async fn test_zero_arc_no_gossip_4way() {
     use futures::future::join_all;
 
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let configs = [
         // Standard config
@@ -443,7 +449,7 @@ async fn test_zero_arc_no_gossip_4way() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "deal with connections closing and banning for 10s"]
 async fn test_gossip_shutdown() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut conductors = SweetConductorBatch::from_config_rendezvous(
         2,
         TestConfig {
@@ -480,7 +486,7 @@ async fn test_gossip_shutdown() {
     // Ensure that gossip loops resume upon startup
     conductors[0].startup().await;
 
-    consistency_60s([&cell_0, &cell_1]).await;
+    await_consistency(60, [&cell_0, &cell_1]).await.unwrap();
     let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
     assert_eq!(record.unwrap().action_address(), &hash);
 }
@@ -491,7 +497,7 @@ async fn test_gossip_shutdown() {
 #[ignore = "This test is potentially useful but uses sleeps and has never failed.
             Run it again in the future to see if it fails, and if so, rewrite it without sleeps."]
 async fn test_gossip_startup() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let config = || {
         SweetConductorConfig::standard().tune(|t| {
             t.danger_gossip_recent_threshold_secs = 1;
@@ -526,7 +532,7 @@ async fn test_gossip_startup() {
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     SweetConductor::exchange_peer_info([&conductor0, &conductor1]).await;
 
-    consistency_60s([&cell0, &cell1]).await;
+    await_consistency(60, [&cell0, &cell1]).await.unwrap();
     let record: Option<Record> = conductor1.call(&zome1, "read", hash.clone()).await;
     assert_eq!(record.unwrap().action_address(), &hash);
 }
@@ -604,7 +610,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         hashes.push(hash);
     }
 
-    consistency_10s([&cells[0], &cells[1]]).await;
+    await_consistency(10, [&cells[0], &cells[1]]).await.unwrap();
 
     println!(
         "Done waiting for consistency between first two nodes. Elapsed: {:?}",
@@ -663,12 +669,9 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         start.elapsed()
     );
 
-    consistency_advanced(
-        [(&cells[0], false), (&cells[1], true), (&cell, true)],
-        10,
-        std::time::Duration::from_secs(1),
-    )
-    .await;
+    await_consistency_advanced(10, [(&cells[0], false), (&cells[1], true), (&cell, true)])
+        .await
+        .unwrap();
 
     println!(
         "Done waiting for consistency between last two nodes. Elapsed: {:?}",
@@ -694,7 +697,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
 async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     use holochain::{sweettest::SweetConductor, test_utils::inline_zomes::simple_create_read_zome};
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_config_rendezvous(
         TestConfig {
@@ -722,7 +725,7 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     let hash: ActionHash = conductor.call(&alice.zome("simple"), "create", ()).await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s([&alice, &bobbo]).await;
+    await_consistency(10, [&alice, &bobbo]).await.unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductor.call(&bobbo.zome("simple"), "read", hash).await;
@@ -827,7 +830,7 @@ async fn mock_network_sharded_gossip() {
     // Check if we should for new data to be generated even if it already exists.
     let force_new_data = std::env::var_os("FORCE_NEW_DATA").is_some();
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
 
     // Generate or use cached test data.
     let (data, mut conn) = generate_test_data(num_agents, min_ops, false, force_new_data).await;
@@ -1363,7 +1366,7 @@ async fn mock_network_sharding() {
     // Check if we should for new data to be generated even if it already exists.
     let force_new_data = std::env::var_os("FORCE_NEW_DATA").is_some();
 
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
 
     // Generate or use cached test data.
     let (data, mut conn) = generate_test_data(num_agents, min_ops, false, force_new_data).await;

@@ -7,14 +7,11 @@ use holo_hash::HasHash;
 use holochain_cascade::test_utils::fill_db;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::test_keystore;
-use holochain_p2p::dht::hash::RegionHash;
-use holochain_p2p::dht::prelude::Dimension;
-use holochain_p2p::dht::region::RegionData;
-use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
-use holochain_p2p::dht_arc::DhtArcSet;
+use holochain_p2p::dht::prelude::*;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
 use holochain_types::facts::valid_dht_op;
 use holochain_types::prelude::*;
+use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p_types::dht::ArqStrat;
 use rand::Rng;
 
@@ -34,7 +31,7 @@ use super::Spaces;
 async fn test_region_queries() {
     const NUM_OPS: usize = 100;
 
-    // let _g = holochain_trace::test_run().ok();
+    // let _g = holochain_trace::test_run();
 
     let mut g = random_generator();
 
@@ -53,7 +50,7 @@ async fn test_region_queries() {
     let agent = keystore.new_sign_keypair_random().await.unwrap();
 
     let mut dna_def = DnaDef::arbitrary(&mut g).unwrap();
-    let q_us = Dimension::standard_time().quantum as u64;
+    let q_us = TimeDimension::standard().quantum as u64;
     let tq = Duration::from_micros(q_us);
     let tq5 = Duration::from_micros(q_us * 5);
     let five_quanta_ago = (Timestamp::now() - tq5).unwrap();

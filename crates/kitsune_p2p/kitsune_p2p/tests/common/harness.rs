@@ -1,8 +1,10 @@
+use ghost_actor::{GhostControlSender, GhostSender};
 use std::{net::SocketAddr, sync::Arc};
 
 use super::{test_keystore, RecordedKitsuneP2pEvent, TestHost, TestHostOp, TestLegacyHost};
 use kitsune_p2p::{
-    actor::KitsuneP2p, event::KitsuneP2pEventReceiver, spawn_kitsune_p2p, HostApi, KitsuneP2pResult,
+    actor::KitsuneP2p, event::KitsuneP2pEventReceiver, spawn_kitsune_p2p, HostApi,
+    KitsuneP2pResult, PreflightUserData,
 };
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
@@ -72,7 +74,7 @@ impl KitsuneTestHarness {
         self
     }
 
-    pub async fn spawn(&mut self) -> KitsuneP2pResult<ghost_actor::GhostSender<KitsuneP2p>> {
+    pub async fn spawn(&mut self) -> KitsuneP2pResult<GhostSender<KitsuneP2p>> {
         let (sender, receiver) = self.spawn_without_legacy_host(self.name.clone()).await?;
 
         self.start_legacy_host(vec![receiver]).await;
@@ -83,15 +85,17 @@ impl KitsuneTestHarness {
     pub async fn spawn_without_legacy_host(
         &mut self,
         name: String,
-    ) -> KitsuneP2pResult<(
-        ghost_actor::GhostSender<KitsuneP2p>,
-        KitsuneP2pEventReceiver,
-    )> {
+    ) -> KitsuneP2pResult<(GhostSender<KitsuneP2p>, KitsuneP2pEventReceiver)> {
         let mut config = self.config.clone();
         config.tracing_scope = Some(name);
 
-        let (sender, receiver) =
-            spawn_kitsune_p2p(config, self.tls_config.clone(), self.host_api.clone()).await?;
+        let (sender, receiver) = spawn_kitsune_p2p(
+            config,
+            self.tls_config.clone(),
+            self.host_api.clone(),
+            PreflightUserData::default(),
+        )
+        .await?;
 
         Ok((sender, receiver))
     }
@@ -100,6 +104,24 @@ impl KitsuneTestHarness {
         self.legacy_host_api
             .start(self.agent_store.clone(), self.op_store.clone(), receivers)
             .await;
+    }
+
+    /// Attempts to do a reasonably realistic restart of the Kitsune module.
+    /// The host is restarted but not recreated so that in-memory state like the peer store and op data is retained.
+    ///
+    /// Provide the `sender` that you got from calling `spawn`.
+    pub async fn simulated_restart(
+        &mut self,
+        sender: GhostSender<KitsuneP2p>,
+    ) -> KitsuneP2pResult<GhostSender<KitsuneP2p>> {
+        // Shutdown the Kitsune module
+        sender.ghost_actor_shutdown_immediate().await?;
+
+        // Shutdown the legacy host so that it can be started with a channel to the new Kitsune module
+        self.legacy_host_api.shutdown();
+
+        // Start up again
+        self.spawn().await
     }
 
     pub async fn create_agent(&mut self) -> KAgent {

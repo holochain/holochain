@@ -1,6 +1,5 @@
 use crate::sweettest::*;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
-use crate::test_utils::{consistency_10s, consistency_60s};
 use hdk::prelude::*;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_sqlite::store::AsP2pStateReadExt;
@@ -10,7 +9,7 @@ use kitsune_p2p_types::config::TransportConfig;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn gossip_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let config = SweetConductorConfig::standard().no_publish();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
@@ -25,7 +24,7 @@ async fn gossip_test() {
         .call(&cell_1.zome(TestWasm::Anchor), "anchor", anchor)
         .await;
 
-    consistency_60s([&cell_1, &cell_2]).await;
+    await_consistency(60, [&cell_1, &cell_2]).await.unwrap();
 
     let hashes: EntryHashes = conductors[1]
         .call(
@@ -39,7 +38,7 @@ async fn gossip_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn signature_smoke_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let rendezvous = SweetLocalRendezvous::new().await;
 
@@ -60,7 +59,7 @@ async fn signature_smoke_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_info_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let config = SweetConductorConfig::standard().no_publish();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
@@ -81,7 +80,7 @@ async fn agent_info_test() {
         })
         .collect();
 
-    consistency_10s([&cell_1, &cell_2]).await;
+    await_consistency(10, [&cell_1, &cell_2]).await.unwrap();
     for p2p_agents_db in p2p_agents_dbs {
         let len = p2p_agents_db.p2p_count_agents().await.unwrap();
         assert_eq!(len, 2);

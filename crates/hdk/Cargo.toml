@@ -1,6 +1,6 @@
 [package]
 name = "hdk"
-version = "0.3.0-beta-dev.31"
+version = "0.3.0-beta-dev.39"
 description = "The Holochain HDK"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
@@ -10,19 +10,20 @@ keywords = [ "holochain", "holo", "hdk" ]
 categories = [ "cryptography" ]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-hdi = { version = "=0.4.0-beta-dev.27", path = "../hdi", features = ["trace"] }
-hdk_derive = { version = "^0.3.0-beta-dev.26", path = "../hdk_derive" }
-holo_hash = { version = "^0.3.0-beta-dev.22", path = "../holo_hash" }
-holochain_wasmer_guest = { workspace = true }
+hdi = { version = "=0.4.0-beta-dev.35", path = "../hdi", features = ["trace"] }
+hdk_derive = { version = "^0.3.0-beta-dev.33", path = "../hdk_derive" }
+holo_hash = { version = "^0.3.0-beta-dev.27", path = "../holo_hash" }
+holochain_wasmer_guest = { version = "=0.0.92" }
 # it's important that we depend on holochain_zome_types with no default
 # features, both here AND in hdk_derive, to reduce code bloat
-holochain_zome_types = { version = "^0.3.0-beta-dev.27", path = "../holochain_zome_types", default-features = false }
+holochain_zome_types = { version = "^0.3.0-beta-dev.34", path = "../holochain_zome_types", default-features = false }
 paste = "1.0"
 serde = "1.0"
 serde_bytes = "0.11"
 thiserror = "1.0.22"
-tracing = { workspace = true }
+tracing = "0.1"
 tracing-core = "0.1"
 mockall = { version = "0.11.3", optional = true }
 
@@ -35,6 +36,9 @@ getrandom = { version = "0.2", features = ["custom"] }
 [dev-dependencies]
 fixt = { path = "../fixt" }
 trybuild = "1.0"
+
+[lints]
+workspace = true
 
 [features]
 default = []

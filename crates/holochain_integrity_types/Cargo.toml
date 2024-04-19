@@ -1,6 +1,6 @@
 [package]
 name = "holochain_integrity_types"
-version = "0.3.0-beta-dev.26"
+version = "0.3.0-beta-dev.32"
 description = "Holochain integrity types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -9,24 +9,24 @@ readme = "README.md"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-holo_hash = { version = "^0.3.0-beta-dev.22", path = "../holo_hash" }
-holochain_serialized_bytes = { workspace = true }
-holochain_util = { version = "^0.3.0-beta-dev.4", path = "../holochain_util", default-features = false }
-holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "../holochain_secure_primitive"}
-paste = "1.0"
+holo_hash = { version = "^0.3.0-beta-dev.27", path = "../holo_hash" }
+holochain_serialized_bytes = "=0.0.53"
+holochain_util = { version = "^0.3.0-beta-dev.7", path = "../holochain_util", default-features = false }
+holochain_secure_primitive = { version = "^0.3.0-beta-dev.23", path = "../holochain_secure_primitive"}
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 
 # Just the bare minimum timestamp with no extra features.
 # TODO: This needs to point to a published version of this crate and be pinned.
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.7", path = "../kitsune_p2p/timestamp", default-features = false }
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.9", path = "../kitsune_p2p/timestamp", default-features = false }
 
 # TODO: Figure out how to remove these dependencies.
 subtle = "2"
 
 # full-dna-def dependencies
-derive_builder = { version = "0.9", optional = true }
+derive_builder = { version = "0.20", optional = true }
 
 # Optional
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
@@ -37,7 +37,10 @@ tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]
 holochain_integrity_types = { path = ".", features = ["test_utils", "fuzzing"]}
-serde_json = { workspace = true }
+serde_json = "1.0"
+
+[lints]
+workspace = true
 
 [features]
 default = []

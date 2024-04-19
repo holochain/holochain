@@ -27,7 +27,7 @@ use std::sync::Arc;
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "full-dna-def", derive(shrinkwraprs::Shrinkwrap))]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub struct Zome<T = ZomeDef> {
+pub struct Zome<T: Send + Sync = ZomeDef> {
     pub name: ZomeName,
     #[cfg_attr(feature = "full-dna-def", shrinkwrap(main_field))]
     pub def: T,
@@ -37,7 +37,7 @@ pub type IntegrityZome = Zome<IntegrityZomeDef>;
 
 pub type CoordinatorZome = Zome<CoordinatorZomeDef>;
 
-impl<T> Zome<T> {
+impl<T: Send + Sync> Zome<T> {
     /// Constructor
     pub fn new(name: ZomeName, def: T) -> Self {
         Self { name, def }
@@ -108,13 +108,13 @@ impl From<(ZomeName, CoordinatorZomeDef)> for CoordinatorZome {
     }
 }
 
-impl<T> From<Zome<T>> for (ZomeName, T) {
+impl<T: Send + Sync> From<Zome<T>> for (ZomeName, T) {
     fn from(zome: Zome<T>) -> Self {
         zome.into_inner()
     }
 }
 
-impl<T> From<Zome<T>> for ZomeName {
+impl<T: Send + Sync> From<Zome<T>> for ZomeName {
     fn from(zome: Zome<T>) -> Self {
         zome.name
     }

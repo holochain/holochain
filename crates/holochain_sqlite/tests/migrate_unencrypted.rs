@@ -1,14 +1,14 @@
-use holochain_sqlite::{
-    db::{DbKindConductor, DbWrite},
-    error::DatabaseResult,
-};
-use rusqlite::Connection;
-use std::fs::create_dir_all;
-
 #[cfg(feature = "sqlite-encrypted")]
 #[tokio::test]
 async fn migrate_unencrypted() {
-    holochain_trace::test_run().unwrap();
+    use holochain_sqlite::{
+        db::{DbKindConductor, DbWrite},
+        error::DatabaseResult,
+    };
+    use rusqlite::Connection;
+    use std::fs::create_dir_all;
+
+    holochain_trace::test_run();
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
     create_dir_all(tmp_dir.path().join("conductor")).unwrap();

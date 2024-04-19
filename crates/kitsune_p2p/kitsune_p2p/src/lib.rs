@@ -41,6 +41,10 @@ pub mod dependencies {
     pub use ::url2;
 }
 
+/// This value determines protocol compatibility.
+/// Any time there is a protocol breaking change, this number must be incremented.
+pub const KITSUNE_PROTOCOL_VERSION: u16 = 0;
+
 pub mod metrics;
 
 mod types;
@@ -54,6 +58,8 @@ pub use spawn::*;
 
 mod host_api;
 pub use host_api::*;
+
+pub use meta_net::PreflightUserData;
 
 #[allow(missing_docs)]
 #[cfg(feature = "test_utils")]

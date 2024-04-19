@@ -1,6 +1,6 @@
 [package]
 name = "aitia"
-version = "0.2.0-beta-dev.4"
+version = "0.2.0-beta-dev.8"
 description = "Library for making sense of events in terms of causal graphs"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -9,17 +9,18 @@ authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo" ]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
 anyhow = "1.0"
-derive_more = { workspace = true }
-holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
-parking_lot = "0.10"
+derive_more = "0.99"
+holochain_trace = { version = "^0.3.0-beta-dev.10", path = "../holochain_trace" }
+parking_lot = "0.12"
 petgraph = "0.6"
 regex = "1"
-tracing = { workspace = true }
+tracing = "0.1"
 
 serde = { version = "1.0", features = ["derive"], optional = true }
-serde_json = { workspace = true, optional = true }
+serde_json = { version = "1.0", optional = true }
 tracing-core = { version = "0.1", optional = true }
 tracing-serde = { version = "0.1", optional = true }
 tracing-subscriber = { version = "0.3", optional = true }
@@ -27,7 +28,10 @@ tracing-subscriber = { version = "0.3", optional = true }
 [dev-dependencies]
 maplit = "1"
 pretty_assertions = "1.4"
-test-case = "2.1"
+test-case = "3.3"
+
+[lints]
+workspace = true
 
 [features]
 default = ["tracing"]

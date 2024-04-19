@@ -21,7 +21,7 @@ use std::sync::Arc;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky in CI"]
 async fn minimise_p2p_agent_store_host_calls() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let num_spaces = 10;
 

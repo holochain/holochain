@@ -30,6 +30,7 @@ use holochain_p2p::spawn_holochain_p2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
+use holochain_p2p::NetworkCompatParams;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::from_blob;
@@ -66,8 +67,7 @@ mod big_stack_test;
 
 mod generate_records;
 pub use generate_records::*;
-
-pub use crate::sweettest::sweet_consistency::*;
+use holochain_types::websocket::AllowedOrigins;
 
 use self::consistency::request_published_ops;
 
@@ -260,6 +260,7 @@ where
         .await
         .unwrap(),
         test_host,
+        NetworkCompatParams::default(),
     )
     .await
     .unwrap();
@@ -278,7 +279,7 @@ where
                     respond.r(ok_fut(Ok([0; 64].into())));
                 }
                 PutAgentInfoSigned { respond, .. } => {
-                    respond.r(ok_fut(Ok(())));
+                    respond.r(ok_fut(Ok(vec![])));
                 }
                 QueryAgentInfoSigned { respond, .. } => {
                     respond.r(ok_fut(Ok(vec![])));
@@ -442,7 +443,10 @@ pub async fn setup_app_inner(
     let config = ConductorConfig {
         data_root_path: Some(data_root_path.clone()),
         admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port: 0 },
+            driver: InterfaceDriver::Websocket {
+                port: 0,
+                allowed_origins: AllowedOrigins::Any,
+            },
         }]),
         network: network.unwrap_or_else(KitsuneP2pConfig::empty),
         ..ConductorConfig::empty()
@@ -478,13 +482,26 @@ pub fn warm_wasm_tests() {
     }
 }
 
+/// Consistency was failed to be reached. Here's a report.
+#[derive(derive_more::From)]
+pub struct ConsistencyError(String);
+
+impl std::fmt::Debug for ConsistencyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Alias
+pub type ConsistencyResult = Result<(), ConsistencyError>;
+
 /// Wait for all cell envs to reach consistency, meaning that every op
 /// published by every cell has been integrated by every node
 pub async fn consistency_dbs<AuthorDb, DhtDb>(
     all_cell_dbs: &[(&SleuthId, &AgentPubKey, &AuthorDb, Option<&DhtDb>)],
-    num_attempts: usize,
-    delay: Duration,
-) where
+    timeout: Duration,
+) -> ConsistencyResult
+where
     AuthorDb: ReadAccess<DbKindAuthored>,
     DhtDb: ReadAccess<DbKindDht>,
 {
@@ -498,34 +515,44 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
                 .map(|(_, _, op)| op),
         );
     }
-    let published = published.into_iter().collect::<Vec<_>>();
+    let published = Arc::new(published.into_iter().collect::<Vec<_>>());
     let all_node_ids: HashSet<_> = all_cell_dbs
         .iter()
         .map(|(node_id, _, _, _)| node_id)
         .collect();
-    for (&db, node_id) in all_cell_dbs
-        .iter()
-        .flat_map(|(node_id, _, _, d)| Some((d.as_ref()?, node_id)))
-    {
-        let others: Vec<String> = all_node_ids
-            .difference(&[node_id].into_iter().collect())
-            .map(|n| n.to_string())
-            .collect();
-        wait_for_integration_diff(&others, db, &published, num_attempts, delay).await
-    }
+
+    futures::future::join_all(
+        all_cell_dbs
+            .iter()
+            .flat_map(|(node_id, _, _, d)| Some((d.as_ref()?, node_id)))
+            .map(move |(&db, node_id)| {
+                let others: Vec<String> = all_node_ids
+                    .difference(&[node_id].into_iter().collect())
+                    .map(|n| n.to_string())
+                    .collect();
+                wait_for_integration_diff(others, db.clone(), published.clone(), timeout)
+            }),
+    )
+    .await
+    .into_iter()
+    .collect::<Result<Vec<()>, ConsistencyError>>()?;
+    Ok(())
 }
+
+const CONSISTENCY_DELAY_LOW: Duration = Duration::from_millis(100);
+const CONSISTENCY_DELAY_MID: Duration = Duration::from_millis(500);
+const CONSISTENCY_DELAY_HIGH: Duration = Duration::from_millis(1000);
 
 /// Wait for num_attempts * delay, or until all published ops have been integrated.
 /// If the timeout is reached, print a report including a diff of all published ops
 /// which were not integrated.
 #[tracing::instrument(skip(db, published))]
 async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
-    node_ids: &[SleuthId],
-    db: &Db,
-    published: &[DhtOp],
-    num_attempts: usize,
-    delay: Duration,
-) {
+    node_ids: Vec<SleuthId>,
+    db: Db,
+    published: Arc<Vec<DhtOp>>,
+    timeout: Duration,
+) -> ConsistencyResult {
     fn display_op(op: &DhtOp) -> String {
         format!(
             "{} {:>3}  {} ({})",
@@ -538,29 +565,42 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     }
 
     let header = format!("{:54} {:>3}  {}", "author", "seq", "op_type (action_type)",);
+    let start = tokio::time::Instant::now();
 
     let num_published = published.len();
-    let mut num_integrated = 0;
-    for i in 0..num_attempts {
-        num_integrated = get_integrated_count(db).await;
-        if num_integrated >= num_published {
+    while start.elapsed() < timeout {
+        let num_integrated = get_integrated_count(&db).await;
+        let delay = if num_integrated >= num_published {
             if num_integrated > num_published {
                 tracing::warn!("num integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test.
                 Consistency may not be complete.", num_integrated, num_published)
             }
-            return;
+            return Ok(());
         } else {
-            let total_time_waited = delay * i as u32;
-            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await);
-        }
+            let total_time_waited = start.elapsed();
+            let queries = query_integration(&db).await;
+            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?queries, "consistency-status");
+
+            if total_time_waited > Duration::from_secs(10) {
+                CONSISTENCY_DELAY_HIGH
+            } else if total_time_waited > Duration::from_secs(1) {
+                CONSISTENCY_DELAY_MID
+            } else {
+                CONSISTENCY_DELAY_LOW
+            }
+        };
         tokio::time::sleep(delay).await;
     }
 
     // Timeout has been reached at this point, so print a helpful report
 
+    if published.is_empty() {
+        return Err(format!("No ops were published in {timeout:?}").into());
+    }
+
     // Otherwise just print a report of which ops were not integrated
     let mut published_displays: Vec<_> = published.iter().map(display_op).collect();
-    let mut integrated: Vec<_> = get_integrated_ops(db)
+    let mut integrated: Vec<_> = get_integrated_ops(&db)
         .await
         .iter()
         .map(display_op)
@@ -577,10 +617,10 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         .cloned()
         .collect::<Vec<_>>();
 
-    assert!(
-        !unintegrated.is_empty(),
-        "consistency should only fail if items were published but not integrated"
-    );
+    if unintegrated.is_empty() {
+        // Even though the main loop failed, the final check shows that we have all ops!
+        return Ok(());
+    }
 
     if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
         // If hc_sleuth has been initialized, print a sleuthy report
@@ -605,19 +645,17 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         }
     }
 
-    let timeout = delay * num_attempts as u32;
+    let integration_dump = integration_dump(&db).await.unwrap();
 
-    let integration_dump = integration_dump(db).await.unwrap();
-
-    panic!(
-            "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n\n{:?}",
-            timeout.as_millis(),
-            num_published,
-            num_integrated,
-            header,
-            unintegrated.join("\n"),
-            integration_dump,
-        );
+    Err(format!(
+        "Consistency not achieved after {:?}. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n\n{:?}",
+        timeout,
+        num_published,
+        integrated.len(),
+        header,
+        unintegrated.join("\n"),
+        integration_dump,
+    ).into())
 }
 
 /// Wait for num_attempts * delay, or until all published ops have been integrated.
@@ -701,7 +739,7 @@ async fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
     .unwrap()
 }
 
-/// Get all [`DhtOps`] integrated by this node
+/// Get all [`DhtOps`](holochain_types::prelude::DhtOp) integrated by this node
 pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp> {
     db.read_async(move |txn| -> StateQueryResult<Vec<DhtOp>> {
         txn.prepare(

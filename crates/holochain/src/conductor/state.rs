@@ -3,7 +3,9 @@
 
 use holochain_conductor_api::config::InterfaceDriver;
 use holochain_conductor_api::signal_subscription::SignalSubscription;
+use holochain_p2p::NetworkCompatParams;
 use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -200,6 +202,18 @@ impl ConductorState {
             .values()
             .find(|app| app.all_cells().any(|id| id == cell_id))
     }
+
+    /// Get network compability params
+    /// (but this can't actually be on the Conductor since it must be retrieved before
+    /// conductor initialization)
+    pub fn get_network_compat(&self) -> NetworkCompatParams {
+        NetworkCompatParams {
+            dpki_hash: {
+                tracing::warn!("Using default NetworkCompatParams");
+                None
+            },
+        }
+    }
 }
 
 /// Here, interfaces are user facing and make available zome functions to
@@ -223,10 +237,13 @@ pub struct AppInterfaceConfig {
 
 impl AppInterfaceConfig {
     /// Create config for a websocket interface
-    pub fn websocket(port: u16) -> Self {
+    pub fn websocket(port: u16, allowed_origins: AllowedOrigins) -> Self {
         Self {
             signal_subscriptions: HashMap::new(),
-            driver: InterfaceDriver::Websocket { port },
+            driver: InterfaceDriver::Websocket {
+                port,
+                allowed_origins,
+            },
         }
     }
 }

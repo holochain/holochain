@@ -142,10 +142,7 @@ impl BootstrapTask {
                         }
 
                         if let Err(err) = host_sender
-                            .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                space: space.clone(),
-                                peer_data,
-                            })
+                            .put_agent_info_signed(PutAgentInfoSignedEvt { peer_data })
                             .await
                         {
                             match err {

@@ -66,12 +66,13 @@ impl<T: 'static + Send> ResourceBucket<T> {
         async move {
             // first, see if there is a resource to return immediately
             // or, capture a notifier for when there might be again
-            let notify = match inner.share_mut(|i, _| {
+            let bucket_result = inner.share_mut(|i, _| {
                 if !i.bucket.is_empty() {
                     return Ok((Some(i.bucket.remove(0)), None));
                 }
                 Ok((None, Some(i.notify.clone())))
-            }) {
+            });
+            let notify = match bucket_result {
                 Err(e) => return Err(e),
                 Ok((Some(t), None)) => return Ok(t),
                 Ok((None, Some(notify))) => notify,
@@ -99,12 +100,13 @@ impl<T: 'static + Send> ResourceBucket<T> {
                 }?;
 
                 // we've been notified, see if there is data
-                match inner.share_mut(|i, _| {
+                let bucket_result = inner.share_mut(|i, _| {
                     if !i.bucket.is_empty() {
                         return Ok(Some(i.bucket.remove(0)));
                     }
                     Ok(None)
-                }) {
+                });
+                match bucket_result {
                     Err(e) => return Err(e),
                     Ok(Some(t)) => return Ok(t),
                     _ => (),

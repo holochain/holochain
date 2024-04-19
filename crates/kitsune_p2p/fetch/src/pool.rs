@@ -642,7 +642,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn remove_fetch_item() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
 
         let cfg = Arc::new(TestFetchConfig(1, 10));
         let mut q: State = {

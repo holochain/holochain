@@ -14,6 +14,7 @@ members = [
     "debug",
     "dna_properties",
     "emit_signal",
+    "post_commit_signal",
     "entry_defs",
     "hash_entry",
     "foo",
@@ -63,14 +64,12 @@ resolver = "2"
 opt-level = "z"
 
 [workspace.dependencies]
-derive_more = "0.99"
-serde = "1.0"
-tracing = "0.1"
-hdi = { path = "../../../hdi" }
-hdk = { path = "../../../hdk" }
-
-# workaround to make it slightly easier to import hc-scress-test zomes
-files_integrity = { path = "hc-stress-test-integrity" }
+# !!!
+# WARNING - PUT NOTHING HERE
+# !!!
+#
+# release automation currently cannot handle workspace.dependencies
+# it will publish unbuildable releases to crates.io
 
 [patch.crates-io]
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "develop" }

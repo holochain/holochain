@@ -44,7 +44,7 @@ use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_no_dependency() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -70,7 +70,7 @@ async fn validate_op_with_no_dependency() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_dependency_held_in_cache() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -121,7 +121,7 @@ async fn validate_op_with_dependency_held_in_cache() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_dependency_not_held() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -176,7 +176,7 @@ async fn validate_op_with_dependency_not_held() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_dependency_not_found_on_the_dht() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -225,7 +225,7 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_app_validation() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -292,7 +292,7 @@ impl TestCase {
         let test_space = TestSpace::new(dna_hash.hash.clone());
 
         let keystore = holochain_keystore::test_keystore();
-        let agent = keystore.new_sign_keypair_random().await.unwrap().into();
+        let agent = keystore.new_sign_keypair_random().await.unwrap();
 
         Self {
             dna_def,
@@ -353,7 +353,11 @@ impl TestCase {
 
     async fn run(&mut self) -> WorkComplete {
         let workspace = SysValidationWorkspace::new(
-            self.test_space.space.authored_db.clone().into(),
+            self.test_space
+                .space
+                .get_or_create_authored_db(self.agent.clone())
+                .unwrap()
+                .into(),
             self.test_space.space.dht_db.clone().into(),
             self.test_space.space.dht_query_cache.clone(),
             self.test_space.space.cache_db.clone().into(),

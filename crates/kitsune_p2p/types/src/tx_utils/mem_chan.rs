@@ -92,43 +92,44 @@ impl futures::io::AsyncWrite for MemWrite {
             )));
         }
 
-        match self.0.share_mut(|i, _| {
-            // exit early if we are already write-side closed
-            if i.closed {
-                return Ok(std::task::Poll::Ready(Err(Error::new(
-                    ErrorKind::Other,
-                    "PreviouslyClosed",
-                ))));
-            }
+        self.0
+            .share_mut(|i, _| {
+                // exit early if we are already write-side closed
+                if i.closed {
+                    return Ok(std::task::Poll::Ready(Err(Error::new(
+                        ErrorKind::Other,
+                        "PreviouslyClosed",
+                    ))));
+                }
 
-            // how much can we write to the buffer?
-            let amount = std::cmp::min(
-                4096, //
-                std::cmp::min(
-                    buf.len(),                 //
-                    i.max_bytes - i.buf.len(), //
-                ),
-            );
+                // how much can we write to the buffer?
+                let amount = std::cmp::min(
+                    4096, //
+                    std::cmp::min(
+                        buf.len(),                 //
+                        i.max_bytes - i.buf.len(), //
+                    ),
+                );
 
-            // if we cannot write, schedule a waker / return pending
-            if amount == 0 {
-                i.want_write_waker = Some(cx.waker().clone());
-                return Ok(std::task::Poll::Pending);
-            }
+                // if we cannot write, schedule a waker / return pending
+                if amount == 0 {
+                    i.want_write_waker = Some(cx.waker().clone());
+                    return Ok(std::task::Poll::Pending);
+                }
 
-            // write the amout we decided
-            i.buf.extend_from_slice(&buf[..amount]);
+                // write the amout we decided
+                i.buf.extend_from_slice(&buf[..amount]);
 
-            // wake the reader side if pending
-            if let Some(waker) = i.want_read_waker.take() {
-                waker.wake();
-            }
+                // wake the reader side if pending
+                if let Some(waker) = i.want_read_waker.take() {
+                    waker.wake();
+                }
 
-            Ok(std::task::Poll::Ready(Ok(amount)))
-        }) {
-            Err(_) => std::task::Poll::Ready(Err(Error::new(ErrorKind::Other, "PreviouslyClosed"))),
-            Ok(p) => p,
-        }
+                Ok(std::task::Poll::Ready(Ok(amount)))
+            })
+            .unwrap_or_else(|_| {
+                std::task::Poll::Ready(Err(Error::new(ErrorKind::Other, "PreviouslyClosed")))
+            })
     }
 
     fn poll_flush(
@@ -170,56 +171,57 @@ impl futures::io::AsyncRead for MemRead {
             )));
         }
 
-        match self.0.share_mut(|i, c| {
-            // if the read buffer is empty...
-            if i.buf.is_empty() {
-                if i.closed {
-                    // if we are writer-side closed, close reader side too
-                    *c = true;
-                    if let Some(waker) = i.want_write_waker.take() {
-                        waker.wake();
+        self.0
+            .share_mut(|i, c| {
+                // if the read buffer is empty...
+                if i.buf.is_empty() {
+                    if i.closed {
+                        // if we are writer-side closed, close reader side too
+                        *c = true;
+                        if let Some(waker) = i.want_write_waker.take() {
+                            waker.wake();
+                        }
+                        return Ok(std::task::Poll::Ready(Ok(0)));
+                    } else {
+                        // otherwise record waker / return pending
+                        i.want_read_waker = Some(cx.waker().clone());
+                        return Ok(std::task::Poll::Pending);
                     }
-                    return Ok(std::task::Poll::Ready(Ok(0)));
-                } else {
-                    // otherwise record waker / return pending
-                    i.want_read_waker = Some(cx.waker().clone());
-                    return Ok(std::task::Poll::Pending);
                 }
-            }
 
-            // determine how much we can read
-            let amount = std::cmp::min(
-                4096, //
-                std::cmp::min(
-                    buf.len(),   //
-                    i.buf.len(), //
-                ),
-            );
+                // determine how much we can read
+                let amount = std::cmp::min(
+                    4096, //
+                    std::cmp::min(
+                        buf.len(),   //
+                        i.buf.len(), //
+                    ),
+                );
 
-            // read that amount
-            buf[..amount].copy_from_slice(&i.buf[..amount]);
+                // read that amount
+                buf[..amount].copy_from_slice(&i.buf[..amount]);
 
-            if i.buf.len() > amount {
-                // if there is more that "could" be read...
-                // move that data to the front of our buf / truncate
-                i.buf.copy_within(amount.., 0);
-                let new_len = i.buf.len() - amount;
-                i.buf.truncate(new_len);
-            } else {
-                // otherwise we can more cheaply clear the buf
-                i.buf.clear()
-            }
+                if i.buf.len() > amount {
+                    // if there is more that "could" be read...
+                    // move that data to the front of our buf / truncate
+                    i.buf.copy_within(amount.., 0);
+                    let new_len = i.buf.len() - amount;
+                    i.buf.truncate(new_len);
+                } else {
+                    // otherwise we can more cheaply clear the buf
+                    i.buf.clear()
+                }
 
-            // notify the writer that maybe more can be written
-            if let Some(waker) = i.want_write_waker.take() {
-                waker.wake();
-            }
+                // notify the writer that maybe more can be written
+                if let Some(waker) = i.want_write_waker.take() {
+                    waker.wake();
+                }
 
-            Ok(std::task::Poll::Ready(Ok(amount)))
-        }) {
-            Err(_) => std::task::Poll::Ready(Err(Error::new(ErrorKind::Other, "PreviouslyClosed"))),
-            Ok(p) => p,
-        }
+                Ok(std::task::Poll::Ready(Ok(amount)))
+            })
+            .unwrap_or_else(|_| {
+                std::task::Poll::Ready(Err(Error::new(ErrorKind::Other, "PreviouslyClosed")))
+            })
     }
 }
 

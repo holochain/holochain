@@ -2,73 +2,106 @@ use assert_cmd::prelude::*;
 use holochain_cli_sandbox::cli::LaunchInfo;
 use holochain_conductor_api::AppRequest;
 use holochain_conductor_api::AppResponse;
-use holochain_websocket::{self as ws, WebsocketConfig, WebsocketReceiver, WebsocketSender};
+use holochain_websocket::{
+    self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketSender,
+};
 use matches::assert_matches;
-use once_cell::sync::Lazy;
 use std::future::Future;
+use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdout, Command};
-use url2::url2;
 use which::which;
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
 
-static HC_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
-    let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_path.push("../hc/Cargo.toml");
+fn get_hc_built_path() -> &'static PathBuf {
+    static HC_BUILT_PATH: OnceLock<PathBuf> = OnceLock::new();
 
-    let out = escargot::CargoBuild::new()
-        .bin("hc")
-        .current_target()
-        .current_release()
-        .manifest_path(manifest_path)
-        // Not defined on CI
-        .target_dir(PathBuf::from(
-            option_env!("CARGO_TARGET_DIR").unwrap_or("./target"),
-        ))
-        .run()
-        .unwrap();
+    HC_BUILT_PATH.get_or_init(|| {
+        let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        manifest_path.push("../hc/Cargo.toml");
 
-    out.path().to_path_buf()
-});
+        println!("@@ Warning, Building `hc` binary!");
 
-static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
-    let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_path.push("../holochain/Cargo.toml");
+        let out = escargot::CargoBuild::new()
+            .bin("hc")
+            .current_target()
+            .current_release()
+            .manifest_path(manifest_path)
+            // Not defined on CI
+            .target_dir(PathBuf::from(
+                option_env!("CARGO_TARGET_DIR").unwrap_or("./target"),
+            ))
+            .run()
+            .unwrap();
 
-    let out = escargot::CargoBuild::new()
-        .bin("holochain")
-        .current_target()
-        .current_release()
-        .manifest_path(manifest_path)
-        .target_dir(PathBuf::from(
-            option_env!("CARGO_TARGET_DIR").unwrap_or("./target"),
-        ))
-        .run()
-        .unwrap();
+        println!("@@ `hc` binary built");
 
-    out.path().to_path_buf()
-});
+        out.path().to_path_buf()
+    })
+}
+
+fn get_holochain_built_path() -> &'static PathBuf {
+    static HOLOCHAIN_BUILT_PATH: OnceLock<PathBuf> = OnceLock::new();
+
+    HOLOCHAIN_BUILT_PATH.get_or_init(|| {
+        let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        manifest_path.push("../holochain/Cargo.toml");
+
+        println!("@@ Warning, Building `holochain` binary!");
+
+        let out = escargot::CargoBuild::new()
+            .bin("holochain")
+            .current_target()
+            .current_release()
+            .manifest_path(manifest_path)
+            .target_dir(PathBuf::from(
+                option_env!("CARGO_TARGET_DIR").unwrap_or("./target"),
+            ))
+            .run()
+            .unwrap();
+
+        println!("@@ `holochain` binary built");
+
+        out.path().to_path_buf()
+    })
+}
 
 async fn new_websocket_client_for_port(
     port: u16,
 ) -> anyhow::Result<(WebsocketSender, WebsocketReceiver)> {
+    println!("Client for address: {:?}", format!("localhost:{port}"));
     Ok(ws::connect(
-        url2!("ws://127.0.0.1:{}", port),
-        Arc::new(WebsocketConfig::default()),
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        ),
     )
     .await?)
 }
 
 async fn get_app_info(port: u16) {
     tracing::debug!(calling_app_interface = ?port);
-    let (mut app_tx, _) = new_websocket_client_for_port(port)
+    let (app_tx, mut rx) = new_websocket_client_for_port(port)
         .await
         .unwrap_or_else(|_| panic!("Failed to connect to conductor on port [{}]", port));
+    struct D(tokio::task::JoinHandle<()>);
+    impl Drop for D {
+        fn drop(&mut self) {
+            self.0.abort();
+        }
+    }
+    let _d = D(tokio::task::spawn(async move {
+        while rx.recv::<AppResponse>().await.is_ok() {}
+    }));
     let request = AppRequest::AppInfo {
         installed_app_id: "Stub".to_string(),
     };
@@ -77,7 +110,7 @@ async fn get_app_info(port: u16) {
     assert_matches!(r, AppResponse::AppInfo(None));
 }
 
-async fn check_timeout<T>(response: impl Future<Output = Result<T, ws::WebsocketError>>) -> T {
+async fn check_timeout<T>(response: impl Future<Output = std::io::Result<T>>) -> T {
     match tokio::time::timeout(WEBSOCKET_TIMEOUT, response).await {
         Ok(response) => response.expect("Calling websocket failed"),
         Err(_) => {
@@ -91,33 +124,39 @@ async fn package_fixture_if_not_packaged() {
         return;
     }
 
-    get_hc_command()
-        .arg("dna")
-        .arg("pack")
-        .arg("tests/fixtures/my-app/dna")
-        .stdout(Stdio::null())
-        .status()
-        .await
-        .expect("Failed to pack DNA");
+    println!("@@ Package Fixture");
 
-    get_hc_command()
-        .arg("app")
-        .arg("pack")
-        .arg("tests/fixtures/my-app")
-        .stdout(Stdio::null())
-        .status()
-        .await
-        .expect("Failed to pack hApp");
+    let mut cmd = get_hc_command();
+
+    cmd.arg("dna").arg("pack").arg("tests/fixtures/my-app/dna");
+
+    println!("@@ {cmd:?}");
+
+    cmd.status().await.expect("Failed to pack DNA");
+
+    let mut cmd = get_hc_command();
+
+    cmd.arg("app").arg("pack").arg("tests/fixtures/my-app");
+
+    println!("@@ {cmd:?}");
+
+    cmd.status().await.expect("Failed to pack hApp");
+
+    println!("@@ Package Fixture Complete");
 }
 
 async fn clean_sandboxes() {
-    get_sandbox_command()
-        .arg("clean")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await
-        .unwrap();
+    println!("@@ Clean");
+
+    let mut cmd = get_sandbox_command();
+
+    cmd.arg("clean");
+
+    println!("@@ {cmd:?}");
+
+    cmd.status().await.unwrap();
+
+    println!("@@ Clean Complete");
 }
 
 /// Generates a new sandbox with a single app deployed and tries to get app info
@@ -126,7 +165,7 @@ async fn generate_sandbox_and_connect() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
 
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -142,6 +181,8 @@ async fn generate_sandbox_and_connect() {
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true);
+
+    println!("@@ {cmd:?}");
 
     let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
 
@@ -162,7 +203,7 @@ async fn generate_sandbox_and_call_list_dna() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
 
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -202,17 +243,11 @@ async fn generate_sandbox_and_call_list_dna() {
 }
 
 fn get_hc_command() -> Command {
-    Command::new(match which("hc") {
-        Ok(p) => p,
-        Err(_) => HC_BUILT_PATH.clone(),
-    })
+    Command::new(which("hc").unwrap_or_else(|_| get_hc_built_path().clone()))
 }
 
 fn get_holochain_bin_path() -> PathBuf {
-    match which("holochain") {
-        Ok(p) => p,
-        Err(_) => HOLOCHAIN_BUILT_PATH.clone(),
-    }
+    which("holochain").unwrap_or_else(|_| get_holochain_built_path().clone())
 }
 
 fn get_sandbox_command() -> Command {
@@ -225,6 +260,7 @@ fn get_sandbox_command() -> Command {
 async fn get_launch_info(stdout: &mut ChildStdout) -> LaunchInfo {
     let mut lines = BufReader::new(stdout).lines();
     while let Ok(Some(line)) = lines.next_line().await {
+        println!("@@@@@-{line}-@@@@@");
         if let Some(index) = line.find("#!0") {
             let launch_info_str = &line[index + 3..].trim();
             return serde_json::from_str::<LaunchInfo>(launch_info_str).unwrap();

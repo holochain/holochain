@@ -17,7 +17,7 @@ pub(crate) fn put(
 
 async fn put_info(peer: Bytes, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
     #[derive(Debug)]
-    struct BadDecode(String);
+    struct BadDecode(#[allow(dead_code)] String);
     impl warp::reject::Reject for BadDecode {}
     let peer: AgentInfoSigned =
         rmp_decode(&mut AsRef::<[u8]>::as_ref(&peer)).map_err(|e| BadDecode(format!("{e:?}")))?;

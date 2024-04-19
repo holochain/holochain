@@ -189,6 +189,7 @@ impl Default for ConductorTuningParams {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use holochain_types::websocket::AllowedOrigins;
     use kitsune_p2p_types::config::TransportConfig;
     use matches::assert_matches;
     use std::path::Path;
@@ -241,7 +242,7 @@ mod tests {
 
     #[test]
     fn test_config_complete_config() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let yaml = r#"---
     data_root_path: /path/to/env
@@ -260,6 +261,7 @@ mod tests {
       - driver:
           type: websocket
           port: 1234
+          allowed_origins: "*"
 
     network:
       bootstrap_service: https://bootstrap-staging.holo.host
@@ -311,7 +313,10 @@ mod tests {
                 }),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
-                    driver: InterfaceDriver::Websocket { port: 1234 }
+                    driver: InterfaceDriver::Websocket {
+                        port: 1234,
+                        allowed_origins: AllowedOrigins::Any
+                    }
                 }]),
                 network: network_config,
                 db_sync_strategy: DbSyncStrategy::Fast,

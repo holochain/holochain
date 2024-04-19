@@ -55,7 +55,7 @@ use holochain::test_utils::host_fn_caller::*;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky"]
 async fn get_updates_cache() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // Database setup
     let test_db = test_cell_db();
     let db = test_db.db();
@@ -99,7 +99,7 @@ async fn get_updates_cache() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky!"]
 async fn get_meta_updates_meta_cache() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // Database setup
     let test_db = test_cell_db();
     let db = test_db.db();
@@ -165,7 +165,7 @@ let mut reader = g.reader().unwrap();
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky"]
 async fn get_from_another_agent() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let dna_file = DnaFile::new(
         DnaDef {
             name: "dht_get_test".to_string(),
@@ -195,7 +195,7 @@ async fn get_from_another_agent() {
     )
     .await;
 
-    let options = GetOptions::latest();
+    let options = GetOptions::network();
 
     // Bob store record
     let entry = Post("Bananas are good for you".into());
@@ -297,7 +297,7 @@ async fn get_from_another_agent() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky for some reason"]
 async fn get_links_from_another_agent() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let dna_file = DnaFile::new(
         DnaDef {
             name: "dht_get_test".to_string(),

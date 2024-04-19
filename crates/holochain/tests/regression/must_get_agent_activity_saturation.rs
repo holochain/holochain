@@ -12,7 +12,7 @@ use std::time::Duration;
 #[cfg(feature = "slow_tests")]
 #[ignore = "temporarily while working on app validation refactor; to be reinstated along the refactor"]
 async fn must_get_agent_activity_saturation() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut rng = thread_rng();
     let (dna, _, _) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MustGetAgentActivity]).await;

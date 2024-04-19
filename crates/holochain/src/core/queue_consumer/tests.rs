@@ -30,7 +30,7 @@ async fn test_trigger_send() {
 
 #[tokio::test]
 async fn test_trigger_only_permits_single_trigger() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let (tx, mut rx) = TriggerSender::new();
     let jh = tokio::spawn(async move {
@@ -224,7 +224,7 @@ async fn test_concurrency() {
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn publish_loop() {
     let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-    let kind = DbKindAuthored(Arc::new(DnaHash::arbitrary(&mut u).unwrap()));
+    let kind = DbKindAuthored(Arc::new(CellId::arbitrary(&mut u).unwrap()));
     let tmpdir = tempfile::Builder::new()
         .prefix("holochain-test-environments")
         .tempdir()

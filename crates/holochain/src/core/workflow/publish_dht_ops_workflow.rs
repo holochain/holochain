@@ -39,7 +39,7 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 
 #[instrument(skip(db, network, trigger_self))]
 pub async fn publish_dht_ops_workflow(
     db: DbWrite<DbKindAuthored>,
-    network: Arc<impl HolochainP2pDnaT + Send + Sync>,
+    network: Arc<impl HolochainP2pDnaT>,
     trigger_self: TriggerSender,
     agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
@@ -221,7 +221,6 @@ mod tests {
         // Receive events and increment count
         let recv_task = tokio::task::spawn({
             async move {
-                // use tokio_stream::StreamExt;
                 let mut tx_complete = Some(tx_complete);
                 while let Some(evt) = recv.recv().await {
                     use holochain_p2p::event::HolochainP2pEvent::*;
@@ -285,7 +284,7 @@ mod tests {
     #[ignore = "(david.b) tests should be re-written using mock network"]
     fn test_sent_to_r_nodes(num_agents: u32, num_hash: u32) {
         tokio_helper::block_forever_on(async {
-            holochain_trace::test_run().ok();
+            holochain_trace::test_run();
 
             // Create test db
             let test_db = test_authored_db();
@@ -351,7 +350,7 @@ mod tests {
     fn test_private_entries(num_agents: u32) {
         tokio_helper::block_forever_on(
             async {
-                holochain_trace::test_run().ok();
+                holochain_trace::test_run();
 
                 // Create test db
                 let test_db = test_authored_db();

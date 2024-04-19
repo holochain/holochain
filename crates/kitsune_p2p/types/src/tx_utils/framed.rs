@@ -172,7 +172,7 @@ impl AsFramedReader for FramedReader {
                 Some(inner) => inner,
             };
 
-            let out = match timeout
+            let read_result = timeout
                 .mix("FramedReader::read", async {
                     let mut read = 0;
                     let want = MSG_SIZE_BYTES + MSG_ID_BYTES;
@@ -216,8 +216,8 @@ impl AsFramedReader for FramedReader {
 
                     Ok((msg_id, buf))
                 })
-                .await
-            {
+                .await;
+            let out = match read_result {
                 Err(e) => {
                     return Err(e);
                 }

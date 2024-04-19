@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::FnComponents;
@@ -114,7 +116,7 @@ pub async fn send_post_commit(
 pub struct PostCommitArgs {
     pub host_access: PostCommitHostAccess,
     pub invocation: PostCommitInvocation,
-    pub cell_id: CellId,
+    pub cell_id: Arc<CellId>,
 }
 
 #[cfg(test)]
@@ -228,7 +230,7 @@ mod slow_tests {
     #[ignore = "flakey. Sometimes fails the second last assert with 3 instead of 5"]
     #[cfg(feature = "test_utils")]
     async fn post_commit_test_volley() -> anyhow::Result<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,

@@ -39,7 +39,7 @@ pub fn delete_link<'a>(
                     let workspace = call_context_2.host_context.workspace();
                     CascadeResult::Ok(
                         CascadeImpl::from_workspace_and_network(&workspace, network)
-                            .dht_get(address_2.into(), GetOptions::content())
+                            .dht_get(address_2.into(), GetOptions::local())
                             .await?
                             .map(|el| el.into_inner().0),
                     )
@@ -116,7 +116,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_link_add_remove() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;

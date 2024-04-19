@@ -74,7 +74,7 @@ pub(crate) fn get_original_entry_data(
     tokio_helper::block_forever_on(async move {
         let cascade = CascadeImpl::from_workspace_and_network(&workspace, network);
         let maybe_original_record: Option<SignedActionHashed> = cascade
-            .get_details(address.clone().into(), GetOptions::content())
+            .get_details(address.clone().into(), GetOptions::local())
             .await?
             .map(|el| {
                 match el {
@@ -114,7 +114,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_entry_test<'a>() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Crd).await;
