@@ -12,12 +12,12 @@ use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::core::validation::OutcomeOrError;
 use crate::core::SysValidationError;
 use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
 pub use error::*;
 use holo_hash::DhtOpHash;
-use holochain_cascade::error::CascadeError;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
@@ -127,6 +127,10 @@ async fn app_validation_workflow_inner(
     tracing::debug!(
         "number of ops to validate after filtering out ops missing hashes {num_ops_to_validate}"
     );
+    tracing::trace!(
+        "missing hashes: {:?}",
+        validation_dependencies.lock().hashes_missing_for_op
+    );
     let sleuth_id = conductor.config.sleuth_id();
 
     // Build an iterator of all op validations
@@ -231,14 +235,16 @@ async fn app_validation_workflow_inner(
                     }
                     Outcome::AwaitingDeps(deps) => {
                         awaiting += 1;
-                        let status = ValidationStage::AwaitingAppDeps(deps);
-                        put_validation_limbo(txn, &op_hash, status)?;
+                        put_validation_limbo(
+                            txn,
+                            &op_hash,
+                            ValidationStage::AwaitingAppDeps(deps),
+                        )?;
                     }
                     Outcome::Rejected(_) => {
                         rejected += 1;
                         tracing::info!(
-                            "Received invalid op. The op author will be blocked.\nOp: {:?}",
-                            op_lite
+                            "Received invalid op. The op author will be blocked. Op: {op_lite:?}"
                         );
                         if dependency.is_none() {
                             put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
@@ -431,12 +437,11 @@ pub async fn validate_op(
 
     let network = Arc::new(network.clone());
 
-    let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, network.clone(), ribosome)
-        .await
-        .map_err(|e| {
-            tracing::error!("could not get zomes to invoke to validate op {op:?} - {e:?}");
-            AppValidationError::CascadeError(CascadeError::ActionError(ActionError::NotNewEntry))
-        })?;
+    let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, network.clone(), ribosome).await;
+    if let Err(OutcomeOrError::Err(e)) = &zomes_to_invoke {
+        tracing::error!("Error getting zomes to invoke: {e} to validate op {op:?}");
+    };
+    let zomes_to_invoke = zomes_to_invoke?;
     let invocation = ValidateInvocation::new(zomes_to_invoke, op)
         .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
 
@@ -624,8 +629,7 @@ fn get_integrity_zome_from_ribosome(
     ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     let zome = ribosome.get_integrity_zome(zome_index).ok_or_else(|| {
-        tracing::error!("No integrity zome with index {zome_index:?} found");
-        Outcome::rejected(format!("No integrity zome with index {zome_index:?} found"))
+        Outcome::rejected(format!("No integrity zome found with index {zome_index:?}"))
     })?;
     Ok(ZomesToInvoke::OneIntegrity(zome))
 }
