@@ -447,16 +447,17 @@ fn app_request_serialization() {
         installed_app_id: "some_id".to_string(),
     };
     let serialized_request = holochain_serialized_bytes::encode(&request).unwrap();
+    println!("serialized request {serialized_request:?}");
     assert_eq!(
         serialized_request,
         vec![
-            130, 164, 116, 121, 112, 101, 129, 168, 97, 112, 112, 95, 105, 110, 102, 111, 192, 164,
-            100, 97, 116, 97, 129, 176, 105, 110, 115, 116, 97, 108, 108, 101, 100, 95, 97, 112,
-            112, 95, 105, 100, 167, 115, 111, 109, 101, 95, 105, 100
+            130, 164, 116, 121, 112, 101, 168, 97, 112, 112, 95, 105, 110, 102, 111, 164, 100, 97,
+            116, 97, 129, 176, 105, 110, 115, 116, 97, 108, 108, 101, 100, 95, 97, 112, 112, 95,
+            105, 100, 167, 115, 111, 109, 101, 95, 105, 100
         ]
     );
 
-    let json_expected = r#"{"type":{"app_info":null},"data":{"installed_app_id":"some_id"}}"#;
+    let json_expected = r#"{"type":"app_info","data":{"installed_app_id":"some_id"}}"#;
     let mut deserializer = Deserializer::new(&*serialized_request);
     let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
     let json_actual = serde_json::to_string(&json_value).unwrap();
@@ -470,15 +471,14 @@ fn app_request_serialization() {
     assert_eq!(
         serialized_response,
         vec![
-            130, 164, 116, 121, 112, 101, 129, 184, 108, 105, 115, 116, 95, 119, 97, 115, 109, 95,
-            104, 111, 115, 116, 95, 102, 117, 110, 99, 116, 105, 111, 110, 115, 192, 164, 100, 97,
-            116, 97, 146, 169, 104, 111, 115, 116, 95, 102, 110, 95, 49, 169, 104, 111, 115, 116,
-            95, 102, 110, 95, 50
+            130, 164, 116, 121, 112, 101, 184, 108, 105, 115, 116, 95, 119, 97, 115, 109, 95, 104,
+            111, 115, 116, 95, 102, 117, 110, 99, 116, 105, 111, 110, 115, 164, 100, 97, 116, 97,
+            146, 169, 104, 111, 115, 116, 95, 102, 110, 95, 49, 169, 104, 111, 115, 116, 95, 102,
+            110, 95, 50
         ]
     );
 
-    let json_expected =
-        r#"{"type":{"list_wasm_host_functions":null},"data":["host_fn_1","host_fn_2"]}"#;
+    let json_expected = r#"{"type":"list_wasm_host_functions","data":["host_fn_1","host_fn_2"]}"#;
     let mut deserializer = Deserializer::new(&*serialized_response);
     let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
     let json_actual = serde_json::to_string(&json_value).unwrap();
