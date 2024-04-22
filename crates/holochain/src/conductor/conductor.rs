@@ -399,7 +399,7 @@ mod interface_impls {
                     match driver {
                         InterfaceDriver::Websocket { port } => {
                             let listener = spawn_websocket_listener(port).await?;
-                            let port = listener.local_addr()?.port();
+                            let port = listener.local_addrs()?[0].port();
                             spawn_admin_interface_tasks(
                                 tm.clone(),
                                 listener,

@@ -11,6 +11,7 @@ use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -36,12 +37,13 @@ pub const MAX_CONNECTIONS: usize = 400;
 /// Create a WebsocketListener to be used in interfaces
 pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
     trace!("Initializing Admin interface");
-    let listener = WebsocketListener::bind(
+    let listener = WebsocketListener::dual_bind(
         Arc::new(WebsocketConfig::default()),
-        format!("localhost:{}", port),
+        SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
+        SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0),
     )
     .await?;
-    trace!("LISTENING AT: {}", listener.local_addr()?);
+    trace!("LISTENING AT: {:?}", listener.local_addrs()?);
     Ok(listener)
 }
 
@@ -111,14 +113,15 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     signal_broadcaster: broadcast::Sender<Signal>,
 ) -> InterfaceResult<u16> {
     trace!("Initializing App interface");
-    let listener = WebsocketListener::bind(
+    let listener = WebsocketListener::dual_bind(
         Arc::new(WebsocketConfig::default()),
-        format!("localhost:{}", port),
+        SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
+        SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0),
     )
     .await?;
-    let addr = listener.local_addr()?;
-    trace!("LISTENING AT: {}", addr);
-    let port = addr.port();
+    let addrs = listener.local_addrs()?;
+    trace!("LISTENING AT: {:?}", addrs);
+    let port = addrs[0].port();
 
     tm.add_conductor_task_ignored("app interface new connection handler", move || {
         async move {
@@ -376,14 +379,15 @@ pub mod test {
             .await
             .unwrap();
 
-        let admin_port = 65000;
-        conductor_handle
+        let admin_port = conductor_handle
             .clone()
             .add_admin_interfaces(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: admin_port },
+                driver: InterfaceDriver::Websocket {
+                    port: 0,
+                },
             }])
             .await
-            .unwrap();
+            .unwrap()[0];
 
         let (admin_tx, rx) = websocket_client_by_port(admin_port).await.unwrap();
         let _rx = PollRecv::new::<AdminResponse>(rx);
