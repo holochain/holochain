@@ -632,7 +632,7 @@ pub type AppAuthenticationToken = Vec<u8>;
 /// Response payload for [AdminResponse::AppAuthenticationTokenIssued].
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct AppAuthenticationTokenIssued {
-    /// A token issued by the conductor that can be used to authenticate a connection the an app interface.
+    /// A token issued by the conductor that can be used to authenticate a connection to an app interface.
     /// This is expected to be passed from the caller of the admin interface to the client that will
     /// use the app interface. It should be treated as secret and kept from other parties.
     pub token: AppAuthenticationToken,
