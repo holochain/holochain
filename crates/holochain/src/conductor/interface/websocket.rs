@@ -234,11 +234,17 @@ fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication
                     // Already logged, continue to drop connection
                 }
                 Ok(Ok(auth_payload)) => {
-                    let payload: AppAuthenticationRequest = SerializedBytes::from(
+                    let payload: AppAuthenticationRequest = match SerializedBytes::from(
                         holochain_serialized_bytes::UnsafeBytes::from(auth_payload),
                     )
-                    .try_into()
-                    .unwrap();
+                    .try_into() {
+                        Ok(payload) => payload,
+                        Err(e) => {
+                            warn!("Holochain app port {port} received a payload that failed to decode into an authentication payload: {e}. Dropping connection.");
+                            return;
+                        }
+                    };
+
                     match api
                         .auth(AppAuthentication {
                             token: payload.token,
