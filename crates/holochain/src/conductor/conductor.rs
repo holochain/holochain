@@ -247,8 +247,6 @@ pub struct Conductor {
     // Used in ribosomes but kept here as a single instance.
     pub(crate) wasmer_module_cache: Arc<ModuleCacheLock>,
 
-    app_connection_auth: RwShare<AppAuthTokenStore>,
-
     app_auth_token_store: RwShare<AppAuthTokenStore>,
 
     /// Container to connect app signals to app interfaces, by installed app id.
@@ -310,7 +308,6 @@ mod startup_shutdown_impls {
                 wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
                     maybe_data_root_path,
                 ))),
-                app_connection_auth: RwShare::default(),
                 app_auth_token_store: RwShare::default(),
                 app_broadcast: AppBroadcast::default(),
             }

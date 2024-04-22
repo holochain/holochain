@@ -13,6 +13,10 @@ use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 
+use crate::conductor::api::{AdminInterfaceApi, AppAuthentication, AppInterfaceApi};
+use holochain_conductor_api::{
+    AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest, AppResponse,
+};
 use holochain_types::app::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;
 use std::sync::Arc;
@@ -239,7 +243,7 @@ fn authenticate_incoming_app_connection(
                     let payload: AppAuthenticationRequest = match SerializedBytes::from(
                         holochain_serialized_bytes::UnsafeBytes::from(auth_payload),
                     )
-                        .try_into()
+                    .try_into()
                     {
                         Ok(payload) => payload,
                         Err(e) => {
@@ -394,10 +398,6 @@ async fn handle_incoming_admin_message(
         }
         ReceiveMessage::Authenticate(_) => {
             warn!("Unexpected Authenticate from client on an admin interface");
-            Ok(())
-        }
-        ReceiveMessage::Authenticate(_) => {
-            warn!("Unexpected Authenticate From Client!");
             Ok(())
         }
         ReceiveMessage::Request(data, respond) => {

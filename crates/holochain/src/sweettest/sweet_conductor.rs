@@ -2,7 +2,6 @@
 // TODO [ B-03669 ] move to own crate
 
 use super::*;
-use crate::conductor::state::AppInterfaceId;
 use crate::conductor::ConductorHandle;
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, space::Spaces,
