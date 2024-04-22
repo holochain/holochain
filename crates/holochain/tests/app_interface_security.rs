@@ -1,7 +1,7 @@
 use either::Either;
 
 use holochain::sweettest::{
-    websocket_client_by_port, SweetAgents, SweetConductor, SweetConductorHandle, SweetDnaFile,
+    SweetConductor, SweetDnaFile, websocket_client_by_port,
     WsPollRecv,
 };
 use holochain_conductor_api::{
@@ -15,7 +15,7 @@ use holochain_websocket::ReceiveMessage;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_interface_requires_auth() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let conductor = SweetConductor::from_standard_config().await;
 
@@ -68,7 +68,7 @@ async fn app_interface_requires_auth() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_interfaces_can_be_bound_to_apps() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let conductor = SweetConductor::from_standard_config().await;
 
@@ -127,7 +127,7 @@ async fn app_interfaces_can_be_bound_to_apps() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn signals_are_not_sent_until_after_auth() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
 
@@ -214,7 +214,7 @@ async fn signals_are_not_sent_until_after_auth() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn signals_are_restricted_by_app() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
 

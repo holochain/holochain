@@ -1074,9 +1074,7 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     authenticate_app_ws_client(ipv4_app_sender.clone(), admin_port, "".to_string()).await;
 
     let response: AppResponse = ipv4_app_sender
-        .request(AppRequest::AppInfo {
-            installed_app_id: "".to_string(),
-        })
+        .request(AppRequest::AppInfo)
         .await
         .unwrap();
     match response {
@@ -1094,9 +1092,7 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     authenticate_app_ws_client(ipv6_app_sender.clone(), admin_port, "".to_string()).await;
 
     let response: AppResponse = ipv6_app_sender
-        .request(AppRequest::AppInfo {
-            installed_app_id: "".to_string(),
-        })
+        .request(AppRequest::AppInfo)
         .await
         .unwrap();
     match response {
