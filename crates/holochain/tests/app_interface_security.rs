@@ -64,6 +64,56 @@ async fn app_interface_requires_auth() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn app_interface_can_handle_bad_auth_payload() {
+    holochain_trace::test_run();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let app_port = conductor
+        .clone()
+        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .await
+        .unwrap();
+
+    let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
+
+    // Send a payload that is clearly not an authentication request, which should kill the connection
+    // but NOT the interface
+    app_tx.authenticate(AppRequest::AppInfo).await.unwrap();
+
+    let token = create_token(&conductor, "test-app".into()).await;
+
+    // Try to authenticate against the connection which should be closed
+    let err = app_tx
+        .authenticate(AppAuthenticationRequest {
+            token: token.clone(),
+        })
+        .await
+        .unwrap_err();
+    assert_eq!("WebsocketClosed", err.to_string());
+
+    // Open a new connection
+    let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
+
+    // Now authenticate properly
+    app_tx
+        .authenticate(AppAuthenticationRequest {
+            token: token.clone(),
+        })
+        .await
+        .unwrap();
+
+    // Authentication should have worked, so now we can make requests
+    let response: AppResponse = app_tx
+        .request(AppRequest::ListWasmHostFunctions)
+        .await
+        .unwrap();
+    assert!(matches!(response, AppResponse::ListWasmHostFunctions(_)));
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn app_interfaces_can_be_bound_to_apps() {
     holochain_trace::test_run();
 
