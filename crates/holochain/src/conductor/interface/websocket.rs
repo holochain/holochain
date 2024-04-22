@@ -195,7 +195,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: Websoc
 /// registration. If the connection is not authenticated within 10s or any other content is sent,
 /// then the connection is dropped.
 ///
-/// If the authentication succeeds then message handling tasks are spawned to handle normal
+/// If the authentication succeeds, then message handling tasks are spawned to handle normal
 /// communication with the client.
 fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication>>(
     task_list: TaskListInner,
