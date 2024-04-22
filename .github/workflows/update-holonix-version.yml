@@ -1,0 +1,45 @@
+name: "Update Holonix versions"
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: |
+          One of the directory names under ./versions
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "0_1"
+          - "0_2"
+          - "0_2_rc"
+          - "weekly"
+
+concurrency:
+  group: ${{ github.ref_name }}
+
+jobs:
+  update-holonix-version:
+    runs-on: [ self-hosted, multi-arch ]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run the update script
+        run: |
+          ./scripts/update-holonix-version.sh ${{ github.event.inputs.version }}
+          nix run .#scripts-repo-flake-update ${{ github.event.inputs.version }}
+      - name: Create Pull Request
+        id: cpr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.HRA_GITHUB_TOKEN }}
+          title: "Update Holonix version for ${{ github.event.inputs.version }}"
+          branch: auto-update/${{ github.event.inputs.version }}
+          labels: |
+            autorebase:opt-in
+          draft: false
+          delete-branch: true
+      - name: Enable auto-merge
+        if: steps.cpr.outputs.pull-request-operation == 'created'
+        run: gh pr merge --merge --auto "${{ steps.cpr.outputs.pull-request-number }}"
+        env:
+          GH_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
