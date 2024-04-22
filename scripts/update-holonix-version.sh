@@ -39,4 +39,4 @@ fi
 
 echo "Latest matching tag: $LATEST_MATCHING_TAG"
 
-sed --in-place --regexp-extended "s#holochain/holochain/holochain-.*\"#holochain/holochain/$LATEST_MATCHING_TAG\"#" "./versions/$VERSION_STR/flake.nix"
+sed --in-place "s#holochain/holochain/holochain-.*\"#holochain/holochain/$LATEST_MATCHING_TAG\"#" "./versions/$VERSION_STR/flake.nix"
