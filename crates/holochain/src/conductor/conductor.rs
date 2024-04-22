@@ -2596,7 +2596,7 @@ mod authenticate_token_impls {
         /// Authenticate the app interface authentication `token`, optionally requiring the token to
         /// have been issued for a specific `app_id`.
         ///
-        /// Returns the [InstalledAppid] that the token was issued for.
+        /// Returns the [InstalledAppId] that the token was issued for.
         pub fn authenticate_app_token(
             &self,
             token: Vec<u8>,
