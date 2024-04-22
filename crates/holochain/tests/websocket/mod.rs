@@ -15,12 +15,14 @@ use holochain::{
     },
     fixt::*,
 };
-use std::net::ToSocketAddrs;
+use std::net::{Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 
+use either::Either;
 use holochain_conductor_api::{
     AdminInterfaceConfig, AppAuthenticationRequest, AppAuthenticationToken, AppRequest,
     InterfaceDriver, IssueAppAuthenticationTokenPayload,
 };
+use holochain_types::websocket::AllowedOrigins;
 use holochain_types::{
     prelude::*,
     test_utils::{fake_dna_zomes, write_fake_dna_file},
@@ -1004,6 +1006,103 @@ async fn create_multi_use_token(conductor: &SweetConductor) -> AppAuthentication
     };
 
     token
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
+    holochain_trace::test_run();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
+
+    //
+    // Connect to the admin interface on ipv4 and ipv6 localhost
+    //
+
+    let (ipv4_admin_sender, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new((Ipv4Addr::LOCALHOST, admin_port).into()),
+    )
+    .await
+    .unwrap();
+    let _rx4 = WsPollRecv::new::<AdminResponse>(rx);
+
+    let response: AdminResponse = ipv4_admin_sender
+        .request(AdminRequest::ListCellIds)
+        .await
+        .unwrap();
+    match response {
+        AdminResponse::CellIdsListed(_) => (),
+        _ => panic!("unexpected response"),
+    }
+
+    let (ipv6_admin_sender, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new((Ipv6Addr::LOCALHOST, admin_port).into()),
+    )
+    .await
+    .unwrap();
+    let _rx6 = WsPollRecv::new::<AdminResponse>(rx);
+
+    let response: AdminResponse = ipv6_admin_sender
+        .request(AdminRequest::ListCellIds)
+        .await
+        .unwrap();
+    match response {
+        AdminResponse::CellIdsListed(_) => (),
+        _ => panic!("unexpected response"),
+    }
+
+    //
+    // Do the same for an app interface
+    //
+
+    let app_port = conductor
+        .clone()
+        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .await
+        .unwrap();
+
+    let (ipv4_app_sender, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new((Ipv4Addr::LOCALHOST, app_port).into()),
+    )
+    .await
+    .unwrap();
+    let _rx4 = WsPollRecv::new::<AppResponse>(rx);
+    authenticate_app_ws_client(ipv4_app_sender.clone(), admin_port, "".to_string()).await;
+
+    let response: AppResponse = ipv4_app_sender
+        .request(AppRequest::AppInfo {
+            installed_app_id: "".to_string(),
+        })
+        .await
+        .unwrap();
+    match response {
+        AppResponse::AppInfo(_) => (),
+        _ => panic!("unexpected response"),
+    }
+
+    let (ipv6_app_sender, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new((Ipv6Addr::LOCALHOST, app_port).into()),
+    )
+    .await
+    .unwrap();
+    let _rx6 = WsPollRecv::new::<AppResponse>(rx);
+    authenticate_app_ws_client(ipv6_app_sender.clone(), admin_port, "".to_string()).await;
+
+    let response: AppResponse = ipv6_app_sender
+        .request(AppRequest::AppInfo {
+            installed_app_id: "".to_string(),
+        })
+        .await
+        .unwrap();
+    match response {
+        AppResponse::AppInfo(_) => (),
+        _ => panic!("unexpected response"),
+    }
 }
 
 async fn check_app_port(port: u16, origin: &str, token: AppAuthenticationToken) {

@@ -11,6 +11,7 @@ use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 
 use holochain_types::app::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;
@@ -45,8 +46,13 @@ pub async fn spawn_websocket_listener(
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::bind(Arc::new(config), format!("localhost:{}", port)).await?;
-    trace!("LISTENING AT: {}", listener.local_addr()?);
+    let listener = WebsocketListener::dual_bind(
+        Arc::new(config),
+        SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
+        SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0),
+    )
+    .await?;
+    trace!("LISTENING AT: {:?}", listener.local_addrs()?);
     Ok(listener)
 }
 
@@ -124,10 +130,15 @@ pub async fn spawn_app_interface_task<A: InterfaceApi<Auth = AppAuthentication>>
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::bind(Arc::new(config), format!("localhost:{}", port)).await?;
-    let addr = listener.local_addr()?;
-    trace!("LISTENING AT: {}", addr);
-    let port = addr.port();
+    let listener = WebsocketListener::dual_bind(
+        Arc::new(config),
+        SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
+        SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0),
+    )
+    .await?;
+    let addrs = listener.local_addrs()?;
+    trace!("LISTENING AT: {:?}", addrs);
+    let port = addrs[0].port();
 
     tm.add_conductor_task_ignored("app interface new connection handler", move || {
         async move {
@@ -459,17 +470,16 @@ pub mod test {
             .await
             .unwrap();
 
-        let admin_port = 65000;
-        conductor_handle
+        let admin_port = conductor_handle
             .clone()
             .add_admin_interfaces(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket {
-                    port: admin_port,
+                    port: 0,
                     allowed_origins: AllowedOrigins::Any,
                 },
             }])
             .await
-            .unwrap();
+            .unwrap()[0];
 
         let (admin_tx, rx) = websocket_client_by_port(admin_port).await.unwrap();
         let _rx = WsPollRecv::new::<AdminResponse>(rx);
