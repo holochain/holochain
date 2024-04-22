@@ -11,7 +11,7 @@ use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 
 use holochain_types::app::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;
@@ -48,8 +48,8 @@ pub async fn spawn_websocket_listener(
 
     let listener = WebsocketListener::dual_bind(
         Arc::new(config),
-        (Ipv4Addr::LOCALHOST, port),
-        (Ipv6Addr::LOCALHOST, port),
+        SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
+        SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0),
     )
     .await?;
     trace!("LISTENING AT: {:?}", listener.local_addrs()?);
@@ -132,8 +132,8 @@ pub async fn spawn_app_interface_task<A: InterfaceApi<Auth = AppAuthentication>>
 
     let listener = WebsocketListener::dual_bind(
         Arc::new(config),
-        (Ipv4Addr::LOCALHOST, port),
-        (Ipv6Addr::LOCALHOST, port),
+        SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
+        SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0),
     )
     .await?;
     let addrs = listener.local_addrs()?;

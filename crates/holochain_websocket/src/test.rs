@@ -178,7 +178,7 @@ async fn origin_is_required_on_listener() {
         Err(e) => {
             assert_eq!(
                 e.to_string(),
-                "WebsocketListener requires access control to be set in the config"
+                "WebsocketListener requires allowed_origins to be set in the config"
             );
         }
     }
@@ -198,8 +198,8 @@ async fn ipv6_or_ipv4_connect() {
     let l_task = tokio::task::spawn(async move {
         let l = WebsocketListener::dual_bind(
             Arc::new(WebsocketConfig::LISTENER_DEFAULT),
-            (Ipv4Addr::LOCALHOST, 0),
-            (Ipv6Addr::LOCALHOST, 0),
+            SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0),
+            SocketAddrV6::new(Ipv6Addr::LOCALHOST, 0, 0, 0),
         )
         .await
         .unwrap();

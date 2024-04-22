@@ -5,8 +5,9 @@
 
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
+use std::io::ErrorKind;
 pub use std::io::{Error, Result};
-use std::net::SocketAddr;
+use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::Arc;
 use tokio::net::ToSocketAddrs;
 use tokio::select;
@@ -774,7 +775,7 @@ impl WebsocketListener {
     /// Bind a new websocket listener.
     pub async fn bind(config: Arc<WebsocketConfig>, addr: impl ToSocketAddrs) -> Result<Self> {
         let access_control = Arc::new(config.allowed_origins.clone().ok_or_else(|| {
-            Error::other("WebsocketListener requires access control to be set in the config")
+            Error::other("WebsocketListener requires allowed_origins to be set in the config")
         })?);
 
         let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -790,37 +791,94 @@ impl WebsocketListener {
     }
 
     /// Bind a new websocket listener on the same port using a v4 and a v6 socket.
+    ///
+    /// If the port is 0, then the OS will be allowed to pick a port for IPv6. This function will
+    /// then try to bind to the same port for IPv4. If the OS picks a port that is not available for
+    /// IPv4, then the function will retry binding IPv6 to get a new port and see if that is
+    /// available for IPv4. If this fails after 5 retries, then an error will be returned.
+    ///
+    /// If either IPv4 or IPv6 is disabled, then the function will fall back to binding to the
+    /// available stack. An info message will be logged to let the user know that one interface was
+    /// unavailable, but this is likely intentional or expected in the user's environment, so it will
+    /// not be treated as an error that should prevent the listener from starting.
+    ///
+    /// Note: The interface fallback behaviour can be tested manually on Linux by running:
+    /// `echo 1 | sudo tee /proc/sys/net/ipv6/conf/lo/disable_ipv6`
+    /// and then trying to start Holochain with info logging enabled. You can undo the change with:
+    /// `echo 0 | sudo tee /proc/sys/net/ipv6/conf/lo/disable_ipv6`.
     pub async fn dual_bind(
         config: Arc<WebsocketConfig>,
-        addr_v4: impl Into<SocketAddr>,
-        addr_v6: impl Into<SocketAddr>,
+        addr_v4: SocketAddrV4,
+        addr_v6: SocketAddrV6,
     ) -> Result<Self> {
         let access_control = Arc::new(config.allowed_origins.clone().ok_or_else(|| {
-            Error::other("WebsocketListener requires access control to be set in the config")
+            Error::other("WebsocketListener requires allowed_origins to be set in the config")
         })?);
 
-        let mut addr_v4 = addr_v4.into();
-        let addr_v6 = addr_v6.into();
+        let addr_v6: SocketAddr = addr_v6.into();
+        let mut addr_v4: SocketAddr = addr_v4.into();
 
-        if !addr_v4.is_ipv4() {
-            return Err(Error::other("Expected an IPv4 address"));
+        // The point of dual_bind is to bind to the same port on both v4 and v6
+        if addr_v6.port() != 0 && addr_v6.port() == addr_v4.port() {
+            return Err(Error::other(
+                "dual_bind requires the same port for IPv4 and IPv6",
+            ));
         }
 
-        if !addr_v6.is_ipv6() {
-            return Err(Error::other("Expected an IPv6 address"));
-        }
-
-        // Note that tokio binds to the stack matching the address type so we can re-use the port
+        // Note that tokio binds to the stack matching the address type, so we can re-use the port
         // without needing to create the sockets ourselves to configure this.
-        let v6_listener = tokio::net::TcpListener::bind(addr_v6).await?;
-        addr_v4.set_port(v6_listener.local_addr()?.port());
 
-        let v4_listener = tokio::net::TcpListener::bind(addr_v4).await?;
+        let mut listener: Option<DualStackListener> = None;
+        for _ in 0..5 {
+            let v6_listener = match tokio::net::TcpListener::bind(addr_v6).await {
+                Ok(l) => l,
+                // This is the error code that *should* be returned if IPv6 is disabled
+                Err(e) if e.kind() == ErrorKind::AddrNotAvailable => {
+                    tracing::info!(?e, "Failed to bind IPv6 listener because IPv6 appears to be disabled, falling back to IPv4 only");
+                    return Self::bind(config, addr_v4).await;
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            };
 
-        let listener = DualStackListener {
-            v4: v4_listener,
-            v6: v6_listener,
-        };
+            addr_v4.set_port(v6_listener.local_addr()?.port());
+
+            let v4_listener = match tokio::net::TcpListener::bind(addr_v4).await {
+                Ok(l) => l,
+                // This is the error code that *should* be returned if IPv4 is disabled
+                Err(e) if e.kind() == ErrorKind::AddrNotAvailable => {
+                    tracing::info!(?e, "Failed to bind IPv4 listener because IPv4 appears to be disabled, falling back to IPv6 only");
+                    // No need to re-bind the v6 listener, it's already bound. Just create a new Self
+                    // from the v6 listener and return it.
+                    return Ok(Self {
+                        config,
+                        access_control,
+                        listener: Box::new(v6_listener),
+                    });
+                }
+                // If the port for IPv6 was selected by the OS but it isn't available for IPv4, retry and let the OS pick a new port for IPv6
+                // and hopefully it will be available for IPv4.
+                Err(e) if addr_v6.port() == 0 && e.kind() == ErrorKind::AddrInUse => {
+                    tracing::warn!(?e, "Failed to bind the same port for IPv4 that was selected for IPv6, retrying with a new port");
+                    continue;
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            };
+
+            listener = Some(DualStackListener {
+                v4: v4_listener,
+                v6: v6_listener,
+            });
+        }
+
+        // Gave up after a few retries, there's no point in continuing forever because there might be
+        // something wrong that the logic above isn't accounting for.
+        let listener = listener.ok_or_else(|| {
+            Error::other("Failed to bind listener to IPv4 and IPv6 interfaces after 5 retries")
+        })?;
 
         let addr = listener.v4.local_addr()?;
         tracing::info!(?addr, "WebsocketListener listening");
