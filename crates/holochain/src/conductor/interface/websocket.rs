@@ -192,7 +192,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: Websoc
 }
 
 /// Takes an open connection and waits for an authentication message to complete the connection
-/// registration. If the connection is not authenticated within 10s or any other content is sent
+/// registration. If the connection is not authenticated within 10s or any other content is sent,
 /// then the connection is dropped.
 ///
 /// If the authentication succeeds then message handling tasks are spawned to handle normal
