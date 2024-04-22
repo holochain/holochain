@@ -1373,6 +1373,8 @@ mod network_impls {
 
 /// Methods related to app installation and management
 mod app_impls {
+    use holochain_types::deepkey_roundtrip_backward;
+
     use crate::conductor::state::is_app;
 
     use super::*;
@@ -1531,11 +1533,18 @@ mod app_impls {
                         .await
                         .map_err(|e| DpkiServiceError::Lair(e.into()))?;
 
-                    let dna_hashes = cell_ids.iter().map(|c| c.dna_hash().clone()).collect();
+                    let signature = deepkey_roundtrip_backward!(Signature, &signature);
+
+                    let dna_hashes = cell_ids
+                        .iter()
+                        .map(|c| deepkey_roundtrip_backward!(DnaHash, c.dna_hash()))
+                        .collect();
+
+                    let agent_key = deepkey_roundtrip_backward!(AgentPubKey, &agent_key);
 
                     let input = CreateKeyInput {
                         key_generation: KeyGeneration {
-                            new_key: agent_key.clone(),
+                            new_key: agent_key,
                             new_key_signing_of_author: signature,
                         },
                         app_binding: AppBindingInput {

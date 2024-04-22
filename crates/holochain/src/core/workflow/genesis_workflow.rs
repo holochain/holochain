@@ -181,6 +181,7 @@ mod tests {
     use holochain_state::prelude::test_dht_db;
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
     use holochain_trace;
+    use holochain_types::deepkey_roundtrip_backward;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Action;
@@ -198,7 +199,8 @@ mod tests {
         let author = fake_agent_pubkey_1();
 
         let mut mock_dpki = MockDpkiState::new();
-        let action = ::fixt::fixt!(SignedActionHashed);
+        let action =
+            deepkey_roundtrip_backward!(SignedActionHashed, &::fixt::fixt!(SignedActionHashed));
         mock_dpki.expect_key_state().returning(move |_, _| {
             let action = action.clone();
             async move { Ok(KeyState::Valid(action)) }.boxed()

@@ -2502,8 +2502,6 @@ dependencies = [
 [[package]]
 name = "hc_deepkey_sdk"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f2e154f632548df44a4ae5214d23e5a05c8c243ac720dfde7b077f1b3e0c54a"
 dependencies = [
  "arbitrary",
  "hc_deepkey_types",
@@ -3146,8 +3144,6 @@ dependencies = [
 [[package]]
 name = "holochain_deepkey_dna"
 version = "0.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40b63c72b8df461200bab981e812e786d51d783779c259c9d615f25da0b6fd8d"
 dependencies = [
  "hc_deepkey_sdk",
 ]

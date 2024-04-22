@@ -85,12 +85,14 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     nonce: [0; 32].into(),
                     signature: [0; 64].into(),
                 };
-                REAL_RIBOSOME
-                    .lock()
-                    .unwrap()
-                    .clone()
-                    .maybe_call(ha.clone().into(), &i, &zome, &i.fn_name)
-                    .unwrap();
+
+                todo!("allow this to be async");
+                // REAL_RIBOSOME
+                //     .lock()
+                //     .unwrap()
+                //     .clone()
+                //     .maybe_call(ha.clone().into(), &i, &zome, &i.fn_name)
+                //     .unwrap();
             });
         });
     }

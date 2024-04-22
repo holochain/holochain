@@ -1,5 +1,6 @@
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use arbitrary::{Arbitrary, Unstructured};
+use holochain_types::{deepkey_roundtrip_backward, deepkey_roundtrip_forward};
 use parking_lot::Mutex;
 
 use super::*;
@@ -41,10 +42,10 @@ fn make_mock_dpki_impl(u: &mut Unstructured<'_>, state: DpkiKeyState) -> DpkiImp
             let state = state.clone();
             let fake_register_key_output = fake_register_key_output.clone();
             async move {
-                let agent = input.key_generation.new_key;
-                state
-                    .lock()
-                    .insert(agent.clone(), KeyState::Valid(fixt!(SignedActionHashed)));
+                let agent = deepkey_roundtrip_forward!(AgentPubKey, &input.key_generation.new_key);
+                let action =
+                    deepkey_roundtrip_backward!(SignedActionHashed, &fixt!(SignedActionHashed));
+                state.lock().insert(agent, KeyState::Valid(action));
                 Ok(fake_register_key_output)
             }
             .boxed()
@@ -265,7 +266,13 @@ async fn mock_dpki_invalid_key_state() {
         // Alice thinks Bob's DPKI key is invalid
         s0.insert(a1, KeyState::Invalid(None));
         // But Bob thinks Alice is valid
-        s1.insert(a0, KeyState::Valid(fixt!(SignedActionHashed)));
+        s1.insert(
+            a0,
+            KeyState::Valid(deepkey_roundtrip_backward!(
+                SignedActionHashed,
+                &fixt!(SignedActionHashed)
+            )),
+        );
     }
 
     let hash: ActionHash = conductors[1].call(&bob.zome("simple"), "create", ()).await;
