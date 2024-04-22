@@ -1,4 +1,5 @@
 use self::meta_net::PreflightUserData;
+use crate::dht::prelude::ArqSet;
 
 use super::*;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
@@ -55,7 +56,7 @@ impl KitsuneHostDefaultError for HarnessHost {
     fn query_region_set(
         &self,
         _space: Arc<KitsuneSpace>,
-        _dht_arc_set: Arc<DhtArcSet>,
+        _dht_arc_set: ArqSet,
     ) -> KitsuneHostResult<RegionSetLtcs> {
         box_fut(Ok(RegionSetLtcs::empty()))
     }
@@ -107,7 +108,7 @@ use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken;
 use kitsune_p2p_types::dht::prelude::RegionSetLtcs;
-use kitsune_p2p_types::dht::spacetime::Topology;
+use kitsune_p2p_types::dht::spacetime::{SpaceOffset, Topology};
 use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
 use kitsune_p2p_types::dht_arc::DhtArcSet;
 
@@ -219,7 +220,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
             limit,
         }: QueryAgentsEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        let arc_set = arc_set.unwrap_or_else(|| Arc::new(DhtArcSet::Full));
+        let arq_set = arc_set.unwrap_or_else(ArqSet::<SpaceOffset>::full_std);
         let window = window.unwrap_or_else(full_time_window);
         // TODO - sort by near_basis if set
         let out = self
@@ -231,7 +232,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
                     .map(|agents| agents.contains(*a))
                     .unwrap_or(true)
             })
-            .filter(|(_, i)| arc_set.contains(i.agent.get_loc()))
+            .filter(|(_, i)| arq_set.to_dht_arc_set_std().contains(i.agent.get_loc()))
             .filter(|(_, i)| window.contains(&Timestamp::from_micros(i.signed_at_ms as i64 * 1000)))
             .take(limit.unwrap_or(u32::MAX) as usize)
             .map(|(_, i)| (**i).clone())

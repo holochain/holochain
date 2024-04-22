@@ -45,6 +45,12 @@ pub fn add_location_ascii(mut s: String, locs: Vec<Loc>) -> String {
 impl<S: ArqStart> Arq<S> {
     /// Handy ascii representation of an arc, especially useful when
     /// looking at several arcs at once to get a sense of their overlap
+    pub fn to_ascii_std(&self, len: usize) -> String {
+        self.to_ascii(SpaceDimension::standard(), len)
+    }
+
+    /// Handy ascii representation of an arc, especially useful when
+    /// looking at several arcs at once to get a sense of their overlap
     pub fn to_ascii(&self, dim: impl SpaceDim, len: usize) -> String {
         let empty = || {
             let mut s = " ".repeat(len);

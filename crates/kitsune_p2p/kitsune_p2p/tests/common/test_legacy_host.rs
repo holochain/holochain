@@ -137,7 +137,7 @@ impl TestLegacyHost {
                                 }
 
                                 // Handle as a "gossip agents" query.
-                                (_agents, window, Some(arc_set), None, None) => {
+                                (_agents, window, Some(arq_set), None, None) => {
                                     let window = window.unwrap_or_else(full_time_window);
                                     let since_ms = window.start.as_millis().max(0) as u64;
                                     let until_ms = window.end.as_millis().max(0) as u64;
@@ -156,7 +156,7 @@ impl TestLegacyHost {
                                         }
 
                                         let interval = DhtArcRange::from(info.storage_arc());
-                                        if !arc_set.overlap(&interval.into()) {
+                                        if !arq_set.to_dht_arc_set_std().overlap(&interval.into()) {
                                             return None;
                                         }
 

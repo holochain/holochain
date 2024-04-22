@@ -706,14 +706,21 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 }
 
                 // If arc_set is set, this is a "gossip agents" query
-                (agents, window, Some(arc_set), None, None) => {
+                (agents, window, Some(arq_set), None, None) => {
                     let window = window.unwrap_or_else(full_time_window);
                     let h_agents =
                         agents.map(|agents| agents.iter().map(AgentPubKey::from_kitsune).collect());
                     let since_ms = window.start.as_millis().max(0) as u64;
                     let until_ms = window.end.as_millis().max(0) as u64;
                     evt_sender
-                        .query_gossip_agents(h_space, h_agents, space, since_ms, until_ms, arc_set)
+                        .query_gossip_agents(
+                            h_space,
+                            h_agents,
+                            space,
+                            since_ms,
+                            until_ms,
+                            arq_set.to_dht_arc_set_std().into(),
+                        )
                         .await?
                 }
 

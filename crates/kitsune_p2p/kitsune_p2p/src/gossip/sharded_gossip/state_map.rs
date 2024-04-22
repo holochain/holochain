@@ -95,7 +95,6 @@ impl From<HashMap<NodeCert, RoundState>> for RoundStateMap {
 
 #[cfg(test)]
 mod tests {
-    use crate::dht_arc::DhtArcSet;
     use crate::gossip::sharded_gossip::state_map::RoundStateMap;
     use crate::gossip::sharded_gossip::{NodeCert, RoundState};
     use crate::NOISE;

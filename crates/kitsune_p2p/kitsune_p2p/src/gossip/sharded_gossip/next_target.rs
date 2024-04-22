@@ -16,7 +16,7 @@ impl ShardedGossipLocal {
     /// Find a remote endpoint from agents within arc set.
     pub(super) async fn find_remote_agent_within_arcset(
         &self,
-        arc_set: Arc<DhtArcSet>,
+        arc_set: ArqSet,
         agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Option<Node>> {
         let mut remote_nodes: HashMap<NodeCert, Node> = HashMap::new();

@@ -20,7 +20,7 @@ use kitsune_p2p_types::dht::arq::ArqSet;
 use kitsune_p2p_types::dht::region::{Region, RegionData};
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht::ArqBounds;
-use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
+use kitsune_p2p_types::dht_arc::DhtArcSet;
 use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
@@ -736,6 +736,7 @@ impl RoundState {
         }
     }
 
+    /// Get the common arcs as continuous arcs
     pub fn common_arc_set(&self) -> Arc<DhtArcSet> {
         Arc::new(self.common_arq_set.to_dht_arc_set_std())
     }

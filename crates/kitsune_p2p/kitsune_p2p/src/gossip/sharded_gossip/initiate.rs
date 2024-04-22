@@ -1,7 +1,4 @@
-use kitsune_p2p_types::{
-    dht::{arq::ArqSet, spacetime::SpaceDimension, ArqBounds},
-    dht_arc::DhtArcRange,
-};
+use kitsune_p2p_types::dht::{arq::ArqSet, ArqBounds};
 use rand::Rng;
 
 use super::*;
@@ -33,17 +30,15 @@ impl ShardedGossipLocal {
         }
 
         // Get the local agents intervals.
-        let intervals: Vec<_> = agent_info_session
+        let intervals: Vec<ArqBounds> = agent_info_session
             .local_arqs()
             .into_iter()
             .map(|a| a.to_bounds_std())
             .collect();
 
-        let arcset: Vec<DhtArcRange> = intervals.iter().map(|a| a.to_dht_arc_range_std()).collect();
-
         // Choose a remote agent to gossip with.
         let remote_agent = self
-            .find_remote_agent_within_arcset(Arc::new(arcset.into()), agent_info_session)
+            .find_remote_agent_within_arcset(ArqSet::new(intervals.clone()), agent_info_session)
             .await?;
 
         let maybe_gossip = if let Some(next_target::Node {
@@ -219,12 +214,14 @@ impl ShardedGossipLocal {
         let local_arqs = ArqSet::new(local_arqs);
         let remote_arqs = ArqSet::new(remote_arqs);
         let common_arqs = Arc::new(local_arqs.intersection(&topo, &remote_arqs));
-        let common_arcs = Arc::new(common_arqs.to_dht_arc_set_std());
 
         let region_set = if let GossipType::Historical = self.gossip_type {
-            let region_set =
-                store::query_region_set(self.host_api.clone().api, self.space.clone(), common_arcs)
-                    .await?;
+            let region_set = store::query_region_set(
+                self.host_api.clone().api,
+                self.space.clone(),
+                (*common_arqs).clone(),
+            )
+            .await?;
             gossip.push(ShardedGossipWire::op_regions(region_set.clone()));
             Some(region_set)
         } else {
@@ -283,7 +280,7 @@ impl ShardedGossipLocal {
             window.start = cursor;
         }
         let blooms = self
-            .generate_op_blooms_for_time_window(&state.common_arc_set(), window)
+            .generate_op_blooms_for_time_window(&state.common_arq_set, window)
             .await?;
 
         let blooms = match blooms {

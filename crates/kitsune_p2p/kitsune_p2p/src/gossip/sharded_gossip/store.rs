@@ -11,12 +11,13 @@ use crate::event::{
 use crate::types::event::KitsuneP2pEventSender;
 use crate::{HostApi, HostApiLegacy};
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::dht::arq::ArqSet;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht::Arq;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KitsuneAgent, KitsuneOpHash, KitsuneSpace},
-    dht_arc::{DhtArc, DhtArcSet},
+    dht_arc::DhtArcSet,
     KitsuneError, KitsuneResult,
 };
 
@@ -37,7 +38,7 @@ pub(super) struct AgentInfoSession {
 
     /// Cache of agents whose storage arc is contained in an arc set.
     /// Finding these agents requires a host query so we cache the results because they are used frequently.
-    agents_by_arc_set_cache: HashMap<Arc<DhtArcSet>, Vec<AgentInfoSigned>>,
+    agents_by_arc_set_cache: HashMap<ArqSet, Vec<AgentInfoSigned>>,
 }
 
 impl AgentInfoSession {
@@ -70,7 +71,7 @@ impl AgentInfoSession {
     pub(super) fn local_agent_arqs(&self) -> Vec<(Arc<KitsuneAgent>, Arq)> {
         self.local_agents
             .iter()
-            .map(|info| (info.agent.clone(), info.storage_arq.clone()))
+            .map(|info| (info.agent.clone(), info.storage_arq))
             .collect()
     }
 
@@ -78,7 +79,7 @@ impl AgentInfoSession {
     pub(super) fn local_arqs(&self) -> Vec<Arq> {
         self.local_agents
             .iter()
-            .map(|info| info.storage_arq.clone())
+            .map(|info| info.storage_arq)
             .collect()
     }
 
@@ -86,7 +87,7 @@ impl AgentInfoSession {
         &mut self,
         host_api: &HostApiLegacy,
         space: &Arc<KitsuneSpace>,
-        arc_set: Arc<DhtArcSet>,
+        arc_set: ArqSet,
     ) -> KitsuneResult<Vec<AgentInfoSigned>> {
         match self.agents_by_arc_set_cache.entry(arc_set.clone()) {
             std::collections::hash_map::Entry::Occupied(o) => Ok(o.get().clone()),
@@ -277,7 +278,7 @@ pub(super) fn hash_chunks_query(
 pub(super) async fn query_region_set<'a>(
     host_api: HostApi,
     space: Arc<KitsuneSpace>,
-    common_arc_set: Arc<DhtArcSet>,
+    common_arc_set: ArqSet,
 ) -> KitsuneResult<RegionSetLtcs> {
     host_api
         .query_region_set(space, common_arc_set)

@@ -9,7 +9,7 @@ use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_p2p::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
+use holochain_p2p::dht_arc::{DhtArcRange, DhtLocation};
 use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::store::{p2p_put_single, AsP2pStateTxExt};
@@ -19,6 +19,8 @@ use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dht::arq::ArqSize;
+use kitsune_p2p::dht::spacetime::SpaceDimension;
+use kitsune_p2p::dht::Arq;
 use kitsune_p2p::{fixt::*, KitsuneAgent, KitsuneOpHash};
 use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneSpace};
 use kitsune_p2p_types::config::KitsuneP2pConfig;
@@ -43,7 +45,7 @@ pub struct MockNetworkData {
     /// KitsuneAgent -> AgentPubKey
     pub agent_kit_to_hash: HashMap<Arc<KitsuneAgent>, Arc<AgentPubKey>>,
     /// Agent storage arcs.
-    pub agent_to_arc: HashMap<Arc<AgentPubKey>, DhtArc>,
+    pub agent_to_arq: HashMap<Arc<AgentPubKey>, Arq>,
     /// Agents peer info.
     pub agent_to_info: HashMap<Arc<AgentPubKey>, AgentInfoSigned>,
     /// Hashes ordered by their basis location.
@@ -103,9 +105,9 @@ impl MockNetworkData {
             .into_iter()
             .map(|info| (agent_kit_to_hash[&info.agent].clone(), info))
             .collect();
-        let agent_to_arc = agent_to_info
+        let agent_to_arq = agent_to_info
             .iter()
-            .map(|(k, v)| (k.clone(), v.storage_arc()))
+            .map(|(k, v)| (k.clone(), v.storage_arq))
             .collect();
         Self {
             authored,
@@ -113,7 +115,7 @@ impl MockNetworkData {
             op_kit_to_hash,
             agent_hash_to_kit,
             agent_kit_to_hash,
-            agent_to_arc,
+            agent_to_arq,
             agent_to_info,
             ops_by_loc,
             op_to_loc,
@@ -146,25 +148,26 @@ impl MockNetworkData {
 
     /// Hashes that an agent is an authority for.
     pub fn hashes_authority_for(&self, agent: &AgentPubKey) -> Vec<Arc<DhtOpHash>> {
-        let arc = self.agent_to_arc[agent].inner();
-        match arc {
-            DhtArcRange::Empty => Vec::with_capacity(0),
-            DhtArcRange::Full => self.ops_by_loc.values().flatten().cloned().collect(),
-            DhtArcRange::Bounded(start, end) => {
-                if start <= end {
-                    self.ops_by_loc
-                        .range(start..=end)
-                        .flat_map(|(_, hash)| hash)
-                        .cloned()
-                        .collect()
-                } else {
-                    self.ops_by_loc
-                        .range(..=end)
-                        .flat_map(|(_, hash)| hash)
-                        .chain(self.ops_by_loc.range(start..).flat_map(|(_, hash)| hash))
-                        .cloned()
-                        .collect()
-                }
+        let arq = self.agent_to_arq[agent];
+        if arq.is_empty() {
+            Vec::with_capacity(0)
+        } else if arq.is_full(SpaceDimension::standard()) {
+            self.ops_by_loc.values().flatten().cloned().collect()
+        } else {
+            let (start, end) = arq.to_dht_arc_range_std().to_bounds_grouped().unwrap();
+            if start <= end {
+                self.ops_by_loc
+                    .range(start..=end)
+                    .flat_map(|(_, hash)| hash)
+                    .cloned()
+                    .collect()
+            } else {
+                self.ops_by_loc
+                    .range(..=end)
+                    .flat_map(|(_, hash)| hash)
+                    .chain(self.ops_by_loc.range(start..).flat_map(|(_, hash)| hash))
+                    .cloned()
+                    .collect()
             }
         }
     }

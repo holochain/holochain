@@ -17,7 +17,7 @@ use num_traits::Zero;
 pub struct StandardResponsesHostApi {
     infos: Vec<AgentInfoSigned>,
     topology: Topology,
-    strat: ArqStrat,
+    _strat: ArqStrat,
     with_data: bool,
 }
 
@@ -86,17 +86,11 @@ impl KitsuneHost for StandardResponsesHostApi {
 
     fn query_region_set(
         &self,
-        space: Arc<KitsuneSpace>,
-        dht_arc_set: Arc<DhtArcSet>,
+        _space: Arc<KitsuneSpace>,
+        arq_set: ArqSet,
     ) -> crate::KitsuneHostResult<RegionSetLtcs> {
         async move {
-            let arqs = ArqSet::from_dht_arc_set_exact(
-                &self.get_topology(space).await?,
-                &self.strat,
-                &dht_arc_set,
-            )
-            .expect("an arc in the set could not be quantized");
-            let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(1.into()), arqs);
+            let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(1.into()), arq_set);
             let region_set = if self.with_data {
                 // XXX: this is very fake, and completely wrong!
                 //      in order to properly match the fake data returned in other methods,
@@ -154,7 +148,7 @@ async fn standard_responses(
     let host_api = StandardResponsesHostApi {
         infos: infos.clone(),
         topology: Topology::standard_epoch_full(),
-        strat: ArqStrat::default(),
+        _strat: ArqStrat::default(),
         with_data,
     };
     // Note that this mock is not realistic, query by agents should filter by input agents

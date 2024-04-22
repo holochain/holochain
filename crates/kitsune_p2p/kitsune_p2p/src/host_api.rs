@@ -1,3 +1,4 @@
+use crate::dht::prelude::ArqSet;
 use kitsune_p2p_fetch::{OpHashSized, RoughSized, TransferMethod};
 use kitsune_p2p_timestamp::Timestamp;
 use must_future::MustBoxFuture;
@@ -57,7 +58,7 @@ pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,
-        dht_arc_set: Arc<DhtArcSet>,
+        dht_arc_set: ArqSet,
     ) -> KitsuneHostResult<RegionSetLtcs>;
 
     /// Given an input list of regions, return a list of equal or greater length

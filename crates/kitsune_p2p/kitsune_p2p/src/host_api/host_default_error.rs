@@ -1,3 +1,4 @@
+use crate::dht::prelude::ArqSet;
 use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
@@ -86,7 +87,7 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
     fn query_region_set(
         &self,
         _space: Arc<KitsuneSpace>,
-        _dht_arc_set: Arc<DhtArcSet>,
+        _dht_arc_set: ArqSet,
     ) -> KitsuneHostResult<RegionSetLtcs> {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
@@ -205,7 +206,7 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,
-        dht_arc_set: Arc<DhtArcSet>,
+        dht_arc_set: ArqSet,
     ) -> KitsuneHostResult<RegionSetLtcs> {
         KitsuneHostDefaultError::query_region_set(self, space, dht_arc_set)
     }

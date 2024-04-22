@@ -14,6 +14,7 @@ use super::{power_and_count_from_length, power_and_count_from_length_exact, Arq,
     Clone,
     PartialEq,
     Eq,
+    Hash,
     derive_more::Deref,
     derive_more::DerefMut,
     derive_more::IntoIterator,
@@ -197,7 +198,7 @@ impl ArqSet {
                 a
             })
             .collect::<Vec<_>>();
-        (Self::new(dbg!(arqs)), dbg!(rounded))
+        (Self::new(arqs), rounded)
     }
 }
 

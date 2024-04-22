@@ -904,9 +904,9 @@ async fn mock_network_sharded_gossip() {
                                 options,
                             );
                             if bad_get.is_some() {
-                                let arc = data.agent_to_arc[&agent];
+                                let arq = data.agent_to_arq[&agent];
 
-                                if !arc.contains(dht_hash.get_loc()) {
+                                if !arq.to_dht_arc_range_std().contains(dht_hash.get_loc()) {
                                     bad_get.take().unwrap().send(()).unwrap();
                                 }
                             }
@@ -950,7 +950,7 @@ async fn mock_network_sharded_gossip() {
                                         // This works because alice will only initiate with one simulated
                                         // agent at a time.
                                         last_intervals = Some(intervals);
-                                        let arc = data.agent_to_arc[&agent];
+                                        let arc = data.agent_to_arq[&agent];
                                         let agent_info = data.agent_to_info[&agent].clone();
                                         let interval = arc;
 
@@ -958,9 +958,9 @@ async fn mock_network_sharded_gossip() {
                                         if let Some(alice) = &alice {
                                             let a = alice.storage_arc();
                                             let b = interval;
-                                            debug!("{}\n{}", a.to_ascii(10), b.to_ascii(10));
+                                            debug!("{}\n{}", a.to_ascii(10), b.to_ascii_std(10));
                                             let a: DhtArcSet = a.inner().into();
-                                            let b: DhtArcSet = b.inner().into();
+                                            let b: DhtArcSet = b.to_dht_arc_range_std().into();
                                             if !a.overlap(&b) {
                                                 num_missed_gossips += 1;
                                             }
@@ -978,7 +978,7 @@ async fn mock_network_sharded_gossip() {
                                             module: module,
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::accept(
-                                                    vec![interval.into()],
+                                                    vec![interval.to_bounds_std()],
                                                     vec![agent_info],
                                                 ),
                                             ),
@@ -1051,7 +1051,7 @@ async fn mock_network_sharded_gossip() {
                                             Some(intervals) => missing_hashes
                                                 .into_iter()
                                                 .filter(|hash| {
-                                                    intervals[0].contains(
+                                                    intervals[0].to_dht_arc_range_std().contains(
                                                         data.op_to_loc[&data.op_kit_to_hash[*hash]],
                                                     )
                                                 })
@@ -1080,9 +1080,9 @@ async fn mock_network_sharded_gossip() {
                                         let (overlap, max_could_get) = alice
                                             .as_ref()
                                             .map(|alice| {
-                                                let arc = data.agent_to_arc[&agent];
+                                                let arc = data.agent_to_arq[&agent];
                                                 let a = alice.storage_arc();
-                                                let b = arc;
+                                                let b = arc.to_dht_arc_range_std();
                                                 let num_should_hold = this_agent_hashes
                                                     .iter()
                                                     .filter(|hash| {
@@ -1396,7 +1396,10 @@ async fn mock_network_sharding() {
                         }
                         holochain_p2p::WireMessage::Get { dht_hash, options } => {
                             num_gets.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            let ops = if data.agent_to_arc[&agent].contains(dht_hash.get_loc()) {
+                            let ops = if data.agent_to_arq[&agent]
+                                .to_dht_arc_range_std()
+                                .contains(dht_hash.get_loc())
+                            {
                                 let txn = conn
                                     .transaction_with_behavior(
                                         rusqlite::TransactionBehavior::Exclusive,
@@ -1453,15 +1456,15 @@ async fn mock_network_sharding() {
                         basis_loc,
                         ..
                     }) => {
-                        let this_arc = data.agent_to_arc[&agent];
+                        let this_arc = data.agent_to_arq[&agent];
                         let basis_loc_i = basis_loc.as_u32() as i64;
                         let mut agents = data
-                            .agent_to_arc
+                            .agent_to_arq
                             .iter()
-                            .filter(|(a, _)| this_arc.contains(a.get_loc()))
+                            .filter(|(a, _)| this_arc.to_dht_arc_range_std().contains(a.get_loc()))
                             .map(|(a, arc)| {
                                 (
-                                    if arc.contains(basis_loc) {
+                                    if arc.to_dht_arc_range_std().contains(basis_loc) {
                                         0
                                     } else {
                                         (arc.start_loc().as_u32() as i64 - basis_loc_i).abs()
@@ -1499,7 +1502,7 @@ async fn mock_network_sharding() {
                                         // This works because alice will only initiate with one simulated
                                         // agent at a time.
                                         last_intervals = Some(intervals);
-                                        let arc = data.agent_to_arc[&agent];
+                                        let arc = data.agent_to_arq[&agent];
                                         let agent_info = data.agent_to_info[&agent].clone();
                                         let interval = arc;
 
@@ -1509,7 +1512,7 @@ async fn mock_network_sharding() {
                                             module: module,
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::accept(
-                                                    vec![interval.into()],
+                                                    vec![interval.to_bounds_std()],
                                                     vec![agent_info],
                                                 ),
                                             ),
@@ -1586,7 +1589,7 @@ async fn mock_network_sharding() {
                                             Some(intervals) => missing_hashes
                                                 .into_iter()
                                                 .filter(|hash| {
-                                                    intervals[0].contains(
+                                                    intervals[0].to_dht_arc_range_std().contains(
                                                         data.op_to_loc[&data.op_kit_to_hash[*hash]],
                                                     )
                                                 })
@@ -1612,11 +1615,15 @@ async fn mock_network_sharding() {
                                         channel.send(msg.addressed((*agent).clone())).await;
                                     }
                                     ShardedGossipWire::Agents(Agents { filter }) => {
-                                        let this_agent_arc = &data.agent_to_arc[&agent];
+                                        let this_agent_arc = &data.agent_to_arq[&agent];
                                         let iter = data
                                             .agent_to_info
                                             .iter()
-                                            .filter(|(a, _)| this_agent_arc.contains(a.get_loc()))
+                                            .filter(|(a, _)| {
+                                                this_agent_arc
+                                                    .to_dht_arc_range_std()
+                                                    .contains(a.get_loc())
+                                            })
                                             .map(|(a, info)| (&data.agent_hash_to_kit[a], info));
                                         let agents = check_agent_boom(iter, &filter);
                                         let peer_data = agents

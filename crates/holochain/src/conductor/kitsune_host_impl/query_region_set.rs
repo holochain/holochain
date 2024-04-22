@@ -1,16 +1,10 @@
-use std::sync::{
-    atomic::{AtomicI64, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 
 use holochain_p2p::dht::prelude::*;
 use holochain_sqlite::prelude::*;
 use rusqlite::named_params;
 
 use crate::conductor::error::ConductorResult;
-
-static LAST_LOG_MS: AtomicI64 = AtomicI64::new(0);
-const LOG_RATE_MS: i64 = 1000;
 
 /// The network module needs info about various groupings ("regions") of ops.
 ///
@@ -23,7 +17,7 @@ const LOG_RATE_MS: i64 = 1000;
 pub async fn query_region_set(
     db: DbWrite<DbKindDht>,
     topology: Topology,
-    strat: &ArqStrat,
+    _strat: &ArqStrat,
     arq_set: Arc<ArqSet>,
 ) -> ConductorResult<RegionSetLtcs> {
     let times = TelescopingTimes::historical(&topology);
@@ -88,9 +82,9 @@ mod tests {
         let db = test_dht_db();
         let topo = Topology::standard(Timestamp::now(), Duration::ZERO);
         let strat = ArqStrat::default();
-        let arcset = Arc::new(DhtArcSet::Full);
+        let arq_set = Arc::new(ArqSet::full_std());
 
-        let regions_empty = query_region_set(db.to_db(), topo.clone(), &strat, arcset.clone())
+        let regions_empty = query_region_set(db.to_db(), topo.clone(), &strat, arq_set.clone())
             .await
             .unwrap();
         {
@@ -133,7 +127,7 @@ mod tests {
             }
         });
 
-        let regions = query_region_set(db.to_db(), topo, &strat, arcset)
+        let regions = query_region_set(db.to_db(), topo, &strat, arq_set)
             .await
             .unwrap();
 

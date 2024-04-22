@@ -15,11 +15,7 @@ impl ShardedGossipLocal {
         // Get all agents within common arc and filter out
         // the ones in the remote bloom.
         let missing: Vec<_> = agent_info_session
-            .agent_info_within_arc_set(
-                &self.host_api,
-                &self.space,
-                Arc::new(common_arq_set.to_dht_arc_set_std()),
-            )
+            .agent_info_within_arc_set(&self.host_api, &self.space, (*common_arq_set).clone())
             .await?
             .into_iter()
             .filter(|info| {
