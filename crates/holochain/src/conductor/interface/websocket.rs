@@ -470,17 +470,16 @@ pub mod test {
             .await
             .unwrap();
 
-        let admin_port = 65000;
-        conductor_handle
+        let admin_port = conductor_handle
             .clone()
             .add_admin_interfaces(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket {
-                    port: admin_port,
+                    port: 0,
                     allowed_origins: AllowedOrigins::Any,
                 },
             }])
             .await
-            .unwrap();
+            .unwrap()[0];
 
         let (admin_tx, rx) = websocket_client_by_port(admin_port).await.unwrap();
         let _rx = WsPollRecv::new::<AdminResponse>(rx);
