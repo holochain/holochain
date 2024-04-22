@@ -201,7 +201,8 @@ mod tests {
         let result = auth.authenticate_token(token.clone(), Some(other_app_id));
         assert!(result.is_err());
 
-        // Token was retained through the failed attempt. Another reason that single use tokens are safer!
+        // Token was retained through the failed attempt because the caller has used it with a
+        // websocket connection that is restricted to another app.
         let result = auth.authenticate_token(token.clone(), Some(installed_app_id.clone()));
         assert_eq!(result.unwrap(), installed_app_id);
     }
