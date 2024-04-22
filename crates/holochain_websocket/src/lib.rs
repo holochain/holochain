@@ -26,6 +26,13 @@ pub enum WireMessage {
         data: Vec<u8>,
     },
 
+    /// An authentication message, sent by the client if the server requires it.
+    Authenticate {
+        #[serde(with = "serde_bytes")]
+        /// Actual bytes of the message serialized as [message pack](https://msgpack.org/).
+        data: Vec<u8>,
+    },
+
     /// A request that requires a response.
     Request {
         /// The id of this request.
@@ -52,6 +59,20 @@ impl WireMessage {
         let b = SerializedBytes::from(b);
         let b: WireMessage = b.try_into().map_err(Error::other)?;
         Ok(b)
+    }
+
+    /// Create a new authenticate message.
+    fn authenticate<S>(s: S) -> Result<Message>
+    where
+        S: std::fmt::Debug,
+        SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
+    {
+        let s1 = SerializedBytes::try_from(s).map_err(Error::other)?;
+        let s2 = Self::Authenticate {
+            data: UnsafeBytes::from(s1).into(),
+        };
+        let s3: SerializedBytes = s2.try_into().map_err(Error::other)?;
+        Ok(Message::Binary(UnsafeBytes::from(s3).into()))
     }
 
     /// Create a new request message (with new unique msg id).
@@ -298,6 +319,9 @@ where
     D: std::fmt::Debug,
     SerializedBytes: TryInto<D, Error = SerializedBytesError>,
 {
+    /// Received a request to authenticate from the client.
+    Authenticate(Vec<u8>),
+
     /// Received a signal from the remote.
     Signal(Vec<u8>),
 
@@ -407,6 +431,9 @@ impl WebsocketReceiver {
                         Message::Frame(_) => return Err(Error::other("UnexpectedRawFrame")),
                     };
                     match WireMessage::try_from_bytes(msg)? {
+                        WireMessage::Authenticate { data } => {
+                            Ok(Some(ReceiveMessage::Authenticate(data)))
+                        }
                         WireMessage::Request { id, data } => {
                             let resp = WebsocketRespond {
                                 id,
@@ -446,6 +473,35 @@ impl WebsocketReceiver {
 pub struct WebsocketSender(WsCoreSync, std::time::Duration);
 
 impl WebsocketSender {
+    /// Authenticate with the remote using the default configured timeout.
+    pub async fn authenticate<S>(&self, s: S) -> Result<()>
+    where
+        S: std::fmt::Debug,
+        SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
+    {
+        self.authenticate_timeout(s, self.1).await
+    }
+
+    /// Authenticate with the remote.
+    pub async fn authenticate_timeout<S>(&self, s: S, timeout: std::time::Duration) -> Result<()>
+    where
+        S: std::fmt::Debug,
+        SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
+    {
+        use futures::sink::SinkExt;
+        self.0
+            .exec(move |_, core| async move {
+                tokio::time::timeout(timeout, async {
+                    let s = WireMessage::authenticate(s)?;
+                    core.send.lock().await.send(s).await.map_err(Error::other)?;
+                    Ok(())
+                })
+                .await
+                .map_err(Error::other)?
+            })
+            .await
+    }
+
     /// Make a request of the remote using the default configured timeout.
     /// Note, this receiver side must be polled (recv()) for responses to
     /// requests made on this sender to be received.
