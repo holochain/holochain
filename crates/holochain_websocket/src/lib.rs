@@ -819,7 +819,7 @@ impl WebsocketListener {
         let mut addr_v4: SocketAddr = addr_v4.into();
 
         // The point of dual_bind is to bind to the same port on both v4 and v6
-        if addr_v6.port() != 0 && addr_v6.port() == addr_v4.port() {
+        if addr_v6.port() != 0 && addr_v6.port() != addr_v4.port() {
             return Err(Error::other(
                 "dual_bind requires the same port for IPv4 and IPv6",
             ));
