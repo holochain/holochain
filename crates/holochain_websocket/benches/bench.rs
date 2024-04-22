@@ -16,7 +16,7 @@ criterion_main!(benches);
 struct TestMessage(pub String);
 
 fn simple_bench(bench: &mut Criterion) {
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
 
     let runtime = rt();
 
@@ -77,7 +77,7 @@ async fn setup() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
     .unwrap();
 
     // Get the address of the server
-    let addr = listener.local_addr().unwrap();
+    let addr = listener.local_addrs().unwrap();
 
     let jh = tokio::task::spawn(async move {
         let mut jhs = Vec::new();

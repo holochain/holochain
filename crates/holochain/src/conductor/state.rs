@@ -231,7 +231,9 @@ pub struct AppInterfaceConfig {
     /// The signal subscription settings for each App
     pub signal_subscriptions: HashMap<InstalledAppId, SignalSubscription>,
 
-    /// TODO docs
+    /// The application that this interface is for. If `Some`, then this interface will only allow
+    /// connections which use a token that has been issued for the same app id. Otherwise, any app
+    /// is allowed to connect.
     pub installed_app_id: Option<InstalledAppId>,
 
     /// The driver for the interface, e.g. Websocket

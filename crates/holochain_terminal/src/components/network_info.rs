@@ -19,11 +19,11 @@ static NETWORK_INFO_PARAMS: Lazy<Arc<RwLock<Option<NetworkInfoParams>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
 static SELECTED: Lazy<RwLock<usize>> = Lazy::new(|| RwLock::new(0));
 
-pub fn render_network_info_widget<B: Backend>(
+pub fn render_network_info_widget(
     args: &Args,
     app_client: Option<Arc<Mutex<AppClient>>>,
     events: Vec<ScreenEvent>,
-    frame: &mut Frame<B>,
+    frame: &mut Frame,
     rect: Rect,
 ) {
     let app_id = match &args.app_id {

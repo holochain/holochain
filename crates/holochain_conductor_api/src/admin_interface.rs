@@ -587,7 +587,7 @@ pub struct IssueAppAuthenticationTokenPayload {
     pub expiry_seconds: u64,
 
     /// Whether the token should be single-use. This is `true` by default and will cause the token
-    /// to be invalidated after the first use.
+    /// to be invalidated after the first use, irrespective of connection success.
     ///
     /// Set this to `false` to allow the token to be used multiple times.
     // #[serde(default = "true")]
@@ -632,7 +632,7 @@ pub type AppAuthenticationToken = Vec<u8>;
 /// Response payload for [AdminResponse::AppAuthenticationTokenIssued].
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct AppAuthenticationTokenIssued {
-    /// A token issued by the conductor that can be used to authenticate a connection the an app interface.
+    /// A token issued by the conductor that can be used to authenticate a connection to an app interface.
     /// This is expected to be passed from the caller of the admin interface to the client that will
     /// use the app interface. It should be treated as secret and kept from other parties.
     pub token: AppAuthenticationToken,

@@ -11,6 +11,7 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
+use crate::core::ribosome::real_ribosome::ModuleCacheLock;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
@@ -33,7 +34,6 @@ use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasmer_host::module::ModuleCache;
-use parking_lot::RwLock;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
@@ -61,16 +61,20 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
             SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
         });
 
-        let ribosome =
-            RealRibosome::new(dna_file, Arc::new(RwLock::new(ModuleCache::new(None)))).unwrap();
+        let ribosome = tokio_helper::block_forever_on(RealRibosome::new(
+            dna_file,
+            Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
+        ))
+        .unwrap();
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {
             let mut call_context = CallContextFixturator::new(Empty).next().unwrap();
             call_context.zome = CoordinatorZome::from(zome).erase_type();
-            ribosome
-                .runtime_compiled_module(call_context.zome.zome_name())
-                .unwrap();
+            tokio_helper::block_forever_on(
+                ribosome.runtime_compiled_module(call_context.zome.zome_name()),
+            )
+            .unwrap();
         }
 
         self.0.index += 1;

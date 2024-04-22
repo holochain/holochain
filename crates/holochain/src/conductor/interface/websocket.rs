@@ -11,11 +11,8 @@ use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 
-use crate::conductor::api::{AdminInterfaceApi, AppAuthentication, AppInterfaceApi};
-use holochain_conductor_api::{
-    AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest, AppResponse,
-};
 use holochain_types::app::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;
 use std::sync::Arc;
@@ -42,8 +39,13 @@ pub async fn spawn_websocket_listener(
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::bind(Arc::new(config), format!("localhost:{}", port)).await?;
-    trace!("LISTENING AT: {}", listener.local_addr()?);
+    let listener = WebsocketListener::dual_bind(
+        Arc::new(config),
+        SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
+        SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0),
+    )
+    .await?;
+    trace!("LISTENING AT: {:?}", listener.local_addrs()?);
     Ok(listener)
 }
 
@@ -121,10 +123,15 @@ pub async fn spawn_app_interface_task(
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::bind(Arc::new(config), format!("localhost:{}", port)).await?;
-    let addr = listener.local_addr()?;
-    trace!("LISTENING AT: {}", addr);
-    let port = addr.port();
+    let listener = WebsocketListener::dual_bind(
+        Arc::new(config),
+        SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
+        SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0),
+    )
+    .await?;
+    let addrs = listener.local_addrs()?;
+    trace!("LISTENING AT: {:?}", addrs);
+    let port = addrs[0].port();
 
     tm.add_conductor_task_ignored("app interface new connection handler", move || {
         async move {
@@ -223,17 +230,24 @@ fn authenticate_incoming_app_connection(
 
             match auth_payload_result {
                 Err(_) => {
-                    warn!("Connection to Holochain app port {port} timed out while waiting authenticating. Dropping connection.");
+                    warn!("Connection to Holochain app port {port} timed out while awaiting authentication. Dropping connection.");
                 }
                 Ok(Err(_)) => {
                     // Already logged, continue to drop connection
                 }
                 Ok(Ok(auth_payload)) => {
-                    let payload: AppAuthenticationRequest = SerializedBytes::from(
+                    let payload: AppAuthenticationRequest = match SerializedBytes::from(
                         holochain_serialized_bytes::UnsafeBytes::from(auth_payload),
                     )
-                    .try_into()
-                    .unwrap();
+                        .try_into()
+                    {
+                        Ok(payload) => payload,
+                        Err(e) => {
+                            warn!("Holochain app port {port} received a payload that failed to decode into an authentication payload: {e}. Dropping connection.");
+                            return;
+                        }
+                    };
+
                     match api
                         .auth(AppAuthentication {
                             token: payload.token,
@@ -382,6 +396,10 @@ async fn handle_incoming_admin_message(
             warn!("Unexpected Authenticate from client on an admin interface");
             Ok(())
         }
+        ReceiveMessage::Authenticate(_) => {
+            warn!("Unexpected Authenticate From Client!");
+            Ok(())
+        }
         ReceiveMessage::Request(data, respond) => {
             use holochain_serialized_bytes::SerializedBytesError;
             let result: AdminResponse = api.handle_request(Ok(data)).await?;
@@ -509,7 +527,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn signal_in_post_commit() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db_dir = test_db_dir();
         let conductor_handle = ConductorBuilder::new()
             .with_data_root_path(db_dir.path().to_path_buf().into())
@@ -517,17 +535,16 @@ pub mod test {
             .await
             .unwrap();
 
-        let admin_port = 65000;
-        conductor_handle
+        let admin_port = conductor_handle
             .clone()
             .add_admin_interfaces(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket {
-                    port: admin_port,
+                    port: 0,
                     allowed_origins: AllowedOrigins::Any,
                 },
             }])
             .await
-            .unwrap();
+            .unwrap()[0];
 
         let (admin_tx, rx) = websocket_client_by_port(admin_port).await.unwrap();
         let _rx = WsPollRecv::new::<AdminResponse>(rx);
@@ -729,7 +746,7 @@ pub mod test {
     #[ignore]
     #[allow(unreachable_code, unused_variables)]
     async fn invalid_request() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = AdminInterfaceApi::new(conductor_handle.clone());
         let dna_payload = InstallAppDnaPayload::hash_only(fake_dna_hash(1), "".to_string());
@@ -756,7 +773,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn websocket_call_zome_function() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -797,7 +814,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn gossip_info_request() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -852,7 +869,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn storage_info() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let uuid_1 = Uuid::new_v4();
         let dna_1 = fake_dna_zomes(
             &uuid_1.to_string(),
@@ -942,7 +959,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn enable_disable_enable_app() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let agent_key = fake_agent_pubkey_1();
         let mut dnas = Vec::new();
         for _i in 0..2 as u32 {
@@ -1125,7 +1142,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn attach_app_interface() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = AdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface {
@@ -1145,7 +1162,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dump_state() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -1210,7 +1227,7 @@ pub mod test {
     /// across the admin websocket.
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_via_admin() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let dnas = vec![
             make_dna("1", vec![TestWasm::Anchor]).await,
             make_dna("2", vec![TestWasm::Anchor]).await,

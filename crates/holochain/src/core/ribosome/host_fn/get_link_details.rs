@@ -91,7 +91,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::HashPath).await;
@@ -160,7 +160,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn get_link_details_local_only() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         // agents should not pass around data
         let config = SweetConductorConfig::rendezvous(false).tune(|config| {
             config.disable_historical_gossip = true;

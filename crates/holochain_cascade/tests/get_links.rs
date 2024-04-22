@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_not_authority() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -62,7 +62,7 @@ async fn links_not_authority() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_authority() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -103,7 +103,7 @@ async fn links_authority() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_authoring() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -169,7 +169,7 @@ async fn links_authoring() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_links_can_match_a_partial_tag() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();

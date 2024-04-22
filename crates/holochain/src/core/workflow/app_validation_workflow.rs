@@ -34,6 +34,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
+use std::time::Instant;
 use tracing::*;
 pub use types::Outcome;
 
@@ -68,21 +69,37 @@ pub async fn app_validation_workflow(
     dht_query_cache: DhtDbQueryCache,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> WorkflowResult<WorkComplete> {
-    let complete = app_validation_workflow_inner(
+    let outcome_summary = app_validation_workflow_inner(
         dna_hash,
         workspace,
         conductor_handle,
         &network,
         dht_query_cache,
-        validation_dependencies,
+        validation_dependencies.clone(),
     )
     .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-    // trigger other workflows
-    trigger_integration.trigger(&"app_validation_workflow");
+    // if ops have been accepted or rejected, trigger integration
+    if outcome_summary.validated > 0 {
+        trigger_integration.trigger(&"app_validation_workflow");
+    }
 
-    Ok(complete)
+    Ok(
+        // if not all ops have been validated
+        // and fetching missing hashes has not passed expiration,
+        // trigger app validation workflow again
+        if outcome_summary.validated < outcome_summary.ops_to_validate
+            && !validation_dependencies
+                .lock()
+                .fetch_missing_hashes_timed_out()
+        {
+            // trigger app validation workflow again in 10 seconds
+            WorkComplete::Incomplete(Some(Duration::from_secs(10)))
+        } else {
+            WorkComplete::Complete
+        },
+    )
 }
 
 async fn app_validation_workflow_inner(
@@ -92,15 +109,18 @@ async fn app_validation_workflow_inner(
     network: &HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
-) -> WorkflowResult<WorkComplete> {
+) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
     // filter out ops that have missing dependencies
+    tracing::debug!("number of ops to validate {:?}", sorted_ops.len());
     let sorted_ops = validation_dependencies
         .lock()
         .filter_ops_missing_dependencies(sorted_ops);
     let num_ops_to_validate = sorted_ops.len();
-    tracing::debug!("validating {num_ops_to_validate} ops");
+    tracing::debug!(
+        "number of ops to validate after filtering out ops missing hashes {num_ops_to_validate}"
+    );
     let sleuth_id = conductor.config.sleuth_id();
 
     // Build an iterator of all op validations
@@ -157,7 +177,6 @@ async fn app_validation_workflow_inner(
     let validation_results = futures::future::join_all(iter).await;
 
     tracing::debug!("Committing {} ops", validation_results.len());
-    let mut ops_validated = 0;
     let sleuth_id = sleuth_id.clone();
     let (accepted_ops, awaiting_ops, rejected_ops, activity) = workspace
         .dht_db
@@ -242,16 +261,17 @@ async fn app_validation_workflow_inner(
                 .await?;
         }
     }
-    ops_validated += accepted_ops;
-    ops_validated += rejected_ops;
+    let ops_validated = accepted_ops + rejected_ops;
     tracing::debug!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected.");
 
-    Ok(if ops_validated < num_ops_to_validate {
-        // trigger app validation workflow again in 10 seconds
-        WorkComplete::Incomplete(Some(Duration::from_secs(10)))
-    } else {
-        WorkComplete::Complete
-    })
+    let outcome_summary = OutcomeSummary {
+        ops_to_validate: num_ops_to_validate,
+        validated: ops_validated,
+        accepted: accepted_ops,
+        missing: awaiting_ops,
+        rejected: rejected_ops,
+    };
+    Ok(outcome_summary)
 }
 
 pub async fn record_to_op(
@@ -695,8 +715,10 @@ async fn run_validation_callback(
                 .filter(move |hash| {
                     // keep track of which dependencies are being fetched to
                     // prevent multiple fetches of the same hash
-                    let is_new_dependency =
-                        validation_deps.lock().insert_missing_hash(hash.clone());
+                    let is_new_dependency = validation_deps
+                        .lock()
+                        .insert_missing_hash(hash.clone())
+                        .is_none();
                     is_new_dependency
                 })
                 .map(move |hash| {
@@ -742,7 +764,8 @@ async fn run_validation_callback(
             let validation_dependencies = validation_dependencies.clone();
             let is_new_dependency = validation_dependencies
                 .lock()
-                .insert_missing_hash(author.clone().into());
+                .insert_missing_hash(author.clone().into())
+                .is_none();
             // fetch dependency if it is not being fetched yet
             if is_new_dependency {
                 tokio::spawn({
@@ -772,10 +795,40 @@ async fn run_validation_callback(
     }
 }
 
+// accepted, missing and rejected are only used in tests
+#[allow(dead_code)]
+#[derive(Debug)]
+struct OutcomeSummary {
+    ops_to_validate: usize,
+    validated: usize,
+    accepted: usize,
+    missing: usize,
+    rejected: usize,
+}
+
+impl OutcomeSummary {
+    fn new() -> Self {
+        OutcomeSummary {
+            ops_to_validate: 0,
+            validated: 0,
+            accepted: 0,
+            missing: 0,
+            rejected: 0,
+        }
+    }
+}
+
+impl Default for OutcomeSummary {
+    fn default() -> Self {
+        OutcomeSummary::new()
+    }
+}
+
 /// Dependencies required for app validating an op.
 pub struct ValidationDependencies {
-    /// Missing hashes that are being fetched.
-    missing_hashes: HashSet<AnyDhtHash>,
+    /// Missing hashes that are being fetched, along with
+    /// the last Instant a fetch was attempted
+    missing_hashes: HashMap<AnyDhtHash, Instant>,
     /// Dependencies that are missing to app validate an op.
     hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
 }
@@ -787,19 +840,27 @@ impl Default for ValidationDependencies {
 }
 
 impl ValidationDependencies {
+    const FETCH_TIMEOUT: Duration = Duration::from_secs(60);
+
     pub fn new() -> Self {
         Self {
-            missing_hashes: HashSet::new(),
+            missing_hashes: HashMap::new(),
             hashes_missing_for_op: HashMap::new(),
         }
     }
 
-    pub fn insert_missing_hash(&mut self, hash: AnyDhtHash) -> bool {
-        self.missing_hashes.insert(hash)
+    pub fn insert_missing_hash(&mut self, hash: AnyDhtHash) -> Option<Instant> {
+        self.missing_hashes.insert(hash, Instant::now())
     }
 
-    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) -> bool {
-        self.missing_hashes.remove(hash)
+    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) {
+        self.missing_hashes.remove(hash);
+    }
+
+    pub fn fetch_missing_hashes_timed_out(&self) -> bool {
+        self.missing_hashes
+            .iter()
+            .all(|(_, instant)| instant.elapsed() > Self::FETCH_TIMEOUT)
     }
 
     pub fn insert_hash_missing_for_op(&mut self, dht_op_hash: DhtOpHash, hash: AnyDhtHash) {

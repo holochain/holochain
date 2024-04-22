@@ -127,11 +127,13 @@ pub(crate) struct KitsuneP2pActor {
 }
 
 impl KitsuneP2pActor {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         config: KitsuneP2pConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
         direct_host_api: HostApiLegacy,
+        self_host_api: HostApiLegacy,
         ep_hnd: MetaNet,
         ep_evt: MetaNetEvtRecv,
         bootstrap_net: BootstrapNet,
@@ -148,7 +150,7 @@ impl KitsuneP2pActor {
         FetchTask::spawn(
             config.clone(),
             fetch_pool.clone(),
-            direct_host_api.clone(),
+            self_host_api.clone(),
             internal_sender.clone(),
         );
 
@@ -160,7 +162,7 @@ impl KitsuneP2pActor {
         ));
 
         MetaNetTask::new(
-            direct_host_api.clone(),
+            self_host_api.clone(),
             config.clone(),
             fetch_pool.clone(),
             fetch_response_queue,
@@ -250,6 +252,7 @@ pub(super) async fn create_meta_net(
 use crate::spawn::actor::fetch::{FetchResponseConfig, FetchTask};
 use crate::spawn::actor::meta_net_task::MetaNetTask;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 
 impl ghost_actor::GhostControlHandler for KitsuneP2pActor {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
@@ -503,8 +506,24 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_put_agent_info_signed(
         &mut self,
         input: crate::event::PutAgentInfoSignedEvt,
-    ) -> KitsuneP2pEventHandlerResult<()> {
-        Ok(self.host_api.legacy.put_agent_info_signed(input))
+    ) -> KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>> {
+        let legacy_host = self.host_api.legacy.clone();
+        let ep_hnd = self.ep_hnd.clone();
+
+        Ok(async move {
+            let puts = legacy_host.put_agent_info_signed(input).await?;
+
+            for removed_url in puts.iter().flat_map(|r| r.removed_urls.clone()) {
+                tracing::debug!(?removed_url, "peer URL changed, closing connection");
+                if let Err(e) = ep_hnd.close_peer_con(removed_url.clone()) {
+                    tracing::debug!(?e, ?removed_url, "could not close peer connection");
+                }
+            }
+
+            Ok(puts)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_query_agents(
@@ -549,18 +568,18 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         Ok(self.host_api.legacy.receive_ops(space, ops, context))
     }
 
-    fn handle_fetch_op_data(
-        &mut self,
-        input: FetchOpDataEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
-        Ok(self.host_api.legacy.fetch_op_data(input))
-    }
-
     fn handle_query_op_hashes(
         &mut self,
         input: QueryOpHashesEvt,
     ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
         Ok(self.host_api.legacy.query_op_hashes(input))
+    }
+
+    fn handle_fetch_op_data(
+        &mut self,
+        input: FetchOpDataEvt,
+    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
+        Ok(self.host_api.legacy.fetch_op_data(input))
     }
 
     fn handle_sign_network_data(
@@ -910,7 +929,7 @@ mockall::mock! {
         fn handle_put_agent_info_signed(
             &mut self,
             input: crate::event::PutAgentInfoSignedEvt,
-        ) -> KitsuneP2pEventHandlerResult<()>;
+        ) -> KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>>;
 
         fn handle_query_agents(
             &mut self,

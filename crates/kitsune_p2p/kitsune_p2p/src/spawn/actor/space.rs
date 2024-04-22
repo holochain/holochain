@@ -43,12 +43,15 @@ ghost_actor::ghost_chan! {
         /// List online agents that claim to be covering a basis hash
         fn list_online_agents_for_basis_hash(space: KSpace, from_agent: KAgent, basis: KBasis) -> HashSet<KAgent>;
 
+        // TODO document these properly so the difference between update single and update is clear
+
         /// Update / publish our agent info
         fn update_agent_info() -> ();
 
         /// Update / publish a single agent info
         fn update_single_agent_info(agent: KAgent) -> ();
 
+        // TODO what about this, this is different again and not properly documented
         /// Update / publish a single agent info
         fn publish_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
 
@@ -662,6 +665,7 @@ async fn update_arc_length(
     Ok(())
 }
 
+// TODO document me
 async fn update_single_agent_info(
     input: UpdateAgentInfoInput<'_>,
 ) -> KitsuneP2pResult<AgentInfoSigned> {

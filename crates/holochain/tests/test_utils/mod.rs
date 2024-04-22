@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use arbitrary::Arbitrary;
-use ed25519_dalek::{Keypair, Signer};
+use ed25519_dalek::{Signer, SigningKey};
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::FullStateDump;
@@ -121,7 +121,7 @@ pub async fn grant_zome_call_capability(
 pub async fn call_zome_fn<S>(
     app_tx: &WebsocketSender,
     cell_id: CellId,
-    signing_keypair: &Keypair,
+    signing_keypair: &SigningKey,
     cap_secret: CapSecret,
     zome_name: ZomeName,
     fn_name: FunctionName,
@@ -130,7 +130,7 @@ pub async fn call_zome_fn<S>(
     S: Serialize + std::fmt::Debug,
 {
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
-    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
     let zome_call_unsigned = ZomeCallUnsigned {
         cap_secret: Some(cap_secret),
         cell_id: cell_id.clone(),

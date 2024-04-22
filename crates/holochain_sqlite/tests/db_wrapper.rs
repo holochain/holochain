@@ -11,7 +11,7 @@ mod common;
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test(flavor = "multi_thread")]
 async fn async_read_respects_reader_permit_limits() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     set_acquire_timeout(100);
     set_connection_timeout(300);
@@ -83,7 +83,7 @@ async fn async_read_respects_reader_permit_limits() {
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test(flavor = "multi_thread")]
 async fn get_read_txn_respects_reader_permit_limits() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     set_acquire_timeout(100);
     set_connection_timeout(300);
@@ -154,7 +154,7 @@ async fn get_read_txn_respects_reader_permit_limits() {
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test(flavor = "multi_thread")]
 async fn read_async_releases_permits() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     set_acquire_timeout(100);
     set_connection_timeout(300);
@@ -185,7 +185,7 @@ async fn read_async_releases_permits() {
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test(flavor = "multi_thread")]
 async fn write_permits_can_be_released() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     set_acquire_timeout(100);
     set_connection_timeout(300);

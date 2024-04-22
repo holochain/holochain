@@ -6,6 +6,7 @@ use holochain_util::hex::many_bytes_string;
 use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSpace};
 use kitsune_p2p_dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rusqlite::*;
@@ -120,6 +121,8 @@ impl AgentStore {
         Ok(Self(Arc::new(Mutex::new(map))))
     }
 
+    /// Prune all expired AgentInfoSigned records from the store.
+    /// Local agents provided as input are never removed.
     fn prune(&self, now: u64, local_agents: &[Arc<KitsuneAgent>]) -> DatabaseResult<()> {
         let mut lock = self.0.lock();
 
@@ -135,32 +138,40 @@ impl AgentStore {
         Ok(())
     }
 
-    fn put(&self, agent_info: AgentInfoSigned) -> DatabaseResult<()> {
+    fn put(&self, agent_info: AgentInfoSigned) -> DatabaseResult<AgentInfoPut> {
         let mut lock = self.0.lock();
 
         // If we already have an info then this is an updated info
-        if let Some(a) = lock.get(&agent_info.agent) {
+        let removed_urls = if let Some(a) = lock.get(&agent_info.agent) {
             // Check whether we already have a newer info for this agent.
             if a.signed_at_ms >= agent_info.signed_at_ms {
-                return Ok(());
+                return Ok(AgentInfoPut::default());
             }
 
             let old_url_list: HashSet<_> = a.url_list.iter().collect();
             let new_url_list: HashSet<_> = agent_info.url_list.iter().collect();
 
             // Find URLs that were in the old list but AREN'T in the new list
-            let unused_urls: HashSet<_> = old_url_list
+            let removed_urls: HashSet<_> = old_url_list
                 .difference(&new_url_list)
                 .map(|&u| u.clone())
                 .collect();
-            if !unused_urls.is_empty() {
-                tracing::info!(?agent_info.agent, "Agent URLs changed, no longer advertising at: {:?}", unused_urls);
+            if !removed_urls.is_empty() {
+                tracing::info!(
+                    ?agent_info,
+                    "Agent URLs changed, no longer advertising at: {:?}",
+                    removed_urls
+                );
             }
-        }
+
+            removed_urls
+        } else {
+            HashSet::with_capacity(0)
+        };
 
         lock.insert(agent_info.agent.clone(), agent_info);
 
-        Ok(())
+        Ok(AgentInfoPut { removed_urls })
     }
 
     fn remove(&self, agent: &KitsuneAgent) -> DatabaseResult<()> {
@@ -356,7 +367,7 @@ pub async fn p2p_put(
 pub async fn p2p_put_all(
     db: &DbWrite<DbKindP2pAgents>,
     signed: impl Iterator<Item = &AgentInfoSigned>,
-) -> DatabaseResult<()> {
+) -> DatabaseResult<Vec<AgentInfoPut>> {
     let mut records = Vec::new();
     let mut ns = Vec::new();
     for s in signed {
@@ -365,14 +376,16 @@ pub async fn p2p_put_all(
     }
     let space = db.kind().0.clone();
     db.write_async(move |txn| {
+        let mut responses = Vec::new();
         for s in ns {
-            cache_get(space.clone(), &*txn)?.put(s)?;
+            responses.push(cache_get(space.clone(), &*txn)?.put(s)?);
         }
 
         for record in records {
             tx_p2p_put(txn, record)?;
         }
-        Ok(())
+
+        Ok(responses)
     })
     .await
 }
@@ -382,10 +395,11 @@ pub fn p2p_put_single(
     space: Arc<KitsuneSpace>,
     txn: &mut Transaction<'_>,
     signed: &AgentInfoSigned,
-) -> DatabaseResult<()> {
-    cache_get(space, &*txn)?.put(signed.clone())?;
+) -> DatabaseResult<AgentInfoPut> {
+    let agent_info_put = cache_get(space, &*txn)?.put(signed.clone())?;
     let record = P2pRecord::from_signed(signed)?;
-    tx_p2p_put(txn, record)
+    tx_p2p_put(txn, record)?;
+    Ok(agent_info_put)
 }
 
 fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
@@ -440,6 +454,7 @@ pub async fn p2p_prune(
                 ":agent_list": agent_list,
             },
         )?;
+
         DatabaseResult::Ok(())
     })
     .await?;

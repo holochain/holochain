@@ -22,7 +22,7 @@ pub struct ChannelName(String);
 
 #[tokio::test(flavor = "multi_thread")]
 async fn ser_entry_hash_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let eh = fixt!(EntryHash);
     let extern_io: ExternIO = ExternIO::encode(eh).unwrap();
     tracing::debug!(?extern_io);
@@ -35,7 +35,7 @@ async fn ser_entry_hash_test() {
 #[tokio::test(flavor = "multi_thread")]
 /// we can call a fn on a remote
 async fn ser_regression_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // ////////////
     // START DNA
     // ////////////
