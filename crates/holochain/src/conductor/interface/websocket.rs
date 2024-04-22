@@ -228,7 +228,7 @@ fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication
 
             match auth_payload_result {
                 Err(_) => {
-                    warn!("Connection to Holochain app port {port} timed out while waiting authenticating. Dropping connection.");
+                    warn!("Connection to Holochain app port {port} timed out while awaiting authentication. Dropping connection.");
                 }
                 Ok(Err(_)) => {
                     // Already logged, continue to drop connection
