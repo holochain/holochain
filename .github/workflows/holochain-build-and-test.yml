@@ -44,8 +44,7 @@ jobs:
               - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/weekly"
         platform:
-          # TODO temporarily disabled due to unexplained issues running builds on this platform.
-          # - system: x86_64-darwin
+          - system: x86_64-darwin
           - system: aarch64-darwin
           - system: x86_64-linux
 
@@ -100,10 +99,10 @@ jobs:
           nix build -L --show-trace \
             ${{ matrix.cmd.extra_arg }} \
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
-          
+
           # Don't exit if this fails so we can clean up the profile
           for i in result*; do
             cachix push holochain-ci-internal $i || true
           done
-          
+
           rm result*
