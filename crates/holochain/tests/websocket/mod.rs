@@ -1026,7 +1026,7 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     )
     .await
     .unwrap();
-    let _rx4 = PollRecv::new::<AdminResponse>(rx);
+    let _rx4 = WsPollRecv::new::<AdminResponse>(rx);
 
     let response: AdminResponse = ipv4_admin_sender
         .request(AdminRequest::ListCellIds)
@@ -1043,7 +1043,7 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     )
     .await
     .unwrap();
-    let _rx6 = PollRecv::new::<AdminResponse>(rx);
+    let _rx6 = WsPollRecv::new::<AdminResponse>(rx);
 
     let response: AdminResponse = ipv6_admin_sender
         .request(AdminRequest::ListCellIds)
@@ -1060,7 +1060,7 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
 
     let app_port = conductor
         .clone()
-        .add_app_interface(Either::Left(0), AllowedOrigins::Any)
+        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
         .await
         .unwrap();
 
@@ -1070,7 +1070,7 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     )
     .await
     .unwrap();
-    let _rx4 = PollRecv::new::<AppResponse>(rx);
+    let _rx4 = WsPollRecv::new::<AppResponse>(rx);
 
     let response: AppResponse = ipv4_app_sender
         .request(AppRequest::AppInfo {
@@ -1089,7 +1089,7 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     )
     .await
     .unwrap();
-    let _rx6 = PollRecv::new::<AppResponse>(rx);
+    let _rx6 = WsPollRecv::new::<AppResponse>(rx);
 
     let response: AppResponse = ipv6_app_sender
         .request(AppRequest::AppInfo {
