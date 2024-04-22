@@ -129,6 +129,9 @@ pub enum ConductorError {
     #[error(transparent)]
     RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
 
+    #[error("Authentication failed with reason: {0}")]
+    FailedAuthenticationError(String),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),

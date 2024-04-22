@@ -206,14 +206,18 @@ async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
         .setup_apps("app", NUM_AGENTS, &[dna_file])
         .await
         .unwrap();
+    let installed_app_id = apps[0].installed_app_id().clone();
     let cells = apps.cells_flattened();
     let zomes: Vec<_> = cells
         .iter()
         .map(|c| c.zome(TestWasm::MultipleCalls))
         .collect();
-    let mut clients: Vec<_> =
-        future::join_all((0..NUM_AGENTS).map(|_| conductor.app_ws_client().map(|(tx, _)| tx)))
-            .await;
+    let mut clients: Vec<_> = future::join_all((0..NUM_AGENTS).map(|_| {
+        conductor
+            .app_ws_client::<AppResponse>(installed_app_id.clone())
+            .map(|(tx, _)| tx)
+    }))
+    .await;
 
     async fn all_call(
         conductor: &SweetConductor,

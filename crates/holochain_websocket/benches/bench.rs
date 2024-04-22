@@ -77,7 +77,7 @@ async fn setup() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
     .unwrap();
 
     // Get the address of the server
-    let addr = listener.local_addr().unwrap();
+    let addr = listener.local_addrs().unwrap();
 
     let jh = tokio::task::spawn(async move {
         let mut jhs = Vec::new();

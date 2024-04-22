@@ -5,9 +5,12 @@
 
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
+use std::io::ErrorKind;
 pub use std::io::{Error, Result};
+use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::Arc;
 use tokio::net::ToSocketAddrs;
+use tokio::select;
 use tokio_tungstenite::tungstenite::handshake::client::Request;
 use tokio_tungstenite::tungstenite::handshake::server::{Callback, ErrorResponse, Response};
 use tokio_tungstenite::tungstenite::http::{HeaderMap, HeaderValue, StatusCode};
@@ -21,6 +24,13 @@ use tokio_tungstenite::tungstenite::protocol::Message;
 pub enum WireMessage {
     /// A message without a response.
     Signal {
+        #[serde(with = "serde_bytes")]
+        /// Actual bytes of the message serialized as [message pack](https://msgpack.org/).
+        data: Vec<u8>,
+    },
+
+    /// An authentication message, sent by the client if the server requires it.
+    Authenticate {
         #[serde(with = "serde_bytes")]
         /// Actual bytes of the message serialized as [message pack](https://msgpack.org/).
         data: Vec<u8>,
@@ -52,6 +62,20 @@ impl WireMessage {
         let b = SerializedBytes::from(b);
         let b: WireMessage = b.try_into().map_err(Error::other)?;
         Ok(b)
+    }
+
+    /// Create a new authenticate message.
+    fn authenticate<S>(s: S) -> Result<Message>
+    where
+        S: std::fmt::Debug,
+        SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
+    {
+        let s1 = SerializedBytes::try_from(s).map_err(Error::other)?;
+        let s2 = Self::Authenticate {
+            data: UnsafeBytes::from(s1).into(),
+        };
+        let s3: SerializedBytes = s2.try_into().map_err(Error::other)?;
+        Ok(Message::Binary(UnsafeBytes::from(s3).into()))
     }
 
     /// Create a new request message (with new unique msg id).
@@ -298,6 +322,9 @@ where
     D: std::fmt::Debug,
     SerializedBytes: TryInto<D, Error = SerializedBytesError>,
 {
+    /// Received a request to authenticate from the client.
+    Authenticate(Vec<u8>),
+
     /// Received a signal from the remote.
     Signal(Vec<u8>),
 
@@ -407,6 +434,9 @@ impl WebsocketReceiver {
                         Message::Frame(_) => return Err(Error::other("UnexpectedRawFrame")),
                     };
                     match WireMessage::try_from_bytes(msg)? {
+                        WireMessage::Authenticate { data } => {
+                            Ok(Some(ReceiveMessage::Authenticate(data)))
+                        }
                         WireMessage::Request { id, data } => {
                             let resp = WebsocketRespond {
                                 id,
@@ -446,6 +476,35 @@ impl WebsocketReceiver {
 pub struct WebsocketSender(WsCoreSync, std::time::Duration);
 
 impl WebsocketSender {
+    /// Authenticate with the remote using the default configured timeout.
+    pub async fn authenticate<S>(&self, s: S) -> Result<()>
+    where
+        S: std::fmt::Debug,
+        SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
+    {
+        self.authenticate_timeout(s, self.1).await
+    }
+
+    /// Authenticate with the remote.
+    pub async fn authenticate_timeout<S>(&self, s: S, timeout: std::time::Duration) -> Result<()>
+    where
+        S: std::fmt::Debug,
+        SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
+    {
+        use futures::sink::SinkExt;
+        self.0
+            .exec(move |_, core| async move {
+                tokio::time::timeout(timeout, async {
+                    let s = WireMessage::authenticate(s)?;
+                    core.send.lock().await.send(s).await.map_err(Error::other)?;
+                    Ok(())
+                })
+                .await
+                .map_err(Error::other)?
+            })
+            .await
+    }
+
     /// Make a request of the remote using the default configured timeout.
     /// Note, this receiver side must be polled (recv()) for responses to
     /// requests made on this sender to be received.
@@ -660,11 +719,50 @@ impl ConnectRequest {
     }
 }
 
+// TODO async_trait still needed for dynamic dispatch https://blog.rust-lang.org/2023/12/21/async-fn-rpit-in-traits.html#dynamic-dispatch
+#[async_trait::async_trait]
+trait TcpListener: Send + Sync {
+    async fn accept(&self) -> Result<(tokio::net::TcpStream, SocketAddr)>;
+
+    fn local_addrs(&self) -> Result<Vec<SocketAddr>>;
+}
+
+#[async_trait::async_trait]
+impl TcpListener for tokio::net::TcpListener {
+    async fn accept(&self) -> Result<(tokio::net::TcpStream, SocketAddr)> {
+        self.accept().await
+    }
+
+    fn local_addrs(&self) -> Result<Vec<SocketAddr>> {
+        Ok(vec![self.local_addr()?])
+    }
+}
+
+struct DualStackListener {
+    v4: tokio::net::TcpListener,
+    v6: tokio::net::TcpListener,
+}
+
+#[async_trait::async_trait]
+impl TcpListener for DualStackListener {
+    async fn accept(&self) -> Result<(tokio::net::TcpStream, SocketAddr)> {
+        let (stream, addr) = select! {
+            res = self.v4.accept() => res?,
+            res = self.v6.accept() => res?,
+        };
+        Ok((stream, addr))
+    }
+
+    fn local_addrs(&self) -> Result<Vec<SocketAddr>> {
+        Ok(vec![self.v4.local_addr()?, self.v6.local_addr()?])
+    }
+}
+
 /// A Holochain websocket listener.
 pub struct WebsocketListener {
     config: Arc<WebsocketConfig>,
     access_control: Arc<AllowedOrigins>,
-    listener: tokio::net::TcpListener,
+    listener: Box<dyn TcpListener>,
 }
 
 impl Drop for WebsocketListener {
@@ -675,9 +773,9 @@ impl Drop for WebsocketListener {
 
 impl WebsocketListener {
     /// Bind a new websocket listener.
-    pub async fn bind<A: ToSocketAddrs>(config: Arc<WebsocketConfig>, addr: A) -> Result<Self> {
+    pub async fn bind(config: Arc<WebsocketConfig>, addr: impl ToSocketAddrs) -> Result<Self> {
         let access_control = Arc::new(config.allowed_origins.clone().ok_or_else(|| {
-            Error::other("WebsocketListener requires access control to be set in the config")
+            Error::other("WebsocketListener requires allowed_origins to be set in the config")
         })?);
 
         let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -688,13 +786,116 @@ impl WebsocketListener {
         Ok(Self {
             config,
             access_control,
-            listener,
+            listener: Box::new(listener),
+        })
+    }
+
+    /// Bind a new websocket listener on the same port using a v4 and a v6 socket.
+    ///
+    /// If the port is 0, then the OS will be allowed to pick a port for IPv6. This function will
+    /// then try to bind to the same port for IPv4. If the OS picks a port that is not available for
+    /// IPv4, then the function will retry binding IPv6 to get a new port and see if that is
+    /// available for IPv4. If this fails after 5 retries, then an error will be returned.
+    ///
+    /// If either IPv4 or IPv6 is disabled, then the function will fall back to binding to the
+    /// available stack. An info message will be logged to let the user know that one interface was
+    /// unavailable, but this is likely intentional or expected in the user's environment, so it will
+    /// not be treated as an error that should prevent the listener from starting.
+    ///
+    /// Note: The interface fallback behaviour can be tested manually on Linux by running:
+    /// `echo 1 | sudo tee /proc/sys/net/ipv6/conf/lo/disable_ipv6`
+    /// and then trying to start Holochain with info logging enabled. You can undo the change with:
+    /// `echo 0 | sudo tee /proc/sys/net/ipv6/conf/lo/disable_ipv6`.
+    pub async fn dual_bind(
+        config: Arc<WebsocketConfig>,
+        addr_v4: SocketAddrV4,
+        addr_v6: SocketAddrV6,
+    ) -> Result<Self> {
+        let access_control = Arc::new(config.allowed_origins.clone().ok_or_else(|| {
+            Error::other("WebsocketListener requires allowed_origins to be set in the config")
+        })?);
+
+        let addr_v6: SocketAddr = addr_v6.into();
+        let mut addr_v4: SocketAddr = addr_v4.into();
+
+        // The point of dual_bind is to bind to the same port on both v4 and v6
+        if addr_v6.port() != 0 && addr_v6.port() != addr_v4.port() {
+            return Err(Error::other(
+                "dual_bind requires the same port for IPv4 and IPv6",
+            ));
+        }
+
+        // Note that tokio binds to the stack matching the address type, so we can re-use the port
+        // without needing to create the sockets ourselves to configure this.
+
+        let mut listener: Option<DualStackListener> = None;
+        for _ in 0..5 {
+            let v6_listener = match tokio::net::TcpListener::bind(addr_v6).await {
+                Ok(l) => l,
+                // This is the error code that *should* be returned if IPv6 is disabled
+                Err(e) if e.kind() == ErrorKind::AddrNotAvailable => {
+                    tracing::info!(?e, "Failed to bind IPv6 listener because IPv6 appears to be disabled, falling back to IPv4 only");
+                    return Self::bind(config, addr_v4).await;
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            };
+
+            addr_v4.set_port(v6_listener.local_addr()?.port());
+
+            let v4_listener = match tokio::net::TcpListener::bind(addr_v4).await {
+                Ok(l) => l,
+                // This is the error code that *should* be returned if IPv4 is disabled
+                Err(e) if e.kind() == ErrorKind::AddrNotAvailable => {
+                    tracing::info!(?e, "Failed to bind IPv4 listener because IPv4 appears to be disabled, falling back to IPv6 only");
+                    // No need to re-bind the v6 listener, it's already bound. Just create a new Self
+                    // from the v6 listener and return it.
+                    return Ok(Self {
+                        config,
+                        access_control,
+                        listener: Box::new(v6_listener),
+                    });
+                }
+                // If the port for IPv6 was selected by the OS but it isn't available for IPv4, retry and let the OS pick a new port for IPv6
+                // and hopefully it will be available for IPv4.
+                Err(e) if addr_v6.port() == 0 && e.kind() == ErrorKind::AddrInUse => {
+                    tracing::warn!(?e, "Failed to bind the same port for IPv4 that was selected for IPv6, retrying with a new port");
+                    continue;
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            };
+
+            listener = Some(DualStackListener {
+                v4: v4_listener,
+                v6: v6_listener,
+            });
+        }
+
+        // Gave up after a few retries, there's no point in continuing forever because there might be
+        // something wrong that the logic above isn't accounting for.
+        let listener = listener.ok_or_else(|| {
+            Error::other("Failed to bind listener to IPv4 and IPv6 interfaces after 5 retries")
+        })?;
+
+        let addr = listener.v4.local_addr()?;
+        tracing::info!(?addr, "WebsocketListener listening");
+
+        let addr = listener.v6.local_addr()?;
+        tracing::info!(?addr, "WebsocketListener listening");
+
+        Ok(Self {
+            config,
+            access_control,
+            listener: Box::new(listener),
         })
     }
 
     /// Get the bound local address of this listener.
-    pub fn local_addr(&self) -> Result<std::net::SocketAddr> {
-        self.listener.local_addr()
+    pub fn local_addrs(&self) -> Result<Vec<std::net::SocketAddr>> {
+        self.listener.local_addrs()
     }
 
     /// Accept an incoming connection.
