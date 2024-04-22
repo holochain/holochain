@@ -198,10 +198,10 @@ async fn recv_incoming_admin_msgs(api: AdminInterfaceApi, rx_from_iface: Websock
 }
 
 /// Takes an open connection and waits for an authentication message to complete the connection
-/// registration. If the connection is not authenticated within 10s or any other content is sent
-/// then the connection is dropped.
-///
-/// If the authentication succeeds then message handling tasks are spawned to handle normal
+/// registration.
+/// If the connection is not authenticated within 10s or any other content is sent, then the
+/// connection is dropped.
+/// If the authentication succeeds, then message handling tasks are spawned to handle normal
 /// communication with the client.
 fn authenticate_incoming_app_connection(
     task_list: TaskListInner,

@@ -1073,10 +1073,7 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     let _rx4 = WsPollRecv::new::<AppResponse>(rx);
     authenticate_app_ws_client(ipv4_app_sender.clone(), admin_port, "".to_string()).await;
 
-    let response: AppResponse = ipv4_app_sender
-        .request(AppRequest::AppInfo)
-        .await
-        .unwrap();
+    let response: AppResponse = ipv4_app_sender.request(AppRequest::AppInfo).await.unwrap();
     match response {
         AppResponse::AppInfo(_) => (),
         _ => panic!("unexpected response"),
@@ -1091,10 +1088,7 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     let _rx6 = WsPollRecv::new::<AppResponse>(rx);
     authenticate_app_ws_client(ipv6_app_sender.clone(), admin_port, "".to_string()).await;
 
-    let response: AppResponse = ipv6_app_sender
-        .request(AppRequest::AppInfo)
-        .await
-        .unwrap();
+    let response: AppResponse = ipv6_app_sender.request(AppRequest::AppInfo).await.unwrap();
     match response {
         AppResponse::AppInfo(_) => (),
         _ => panic!("unexpected response"),

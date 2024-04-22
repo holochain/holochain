@@ -1,9 +1,6 @@
 use either::Either;
 
-use holochain::sweettest::{
-    SweetConductor, SweetDnaFile, websocket_client_by_port,
-    WsPollRecv,
-};
+use holochain::sweettest::{websocket_client_by_port, SweetConductor, SweetDnaFile, WsPollRecv};
 use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, AppAuthenticationToken, AppRequest,
     AppResponse,

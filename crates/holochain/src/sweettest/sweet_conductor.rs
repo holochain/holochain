@@ -121,12 +121,6 @@ impl SweetConductor {
         config: Arc<ConductorConfig>,
         rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
-        // Automatically add a test app interface
-        // handle
-        //     .add_test_app_interface(AppInterfaceId::default())
-        //     .await
-        //     .expect("Couldn't set up test app interface");
-
         // XXX: this is a bit wonky.
         // We create a Spaces instance here purely because it's easier to initialize
         // the per-space databases this way. However, we actually use the TestEnvs
