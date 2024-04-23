@@ -858,7 +858,7 @@ pub mod test {
             }
             other => panic!("unexpected response {:?}", other),
         };
-        test_handle_incoming_app_message("".to_string(), msg, respond, app_api)
+        test_handle_incoming_app_message("test app".to_string(), msg, respond, app_api)
             .await
             .unwrap();
         // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
