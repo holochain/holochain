@@ -388,7 +388,6 @@ mod tests {
             .take(5)
             .collect::<Vec<_>>();
 
-
         let mut expect = agent_infos.clone();
         expect.sort_by(|a, b| a.agent.partial_cmp(&b.agent).unwrap());
 
