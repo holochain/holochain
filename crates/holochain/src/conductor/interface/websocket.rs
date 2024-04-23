@@ -2,7 +2,7 @@
 //! i.e. those configured with `InterfaceDriver::Websocket`
 
 use super::error::InterfaceResult;
-use crate::conductor::interface::*;
+use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::manager::TaskManagerClient;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::signal::Signal;
@@ -13,6 +13,10 @@ use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 
+use crate::conductor::api::{AdminInterfaceApi, AppAuthentication, AppInterfaceApi};
+use holochain_conductor_api::{
+    AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest, AppResponse,
+};
 use holochain_types::app::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;
 use std::sync::Arc;
@@ -23,16 +27,9 @@ use tracing::*;
 /// Concurrency count for websocket message processing.
 /// This could represent a significant memory investment for
 /// e.g. app installations, but we also need enough buffer
-/// to accomodate interdependent operations.
+/// to accommodate interdependent operations.
 const CONCURRENCY_COUNT: usize = 128;
 
-// TODO: This is arbitrary, choose reasonable size.
-// ERROR TODO XXX (david.b): There is no such thing as backpressure in
-//                           broadcast queues! It'll just start deleting
-//                           items, and giving "Lagged" errors on receivers.
-/// Number of signals in buffer before applying
-/// back pressure.
-pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
 /// The maximum number of connections allowed to the admin interface
 pub const MAX_CONNECTIONS: usize = 400;
 
@@ -79,10 +76,10 @@ impl TaskList {
 
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
-pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
+pub fn spawn_admin_interface_tasks(
     tm: TaskManagerClient,
     listener: WebsocketListener,
-    api: A,
+    api: AdminInterfaceApi,
     port: u16,
 ) {
     tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), move || {
@@ -117,13 +114,13 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
 
 /// Create an App Interface, which includes the ability to receive signals
 /// from Cells via a broadcast channel
-pub async fn spawn_app_interface_task<A: InterfaceApi<Auth = AppAuthentication>>(
+pub async fn spawn_app_interface_task(
     tm: TaskManagerClient,
     port: u16,
     allowed_origins: AllowedOrigins,
     installed_app_id: Option<InstalledAppId>,
-    api: A,
-    signal_broadcaster: broadcast::Sender<Signal>,
+    api: AppInterfaceApi,
+    app_broadcast: AppBroadcast,
 ) -> InterfaceResult<u16> {
     trace!("Initializing App interface");
 
@@ -147,14 +144,11 @@ pub async fn spawn_app_interface_task<A: InterfaceApi<Auth = AppAuthentication>>
             loop {
                 match listener.accept().await {
                     Ok((tx_to_iface, rx_from_iface)) => {
-                        // TODO need to rework here so that connections are identifiable and not just run anon
-                        //      with access into Holochain
-                        let rx_from_cell = signal_broadcaster.subscribe();
                         authenticate_incoming_app_connection(
                             task_list.0.clone(),
                             api.clone(),
                             rx_from_iface,
-                            rx_from_cell,
+                            app_broadcast.clone(),
                             tx_to_iface,
                             installed_app_id.clone(),
                             port,
@@ -172,7 +166,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi<Auth = AppAuthentication>>
 
 /// Polls for messages coming in from the external client.
 /// Used by Admin interface.
-async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: WebsocketReceiver) {
+async fn recv_incoming_admin_msgs(api: AdminInterfaceApi, rx_from_iface: WebsocketReceiver) {
     use futures::stream::StreamExt;
 
     tracing::info!("Starting admin listener");
@@ -193,26 +187,27 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: Websoc
         .for_each_concurrent(CONCURRENCY_COUNT, move |msg| {
             let api = api.clone();
             async move {
-                tracing::info!("got an admin message");
-                if let Err(e) = handle_incoming_message(msg, api.clone()).await {
+                if let Err(e) = handle_incoming_admin_message(msg, api.clone()).await {
                     error!(error = &e as &dyn std::error::Error)
                 }
             }
         })
         .await;
+
+    info!("Admin listener finished");
 }
 
 /// Takes an open connection and waits for an authentication message to complete the connection
-/// registration. If the connection is not authenticated within 10s or any other content is sent,
-/// then the connection is dropped.
-///
+/// registration.
+/// If the connection is not authenticated within 10s or any other content is sent, then the
+/// connection is dropped.
 /// If the authentication succeeds, then message handling tasks are spawned to handle normal
 /// communication with the client.
-fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication>>(
+fn authenticate_incoming_app_connection(
     task_list: TaskListInner,
-    api: A,
+    api: AppInterfaceApi,
     mut rx_from_iface: WebsocketReceiver,
-    rx_from_cell: broadcast::Receiver<Signal>,
+    app_broadcast: AppBroadcast,
     tx_to_iface: WebsocketSender,
     installed_app_id: Option<InstalledAppId>,
     port: u16,
@@ -221,7 +216,7 @@ fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication
         let task_list = task_list.clone();
         async move {
             let auth_payload_result = tokio::time::timeout(std::time::Duration::from_secs(10), async {
-                if let Ok(msg) = rx_from_iface.recv::<A::ApiRequest>().await {
+                if let Ok(msg) = rx_from_iface.recv::<AppRequest>().await {
                     return match msg {
                         ReceiveMessage::Authenticate(auth_payload) => {
                             Ok(auth_payload)
@@ -265,13 +260,22 @@ fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication
                         .await
                     {
                         Ok(installed_app_id) => {
-                            spawn_recv_incoming_msgs_and_outgoing_signals(
+                            // Once authentication passes we know which app this connection is for,
+                            // so we can subscribe to app signals now.
+                            let rx_from_cell = app_broadcast.subscribe(installed_app_id.clone());
+
+                            spawn_app_signals_handler(
+                                task_list.clone(),
+                                rx_from_cell,
+                                tx_to_iface.clone(),
+                                port,
+                                installed_app_id.clone(),
+                            );
+                            spawn_recv_incoming_app_msgs(
                                 task_list,
                                 api,
                                 rx_from_iface,
-                                rx_from_cell,
-                                tx_to_iface,
-                                port,
+                                installed_app_id,
                             );
                         }
                         Err(e) => {
@@ -287,33 +291,32 @@ fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication
     task_list_lock.push(join_handle);
 }
 
-/// Polls for messages coming in from the external client while simultaneously
-/// polling for signals being broadcast from the Cells associated with this
-/// App interface.
-fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
+/// Starts a task that listens for signals coming from apps with `rx_from_cell` and sends them to
+/// the connected client via `tx_to_iface`.
+fn spawn_app_signals_handler(
     task_list: TaskListInner,
-    api: A,
-    rx_from_iface: WebsocketReceiver,
     rx_from_cell: broadcast::Receiver<Signal>,
     tx_to_iface: WebsocketSender,
     port: u16,
+    installed_app_id: InstalledAppId,
 ) {
     use futures::stream::StreamExt;
 
-    trace!("CONNECTION: {}", rx_from_iface.peer_addr());
-
-    let rx_from_cell = futures::stream::unfold(rx_from_cell, move |mut rx_from_cell| async move {
-        loop {
-            match rx_from_cell.recv().await {
-                // We missed some signals, but the channel is still open
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(dropped)) => {
-                    warn!("Holochain app port {port} dropped {dropped} signals. The app is emitting signals too fast.");
-                    continue;
-                }
-                Ok(item) => return Some((item, rx_from_cell)),
-                _ => {
-                    debug!("SignalChannelClosed");
-                    return None;
+    let rx_from_cell = futures::stream::unfold(rx_from_cell, move |mut rx_from_cell| {
+        let installed_app_id = installed_app_id.clone();
+        async move {
+            loop {
+                match rx_from_cell.recv().await {
+                    // We missed some signals, but the channel is still open
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(dropped)) => {
+                        warn!("Holochain app port {port} dropped {dropped} signals. The app '{installed_app_id}' is emitting signals too fast.");
+                        continue;
+                    }
+                    Ok(item) => return Some((item, rx_from_cell)),
+                    _ => {
+                        debug!("SignalChannelClosed");
+                        return None;
+                    }
                 }
             }
         }
@@ -339,6 +342,20 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
                 }
             },
         )));
+}
+
+/// Starts a task that listens for messages coming from the external client on `rx_from_iface`
+/// and calls the provided `api` to handle them. Responses from the `api` are sent back to the
+/// client via `tx_to_iface`.
+fn spawn_recv_incoming_app_msgs(
+    task_list: TaskListInner,
+    api: AppInterfaceApi,
+    rx_from_iface: WebsocketReceiver,
+    installed_app_id: InstalledAppId,
+) {
+    use futures::stream::StreamExt;
+
+    trace!("CONNECTION: {}", rx_from_iface.peer_addr());
 
     let rx_from_iface =
         futures::stream::unfold(rx_from_iface, move |mut rx_from_iface| async move {
@@ -357,36 +374,71 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
         .push(tokio::task::spawn(rx_from_iface.for_each_concurrent(
             CONCURRENCY_COUNT,
             move |msg| {
+                let installed_app_id = installed_app_id.clone();
                 let api = api.clone();
                 async move {
-                    if let Err(err) = handle_incoming_message(msg, api).await {
-                        error!(?err, "error handling websocket message");
+                    if let Err(err) = handle_incoming_app_message(msg, installed_app_id, api).await
+                    {
+                        error!(?err, "error handling app websocket message");
                     }
                 }
             },
         )));
 }
 
-/// Handles messages on all interfaces
-async fn handle_incoming_message<A>(
-    ws_msg: ReceiveMessage<A::ApiRequest>,
-    api: A,
-) -> InterfaceResult<()>
-where
-    A: InterfaceApi,
-{
+/// Handles messages on admin interfaces
+async fn handle_incoming_admin_message(
+    ws_msg: ReceiveMessage<AdminRequest>,
+    api: AdminInterfaceApi,
+) -> InterfaceResult<()> {
     match ws_msg {
         ReceiveMessage::Signal(_) => {
-            warn!("Unexpected Signal From Client!");
+            warn!("Unexpected Signal From client");
             Ok(())
         }
         ReceiveMessage::Authenticate(_) => {
-            warn!("Unexpected Authenticate From Client!");
+            warn!("Unexpected Authenticate from client on an admin interface");
             Ok(())
         }
         ReceiveMessage::Request(data, respond) => {
             use holochain_serialized_bytes::SerializedBytesError;
-            let result: A::ApiResponse = api.handle_request(Ok(data)).await?;
+            let result: AdminResponse = api.handle_request(Ok(data)).await?;
+            // Have to jump through some hoops, because our response type
+            // only implements try_into, but the responder needs try_from.
+            let result = result.try_into();
+            #[derive(Debug)]
+            struct Cnv(Result<SerializedBytes, SerializedBytesError>);
+            impl std::convert::TryFrom<Cnv> for SerializedBytes {
+                type Error = SerializedBytesError;
+                fn try_from(b: Cnv) -> Result<SerializedBytes, Self::Error> {
+                    b.0
+                }
+            }
+            let result = Cnv(result);
+            respond.respond(result).await?;
+            Ok(())
+        }
+    }
+}
+
+/// Handles messages on app interfaces
+async fn handle_incoming_app_message(
+    ws_msg: ReceiveMessage<AppRequest>,
+    installed_app_id: InstalledAppId,
+    api: AppInterfaceApi,
+) -> InterfaceResult<()> {
+    match ws_msg {
+        ReceiveMessage::Signal(_) => {
+            warn!("Unexpected Signal from client");
+            Ok(())
+        }
+        ReceiveMessage::Authenticate(_) => {
+            warn!("Unexpected Authenticate from client");
+            Ok(())
+        }
+        ReceiveMessage::Request(data, respond) => {
+            use holochain_serialized_bytes::SerializedBytesError;
+            let result: AppResponse = api.handle_request(installed_app_id, Ok(data)).await?;
             // Have to jump through some hoops, because our response type
             // only implements try_into, but the responder needs try_from.
             let result = result.try_into();
@@ -413,9 +465,10 @@ pub use crate::test_utils::setup_app_in_new_conductor;
 pub mod test {
     use super::*;
     use crate::conductor::api::error::ExternalApiWireError;
+    use crate::conductor::api::AdminInterfaceApi;
     use crate::conductor::api::AdminRequest;
     use crate::conductor::api::AdminResponse;
-    use crate::conductor::api::RealAdminInterfaceApi;
+    use crate::conductor::api::AppInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
     use crate::conductor::state::ConductorState;
     use crate::conductor::Conductor;
@@ -428,6 +481,7 @@ pub mod test {
     use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
+    use holochain_conductor_api::*;
     use holochain_keystore::test_keystore;
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
@@ -450,12 +504,23 @@ pub mod test {
     use tempfile::TempDir;
     use uuid::Uuid;
 
-    async fn test_handle_incoming_message<A: InterfaceApi>(
-        msg: A::ApiRequest,
-        respond: impl FnOnce(A::ApiResponse) + 'static + Send,
-        api: A,
+    async fn test_handle_incoming_admin_message(
+        msg: AdminRequest,
+        respond: impl FnOnce(AdminResponse) + 'static + Send,
+        api: AdminInterfaceApi,
     ) -> InterfaceResult<()> {
-        let result: A::ApiResponse = api.handle_request(Ok(msg)).await?;
+        let result: AdminResponse = api.handle_request(Ok(msg)).await?;
+        respond(result);
+        Ok(())
+    }
+
+    async fn test_handle_incoming_app_message(
+        installed_app_id: InstalledAppId,
+        msg: AppRequest,
+        respond: impl FnOnce(AppResponse) + 'static + Send,
+        api: AppInterfaceApi,
+    ) -> InterfaceResult<()> {
+        let result: AppResponse = api.handle_request(installed_app_id, Ok(msg)).await?;
         respond(result);
         Ok(())
     }
@@ -667,10 +732,11 @@ pub mod test {
             .unwrap();
 
         let msg = AppRequest::CallZome(Box::new(request));
-        test_handle_incoming_message(
+        test_handle_incoming_app_message(
+            "".to_string(),
             msg,
             respond,
-            RealAppInterfaceApi::new(conductor_handle.clone()),
+            AppInterfaceApi::new(conductor_handle.clone()),
         )
         .await
         .unwrap();
@@ -682,7 +748,7 @@ pub mod test {
     async fn invalid_request() {
         holochain_trace::test_run();
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
+        let admin_api = AdminInterfaceApi::new(conductor_handle.clone());
         let dna_payload = InstallAppDnaPayload::hash_only(fake_dna_hash(1), "".to_string());
         let agent_key = fake_agent_pubkey_1();
         let payload = todo!("Use new payload struct");
@@ -699,7 +765,7 @@ pub mod test {
                 AdminResponse::Error(ExternalApiWireError::DnaReadError(_))
             );
         };
-        test_handle_incoming_message(msg, respond, admin_api)
+        test_handle_incoming_admin_message(msg, respond, admin_api)
             .await
             .unwrap();
         conductor_handle.shutdown();
@@ -792,7 +858,7 @@ pub mod test {
             }
             other => panic!("unexpected response {:?}", other),
         };
-        test_handle_incoming_message(msg, respond, app_api)
+        test_handle_incoming_app_message("test app".to_string(), msg, respond, app_api)
             .await
             .unwrap();
         // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
@@ -884,7 +950,7 @@ pub mod test {
             }
             other => panic!("unexpected response {:?}", other),
         };
-        test_handle_incoming_message(msg, respond, RealAdminInterfaceApi::new(handle.clone()))
+        test_handle_incoming_admin_message(msg, respond, AdminInterfaceApi::new(handle.clone()))
             .await
             .unwrap();
 
@@ -931,10 +997,10 @@ pub mod test {
             assert_matches!(response, AdminResponse::AppEnabled { .. });
         };
 
-        test_handle_incoming_message(
+        test_handle_incoming_admin_message(
             msg,
             respond,
-            RealAdminInterfaceApi::new(conductor_handle.clone()),
+            AdminInterfaceApi::new(conductor_handle.clone()),
         )
         .await
         .unwrap();
@@ -1000,10 +1066,10 @@ pub mod test {
             assert_matches!(response, AdminResponse::AppDisabled);
         };
 
-        test_handle_incoming_message(
+        test_handle_incoming_admin_message(
             msg,
             respond,
-            RealAdminInterfaceApi::new(conductor_handle.clone()),
+            AdminInterfaceApi::new(conductor_handle.clone()),
         )
         .await
         .unwrap();
@@ -1045,10 +1111,10 @@ pub mod test {
             assert_matches!(response, AdminResponse::AppEnabled { .. });
         };
 
-        test_handle_incoming_message(
+        test_handle_incoming_admin_message(
             msg,
             respond,
-            RealAdminInterfaceApi::new(conductor_handle.clone()),
+            AdminInterfaceApi::new(conductor_handle.clone()),
         )
         .await
         .unwrap();
@@ -1078,7 +1144,7 @@ pub mod test {
     async fn attach_app_interface() {
         holochain_trace::test_run();
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
+        let admin_api = AdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface {
             port: None,
             allowed_origins: AllowedOrigins::Any,
@@ -1088,7 +1154,7 @@ pub mod test {
         let respond = |response: AdminResponse| {
             assert_matches!(response, AdminResponse::AppInterfaceAttached { .. });
         };
-        test_handle_incoming_message(msg, respond, admin_api)
+        test_handle_incoming_admin_message(msg, respond, admin_api)
             .await
             .unwrap();
         conductor_handle.shutdown().await.unwrap().unwrap();
@@ -1115,7 +1181,7 @@ pub mod test {
         // Get state
         let expected = conductor_handle.dump_cell_state(&cell_id).await.unwrap();
 
-        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
+        let admin_api = AdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::DumpState {
             cell_id: Box::new(cell_id),
         };
@@ -1123,7 +1189,7 @@ pub mod test {
         let respond = move |response: AdminResponse| {
             assert_matches!(response, AdminResponse::StateDumped(s) if s == expected);
         };
-        test_handle_incoming_message(msg, respond, admin_api)
+        test_handle_incoming_admin_message(msg, respond, admin_api)
             .await
             .unwrap();
         conductor_handle.shutdown().await.unwrap().unwrap();
@@ -1204,7 +1270,7 @@ pub mod test {
         expect.push(k1.clone());
         expect.sort();
 
-        let admin_api = RealAdminInterfaceApi::new(handle.clone());
+        let admin_api = AdminInterfaceApi::new(handle.clone());
 
         // - Add the agent infos
         let req = AdminRequest::AddAgentInfo { agent_infos };
@@ -1237,7 +1303,7 @@ pub mod test {
     }
 
     async fn make_req(
-        admin_api: RealAdminInterfaceApi,
+        admin_api: AdminInterfaceApi,
         req: AdminRequest,
     ) -> tokio::sync::oneshot::Receiver<AdminResponse> {
         let msg = req.try_into().unwrap();
@@ -1247,7 +1313,7 @@ pub mod test {
             tx.send(response).unwrap();
         };
 
-        test_handle_incoming_message(msg, respond, admin_api)
+        test_handle_incoming_admin_message(msg, respond, admin_api)
             .await
             .unwrap();
         rx

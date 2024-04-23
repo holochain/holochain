@@ -32,8 +32,7 @@ pub fn create_clone_cell<'a>(
 
             tokio_helper::block_forever_on(async move {
                 conductor_handle
-                    .create_clone_cell(CreateCloneCellPayload {
-                        app_id: installed_app_id,
+                    .create_clone_cell(&installed_app_id, CreateCloneCellPayload {
                         role_name,
                         modifiers: input.modifiers,
                         membrane_proof: input.membrane_proof,

@@ -4321,7 +4321,7 @@ version = "0.3.0-beta-dev.3"
 dependencies = [
  "base64 0.22.0",
  "err-derive 0.3.1",
- "futures",
+ "futures-util",
  "libmdns",
  "mdns",
  "tokio",
