@@ -819,7 +819,9 @@ mod network_impls {
     use futures::future::join_all;
     use rusqlite::params;
 
-    use holochain_conductor_api::{CellInfo, DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo};
+    use holochain_conductor_api::{
+        CellInfo, DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo,
+    };
     use holochain_p2p::HolochainP2pSender;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
@@ -930,15 +932,25 @@ mod network_impls {
                 last_time_queried,
             } = payload;
 
-            let app_info = self.get_app_info(&installed_app_id)
+            let app_info = self
+                .get_app_info(&installed_app_id)
                 .await?
                 .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
 
-            if agent_pub_key != &app_info.agent_pub_key && !app_info.cell_info.values().flatten().any(|cell_info| match cell_info {
-                CellInfo::Provisioned(cell) => cell.cell_id.agent_pubkey() == agent_pub_key,
-                _ => false
-            }) {
-                return Err(ConductorError::AppAccessError(installed_app_id.clone(), Box::new(agent_pub_key.clone())));
+            if agent_pub_key != &app_info.agent_pub_key
+                && !app_info
+                    .cell_info
+                    .values()
+                    .flatten()
+                    .any(|cell_info| match cell_info {
+                        CellInfo::Provisioned(cell) => cell.cell_id.agent_pubkey() == agent_pub_key,
+                        _ => false,
+                    })
+            {
+                return Err(ConductorError::AppAccessError(
+                    installed_app_id.clone(),
+                    Box::new(agent_pub_key.clone()),
+                ));
             }
 
             futures::future::join_all(dnas.iter().map(|dna| async move {
