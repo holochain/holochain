@@ -15,8 +15,10 @@ use holochain::{
     },
     fixt::*,
 };
-use std::net::ToSocketAddrs;
+use std::net::{Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 
+use either::Either;
+use holochain_conductor_api::AppRequest;
 use holochain_types::{
     prelude::*,
     test_utils::{fake_dna_zomes, write_fake_dna_file},
@@ -838,4 +840,99 @@ async fn full_state_dump_cursor_works() {
         integrated_ops_count + validation_limbo_ops_count + integration_limbo_ops_count;
 
     assert_eq!(1, new_all_dht_ops_count);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
+    holochain_trace::test_run().unwrap();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
+
+    //
+    // Connect to the admin interface on ipv4 and ipv6 localhost
+    //
+
+    let (ipv4_admin_sender, rx) = connect(
+        Arc::new(WebsocketConfig::default()),
+        (Ipv4Addr::LOCALHOST, admin_port).into(),
+    )
+    .await
+    .unwrap();
+    let _rx4 = PollRecv::new::<AdminResponse>(rx);
+
+    let response: AdminResponse = ipv4_admin_sender
+        .request(AdminRequest::ListCellIds)
+        .await
+        .unwrap();
+    match response {
+        AdminResponse::CellIdsListed(_) => (),
+        _ => panic!("unexpected response"),
+    }
+
+    let (ipv6_admin_sender, rx) = connect(
+        Arc::new(WebsocketConfig::default()),
+        (Ipv6Addr::LOCALHOST, admin_port).into(),
+    )
+    .await
+    .unwrap();
+    let _rx6 = PollRecv::new::<AdminResponse>(rx);
+
+    let response: AdminResponse = ipv6_admin_sender
+        .request(AdminRequest::ListCellIds)
+        .await
+        .unwrap();
+    match response {
+        AdminResponse::CellIdsListed(_) => (),
+        _ => panic!("unexpected response"),
+    }
+
+    //
+    // Do the same for an app interface
+    //
+
+    let app_port = conductor
+        .clone()
+        .add_app_interface(Either::Left(0))
+        .await
+        .unwrap();
+
+    let (ipv4_app_sender, rx) = connect(
+        Arc::new(WebsocketConfig::default()),
+        (Ipv4Addr::LOCALHOST, app_port).into(),
+    )
+    .await
+    .unwrap();
+    let _rx4 = PollRecv::new::<AppResponse>(rx);
+
+    let response: AppResponse = ipv4_app_sender
+        .request(AppRequest::AppInfo {
+            installed_app_id: "".to_string(),
+        })
+        .await
+        .unwrap();
+    match response {
+        AppResponse::AppInfo(_) => (),
+        _ => panic!("unexpected response"),
+    }
+
+    let (ipv6_app_sender, rx) = connect(
+        Arc::new(WebsocketConfig::default()),
+        (Ipv6Addr::LOCALHOST, app_port).into(),
+    )
+    .await
+    .unwrap();
+    let _rx6 = PollRecv::new::<AppResponse>(rx);
+
+    let response: AppResponse = ipv6_app_sender
+        .request(AppRequest::AppInfo {
+            installed_app_id: "".to_string(),
+        })
+        .await
+        .unwrap();
+    match response {
+        AppResponse::AppInfo(_) => (),
+        _ => panic!("unexpected response"),
+    }
 }

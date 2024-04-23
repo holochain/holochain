@@ -16,6 +16,7 @@ serde_bytes = { workspace = true }
 tokio = { workspace = true }
 tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }
+async-trait = { workspace = true }
 
 [dev-dependencies]
 holochain_trace = { version = "^0.2.7", path = "../holochain_trace" }

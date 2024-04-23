@@ -387,7 +387,7 @@ mod interface_impls {
         pub(crate) async fn add_admin_interfaces(
             self: Arc<Self>,
             configs: Vec<AdminInterfaceConfig>,
-        ) -> ConductorResult<()> {
+        ) -> ConductorResult<Vec<u16>> {
             let admin_api = RealAdminInterfaceApi::new(self.clone());
             let tm = self.task_manager();
 
@@ -399,7 +399,7 @@ mod interface_impls {
                     match driver {
                         InterfaceDriver::Websocket { port } => {
                             let listener = spawn_websocket_listener(port).await?;
-                            let port = listener.local_addr()?.port();
+                            let port = listener.local_addrs()?[0].port();
                             spawn_admin_interface_tasks(
                                 tm.clone(),
                                 listener,
@@ -423,10 +423,10 @@ mod interface_impls {
             // Exit if the admin interfaces fail to be created
             let ports = ports.map_err(Box::new)?;
 
-            for p in ports {
-                self.add_admin_port(p);
+            for p in &ports {
+                self.add_admin_port(*p);
             }
-            Ok(())
+            Ok(ports)
         }
 
         /// Spawn a new app interface task, register it with the TaskManager,
