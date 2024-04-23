@@ -42,8 +42,8 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
         app_batch.into_tuples();
 
     // Make sure the conductors are talking to each other before sending signals.
-    conductors
-        .require_initial_gossip_activity_for_cell(&bob, Duration::from_secs(90))
+    conductors[1]
+        .require_initial_gossip_activity_for_cell(&bob, 3, Duration::from_secs(90))
         .await;
 
     // Listen for signals on Bob's and Carol's conductors.
