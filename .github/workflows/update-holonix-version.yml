@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-tags: true
       - name: Run the update script
         run: |
           ./scripts/update-holonix-version.sh ${{ github.event.inputs.version }}
