@@ -258,7 +258,7 @@ async fn remote_signals() -> anyhow::Result<()> {
     let all_agents: HashSet<_> = apps
         .cells_flattened()
         .into_iter()
-        .map(|c| c.agent_pubkey())
+        .map(|c| c.agent_pubkey().clone())
         .collect();
 
     assert_eq!(all_agents.len(), NUM_CONDUCTORS);
