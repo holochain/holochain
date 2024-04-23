@@ -72,7 +72,7 @@ async fn sanity() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn ipv6_or_ipv4_connect() {
-    holochain_trace::test_run();
+    holochain_trace::test_run().unwrap();
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq)]
     enum TestMsg {
@@ -83,12 +83,12 @@ async fn ipv6_or_ipv4_connect() {
 
     let l_task = tokio::task::spawn(async move {
         let l = WebsocketListener::dual_bind(
-            Arc::new(WebsocketConfig::LISTENER_DEFAULT),
+            Arc::new(WebsocketConfig::default()),
             SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0),
             SocketAddrV6::new(Ipv6Addr::LOCALHOST, 0, 0, 0),
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         addr_s.send(l.local_addrs().unwrap()).unwrap();
 
@@ -115,7 +115,7 @@ async fn ipv6_or_ipv4_connect() {
     ];
     for addr in test_addrs {
         let r_task = tokio::task::spawn(async move {
-            let (send, mut recv) = connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), addr)
+            let (send, mut recv) = connect(Arc::new(WebsocketConfig::default()), addr)
                 .await
                 .unwrap();
 

@@ -382,9 +382,7 @@ pub mod test {
         let admin_port = conductor_handle
             .clone()
             .add_admin_interfaces(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket {
-                    port: 0,
-                },
+                driver: InterfaceDriver::Websocket { port: 0 },
             }])
             .await
             .unwrap()[0];

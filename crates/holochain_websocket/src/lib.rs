@@ -586,69 +586,6 @@ pub async fn connect(
     split(stream, config.default_request_timeout, peer_addr)
 }
 
-/// A request to connect to a websocket server.
-pub struct ConnectRequest {
-    addr: std::net::SocketAddr,
-    headers: HeaderMap<HeaderValue>,
-}
-
-impl From<std::net::SocketAddr> for ConnectRequest {
-    fn from(addr: std::net::SocketAddr) -> Self {
-        Self::new(addr)
-    }
-}
-
-impl ConnectRequest {
-    /// Create a new [ConnectRequest].
-    pub fn new(addr: std::net::SocketAddr) -> Self {
-        let mut cr = ConnectRequest {
-            addr,
-            headers: HeaderMap::new(),
-        };
-
-        // Set a default Origin so that the connection request will be allowed by default when the listener is
-        // using `Any` as the allowed origin.
-        cr.headers.insert(
-            "Origin",
-            HeaderValue::from_str("holochain_websocket").expect("Invalid Origin value"),
-        );
-
-        cr
-    }
-
-    /// Try to set a header on this request.
-    ///
-    /// Errors if the value is invalid. See [HeaderValue::from_str].
-    pub fn try_set_header(mut self, name: &'static str, value: &str) -> Result<Self> {
-        self.headers
-            .insert(name, HeaderValue::from_str(value).map_err(Error::other)?);
-        Ok(self)
-    }
-
-    fn into_client_request(
-        self,
-    ) -> Result<impl tokio_tungstenite::tungstenite::client::IntoClientRequest + Unpin> {
-        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-        let mut req =
-            String::into_client_request(format!("ws://{}", self.addr)).map_err(Error::other)?;
-        for (name, value) in self.headers {
-            if let Some(name) = name {
-                req.headers_mut().insert(name, value);
-            } else {
-                tracing::warn!("Dropping invalid header");
-            }
-        }
-        Ok(req)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn clear_headers(mut self) -> Self {
-        self.headers.clear();
-
-        self
-    }
-}
-
 // TODO async_trait still needed for dynamic dispatch https://blog.rust-lang.org/2023/12/21/async-fn-rpit-in-traits.html#dynamic-dispatch
 #[async_trait::async_trait]
 trait TcpListener: Send + Sync {
@@ -708,7 +645,10 @@ impl WebsocketListener {
         let addr = listener.local_addr()?;
         tracing::info!(?addr, "WebsocketListener Listening");
 
-        Ok(Self { config, listener: Box::new(listener) })
+        Ok(Self {
+            config,
+            listener: Box::new(listener),
+        })
     }
 
     /// Bind a new websocket listener on the same port using a v4 and a v6 socket.

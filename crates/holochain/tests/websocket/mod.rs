@@ -18,6 +18,7 @@ use holochain::{
 use std::net::{Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 
 use either::Either;
+use holochain_conductor_api::AppRequest;
 use holochain_types::{
     prelude::*,
     test_utils::{fake_dna_zomes, write_fake_dna_file},
@@ -29,7 +30,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 use tracing::*;
-use holochain_conductor_api::AppRequest;
 
 use crate::test_utils::*;
 
@@ -844,7 +844,7 @@ async fn full_state_dump_cursor_works() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
-    holochain_trace::test_run();
+    holochain_trace::test_run().unwrap();
 
     let conductor = SweetConductor::from_standard_config().await;
 
@@ -855,11 +855,11 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     //
 
     let (ipv4_admin_sender, rx) = connect(
-        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new((Ipv4Addr::LOCALHOST, admin_port).into()),
+        Arc::new(WebsocketConfig::default()),
+        (Ipv4Addr::LOCALHOST, admin_port).into(),
     )
-        .await
-        .unwrap();
+    .await
+    .unwrap();
     let _rx4 = PollRecv::new::<AdminResponse>(rx);
 
     let response: AdminResponse = ipv4_admin_sender
@@ -872,11 +872,11 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     }
 
     let (ipv6_admin_sender, rx) = connect(
-        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new((Ipv6Addr::LOCALHOST, admin_port).into()),
+        Arc::new(WebsocketConfig::default()),
+        (Ipv6Addr::LOCALHOST, admin_port).into(),
     )
-        .await
-        .unwrap();
+    .await
+    .unwrap();
     let _rx6 = PollRecv::new::<AdminResponse>(rx);
 
     let response: AdminResponse = ipv6_admin_sender
@@ -899,11 +899,11 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
         .unwrap();
 
     let (ipv4_app_sender, rx) = connect(
-        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new((Ipv4Addr::LOCALHOST, app_port).into()),
+        Arc::new(WebsocketConfig::default()),
+        (Ipv4Addr::LOCALHOST, app_port).into(),
     )
-        .await
-        .unwrap();
+    .await
+    .unwrap();
     let _rx4 = PollRecv::new::<AppResponse>(rx);
 
     let response: AppResponse = ipv4_app_sender
@@ -918,11 +918,11 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     }
 
     let (ipv6_app_sender, rx) = connect(
-        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new((Ipv6Addr::LOCALHOST, app_port).into()),
+        Arc::new(WebsocketConfig::default()),
+        (Ipv6Addr::LOCALHOST, app_port).into(),
     )
-        .await
-        .unwrap();
+    .await
+    .unwrap();
     let _rx6 = PollRecv::new::<AppResponse>(rx);
 
     let response: AppResponse = ipv6_app_sender
