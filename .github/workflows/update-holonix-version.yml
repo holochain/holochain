@@ -27,15 +27,21 @@ jobs:
         run: git fetch --tags origin
       - name: Run the update script
         run: |
-          git tag --list | head -n 30
           ./scripts/update-holonix-version.sh ${{ github.event.inputs.version }}
+          
+          echo "Completed source update. Now updating the flake locks"
+          
           nix run .#scripts-repo-flake-update ${{ github.event.inputs.version }}
+      - name: Configure Git
+        shell: bash
+        run: |
+          ./scripts/ci-git-config.sh
       - name: Create Pull Request
         id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.HRA_GITHUB_TOKEN }}
-          title: "Update Holonix version for ${{ github.event.inputs.version }}"
+          title: "Update Holohain version in Holonix for ${{ github.event.inputs.version }}"
           branch: auto-update/${{ github.event.inputs.version }}
           labels: |
             autorebase:opt-in
