@@ -429,7 +429,7 @@ async fn handle_incoming_app_message(
 ) -> InterfaceResult<()> {
     match ws_msg {
         ReceiveMessage::Signal(_) => {
-            warn!("Unexpected Signal From client");
+            warn!("Unexpected Signal from client");
             Ok(())
         }
         ReceiveMessage::Authenticate(_) => {
