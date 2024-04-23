@@ -933,7 +933,7 @@ mod network_impls {
             } = payload;
 
             let app_info = self
-                .get_app_info(&installed_app_id)
+                .get_app_info(installed_app_id)
                 .await?
                 .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
 
