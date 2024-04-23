@@ -11,7 +11,9 @@ use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 
+use holochain_types::app::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -44,18 +46,25 @@ pub async fn spawn_websocket_listener(
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::bind(Arc::new(config), format!("localhost:{}", port)).await?;
-    trace!("LISTENING AT: {}", listener.local_addr()?);
+    let listener = WebsocketListener::dual_bind(
+        Arc::new(config),
+        SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
+        SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0),
+    )
+    .await?;
+    trace!("LISTENING AT: {:?}", listener.local_addrs()?);
     Ok(listener)
 }
 
+type TaskListInner = Arc<parking_lot::Mutex<Vec<JoinHandle<()>>>>;
+
 /// Abort tokio tasks on Drop.
-#[derive(Default)]
-struct TaskList(pub Vec<JoinHandle<()>>);
+#[derive(Default, Clone)]
+struct TaskList(pub TaskListInner);
 impl Drop for TaskList {
     fn drop(&mut self) {
         debug!("TaskList Dropped!");
-        for h in self.0.iter() {
+        for h in self.0.lock().iter() {
             h.abort();
         }
     }
@@ -64,7 +73,7 @@ impl Drop for TaskList {
 impl TaskList {
     /// Clean up already closed tokio tasks.
     pub fn prune(&mut self) {
-        self.0.retain_mut(|h| !h.is_finished());
+        self.0.lock().retain(|h| !h.is_finished());
     }
 }
 
@@ -84,7 +93,7 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
                 match listener.accept().await {
                     Ok((_, rx_from_iface)) => {
                         task_list.prune();
-                        let conn_count = task_list.0.len();
+                        let conn_count = task_list.0.lock().len();
                         if conn_count >= MAX_CONNECTIONS {
                             warn!("Connection limit reached, dropping newly opened connection. num_connections={}", conn_count);
                             // Max connections so drop this connection
@@ -92,7 +101,7 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
                             continue;
                         };
                         debug!("Accepting new connection with number of existing connections {}", conn_count);
-                        task_list.0.push(tokio::task::spawn(recv_incoming_admin_msgs(
+                        task_list.0.lock().push(tokio::task::spawn(recv_incoming_admin_msgs(
                             api.clone(),
                             rx_from_iface,
                         )));
@@ -108,10 +117,11 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
 
 /// Create an App Interface, which includes the ability to receive signals
 /// from Cells via a broadcast channel
-pub async fn spawn_app_interface_task<A: InterfaceApi>(
+pub async fn spawn_app_interface_task<A: InterfaceApi<Auth = AppAuthentication>>(
     tm: TaskManagerClient,
     port: u16,
     allowed_origins: AllowedOrigins,
+    installed_app_id: Option<InstalledAppId>,
     api: A,
     signal_broadcaster: broadcast::Sender<Signal>,
 ) -> InterfaceResult<u16> {
@@ -120,25 +130,33 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::bind(Arc::new(config), format!("localhost:{}", port)).await?;
-    let addr = listener.local_addr()?;
-    trace!("LISTENING AT: {}", addr);
-    let port = addr.port();
+    let listener = WebsocketListener::dual_bind(
+        Arc::new(config),
+        SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
+        SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0),
+    )
+    .await?;
+    let addrs = listener.local_addrs()?;
+    trace!("LISTENING AT: {:?}", addrs);
+    let port = addrs[0].port();
 
     tm.add_conductor_task_ignored("app interface new connection handler", move || {
         async move {
-            let mut task_list = TaskList::default();
+            let task_list = TaskList::default();
             // establish a new connection to a client
             loop {
                 match listener.accept().await {
                     Ok((tx_to_iface, rx_from_iface)) => {
+                        // TODO need to rework here so that connections are identifiable and not just run anon
+                        //      with access into Holochain
                         let rx_from_cell = signal_broadcaster.subscribe();
-                        spawn_recv_incoming_msgs_and_outgoing_signals(
-                            &mut task_list,
+                        authenticate_incoming_app_connection(
+                            task_list.0.clone(),
                             api.clone(),
                             rx_from_iface,
                             rx_from_cell,
                             tx_to_iface,
+                            installed_app_id.clone(),
                             port,
                         );
                     }
@@ -157,6 +175,8 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
 async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: WebsocketReceiver) {
     use futures::stream::StreamExt;
 
+    tracing::info!("Starting admin listener");
+
     let rx_from_iface =
         futures::stream::unfold(rx_from_iface, move |mut rx_from_iface| async move {
             match rx_from_iface.recv().await {
@@ -173,6 +193,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: Websoc
         .for_each_concurrent(CONCURRENCY_COUNT, move |msg| {
             let api = api.clone();
             async move {
+                tracing::info!("got an admin message");
                 if let Err(e) = handle_incoming_message(msg, api.clone()).await {
                     error!(error = &e as &dyn std::error::Error)
                 }
@@ -181,11 +202,96 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: Websoc
         .await;
 }
 
+/// Takes an open connection and waits for an authentication message to complete the connection
+/// registration. If the connection is not authenticated within 10s or any other content is sent,
+/// then the connection is dropped.
+///
+/// If the authentication succeeds, then message handling tasks are spawned to handle normal
+/// communication with the client.
+fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication>>(
+    task_list: TaskListInner,
+    api: A,
+    mut rx_from_iface: WebsocketReceiver,
+    rx_from_cell: broadcast::Receiver<Signal>,
+    tx_to_iface: WebsocketSender,
+    installed_app_id: Option<InstalledAppId>,
+    port: u16,
+) {
+    let join_handle = tokio::task::spawn({
+        let task_list = task_list.clone();
+        async move {
+            let auth_payload_result = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                if let Ok(msg) = rx_from_iface.recv::<A::ApiRequest>().await {
+                    return match msg {
+                        ReceiveMessage::Authenticate(auth_payload) => {
+                            Ok(auth_payload)
+                        }
+                        _ => {
+                            warn!("Connection to Holochain app port {port} tried to send a message before authenticating. Dropping connection.");
+                            Err(())
+                        }
+                    }
+                }
+
+                warn!("Could not receive authentication message, the client either disconnected or sent a message that didn't decode to an authentication request. Dropping connection.");
+                Err(())
+            }).await;
+
+            match auth_payload_result {
+                Err(_) => {
+                    warn!("Connection to Holochain app port {port} timed out while awaiting authentication. Dropping connection.");
+                }
+                Ok(Err(_)) => {
+                    // Already logged, continue to drop connection
+                }
+                Ok(Ok(auth_payload)) => {
+                    let payload: AppAuthenticationRequest = match SerializedBytes::from(
+                        holochain_serialized_bytes::UnsafeBytes::from(auth_payload),
+                    )
+                    .try_into()
+                    {
+                        Ok(payload) => payload,
+                        Err(e) => {
+                            warn!("Holochain app port {port} received a payload that failed to decode into an authentication payload: {e}. Dropping connection.");
+                            return;
+                        }
+                    };
+
+                    match api
+                        .auth(AppAuthentication {
+                            token: payload.token,
+                            installed_app_id,
+                        })
+                        .await
+                    {
+                        Ok(installed_app_id) => {
+                            spawn_recv_incoming_msgs_and_outgoing_signals(
+                                task_list,
+                                api,
+                                rx_from_iface,
+                                rx_from_cell,
+                                tx_to_iface,
+                                port,
+                            );
+                        }
+                        Err(e) => {
+                            warn!("Connection to Holochain app port {port} failed to authenticate: {e}. Dropping connection.");
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    let mut task_list_lock = task_list.lock();
+    task_list_lock.push(join_handle);
+}
+
 /// Polls for messages coming in from the external client while simultaneously
 /// polling for signals being broadcast from the Cells associated with this
 /// App interface.
 fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
-    task_list: &mut TaskList,
+    task_list: TaskListInner,
     api: A,
     rx_from_iface: WebsocketReceiver,
     rx_from_cell: broadcast::Receiver<Signal>,
@@ -215,7 +321,7 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
 
     // TODO - metrics to indicate if we're getting overloaded here.
     task_list
-        .0
+        .lock()
         .push(tokio::task::spawn(rx_from_cell.for_each_concurrent(
             CONCURRENCY_COUNT,
             move |signal| {
@@ -247,7 +353,7 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
 
     // TODO - metrics to indicate if we're getting overloaded here.
     task_list
-        .0
+        .lock()
         .push(tokio::task::spawn(rx_from_iface.for_each_concurrent(
             CONCURRENCY_COUNT,
             move |msg| {
@@ -272,6 +378,10 @@ where
     match ws_msg {
         ReceiveMessage::Signal(_) => {
             warn!("Unexpected Signal From Client!");
+            Ok(())
+        }
+        ReceiveMessage::Authenticate(_) => {
+            warn!("Unexpected Authenticate From Client!");
             Ok(())
         }
         ReceiveMessage::Request(data, respond) => {
@@ -311,10 +421,11 @@ pub mod test {
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
-    use crate::sweettest::app_bundle_from_dnas;
     use crate::sweettest::websocket_client_by_port;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::WsPollRecv;
+    use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
     use holochain_keystore::test_keystore;
@@ -351,26 +462,6 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn signal_in_post_commit() {
-        struct PollRecv(tokio::task::JoinHandle<()>);
-
-        impl Drop for PollRecv {
-            fn drop(&mut self) {
-                self.0.abort();
-            }
-        }
-
-        impl PollRecv {
-            pub fn new<D>(mut rx: WebsocketReceiver) -> Self
-            where
-                D: std::fmt::Debug,
-                SerializedBytes: TryInto<D, Error = SerializedBytesError>,
-            {
-                Self(tokio::task::spawn(async move {
-                    while rx.recv::<D>().await.is_ok() {}
-                }))
-            }
-        }
-
         holochain_trace::test_run();
         let db_dir = test_db_dir();
         let conductor_handle = ConductorBuilder::new()
@@ -379,20 +470,19 @@ pub mod test {
             .await
             .unwrap();
 
-        let admin_port = 65000;
-        conductor_handle
+        let admin_port = conductor_handle
             .clone()
             .add_admin_interfaces(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket {
-                    port: admin_port,
+                    port: 0,
                     allowed_origins: AllowedOrigins::Any,
                 },
             }])
             .await
-            .unwrap();
+            .unwrap()[0];
 
         let (admin_tx, rx) = websocket_client_by_port(admin_port).await.unwrap();
-        let _rx = PollRecv::new::<AdminResponse>(rx);
+        let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
         let agent_key = conductor_handle
             .keystore()
@@ -437,6 +527,7 @@ pub mod test {
         let request = AdminRequest::AttachAppInterface {
             port: None,
             allowed_origins: AllowedOrigins::Any,
+            installed_app_id: None,
         };
         let response: AdminResponse = admin_tx.request(request).await.unwrap();
         let app_port = match response {
@@ -451,6 +542,14 @@ pub mod test {
                 s_send.send(s).unwrap();
             }
         });
+        authenticate_app_ws_client(
+            app_tx.clone(),
+            conductor_handle
+                .get_arbitrary_admin_websocket_port()
+                .expect("No admin port on this conductor"),
+            app_info.installed_app_id,
+        )
+        .await;
 
         // Call Zome
         let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
@@ -983,6 +1082,7 @@ pub mod test {
         let msg = AdminRequest::AttachAppInterface {
             port: None,
             allowed_origins: AllowedOrigins::Any,
+            installed_app_id: None,
         };
         let msg = msg.try_into().unwrap();
         let respond = |response: AdminResponse| {

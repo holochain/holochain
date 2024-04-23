@@ -76,6 +76,7 @@ use holochain_zome_types::prelude::ClonedCell;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
 use crate::conductor::cell::Cell;
+use crate::conductor::conductor::app_connection_auth::AppAuthTokenStore;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::metrics::create_p2p_event_duration_metric;
@@ -243,6 +244,8 @@ pub struct Conductor {
     /// File system and in-memory cache for wasmer modules.
     // Used in ribosomes but kept here as a single instance.
     pub(crate) wasmer_module_cache: Arc<ModuleCacheLock>,
+
+    app_connection_auth: RwShare<AppAuthTokenStore>,
 }
 
 impl Conductor {
@@ -301,6 +304,7 @@ mod startup_shutdown_impls {
                 wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
                     maybe_data_root_path,
                 ))),
+                app_connection_auth: RwShare::default(),
             }
         }
 
@@ -397,6 +401,7 @@ mod startup_shutdown_impls {
 /// Methods related to conductor interfaces
 mod interface_impls {
     use super::*;
+    use holochain_conductor_api::AppInterfaceInfo;
     use holochain_types::websocket::AllowedOrigins;
 
     impl Conductor {
@@ -421,7 +426,7 @@ mod interface_impls {
                             allowed_origins,
                         } => {
                             let listener = spawn_websocket_listener(port, allowed_origins).await?;
-                            let port = listener.local_addr()?.port();
+                            let port = listener.local_addrs()?[0].port();
                             spawn_admin_interface_tasks(
                                 tm.clone(),
                                 listener,
@@ -453,14 +458,15 @@ mod interface_impls {
         }
 
         /// Spawn a new app interface task, register it with the TaskManager,
-        /// and modify the conductor accordingly, based on the config passed in
-        /// which is just a networking port number (or 0 to auto-select one).
+        /// and modify the conductor accordingly, based on the config passed in.
+        ///
         /// Returns the given or auto-chosen port number if giving an Ok Result
         #[tracing::instrument(skip_all)]
         pub async fn add_app_interface(
             self: Arc<Self>,
             port: either::Either<u16, AppInterfaceId>,
             allowed_origins: AllowedOrigins,
+            installed_app_id: Option<InstalledAppId>,
         ) -> ConductorResult<u16> {
             let interface_id = match port {
                 either::Either::Left(port) => AppInterfaceId::new(port),
@@ -480,6 +486,7 @@ mod interface_impls {
                 tm.clone(),
                 port,
                 allowed_origins.clone(),
+                installed_app_id.clone(),
                 app_api,
                 signal_tx.clone(),
             )
@@ -497,7 +504,7 @@ mod interface_impls {
                 app_interfaces.insert(interface_id.clone(), interface);
                 Ok(())
             })?;
-            let config = AppInterfaceConfig::websocket(port, allowed_origins);
+            let config = AppInterfaceConfig::websocket(port, allowed_origins, installed_app_id);
             self.update_state(|mut state| {
                 state.app_interfaces.insert(interface_id, config);
                 Ok(state)
@@ -515,13 +522,17 @@ mod interface_impls {
 
         /// Give a list of networking ports taken up as running app interface tasks
         #[tracing::instrument(skip_all)]
-        pub async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {
+        pub async fn list_app_interfaces(&self) -> ConductorResult<Vec<AppInterfaceInfo>> {
             Ok(self
                 .get_state()
                 .await?
                 .app_interfaces
                 .values()
-                .map(|config| config.driver.port())
+                .map(|config| AppInterfaceInfo {
+                    port: config.driver.port(),
+                    allowed_origins: config.driver.allowed_origins().clone(),
+                    installed_app_id: config.installed_app_id.clone(),
+                })
                 .collect())
         }
 
@@ -537,6 +548,7 @@ mod interface_impls {
                     .add_app_interface(
                         either::Right(id.clone()),
                         config.driver.allowed_origins().clone(),
+                        config.installed_app_id.clone(),
                     )
                     .await?;
             }
@@ -2553,6 +2565,50 @@ mod accessor_impls {
     }
 }
 
+mod authenticate_token_impls {
+    use super::*;
+    use holochain_conductor_api::{
+        AppAuthenticationTokenIssued, IssueAppAuthenticationTokenPayload,
+    };
+
+    impl Conductor {
+        /// Issue a new app interface authentication token for the given `installed_app_id`.
+        pub fn issue_app_authentication_token(
+            &self,
+            payload: IssueAppAuthenticationTokenPayload,
+        ) -> ConductorResult<AppAuthenticationTokenIssued> {
+            let (token, expires_at) = self.app_connection_auth.share_mut(|app_connection_auth| {
+                app_connection_auth.issue_token(
+                    payload.installed_app_id,
+                    payload.expiry_seconds,
+                    payload.single_use,
+                )
+            });
+
+            Ok(AppAuthenticationTokenIssued {
+                token,
+                expires_at: expires_at
+                    .and_then(|i| i.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| Timestamp::saturating_from_dur(&d)),
+            })
+        }
+
+        /// Authenticate the app interface authentication `token`, optionally requiring the token to
+        /// have been issued for a specific `app_id`.
+        ///
+        /// Returns the [InstalledAppId] that the token was issued for.
+        pub fn authenticate_app_token(
+            &self,
+            token: Vec<u8>,
+            app_id: Option<InstalledAppId>,
+        ) -> ConductorResult<InstalledAppId> {
+            self.app_connection_auth.share_mut(|app_connection_auth| {
+                app_connection_auth.authenticate_token(token, app_id)
+            })
+        }
+    }
+}
+
 /// Private methods, only used within the Conductor, never called from outside.
 impl Conductor {
     fn add_admin_port(&self, port: u16) {
@@ -3201,3 +3257,5 @@ async fn p2p_event_task(
 
 #[cfg(test)]
 pub mod tests;
+
+mod app_connection_auth;
