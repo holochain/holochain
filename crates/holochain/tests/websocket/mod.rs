@@ -1,12 +1,11 @@
 use ::fixt::prelude::*;
 use anyhow::Result;
-use futures::future;
 use hdk::prelude::RemoteSignal;
 use holochain::conductor::interface::websocket::MAX_CONNECTIONS;
 use holochain::sweettest::SweetConductorBatch;
+use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::SweetDnaFile;
 use holochain::sweettest::{authenticate_app_ws_client, SweetConductor, WsPollRecv};
-use holochain::sweettest::{SweetAgents, SweetConductorConfig};
 use holochain::{
     conductor::{
         api::{AdminRequest, AdminResponse, AppResponse},
@@ -243,33 +242,26 @@ async fn call_zome() {
 #[cfg(feature = "slow_tests")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn remote_signals() -> anyhow::Result<()> {
+    use std::collections::HashSet;
+
     holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 2;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
-    // MAYBE: write helper for agents across conductors
-    let all_agents: Vec<HoloHash<hash_type::Agent>> =
-        future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
-
-    // Check that there are no duplicate agents
-    assert_eq!(
-        all_agents.len(),
-        all_agents
-            .clone()
-            .into_iter()
-            .collect::<std::collections::HashSet<_>>()
-            .len()
-    );
-
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
         .0;
 
-    let apps = conductors
-        .setup_app_for_zipped_agents("app", &all_agents, &[dna_file])
-        .await
-        .unwrap();
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+
+    let all_agents: HashSet<_> = apps
+        .cells_flattened()
+        .into_iter()
+        .map(|c| c.agent_pubkey())
+        .collect();
+
+    assert_eq!(all_agents.len(), NUM_CONDUCTORS);
 
     conductors.exchange_peer_info().await;
 
@@ -288,7 +280,7 @@ async fn remote_signals() -> anyhow::Result<()> {
             "signal_others",
             RemoteSignal {
                 signal: signal.clone(),
-                agents: all_agents,
+                agents: all_agents.into_iter().collect(),
             },
         )
         .await;

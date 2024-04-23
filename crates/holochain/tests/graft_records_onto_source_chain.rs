@@ -12,7 +12,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::prelude::{StateMutationError, Store, Txn};
-use holochain_types::chc::ChainHeadCoordinatorExt;
 use holochain_types::record::SignedActionHashedExt;
 use rusqlite::Transaction;
 
