@@ -47,10 +47,13 @@ impl ActionBuilderCommon {
 /// surrounding code to construct a proper Action outside of the context of
 /// the SourceChain.
 ///
-/// This builder does not build pre-genesis Actions, because prior to genesis
-/// there is no Agent associated with the source chain, and also the fact that
-/// the Dna action has no prev_action causes a special case that needs not be
-/// dealt with. SourceChain::genesis already handles genesis in one fell swoop.
+/// Genesis actions cannot be built with this method, because the way
+/// SourceChain is written, the agent key is not known until after genesis is
+/// performed, and the agent key is one of the values injected rather than
+/// provided by this builder. (There is also the problem that the Dna action 
+/// is a special case as it has no `prev_action`, and generalizing
+/// `ActionBuilderCommon` just to make that optional is a bit inconvenient.)
+/// `SourceChain::genesis` already handles genesis in one fell swoop.
 pub trait ActionBuilder<U: ActionUnweighed>: Sized {
     fn build(self, common: ActionBuilderCommon) -> U;
 }
