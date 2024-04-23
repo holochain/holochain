@@ -191,8 +191,6 @@ impl ConductorBuilder {
                 .unwrap_or(DpkiConfig::new(None, "DPKI_DEVICE_SEED".to_string())),
         );
 
-        dbg!(&dpki_config);
-
         let dpki_dna_to_install = match &dpki_config {
             Some(config) => {
                 if config.no_dpki {
@@ -211,8 +209,6 @@ impl ConductorBuilder {
                 "We currently require DPKI to be used, but this may change in the future"
             ),
         };
-
-        dbg!(dpki_dna_to_install.is_some());
 
         let dpki_uuid = dpki_dna_to_install
             .as_ref()
