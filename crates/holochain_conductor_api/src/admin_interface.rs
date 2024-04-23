@@ -583,14 +583,14 @@ pub struct IssueAppAuthenticationTokenPayload {
     /// set to `false`, the token will be invalidated after the first use anyway.
     ///
     /// Set this to 0 to create a token that does not expire.
-    // #[serde(default = "30")]
+    #[serde(default = "30")]
     pub expiry_seconds: u64,
 
     /// Whether the token should be single-use. This is `true` by default and will cause the token
     /// to be invalidated after the first use, irrespective of connection success.
     ///
     /// Set this to `false` to allow the token to be used multiple times.
-    // #[serde(default = "true")]
+    #[serde(default = "true")]
     pub single_use: bool,
 }
 
