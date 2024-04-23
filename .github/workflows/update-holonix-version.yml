@@ -23,8 +23,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-tags: true
+      - name: Get tags
+        run: git fetch --tags origin
       - name: Run the update script
         run: |
           git tag --list | head -n 30
