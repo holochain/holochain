@@ -50,13 +50,13 @@ First of all, from the root folder, run `nix develop .#coreDev`.
 The _coreDev_ developer shell provides impure test scripts that are automatically generated from the Nix derivations that we use for testing on CI.
 They are prefixed with *script-* and you should be able to autocomplete them by typing _script-<TAB>_.
 
-For example To run all tests in from all the crates, run this from the root folder:
+For example to run all tests from all the crates, run this from the root folder:
 
 ```bash
 script-holochain-tests-all
 ```
 
-Or use `script-holochain-tests-unit-all` if you don't want to run the static checks (cargo doc, cargo fmt and cargo clippy, but all of these this will be RUN on CI.
+Or use `script-holochain-tests-unit-all` if you don't want to run the static checks (cargo doc, cargo fmt and cargo clippy), but all of these this will be run on CI.
 
 ### Filtering tests
 

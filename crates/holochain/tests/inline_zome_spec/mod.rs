@@ -13,7 +13,6 @@ use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{op::Op, record::RecordEntry};
 use matches::assert_matches;
-use tokio_stream::StreamExt;
 
 /// Simple scenario involving two agents using the same DNA
 #[tokio::test(flavor = "multi_thread")]
@@ -254,7 +253,7 @@ async fn signal_subscription() {
     let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
     let zome = &app.cells()[0].zome(SweetInlineZomes::COORDINATOR);
 
-    let signals = conductor.signals().take(N);
+    let mut signal_rx = conductor.subscribe_to_app_signals("app".to_string());
 
     // Emit N signals
     for _ in 0..N {
@@ -262,7 +261,12 @@ async fn signal_subscription() {
     }
 
     // Ensure that we can receive all signals
-    let signals: Vec<Signal> = signals.collect().await;
+    let mut signals: Vec<Signal> = vec![];
+    for _ in 0..N {
+        let signal = signal_rx.recv().await.unwrap();
+        signals.push(signal);
+    }
+
     assert_eq!(signals.len(), N);
 }
 

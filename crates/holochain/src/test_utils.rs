@@ -1,5 +1,5 @@
 //! Utils for Holochain tests
-use crate::conductor::api::RealAppInterfaceApi;
+use crate::conductor::api::AppInterfaceApi;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
@@ -351,12 +351,7 @@ pub async fn setup_app_in_new_conductor(
     installed_app_id: InstalledAppId,
     agent: Option<AgentPubKey>,
     dnas: DnasWithProofs,
-) -> (
-    Arc<TempDir>,
-    RealAppInterfaceApi,
-    ConductorHandle,
-    AgentPubKey,
-) {
+) -> (Arc<TempDir>, AppInterfaceApi, ConductorHandle, AgentPubKey) {
     let db_dir = test_db_dir();
 
     let conductor_handle = ConductorBuilder::new()
@@ -372,7 +367,7 @@ pub async fn setup_app_in_new_conductor(
 
     (
         Arc::new(db_dir),
-        RealAppInterfaceApi::new(conductor_handle),
+        AppInterfaceApi::new(conductor_handle),
         handle,
         agent,
     )
@@ -417,7 +412,7 @@ pub async fn install_app_in_conductor(
 pub async fn setup_app_with_names(
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
-) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
+) -> (TempDir, AppInterfaceApi, ConductorHandle) {
     let dir = test_db_dir();
     let (iface, handle) =
         setup_app_inner(dir.path().to_path_buf().into(), agent, apps_data, None).await;
@@ -430,7 +425,7 @@ pub async fn setup_app_with_network(
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
     network: KitsuneP2pConfig,
-) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
+) -> (TempDir, AppInterfaceApi, ConductorHandle) {
     let dir = test_db_dir();
     let (iface, handle) = setup_app_inner(
         dir.path().to_path_buf().into(),
@@ -448,7 +443,7 @@ pub async fn setup_app_inner(
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
     network: Option<KitsuneP2pConfig>,
-) -> (RealAppInterfaceApi, ConductorHandle) {
+) -> (AppInterfaceApi, ConductorHandle) {
     let config = ConductorConfig {
         data_root_path: Some(data_root_path.clone()),
         admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -479,7 +474,7 @@ pub async fn setup_app_inner(
 
     let handle = conductor_handle.clone();
 
-    (RealAppInterfaceApi::new(conductor_handle), handle)
+    (AppInterfaceApi::new(conductor_handle), handle)
 }
 
 /// If HC_WASM_CACHE_PATH is set warm the cache

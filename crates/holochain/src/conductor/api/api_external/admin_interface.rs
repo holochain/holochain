@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use super::InterfaceApi;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::api::error::SerializationError;
@@ -17,49 +16,51 @@ use tracing::*;
 
 pub use holochain_conductor_api::*;
 
-/// A trait for the interface that a Conductor exposes to the outside world to use for administering the conductor.
-/// This trait has one mock implementation and one "real" implementation
-#[async_trait::async_trait]
-pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
-    /// Call an admin function to modify this Conductor's behavior
-    async fn handle_admin_request_inner(
-        &self,
-        request: AdminRequest,
-    ) -> ConductorApiResult<AdminResponse>;
-
-    // -- provided -- //
-
-    /// Deal with error cases produced by `handle_admin_request_inner`
-    async fn handle_admin_request(&self, request: AdminRequest) -> AdminResponse {
-        debug!("admin request: {:?}", request);
-
-        let res = match self.handle_admin_request_inner(request).await {
-            Ok(response) => response,
-            Err(e) => AdminResponse::Error(e.into()),
-        };
-        debug!("admin response: {:?}", res);
-        res
-    }
-}
-
 /// The admin interface that external connections
 /// can use to make requests to the conductor
 /// The concrete (non-mock) implementation of the AdminInterfaceApi
 #[derive(Clone)]
-pub struct RealAdminInterfaceApi {
+pub struct AdminInterfaceApi {
     /// Mutable access to the Conductor
     conductor_handle: ConductorHandle,
 }
 
-impl RealAdminInterfaceApi {
+impl AdminInterfaceApi {
     /// Create an admin interface api.
     pub fn new(conductor_handle: ConductorHandle) -> Self {
-        RealAdminInterfaceApi { conductor_handle }
+        AdminInterfaceApi { conductor_handle }
     }
-}
 
-#[async_trait::async_trait]
-impl AdminInterfaceApi for RealAdminInterfaceApi {
+    /// Handle an [AdminRequest] and return an [AdminResponse].
+    pub async fn handle_request(
+        &self,
+        request: Result<AdminRequest, SerializedBytesError>,
+    ) -> InterfaceResult<AdminResponse> {
+        // Don't hold the read across both awaits
+        {
+            self.conductor_handle
+                .check_running()
+                .map_err(Box::new)
+                .map_err(InterfaceError::RequestHandler)?;
+        }
+        match request {
+            Ok(request) => Ok(self.handle_admin_request(request).await),
+            Err(e) => Ok(AdminResponse::Error(SerializationError::from(e).into())),
+        }
+    }
+
+    /// Deal with error cases produced by `handle_admin_request_inner`
+    pub(crate) async fn handle_admin_request(&self, request: AdminRequest) -> AdminResponse {
+        debug!("admin request: {:?}", request);
+
+        let res = self
+            .handle_admin_request_inner(request)
+            .await
+            .unwrap_or_else(|e| AdminResponse::Error(e.into()));
+        debug!("admin response: {:?}", res);
+        res
+    }
+
     async fn handle_admin_request_inner(
         &self,
         request: AdminRequest,
@@ -312,36 +313,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
     }
 }
 
-#[async_trait::async_trait]
-impl InterfaceApi for RealAdminInterfaceApi {
-    type Auth = ();
-    type ApiRequest = AdminRequest;
-    type ApiResponse = AdminResponse;
-
-    async fn auth(&self, _auth: Self::Auth) -> InterfaceResult<InstalledAppId> {
-        Err(InterfaceError::Other(
-            "Admin interface does not support authentication".to_string(),
-        ))
-    }
-
-    async fn handle_request(
-        &self,
-        request: Result<Self::ApiRequest, SerializedBytesError>,
-    ) -> InterfaceResult<Self::ApiResponse> {
-        // Don't hold the read across both awaits
-        {
-            self.conductor_handle
-                .check_running()
-                .map_err(Box::new)
-                .map_err(InterfaceError::RequestHandler)?;
-        }
-        match request {
-            Ok(request) => Ok(AdminInterfaceApi::handle_admin_request(self, request).await),
-            Err(e) => Ok(AdminResponse::Error(SerializationError::from(e).into())),
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -364,7 +335,7 @@ mod test {
             .test(&[])
             .await?;
 
-        let admin_api = RealAdminInterfaceApi::new(handle.clone());
+        let admin_api = AdminInterfaceApi::new(handle.clone());
         let network_seed = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &network_seed.to_string(),

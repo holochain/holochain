@@ -28,7 +28,7 @@ async fn network_info() {
         dnas: vec![dna.dna_hash().clone()],
         last_time_queried: None,
     };
-    let network_info = conductors[0].network_info(&payload).await.unwrap();
+    let network_info = conductors[0].network_info(&app_id, &payload).await.unwrap();
 
     assert_eq!(network_info[0].current_number_of_peers, 3);
     assert_eq!(network_info[0].arc_size, 1.0);
@@ -43,7 +43,7 @@ async fn network_info() {
         dnas: vec![dna.dna_hash().clone()],
         last_time_queried: Some(last_time_queried),
     };
-    let network_info = conductors[0].network_info(&payload).await.unwrap();
+    let network_info = conductors[0].network_info(&app_id, &payload).await.unwrap();
 
     assert_eq!(network_info[0].bytes_since_last_time_queried, 0);
 
@@ -71,6 +71,6 @@ async fn network_info() {
         dnas: vec![dna.dna_hash().clone()],
         last_time_queried: Some(last_time_queried),
     };
-    let network_info = conductors[1].network_info(&payload).await.unwrap();
+    let network_info = conductors[1].network_info(&app_id, &payload).await.unwrap();
     assert!(network_info[0].bytes_since_last_time_queried > 0);
 }
