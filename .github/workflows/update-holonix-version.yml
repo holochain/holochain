@@ -19,10 +19,10 @@ concurrency:
 
 jobs:
   update-holonix-version:
-    runs-on: [ self-hosted, multi-arch ]
+    runs-on: "ubuntu-latest"
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v22
       - name: Get tags
         run: git fetch --quiet --tags origin
       - name: Configure Git
@@ -41,14 +41,15 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.HRA_GITHUB_TOKEN }}
-          title: "Update Holohain version in Holonix for ${{ github.event.inputs.version }}"
+          committer: "Holochain Release Automation <hra+gh@holochain.org>"
+          title: "Update Holochain version in Holonix for ${{ github.event.inputs.version }}"
           branch: auto-update/${{ github.event.inputs.version }}
           labels: |
             autorebase:opt-in
           draft: false
           delete-branch: true
       - name: Enable auto-merge
-        uses: peter-evans/enable-pull-request-automerge@v3
-        with:
-          token: ${{ secrets.HRA_GITHUB_TOKEN }}
-          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+        if: steps.cpr.outputs.pull-request-operation == 'created'
+        run: gh pr merge --squash --auto "${{ steps.cpr.outputs.pull-request-number }}"
+        env:
+          GH_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
