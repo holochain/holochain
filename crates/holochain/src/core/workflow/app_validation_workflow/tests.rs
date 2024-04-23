@@ -208,7 +208,159 @@ async fn main_workflow() {
 // test that app validation validates multiple ops in one workflow run where
 // one op depends on the other op
 #[tokio::test(flavor = "multi_thread")]
-async fn parallel_op_validation() {
+async fn validate_ops_in_sequence_must_get_agent_activity() {
+    holochain_trace::test_run();
+
+    let agent = fixt!(AgentPubKey);
+
+    // create op that following delete op depends on
+    let mut create = fixt!(Create);
+    create.action_seq = 0;
+    create.author = agent.clone();
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
+    let create_op = Action::Create(create);
+    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+    let create_action_hash = dht_create_op_hashed.action().to_hash();
+
+    // create op that depends on previous create
+    let mut delete = fixt!(Delete);
+    delete.action_seq = 1;
+    delete.author = create_op.author().clone();
+    delete.deletes_address = create_op.clone().to_hash();
+    delete.deletes_entry_address = create_op.entry_hash().unwrap().clone();
+    let dht_delete_op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
+    let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
+    let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
+    let delete_action_hash = dht_delete_op_hashed.action().to_hash();
+
+    let entry_def = EntryDef::default_from_id("entry_def_id");
+    let zomes = SweetInlineZomes::new(vec![entry_def.clone()], 0).integrity_function(
+        "validate",
+        move |api, op: Op| {
+            // chain filter goes from delete action until create action
+            let mut chain_filter =
+                ChainFilter::new(delete_action_hash.clone()).until(create_action_hash.clone());
+            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
+                let result = api.must_get_agent_activity(MustGetAgentActivityInput {
+                    author: agent.clone(),
+                    chain_filter: chain_filter.clone(),
+                });
+                if result.is_ok() {
+                    Ok(ValidateCallbackResult::Valid)
+                } else {
+                    Ok(ValidateCallbackResult::UnresolvedDependencies(
+                        UnresolvedDependencies::AgentActivity(agent.clone(), chain_filter),
+                    ))
+                }
+            } else {
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
+    );
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let dna_hash = dna_file.dna_hash().clone();
+
+    let mut conductor = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        SweetLocalRendezvous::new().await,
+    )
+    .await;
+    let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
+    let cell_id = app.cells()[0].cell_id().clone();
+
+    let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
+        conductor
+            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
+            .unwrap()
+            .into(),
+        conductor.get_dht_db(&dna_hash).unwrap(),
+        conductor.get_dht_db_cache(&dna_hash).unwrap(),
+        conductor.get_cache_db(&cell_id).await.unwrap(),
+        conductor.keystore(),
+        Arc::new(dna_file.dna_def().clone()),
+    ));
+
+    // check there are no ops to app validate
+    // genesis entries have already been validated at this stage
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 0);
+
+    // insert create and delete op in dht db and mark ready for app validation
+    app_validation_workspace.dht_db.test_write(move |txn| {
+        insert_op(txn, &dht_delete_op_hashed).unwrap();
+        put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
+        insert_op(txn, &dht_create_op_hashed).unwrap();
+        put_validation_limbo(
+            txn,
+            &dht_create_op_hashed.hash,
+            ValidationStage::SysValidated,
+        )
+        .unwrap();
+    });
+
+    // check create and delete op are now counted as ops to validate
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 2);
+
+    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+
+    // run validation workflow
+    // outcome should be complete
+    let outcome_summary = app_validation_workflow_inner(
+        Arc::new(dna_hash.clone()),
+        app_validation_workspace.clone(),
+        conductor.raw_handle(),
+        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        conductor
+            .get_or_create_space(&dna_hash)
+            .unwrap()
+            .dht_query_cache,
+        validation_dependencies.clone(),
+    )
+    .await
+    .unwrap();
+    assert_matches!(
+        outcome_summary,
+        OutcomeSummary {
+            ops_to_validate: 2,
+            validated: 2,
+            accepted: 2,
+            rejected: 0,
+            missing: 0,
+        }
+    );
+
+    // check ops to validate is also 0
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 0);
+}
+
+// test that app validation validates multiple ops in one workflow run where
+// one op depends on the other op
+// TODO this test only passes because actions are mistakenly written to the
+// Action table in the dht database before being validated. Once that is fixed
+// with issue https://github.com/holochain/holochain/issues/3724,
+// this test should fail.
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_ops_in_sequence_must_get_action() {
     holochain_trace::test_run();
 
     let entry_def = EntryDef::default_from_id("entry_def_id");
