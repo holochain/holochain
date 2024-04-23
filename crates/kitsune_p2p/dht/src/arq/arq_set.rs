@@ -4,7 +4,7 @@ use kitsune_p2p_dht_arc::DhtArcSet;
 
 use crate::{arq::ArqBounds, spacetime::*, ArqStrat};
 
-use super::{power_and_count_from_length_exact, Arq, ArqStart};
+use super::{power_and_count_from_length_exact, Arq, ArqSize, ArqStart};
 
 /// A collection of ArqBounds.
 /// All bounds are guaranteed to be quantized to the same power
@@ -169,8 +169,9 @@ impl ArqSet {
                 .into_iter()
                 .map(|i| {
                     let len = i.length();
-                    let (pow, _) = power_and_count_from_length_exact(dim, len, strat.min_chunks())?;
-                    ArqBounds::from_interval(dim, pow, i)
+                    let ArqSize { power, .. } =
+                        power_and_count_from_length_exact(dim, len, strat.min_chunks())?;
+                    ArqBounds::from_interval(dim, power, i)
                 })
                 .collect::<Option<Vec<_>>>()?,
         ))

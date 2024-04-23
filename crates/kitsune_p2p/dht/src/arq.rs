@@ -574,8 +574,7 @@ pub fn is_full(dim: impl SpaceDim, power: u8, count: u32) -> bool {
 /// Calculate the unique pairing of power and count implied by a given length
 /// and max number of chunks. Gives the nearest value that satisfies the constraints,
 /// but may not be exact.
-// TODO: use ArqSize
-pub fn power_and_count_from_length(dim: impl SpaceDim, len: u64, max_chunks: u32) -> (u8, u32) {
+pub fn power_and_count_from_length(dim: impl SpaceDim, len: u64, max_chunks: u32) -> ArqSize {
     let dim = dim.get();
     assert!(len <= U32_LEN);
     let mut power = 0;
@@ -587,18 +586,20 @@ pub fn power_and_count_from_length(dim: impl SpaceDim, len: u64, max_chunks: u32
         count /= 2.0;
     }
     let count = count.round() as u32;
-    (power, count)
+    ArqSize {
+        power,
+        count: count.into(),
+    }
 }
 
 /// Calculate the highest power and lowest count such that the given length is
 /// represented exactly. If the length is not representable even at the quantum
 /// level (power==0), return None.
-// TODO: use ArqSize
 pub fn power_and_count_from_length_exact(
     dim: impl SpaceDim,
     len: u64,
     min_chunks: u32,
-) -> Option<(u8, u32)> {
+) -> Option<ArqSize> {
     let dim = dim.get();
     assert!(len <= U32_LEN);
 
@@ -614,7 +615,10 @@ pub fn power_and_count_from_length_exact(
         count *= 2;
         power -= 1;
     }
-    Some((power, count as u32))
+    Some(ArqSize {
+        power,
+        count: (count as u32).into(),
+    })
 }
 
 /// Given a center and a length, give Arq which matches most closely given the provided strategy
@@ -623,7 +627,8 @@ pub fn approximate_arq(dim: impl SpaceDim, strat: &ArqStrat, start: Loc, len: u6
     if len == 0 {
         Arq::new(dim.min_power(), start, 0.into())
     } else {
-        let (power, count) = power_and_count_from_length(dim, len, strat.max_chunks());
+        let ArqSize { power, count } = power_and_count_from_length(dim, len, strat.max_chunks());
+        let count = count.0;
 
         let min = strat.min_chunks() as f64;
         let max = strat.max_chunks() as f64;
@@ -750,10 +755,10 @@ mod tests {
     #[test_case((128 + 16) * 2u64.pow(24), (16, 9))]
     fn test_power_and_count_from_length(len: u64, expected: (u8, u32)) {
         let topo = Topology::standard_epoch_full();
-        let (p, c) = power_and_count_from_length(&topo, len, 16);
-        assert_eq!((p, c), expected);
+        let ArqSize { power, count } = power_and_count_from_length(&topo, len, 16);
+        assert_eq!((power, count.0), expected);
         assert_eq!(
-            2u64.pow(p as u32 + topo.space.quantum_power as u32) * c as u64,
+            2u64.pow(power as u32 + topo.space.quantum_power as u32) * count.0 as u64,
             len
         );
     }
@@ -765,10 +770,10 @@ mod tests {
     #[test_case((128 + 16 + 8 + 4 + 2) * 2u64.pow(24), (13, 79))]
     fn test_power_and_count_from_length_exact(len: u64, expected: (u8, u32)) {
         let topo = Topology::standard_epoch_full();
-        let (p, c) = power_and_count_from_length_exact(&topo, len, 8).unwrap();
-        assert_eq!((p, c), expected);
+        let ArqSize { power, count } = power_and_count_from_length_exact(&topo, len, 8).unwrap();
+        assert_eq!((power, count.0), expected);
         assert_eq!(
-            2u64.pow(p as u32 + topo.space.quantum_power as u32) * c as u64,
+            2u64.pow(power as u32 + topo.space.quantum_power as u32) * count.0 as u64,
             len
         );
     }
