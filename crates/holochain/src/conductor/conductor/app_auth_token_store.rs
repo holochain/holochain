@@ -1,4 +1,5 @@
 use holochain_conductor_api::AppAuthenticationToken;
+use rand::RngCore;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::time::SystemTime;
@@ -27,7 +28,10 @@ impl AppAuthTokenStore {
         expiry_seconds: u64,
         single_use: bool,
     ) -> (AppAuthenticationToken, Option<SystemTime>) {
-        let token = nanoid::nanoid!().into_bytes();
+        let mut token = [0u8; 64];
+        rand::thread_rng().fill_bytes(&mut token);
+        let token = token.to_vec();
+
         let expires_at =
             SystemTime::now().checked_add(std::time::Duration::from_secs(expiry_seconds));
         self.issued_tokens.insert(
@@ -129,8 +133,8 @@ struct TokenMeta {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn issue_and_use_single_use_token() {
+    #[test]
+    fn issue_and_use_single_use_token() {
         let mut auth = AppAuthTokenStore::new();
         let installed_app_id = "test_app".to_string();
         let (token, _) = auth.issue_token(installed_app_id.clone(), 10, true);
@@ -142,8 +146,8 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[tokio::test]
-    async fn reuse_token() {
+    #[test]
+    fn reuse_token() {
         let mut auth = AppAuthTokenStore::new();
         let installed_app_id = "test_app".to_string();
         let (token, _) = auth.issue_token(installed_app_id.clone(), 10, false);
@@ -155,15 +159,15 @@ mod tests {
         assert_eq!(authenticated_for_app, installed_app_id);
     }
 
-    #[tokio::test]
-    async fn attempt_with_token_that_does_not_exist() {
+    #[test]
+    fn attempt_with_token_that_does_not_exist() {
         let mut auth = AppAuthTokenStore::new();
         let result = auth.authenticate_token(vec![0; 16], None);
         assert!(result.is_err());
     }
 
-    #[tokio::test]
-    async fn use_token_with_app_restriction() {
+    #[test]
+    fn use_token_with_app_restriction() {
         let mut auth = AppAuthTokenStore::new();
         let installed_app_id = "test_app".to_string();
         let (token, _) = auth.issue_token(installed_app_id.clone(), 1, true);
@@ -172,8 +176,8 @@ mod tests {
         assert_eq!(result.unwrap(), installed_app_id);
     }
 
-    #[tokio::test]
-    async fn use_token_with_app_restriction_mismatch() {
+    #[test]
+    fn use_token_with_app_restriction_mismatch() {
         let mut auth = AppAuthTokenStore::new();
         let installed_app_id = "test_app".to_string();
         let (token, _) = auth.issue_token(installed_app_id.clone(), 1, true);
@@ -187,8 +191,8 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[tokio::test]
-    async fn use_token_with_app_restriction_mismatch_multi_use() {
+    #[test]
+    fn use_token_with_app_restriction_mismatch_multi_use() {
         let mut auth = AppAuthTokenStore::new();
         let installed_app_id = "test_app".to_string();
         let (token, _) = auth.issue_token(installed_app_id.clone(), 1, false);
@@ -197,13 +201,14 @@ mod tests {
         let result = auth.authenticate_token(token.clone(), Some(other_app_id));
         assert!(result.is_err());
 
-        // Token was retained through the failed attempt. Another reason that single use tokens are safer!
+        // Token was retained through the failed attempt because the caller has used it with a
+        // websocket connection that is restricted to another app.
         let result = auth.authenticate_token(token.clone(), Some(installed_app_id.clone()));
         assert_eq!(result.unwrap(), installed_app_id);
     }
 
-    #[tokio::test]
-    async fn use_expired_token() {
+    #[test]
+    fn use_expired_token() {
         let mut auth = AppAuthTokenStore::new();
         let installed_app_id = "test_app".to_string();
         let (token, _) = auth.issue_token(installed_app_id.clone(), 1, true);
@@ -216,8 +221,8 @@ mod tests {
         assert!(auth.get_tokens().is_empty());
     }
 
-    #[tokio::test]
-    async fn issuing_new_tokens_removes_expired_tokens() {
+    #[test]
+    fn issuing_new_tokens_removes_expired_tokens() {
         let mut auth = AppAuthTokenStore::new();
         let installed_app_id = "test_app".to_string();
         for _ in 0..3 {
