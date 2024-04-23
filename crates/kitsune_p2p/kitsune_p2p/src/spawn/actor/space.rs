@@ -659,12 +659,17 @@ async fn update_arc_length(
 
     let cov_before = arq.coverage(dim) * 100.0;
     tracing::trace!("Updating arc for space {:?}:", space);
+
+    #[cfg(feature = "test_utils")]
     tracing::trace!("Before: {:2.1}% |{}|", cov_before, arq.to_ascii(dim, 64));
 
     view.update_arc(arq);
 
     let cov_after = arq.coverage(dim) * 100.0;
+
+    #[cfg(feature = "test_utils")]
     tracing::trace!("After:  {:2.1}% |{}|", cov_after, arq.to_ascii(dim, 64));
+
     tracing::trace!("Diff: {:-2.2}%", cov_after - cov_before);
 
     Ok(())
@@ -1585,9 +1590,9 @@ impl Space {
         //
         // In the case an initial_arc is passend into the join request,
         // handle_join will initialize this agent_arcs map to that value.
+        let strat = self.config.tuning_params.to_arq_strat();
         self.agent_arqs.get(agent).cloned().unwrap_or_else(|| {
             let dim = SpaceDimension::standard();
-            let strat = crate::dht::ArqStrat::default();
             match self.config.tuning_params.arc_clamping() {
                 Some(ArqClamping::Empty) => Arq::new_empty(dim, agent.get_loc()),
                 Some(ArqClamping::Full) | None => Arq::new_full_max(dim, &strat, agent.get_loc()),

@@ -11,7 +11,7 @@ use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     dependencies::lair_keystore_api::LairClient,
-    dht::{arq::LocalStorageConfig, spacetime::*, ArqStrat, PeerStrat},
+    dht::{spacetime::*, ArqStrat, PeerStrat},
     dht_arc::{DhtArc, DhtArcRange},
     KAgent,
 };
@@ -216,9 +216,7 @@ impl TestLegacyHost {
                                 })
                                 .collect::<Vec<_>>();
 
-                            let strat = PeerStrat::Quantized(ArqStrat::standard(
-                                LocalStorageConfig::default(),
-                            ));
+                            let strat = PeerStrat::Quantized(ArqStrat::default());
                             let view = strat.view(topology, &arcs);
 
                             respond.respond(Ok(async move { Ok(view) }.boxed().into()))
