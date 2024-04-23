@@ -698,10 +698,15 @@ impl SweetConductor {
     ) {
         let handle = self.raw_handle();
 
+        let installed_app = handle.find_app_containing_cell(cell.cell_id())
+            .await
+            .expect("Could not find app containing cell")
+            .unwrap();
+
         let wait_start = Instant::now();
         loop {
             let (number_of_peers, completed_rounds) = handle
-                .network_info(&NetworkInfoRequestPayload {
+                .network_info(installed_app.id(), &NetworkInfoRequestPayload {
                     agent_pub_key: cell.agent_pubkey().clone(),
                     dnas: vec![cell.cell_id.dna_hash().clone()],
                     last_time_queried: None, // Just care about seeing the first data

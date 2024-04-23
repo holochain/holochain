@@ -128,6 +128,9 @@ pub enum ConductorError {
     #[error("Authentication failed with reason: {0}")]
     FailedAuthenticationError(String),
 
+    #[error("App {0} is not allowed to access: {1:?}")]
+    AppAccessError(InstalledAppId, Box<dyn std::fmt::Debug + Send + Sync>),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),

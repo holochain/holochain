@@ -124,7 +124,7 @@ impl AppInterfaceApi {
                 Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }
             AppRequest::NetworkInfo(payload) => {
-                let info = self.conductor_handle.network_info(&payload).await?;
+                let info = self.conductor_handle.network_info(&installed_app_id, &payload).await?;
                 Ok(AppResponse::NetworkInfo(info))
             }
             AppRequest::ListWasmHostFunctions => Ok(AppResponse::ListWasmHostFunctions(
