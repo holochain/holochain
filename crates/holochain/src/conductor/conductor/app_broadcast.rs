@@ -5,13 +5,12 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
-// TODO: This is arbitrary, choose reasonable size.
-// ERROR TODO XXX (david.b): There is no such thing as backpressure in
-//                           broadcast queues! It'll just start deleting
-//                           items, and giving "Lagged" errors on receivers.
-/// Number of signals in buffer before applying
-/// back pressure.
-const SIGNAL_BUFFER_SIZE: usize = 50;
+// Number of signals in buffer before we start dropping them.
+// 64 gives us a good burst buffer incase multiple threads are
+// sending signals at the same time and we need to catch up,
+// but not so many that we have to be overly concerned about
+// the memory usage implications.
+const SIGNAL_BUFFER_SIZE: usize = 64;
 
 #[derive(Debug, Clone)]
 pub struct AppBroadcast {
