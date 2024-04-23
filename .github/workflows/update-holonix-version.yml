@@ -43,7 +43,7 @@ jobs:
           token: ${{ secrets.HRA_GITHUB_TOKEN }}
           committer: "Holochain Release Automation <hra+gh@holochain.org>"
           title: "Update Holochain version in Holonix for ${{ github.event.inputs.version }}"
-          branch: auto-update/${{ github.event.inputs.version }}
+          branch: holonix-update/${{ github.event.inputs.version }}
           labels: |
             autorebase:opt-in
           draft: false
