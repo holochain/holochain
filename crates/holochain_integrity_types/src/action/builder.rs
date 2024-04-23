@@ -50,7 +50,7 @@ impl ActionBuilderCommon {
 /// Genesis actions cannot be built with this method, because the way
 /// SourceChain is written, the agent key is not known until after genesis is
 /// performed, and the agent key is one of the values injected rather than
-/// provided by this builder. (There is also the problem that the Dna action 
+/// provided by this builder. (There is also the problem that the Dna action
 /// is a special case as it has no `prev_action`, and generalizing
 /// `ActionBuilderCommon` just to make that optional is a bit inconvenient.)
 /// `SourceChain::genesis` already handles genesis in one fell swoop.
