@@ -2757,7 +2757,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.2.7"
+version = "0.2.8-rc.0"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2904,7 +2904,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.2.7"
+version = "0.2.8-rc.0"
 dependencies = [
  "anyhow",
  "clap 4.5.1",
@@ -2961,7 +2961,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.2.7"
+version = "0.2.8-rc.0"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -3424,7 +3424,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.2.7"
+version = "0.2.8-rc.0"
 dependencies = [
  "async-trait",
  "criterion",
