@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- App websocket connections now require authentication. There is a new admin operation `AdminRequest::IssueAppAuthenticationToken`
+  which must be used to issue a connection token for a specific app. That token can be used with any app interface that
+  will permit a connection to that app. After establishing a client connection, the first message must be an Authenticate
+  message (rather than Request or Signal) and contain an `AppAuthenticationRequest` as its payload. #3622
+- When creating an app interface with `AdminRequest::AttachAppInterface` it is possible to specify an `installed_app_id`
+  which will require that connections to that app interface are for the specified app. #3622
+- `AdminRequest::ListAppInterfaces` has been changed from returning a list of ports to return a list of `AppInterfaceInfo`
+  which includes the port as well as the `installed_app_id` and `allowed_origins` for that interface. #3622
+
 ## 0.3.0-beta-dev.46
 
 ## 0.3.0-beta-dev.45
