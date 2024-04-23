@@ -264,7 +264,7 @@ fn authenticate_incoming_app_connection<A: InterfaceApi<Auth = AppAuthentication
                         })
                         .await
                     {
-                        Ok(installed_app_id) => {
+                        Ok(_installed_app_id) => {
                             spawn_recv_incoming_msgs_and_outgoing_signals(
                                 task_list,
                                 api,
