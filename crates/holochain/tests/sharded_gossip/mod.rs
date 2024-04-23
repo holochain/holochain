@@ -97,8 +97,12 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
-    conductors
-        .require_initial_gossip_activity_for_cell(&alice, Duration::from_secs(90))
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(
+            &alice,
+            NUM_CONDUCTORS as u32,
+            Duration::from_secs(90),
+        )
         .await;
 
     // Call the "create" zome fn on Alice's app
@@ -160,8 +164,12 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
-    conductors
-        .require_initial_gossip_activity_for_cell(&alice, Duration::from_secs(90))
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(
+            &alice,
+            NUM_CONDUCTORS as u32,
+            Duration::from_secs(90),
+        )
         .await;
 
     // Call the "create" zome fn on Alice's app

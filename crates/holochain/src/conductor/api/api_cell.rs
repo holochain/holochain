@@ -6,7 +6,6 @@ use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
 use crate::conductor::conductor::ConductorServices;
 use crate::conductor::error::ConductorResult;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::real_ribosome::RealRibosome;
@@ -84,10 +83,6 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.keystore()
     }
 
-    fn signal_broadcaster(&self) -> SignalBroadcaster {
-        self.conductor_handle.signal_broadcaster()
-    }
-
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
         self.conductor_handle.get_dna_file(dna_hash)
     }
@@ -145,10 +140,6 @@ pub trait CellConductorApiT: Send + Sync {
 
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &MetaLairClient;
-
-    /// Access the broadcast Sender which will send a Signal across every
-    /// attached app interface
-    fn signal_broadcaster(&self) -> SignalBroadcaster;
 
     /// Get a [`Dna`](holochain_types::prelude::Dna) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
@@ -229,15 +220,21 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Expose create_clone_cell functionality to zomes.
     async fn create_clone_cell(
         &self,
+        installed_app_id: &InstalledAppId,
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<ClonedCell>;
 
     /// Expose disable_clone_cell functionality to zomes.
-    async fn disable_clone_cell(&self, payload: DisableCloneCellPayload) -> ConductorResult<()>;
+    async fn disable_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: DisableCloneCellPayload,
+    ) -> ConductorResult<()>;
 
     /// Expose enable_clone_cell functionality to zomes.
     async fn enable_clone_cell(
         &self,
+        installed_app_id: &InstalledAppId,
         payload: EnableCloneCellPayload,
     ) -> ConductorResult<ClonedCell>;
 
@@ -318,28 +315,34 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     async fn create_clone_cell(
         &self,
+        installed_app_id: &InstalledAppId,
         payload: CreateCloneCellPayload,
     ) -> ConductorResult<ClonedCell> {
         self.conductor_handle
             .clone()
-            .create_clone_cell(payload)
+            .create_clone_cell(installed_app_id, payload)
             .await
     }
 
-    async fn disable_clone_cell(&self, payload: DisableCloneCellPayload) -> ConductorResult<()> {
+    async fn disable_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: DisableCloneCellPayload,
+    ) -> ConductorResult<()> {
         self.conductor_handle
             .clone()
-            .disable_clone_cell(&payload)
+            .disable_clone_cell(installed_app_id, &payload)
             .await
     }
 
     async fn enable_clone_cell(
         &self,
+        installed_app_id: &InstalledAppId,
         payload: EnableCloneCellPayload,
     ) -> ConductorResult<ClonedCell> {
         self.conductor_handle
             .clone()
-            .enable_clone_cell(&payload)
+            .enable_clone_cell(installed_app_id, &payload)
             .await
     }
 

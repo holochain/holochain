@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use holo_hash::ActionHash;
 use holo_hash::WasmHash;
 use holochain::conductor::api::AdminInterfaceApi;
-use holochain::conductor::api::RealAdminInterfaceApi;
 use holochain::sweettest::*;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
@@ -228,7 +227,7 @@ async fn test_update_admin_interface() {
         )
         .await;
 
-    let admin_api = RealAdminInterfaceApi::new(conductor.clone());
+    let admin_api = AdminInterfaceApi::new(conductor.clone());
 
     let manifest = CoordinatorManifest {
         zomes: vec![ZomeManifest {
@@ -263,7 +262,7 @@ async fn test_update_admin_interface() {
         source: holochain_types::prelude::CoordinatorSource::Bundle(Box::new(source)),
     };
     let req = AdminRequest::UpdateCoordinators(Box::new(req));
-    let r = admin_api.handle_admin_request(req).await;
+    let r = admin_api.handle_request(Ok(req)).await.unwrap();
     assert!(matches!(r, AdminResponse::CoordinatorsUpdated));
 
     let record: Option<Record> = conductor
