@@ -1467,46 +1467,44 @@ mod app_impls {
                         tracing::warn!("Using app with a pre-existing agent key: DPKI will not be used to manage keys for this app.");
                     }
                     (agent_key, None)
+                } else if let Some((dpki, state)) = &mut dpki {
+                    let derivation_details = state.next_derivation_details(None).await?;
+
+                    let dst_tag = format!(
+                        "DPKI-{:04}-{:04}",
+                        derivation_details.app_index, derivation_details.key_index
+                    );
+
+                    let derivation_path = derivation_details.to_derivation_path();
+                    let derivation_bytes = derivation_path
+                        .iter()
+                        .flat_map(|c| c.to_be_bytes())
+                        .collect();
+
+                    let info = self
+                        .keystore
+                        .lair_client()
+                        .derive_seed(
+                            dpki.device_seed_lair_tag.clone().into(),
+                            None,
+                            dst_tag.into(),
+                            None,
+                            derivation_path.into_boxed_slice(),
+                        )
+                        .await
+                        .map_err(|e| DpkiServiceError::Lair(e.into()))?;
+                    let seed = info.ed25519_pub_key.0.to_vec();
+
+                    let derivation = DerivationDetailsInput {
+                        app_index: derivation_details.app_index,
+                        key_index: derivation_details.key_index,
+                        derivation_seed: seed.clone(),
+                        derivation_bytes,
+                    };
+
+                    (AgentPubKey::from_raw_32(seed), Some(derivation))
                 } else {
-                    if let Some((dpki, state)) = &mut dpki {
-                        let derivation_details = state.next_derivation_details(None).await?;
-
-                        let dst_tag = format!(
-                            "DPKI-{:04}-{:04}",
-                            derivation_details.app_index, derivation_details.key_index
-                        );
-
-                        let derivation_path = derivation_details.to_derivation_path();
-                        let derivation_bytes = derivation_path
-                            .iter()
-                            .flat_map(|c| c.to_be_bytes())
-                            .collect();
-
-                        let info = self
-                            .keystore
-                            .lair_client()
-                            .derive_seed(
-                                dpki.device_seed_lair_tag.clone().into(),
-                                None,
-                                dst_tag.into(),
-                                None,
-                                derivation_path.into_boxed_slice(),
-                            )
-                            .await
-                            .map_err(|e| DpkiServiceError::Lair(e.into()))?;
-                        let seed = info.ed25519_pub_key.0.to_vec();
-
-                        let derivation = DerivationDetailsInput {
-                            app_index: derivation_details.app_index,
-                            key_index: derivation_details.key_index,
-                            derivation_seed: seed.clone(),
-                            derivation_bytes,
-                        };
-
-                        (AgentPubKey::from_raw_32(seed), Some(derivation))
-                    } else {
-                        (self.keystore.new_sign_keypair_random().await?, None)
-                    }
+                    (self.keystore.new_sign_keypair_random().await?, None)
                 };
 
             let cells_to_create = ops.cells_to_create(agent_key.clone());
