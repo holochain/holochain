@@ -208,6 +208,7 @@ mod tests {
 
         let db_dir = test_db_dir();
         let conductor_handle = Conductor::builder()
+            .config(SweetConductorConfig::standard().no_dpki().into())
             .with_data_root_path(db_dir.path().to_path_buf().into())
             .test(&[])
             .await
