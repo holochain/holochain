@@ -238,6 +238,7 @@ pub(crate) fn peer_connect(
     })
 }
 
+#[derive(Debug)]
 pub(crate) enum SearchRemotesCoveringBasisLogicResult {
     Success(Vec<AgentInfoSigned>),
     Error(KitsuneP2pError),

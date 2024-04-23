@@ -4,7 +4,7 @@ use kitsune_p2p_dht_arc::DhtArcSet;
 
 use crate::{arq::ArqBounds, spacetime::*, ArqStrat};
 
-use super::{power_and_count_from_length, power_and_count_from_length_exact, Arq, ArqStart};
+use super::{power_and_count_from_length_exact, Arq, ArqStart};
 
 /// A collection of ArqBounds.
 /// All bounds are guaranteed to be quantized to the same power
@@ -175,31 +175,6 @@ impl ArqSet {
                 .collect::<Option<Vec<_>>>()?,
         ))
     }
-
-    /// Convert back from a continuous arc set to a quantized one.
-    /// If the match is not exact, return the nearest possible quantized arcs.
-    pub fn from_dht_arc_set_rounded(
-        dim: impl SpaceDim,
-        strat: &ArqStrat,
-        dht_arc_set: &DhtArcSet,
-    ) -> (Self, bool) {
-        let max_chunks = strat.max_chunks();
-        let mut rounded = false;
-        let arqs = dht_arc_set
-            .intervals()
-            .into_iter()
-            .map(|i| {
-                let len = i.length();
-                let (pow, _) = power_and_count_from_length(dim.get(), len, max_chunks);
-                let (a, r) = ArqBounds::from_interval_rounded(dim, pow, i);
-                if r {
-                    rounded = true;
-                }
-                a
-            })
-            .collect::<Vec<_>>();
-        (Self::new(arqs), rounded)
-    }
 }
 
 /// Print ascii for arq bounds
@@ -330,128 +305,6 @@ mod tests {
     }
 
     proptest::proptest! {
-
-    /// Test that arqs maintain their resolution when the power factor is lost
-    #[test]
-    fn rounded_arcset(
-        p1 in 12u8..17, s1: u32, c1: u32,
-        p2 in 12u8..17, s2: u32, c2: u32,
-        // p3 in 12u8..17, s3: u32, c3: u32,
-    ) {
-        use crate::Loc;
-
-        let topo = Topology::standard_epoch_full();
-        let strat = ArqStrat::default();
-
-        let c1 = strat.min_chunks() + c1 % (strat.max_chunks() - strat.min_chunks());
-        let c2 = strat.min_chunks() + c2 % (strat.max_chunks() - strat.min_chunks());
-        // let c3 = strat.min_chunks() + c3 % (strat.max_chunks() - strat.min_chunks());
-
-        let arq1 = Arq::new(p1, Loc::from(s1), c1.into());
-        let arq2 = Arq::new(p2, Loc::from(s2), c2.into());
-        // let arq3 = Arq::new(p3, Loc::from(s3), c3.into());
-
-        println!("");
-        println!("......................................................................................");
-        println!("......................................................................................");
-        println!("......................................................................................");
-        println!("");
-
-        println!("### arqs ###");
-        println!("     |{}| p{} #{}", arq1.to_ascii(&topo, 64), arq1.power, *arq1.count);
-        println!("     |{}| p{} #{}", arq2.to_ascii(&topo, 64), arq2.power, *arq2.count);
-
-        let arc1 = arq1.to_dht_arc_range(&topo);
-        let arc2 = arq2.to_dht_arc_range(&topo);
-
-        println!("### arc conversion ###");
-        arc1.print(64);
-        arc2.print(64);
-
-        let arcset: DhtArcSet = vec![
-            arq1.to_bounds(&topo).to_dht_arc_range(&topo),
-            arq2.to_bounds(&topo).to_dht_arc_range(&topo),
-            // arq3.to_bounds(&topo).to_dht_arc_range(&topo)
-        ].into();
-
-        println!("### arcset ###");
-        arcset.print_arcs(64);
-
-        println!("### roundtrip arcset ###");
-        let (arqs, rounded) = ArqSet::from_dht_arc_set_rounded(&topo, &strat, &arcset);
-        arqs.to_dht_arc_set(&topo).print_arcs(64);
-
-        println!("### roundtrip arqset ###");
-        arqs.print_arqs(&topo, 64);
-
-        // The actual test
-        assert!(!rounded);
-    }
-
-    #[test]
-    fn rounded_arcset_intersections(
-        p1 in 12u8..17, s1: u32, c1: u32,
-        p2 in 12u8..17, s2: u32, c2: u32,
-        p3 in 12u8..17, s3: u32, c3: u32,
-        p4 in 12u8..17, s4: u32, c4: u32,
-        p5 in 12u8..17, s5: u32, c5: u32,
-        p6 in 12u8..17, s6: u32, c6: u32,
-    ) {
-        use crate::Loc;
-
-        let topo = Topology::standard_epoch_full();
-        let strat = ArqStrat::default();
-
-        let c1 = strat.min_chunks() + c1 % (strat.max_chunks() - strat.min_chunks());
-        let c2 = strat.min_chunks() + c2 % (strat.max_chunks() - strat.min_chunks());
-        let c3 = strat.min_chunks() + c3 % (strat.max_chunks() - strat.min_chunks());
-        let c4 = strat.min_chunks() + c4 % (strat.max_chunks() - strat.min_chunks());
-        let c5 = strat.min_chunks() + c5 % (strat.max_chunks() - strat.min_chunks());
-        let c6 = strat.min_chunks() + c6 % (strat.max_chunks() - strat.min_chunks());
-
-        let arq1 = Arq::new(p1, Loc::from(s1), c1.into());
-        let arq2 = Arq::new(p2, Loc::from(s2), c2.into());
-        let arq3 = Arq::new(p3, Loc::from(s3), c3.into());
-        let arq4 = Arq::new(p4, Loc::from(s4), c4.into());
-        let arq5 = Arq::new(p5, Loc::from(s5), c5.into());
-        let arq6 = Arq::new(p6, Loc::from(s6), c6.into());
-
-        let arcset1: DhtArcSet = vec![
-            arq1.to_bounds(&topo).to_dht_arc_range(&topo),
-            arq2.to_bounds(&topo).to_dht_arc_range(&topo),
-            arq3.to_bounds(&topo).to_dht_arc_range(&topo)
-        ].into();
-        let arcset2: DhtArcSet = vec![
-            arq4.to_bounds(&topo).to_dht_arc_range(&topo),
-            arq5.to_bounds(&topo).to_dht_arc_range(&topo),
-            arq6.to_bounds(&topo).to_dht_arc_range(&topo)
-        ].into();
-
-        println!("### original ###");
-        arcset1.print_arcs(64);
-        arcset2.print_arcs(64);
-
-        println!("### individual roundtrips ###");
-        let (arqs1, rounded1) = ArqSet::from_dht_arc_set_rounded(&topo, &strat, &arcset1);
-        let (arqs2, rounded2) = ArqSet::from_dht_arc_set_rounded(&topo, &strat, &arcset2);
-        arqs1.to_dht_arc_set(&topo).print_arcs(64);
-        assert!(!rounded1);
-        arqs2.to_dht_arc_set(&topo).print_arcs(64);
-        assert!(!rounded2);
-
-        println!("### common ###");
-        let common = arcset1.intersection(&arcset2);
-        common.print_arcs(64);
-        let (arqs, rounded) = ArqSet::from_dht_arc_set_rounded(&topo, &strat, &common);
-
-        println!("### common roundtrip ###");
-        let roundtrip = arqs.to_dht_arc_set(&topo);
-        roundtrip.print_arcs(64);
-
-        println!("...");
-        assert!(!rounded);
-    }
-
 
     #[test]
     fn arqset_intersection_smoke(
