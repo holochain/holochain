@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Connections to Holochain app interfaces are now app specific, so anywhere that you used to have to provide an `installed_app_id`
-  or `app_id` in requests is no longer required and has been removed. For example, `AppRequest::AppInfo` no longer takes any
+  or `app_id` in requests, that is no longer required and has been removed. For example, `AppRequest::AppInfo` no longer takes any
   parameters and will return information about the app the connection is authenticated with. #3643
 - Signals are now only sent to clients that are connected to the app emitting the signal. When a cell is created by the
   conductor, it gets the ability to broadcast signals to any clients that are connected to the app that the cell is part of.
