@@ -101,6 +101,7 @@ async fn validate_with_dpki() {
     await_consistency(60, [&alice, &bob]).await.unwrap();
 
     dbg!(Timestamp::now());
+    
     // Both see each other in DPKI
     assert!(matches!(
         key_state(&conductors[0], bob.agent_pubkey()).await,

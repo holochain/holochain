@@ -545,7 +545,7 @@ pub mod test {
 
                 assert_eq!(Ok(()), topology.integrity_check());
             },
-            3_000_000
+            7_000_000
         );
     }
 
@@ -573,7 +573,7 @@ pub mod test {
                     topology.integrity_check()
                 );
             },
-            3_000_000
+            7_000_000
         );
     }
 
@@ -611,7 +611,7 @@ pub mod test {
                     topology.integrity_check()
                 );
             },
-            3_000_000
+            7_000_000
         );
     }
 
@@ -651,7 +651,7 @@ pub mod test {
                     topology.integrity_check()
                 );
             },
-            3_000_000
+            7_000_000
         );
     }
 
@@ -689,7 +689,7 @@ pub mod test {
                     topology.integrity_check()
                 );
             },
-            3_000_000
+            7_000_000
         );
     }
 }
