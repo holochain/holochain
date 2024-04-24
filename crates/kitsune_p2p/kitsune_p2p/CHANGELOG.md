@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **BREAKING** - AgentInfo uses a quantized arc instead of an arc half-length to represent DHT coverage. This is a breaking protocol change, nodes on different versions will not be able to gossip with each other.
 
+## 0.3.0-beta-dev.39
+
 ## 0.3.0-beta-dev.38
 
 - Kitsune will now close connections in two cases. Firstly, when receiving an updated agent info that indicates that the peer URL for an agent has changed. If there is an open connection to the old peer URL then it will be closed. Secondly, when if a message from a peer fails to decode. This is likely sign that communication between two conductors is not going to work so the connection is closed.

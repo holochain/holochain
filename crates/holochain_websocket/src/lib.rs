@@ -872,6 +872,7 @@ impl WebsocketListener {
                 v4: v4_listener,
                 v6: v6_listener,
             });
+            break;
         }
 
         // Gave up after a few retries, there's no point in continuing forever because there might be

@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_dht"
-version = "0.3.0-beta-dev.22"
+version = "0.3.0-beta-dev.23"
 description = "Kitsune P2p DHT definition"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -16,8 +16,8 @@ colored = { version = "2.1", optional = true }
 derivative = "2.2.0"
 derive_more = "0.99"
 futures = "0.3"
-kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.19", path = "../dht_arc"}
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.9", path = "../timestamp"}
+kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.20", path = "../dht_arc"}
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.10", path = "../timestamp"}
 must_future = "0.1"
 num-traits = "0.2.14"
 rand = "0.8.4"
@@ -36,7 +36,7 @@ kitsune_p2p_dht = { path = ".", features = ["test_utils", "sqlite"]}
 kitsune_p2p_dht_arc = { path = "../dht_arc", features = ["test_utils"]}
 holochain_serialized_bytes = "=0.0.53"
 maplit = "1"
-holochain_trace = { version = "^0.3.0-beta-dev.10", path = "../../holochain_trace" }
+holochain_trace = { version = "^0.3.0-beta-dev.11", path = "../../holochain_trace" }
 pretty_assertions = "1.4.0"
 proptest = "1"
 test-case = "3.3"
