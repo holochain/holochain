@@ -14,6 +14,108 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240424.004413
+
+## [hcterm-0.3.0-beta-dev.22](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [holochain\_cli-0.3.0-beta-dev.46](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.46)
+
+## [holochain-0.3.0-beta-dev.47](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.47)
+
+- Connections to Holochain app interfaces are now app specific, so anywhere that you used to have to provide an `installed_app_id` or `app_id` in requests, that is no longer required and has been removed. For example, `AppRequest::AppInfo` no longer takes any parameters and will return information about the app the connection is authenticated with. \#3643
+- Signals are now only sent to clients that are connected to the app emitting the signal. When a cell is created by the conductor, it gets the ability to broadcast signals to any clients that are connected to the app that the cell is part of. When a client authenticates a connection to an app interface, the broadcaster for that app is found and attached to the connection. Previously all connected clients saw all signals, and there was no requirement to authenticate before receiving them. This is important to be aware of - if you connect to an app interface for signals only, you will still have to authenticate before receiving signals. \#3643
+- App websocket connections now require authentication. There is a new admin operation `AdminRequest::IssueAppAuthenticationToken` which must be used to issue a connection token for a specific app. That token can be used with any app interface that will permit a connection to that app. After establishing a client connection, the first message must be an Authenticate message (rather than Request or Signal) and contain an `AppAuthenticationRequest` as its payload. \#3622
+- When creating an app interface with `AdminRequest::AttachAppInterface` it is possible to specify an `installed_app_id` which will require that connections to that app interface are for the specified app. \#3622
+- `AdminRequest::ListAppInterfaces` has been changed from returning a list of ports to return a list of `AppInterfaceInfo` which includes the port as well as the `installed_app_id` and `allowed_origins` for that interface. \#3622
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.43](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.43)
+
+## [holochain\_cli\_run\_local\_services-0.3.0-beta-dev.28](crates/holochain_cli_run_local_services/CHANGELOG.md#0.3.0-beta-dev.28)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.46](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.46)
+
+## [holochain\_cascade-0.3.0-beta-dev.46](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.46)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.46](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.46)
+
+## [holochain\_conductor\_services-0.2.0-beta-dev.16](crates/holochain_conductor_services/CHANGELOG.md#0.2.0-beta-dev.16)
+
+## [holochain\_metrics-0.3.0-beta-dev.12](crates/holochain_metrics/CHANGELOG.md#0.3.0-beta-dev.12)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.40](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.44](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.44)
+
+## [holochain\_websocket-0.3.0-beta-dev.21](crates/holochain_websocket/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [hdk-0.3.0-beta-dev.40](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [holochain\_state-0.3.0-beta-dev.45](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.45)
+
+## [hdi-0.4.0-beta-dev.36](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.36)
+
+- **BREAKING**: Original action and entry have been removed from relevant variants of `Op`. To use original action and entry during validation, they can be explicitly fetched with HDK calls `must_get_action` and `must_get_entry`. Op is passed into the app validation callback `validate` where validation rules of an app can be implemented. For update and delete operations original action and original entry used to be prefetched, regardless of whether they were used in `validate` or not. Particularly for an update or delete of an entry it is not common to employ the original entry in validation. It is therefore removed from those variants of `Op` which means a potential performance increase for not having to fetch original actions and entries for all ops to be validated.
+
+## [holochain\_p2p-0.3.0-beta-dev.45](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.45)
+
+## [hc\_sleuth-0.2.0-beta-dev.16](crates/hc_sleuth/CHANGELOG.md#0.2.0-beta-dev.16)
+
+## [hdk\_derive-0.3.0-beta-dev.34](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.34)
+
+## [aitia-0.2.0-beta-dev.9](crates/aitia/CHANGELOG.md#0.2.0-beta-dev.9)
+
+## [holochain\_state\_types-0.3.0-beta-dev.40](crates/holochain_state_types/CHANGELOG.md#0.3.0-beta-dev.40)
+
+## [holochain\_types-0.3.0-beta-dev.42](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.42)
+
+## [kitsune\_p2p-0.3.0-beta-dev.39](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.39)
+
+## [holochain\_keystore-0.3.0-beta-dev.36](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.36)
+
+## [holochain\_sqlite-0.3.0-beta-dev.42](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.42)
+
+## [kitsune\_p2p\_bootstrap\_client-0.3.0-beta-dev.33](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.3.0-beta-dev.33)
+
+## [kitsune\_p2p\_fetch-0.3.0-beta-dev.30](crates/kitsune_p2p_fetch/CHANGELOG.md#0.3.0-beta-dev.30)
+
+## [kitsune\_p2p\_mdns-0.3.0-beta-dev.4](crates/kitsune_p2p_mdns/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [kitsune\_p2p\_proxy-0.3.0-beta-dev.27](crates/kitsune_p2p_proxy/CHANGELOG.md#0.3.0-beta-dev.27)
+
+## [mr\_bundle-0.3.0-beta-dev.10](crates/mr_bundle/CHANGELOG.md#0.3.0-beta-dev.10)
+
+## [holochain\_zome\_types-0.3.0-beta-dev.35](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.35)
+
+## [kitsune\_p2p\_bootstrap-0.2.0-beta-dev.27](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.2.0-beta-dev.27)
+
+## [kitsune\_p2p\_transport\_quic-0.3.0-beta-dev.27](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.3.0-beta-dev.27)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.33](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.33)
+
+- **BREAKING**: Original action and entry have been removed from relevant variants of `Op`. To use original action and entry during validation, they can be explicitly fetched with HDK calls `must_get_action` and `must_get_entry`. Op is passed into the app validation callback `validate` where validation rules of an app can be implemented. For update and delete operations original action and original entry used to be prefetched, regardless of whether they were used in `validate` or not. Particularly for an update or delete of an entry it is not common to employ the original entry in validation. It is therefore removed from those variants of `Op` which means a potential performance increase for not having to fetch original actions and entries for all ops to be validated.
+
+## [holochain\_nonce-0.3.0-beta-dev.27](crates/holochain_nonce/CHANGELOG.md#0.3.0-beta-dev.27)
+
+## [kitsune\_p2p\_block-0.3.0-beta-dev.23](crates/kitsune_p2p_block/CHANGELOG.md#0.3.0-beta-dev.23)
+
+## [kitsune\_p2p\_types-0.3.0-beta-dev.27](crates/kitsune_p2p_types/CHANGELOG.md#0.3.0-beta-dev.27)
+
+## [holo\_hash-0.3.0-beta-dev.28](crates/holo_hash/CHANGELOG.md#0.3.0-beta-dev.28)
+
+## [kitsune\_p2p\_bin\_data-0.3.0-beta-dev.21](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [kitsune\_p2p\_dht-0.3.0-beta-dev.23](crates/kitsune_p2p_dht/CHANGELOG.md#0.3.0-beta-dev.23)
+
+## [fixt-0.3.0-beta-dev.4](crates/fixt/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [holochain\_util-0.3.0-beta-dev.8](crates/holochain_util/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [kitsune\_p2p\_dht\_arc-0.3.0-beta-dev.20](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.3.0-beta-dev.20)
+
+## [holochain\_trace-0.3.0-beta-dev.11](crates/holochain_trace/CHANGELOG.md#0.3.0-beta-dev.11)
+
+## [kitsune\_p2p\_timestamp-0.3.0-beta-dev.10](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.3.0-beta-dev.10)
+
 # 20240417.004246
 
 ## [hcterm-0.3.0-beta-dev.21](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.21)
