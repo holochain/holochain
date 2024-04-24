@@ -663,7 +663,7 @@ async fn update_arc_length(
     #[cfg(feature = "test_utils")]
     tracing::trace!("Before: {:2.1}% |{}|", cov_before, arq.to_ascii(dim, 64));
 
-    view.update_arc(arq);
+    view.update_arq(arq);
 
     let cov_after = arq.coverage(dim) * 100.0;
 

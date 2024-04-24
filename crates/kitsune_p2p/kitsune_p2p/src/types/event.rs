@@ -92,7 +92,7 @@ pub struct QueryAgentsEvt {
     /// Optional time range to filter by.
     pub window: Option<TimeWindow>,
     /// Optional arcset to intersect by.
-    pub arc_set: Option<ArqSet>,
+    pub arq_set: Option<ArqSet>,
     /// If set, results are ordered by proximity to the specified location
     pub near_basis: Option<DhtLocation>,
     /// Limit to the number of results returned
@@ -110,7 +110,7 @@ impl QueryAgentsEvt {
             space,
             agents: None,
             window: None,
-            arc_set: None,
+            arq_set: None,
             near_basis: None,
             limit: None,
         }
@@ -129,8 +129,8 @@ impl QueryAgentsEvt {
     }
 
     /// Add in an an arcset query
-    pub fn by_arc_set(mut self, arc_set: ArqSet) -> Self {
-        self.arc_set = Some(arc_set);
+    pub fn by_arq_set(mut self, arq_set: ArqSet) -> Self {
+        self.arq_set = Some(arq_set);
         self
     }
 

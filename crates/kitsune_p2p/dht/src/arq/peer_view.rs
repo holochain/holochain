@@ -21,7 +21,7 @@ pub enum PeerView {
 impl PeerView {
     /// Given the current view of a peer and the peer's current coverage,
     /// this returns the next step to take in reaching the ideal coverage.
-    pub fn update_arc(&self, arq: &mut Arq) -> bool {
+    pub fn update_arq(&self, arq: &mut Arq) -> bool {
         match self {
             Self::Quantized(v) => v.update_arq(arq),
         }

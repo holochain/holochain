@@ -56,7 +56,7 @@ impl KitsuneHostDefaultError for HarnessHost {
     fn query_region_set(
         &self,
         _space: Arc<KitsuneSpace>,
-        _dht_arc_set: ArqSet,
+        _arq_set: ArqSet,
     ) -> KitsuneHostResult<RegionSetLtcs> {
         box_fut(Ok(RegionSetLtcs::empty()))
     }
@@ -215,7 +215,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
             space: _,
             agents,
             window,
-            arc_set,
+            arq_set: arc_set,
             near_basis: _,
             limit,
         }: QueryAgentsEvt,

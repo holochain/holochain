@@ -119,7 +119,7 @@ pub fn run_one_epoch(
         let mut arq = peers.get_mut(i).unwrap();
         let view = strat.view(topo.clone(), p.as_slice());
         let before = arq.absolute_length(topo) as f64;
-        view.update_arc(&mut arq);
+        view.update_arq(&mut arq);
         let after = arq.absolute_length(topo) as f64;
         let delta = after - before;
         // dbg!(&before, &after, &delta);

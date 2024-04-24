@@ -106,7 +106,7 @@ impl TestLegacyHost {
                                 space,
                                 agents,
                                 window,
-                                arc_set,
+                                arq_set: arc_set,
                                 near_basis,
                                 limit,
                             } = input;

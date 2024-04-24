@@ -94,7 +94,7 @@ impl AgentInfoSession {
             std::collections::hash_map::Entry::Vacant(v) => {
                 let agents = host_api
                     .legacy
-                    .query_agents(QueryAgentsEvt::new(space.clone()).by_arc_set(arc_set))
+                    .query_agents(QueryAgentsEvt::new(space.clone()).by_arq_set(arc_set))
                     .await
                     .map_err(KitsuneError::other)?;
                 v.insert(agents.clone());
@@ -278,10 +278,10 @@ pub(super) fn hash_chunks_query(
 pub(super) async fn query_region_set<'a>(
     host_api: HostApi,
     space: Arc<KitsuneSpace>,
-    common_arc_set: ArqSet,
+    common_arq_set: ArqSet,
 ) -> KitsuneResult<RegionSetLtcs> {
     host_api
-        .query_region_set(space, common_arc_set)
+        .query_region_set(space, common_arq_set)
         .await
         .map_err(KitsuneError::other)
 }

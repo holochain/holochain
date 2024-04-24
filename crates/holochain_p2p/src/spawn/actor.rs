@@ -688,7 +688,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             space,
             agents,
             window,
-            arc_set,
+            arq_set,
             near_basis,
             limit,
         } = input;
@@ -697,7 +697,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         let evt_sender = self.evt_sender.clone();
 
         Ok(async move {
-            let agents = match (agents, window, arc_set, near_basis, limit) {
+            let agents = match (agents, window, arq_set, near_basis, limit) {
                 // If only basis and limit are set, this is a "near basis" query
                 (None, None, None, Some(basis), Some(limit)) => {
                     evt_sender

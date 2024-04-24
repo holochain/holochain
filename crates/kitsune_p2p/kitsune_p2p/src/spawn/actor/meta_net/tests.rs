@@ -136,7 +136,7 @@ write_test_struct! {
         fn query_region_set(
             &Self,
             _space: Arc<KitsuneSpace>,
-            _dht_arc_set: ArqSet,
+            _arq_set: ArqSet,
         ) -> KitsuneHostResult<RegionSetLtcs>, HostRet<RegionSetLtcs> {
             Box::pin(async move {
                 Ok(RegionSetLtcs::empty())

@@ -46,7 +46,7 @@ async fn test_arc_redundancy() {
                 let p = peers.clone();
                 let arc = peers.get_mut(i).unwrap();
                 let view = PeerStrat::default().view(Topology::standard_epoch_full(), p.as_slice());
-                view.update_arc(arc);
+                view.update_arq(arc);
             }
 
             let r = check_redundancy(peers.iter().map(|a| a.to_dht_arc_std()).collect());
@@ -95,7 +95,7 @@ async fn test_join_leave() {
             let p = peers.clone();
             let arq = peers.get_mut(i).unwrap();
             let view = PeerStrat::default().view(topo.clone(), p.as_slice());
-            view.update_arc(arq);
+            view.update_arq(arq);
         }
     };
     let mut peers = get_peers(num_peers, &coverages, keystore.clone()).await;
