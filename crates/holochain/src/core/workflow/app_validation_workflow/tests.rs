@@ -247,7 +247,6 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
     let delete_action_hash = delete_action.to_hash();
-    println!("delete action hash {delete_action_hash:?}");
 
     let entry_def = EntryDef::default_from_id("entry_def_id");
     let zomes = SweetInlineZomes::new(vec![entry_def.clone()], 0).integrity_function(
@@ -255,7 +254,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         move |api, op: Op| {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
                 // chain filter goes from delete action until create action
-                let mut chain_filter = ChainFilter::new(delete.hashed.content.clone().to_hash())
+                let chain_filter = ChainFilter::new(delete.hashed.content.clone().to_hash())
                     .until(delete.hashed.deletes_address.clone());
                 let result = api.must_get_agent_activity(MustGetAgentActivityInput {
                     author: agent.clone(),

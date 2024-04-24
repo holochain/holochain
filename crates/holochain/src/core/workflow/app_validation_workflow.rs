@@ -117,13 +117,13 @@ async fn app_validation_workflow_inner(
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone().into();
-    let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
+    let sorted_dht_ops = validation_query::get_ops_to_app_validate(&db).await?;
     // filter out ops that have missing dependencies
-    tracing::debug!("number of ops to validate {:?}", sorted_ops.len());
-    let sorted_ops = validation_dependencies
+    tracing::debug!("number of ops to validate {:?}", sorted_dht_ops.len());
+    let sorted_dht_ops = validation_dependencies
         .lock()
-        .filter_ops_missing_dependencies(sorted_ops);
-    let num_ops_to_validate = sorted_ops.len();
+        .filter_ops_missing_dependencies(sorted_dht_ops);
+    let num_ops_to_validate = sorted_dht_ops.len();
     tracing::debug!(
         "number of ops to validate after filtering out ops missing hashes {num_ops_to_validate}"
     );
@@ -133,22 +133,20 @@ async fn app_validation_workflow_inner(
     );
     let sleuth_id = conductor.config.sleuth_id();
 
-    // Validate ops sequentially
-    let network = network.clone();
-    let conductor = conductor.clone();
-    let workspace = workspace.clone();
+    let cascade = Arc::new(workspace.full_cascade(network.clone()));
     let validation_dependencies = validation_dependencies.clone();
     let accepted_ops = Arc::new(Mutex::new(0));
     let awaiting_ops = Arc::new(Mutex::new(0));
     let rejected_ops = Arc::new(Mutex::new(0));
     let mut agent_activity = Vec::new();
 
-    for sorted_op in sorted_ops.into_iter() {
-        let (op, op_hash) = sorted_op.into_inner();
-        let op_type = op.get_type();
-        let action = op.action();
-        let dependency = op.sys_validation_dependency();
-        let op_lite = op.to_lite();
+    // Validate ops sequentially
+    for sorted_dht_op in sorted_dht_ops.into_iter() {
+        let (dht_op, dht_op_hash) = sorted_dht_op.into_inner();
+        let op_type = dht_op.get_type();
+        let action = dht_op.action();
+        let dependency = dht_op.sys_validation_dependency();
+        let dht_op_lite = dht_op.to_lite();
 
         // If this is agent activity, track it for the cache.
         let activity = matches!(op_type, DhtOpType::RegisterAgentActivity).then(|| {
@@ -160,11 +158,8 @@ async fn app_validation_workflow_inner(
         });
 
         // Validate this op
-        let dht_op_hash = op.to_hash();
-        let cascade = Arc::new(workspace.full_cascade(network.clone()));
-        let validation_outcome = match dhtop_to_op(op.clone(), cascade).await {
+        let validation_outcome = match dhtop_to_op(dht_op.clone(), cascade.clone()).await {
             Ok(op) => {
-                let validation_dependencies = validation_dependencies.clone();
                 validate_op_outer(
                     dna_hash.clone(),
                     &op,
@@ -172,19 +167,17 @@ async fn app_validation_workflow_inner(
                     &conductor,
                     &workspace,
                     &network,
-                    validation_dependencies,
+                    validation_dependencies.clone(),
                 )
                 .await
             }
             Err(e) => Err(e),
         };
+        // Flatten nested app validation outcome to either ok or error
         let validation_outcome = match validation_outcome {
-            Ok(outcome) => Ok(outcome),
-            Err(OutcomeOrError::Outcome(outcome)) => Ok(outcome),
-            Err(OutcomeOrError::Err(e)) => {
-                tracing::error!("app validation error {e:?} when validating {op:?}");
-                Err(e)
-            }
+            Ok(outcome) => AppValidationResult::Ok(outcome),
+            Err(OutcomeOrError::Outcome(outcome)) => AppValidationResult::Ok(outcome),
+            Err(OutcomeOrError::Err(err)) => AppValidationResult::Err(err),
         };
 
         let sleuth_id = sleuth_id.clone();
@@ -215,46 +208,48 @@ async fn app_validation_workflow_inner(
                             *accepted_ops.lock() += 1;
                             aitia::trace!(&hc_sleuth::Event::AppValidated {
                                 by: sleuth_id.clone(),
-                                op: op_hash.clone()
+                                op: dht_op_hash.clone()
                             });
 
                             if dependency.is_none() {
                                 aitia::trace!(&hc_sleuth::Event::Integrated {
                                     by: sleuth_id.clone(),
-                                    op: op_hash.clone()
+                                    op: dht_op_hash.clone()
                                 });
 
-                                put_integrated(txn, &op_hash, ValidationStatus::Valid)
+                                put_integrated(txn, &dht_op_hash, ValidationStatus::Valid)
                             } else {
-                                put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)
+                                put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Valid)
                             }
                         }
                         Outcome::AwaitingDeps(deps) => {
                             *awaiting_ops.lock() += 1;
                             put_validation_limbo(
                                 txn,
-                                &op_hash,
+                                &dht_op_hash,
                                 ValidationStage::AwaitingAppDeps(deps),
                             )
                         }
                         Outcome::Rejected(_) => {
                             *rejected_ops.lock() += 1;
                             tracing::info!(
-                            "Received invalid op. The op author will be blocked. Op: {op_lite:?}"
+                            "Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}"
                         );
                             if dependency.is_none() {
-                                put_integrated(txn, &op_hash, ValidationStatus::Rejected)
+                                put_integrated(txn, &dht_op_hash, ValidationStatus::Rejected)
                             } else {
-                                put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)
+                                put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Rejected)
                             }
                         }
                     })
                     .await;
-                if let Err(e) = write_result {
-                    tracing::error!("error updating op status in database: {e:?}");
+                if let Err(err) = write_result {
+                    tracing::error!("error updating dht op {dht_op:?} in database: {err:?}");
                 }
             }
-            _ => (),
+            Err(err) => {
+                tracing::error!("app validation error when validating dht op {dht_op:?}: {err}");
+            }
         }
     }
 
@@ -327,8 +322,8 @@ pub async fn record_to_op(
     ))
 }
 
-async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
-    let op = match op {
+async fn dhtop_to_op(dht_op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
+    let op = match dht_op {
         DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(
@@ -442,8 +437,8 @@ pub async fn validate_op(
     let network = Arc::new(network.clone());
 
     let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, network.clone(), ribosome).await;
-    if let Err(OutcomeOrError::Err(e)) = &zomes_to_invoke {
-        tracing::error!("Error getting zomes to invoke: {e} to validate op {op:?}");
+    if let Err(OutcomeOrError::Err(err)) = &zomes_to_invoke {
+        tracing::error!("Error getting zomes to invoke to validate op {op:?}: {err}");
     };
     let zomes_to_invoke = zomes_to_invoke?;
     let invocation = ValidateInvocation::new(zomes_to_invoke, op)
