@@ -133,73 +133,63 @@ async fn app_validation_workflow_inner(
     );
     let sleuth_id = conductor.config.sleuth_id();
 
-    // Build an iterator of all op validations
-    let iter = sorted_ops.into_iter().map({
-        let network = network.clone();
-        let workspace = workspace.clone();
-        move |so| {
-            let network = network.clone();
-            let conductor = conductor.clone();
-            let workspace = workspace.clone();
-            let validation_dependencies = validation_dependencies.clone();
-            let dna_hash = dna_hash.clone();
-            async move {
-                let (op, op_hash) = so.into_inner();
-                let op_type = op.get_type();
-                let action = op.action();
-                let dependency = op.sys_validation_dependency();
-                let op_lite = op.to_lite();
+    // Validate ops sequentially
+    let network = network.clone();
+    let conductor = conductor.clone();
+    let workspace = workspace.clone();
+    let validation_dependencies = validation_dependencies.clone();
+    let accepted_ops = Arc::new(Mutex::new(0));
+    let awaiting_ops = Arc::new(Mutex::new(0));
+    let rejected_ops = Arc::new(Mutex::new(0));
+    let mut agent_activity = Vec::new();
 
-                // If this is agent activity, track it for the cache.
-                let activity = matches!(op_type, DhtOpType::RegisterAgentActivity).then(|| {
-                    (
-                        action.author().clone(),
-                        action.action_seq(),
-                        dependency.is_none(),
-                    )
-                });
+    for sorted_op in sorted_ops.into_iter() {
+        let (op, op_hash) = sorted_op.into_inner();
+        let op_type = op.get_type();
+        let action = op.action();
+        let dependency = op.sys_validation_dependency();
+        let op_lite = op.to_lite();
 
-                // Validate this op
-                let dht_op_hash = op.to_hash();
-                let cascade = Arc::new(workspace.full_cascade(network.clone()));
-                let validation_outcome = match dhtop_to_op(op, cascade).await {
-                    Ok(op) => {
-                        let validation_dependencies = validation_dependencies.clone();
-                        validate_op_outer(
-                            dna_hash,
-                            &op,
-                            &dht_op_hash,
-                            &conductor,
-                            &workspace,
-                            &network,
-                            validation_dependencies,
-                        )
-                        .await
-                    }
-                    Err(e) => Err(e),
-                };
+        // If this is agent activity, track it for the cache.
+        let activity = matches!(op_type, DhtOpType::RegisterAgentActivity).then(|| {
+            (
+                action.author().clone(),
+                action.action_seq(),
+                dependency.is_none(),
+            )
+        });
 
-                (op_hash, dependency, op_lite, validation_outcome, activity)
+        // Validate this op
+        let dht_op_hash = op.to_hash();
+        let cascade = Arc::new(workspace.full_cascade(network.clone()));
+        let validation_outcome = match dhtop_to_op(op.clone(), cascade).await {
+            Ok(op) => {
+                let validation_dependencies = validation_dependencies.clone();
+                validate_op_outer(
+                    dna_hash.clone(),
+                    &op,
+                    &dht_op_hash,
+                    &conductor,
+                    &workspace,
+                    &network,
+                    validation_dependencies,
+                )
+                .await
             }
-        }
-    });
+            Err(e) => Err(e),
+        };
+        let validation_outcome = match validation_outcome {
+            Ok(outcome) => Ok(outcome),
+            Err(OutcomeOrError::Outcome(outcome)) => Ok(outcome),
+            Err(OutcomeOrError::Err(e)) => {
+                tracing::error!("app validation error {e:?} when validating {op:?}");
+                Err(e)
+            }
+        };
 
-    let validation_results = futures::future::join_all(iter).await;
-
-    let sleuth_id = sleuth_id.clone();
-
-    let (accepted_ops, awaiting_ops, rejected_ops, activity) = workspace
-        .dht_db
-        .write_async(move |txn| {
-            let mut accepted = 0;
-            let mut awaiting = 0;
-            let mut rejected = 0;
-            let mut agent_activity = Vec::new();
-            for outcome in validation_results {
-                let (op_hash, dependency, op_lite, outcome, activity) = outcome;
-                // Get the outcome or return the error
-                let outcome = outcome.or_else(|outcome_or_err| outcome_or_err.try_into())?;
-
+        let sleuth_id = sleuth_id.clone();
+        match validation_outcome {
+            Ok(outcome) => {
                 // Collect all agent activity.
                 if let Some(activity) = activity {
                     // If the activity is accepted or rejected then it's ready to integrate.
@@ -207,60 +197,70 @@ async fn app_validation_workflow_inner(
                         agent_activity.push(activity);
                     }
                 }
-
                 if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
                     warn!(
                         msg = "DhtOp has failed app validation",
                         outcome = ?outcome,
                     );
                 }
-                match outcome {
-                    Outcome::Accepted => {
-                        accepted += 1;
-                        aitia::trace!(&hc_sleuth::Event::AppValidated {
-                            by: sleuth_id.clone(),
-                            op: op_hash.clone()
-                        });
 
-                        if dependency.is_none() {
-                            aitia::trace!(&hc_sleuth::Event::Integrated {
+                let accepted_ops = accepted_ops.clone();
+                let awaiting_ops = awaiting_ops.clone();
+                let rejected_ops = rejected_ops.clone();
+
+                let write_result = workspace
+                    .dht_db
+                    .write_async(move |txn| match outcome {
+                        Outcome::Accepted => {
+                            *accepted_ops.lock() += 1;
+                            aitia::trace!(&hc_sleuth::Event::AppValidated {
                                 by: sleuth_id.clone(),
                                 op: op_hash.clone()
                             });
 
-                            put_integrated(txn, &op_hash, ValidationStatus::Valid)?;
-                        } else {
-                            put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?;
+                            if dependency.is_none() {
+                                aitia::trace!(&hc_sleuth::Event::Integrated {
+                                    by: sleuth_id.clone(),
+                                    op: op_hash.clone()
+                                });
+
+                                put_integrated(txn, &op_hash, ValidationStatus::Valid)
+                            } else {
+                                put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)
+                            }
                         }
-                    }
-                    Outcome::AwaitingDeps(deps) => {
-                        awaiting += 1;
-                        put_validation_limbo(
-                            txn,
-                            &op_hash,
-                            ValidationStage::AwaitingAppDeps(deps),
-                        )?;
-                    }
-                    Outcome::Rejected(_) => {
-                        rejected += 1;
-                        tracing::info!(
+                        Outcome::AwaitingDeps(deps) => {
+                            *awaiting_ops.lock() += 1;
+                            put_validation_limbo(
+                                txn,
+                                &op_hash,
+                                ValidationStage::AwaitingAppDeps(deps),
+                            )
+                        }
+                        Outcome::Rejected(_) => {
+                            *rejected_ops.lock() += 1;
+                            tracing::info!(
                             "Received invalid op. The op author will be blocked. Op: {op_lite:?}"
                         );
-                        if dependency.is_none() {
-                            put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
-                        } else {
-                            put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
+                            if dependency.is_none() {
+                                put_integrated(txn, &op_hash, ValidationStatus::Rejected)
+                            } else {
+                                put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)
+                            }
                         }
-                    }
+                    })
+                    .await;
+                if let Err(e) = write_result {
+                    tracing::error!("error updating op status in database: {e:?}");
                 }
             }
-            WorkflowResult::Ok((accepted, awaiting, rejected, agent_activity))
-        })
-        .await?;
+            _ => (),
+        }
+    }
 
     // Once the database transaction is committed, add agent activity to the cache
     // that is ready for integration.
-    for (author, seq, has_no_dependency) in activity {
+    for (author, seq, has_no_dependency) in agent_activity {
         // Any activity with no dependency is integrated in this workflow.
         // TODO: This will no longer be true when [#1212](https://github.com/holochain/holochain/pull/1212) lands.
         if has_no_dependency {
@@ -273,6 +273,10 @@ async fn app_validation_workflow_inner(
                 .await?;
         }
     }
+
+    let accepted_ops = *accepted_ops.lock();
+    let awaiting_ops = *awaiting_ops.lock();
+    let rejected_ops = *rejected_ops.lock();
     let ops_validated = accepted_ops + rejected_ops;
     tracing::debug!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected.");
 
