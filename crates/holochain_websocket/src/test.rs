@@ -271,8 +271,8 @@ async fn ipv6_or_ipv4_connect_on_specific_port() {
             SocketAddrV4::new(Ipv4Addr::LOCALHOST, 1456),
             SocketAddrV6::new(Ipv6Addr::LOCALHOST, 1456, 0, 0),
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         addr_s.send(l.local_addrs().unwrap()).unwrap();
 
