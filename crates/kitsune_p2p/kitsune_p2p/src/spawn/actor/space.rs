@@ -10,8 +10,11 @@ use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::NetworkType;
+use kitsune_p2p_types::dht::arq::ArqSize;
 use kitsune_p2p_types::dht::prelude::ArqClamping;
-use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
+use kitsune_p2p_types::dht::spacetime::SpaceDimension;
+use kitsune_p2p_types::dht::Arq;
+use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
@@ -61,7 +64,7 @@ ghost_actor::ghost_chan! {
         fn is_agent_local(agent: KAgent) -> bool;
 
         /// Update the arc of a local agent.
-        fn update_agent_arc(agent: KAgent, arc: DhtArc) -> ();
+        fn update_agent_arc(agent: KAgent, arq: Arq) -> ();
 
         /// Incoming Delegate Broadcast
         /// We are being requested to delegate a broadcast to our neighborhood
@@ -193,8 +196,8 @@ impl SpaceInternalHandler for Space {
         let network_type = self.config.network_type.clone();
         let mut agent_list = Vec::with_capacity(self.local_joined_agents.len());
         for agent in self.local_joined_agents.keys().cloned() {
-            let arc = self.get_agent_arc(&agent);
-            agent_list.push((agent, arc));
+            let arq = self.get_agent_arq(&agent);
+            agent_list.push((agent, arq));
         }
         let bootstrap_net = self.ro_inner.bootstrap_net;
         let ep_hnd = self.ro_inner.ep_hnd.clone();
@@ -206,13 +209,13 @@ impl SpaceInternalHandler for Space {
         Ok(async move {
             let urls = vec![TxUrl::try_from(ep_hnd.local_addr()?)?];
             let mut peer_data = Vec::with_capacity(agent_list.len());
-            for (agent, arc) in agent_list {
+            for (agent, arq) in agent_list {
                 let input = UpdateAgentInfoInput {
                     expires_after,
                     space: space.clone(),
                     agent,
                     bootstrap_net,
-                    arc,
+                    arq,
                     urls: &urls,
                     evt_sender: &evt_sender,
                     internal_sender: &internal_sender,
@@ -246,7 +249,7 @@ impl SpaceInternalHandler for Space {
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
-        let arc = self.get_agent_arc(&agent);
+        let arc = self.get_agent_arq(&agent);
 
         Ok(async move {
             let urls = vec![TxUrl::try_from(ep_hnd.local_addr()?)?];
@@ -255,7 +258,7 @@ impl SpaceInternalHandler for Space {
                 space: space.clone(),
                 agent,
                 bootstrap_net,
-                arc,
+                arq: arc,
                 urls: &urls,
                 evt_sender: &evt_sender,
                 internal_sender: &internal_sender,
@@ -334,9 +337,9 @@ impl SpaceInternalHandler for Space {
     fn handle_update_agent_arc(
         &mut self,
         agent: Arc<KitsuneAgent>,
-        arc: DhtArc,
+        arq: Arq,
     ) -> SpaceInternalHandlerResult<()> {
-        self.agent_arcs.insert(agent, arc);
+        self.agent_arqs.insert(agent, arq);
         self.update_metric_exchange_arcset();
         Ok(async move { Ok(()) }.boxed().into())
     }
@@ -357,8 +360,8 @@ impl SpaceInternalHandler for Space {
         let broadcast_source = match &data {
             BroadcastData::User(data) => {
                 for agent in self.local_joined_agents.keys() {
-                    if let Some(arc) = self.agent_arcs.get(agent) {
-                        if arc.contains(basis.get_loc()) {
+                    if let Some(arc) = self.agent_arqs.get(agent) {
+                        if arc.to_dht_arc_std().contains(basis.get_loc()) {
                             let fut = self.host_api.legacy.notify(
                                 space.clone(),
                                 agent.clone(),
@@ -377,9 +380,9 @@ impl SpaceInternalHandler for Space {
             }
             BroadcastData::AgentInfo(agent_info) => {
                 if self
-                    .agent_arcs
+                    .agent_arqs
                     .values()
-                    .any(|arc| arc.contains(basis.get_loc()))
+                    .any(|arc| arc.to_dht_arc_std().contains(basis.get_loc()))
                 {
                     let fut = self
                         .host_api
@@ -635,7 +638,7 @@ struct UpdateAgentInfoInput<'borrow> {
     space: Arc<KitsuneSpace>,
     agent: Arc<KitsuneAgent>,
     bootstrap_net: BootstrapNet,
-    arc: DhtArc,
+    arq: Arq,
     urls: &'borrow Vec<TxUrl>,
     evt_sender: &'borrow futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     internal_sender: &'borrow ghost_actor::GhostSender<SpaceInternal>,
@@ -648,18 +651,25 @@ struct UpdateAgentInfoInput<'borrow> {
 async fn update_arc_length(
     evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     space: Arc<KitsuneSpace>,
-    arc: &mut DhtArc,
+    arq: &mut Arq,
 ) -> KitsuneP2pResult<()> {
-    let view = evt_sender.query_peer_density(space.clone(), *arc).await?;
+    let dim = SpaceDimension::standard();
+    let arc = arq.to_dht_arc(dim);
+    let view = evt_sender.query_peer_density(space.clone(), arc).await?;
 
-    let cov_before = arc.coverage() * 100.0;
+    let cov_before = arq.coverage(dim) * 100.0;
     tracing::trace!("Updating arc for space {:?}:", space);
-    tracing::trace!("Before: {:2.1}% |{}|", cov_before, arc.to_ascii(64));
 
-    view.update_arc(arc);
+    #[cfg(feature = "test_utils")]
+    tracing::trace!("Before: {:2.1}% |{}|", cov_before, arq.to_ascii(dim, 64));
 
-    let cov_after = arc.coverage() * 100.0;
-    tracing::trace!("After:  {:2.1}% |{}|", cov_after, arc.to_ascii(64));
+    view.update_arq(arq);
+
+    let cov_after = arq.coverage(dim) * 100.0;
+
+    #[cfg(feature = "test_utils")]
+    tracing::trace!("After:  {:2.1}% |{}|", cov_after, arq.to_ascii(dim, 64));
+
     tracing::trace!("Diff: {:-2.2}%", cov_after - cov_before);
 
     Ok(())
@@ -674,7 +684,7 @@ async fn update_single_agent_info(
         space,
         agent,
         bootstrap_net,
-        mut arc,
+        mut arq,
         urls,
         evt_sender,
         internal_sender,
@@ -685,11 +695,11 @@ async fn update_single_agent_info(
     } = input;
 
     if dynamic_arcs {
-        update_arc_length(evt_sender, space.clone(), &mut arc).await?;
+        update_arc_length(evt_sender, space.clone(), &mut arq).await?;
     }
 
     // Update the agents arc through the internal sender.
-    internal_sender.update_agent_arc(agent.clone(), arc).await?;
+    internal_sender.update_agent_arc(agent.clone(), arq).await?;
 
     let signed_at_ms = kitsune_p2p_bootstrap_client::now_once(None, bootstrap_net).await?;
     let expires_at_ms = signed_at_ms + expires_after;
@@ -697,7 +707,7 @@ async fn update_single_agent_info(
     let agent_info_signed = AgentInfoSigned::sign(
         space.clone(),
         agent.clone(),
-        arc.half_length(),
+        arq,
         urls.clone(),
         signed_at_ms,
         expires_at_ms,
@@ -800,11 +810,11 @@ impl KitsuneP2pHandler for Space {
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arc: Option<DhtArc>,
+        initial_arq: Option<Arq>,
     ) -> KitsuneP2pHandlerResult<()> {
-        tracing::debug!(?space, ?agent, ?initial_arc, "handle_join");
-        if let Some(initial_arc) = initial_arc {
-            self.agent_arcs.insert(agent.clone(), initial_arc);
+        tracing::debug!(?space, ?agent, ?initial_arq, "handle_join");
+        if let Some(initial_arq) = initial_arq {
+            self.agent_arqs.insert(agent.clone(), initial_arq);
         }
         self.local_joined_agents
             .insert(agent.clone(), maybe_agent_info);
@@ -868,7 +878,7 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         self.local_joined_agents.remove(&agent);
-        self.agent_arcs.remove(&agent);
+        self.agent_arqs.remove(&agent);
         self.update_metric_exchange_arcset();
         for module in self.gossip_mod.values() {
             module.local_agent_leave(agent.clone());
@@ -968,8 +978,8 @@ impl KitsuneP2pHandler for Space {
         match &data {
             BroadcastData::User(data) => {
                 for (agent_key, _agent_info) in self.local_joined_agents.iter() {
-                    if let Some(arc) = self.agent_arcs.get(agent_key) {
-                        if arc.contains(basis.get_loc()) {
+                    if let Some(arq) = self.agent_arqs.get(agent_key) {
+                        if arq.to_dht_arc_std().contains(basis.get_loc()) {
                             let fut = self.host_api.legacy.notify(
                                 space.clone(),
                                 agent_key.clone(),
@@ -986,9 +996,9 @@ impl KitsuneP2pHandler for Space {
             }
             BroadcastData::AgentInfo(agent_info) => {
                 if self
-                    .agent_arcs
+                    .agent_arqs
                     .values()
-                    .any(|arc| arc.contains(basis.get_loc()))
+                    .any(|arc| arc.to_dht_arc_std().contains(basis.get_loc()))
                 {
                     let fut =
                         put_local_agent_info(self.host_api.legacy.clone(), agent_info.clone());
@@ -1219,9 +1229,9 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<bool> {
         let loc = basis.get_loc();
         let r = self
-            .agent_arcs
+            .agent_arqs
             .values()
-            .any(|agent_arc| agent_arc.contains(loc));
+            .any(|arq| arq.to_dht_arc_std().contains(loc));
         Ok(async move { Ok(r) }.boxed().into())
     }
 
@@ -1339,7 +1349,7 @@ pub(crate) struct Space {
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) host_api: HostApiLegacy,
     pub(crate) local_joined_agents: HashMap<Arc<KitsuneAgent>, Option<AgentInfoSigned>>,
-    pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
+    pub(crate) agent_arqs: HashMap<Arc<KitsuneAgent>, Arq>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
     mdns_listened_spaces: HashSet<String>,
@@ -1481,7 +1491,7 @@ impl Space {
             i_s,
             host_api,
             local_joined_agents: HashMap::new(),
-            agent_arcs: HashMap::new(),
+            agent_arqs: HashMap::new(),
             config,
             mdns_handles: HashMap::new(),
             mdns_listened_spaces: HashSet::new(),
@@ -1491,9 +1501,9 @@ impl Space {
 
     fn update_metric_exchange_arcset(&mut self) {
         let arc_set = self
-            .agent_arcs
+            .agent_arqs
             .values()
-            .map(|a| DhtArcSet::from_interval(DhtArcRange::from(a)))
+            .map(|a| DhtArcSet::from_interval(DhtArcRange::from(a.to_dht_arc_std())))
             .fold(DhtArcSet::new_empty(), |a, i| a.union(&i));
         self.ro_inner.metric_exchange.write().update_arcset(arc_set);
     }
@@ -1516,7 +1526,7 @@ impl Space {
             let agent_info_signed = AgentInfoSigned::sign(
                 space.clone(),
                 agent.clone(),
-                0,          // no storage arc
+                ArqSize::empty(), // no storage arc
                 Vec::new(), // no urls
                 signed_at_ms,
                 expires_at_ms,
@@ -1574,16 +1584,18 @@ impl Space {
     }
 
     /// Get the existing agent storage arc or create a new one.
-    fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
+    fn get_agent_arq(&self, agent: &Arc<KitsuneAgent>) -> Arq {
         // TODO: We are simply setting the initial arc to full.
         // In the future we may want to do something more intelligent.
         //
         // In the case an initial_arc is passend into the join request,
         // handle_join will initialize this agent_arcs map to that value.
-        self.agent_arcs.get(agent).cloned().unwrap_or_else(|| {
+        let strat = self.config.tuning_params.to_arq_strat();
+        self.agent_arqs.get(agent).cloned().unwrap_or_else(|| {
+            let dim = SpaceDimension::standard();
             match self.config.tuning_params.arc_clamping() {
-                Some(ArqClamping::Empty) => DhtArc::empty(agent.get_loc()),
-                Some(ArqClamping::Full) | None => DhtArc::full(agent.get_loc()),
+                Some(ArqClamping::Empty) => Arq::new_empty(dim, agent.get_loc()),
+                Some(ArqClamping::Full) | None => Arq::new_full_max(dim, &strat, agent.get_loc()),
             }
         })
     }

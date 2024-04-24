@@ -772,5 +772,8 @@ async fn request_arc(
     db: &DbRead<DbKindP2pAgents>,
     agent: KitsuneAgent,
 ) -> StateQueryResult<Option<DhtArc>> {
-    Ok(db.p2p_get_agent(&agent).await?.map(|info| info.storage_arc))
+    Ok(db
+        .p2p_get_agent(&agent)
+        .await?
+        .map(|info| info.storage_arc()))
 }

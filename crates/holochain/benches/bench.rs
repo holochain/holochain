@@ -1,8 +1,8 @@
-use ::fixt::prelude::*;
 use criterion::criterion_group;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::Throughput;
+use fixt::prelude::*;
 use hdk::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain::core::ribosome::RibosomeT;
@@ -85,14 +85,9 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     nonce: [0; 32].into(),
                     signature: [0; 64].into(),
                 };
-
-                todo!("allow this to be async");
-                // REAL_RIBOSOME
-                //     .lock()
-                //     .unwrap()
-                //     .clone()
-                //     .maybe_call(ha.clone().into(), &i, &zome, &i.fn_name)
-                //     .unwrap();
+                let ribosome = REAL_RIBOSOME.lock().unwrap().clone();
+                let fut = ribosome.maybe_call(ha.clone().into(), &i, &zome, &i.fn_name);
+                futures::executor::block_on(fut).unwrap();
             });
         });
     }

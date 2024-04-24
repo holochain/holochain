@@ -968,12 +968,12 @@ mod network_impls {
                             )? {
                                 None => (0.0, 0),
                                 Some(agent) => {
-                                    let arc_size = agent.storage_arc.coverage();
+                                    let arc_size = agent.storage_arc().coverage();
                                     let agents_in_arc = txn.p2p_gossip_query_agents(
                                         space.clone(),
                                         u64::MIN,
                                         u64::MAX,
-                                        agent.storage_arc.inner().into(),
+                                        agent.storage_arc().inner().into(),
                                     )?;
                                     let number_of_agents_in_arc = agents_in_arc.len();
                                     let total_network_peers = if number_of_agents_in_arc == 0 {
@@ -2155,7 +2155,7 @@ mod app_status_impls {
                         Ok(maybe_info) => maybe_info,
                         _ => None,
                     };
-                    let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
+                    let maybe_initial_arq = maybe_agent_info.clone().map(|i| i.storage_arq);
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
                     let res = tokio::time::timeout(
@@ -2163,7 +2163,7 @@ mod app_status_impls {
                         cell.holochain_p2p_dna().clone().join(
                             agent_pubkey,
                             maybe_agent_info,
-                            maybe_initial_arc,
+                            maybe_initial_arq,
                         ),
                     )
                         .await;
