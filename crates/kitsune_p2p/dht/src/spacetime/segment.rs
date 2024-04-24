@@ -44,7 +44,10 @@ pub(crate) type QDim<O> = <<O as Offset>::Quantum as Quantum>::Dim;
     serde::Serialize,
     serde::Deserialize,
 )]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[serde(transparent)]
 pub struct SpaceOffset(pub u32);
 
@@ -69,7 +72,10 @@ pub struct SpaceOffset(pub u32);
     serde::Serialize,
     serde::Deserialize,
 )]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[serde(transparent)]
 pub struct TimeOffset(pub u32);
 
@@ -120,7 +126,10 @@ impl Offset for TimeOffset {
 #[derive(
     Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize,
 )]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct Segment<O: Offset> {
     /// The exponent, where length = 2^power
     pub power: u8,

@@ -11,7 +11,7 @@ use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     dependencies::lair_keystore_api::LairClient,
-    dht::{arq::LocalStorageConfig, spacetime::*, ArqStrat, PeerStrat},
+    dht::{spacetime::*, ArqStrat, PeerStrat},
     dht_arc::{DhtArc, DhtArcRange},
     KAgent,
 };
@@ -106,7 +106,7 @@ impl TestLegacyHost {
                                 space,
                                 agents,
                                 window,
-                                arc_set,
+                                arq_set: arc_set,
                                 near_basis,
                                 limit,
                             } = input;
@@ -120,7 +120,7 @@ impl TestLegacyHost {
                                         .iter()
                                         .filter_map(|v| {
                                             if v.is_active() {
-                                                Some((v.storage_arc.dist(basis.as_u32()), v))
+                                                Some((v.storage_arc().dist(basis.as_u32()), v))
                                             } else {
                                                 None
                                             }
@@ -137,7 +137,7 @@ impl TestLegacyHost {
                                 }
 
                                 // Handle as a "gossip agents" query.
-                                (_agents, window, Some(arc_set), None, None) => {
+                                (_agents, window, Some(arq_set), None, None) => {
                                     let window = window.unwrap_or_else(full_time_window);
                                     let since_ms = window.start.as_millis().max(0) as u64;
                                     let until_ms = window.end.as_millis().max(0) as u64;
@@ -155,8 +155,8 @@ impl TestLegacyHost {
                                             return None;
                                         }
 
-                                        let interval = DhtArcRange::from(info.storage_arc);
-                                        if !arc_set.overlap(&interval.into()) {
+                                        let interval = DhtArcRange::from(info.storage_arc());
+                                        if !arq_set.to_dht_arc_set_std().overlap(&interval.into()) {
                                             return None;
                                         }
 
@@ -193,7 +193,7 @@ impl TestLegacyHost {
                         KitsuneP2pEvent::QueryPeerDensity {
                             respond,
                             space,
-                            dht_arc,
+                            dht_arc: _,
                             ..
                         } => {
                             let cutoff = std::time::Duration::from_secs(60 * 15);
@@ -209,17 +209,15 @@ impl TestLegacyHost {
                                 .iter()
                                 .filter_map(|agent: &AgentInfoSigned| {
                                     if agent.space == space && now < agent.expires_at_ms {
-                                        Some(agent.storage_arc)
+                                        Some(agent.storage_arq)
                                     } else {
                                         None
                                     }
                                 })
                                 .collect::<Vec<_>>();
 
-                            let strat = PeerStrat::Quantized(ArqStrat::standard(
-                                LocalStorageConfig::default(),
-                            ));
-                            let view = strat.view(topology, dht_arc, &arcs);
+                            let strat = PeerStrat::Quantized(ArqStrat::default());
+                            let view = strat.view(topology, &arcs);
 
                             respond.respond(Ok(async move { Ok(view) }.boxed().into()))
                         }

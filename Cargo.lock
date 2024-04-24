@@ -4228,6 +4228,7 @@ dependencies = [
 name = "kitsune_p2p_bootstrap_client"
 version = "0.3.0-beta-dev.33"
 dependencies = [
+ "arbitrary",
  "ed25519-dalek",
  "fixt",
  "kitsune_p2p_bin_data",

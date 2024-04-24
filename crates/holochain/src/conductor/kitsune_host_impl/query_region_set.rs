@@ -1,16 +1,10 @@
-use std::sync::{
-    atomic::{AtomicI64, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 
-use holochain_p2p::{dht::prelude::*, dht_arc::DhtArcSet};
+use holochain_p2p::dht::prelude::*;
 use holochain_sqlite::prelude::*;
 use rusqlite::named_params;
 
 use crate::conductor::error::ConductorResult;
-
-static LAST_LOG_MS: AtomicI64 = AtomicI64::new(0);
-const LOG_RATE_MS: i64 = 1000;
 
 /// The network module needs info about various groupings ("regions") of ops.
 ///
@@ -23,48 +17,11 @@ const LOG_RATE_MS: i64 = 1000;
 pub async fn query_region_set(
     db: DbWrite<DbKindDht>,
     topology: Topology,
-    strat: &ArqStrat,
-    dht_arc_set: Arc<DhtArcSet>,
+    _strat: &ArqStrat,
+    arq_set: Arc<ArqSet>,
 ) -> ConductorResult<RegionSetLtcs> {
-    let arq_set =
-        ArqSet::from_dht_arc_set_exact(&topology, strat, &dht_arc_set).unwrap_or_else(|| {
-            // If an exact match couldn't be made, try the rounding approach, though this is probably
-            // hopeless since the only way the exact match can fail is if the arc cannot be represented
-            // by a quantized arq at all. But, this code was already here, so I'm keeping it here
-            // anyway, just in case.
-
-            let (arq_set, rounded) =
-                ArqSet::from_dht_arc_set_rounded(&topology, strat, &dht_arc_set);
-            if rounded {
-                // If an arq was rounded, emit a warning, but throttle it to once every LOG_RATE_MS
-                // so we don't get slammed.
-                let it_is_time = LAST_LOG_MS
-                    .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |t| {
-                        let now = Timestamp::now();
-                        // If the difference is greater than the logging interval,
-                        // produce a Some so that the atomic val gets updated, which
-                        // will trigger a log after the update.
-                        now.checked_difference_signed(&Timestamp::from_micros(t * 1000))
-                            .map(|d| d > chrono::Duration::try_milliseconds(LOG_RATE_MS).unwrap())
-                            .unwrap_or(false)
-                            .then(|| now.as_millis())
-                    })
-                    .is_ok();
-                if it_is_time {
-                    tracing::warn!(
-                        "A continuous arc set could not be properly quantized.
-            Original:  {:?}
-            Quantized: {:?}",
-                        dht_arc_set,
-                        arq_set
-                    );
-                }
-            }
-            arq_set
-        });
-
     let times = TelescopingTimes::historical(&topology);
-    let coords = RegionCoordSetLtcs::new(times, arq_set);
+    let coords = RegionCoordSetLtcs::new(times, (*arq_set).clone());
 
     let region_set = db
         .read_async(move |txn| {
@@ -125,9 +82,9 @@ mod tests {
         let db = test_dht_db();
         let topo = Topology::standard(Timestamp::now(), Duration::ZERO);
         let strat = ArqStrat::default();
-        let arcset = Arc::new(DhtArcSet::Full);
+        let arq_set = Arc::new(ArqSet::full_std());
 
-        let regions_empty = query_region_set(db.to_db(), topo.clone(), &strat, arcset.clone())
+        let regions_empty = query_region_set(db.to_db(), topo.clone(), &strat, arq_set.clone())
             .await
             .unwrap();
         {
@@ -170,7 +127,7 @@ mod tests {
             }
         });
 
-        let regions = query_region_set(db.to_db(), topo, &strat, arcset)
+        let regions = query_region_set(db.to_db(), topo, &strat, arq_set)
             .await
             .unwrap();
 
