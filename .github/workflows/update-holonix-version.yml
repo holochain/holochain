@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: develop
-      - uses: cachix/install-nix-action@v22
+      - uses: cachix/install-nix-action@v26
       - name: Get tags
         run: git fetch --quiet --tags origin
       - name: Configure Git
