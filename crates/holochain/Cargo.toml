@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.2.8-rc.0"
+version = "0.2.8-rc.1"
 description = "Holochain, a framework for distributed applications"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -35,7 +35,7 @@ holochain_state = { version = "^0.2.7", path = "../holochain_state" }
 holochain_types = { version = "^0.2.7", path = "../holochain_types" }
 holochain_util = { version = "^0.2.7", path = "../holochain_util", features = [ "pw" ] }
 holochain_wasmer_host = "=0.0.92"
-holochain_websocket = { version = "^0.2.8-rc.0", path = "../holochain_websocket" }
+holochain_websocket = { version = "^0.2.8-rc.1", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.2.7", path = "../holochain_zome_types", features = ["full"] }
 human-panic = "1.0.3"
 itertools = { version = "0.10" }
