@@ -6,10 +6,7 @@ use std::{
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
 
-use crate::{
-    core::ribosome::guest_callback::validate::ValidateResult, sweettest::*,
-    test_utils::consistency_10s,
-};
+use crate::{core::ribosome::guest_callback::validate::ValidateResult, sweettest::*};
 
 const ZOME_A_0: &'static str = "ZOME_A_0";
 const ZOME_A_1: &'static str = "ZOME_A_1";
@@ -169,7 +166,7 @@ impl Expected {
 /// Test that all ops are created and the correct zomes
 /// are called for each op.
 async fn app_validation_ops() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let entry_def_a = EntryDef::default_from_id("a");
     let entry_def_b = EntryDef::default_from_id("b");
     let call_back_a = |_zome_name: &'static str| {
@@ -230,20 +227,16 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterUpdate(RegisterUpdate {
-                        update,
-                        original_action,
-                        ..
-                    }) => {
-                        let (with_entry_def_index, with_zome_index) =
-                            match original_action.app_entry_def().cloned() {
-                                Some(AppEntryDef {
-                                    entry_index,
-                                    zome_index,
-                                    ..
-                                }) => (Some(entry_index), Some(zome_index)),
-                                _ => (None, None),
-                            };
+                    Op::RegisterUpdate(RegisterUpdate { update, .. }) => {
+                        let (with_entry_def_index, with_zome_index) = match update.hashed.entry_type
+                        {
+                            EntryType::App(AppEntryDef {
+                                entry_index,
+                                zome_index,
+                                ..
+                            }) => (Some(entry_index), Some(zome_index)),
+                            _ => (None, None),
+                        };
                         Event {
                             action: ActionLocation::new(update.hashed.content.clone(), &agents),
                             op_type: DhtOpType::RegisterUpdatedContent,
@@ -252,18 +245,14 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterDelete(RegisterDelete {
-                        delete,
-                        original_action,
-                        ..
-                    }) => {
+                    Op::RegisterDelete(RegisterDelete { delete, .. }) => {
                         let (with_entry_def_index, with_zome_index) =
-                            match original_action.app_entry_def().cloned() {
-                                Some(AppEntryDef {
+                            match (*delete.hashed).clone().into_action().entry_type() {
+                                Some(EntryType::App(AppEntryDef {
                                     entry_index,
                                     zome_index,
                                     ..
-                                }) => (Some(entry_index), Some(zome_index)),
+                                })) => (Some(entry_index.clone()), Some(zome_index.clone())),
                                 _ => (None, None),
                             };
                         Event {
@@ -395,7 +384,7 @@ async fn app_validation_ops() {
         .call(&alice.zome("zome1"), "create_a", ())
         .await;
 
-    consistency_10s([&alice, &bob]).await;
+    await_consistency(10, [&alice, &bob]).await.unwrap();
 
     let mut expected = Expected(HashSet::new());
 

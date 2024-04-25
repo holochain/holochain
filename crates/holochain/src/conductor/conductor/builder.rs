@@ -58,6 +58,7 @@ impl ConductorBuilder {
     }
 
     /// Initialize a "production" Conductor
+    #[tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope))]
     pub async fn build(self) -> ConductorResult<ConductorHandle> {
         tracing::debug!(?self.config);
 
@@ -301,12 +302,12 @@ impl ConductorBuilder {
     ) -> ConductorResult<ConductorHandle> {
         conductor
             .clone()
-            .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL)
-            .await;
+            .start_scheduler(SCHEDULER_INTERVAL)
+            .await?;
 
         info!("Conductor startup: scheduler task started.");
 
-        tokio::task::spawn(p2p_event_task(p2p_evt, conductor.clone()));
+        tokio::task::spawn(p2p_event_task(p2p_evt, conductor.clone()).in_current_span());
 
         info!("Conductor startup: p2p event task started.");
 
@@ -359,6 +360,7 @@ impl ConductorBuilder {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
+    #[tracing::instrument(skip_all)]
     pub(crate) async fn update_fake_state(
         state: Option<ConductorState>,
         conductor: Conductor,
@@ -371,6 +373,7 @@ impl ConductorBuilder {
 
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
+    #[tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope))]
     pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
         use holochain_p2p::NetworkCompatParams;
 

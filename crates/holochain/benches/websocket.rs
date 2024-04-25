@@ -20,7 +20,7 @@ use tracing::debug;
 
 // @todo fix after fixing new InstallApp tests
 // pub fn websocket_concurrent_install(c: &mut Criterion) {
-//     holochain_trace::test_run().ok();
+//     holochain_trace::test_run();
 
 //     static REQ_TIMEOUT_MS: u64 = 15000;
 //     static NUM_DNA_CONCURRENCY: &[(u16, usize)] = &[(1, 1), (8, 4), (64, 10)];

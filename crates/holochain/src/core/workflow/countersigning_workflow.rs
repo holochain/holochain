@@ -9,8 +9,8 @@ use holochain_state::mutations;
 use holochain_state::prelude::*;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use rusqlite::{named_params, Transaction};
+use tokio::sync::broadcast;
 
-use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
 use crate::core::ribosome::weigh_placeholder;
@@ -146,15 +146,16 @@ pub(crate) async fn countersigning_workflow(
 }
 
 /// An incoming countersigning session success.
+#[tracing::instrument(skip_all)]
 pub(crate) async fn countersigning_success(
     space: Space,
     network: &HolochainP2pDna,
     author: AgentPubKey,
     signed_actions: Vec<SignedAction>,
     trigger: QueueTriggers,
-    mut signal: SignalBroadcaster,
+    signal: broadcast::Sender<Signal>,
 ) -> WorkflowResult<()> {
-    let authored_db = space.authored_db;
+    let authored_db = space.get_or_create_authored_db(author.clone())?;
     let dht_db = space.dht_db;
     let dht_db_cache = space.dht_query_cache;
     let QueueTriggers {
@@ -279,8 +280,8 @@ pub(crate) async fn countersigning_success(
                 .into_iter()
                 .map(|(op_hash, _)| op_hash)
                 .collect(),
-            &(authored_db.into()),
-            &dht_db,
+            authored_db.into(),
+            dht_db,
             &dht_db_cache,
         )
         .await?;
@@ -299,10 +300,14 @@ pub(crate) async fn countersigning_success(
                 );
             }
         }
+
         // Signal to the UI.
-        signal.send(Signal::System(SystemSignal::SuccessfulCountersigning(
-            entry_hash,
-        )))?;
+        // If there are no active connections this won't emit anything.
+        signal
+            .send(Signal::System(SystemSignal::SuccessfulCountersigning(
+                entry_hash,
+            )))
+            .ok();
 
         publish_trigger.trigger(&"publish countersigning_success");
     }

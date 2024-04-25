@@ -55,7 +55,7 @@ mod singleton {
     #[test_case( Singleton(true, false) => None ; "passing single isolated fact produces Pass")]
     #[test_case( Singleton(true, true) => None  ; "passing single self-referencing fact produces Pass")]
     fn singleton_deps(fact: Singleton) -> Option<HashSet<Dep<Singleton>>> {
-        holochain_trace::test_run().ok().unwrap();
+        holochain_trace::test_run();
         fact.clone()
             .traverse(&())
             .unwrap()
@@ -128,7 +128,7 @@ mod acyclic_single_path {
         ; "Countdown from 1 with 3 being true returns path from 1 to 0"
     )]
     fn single_path(countdown: Countdown, truths: HashSet<u8>) -> HashSet<u8> {
-        holochain_trace::test_run().ok().unwrap();
+        holochain_trace::test_run();
 
         let tr = countdown.traverse(&truths);
         report(&tr);
@@ -209,7 +209,7 @@ mod single_loop {
         ; "Countdown from 2 with 3 true returns path 2->1"
     )]
     fn single_loop(countdown: Countdown, truths: HashSet<u8>) -> (HashSet<u8>, usize) {
-        holochain_trace::test_run().ok().unwrap();
+        holochain_trace::test_run();
 
         let tr = countdown.traverse(&truths);
         report(&tr);
@@ -234,7 +234,7 @@ mod single_loop {
 /// Contrived test case involving graphs mostly consisting of ANY nodes
 #[test]
 fn branching_any() {
-    holochain_trace::test_run().ok().unwrap();
+    holochain_trace::test_run();
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
     struct Branching(u8);
@@ -358,7 +358,7 @@ mod recipes {
         ; "TunaMelt only requires tuna"
     )]
     fn every_dep_simple(item: Recipe, truths: HashSet<Recipe>) -> HashSet<Recipe> {
-        holochain_trace::test_run().ok().unwrap();
+        holochain_trace::test_run();
 
         // TODO:
         // - loops with Every might take some more thought.
@@ -374,7 +374,7 @@ mod recipes {
 
     #[test]
     fn happy_path() {
-        holochain_trace::test_run().ok().unwrap();
+        holochain_trace::test_run();
         use Recipe::*;
         let mut truths = hashset! {
             Eggs,
@@ -426,7 +426,7 @@ mod recipes {
 #[test]
 #[ignore = "should be run manually"]
 fn holochain_like() {
-    holochain_trace::test_run().ok().unwrap();
+    holochain_trace::test_run();
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
     struct F {

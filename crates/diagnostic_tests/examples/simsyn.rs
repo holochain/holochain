@@ -10,7 +10,10 @@ use std::{
 };
 
 use diagnostic_tests::syn_zome;
-use holochain_diagnostics::{holochain::sweettest::*, random_bytes, seeded_rng, AgentPubKey};
+use holochain_diagnostics::{
+    holochain::sweettest::*, random_bytes, seeded_rng, AgentPubKey, Signal,
+};
+use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::{StreamExt, StreamMap};
 
 const NODES: usize = 10;
@@ -45,7 +48,7 @@ struct App {
 }
 
 impl App {
-    async fn setup() -> (Self, Vec<SignalStream>) {
+    async fn setup() -> (Self, Vec<BroadcastStream<Signal>>) {
         let config = standard_config().into();
 
         let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", syn_zome())).await;
@@ -54,7 +57,11 @@ impl App {
 
         conductors.exchange_peer_info().await;
 
-        let signal_rxs = conductors.iter_mut().map(|c| c.signals()).collect();
+        let signal_rxs = conductors
+            .iter_mut()
+            .map(|c| c.subscribe_to_app_signals("basic".to_string()))
+            .map(|rx| tokio_stream::wrappers::BroadcastStream::new(rx))
+            .collect::<Vec<_>>();
         let nodes = std::iter::zip(conductors.into_iter().map(Arc::new), zomes.into_iter())
             .map(|(conductor, zome)| Node { conductor, zome })
             .collect();
@@ -113,7 +120,10 @@ fn task_signal_sender(app: App) -> tokio::task::JoinHandle<()> {
     })
 }
 
-fn task_signal_handler(_app: App, signal_rxs: Vec<SignalStream>) -> tokio::task::JoinHandle<()> {
+fn task_signal_handler(
+    _app: App,
+    signal_rxs: Vec<BroadcastStream<Signal>>,
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut streams = StreamMap::new();
         for (i, s) in signal_rxs.into_iter().enumerate() {

@@ -13,8 +13,9 @@ name = "integrity_test_wasm_must_get"
 path = "src/integrity.rs"
 crate-type = ["cdylib", "rlib"]
 
+# reminder - do not use workspace deps
 [dependencies]
-serde = { workspace = true }
+serde = "1.0"
 holochain_test_wasm_common = { path = "../../../wasm_common" }
 hdk = { path = "../../../../hdk" }
 thiserror = "1"

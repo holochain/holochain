@@ -12,7 +12,7 @@ use tempfile::{tempdir, TempDir};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
@@ -88,15 +88,19 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
     }
     {
         let clone_cell = conductor
-            .create_clone_cell(CreateCloneCellPayload {
-                app_id: "app_1".into(),
-                role_name: "name".into(),
-                modifiers: DnaModifiersOpt::none()
-                    .with_network_seed("1".into())
-                    .with_properties(YamlProperties::new(serde_yaml::Value::String("foo".into()))),
-                membrane_proof: None,
-                name: Some("Johnny".into()),
-            })
+            .create_clone_cell(
+                &"app_1".into(),
+                CreateCloneCellPayload {
+                    role_name: "name".into(),
+                    modifiers: DnaModifiersOpt::none()
+                        .with_network_seed("1".into())
+                        .with_properties(YamlProperties::new(serde_yaml::Value::String(
+                            "foo".into(),
+                        ))),
+                    membrane_proof: None,
+                    name: Some("Johnny".into()),
+                },
+            )
             .await
             .unwrap();
 
@@ -110,15 +114,19 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
     }
     {
         let err = conductor
-            .create_clone_cell(CreateCloneCellPayload {
-                app_id: "app_1".into(),
-                role_name: "name".into(),
-                modifiers: DnaModifiersOpt::none()
-                    .with_network_seed("1".into())
-                    .with_properties(YamlProperties::new(serde_yaml::Value::String("foo".into()))),
-                membrane_proof: None,
-                name: None,
-            })
+            .create_clone_cell(
+                &"app_1".into(),
+                CreateCloneCellPayload {
+                    role_name: "name".into(),
+                    modifiers: DnaModifiersOpt::none()
+                        .with_network_seed("1".into())
+                        .with_properties(YamlProperties::new(serde_yaml::Value::String(
+                            "foo".into(),
+                        ))),
+                    membrane_proof: None,
+                    name: None,
+                },
+            )
             .await
             .unwrap_err();
         assert_matches!(

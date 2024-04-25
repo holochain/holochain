@@ -5,17 +5,17 @@
 //! The main abstraction for creating data read queries is the [`Query`](crate::query::Query) trait.
 //! This can be implemented to make constructing complex queries easier.
 //!
-//! The [`source_chain`](crate::source_chain) module provides the [`SourceChain`](crate::source_chain::SourceChain) type,
+//! The [`source_chain`] module provides the [`SourceChain`](crate::source_chain::SourceChain) type,
 //! which is the abstraction for working with chains of actions.
 //!
-//! The [`host_fn_workspace`](crate::host_fn_workspace) module provides abstractions for reading data during workflows.
+//! The [`host_fn_workspace`] module provides abstractions for reading data during workflows.
 //!
 //! ## Writes
-//! The [`mutations`](crate::mutations) module is the complete set of functions
+//! The [`mutations`] module is the complete set of functions
 //! for writing data to sqlite in holochain.
 //!
 //! ## In-memory
-//! The [`scratch`](crate::scratch) module provides the [`Scratch`](crate::scratch::Scratch) type for
+//! The [`scratch`] module provides the [`Scratch`](crate::scratch::Scratch) type for
 //! reading and writing data in memory that is not visible anywhere else.
 //!
 //! The SourceChain type uses the Scratch for in-memory operations which

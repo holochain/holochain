@@ -2,10 +2,11 @@ use holochain_cascade::test_utils::*;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::prelude::*;
+use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_not_authority() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -61,7 +62,7 @@ async fn links_not_authority() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_authority() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -76,7 +77,7 @@ async fn links_authority() {
     // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(true));
-    let mock = MockNetwork::new(mock);
+    let mock = Arc::new(mock);
 
     // Cascade
     let cascade = CascadeImpl::empty()
@@ -102,7 +103,7 @@ async fn links_authority() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_authoring() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -133,7 +134,7 @@ async fn links_authoring() {
             deletes: vec![],
         }])
     });
-    let mock = MockNetwork::new(mock);
+    let mock = Arc::new(mock);
 
     // Cascade
     let cascade = CascadeImpl::empty()
@@ -168,7 +169,7 @@ async fn links_authoring() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_links_can_match_a_partial_tag() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // Environments
     let cache = test_cache_db();
@@ -199,7 +200,7 @@ async fn test_links_can_match_a_partial_tag() {
             deletes: vec![],
         }])
     });
-    let mock = MockNetwork::new(mock);
+    let mock = Arc::new(mock);
 
     // Cascade
     let cascade = CascadeImpl::empty()

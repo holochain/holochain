@@ -34,8 +34,7 @@ pub fn disable_clone_cell<'a>(
 
             tokio_helper::block_forever_on(async move {
                 conductor_handle
-                    .disable_clone_cell(DisableCloneCellPayload {
-                        app_id: installed_app_id,
+                    .disable_clone_cell(&installed_app_id, DisableCloneCellPayload {
                         clone_cell_id: input.clone_cell_id,
                     })
                     .await

@@ -3,6 +3,7 @@ use holochain_types::prelude::ChainItem;
 
 use super::*;
 
+#[tracing::instrument(skip_all)]
 pub(crate) async fn graft_records_onto_source_chain(
     conductor: ConductorHandle,
     cell_id: CellId,
@@ -57,7 +58,7 @@ pub(crate) async fn graft_records_onto_source_chain(
 
     // Commit the records to the source chain.
     let ops_to_integrate = space
-        .authored_db
+        .get_or_create_authored_db(cell_id.agent_pubkey().clone())?
         .write_async({
             let cell_id = cell_id.clone();
             move |txn| {
@@ -108,8 +109,10 @@ pub(crate) async fn graft_records_onto_source_chain(
         holochain_state::integrate::authored_ops_to_dht_db(
             &network,
             ops_to_integrate,
-            &space.authored_db,
-            &space.dht_db,
+            space
+                .get_or_create_authored_db(cell_id.agent_pubkey().clone())?
+                .into(),
+            space.dht_db.clone(),
             &space.dht_query_cache,
         )
         .await?;
@@ -139,7 +142,7 @@ async fn validate_records(
     // Create a raw source chain to validate against because
     // genesis may not have been run yet.
     let workspace = SourceChainWorkspace::raw_empty(
-        space.authored_db.clone(),
+        space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?,
         space.dht_db.clone(),
         space.dht_query_cache.clone(),
         space.cache_db.clone(),

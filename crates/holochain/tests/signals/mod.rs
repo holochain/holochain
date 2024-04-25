@@ -1,13 +1,11 @@
 //! Tests for local and remote signals using rendezvous config
 //!
 
-use futures::StreamExt;
 use hdk::prelude::ExternIO;
 use holochain::sweettest::{SweetCell, SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -28,7 +26,7 @@ fn to_signal_message(signal: Signal) -> SignalMessage {
 #[cfg(feature = "slow_tests")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn remote_signals_batch() -> anyhow::Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut conductors =
         SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous(true))
@@ -44,15 +42,15 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
         app_batch.into_tuples();
 
     // Make sure the conductors are talking to each other before sending signals.
-    conductors
-        .require_initial_gossip_activity_for_cell(&bob, Duration::from_secs(90))
+    conductors[1]
+        .require_initial_gossip_activity_for_cell(&bob, 3, Duration::from_secs(90))
         .await;
 
     // Listen for signals on Bob's and Carol's conductors.
     // These are all the signals on that conductor but the only app installed
     // is the one for this test.
-    let conductor_1_signal_stream = conductors[1].signal_stream().await.map(to_signal_message);
-    let conductor_2_signal_stream = conductors[2].signal_stream().await.map(to_signal_message);
+    let mut conductor_1_signal_rx = conductors[1].subscribe_to_app_signals("app".to_string());
+    let mut conductor_2_signal_rx = conductors[2].subscribe_to_app_signals("app".to_string());
 
     // Call `signal_others` multiple times as Alice to send signals to Bob.
     for i in 0..6 {
@@ -73,22 +71,23 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
 
     // Check that Bob and Carol receive all the signals.
     tokio::time::timeout(Duration::from_secs(60), async move {
-        let msgs_1: HashSet<String> = conductor_1_signal_stream
-            .take(6)
-            .map(|m| m.value)
-            .collect()
-            .await;
-        let msgs_2: HashSet<String> = conductor_2_signal_stream
-            .take(6)
-            .map(|m| m.value)
-            .collect()
-            .await;
-        let expected = (0..6)
-            .map(|i| format!("message {}", i))
-            .collect::<HashSet<_>>();
+        for i in 0..6 {
+            let msg_1 = conductor_1_signal_rx
+                .recv()
+                .await
+                .map(to_signal_message)
+                .unwrap()
+                .value;
+            let msg_2 = conductor_2_signal_rx
+                .recv()
+                .await
+                .map(to_signal_message)
+                .unwrap()
+                .value;
 
-        assert_eq!(msgs_1, expected);
-        assert_eq!(msgs_1, msgs_2);
+            assert_eq!(msg_1, format!("message {}", i));
+            assert_eq!(msg_1, msg_2);
+        }
     })
     .await
     .unwrap();

@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use arbitrary::Arbitrary;
-use ed25519_dalek::{Keypair, Signer};
+use ed25519_dalek::{Signer, SigningKey};
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::FullStateDump;
@@ -47,6 +47,7 @@ use holochain::{
 };
 use holochain_conductor_api::AppResponse;
 use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 use holochain_util::tokio_helper;
 
 /// Wrapper that synchronously waits for the Child to terminate on drop.
@@ -120,7 +121,7 @@ pub async fn grant_zome_call_capability(
 pub async fn call_zome_fn<S>(
     app_tx: &WebsocketSender,
     cell_id: CellId,
-    signing_keypair: &Keypair,
+    signing_keypair: &SigningKey,
     cap_secret: CapSecret,
     zome_name: ZomeName,
     fn_name: FunctionName,
@@ -129,7 +130,7 @@ pub async fn call_zome_fn<S>(
     S: Serialize + std::fmt::Debug,
 {
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
-    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
     let zome_call_unsigned = ZomeCallUnsigned {
         cap_secret: Some(cap_secret),
         cell_id: cell_id.clone(),
@@ -160,7 +161,11 @@ pub async fn call_zome_fn<S>(
 }
 
 pub async fn attach_app_interface(client: &mut WebsocketSender, port: Option<u16>) -> u16 {
-    let request = AdminRequest::AttachAppInterface { port };
+    let request = AdminRequest::AttachAppInterface {
+        port,
+        allowed_origins: AllowedOrigins::Any,
+        installed_app_id: None,
+    };
     let response = client.request(request);
     let response = check_timeout(response, 3000).await;
     match response {
@@ -335,7 +340,10 @@ pub async fn check_started(holochain: &mut Child) {
 pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig {
     ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port },
+            driver: InterfaceDriver::Websocket {
+                port,
+                allowed_origins: AllowedOrigins::Any,
+            },
         }]),
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,

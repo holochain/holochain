@@ -1,5 +1,6 @@
 use holo_hash::*;
 use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
@@ -164,10 +165,31 @@ pub enum AdminRequest {
     /// Optionally a `port` parameter can be passed to this request. If it is `None`,
     /// a free port is chosen by the conductor.
     ///
+    /// An `allowed_origins` parameter to control which origins are allowed to connect
+    /// to the app interface.
+    ///
     /// [`AppRequest`]: super::AppRequest
     AttachAppInterface {
         /// Optional port number
         port: Option<u16>,
+
+        /// Allowed origins for this app interface.
+        ///
+        /// This should be one of:
+        /// - A comma separated list of origins - `http://localhost:3000,http://localhost:3001`,
+        /// - A single origin - `http://localhost:3000`,
+        /// - Any origin - `*`
+        ///
+        /// Connections from any origin which is not permitted by this config will be rejected.
+        allowed_origins: AllowedOrigins,
+
+        /// Optionally bind this app interface to a specific installed app.
+        ///
+        /// If this is `None` then the interface can be used to establish a connection for any app.
+        ///
+        /// If this is `Some` then the interface will only accept connections for the specified app.
+        /// Those connections will only be able to make calls to and receive signals from that app.
+        installed_app_id: Option<InstalledAppId>,
     },
 
     /// List all the app interfaces currently attached with [`AttachAppInterface`].
@@ -337,6 +359,14 @@ pub enum AdminRequest {
 
     /// Info about storage used by apps
     StorageInfo,
+
+    /// Connecting to an app over an app websocket requires an authentication token. This endpoint
+    /// is used to issue those tokens for use by app clients.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::AppAuthenticationTokenIssued`]
+    IssueAppAuthenticationToken(IssueAppAuthenticationTokenPayload),
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -410,7 +440,7 @@ pub enum AdminResponse {
     },
 
     /// The list of attached app interfaces.
-    AppInterfacesListed(Vec<u16>),
+    AppInterfacesListed(Vec<AppInterfaceInfo>),
 
     /// The successful response to an [`AdminRequest::EnableApp`].
     ///
@@ -478,6 +508,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::StorageInfo`].
     StorageInfo(StorageInfo),
+
+    /// The successful response to an [`AdminRequest::IssueAppAuthenticationToken`].
+    AppAuthenticationTokenIssued(AppAuthenticationTokenIssued),
 }
 
 /// Error type that goes over the websocket wire.
@@ -524,51 +557,156 @@ pub enum AppStatusFilter {
     Paused,
 }
 
-#[test]
-fn admin_request_serialization() {
-    use rmp_serde::Deserializer;
+/// Informational response for listing app interfaces.
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
+pub struct AppInterfaceInfo {
+    /// The port that the app interface is listening on.
+    pub port: u16,
 
-    // make sure requests are serialized as expected
-    let request = AdminRequest::DisableApp {
-        installed_app_id: "some_id".to_string(),
-    };
-    let serialized_request = holochain_serialized_bytes::encode(&request).unwrap();
-    assert_eq!(
-        serialized_request,
-        vec![
-            130, 164, 116, 121, 112, 101, 129, 171, 100, 105, 115, 97, 98, 108, 101, 95, 97, 112,
-            112, 192, 164, 100, 97, 116, 97, 129, 176, 105, 110, 115, 116, 97, 108, 108, 101, 100,
-            95, 97, 112, 112, 95, 105, 100, 167, 115, 111, 109, 101, 95, 105, 100
-        ]
-    );
+    /// The allowed origins for this app interface.
+    pub allowed_origins: AllowedOrigins,
 
-    let json_expected = r#"{"type":{"disable_app":null},"data":{"installed_app_id":"some_id"}}"#;
-    let mut deserializer = Deserializer::new(&*serialized_request);
-    let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
-    let json_actual = serde_json::to_string(&json_value).unwrap();
+    /// The optional association with a specific installed app.
+    pub installed_app_id: Option<InstalledAppId>,
+}
 
-    assert_eq!(json_actual, json_expected);
+/// Request payload for [AdminRequest::IssueAppAuthenticationToken].
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct IssueAppAuthenticationTokenPayload {
+    /// The app ID to issue a connection token for.
+    pub installed_app_id: InstalledAppId,
 
-    // make sure responses are serialized as expected
-    let response = AdminResponse::Error(ExternalApiWireError::RibosomeError(
-        "error_text".to_string(),
-    ));
-    let serialized_response = holochain_serialized_bytes::encode(&response).unwrap();
-    assert_eq!(
-        serialized_response,
-        vec![
-            130, 164, 116, 121, 112, 101, 129, 165, 101, 114, 114, 111, 114, 192, 164, 100, 97,
-            116, 97, 130, 164, 116, 121, 112, 101, 129, 174, 114, 105, 98, 111, 115, 111, 109, 101,
-            95, 101, 114, 114, 111, 114, 192, 164, 100, 97, 116, 97, 170, 101, 114, 114, 111, 114,
-            95, 116, 101, 120, 116
-        ]
-    );
+    /// The number of seconds that the token should be valid for. After this number of seconds, the
+    /// token will no longer be accepted by the conductor.
+    ///
+    /// This is 30s by default which is reasonably high but with [IssueAppAuthenticationTokenPayload::single_use]
+    /// set to `false`, the token will be invalidated after the first use anyway.
+    ///
+    /// Set this to 0 to create a token that does not expire.
+    #[serde(default = "default_expiry_seconds")]
+    pub expiry_seconds: u64,
 
-    let json_expected =
-        r#"{"type":{"error":null},"data":{"type":{"ribosome_error":null},"data":"error_text"}}"#;
-    let mut deserializer = Deserializer::new(&*serialized_response);
-    let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
-    let json_actual = serde_json::to_string(&json_value).unwrap();
+    /// Whether the token should be single-use. This is `true` by default and will cause the token
+    /// to be invalidated after the first use, irrespective of connection success.
+    ///
+    /// Set this to `false` to allow the token to be used multiple times.
+    #[serde(default = "default_single_use")]
+    pub single_use: bool,
+}
 
-    assert_eq!(json_actual, json_expected);
+fn default_expiry_seconds() -> u64 {
+    30
+}
+
+fn default_single_use() -> bool {
+    true
+}
+
+impl IssueAppAuthenticationTokenPayload {
+    /// Create a new payload for issuing a connection token for the specified app.
+    ///
+    /// The token will be valid for 30 seconds and for a single use.
+    pub fn for_installed_app_id(installed_app_id: InstalledAppId) -> Self {
+        installed_app_id.into()
+    }
+
+    /// Set the expiry time for the token.
+    pub fn expiry_seconds(mut self, expiry_seconds: u64) -> Self {
+        self.expiry_seconds = expiry_seconds;
+        self
+    }
+
+    /// Set whether the token should be single-use.
+    pub fn single_use(mut self, single_use: bool) -> Self {
+        self.single_use = single_use;
+        self
+    }
+}
+
+impl From<InstalledAppId> for IssueAppAuthenticationTokenPayload {
+    fn from(installed_app_id: InstalledAppId) -> Self {
+        // Defaults here should match the serde defaults in the struct definition
+        Self {
+            installed_app_id,
+            expiry_seconds: 30,
+            single_use: true,
+        }
+    }
+}
+
+/// A token issued by the conductor that can be used to authenticate a connection to an app interface.
+pub type AppAuthenticationToken = Vec<u8>;
+
+/// Response payload for [AdminResponse::AppAuthenticationTokenIssued].
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct AppAuthenticationTokenIssued {
+    /// A token issued by the conductor that can be used to authenticate a connection to an app interface.
+    /// This is expected to be passed from the caller of the admin interface to the client that will
+    /// use the app interface. It should be treated as secret and kept from other parties.
+    pub token: AppAuthenticationToken,
+
+    /// The timestamp after which Holochain will consider the token invalid. This should be
+    /// considered informational only and the client should not rely on the token being accepted
+    /// following a client-side check that the token has not yet expired.
+    ///
+    /// If the token was created with [IssueAppAuthenticationTokenPayload::expiry_seconds] set to `0`
+    /// then this field will be `None`.
+    // TODO Kitsune type used in the conductor interface
+    pub expires_at: Option<Timestamp>,
+}
+
+#[cfg(test)]
+mod tests {
+    use serde::Deserialize;
+
+    use crate::{AdminRequest, AdminResponse, ExternalApiWireError};
+
+    #[test]
+    fn admin_request_serialization() {
+        use rmp_serde::Deserializer;
+
+        // make sure requests are serialized as expected
+        let request = AdminRequest::DisableApp {
+            installed_app_id: "some_id".to_string(),
+        };
+        let serialized_request = holochain_serialized_bytes::encode(&request).unwrap();
+        assert_eq!(
+            serialized_request,
+            vec![
+                130, 164, 116, 121, 112, 101, 129, 171, 100, 105, 115, 97, 98, 108, 101, 95, 97,
+                112, 112, 192, 164, 100, 97, 116, 97, 129, 176, 105, 110, 115, 116, 97, 108, 108,
+                101, 100, 95, 97, 112, 112, 95, 105, 100, 167, 115, 111, 109, 101, 95, 105, 100
+            ]
+        );
+
+        let json_expected =
+            r#"{"type":{"disable_app":null},"data":{"installed_app_id":"some_id"}}"#;
+        let mut deserializer = Deserializer::new(&*serialized_request);
+        let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
+        let json_actual = serde_json::to_string(&json_value).unwrap();
+
+        assert_eq!(json_actual, json_expected);
+
+        // make sure responses are serialized as expected
+        let response = AdminResponse::Error(ExternalApiWireError::RibosomeError(
+            "error_text".to_string(),
+        ));
+        let serialized_response = holochain_serialized_bytes::encode(&response).unwrap();
+        assert_eq!(
+            serialized_response,
+            vec![
+                130, 164, 116, 121, 112, 101, 129, 165, 101, 114, 114, 111, 114, 192, 164, 100, 97,
+                116, 97, 130, 164, 116, 121, 112, 101, 129, 174, 114, 105, 98, 111, 115, 111, 109,
+                101, 95, 101, 114, 114, 111, 114, 192, 164, 100, 97, 116, 97, 170, 101, 114, 114,
+                111, 114, 95, 116, 101, 120, 116
+            ]
+        );
+
+        let json_expected = r#"{"type":{"error":null},"data":{"type":{"ribosome_error":null},"data":"error_text"}}"#;
+        let mut deserializer = Deserializer::new(&*serialized_response);
+        let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
+        let json_actual = serde_json::to_string(&json_value).unwrap();
+
+        assert_eq!(json_actual, json_expected);
+    }
 }

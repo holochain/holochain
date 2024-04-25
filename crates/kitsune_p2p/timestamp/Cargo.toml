@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_timestamp"
-version = "0.3.0-beta-dev.8"
+version = "0.3.0-beta-dev.10"
 description = "Microsecond-precision timestamp datatype for kitsune_p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -10,6 +10,7 @@ keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
 categories = [ "network-programming" ]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 
@@ -29,7 +30,7 @@ rand = { version = "0.8", optional = true }
 
 
 [dev-dependencies]
-holochain_serialized_bytes = { workspace = true }
+holochain_serialized_bytes = "=0.0.53"
 serde_yaml = "0.9"
 
 [lints]

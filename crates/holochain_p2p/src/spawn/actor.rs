@@ -6,6 +6,7 @@ use crate::*;
 use futures::future::FutureExt;
 use kitsune_p2p::actor::BroadcastData;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch;
+use kitsune_p2p::dht::Arq;
 use kitsune_p2p::event::*;
 use kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics;
 use kitsune_p2p::KOp;
@@ -22,8 +23,10 @@ use holochain_trace::tracing::warn;
 use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use std::collections::HashSet;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
+use std::iter;
 
 macro_rules! timing_trace {
     ($code:block $($rest:tt)*) => {{
@@ -50,7 +53,7 @@ impl WrapEvtSender {
         &self,
         dna_hash: DnaHash,
         peer_data: Vec<AgentInfoSigned>,
-    ) -> impl Future<Output = HolochainP2pResult<()>> + 'static + Send {
+    ) -> impl Future<Output = HolochainP2pResult<Vec<AgentInfoPut>>> + 'static + Send {
         timing_trace!(
             { self.0.put_agent_info_signed(dna_hash, peer_data) },
             "(hp2p:handle) put_agent_info_signed",
@@ -637,15 +640,38 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     fn handle_put_agent_info_signed(
         &mut self,
         input: kitsune_p2p::event::PutAgentInfoSignedEvt,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
-        let kitsune_p2p::event::PutAgentInfoSignedEvt { space, peer_data } = input;
-        let space = DnaHash::from_kitsune(&space);
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>> {
+        let kitsune_p2p::event::PutAgentInfoSignedEvt { peer_data } = input;
+
+        let put_requests = peer_data
+            .into_iter()
+            .map(|agent| (DnaHash::from_kitsune(&agent.space), agent))
+            .fold(
+                HashMap::<DnaHash, Vec<AgentInfoSigned>>::new(),
+                |mut acc, (dna, agent)| {
+                    acc.entry(dna).or_default().push(agent);
+                    acc
+                },
+            );
+
         let evt_sender = self.evt_sender.clone();
-        Ok(
-            async move { Ok(evt_sender.put_agent_info_signed(space, peer_data).await?) }
-                .boxed()
-                .into(),
-        )
+        Ok(async move {
+            Ok(futures::future::join_all(
+                iter::repeat_with(|| evt_sender.clone())
+                    .zip(put_requests.into_iter())
+                    .map(|(evt_sender, (dna, agents))| async move {
+                        evt_sender.put_agent_info_signed(dna, agents).await
+                    }),
+            )
+            .await
+            .into_iter()
+            .collect::<HolochainP2pResult<Vec<Vec<AgentInfoPut>>>>()?
+            .into_iter()
+            .flatten()
+            .collect())
+        }
+        .boxed()
+        .into())
     }
 
     /// We need to get previously stored agent info. A single kitusne agent query
@@ -662,7 +688,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             space,
             agents,
             window,
-            arc_set,
+            arq_set,
             near_basis,
             limit,
         } = input;
@@ -671,7 +697,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         let evt_sender = self.evt_sender.clone();
 
         Ok(async move {
-            let agents = match (agents, window, arc_set, near_basis, limit) {
+            let agents = match (agents, window, arq_set, near_basis, limit) {
                 // If only basis and limit are set, this is a "near basis" query
                 (None, None, None, Some(basis), Some(limit)) => {
                     evt_sender
@@ -680,14 +706,21 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 }
 
                 // If arc_set is set, this is a "gossip agents" query
-                (agents, window, Some(arc_set), None, None) => {
+                (agents, window, Some(arq_set), None, None) => {
                     let window = window.unwrap_or_else(full_time_window);
                     let h_agents =
                         agents.map(|agents| agents.iter().map(AgentPubKey::from_kitsune).collect());
                     let since_ms = window.start.as_millis().max(0) as u64;
                     let until_ms = window.end.as_millis().max(0) as u64;
                     evt_sender
-                        .query_gossip_agents(h_space, h_agents, space, since_ms, until_ms, arc_set)
+                        .query_gossip_agents(
+                            h_space,
+                            h_agents,
+                            space,
+                            since_ms,
+                            until_ms,
+                            arq_set.to_dht_arc_set_std().into(),
+                        )
                         .await?
                 }
 
@@ -1031,7 +1064,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arc: Option<crate::dht_arc::DhtArc>,
+        initial_arq: Option<Arq>,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
         let agent = agent_pub_key.into_kitsune();
@@ -1039,7 +1072,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             Ok(kitsune_p2p
-                .join(space, agent, maybe_agent_info, initial_arc)
+                .join(space, agent, maybe_agent_info, initial_arq)
                 .await?)
         }
         .boxed()

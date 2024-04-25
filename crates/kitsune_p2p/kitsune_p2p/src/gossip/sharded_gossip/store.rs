@@ -11,11 +11,13 @@ use crate::event::{
 use crate::types::event::KitsuneP2pEventSender;
 use crate::{HostApi, HostApiLegacy};
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::dht::arq::ArqSet;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
+use kitsune_p2p_types::dht::Arq;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KitsuneAgent, KitsuneOpHash, KitsuneSpace},
-    dht_arc::{DhtArc, DhtArcSet},
+    dht_arc::DhtArcSet,
     KitsuneError, KitsuneResult,
 };
 
@@ -36,7 +38,7 @@ pub(super) struct AgentInfoSession {
 
     /// Cache of agents whose storage arc is contained in an arc set.
     /// Finding these agents requires a host query so we cache the results because they are used frequently.
-    agents_by_arc_set_cache: HashMap<Arc<DhtArcSet>, Vec<AgentInfoSigned>>,
+    agents_by_arc_set_cache: HashMap<ArqSet, Vec<AgentInfoSigned>>,
 }
 
 impl AgentInfoSession {
@@ -66,18 +68,18 @@ impl AgentInfoSession {
             .collect()
     }
 
-    pub(super) fn local_agent_arcs(&self) -> Vec<(Arc<KitsuneAgent>, DhtArc)> {
+    pub(super) fn local_agent_arqs(&self) -> Vec<(Arc<KitsuneAgent>, Arq)> {
         self.local_agents
             .iter()
-            .map(|info| (info.agent.clone(), info.storage_arc))
+            .map(|info| (info.agent.clone(), info.storage_arq))
             .collect()
     }
 
     // Get the arc intervals for locally joined agents.
-    pub(super) fn local_arcs(&self) -> Vec<DhtArc> {
+    pub(super) fn local_arqs(&self) -> Vec<Arq> {
         self.local_agents
             .iter()
-            .map(|info| info.storage_arc)
+            .map(|info| info.storage_arq)
             .collect()
     }
 
@@ -85,14 +87,14 @@ impl AgentInfoSession {
         &mut self,
         host_api: &HostApiLegacy,
         space: &Arc<KitsuneSpace>,
-        arc_set: Arc<DhtArcSet>,
+        arc_set: ArqSet,
     ) -> KitsuneResult<Vec<AgentInfoSigned>> {
         match self.agents_by_arc_set_cache.entry(arc_set.clone()) {
             std::collections::hash_map::Entry::Occupied(o) => Ok(o.get().clone()),
             std::collections::hash_map::Entry::Vacant(v) => {
                 let agents = host_api
                     .legacy
-                    .query_agents(QueryAgentsEvt::new(space.clone()).by_arc_set(arc_set))
+                    .query_agents(QueryAgentsEvt::new(space.clone()).by_arq_set(arc_set))
                     .await
                     .map_err(KitsuneError::other)?;
                 v.insert(agents.clone());
@@ -276,10 +278,10 @@ pub(super) fn hash_chunks_query(
 pub(super) async fn query_region_set<'a>(
     host_api: HostApi,
     space: Arc<KitsuneSpace>,
-    common_arc_set: Arc<DhtArcSet>,
+    common_arq_set: ArqSet,
 ) -> KitsuneResult<RegionSetLtcs> {
     host_api
-        .query_region_set(space, common_arc_set)
+        .query_region_set(space, common_arq_set)
         .await
         .map_err(KitsuneError::other)
 }
@@ -287,16 +289,12 @@ pub(super) async fn query_region_set<'a>(
 /// Add new agent info to the p2p store.
 pub(super) async fn put_agent_info(
     host_api: &HostApiLegacy,
-    space: &Arc<KitsuneSpace>,
     agents: &[Arc<AgentInfoSigned>],
 ) -> KitsuneResult<()> {
     let peer_data: Vec<_> = agents.iter().map(|i| (**i).clone()).collect();
     host_api
         .legacy
-        .put_agent_info_signed(PutAgentInfoSignedEvt {
-            space: space.clone(),
-            peer_data,
-        })
+        .put_agent_info_signed(PutAgentInfoSignedEvt { peer_data })
         .await
         .map_err(KitsuneError::other)?;
     Ok(())

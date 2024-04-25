@@ -2,7 +2,6 @@ pub mod curve;
 
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::MockCellConductorReadHandleT;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
@@ -12,6 +11,7 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
+use crate::core::ribosome::real_ribosome::ModuleCacheLock;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
@@ -34,13 +34,13 @@ use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasmer_host::module::ModuleCache;
-use parking_lot::RwLock;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
+use tokio::sync::broadcast;
 
 pub use holochain_types::fixt::*;
 
@@ -61,16 +61,20 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
             SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
         });
 
-        let ribosome =
-            RealRibosome::new(dna_file, Arc::new(RwLock::new(ModuleCache::new(None)))).unwrap();
+        let ribosome = tokio_helper::block_forever_on(RealRibosome::new(
+            dna_file,
+            Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
+        ))
+        .unwrap();
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {
             let mut call_context = CallContextFixturator::new(Empty).next().unwrap();
             call_context.zome = CoordinatorZome::from(zome).erase_type();
-            ribosome
-                .runtime_compiled_module(call_context.zome.zome_name())
-                .unwrap();
+            tokio_helper::block_forever_on(
+                ribosome.runtime_compiled_module(call_context.zome.zome_name()),
+            )
+            .unwrap();
         }
 
         self.0.index += 1;
@@ -212,19 +216,6 @@ fixturator!(
     curve Predictable test_keystore();
 );
 
-fixturator!(
-    SignalBroadcaster;
-    curve Empty {
-        SignalBroadcaster::new(Vec::new())
-    };
-    curve Unpredictable {
-        SignalBroadcaster::new(Vec::new())
-    };
-    curve Predictable {
-        SignalBroadcaster::new(Vec::new())
-    };
-);
-
 // XXX: This may not be great to just grab an environment for this purpose.
 //      It is assumed that this value is never really used in any "real"
 //      way, because previously, it was implemented as a null pointer
@@ -358,7 +349,35 @@ fixturator!(
 
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle);
+    curve Empty ZomeCallHostAccess {
+        workspace: HostFnWorkspaceFixturator::new(Empty).next().unwrap(),
+        keystore: MetaLairClientFixturator::new(Empty).next().unwrap(),
+        network: HolochainP2pDnaFixturator::new(Empty).next().unwrap(),
+        signal_tx: broadcast::channel(50).0,
+        call_zome_handle: CellConductorReadHandleFixturator::new(Empty).next().unwrap(),
+    };
+    curve Unpredictable ZomeCallHostAccess {
+        workspace: HostFnWorkspaceFixturator::new(Unpredictable).next().unwrap(),
+        keystore: MetaLairClientFixturator::new(Unpredictable).next().unwrap(),
+        network: HolochainP2pDnaFixturator::new(Unpredictable).next().unwrap(),
+        signal_tx: broadcast::channel(50).0,
+        call_zome_handle: CellConductorReadHandleFixturator::new(Unpredictable).next().unwrap(),
+    };
+    curve Predictable ZomeCallHostAccess {
+        workspace: HostFnWorkspaceFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        keystore: MetaLairClientFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        network: HolochainP2pDnaFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        signal_tx: broadcast::channel(50).0,
+        call_zome_handle: CellConductorReadHandleFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+    };
 );
 
 fixturator!(
@@ -378,7 +397,35 @@ fixturator!(
 
 fixturator!(
     InitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle);
+    curve Empty InitHostAccess {
+        workspace: HostFnWorkspaceFixturator::new(Empty).next().unwrap(),
+        keystore: MetaLairClientFixturator::new(Empty).next().unwrap(),
+        network: HolochainP2pDnaFixturator::new(Empty).next().unwrap(),
+        signal_tx: broadcast::channel(50).0,
+        call_zome_handle: CellConductorReadHandleFixturator::new(Empty).next().unwrap(),
+    };
+    curve Unpredictable InitHostAccess {
+        workspace: HostFnWorkspaceFixturator::new(Unpredictable).next().unwrap(),
+        keystore: MetaLairClientFixturator::new(Unpredictable).next().unwrap(),
+        network: HolochainP2pDnaFixturator::new(Unpredictable).next().unwrap(),
+        signal_tx: broadcast::channel(50).0,
+        call_zome_handle: CellConductorReadHandleFixturator::new(Unpredictable).next().unwrap(),
+    };
+    curve Predictable InitHostAccess {
+        workspace: HostFnWorkspaceFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        keystore: MetaLairClientFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        network: HolochainP2pDnaFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        signal_tx: broadcast::channel(50).0,
+        call_zome_handle: CellConductorReadHandleFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+    };
 );
 
 fixturator!(
@@ -398,7 +445,30 @@ fixturator!(
 
 fixturator!(
     PostCommitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster);
+    curve Empty PostCommitHostAccess {
+        workspace: HostFnWorkspaceFixturator::new(Empty).next().unwrap(),
+        keystore: MetaLairClientFixturator::new(Empty).next().unwrap(),
+        network: HolochainP2pDnaFixturator::new(Empty).next().unwrap(),
+        signal_tx: broadcast::channel(50).0,
+    };
+    curve Unpredictable PostCommitHostAccess {
+        workspace: HostFnWorkspaceFixturator::new(Unpredictable).next().unwrap(),
+        keystore: MetaLairClientFixturator::new(Unpredictable).next().unwrap(),
+        network: HolochainP2pDnaFixturator::new(Unpredictable).next().unwrap(),
+        signal_tx: broadcast::channel(50).0,
+    };
+    curve Predictable PostCommitHostAccess {
+        workspace: HostFnWorkspaceFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        keystore: MetaLairClientFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        network: HolochainP2pDnaFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        signal_tx: broadcast::channel(50).0,
+    };
 );
 
 fixturator!(

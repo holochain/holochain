@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.3.0-beta-dev.29"
+version = "0.3.0-beta-dev.36"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -9,40 +9,36 @@ readme = "README.md"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
+# reminder - do not use workspace deps
 [dependencies]
-kitsune_p2p_dht = { version = "^0.3.0-beta-dev.18", path = "../kitsune_p2p/dht", optional = true }
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.8", path = "../kitsune_p2p/timestamp" }
-kitsune_p2p_block = { version = "^0.3.0-beta-dev.19", path = "../kitsune_p2p/block" }
-kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.17", path = "../kitsune_p2p/bin_data" }
-holo_hash = { version = "^0.3.0-beta-dev.23", path = "../holo_hash", features = ["encoding"] }
-holochain_integrity_types = { version = "^0.3.0-beta-dev.27", path = "../holochain_integrity_types", features = ["tracing"] }
-holochain_serialized_bytes = { workspace = true }
-holochain_secure_primitive = { version = "^0.3.0-beta-dev.22", path = "../holochain_secure_primitive"}
-holochain_nonce = {version = "^0.3.0-beta-dev.25", path = "../holochain_nonce"}
-paste = "1.0.12"
+kitsune_p2p_dht = { version = "^0.3.0-beta-dev.24", path = "../kitsune_p2p/dht", optional = true }
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.10", path = "../kitsune_p2p/timestamp" }
+kitsune_p2p_block = { version = "^0.3.0-beta-dev.23", path = "../kitsune_p2p/block" }
+holo_hash = { version = "^0.3.0-beta-dev.28", path = "../holo_hash", features = ["encoding"] }
+holochain_integrity_types = { version = "^0.3.0-beta-dev.33", path = "../holochain_integrity_types", features = ["tracing"] }
+holochain_serialized_bytes = "=0.0.53"
+holochain_nonce = {version = "^0.3.0-beta-dev.27", path = "../holochain_nonce"}
 serde = { version = "1.0", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"
 serde_yaml = { version = "0.9", optional = true }
 subtle = "2"
 thiserror = "1.0.22"
-tracing = { workspace = true }
-holochain_wasmer_common = { workspace = true }
-derive_more = { workspace = true }
+tracing = "0.1"
+holochain_wasmer_common = { version = "=0.0.92" }
+derive_more = "0.99"
 
 # fixturator dependencies
-fixt = { version = "^0.3.0-beta-dev.2", path = "../fixt", optional = true }
+fixt = { version = "^0.3.0-beta-dev.4", path = "../fixt", optional = true }
 strum = { version = "0.18.0", optional = true }
 rand = { version = "0.8.5", optional = true }
 
 # sqlite dependencies
 rusqlite = { version = "0.29", optional = true }
-num_enum = { version = "0.5", optional = true }
+num_enum = { version = "0.7", optional = true }
 
 # full-dna-def dependencies
-derive_builder = { version = "0.9", optional = true }
-nanoid = { version = "0.3", optional = true }
+derive_builder = { version = "0.20", optional = true }
+nanoid = { version = "0.4", optional = true }
 shrinkwraprs = { version = "0.3", optional = true }
 
 # fuzzing
@@ -87,6 +83,8 @@ fuzzing = [
   "holochain_serialized_bytes/fuzzing",
   "holo_hash/fuzzing",
   "kitsune_p2p_timestamp/fuzzing",
+  "rand",
+  "fixt",
 ]
 
 test_utils = [
@@ -106,7 +104,6 @@ sqlite-encrypted = [
   "kitsune_p2p_dht/sqlite-encrypted",
   "kitsune_p2p_timestamp/sqlite-encrypted",
   "kitsune_p2p_block/sqlite-encrypted",
-  "kitsune_p2p_bin_data/sqlite-encrypted",
 ]
 sqlite = [
   "rusqlite",
@@ -115,5 +112,4 @@ sqlite = [
   "kitsune_p2p_dht/sqlite",
   "kitsune_p2p_timestamp/sqlite",
   "kitsune_p2p_block/sqlite",
-  "kitsune_p2p_bin_data/sqlite",
 ]

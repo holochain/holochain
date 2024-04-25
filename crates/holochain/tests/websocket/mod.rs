@@ -3,9 +3,9 @@ use anyhow::Result;
 use futures::future;
 use hdk::prelude::RemoteSignal;
 use holochain::conductor::interface::websocket::MAX_CONNECTIONS;
-use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetConductorBatch;
 use holochain::sweettest::SweetDnaFile;
+use holochain::sweettest::{authenticate_app_ws_client, SweetConductor, WsPollRecv};
 use holochain::sweettest::{SweetAgents, SweetConductorConfig};
 use holochain::{
     conductor::{
@@ -15,7 +15,14 @@ use holochain::{
     },
     fixt::*,
 };
+use std::net::{Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 
+use either::Either;
+use holochain_conductor_api::{
+    AdminInterfaceConfig, AppAuthenticationRequest, AppAuthenticationToken, AppRequest,
+    InterfaceDriver, IssueAppAuthenticationTokenPayload,
+};
+use holochain_types::websocket::AllowedOrigins;
 use holochain_types::{
     prelude::*,
     test_utils::{fake_dna_zomes, write_fake_dna_file},
@@ -23,6 +30,7 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use matches::assert_matches;
+use rand::rngs::OsRng;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -30,30 +38,10 @@ use tracing::*;
 
 use crate::test_utils::*;
 
-struct PollRecv(tokio::task::JoinHandle<()>);
-
-impl Drop for PollRecv {
-    fn drop(&mut self) {
-        self.0.abort();
-    }
-}
-
-impl PollRecv {
-    pub fn new<D>(mut rx: WebsocketReceiver) -> Self
-    where
-        D: std::fmt::Debug,
-        SerializedBytes: TryInto<D, Error = SerializedBytesError>,
-    {
-        Self(tokio::task::spawn(async move {
-            while rx.recv::<D>().await.is_ok() {}
-        }))
-    }
-}
-
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn call_admin() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -75,7 +63,7 @@ async fn call_admin() {
     let port = port.await.unwrap();
 
     let (mut client, rx) = websocket_client_by_port(port).await.unwrap();
-    let _rx = PollRecv::new::<AdminResponse>(rx);
+    let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
     let original_dna_hash = dna.dna_hash().clone();
 
@@ -124,7 +112,7 @@ how_many: 42
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn call_zome() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
@@ -141,7 +129,7 @@ async fn call_zome() {
     let admin_port = admin_port.await.unwrap();
 
     let (mut admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
-    let _admin_rx = PollRecv::new::<AdminResponse>(admin_rx);
+    let _admin_rx = WsPollRecv::new::<AdminResponse>(admin_rx);
     let (_, mut receiver2) = websocket_client_by_port(admin_port).await.unwrap();
 
     let uuid = uuid::Uuid::new_v4();
@@ -170,7 +158,7 @@ async fn call_zome() {
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await;
+    let response = check_timeout(response, 15000).await;
 
     let expects = vec![original_dna_hash.clone()];
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
@@ -184,9 +172,9 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair
-    let mut rng = rand_dalek::thread_rng();
-    let signing_keypair = ed25519_dalek::Keypair::generate(&mut rng);
-    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+    let mut rng = OsRng;
+    let signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
 
     // Grant zome call capability for agent
     let zome_name = TestWasm::Foo.coordinator_zome_name();
@@ -204,7 +192,8 @@ async fn call_zome() {
     let app_port = attach_app_interface(&mut admin_tx, None).await;
 
     let (mut app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
-    let _app_rx = PollRecv::new::<AppResponse>(app_rx);
+    let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
+    authenticate_app_ws_client(app_tx.clone(), admin_port, "test".to_string()).await;
 
     // Call Zome
     tracing::info!("Calling zome");
@@ -240,7 +229,7 @@ async fn call_zome() {
     let admin_port = admin_port.await.unwrap();
 
     let (admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
-    let _admin_rx = PollRecv::new::<AdminResponse>(admin_rx);
+    let _admin_rx = WsPollRecv::new::<AdminResponse>(admin_rx);
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
@@ -248,12 +237,13 @@ async fn call_zome() {
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
     let app_port = match response {
-        AdminResponse::AppInterfacesListed(ports) => *ports.first().unwrap(),
+        AdminResponse::AppInterfacesListed(ports) => ports.first().map(|i| i.port).unwrap(),
         _ => panic!("Unexpected response"),
     };
 
     let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
-    let _app_rx = PollRecv::new::<AppResponse>(app_rx);
+    let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
+    authenticate_app_ws_client(app_tx.clone(), admin_port, "test".to_string()).await;
 
     // Call Zome again on the existing app interface port
     tracing::info!("Calling zome again");
@@ -273,7 +263,7 @@ async fn call_zome() {
 #[cfg(feature = "slow_tests")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn remote_signals() -> anyhow::Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 2;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
@@ -307,7 +297,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let mut rxs = Vec::new();
     for h in conductors.iter() {
-        rxs.extend(h.signal_broadcaster().subscribe_separately())
+        rxs.push(h.subscribe_to_app_signals("app".to_string()))
     }
 
     let signal = fixt!(ExternIo);
@@ -345,7 +335,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn emit_signals() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -361,7 +351,7 @@ async fn emit_signals() {
     let admin_port = admin_port.await.unwrap();
 
     let (mut admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
-    let _admin_rx = PollRecv::new::<AdminResponse>(admin_rx);
+    let _admin_rx = WsPollRecv::new::<AdminResponse>(admin_rx);
 
     let uuid = uuid::Uuid::new_v4();
     let dna = fake_dna_zomes(
@@ -395,9 +385,9 @@ async fn emit_signals() {
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair
-    let mut rng = rand_dalek::thread_rng();
-    let signing_keypair = ed25519_dalek::Keypair::generate(&mut rng);
-    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+    let mut rng = OsRng;
+    let signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
 
     // Grant zome call capability for agent
     let zome_name = TestWasm::EmitSignal.coordinator_zome_name();
@@ -432,8 +422,9 @@ async fn emit_signals() {
             }
         }
     });
+    authenticate_app_ws_client(app_tx_1.clone(), admin_port, "test".to_string()).await;
 
-    let (_, mut app_rx_2) = websocket_client_by_port(app_port).await.unwrap();
+    let (app_tx_2, mut app_rx_2) = websocket_client_by_port(app_port).await.unwrap();
     let (sig2_send, sig2_recv) = tokio::sync::oneshot::channel();
     let mut sig2_send = Some(sig2_send);
     let sig2_task = tokio::task::spawn(async move {
@@ -448,6 +439,7 @@ async fn emit_signals() {
             }
         }
     });
+    authenticate_app_ws_client(app_tx_2.clone(), admin_port, "test".to_string()).await;
 
     call_zome_fn(
         &app_tx_1,
@@ -480,13 +472,13 @@ async fn emit_signals() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let (client, rx) = websocket_client(&conductor_handle).await?;
-    let _rx = PollRecv::new::<AdminResponse>(rx);
+    let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
     let dna = fake_dna_zomes("", vec![(TestWasm::Foo.into(), TestWasm::Foo.into())]);
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
@@ -505,7 +497,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn list_app_interfaces_succeeds() -> Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
@@ -514,15 +506,20 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    let (client, rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
-        Arc::new(WebsocketConfig {
-            default_request_timeout: std::time::Duration::from_secs(1),
-            ..Default::default()
-        }),
-        ([127, 0, 0, 1], port).into(),
+    let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
+    ws_config.default_request_timeout = Duration::from_secs(1);
+    let (client, rx): (WebsocketSender, WebsocketReceiver) = connect(
+        Arc::new(ws_config),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        ),
     )
     .await?;
-    let _rx = PollRecv::new::<AdminResponse>(rx);
+    let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
     let request = AdminRequest::ListAppInterfaces;
 
@@ -545,7 +542,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 }
 
 async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
@@ -554,12 +551,17 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
+    let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
+    ws_config.default_request_timeout = Duration::from_secs(1);
     let (client, mut rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
-        Arc::new(WebsocketConfig {
-            default_request_timeout: std::time::Duration::from_secs(1),
-            ..Default::default()
-        }),
-        ([127, 0, 0, 1], port).into(),
+        Arc::new(ws_config),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        ),
     )
     .await?;
 
@@ -608,7 +610,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn connection_limit_is_respected() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
@@ -616,8 +618,12 @@ async fn connection_limit_is_respected() {
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
 
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
-    let cfg = Arc::new(WebsocketConfig::default());
+    let addr = format!("localhost:{port}")
+        .to_socket_addrs()
+        .unwrap()
+        .next()
+        .unwrap();
+    let cfg = Arc::new(WebsocketConfig::CLIENT_DEFAULT);
 
     // Retain handles so that the test can control when to disconnect clients
     let mut handles = Vec::new();
@@ -626,7 +632,7 @@ async fn connection_limit_is_respected() {
     // The first `MAX_CONNECTIONS` connections should succeed
     for count in 0..MAX_CONNECTIONS {
         let (sender, rx) = connect(cfg.clone(), addr).await.unwrap();
-        let rx = PollRecv::new::<AdminResponse>(rx);
+        let rx = WsPollRecv::new::<AdminResponse>(rx);
         let _: AdminResponse = sender
             .request(AdminRequest::ListDnas)
             .await
@@ -638,7 +644,7 @@ async fn connection_limit_is_respected() {
     // Try lots of failed connections to make sure the limit is respected
     for _ in 0..2 * MAX_CONNECTIONS {
         let (sender, rx) = connect(cfg.clone(), addr).await.unwrap();
-        let _rx = PollRecv::new::<AdminResponse>(rx);
+        let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
         // Getting a sender back isn't enough to know that the connection succeeded because the other side takes a moment to shutdown, try sending to be sure
         sender
@@ -653,7 +659,7 @@ async fn connection_limit_is_respected() {
     // Should now be possible to connect new clients
     for count in 0..MAX_CONNECTIONS {
         let (sender, rx) = connect(cfg.clone(), addr).await.unwrap();
-        let rx = PollRecv::new::<AdminResponse>(rx);
+        let rx = WsPollRecv::new::<AdminResponse>(rx);
         let _: AdminResponse = sender
             .request(AdminRequest::ListDnas)
             .await
@@ -675,7 +681,7 @@ async fn concurrent_install_dna() {
     static NUM_CONCURRENT_INSTALLS: u8 = 10;
     static REQ_TIMEOUT_MS: u64 = 15000;
 
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -691,7 +697,7 @@ async fn concurrent_install_dna() {
     let admin_port = admin_port.await.unwrap();
 
     let (client, rx) = websocket_client_by_port(admin_port).await.unwrap();
-    let _rx = PollRecv::new::<AdminResponse>(rx);
+    let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
     // let before = std::time::Instant::now();
 
@@ -748,7 +754,7 @@ async fn concurrent_install_dna() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore)]
 async fn network_stats() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut batch =
         SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(true))
@@ -759,8 +765,11 @@ async fn network_stats() {
     let _ = batch.setup_app("app", &[dna_file]).await.unwrap();
     batch.exchange_peer_info().await;
 
-    let (client, rx) = batch.get(0).unwrap().admin_ws_client().await;
-    let _rx = PollRecv::new::<AdminResponse>(rx);
+    let (client, _rx) = batch
+        .get(0)
+        .unwrap()
+        .admin_ws_client::<AdminResponse>()
+        .await;
 
     #[cfg(feature = "tx5")]
     const EXPECT: &str = "go-pion";
@@ -781,7 +790,7 @@ async fn network_stats() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn full_state_dump_cursor_works() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
 
@@ -798,8 +807,7 @@ async fn full_state_dump_cursor_works() {
 
     let cell_id = app.into_cells()[0].cell_id().clone();
 
-    let (mut client, rx) = conductor.admin_ws_client().await;
-    let _rx = PollRecv::new::<AdminResponse>(rx);
+    let (mut client, _rx) = conductor.admin_ws_client::<AppResponse>().await;
 
     let full_state = dump_full_state(&mut client, cell_id.clone(), None).await;
 
@@ -827,4 +835,289 @@ async fn full_state_dump_cursor_works() {
         integrated_ops_count + validation_limbo_ops_count + integration_limbo_ops_count;
 
     assert_eq!(1, new_all_dht_ops_count);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn admin_allowed_origins() {
+    holochain_trace::test_run();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let ports = conductor
+        .clone()
+        .add_admin_interfaces(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket {
+                port: 0,
+                allowed_origins: "http://localhost:3000".to_string().into(),
+            },
+        }])
+        .await
+        .unwrap();
+
+    let port = *ports.first().unwrap();
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+    )
+    .await
+    .is_err());
+
+    let port = *ports.first().unwrap();
+    let (client, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .try_set_header("origin", "http://localhost:3000")
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let _rx = WsPollRecv::new::<AdminResponse>(rx);
+
+    let request = AdminRequest::ListAppInterfaces;
+    let _: AdminResponse = client.request(request).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_allowed_origins() {
+    holochain_trace::test_run();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let port = conductor
+        .clone()
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3000".to_string().into(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+    )
+    .await
+    .is_err());
+
+    let token = create_multi_use_token(&conductor).await;
+
+    check_app_port(port, "http://localhost:3000", token).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_allowed_origins_independence() {
+    holochain_trace::test_run();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let token = create_multi_use_token(&conductor).await;
+
+    let port_1 = conductor
+        .clone()
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3001".to_string().into(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    let port_2 = conductor
+        .clone()
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3002".to_string().into(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Check that access to another port's origin is blocked
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(
+            format!("localhost:{port_1}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+        .try_set_header("origin", "http://localhost:3002")
+        .unwrap()
+    )
+    .await
+    .is_err());
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(
+            format!("localhost:{port_2}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+        .try_set_header("origin", "http://localhost:3001")
+        .unwrap()
+    )
+    .await
+    .is_err());
+
+    // Check that correct access is allowed
+
+    check_app_port(port_1, "http://localhost:3001", token.clone()).await;
+    check_app_port(port_2, "http://localhost:3002", token).await;
+}
+
+async fn create_multi_use_token(conductor: &SweetConductor) -> AppAuthenticationToken {
+    let (admin_sender, _admin_rx) = conductor.admin_ws_client::<AdminResponse>().await;
+
+    let token_response: AdminResponse = admin_sender
+        .request(AdminRequest::IssueAppAuthenticationToken(
+            IssueAppAuthenticationTokenPayload::for_installed_app_id("test_app".into())
+                .single_use(false),
+        ))
+        .await
+        .unwrap();
+    let token = match token_response {
+        AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
+        _ => panic!("unexpected response"),
+    };
+
+    token
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
+    holochain_trace::test_run();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
+
+    //
+    // Connect to the admin interface on ipv4 and ipv6 localhost
+    //
+
+    let (ipv4_admin_sender, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new((Ipv4Addr::LOCALHOST, admin_port).into()),
+    )
+    .await
+    .unwrap();
+    let _rx4 = WsPollRecv::new::<AdminResponse>(rx);
+
+    let response: AdminResponse = ipv4_admin_sender
+        .request(AdminRequest::ListCellIds)
+        .await
+        .unwrap();
+    match response {
+        AdminResponse::CellIdsListed(_) => (),
+        _ => panic!("unexpected response"),
+    }
+
+    let (ipv6_admin_sender, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new((Ipv6Addr::LOCALHOST, admin_port).into()),
+    )
+    .await
+    .unwrap();
+    let _rx6 = WsPollRecv::new::<AdminResponse>(rx);
+
+    let response: AdminResponse = ipv6_admin_sender
+        .request(AdminRequest::ListCellIds)
+        .await
+        .unwrap();
+    match response {
+        AdminResponse::CellIdsListed(_) => (),
+        _ => panic!("unexpected response"),
+    }
+
+    //
+    // Do the same for an app interface
+    //
+
+    let app_port = conductor
+        .clone()
+        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .await
+        .unwrap();
+
+    let (ipv4_app_sender, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new((Ipv4Addr::LOCALHOST, app_port).into()),
+    )
+    .await
+    .unwrap();
+    let _rx4 = WsPollRecv::new::<AppResponse>(rx);
+    authenticate_app_ws_client(ipv4_app_sender.clone(), admin_port, "".to_string()).await;
+
+    let response: AppResponse = ipv4_app_sender.request(AppRequest::AppInfo).await.unwrap();
+    match response {
+        AppResponse::AppInfo(_) => (),
+        _ => panic!("unexpected response"),
+    }
+
+    let (ipv6_app_sender, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new((Ipv6Addr::LOCALHOST, app_port).into()),
+    )
+    .await
+    .unwrap();
+    let _rx6 = WsPollRecv::new::<AppResponse>(rx);
+    authenticate_app_ws_client(ipv6_app_sender.clone(), admin_port, "".to_string()).await;
+
+    let response: AppResponse = ipv6_app_sender.request(AppRequest::AppInfo).await.unwrap();
+    match response {
+        AppResponse::AppInfo(_) => (),
+        _ => panic!("unexpected response"),
+    }
+}
+
+async fn check_app_port(port: u16, origin: &str, token: AppAuthenticationToken) {
+    let (client, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .try_set_header("origin", origin)
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let _rx = WsPollRecv::new::<AppResponse>(rx);
+
+    client
+        .authenticate(AppAuthenticationRequest { token })
+        .await
+        .unwrap();
+
+    let request = AppRequest::ListWasmHostFunctions;
+    let _: AppResponse = client.request(request).await.unwrap();
 }

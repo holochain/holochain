@@ -58,7 +58,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
     async fn schedule_test_low_level() -> anyhow::Result<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             alice_pubkey,
             alice_host_fn_caller,
@@ -198,7 +198,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
     async fn schedule_test_wasm() -> anyhow::Result<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -214,7 +214,7 @@ mod tests {
         conductor
             .raw_handle()
             .start_scheduler(std::time::Duration::from_millis(1000_000_000))
-            .await;
+            .await?;
 
         // At first nothing has happened because init won't run until some zome
         // call runs.
@@ -337,7 +337,7 @@ mod tests {
         conductor
             .raw_handle()
             .start_scheduler(std::time::Duration::from_millis(1000_000_000))
-            .await;
+            .await?;
 
         assert!(!bob_host_fn_caller
             .authored_db

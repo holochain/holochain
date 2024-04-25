@@ -3,8 +3,8 @@
 
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
 use holochain_integrity_types::{
-    AgentValidationPkg, CloseChain, Create, CreateLink, Delete, DeleteLink, Dna,
-    EntryCreationAction, InitZomesComplete, LinkTag, MembraneProof, OpenChain, UnitEnum, Update,
+    AgentValidationPkg, CloseChain, Create, CreateLink, Delete, DeleteLink, Dna, InitZomesComplete,
+    LinkTag, MembraneProof, OpenChain, UnitEnum, Update,
 };
 
 mod flat_op_activity;
@@ -102,7 +102,7 @@ where
     /// the DHT and is returned when the authority receives a request
     /// for the [`ActionHash`] of the deleted entry [`Action`] or the
     /// [`EntryHash`] of the deleted entry.
-    RegisterDelete(OpDelete<ET>),
+    RegisterDelete(OpDelete),
 }
 
 #[deprecated = "use the name FlatOp instead"]

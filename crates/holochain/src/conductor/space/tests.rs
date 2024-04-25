@@ -7,11 +7,7 @@ use holo_hash::HasHash;
 use holochain_cascade::test_utils::fill_db;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::test_keystore;
-use holochain_p2p::dht::hash::RegionHash;
-use holochain_p2p::dht::prelude::Dimension;
-use holochain_p2p::dht::region::RegionData;
-use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
-use holochain_p2p::dht_arc::DhtArcSet;
+use holochain_p2p::dht::prelude::*;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
 use holochain_types::facts::valid_dht_op;
 use holochain_types::prelude::*;
@@ -34,7 +30,7 @@ use super::Spaces;
 async fn test_region_queries() {
     const NUM_OPS: usize = 100;
 
-    // let _g = holochain_trace::test_run().ok();
+    // let _g = holochain_trace::test_run();
 
     let mut g = random_generator();
 
@@ -53,7 +49,7 @@ async fn test_region_queries() {
     let agent = keystore.new_sign_keypair_random().await.unwrap();
 
     let mut dna_def = DnaDef::arbitrary(&mut g).unwrap();
-    let q_us = Dimension::standard_time().quantum as u64;
+    let q_us = TimeDimension::standard().quantum as u64;
     let tq = Duration::from_micros(q_us);
     let tq5 = Duration::from_micros(q_us * 5);
     let five_quanta_ago = (Timestamp::now() - tq5).unwrap();
@@ -83,9 +79,14 @@ async fn test_region_queries() {
     let mut ops = vec![];
 
     // - Check that we have no ops to begin with
-    let region_set = query_region_set(db.clone(), topo.clone(), &strat, Arc::new(DhtArcSet::Full))
-        .await
-        .unwrap();
+    let region_set = query_region_set(
+        db.clone(),
+        topo.clone(),
+        &strat,
+        Arc::new(ArqSet::full_std()),
+    )
+    .await
+    .unwrap();
     let region_sum: RegionData = region_set.regions().map(|r| r.data).sum();
     assert_eq!(region_sum.count as usize, 0);
 
@@ -110,9 +111,14 @@ async fn test_region_queries() {
         let op2 = DhtOpHashed::from_content_sync(op2);
         fill_db(&db, op2).await;
     }
-    let region_set = query_region_set(db.clone(), topo.clone(), &strat, Arc::new(DhtArcSet::Full))
-        .await
-        .unwrap();
+    let region_set = query_region_set(
+        db.clone(),
+        topo.clone(),
+        &strat,
+        Arc::new(ArqSet::full_std()),
+    )
+    .await
+    .unwrap();
 
     // - Check that the aggregate of all region data matches expectations
     let region_sum: RegionData = region_set.regions().map(|r| r.data).sum();

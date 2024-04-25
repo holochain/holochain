@@ -7,6 +7,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::fixt::ActionFixturator;
+use kitsune_p2p::dht::Arq;
 struct StubNetwork;
 
 impl ghost_actor::GhostHandler<HolochainP2p> for StubNetwork {}
@@ -19,7 +20,7 @@ impl HolochainP2pHandler for StubNetwork {
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arc: Option<crate::dht_arc::DhtArc>,
+        initial_arq: Option<Arq>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
@@ -254,7 +255,7 @@ mod tests {
         holo_hash::AgentPubKey,
         holo_hash::AgentPubKey,
     ) {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         (
             newhash!(DnaHash, 's'),
             fixt!(AgentPubKey, Predictable, 0),
@@ -293,7 +294,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
                         let view = test_peer_view();
@@ -375,7 +376,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
                         let view = test_peer_view();
@@ -453,7 +454,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
@@ -507,7 +508,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_workflow() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let (dna, a1, a2, _a3) = test_setup();
 
@@ -560,7 +561,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
@@ -654,7 +655,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
                         let view = test_peer_view();

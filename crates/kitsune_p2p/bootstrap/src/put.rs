@@ -17,7 +17,7 @@ pub(crate) fn put(
 
 async fn put_info(peer: Bytes, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
     #[derive(Debug)]
-    struct BadDecode(String);
+    struct BadDecode(#[allow(dead_code)] String);
     impl warp::reject::Reject for BadDecode {}
     let peer: AgentInfoSigned =
         rmp_decode(&mut AsRef::<[u8]>::as_ref(&peer)).map_err(|e| BadDecode(format!("{e:?}")))?;
@@ -54,7 +54,7 @@ mod tests {
     use super::*;
     use ::fixt::prelude::*;
     use kitsune_p2p_bin_data::fixt::*;
-    use kitsune_p2p_types::fixt::*;
+    use kitsune_p2p_types::{dht::arq::ArqSize, fixt::*};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_put() {
@@ -64,7 +64,7 @@ mod tests {
         let info = AgentInfoSigned::sign(
             Arc::new(fixt!(KitsuneSpace, Unpredictable)),
             Arc::new(fixt!(KitsuneAgent, Unpredictable)),
-            u32::MAX / 4,
+            ArqSize::from_half_len(u32::MAX / 4),
             fixt!(UrlList, Empty),
             0,
             std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64 + 60_000_000,

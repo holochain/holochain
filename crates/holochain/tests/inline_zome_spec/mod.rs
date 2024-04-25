@@ -2,14 +2,8 @@
 
 use hdk::prelude::*;
 use holochain::core::ribosome::guest_callback::validate::ValidateResult;
-use holochain::test_utils::{
-    consistency_10s,
-    inline_zomes::{simple_crud_zome, AppString},
-};
-use holochain::{
-    conductor::api::error::ConductorApiResult,
-    sweettest::{SweetAgents, SweetConductor, SweetDnaFile, SweetInlineZomes},
-};
+use holochain::test_utils::inline_zomes::{simple_crud_zome, AppString};
+use holochain::{conductor::api::error::ConductorApiResult, sweettest::*};
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
     core::workflow::WorkflowError,
@@ -19,7 +13,6 @@ use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{op::Op, record::RecordEntry};
 use matches::assert_matches;
-use tokio_stream::StreamExt;
 
 /// Simple scenario involving two agents using the same DNA
 #[tokio::test(flavor = "multi_thread")]
@@ -51,7 +44,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
         )
         .await;
 
-    consistency_10s([&alice, &bobbo]).await;
+    await_consistency(10, [&alice, &bobbo]).await.unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let records: Option<Record> = conductor
@@ -73,7 +66,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut conductor = SweetConductor::from_standard_config().await;
 
     let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -115,8 +108,12 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     assert_ne!(hash_foo, hash_bar);
 
     // Wait long enough for others to receive gossip
-    consistency_10s([&alice_foo, &bobbo_foo, &carol_foo]).await;
-    consistency_10s([&alice_bar, &bobbo_bar, &carol_bar]).await;
+    await_consistency(10, [&alice_foo, &bobbo_foo, &carol_foo])
+        .await
+        .unwrap();
+    await_consistency(10, [&alice_bar, &bobbo_bar, &carol_bar])
+        .await
+        .unwrap();
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     // on the "foo" DNA
@@ -159,7 +156,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
 // I can't remember what this test was for? Should we just delete?
 #[ignore = "Needs to be completed when HolochainP2pEvents is accessible"]
 async fn invalid_cell() -> anyhow::Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut conductor = SweetConductor::from_standard_config().await;
 
     let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -189,7 +186,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn get_deleted() -> anyhow::Result<()> {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // Bundle the single zome into a DnaFile
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
@@ -215,7 +212,7 @@ async fn get_deleted() -> anyhow::Result<()> {
         )
         .await;
 
-    consistency_10s([&alice]).await;
+    await_consistency(10, [&alice]).await.unwrap();
 
     let records: Option<Record> = conductor
         .call(
@@ -241,7 +238,7 @@ async fn get_deleted() -> anyhow::Result<()> {
         )
         .await;
 
-    consistency_10s([&alice]).await;
+    await_consistency(10, [&alice]).await.unwrap();
 
     let records: Vec<Option<Record>> = conductor
         .call(
@@ -258,7 +255,7 @@ async fn get_deleted() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn signal_subscription() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     const N: usize = 10;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -266,7 +263,7 @@ async fn signal_subscription() {
     let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
     let zome = &app.cells()[0].zome(SweetInlineZomes::COORDINATOR);
 
-    let signals = conductor.signals().take(N);
+    let mut signal_rx = conductor.subscribe_to_app_signals("app".to_string());
 
     // Emit N signals
     for _ in 0..N {
@@ -274,7 +271,12 @@ async fn signal_subscription() {
     }
 
     // Ensure that we can receive all signals
-    let signals: Vec<Signal> = signals.collect().await;
+    let mut signals: Vec<Signal> = vec![];
+    for _ in 0..N {
+        let signal = signal_rx.recv().await.unwrap();
+        signals.push(signal);
+    }
+
     assert_eq!(signals.len(), N);
 }
 
@@ -363,7 +365,7 @@ async fn simple_validation() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_call_real_zomes_too() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;

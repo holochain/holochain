@@ -158,7 +158,6 @@ pub(crate) fn search_and_discover_peer_connect(
                                     .host_api
                                     .legacy
                                     .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                        space: inner.space.clone(),
                                         peer_data: vec![agent_info_signed.clone()],
                                     })
                                     .await
@@ -239,6 +238,7 @@ pub(crate) fn peer_connect(
     })
 }
 
+#[derive(Debug)]
 pub(crate) enum SearchRemotesCoveringBasisLogicResult {
     Success(Vec<AgentInfoSigned>),
     Error(KitsuneP2pError),
@@ -290,11 +290,11 @@ impl SearchRemotesCoveringBasisLogic {
             }
 
             // skip nodes that can't tell us about any peers
-            if node.storage_arc.range().is_empty() {
+            if node.storage_arc().range().is_empty() {
                 continue;
             }
 
-            if node.storage_arc.contains(self.basis_loc) {
+            if node.storage_arc().contains(self.basis_loc) {
                 cover_nodes.push(node);
             } else {
                 near_nodes.push(node);
@@ -386,7 +386,6 @@ pub(crate) fn search_remotes_covering_basis(
                                 .host_api
                                 .legacy
                                 .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                    space: inner.space.clone(),
                                     peer_data: peer_list,
                                 })
                                 .await

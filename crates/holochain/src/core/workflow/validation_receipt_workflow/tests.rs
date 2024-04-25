@@ -1,7 +1,6 @@
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::prelude::InlineZomeSet;
 use crate::sweettest::*;
-use crate::test_utils::consistency_10s;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
@@ -12,7 +11,7 @@ use rusqlite::Transaction;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky, doesn't take into account timing or retries"]
 async fn test_validation_receipt() {
-    let _g = holochain_trace::test_run().ok();
+    let _g = holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
@@ -30,7 +29,9 @@ async fn test_validation_receipt() {
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    consistency_10s([&alice, &bobbo, &carol]).await;
+    await_consistency(10, [&alice, &bobbo, &carol])
+        .await
+        .unwrap();
 
     // Get op hashes
     let vault = alice.dht_db();
@@ -128,7 +129,7 @@ macro_rules! wait_until {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_block_invalid_receipt() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let unit_entry_def = EntryDef::default_from_id("unit");
     let integrity_name = "integrity";
     let coordinator_name = "coordinator";
@@ -217,7 +218,9 @@ async fn test_block_invalid_receipt() {
         .call(&alice_cell.zome(coordinator_name), create_function_name, ())
         .await;
 
-    consistency_10s([&alice_cell, &bob_cell]).await;
+    await_consistency(10, [&alice_cell, &bob_cell])
+        .await
+        .unwrap();
 
     let alice_block_target = BlockTargetId::Cell(alice_cell.cell_id().to_owned());
     let bob_block_target = BlockTargetId::Cell(bob_cell.cell_id().to_owned());

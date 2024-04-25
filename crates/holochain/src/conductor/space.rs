@@ -1,7 +1,11 @@
 //! This module contains data and functions for running operations
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::{hash_map, HashMap},
+    sync::Arc,
+    time::Duration,
+};
 
 use super::{
     conductor::RwShare,
@@ -39,6 +43,7 @@ use holochain_state::{
     prelude::*,
     query::{map_sql_dht_op_common, StateQueryError},
 };
+use holochain_util::timed;
 use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use kitsune_p2p_block::NodeId;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
@@ -80,9 +85,9 @@ pub struct Space {
     /// The conductor database. There is only one of these.
     pub conductor_db: DbWrite<DbKindConductor>,
 
-    /// The authored databases. These are shared across cells.
-    /// There is one per unique Dna.
-    pub authored_db: DbWrite<DbKindAuthored>,
+    /// The authored databases. These are per-agent.
+    /// There is one per unique combination of Dna and AgentPubKey.
+    pub authored_dbs: Arc<parking_lot::Mutex<HashMap<AgentPubKey, DbWrite<DbKindAuthored>>>>,
 
     /// The dht databases. These are shared across cells.
     /// There is one per unique Dna.
@@ -108,6 +113,8 @@ pub struct Space {
 
     /// Incoming ops batch for this space.
     pub incoming_ops_batch: IncomingOpsBatch,
+
+    root_db_dir: Arc<PathBuf>,
 }
 
 #[cfg(test)]
@@ -135,6 +142,7 @@ impl Spaces {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
+
         let conductor_db =
             DbWrite::open_with_sync_level(root_db_dir.as_ref(), DbKindConductor, db_sync_level)?;
         let wasm_db =
@@ -248,17 +256,21 @@ impl Spaces {
     }
 
     /// Get the holochain conductor state
+    #[tracing::instrument(skip_all)]
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
-        match query_conductor_state(&self.conductor_db).await? {
-            Some(state) => Ok(state),
-            // update_state will again try to read the state. It's a little
-            // inefficient in the infrequent case where we haven't saved the
-            // state yet, but more atomic, so worth it.
-            None => self.update_state(Ok).await,
-        }
+        timed!([1, 10, 1000], "get_state", {
+            match query_conductor_state(&self.conductor_db).await? {
+                Some(state) => Ok(state),
+                // update_state will again try to read the state. It's a little
+                // inefficient in the infrequent case where we haven't saved the
+                // state yet, but more atomic, so worth it.
+                None => self.update_state(Ok).await,
+            }
+        })
     }
 
     /// Update the internal state with a pure function mapping old state to new
+    #[tracing::instrument(skip_all)]
     pub async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
     where
         F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
@@ -270,29 +282,30 @@ impl Spaces {
     /// Update the internal state with a pure function mapping old state to new,
     /// which may also produce an output value which will be the output of
     /// this function
+    #[tracing::instrument(skip_all)]
     pub async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
     where
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
         O: Send + 'static,
     {
-        let output = self
-            .conductor_db
-            .write_async(move |txn| {
-                let state = txn
-                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                        row.get("blob")
-                    })
-                    .optional()?;
-                let state = match state {
-                    Some(state) => from_blob(state)?,
-                    None => ConductorState::default(),
-                };
-                let (new_state, output) = f(state)?;
-                mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
-                Result::<_, ConductorError>::Ok((new_state, output))
-            })
-            .await?;
-        Ok(output)
+        timed!([1, 10, 1000], "update_state_prime", {
+            self.conductor_db
+                .write_async(move |txn| {
+                    let state = txn
+                        .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                            row.get("blob")
+                        })
+                        .optional()?;
+                    let state = match state {
+                        Some(state) => from_blob(state)?,
+                        None => ConductorState::default(),
+                    };
+                    let (new_state, output) = f(state)?;
+                    mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
+                    Result::<_, ConductorError>::Ok((new_state, output))
+                })
+                .await
+        })
     }
 
     /// Get something from every space
@@ -303,7 +316,7 @@ impl Spaces {
 
     /// Get the space if it exists or create it if it doesn't.
     pub fn get_or_create_space(&self, dna_hash: &DnaHash) -> DatabaseResult<Space> {
-        self.get_or_create_space_ref(dna_hash, Space::clone)
+        self.get_or_create_space_ref(dna_hash, |s| s.clone())
     }
 
     fn get_or_create_space_ref<F, R>(&self, dna_hash: &DnaHash, f: F) -> DatabaseResult<R>
@@ -315,11 +328,11 @@ impl Spaces {
             None => self
                 .map
                 .share_mut(|spaces| match spaces.entry(dna_hash.clone()) {
-                    std::collections::hash_map::Entry::Occupied(entry) => Ok(f(entry.get())),
-                    std::collections::hash_map::Entry::Vacant(entry) => {
+                    hash_map::Entry::Occupied(entry) => Ok(f(entry.get())),
+                    hash_map::Entry::Vacant(entry) => {
                         let space = Space::new(
                             Arc::new(dna_hash.clone()),
-                            &self.db_dir,
+                            self.db_dir.to_path_buf(),
                             self.config.db_sync_strategy,
                         )?;
 
@@ -336,9 +349,23 @@ impl Spaces {
         self.get_or_create_space_ref(dna_hash, |space| space.cache_db.clone())
     }
 
-    /// Get the authored database (this will create the space if it doesn't already exist).
-    pub fn authored_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindAuthored>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.authored_db.clone())
+    /// Get or create the authored database for this author (this will create the space if it doesn't already exist).
+    pub fn get_or_create_authored_db(
+        &self,
+        dna_hash: &DnaHash,
+        author: AgentPubKey,
+    ) -> DatabaseResult<DbWrite<DbKindAuthored>> {
+        self.get_or_create_space_ref(dna_hash, |space| {
+            space.get_or_create_authored_db(author.clone())
+        })?
+    }
+
+    /// Get all the authored databases for this space (this will create the space if it doesn't already exist).
+    pub fn get_all_authored_dbs(
+        &self,
+        dna_hash: &DnaHash,
+    ) -> DatabaseResult<Vec<DbWrite<DbKindAuthored>>> {
+        self.get_or_create_space_ref(dna_hash, |space| space.get_all_authored_dbs())
     }
 
     /// Get the dht database (this will create the space if it doesn't already exist).
@@ -658,7 +685,7 @@ impl Spaces {
 impl Space {
     fn new(
         dna_hash: Arc<DnaHash>,
-        root_db_dir: &PathBuf,
+        root_db_dir: PathBuf,
         db_sync_strategy: DbSyncStrategy,
     ) -> DatabaseResult<Self> {
         let space = dna_hash.to_kitsune();
@@ -670,11 +697,6 @@ impl Space {
             root_db_dir.as_ref(),
             DbKindCache(dna_hash.clone()),
             db_sync_level,
-        )?;
-        let authored_db = DbWrite::open_with_sync_level(
-            root_db_dir.as_ref(),
-            DbKindAuthored(dna_hash.clone()),
-            DbSyncLevel::Normal,
         )?;
         let dht_db = DbWrite::open_with_sync_level(
             root_db_dir.as_ref(),
@@ -708,7 +730,7 @@ impl Space {
         let r = Self {
             dna_hash,
             cache_db: cache,
-            authored_db,
+            authored_dbs: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             dht_db,
             p2p_agents_db,
             p2p_metrics_db,
@@ -718,6 +740,7 @@ impl Space {
             incoming_ops_batch,
             dht_query_cache,
             conductor_db,
+            root_db_dir: Arc::new(root_db_dir),
         };
         Ok(r)
     }
@@ -729,7 +752,7 @@ impl Space {
         author: AgentPubKey,
     ) -> SourceChainResult<SourceChain> {
         SourceChain::raw_empty(
-            self.authored_db.clone(),
+            self.get_or_create_authored_db(author.clone())?,
             self.dht_db.clone(),
             self.dht_query_cache.clone(),
             keystore,
@@ -742,23 +765,49 @@ impl Space {
     pub async fn source_chain_workspace(
         &self,
         keystore: MetaLairClient,
-        agent_pubkey: AgentPubKey,
+        author: AgentPubKey,
         dna_def: Arc<DnaDef>,
     ) -> ConductorResult<SourceChainWorkspace> {
         Ok(SourceChainWorkspace::new(
-            self.authored_db.clone(),
+            self.get_or_create_authored_db(author.clone())?.clone(),
             self.dht_db.clone(),
             self.dht_query_cache.clone(),
             self.cache_db.clone(),
             keystore,
-            agent_pubkey,
+            author,
             dna_def,
         )
         .await?)
     }
+
+    /// Get or create the authored database for an agent in this space
+    pub fn get_or_create_authored_db(
+        &self,
+        author: AgentPubKey,
+    ) -> DatabaseResult<DbWrite<DbKindAuthored>> {
+        match self.authored_dbs.lock().entry(author.clone()) {
+            hash_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
+            hash_map::Entry::Vacant(entry) => {
+                let db = DbWrite::open_with_sync_level(
+                    self.root_db_dir.as_ref(),
+                    DbKindAuthored(Arc::new(CellId::new((*self.dna_hash).clone(), author))),
+                    DbSyncLevel::Normal,
+                )?;
+
+                entry.insert(db.clone());
+                Ok(db)
+            }
+        }
+    }
+
+    /// Gets authored databases for this space, for every author.
+    pub fn get_all_authored_dbs(&self) -> Vec<DbWrite<DbKindAuthored>> {
+        self.authored_dbs.lock().values().cloned().collect()
+    }
 }
 
 /// Get the holochain conductor state
+#[tracing::instrument(skip_all)]
 pub async fn query_conductor_state(
     db: &DbRead<DbKindConductor>,
 ) -> ConductorResult<Option<ConductorState>> {
@@ -829,7 +878,7 @@ impl TestSpace {
         Self {
             space: Space::new(
                 Arc::new(dna_hash),
-                &temp_dir.path().to_path_buf().into(),
+                temp_dir.path().to_path_buf(),
                 Default::default(),
             )
             .unwrap(),

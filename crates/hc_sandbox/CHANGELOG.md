@@ -7,6 +7,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.47
+
+## 0.3.0-beta-dev.46
+
+## 0.3.0-beta-dev.45
+
+## 0.3.0-beta-dev.44
+
+## 0.3.0-beta-dev.43
+
+- Make `hc-sandbox call` support the `--force_admin_ports`/`-f` flag for specifying which admin ports to connect to. This takes precedence over the `--running`/`-r` flag which exists on the `call` subcommand. So you could still write `hc-sandbox -f 1234 call -r 5678` but the sandbox will connect to the admin port at 1234 instead of 5678.
+
+## 0.3.0-beta-dev.42
+
+## 0.3.0-beta-dev.41
+
+## 0.3.0-beta-dev.40
+
+## 0.3.0-beta-dev.39
+
 ## 0.3.0-beta-dev.38
 
 ## 0.3.0-beta-dev.37

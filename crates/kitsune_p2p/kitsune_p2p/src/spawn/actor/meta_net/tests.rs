@@ -9,6 +9,7 @@ use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
     dependencies::lair_keystore_api,
     dht::{
+        arq::ArqSet,
         region::{Region, RegionCoords},
         region_set::RegionSetLtcs,
         spacetime::Topology,
@@ -135,7 +136,7 @@ write_test_struct! {
         fn query_region_set(
             &Self,
             _space: Arc<KitsuneSpace>,
-            _dht_arc_set: Arc<DhtArcSet>,
+            _arq_set: ArqSet,
         ) -> KitsuneHostResult<RegionSetLtcs>, HostRet<RegionSetLtcs> {
             Box::pin(async move {
                 Ok(RegionSetLtcs::empty())
@@ -291,9 +292,9 @@ write_test_struct! {
         }
     }
     KitsuneP2pEventHandler {
-        fn handle_put_agent_info_signed(&mut Self, input: PutAgentInfoSignedEvt,) -> KitsuneP2pEventHandlerResult<()>, KitsuneP2pEventHandlerResult<()> {
+        fn handle_put_agent_info_signed(&mut Self, input: PutAgentInfoSignedEvt,) -> KitsuneP2pEventHandlerResult<Vec<kitsune_p2p_types::bootstrap::AgentInfoPut>>, KitsuneP2pEventHandlerResult<Vec<kitsune_p2p_types::bootstrap::AgentInfoPut>> {
             Ok(futures::future::FutureExt::boxed(async move {
-                Ok(())
+                Ok(vec![])
             }).into())
         }
         fn handle_query_agents(&mut Self, input: QueryAgentsEvt,) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>>, KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
@@ -741,7 +742,7 @@ async fn preflight() {
         });
         test.handle_put_agent_info_signed = Arc::new(move |_| {
             recv_not.notify();
-            Ok(futures::future::FutureExt::boxed(async move { Ok(()) }).into())
+            Ok(futures::future::FutureExt::boxed(async move { Ok(vec![]) }).into())
         });
     }
 
@@ -781,7 +782,7 @@ async fn preflight_user_data_mismatch() {
         });
         test.handle_put_agent_info_signed = Arc::new(move |_| {
             recv_not.notify();
-            Ok(futures::future::FutureExt::boxed(async move { Ok(()) }).into())
+            Ok(futures::future::FutureExt::boxed(async move { Ok(vec![]) }).into())
         });
     }
 

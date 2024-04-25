@@ -80,7 +80,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dna_info_test_2() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         // let RibosomeTestFixture {
         //     conductor, alice, ..
         // } = RibosomeTestFixture::new(TestWasm::ZomeInfo).await;
