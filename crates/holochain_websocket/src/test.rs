@@ -142,7 +142,7 @@ async fn ipv6_or_ipv4_connect() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Requires a port to be free so should not run on CI"]
 async fn ipv6_or_ipv4_connect_on_specific_port() {
-    holochain_trace::test_run();
+    holochain_trace::test_run().unwrap();
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq)]
     enum TestMsg {
@@ -153,7 +153,7 @@ async fn ipv6_or_ipv4_connect_on_specific_port() {
 
     let l_task = tokio::task::spawn(async move {
         let l = WebsocketListener::dual_bind(
-            Arc::new(WebsocketConfig::LISTENER_DEFAULT),
+            Arc::new(WebsocketConfig::default()),
             SocketAddrV4::new(Ipv4Addr::LOCALHOST, 1456),
             SocketAddrV6::new(Ipv6Addr::LOCALHOST, 1456, 0, 0),
         )
@@ -185,7 +185,7 @@ async fn ipv6_or_ipv4_connect_on_specific_port() {
     ];
     for addr in test_addrs {
         let r_task = tokio::task::spawn(async move {
-            let (send, mut recv) = connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), addr)
+            let (send, mut recv) = connect(Arc::new(WebsocketConfig::default()), addr)
                 .await
                 .unwrap();
 
