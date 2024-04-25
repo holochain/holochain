@@ -193,6 +193,7 @@ impl SweetConductor {
             &[],
         )
         .await;
+
         Self::new(handle, dir, Arc::new(config), rendezvous).await
     }
 
@@ -766,14 +767,13 @@ impl SweetConductor {
         cell: &SweetCell,
         min_peers: u32,
         timeout: Duration,
-    ) {
+    ) -> anyhow::Result<()> {
         let handle = self.raw_handle();
 
         let installed_app = handle
             .find_app_containing_cell(cell.cell_id())
-            .await
-            .expect("Could not find app containing cell")
-            .unwrap();
+            .await?
+            .ok_or(anyhow::anyhow!("Could not find app containing cell"))?;
 
         let wait_start = Instant::now();
         loop {
@@ -786,8 +786,7 @@ impl SweetConductor {
                         last_time_queried: None, // Just care about seeing the first data
                     },
                 )
-                .await
-                .expect("Could not get network info")
+                .await?
                 .first()
                 .map_or((0, 0), |info| {
                     (
@@ -803,13 +802,13 @@ impl SweetConductor {
                     cell.cell_id(),
                     completed_rounds
                 );
-                return;
+                return Ok(());
             }
 
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
             if wait_start.elapsed() > timeout {
-                panic!(
+                anyhow::bail!(
                     "Timed out waiting for gossip to start for cell {}",
                     cell.cell_id()
                 );
