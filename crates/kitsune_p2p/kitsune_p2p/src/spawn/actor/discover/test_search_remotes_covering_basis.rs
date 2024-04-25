@@ -1,5 +1,8 @@
 use super::*;
-use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
+use kitsune_p2p_types::{
+    dht::{arq::ArqSize, spacetime::SpaceDimension},
+    tx2::tx2_utils::TxUrl,
+};
 use SearchRemotesCoveringBasisLogicResult::*;
 
 async fn mk_agent_info(u: u8, covers: u32, offline: bool) -> AgentInfoSigned {
@@ -12,7 +15,7 @@ async fn mk_agent_info(u: u8, covers: u32, offline: bool) -> AgentInfoSigned {
     AgentInfoSigned::sign(
         Arc::new(KitsuneSpace::new(vec![0x11; 32])),
         Arc::new(KitsuneAgent::new(vec![u; 32])),
-        covers,
+        ArqSize::from_half_len(covers),
         url_list,
         0,
         0,
@@ -34,7 +37,7 @@ async fn happy_path() {
 
     assert!(matches!(logic.check_nodes(vec![]), ShouldWait));
 
-    let near = mk_agent_info(1, 1, false).await;
+    let near = mk_agent_info(1, SpaceDimension::standard().quantum, false).await;
 
     assert!(matches!(logic.check_nodes(vec![near]), QueryPeers(_)));
 
@@ -91,7 +94,7 @@ async fn respect_max_near() {
 
     let mut covers = Vec::new();
     for i in 0..5 {
-        covers.push(mk_agent_info(i, 1, false).await);
+        covers.push(mk_agent_info(i, SpaceDimension::standard().quantum, false).await);
     }
 
     assert!(matches!(
@@ -131,7 +134,7 @@ async fn ignore_zero_cover_nodes() {
     let mut nodes = Vec::new();
 
     // this one just has a small arc
-    nodes.push(mk_agent_info(2, 1, false).await);
+    nodes.push(mk_agent_info(2, SpaceDimension::standard().quantum, false).await);
     // this one is a full-on lurker
     nodes.push(mk_agent_info(2, 0, false).await);
 

@@ -21,6 +21,7 @@ reqwest = "0.12"
 url2 = "0.0.6"
 
 [dev-dependencies]
+arbitrary = { version = "1.0", features = ["derive"] }
 kitsune_p2p_bootstrap_client = { path = ".", features = ["tx2", "test_utils"] }
 fixt = { version = "^0.3.0-beta-dev.4", path = "../../fixt" }
 tokio = "1"
