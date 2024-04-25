@@ -17,7 +17,10 @@ use super::test_utils::*;
 const ADMIN_PORT: u16 = 12909;
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "processes fail to launch on macos, broken!")]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "processes fail to launch on macos, broken!"
+)]
 async fn test_new_lair_conductor_integration() {
     // working temp dir
     let tmp = tempfile::tempdir().unwrap();
