@@ -1,7 +1,7 @@
 use assert_cmd::prelude::*;
 use holochain_conductor_api::config::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
-use holochain_conductor_api::AdminInterfaceConfig;
+use holochain_conductor_api::{AdminInterfaceConfig, AdminResponse};
 use holochain_conductor_api::InterfaceDriver;
 use holochain_types::websocket::AllowedOrigins;
 use kitsune_p2p_types::dependencies::lair_keystore_api;
@@ -10,6 +10,7 @@ use lair_keystore_api::ipc_keystore::*;
 use lair_keystore_api::mem_store::*;
 use lair_keystore_api::prelude::*;
 use std::sync::Arc;
+use holochain::sweettest::WsPollRecv;
 
 use super::test_utils::*;
 
@@ -66,8 +67,8 @@ async fn test_new_lair_conductor_integration() {
         .arg(cc_path)
         .arg("--piped")
         .env("RUST_LOG", "trace")
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
         .stdin(std::process::Stdio::piped())
         .kill_on_drop(true);
 
@@ -86,9 +87,10 @@ async fn test_new_lair_conductor_integration() {
         panic!("failed to start holochain: {:?}", status);
     }
 
-    let (mut client, _) = websocket_client_by_port(ADMIN_PORT).await.unwrap();
+    let (mut client, rx) = websocket_client_by_port(ADMIN_PORT).await.unwrap();
+    let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
-    let agent_key = generate_agent_pubkey(&mut client, 15000).await;
+    let agent_key = generate_agent_pub_key(&mut client, 15_000).await.unwrap();
     println!("GENERATED AGENT KEY: {}", agent_key);
     let mut agent_key_bytes = [0; 32];
     agent_key_bytes.copy_from_slice(agent_key.get_raw_32());
