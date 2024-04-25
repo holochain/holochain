@@ -1,11 +1,10 @@
 use super::{DnaWithRole, SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::api::error::ConductorApiResult;
-use crate::sweettest::{SweetCell, SweetLocalRendezvous};
+use crate::sweettest::SweetLocalRendezvous;
 use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
 use std::path::PathBuf;
-use std::time::Duration;
 
 /// A collection of SweetConductors, with methods for operating on the entire collection
 #[derive(derive_more::Into, derive_more::IntoIterator, derive_more::Deref)]
@@ -250,23 +249,6 @@ impl SweetConductorBatch {
         for c in self.0.iter_mut() {
             let _ = c.persist_dbs();
         }
-    }
-
-    /// Wait for the first conductor to have started gossipping. If all conductors in this batch were
-    /// started at the same time, this should be enough to ensure that all conductors have started gossipping.
-    /// If other conductors are added later, separately check that they have started gossipping as required.
-    pub async fn require_initial_gossip_activity_for_cell(
-        &self,
-        cell: &SweetCell,
-        timeout: Duration,
-    ) {
-        SweetConductor::require_initial_gossip_activity_for_cell(
-            &self.0[0],
-            cell,
-            self.0.len() as u32,
-            timeout,
-        )
-        .await;
     }
 }
 

@@ -1,5 +1,6 @@
 //! Definitions for events emited from the KitsuneP2p actor.
 
+use crate::dht::prelude::ArqSet;
 use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
@@ -91,7 +92,7 @@ pub struct QueryAgentsEvt {
     /// Optional time range to filter by.
     pub window: Option<TimeWindow>,
     /// Optional arcset to intersect by.
-    pub arc_set: Option<Arc<DhtArcSet>>,
+    pub arq_set: Option<ArqSet>,
     /// If set, results are ordered by proximity to the specified location
     pub near_basis: Option<DhtLocation>,
     /// Limit to the number of results returned
@@ -109,7 +110,7 @@ impl QueryAgentsEvt {
             space,
             agents: None,
             window: None,
-            arc_set: None,
+            arq_set: None,
             near_basis: None,
             limit: None,
         }
@@ -128,8 +129,8 @@ impl QueryAgentsEvt {
     }
 
     /// Add in an an arcset query
-    pub fn by_arc_set(mut self, arc_set: Arc<DhtArcSet>) -> Self {
-        self.arc_set = Some(arc_set);
+    pub fn by_arq_set(mut self, arq_set: ArqSet) -> Self {
+        self.arq_set = Some(arq_set);
         self
     }
 

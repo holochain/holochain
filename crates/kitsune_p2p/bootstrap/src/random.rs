@@ -35,7 +35,7 @@ mod tests {
     use ::fixt::prelude::*;
     use kitsune_p2p::{agent_store::AgentInfoSigned, KitsuneSpace};
     use kitsune_p2p_bin_data::fixt::*;
-    use kitsune_p2p_types::{bootstrap::RandomLimit, tx_utils::TxUrl};
+    use kitsune_p2p_types::{tx_utils::TxUrl, bootstrap::RandomLimit, dht::arq::ArqSize, tx2::tx2_utils::TxUrl};
 
     async fn put(store: Store, peers: Vec<AgentInfoSigned>) {
         let filter = crate::put::put(store);
@@ -63,7 +63,7 @@ mod tests {
         let offline_peer = AgentInfoSigned::sign(
             space.clone(),
             Arc::new(fixt!(KitsuneAgent, Unpredictable)),
-            u32::MAX / 4,
+            ArqSize::from_half_len(u32::MAX / 4),
             vec![], // no url means offline
             0,
             std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64 + 60_000_000,
@@ -114,7 +114,7 @@ mod tests {
             let info = AgentInfoSigned::sign(
                 space.clone(),
                 Arc::new(fixt!(KitsuneAgent, Unpredictable)),
-                u32::MAX / 4,
+                ArqSize::from_half_len(u32::MAX / 4),
                 vec![TxUrl::from_str_panicking("fake:")],
                 0,
                 std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64 + 60_000_000,

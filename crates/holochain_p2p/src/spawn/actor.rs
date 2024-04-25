@@ -6,6 +6,7 @@ use crate::*;
 use futures::future::FutureExt;
 use kitsune_p2p::actor::BroadcastData;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch;
+use kitsune_p2p::dht::Arq;
 use kitsune_p2p::event::*;
 use kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics;
 use kitsune_p2p::KOp;
@@ -687,7 +688,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             space,
             agents,
             window,
-            arc_set,
+            arq_set,
             near_basis,
             limit,
         } = input;
@@ -696,7 +697,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         let evt_sender = self.evt_sender.clone();
 
         Ok(async move {
-            let agents = match (agents, window, arc_set, near_basis, limit) {
+            let agents = match (agents, window, arq_set, near_basis, limit) {
                 // If only basis and limit are set, this is a "near basis" query
                 (None, None, None, Some(basis), Some(limit)) => {
                     evt_sender
@@ -705,14 +706,21 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 }
 
                 // If arc_set is set, this is a "gossip agents" query
-                (agents, window, Some(arc_set), None, None) => {
+                (agents, window, Some(arq_set), None, None) => {
                     let window = window.unwrap_or_else(full_time_window);
                     let h_agents =
                         agents.map(|agents| agents.iter().map(AgentPubKey::from_kitsune).collect());
                     let since_ms = window.start.as_millis().max(0) as u64;
                     let until_ms = window.end.as_millis().max(0) as u64;
                     evt_sender
-                        .query_gossip_agents(h_space, h_agents, space, since_ms, until_ms, arc_set)
+                        .query_gossip_agents(
+                            h_space,
+                            h_agents,
+                            space,
+                            since_ms,
+                            until_ms,
+                            arq_set.to_dht_arc_set_std().into(),
+                        )
                         .await?
                 }
 
@@ -1056,7 +1064,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arc: Option<crate::dht_arc::DhtArc>,
+        initial_arq: Option<Arq>,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
         let agent = agent_pub_key.into_kitsune();
@@ -1064,7 +1072,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             Ok(kitsune_p2p
-                .join(space, agent, maybe_agent_info, initial_arc)
+                .join(space, agent, maybe_agent_info, initial_arq)
                 .await?)
         }
         .boxed()

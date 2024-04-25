@@ -15,6 +15,7 @@ use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
 use kitsune_p2p_types::metrics::Tx2ApiMetrics;
+use kitsune_p2p_types::dht::Arq;
 use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -528,9 +529,9 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_query_peer_density(
         &mut self,
         space: Arc<KitsuneSpace>,
-        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+        arq: kitsune_p2p_types::dht_arc::DhtArc,
     ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
-        Ok(self.host_api.legacy.query_peer_density(space, dht_arc))
+        Ok(self.host_api.legacy.query_peer_density(space, arq))
     }
 
     fn handle_call(
@@ -597,7 +598,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arc: Option<crate::dht_arc::DhtArc>,
+        initial_arq: Option<Arq>,
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
         let space2 = space.clone();
@@ -635,7 +636,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender
-                .join(space, agent, maybe_agent_info, initial_arc)
+                .join(space, agent, maybe_agent_info, initial_arq)
                 .await
         }
         .boxed()
@@ -931,7 +932,7 @@ mockall::mock! {
         fn handle_query_peer_density(
             &mut self,
             space: Arc<KitsuneSpace>,
-            dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+            arq: kitsune_p2p_types::dht_arc::DhtArc,
         ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView>;
 
         fn handle_call(

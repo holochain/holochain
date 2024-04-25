@@ -1,0 +1,45 @@
+[package]
+name = "kitsune_p2p_proxy"
+version = "0.3.0-beta-dev.27"
+description = "Proxy transport module for kitsune-p2p"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/kitsune_p2p_proxy"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
+categories = [ "network-programming" ]
+edition = "2021"
+
+# reminder - do not use workspace deps
+[dependencies]
+base64 = "0.22"
+derive_more = "0.99"
+futures = "0.3"
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.27", path = "../types" }
+kitsune_p2p_transport_quic = { version = "^0.3.0-beta-dev.27", path = "../transport_quic" }
+holochain_trace = { version = "^0.3.0-beta-dev.11", path = "../../holochain_trace" }
+serde = { version = "1", features = [ "derive" ] }
+serde_bytes = "0.11"
+structopt = "0.3"
+tokio = { version = "1.27", features = [ "full" ] }
+
+[dev-dependencies]
+criterion = "0.5.1"
+crossterm = "0.27.0"
+
+[[bench]]
+name = "thru"
+harness = false
+
+[lints]
+workspace = true
+
+[features]
+sqlite-encrypted = [
+    "kitsune_p2p_types/sqlite-encrypted",
+    "kitsune_p2p_transport_quic/sqlite-encrypted",
+]
+sqlite = [
+    "kitsune_p2p_types/sqlite",
+    "kitsune_p2p_transport_quic/sqlite",
+]

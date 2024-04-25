@@ -11,7 +11,6 @@ use holochain_p2p::dht::prelude::*;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
 use holochain_types::facts::valid_dht_op;
 use holochain_types::prelude::*;
-use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p_types::dht::ArqStrat;
 use rand::Rng;
 
@@ -80,9 +79,14 @@ async fn test_region_queries() {
     let mut ops = vec![];
 
     // - Check that we have no ops to begin with
-    let region_set = query_region_set(db.clone(), topo.clone(), &strat, Arc::new(DhtArcSet::Full))
-        .await
-        .unwrap();
+    let region_set = query_region_set(
+        db.clone(),
+        topo.clone(),
+        &strat,
+        Arc::new(ArqSet::full_std()),
+    )
+    .await
+    .unwrap();
     let region_sum: RegionData = region_set.regions().map(|r| r.data).sum();
     assert_eq!(region_sum.count as usize, 0);
 
@@ -107,9 +111,14 @@ async fn test_region_queries() {
         let op2 = DhtOpHashed::from_content_sync(op2);
         fill_db(&db, op2).await;
     }
-    let region_set = query_region_set(db.clone(), topo.clone(), &strat, Arc::new(DhtArcSet::Full))
-        .await
-        .unwrap();
+    let region_set = query_region_set(
+        db.clone(),
+        topo.clone(),
+        &strat,
+        Arc::new(ArqSet::full_std()),
+    )
+    .await
+    .unwrap();
 
     // - Check that the aggregate of all region data matches expectations
     let region_sum: RegionData = region_set.regions().map(|r| r.data).sum();

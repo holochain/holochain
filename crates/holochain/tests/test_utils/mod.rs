@@ -165,6 +165,7 @@ pub async fn attach_app_interface(client: &mut WebsocketSender, port: Option<u16
     let request = AdminRequest::AttachAppInterface {
         port,
         allowed_origins: AllowedOrigins::Any,
+        installed_app_id: None,
     };
     let response = client.request(request);
     let response = check_timeout(response, 3000).await;

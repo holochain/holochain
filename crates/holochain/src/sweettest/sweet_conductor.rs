@@ -2,7 +2,6 @@
 // TODO [ B-03669 ] move to own crate
 
 use super::*;
-use crate::conductor::state::AppInterfaceId;
 use crate::conductor::ConductorHandle;
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, space::Spaces,
@@ -11,6 +10,7 @@ use crate::conductor::{
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
+use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest};
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
@@ -52,7 +52,6 @@ pub struct SweetConductor {
     pub(crate) spaces: Spaces,
     config: Arc<ConductorConfig>,
     dnas: Vec<DnaFile>,
-    signal_stream: Option<SignalStream>,
     rendezvous: Option<DynSweetRendezvous>,
 }
 
@@ -122,15 +121,6 @@ impl SweetConductor {
         config: Arc<ConductorConfig>,
         rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
-        // Automatically add a test app interface
-        handle
-            .add_test_app_interface(AppInterfaceId::default())
-            .await
-            .expect("Couldn't set up test app interface");
-
-        // Get a stream of all signals since conductor startup
-        let signal_stream = handle.signal_broadcaster().subscribe_merged();
-
         // XXX: this is a bit wonky.
         // We create a Spaces instance here purely because it's easier to initialize
         // the per-space databases this way. However, we actually use the TestEnvs
@@ -148,7 +138,6 @@ impl SweetConductor {
             spaces,
             config,
             dnas: Vec::new(),
-            signal_stream: Some(Box::new(signal_stream)),
             rendezvous,
         }
     }
@@ -495,44 +484,60 @@ impl SweetConductor {
     /// created dna with SweetConductor so it will be reloaded on restart.
     pub async fn create_clone_cell(
         &mut self,
+        installed_app_id: &InstalledAppId,
         payload: CreateCloneCellPayload,
     ) -> ConductorApiResult<holochain_zome_types::clone::ClonedCell> {
-        let clone = self.raw_handle().create_clone_cell(payload).await?;
+        let clone = self
+            .raw_handle()
+            .create_clone_cell(installed_app_id, payload)
+            .await?;
         let dna_file = self.get_dna_file(clone.cell_id.dna_hash()).unwrap();
         self.dnas.push(dna_file);
         Ok(clone)
     }
 
-    /// Get a stream of all Signals emitted on the "sweet-interface" AppInterface.
-    ///
-    /// This is designed to crash if called more than once, because as currently
-    /// implemented, creating multiple signal streams would simply cause multiple
-    /// consumers of the same underlying streams, not a fresh subscription
-    pub fn signals(&mut self) -> SignalStream {
-        self.signal_stream
-            .take()
-            .expect("Can't take the SweetConductor signal stream twice")
-    }
-
     /// Get a new websocket client which can send requests over the admin
     /// interface. It presupposes that an admin interface has been configured.
     /// (The standard_config includes an admin interface at port 0.)
-    pub async fn admin_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
+    pub async fn admin_ws_client<D>(&self) -> (WebsocketSender, WsPollRecv)
+    where
+        D: std::fmt::Debug,
+        SerializedBytes: TryInto<D, Error = SerializedBytesError>,
+    {
         let port = self
             .get_arbitrary_admin_websocket_port()
             .expect("No admin port open on conductor");
-        websocket_client_by_port(port).await.unwrap()
+        let (tx, rx) = websocket_client_by_port(port).await.unwrap();
+
+        (tx, WsPollRecv::new::<D>(rx))
     }
 
     /// Create a new app interface and get a websocket client which can send requests
     /// to it.
-    pub async fn app_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
+    pub async fn app_ws_client<D>(
+        &self,
+        installed_app_id: InstalledAppId,
+    ) -> (WebsocketSender, WsPollRecv)
+    where
+        D: std::fmt::Debug,
+        SerializedBytes: TryInto<D, Error = SerializedBytesError>,
+    {
         let port = self
             .raw_handle()
-            .add_app_interface(either::Either::Left(0), AllowedOrigins::Any)
+            .add_app_interface(either::Either::Left(0), AllowedOrigins::Any, None)
             .await
             .expect("Couldn't create app interface");
-        websocket_client_by_port(port).await.unwrap()
+        let (tx, rx) = websocket_client_by_port(port).await.unwrap();
+
+        authenticate_app_ws_client(
+            tx.clone(),
+            self.get_arbitrary_admin_websocket_port()
+                .expect("No admin ports on this conductor"),
+            installed_app_id,
+        )
+        .await;
+
+        (tx, WsPollRecv::new::<D>(rx))
     }
 
     /// Shutdown this conductor.
@@ -693,14 +698,23 @@ impl SweetConductor {
     ) {
         let handle = self.raw_handle();
 
+        let installed_app = handle
+            .find_app_containing_cell(cell.cell_id())
+            .await
+            .expect("Could not find app containing cell")
+            .unwrap();
+
         let wait_start = Instant::now();
         loop {
             let (number_of_peers, completed_rounds) = handle
-                .network_info(&NetworkInfoRequestPayload {
-                    agent_pub_key: cell.agent_pubkey().clone(),
-                    dnas: vec![cell.cell_id.dna_hash().clone()],
-                    last_time_queried: None, // Just care about seeing the first data
-                })
+                .network_info(
+                    installed_app.id(),
+                    &NetworkInfoRequestPayload {
+                        agent_pub_key: cell.agent_pubkey().clone(),
+                        dnas: vec![cell.cell_id.dna_hash().clone()],
+                        last_time_queried: None, // Just care about seeing the first data
+                    },
+                )
                 .await
                 .expect("Could not get network info")
                 .first()
@@ -733,7 +747,51 @@ impl SweetConductor {
     }
 }
 
-/// Get a websocket client on localhost at the specified port
+/// You do not need to do anything with this type. While it is held it will keep polling a websocket
+/// receiver.
+pub struct WsPollRecv(tokio::task::JoinHandle<()>);
+
+impl Drop for WsPollRecv {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
+impl WsPollRecv {
+    /// Create a new [WsPollRecv] that will poll the given [WebsocketReceiver] for messages.
+    /// The type of the messages being received must be specified. For example
+    ///
+    /// ```no_run
+    /// # #[tokio::main]
+    /// # async fn main() -> anyhow::Result<()>
+    /// # {
+    ///
+    /// use holochain::sweettest::{websocket_client_by_port, WsPollRecv};
+    /// use holochain_conductor_api::AdminResponse;
+    ///
+    /// let (tx, rx) = websocket_client_by_port(3000).await?;
+    /// let _rx = WsPollRecv::new::<AdminResponse>(rx);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new<D>(mut rx: WebsocketReceiver) -> Self
+    where
+        D: std::fmt::Debug,
+        SerializedBytes: TryInto<D, Error = SerializedBytesError>,
+    {
+        Self(tokio::task::spawn(async move {
+            while rx.recv::<D>().await.is_ok() {}
+        }))
+    }
+}
+
+/// Connect to a websocket server at the given port.
+///
+/// Note that the [WebsocketReceiver] returned by this function will need to be polled. This can be
+/// done with a [WsPollRecv].
+/// If this is an app client, you will need to authenticate the connection before you can send any
+/// other requests.
 pub async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, WebsocketReceiver)> {
     connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
@@ -745,6 +803,32 @@ pub async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, Web
         ),
     )
     .await
+}
+
+/// Create an authentication token for an app client and authenticate the connection.
+pub async fn authenticate_app_ws_client(
+    app_sender: WebsocketSender,
+    admin_port: u16,
+    installed_app_id: InstalledAppId,
+) {
+    let (admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _admin_rx = WsPollRecv::new::<AdminResponse>(admin_rx);
+
+    let token_response: AdminResponse = admin_tx
+        .request(AdminRequest::IssueAppAuthenticationToken(
+            installed_app_id.into(),
+        ))
+        .await
+        .unwrap();
+    let token = match token_response {
+        AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
+        _ => panic!("unexpected response"),
+    };
+
+    app_sender
+        .authenticate(AppAuthenticationRequest { token })
+        .await
+        .unwrap();
 }
 
 impl Drop for SweetConductor {

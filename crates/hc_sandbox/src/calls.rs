@@ -12,18 +12,18 @@ use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::ensure;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
-use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
-use holochain_types::prelude::DnaHash;
+use holochain_conductor_api::{AdminRequest, AppInterfaceInfo};
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::Timestamp;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
+use holochain_types::prelude::{DnaHash, InstalledAppId};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use std::convert::TryFrom;
@@ -119,6 +119,13 @@ pub struct AddAppWs {
     /// If not provided, defaults to `*` which allows any origin.
     #[arg(long, default_value_t = AllowedOrigins::Any)]
     pub allowed_origins: AllowedOrigins,
+
+    /// Optional app id to restrict this interface to.
+    ///
+    /// If provided then only apps with an authentication token issued to the same app id
+    /// will be allowed to connect to this interface.
+    #[arg(long)]
+    pub installed_app_id: Option<InstalledAppId>,
 }
 
 /// Calls AdminRequest::RegisterDna
@@ -543,7 +550,7 @@ pub async fn uninstall_app(cmd: &mut CmdRunner, args: UninstallApp) -> anyhow::R
 }
 
 /// Calls [`AdminRequest::ListAppInterfaces`].
-pub async fn list_app_ws(cmd: &mut CmdRunner) -> anyhow::Result<Vec<u16>> {
+pub async fn list_app_ws(cmd: &mut CmdRunner) -> anyhow::Result<Vec<AppInterfaceInfo>> {
     let resp = cmd.command(AdminRequest::ListAppInterfaces).await?;
     Ok(expect_match!(resp => AdminResponse::AppInterfacesListed, "Failed to list app interfaces"))
 }
@@ -610,6 +617,7 @@ pub async fn attach_app_interface(cmd: &mut CmdRunner, args: AddAppWs) -> anyhow
         .command(AdminRequest::AttachAppInterface {
             port: args.port,
             allowed_origins: args.allowed_origins,
+            installed_app_id: args.installed_app_id,
         })
         .await?;
     tracing::debug!(?resp);
