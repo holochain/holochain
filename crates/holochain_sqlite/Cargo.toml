@@ -34,7 +34,7 @@ num_cpus = "1.13.0"
 parking_lot = "0.12"
 r2d2 = "0.8"
 r2d2_sqlite = { version = "0.1", package = "r2d2_sqlite_neonphog" }
-rmp-serde = "=0.15.5"
+rmp-serde = "=1.1.2"
 scheduled-thread-pool = "0.2"
 serde = "1.0"
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
