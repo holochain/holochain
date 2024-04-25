@@ -375,7 +375,6 @@ async fn check_timeout_named<T>(
     response: impl Future<Output = std::io::Result<T>>,
     timeout_millis: u64,
 ) -> std::io::Result<T> {
-    let timeout_millis = timeout_millis;
     match tokio::time::timeout(Duration::from_millis(timeout_millis), response).await {
         Ok(response) => response,
         Err(_) => Err(std::io::Error::other(format!(
