@@ -916,7 +916,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.3.0-beta-dev.40"
+version = "0.3.0-beta-dev.41"
 dependencies = [
  "getrandom",
  "hdi",
@@ -1064,7 +1064,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.3.0-beta-dev.40"
+version = "0.3.0-beta-dev.41"
 dependencies = [
  "hdk",
  "serde",
@@ -1112,7 +1112,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.3.0-beta-dev.35"
+version = "0.3.0-beta-dev.36"
 dependencies = [
  "derive_builder",
  "derive_more",
@@ -1281,7 +1281,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.3.0-beta-dev.23"
+version = "0.3.0-beta-dev.24"
 dependencies = [
  "derivative",
  "derive_more",
