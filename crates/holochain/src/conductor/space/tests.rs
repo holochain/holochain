@@ -40,7 +40,7 @@ async fn test_region_queries() {
     let spaces = Spaces::new(
         ConductorConfig {
             data_root_path: Some(data_root_path),
-            ..Default::default()
+            ..ConductorConfig::empty()
         }
         .into(),
     )

@@ -2,7 +2,6 @@ use crate::spawn::actor::{Internal, InternalSender};
 use crate::{HostApiLegacy, KitsuneP2pError};
 use ghost_actor::{GhostError, GhostSender};
 use kitsune_p2p_fetch::{FetchKey, FetchPool};
-use kitsune_p2p_types::config::KitsuneP2pConfig;
 use parking_lot::RwLock;
 use std::sync::Arc;
 use tracing::Instrument;
@@ -13,10 +12,10 @@ pub struct FetchTask {
 
 impl FetchTask {
     pub fn spawn(
-        config: KitsuneP2pConfig,
         fetch_pool: FetchPool,
         host: HostApiLegacy,
         internal_sender: GhostSender<Internal>,
+        tracing_scope: Option<String>,
     ) -> Arc<RwLock<Self>> {
         let this = Arc::new(RwLock::new(FetchTask { is_finished: false }));
 
@@ -71,9 +70,8 @@ impl FetchTask {
 #[cfg(test)]
 mod tests {
     use super::FetchTask;
-    use crate::spawn::actor::test_util::InternalStubTestSender;
+    use crate::spawn::actor::test_util::{InternalStub, InternalStubTest, InternalStubTestSender};
     use crate::spawn::actor::{Internal, KSpace};
-    use crate::spawn::test_util::{InternalStub, InternalStubTest};
     use crate::HostStub;
     use futures::FutureExt;
     use ghost_actor::actor_builder::GhostActorBuilder;
@@ -231,12 +229,7 @@ mod tests {
         })
         .legacy(dummy_sender);
 
-        let task = FetchTask::spawn(
-            Default::default(),
-            fetch_pool.clone(),
-            host_stub,
-            internal_sender,
-        );
+        let task = FetchTask::spawn(fetch_pool.clone(), host_stub, internal_sender, None);
 
         (
             task,

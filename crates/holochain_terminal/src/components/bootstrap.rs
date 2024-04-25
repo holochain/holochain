@@ -111,8 +111,8 @@ pub fn render_bootstrap_widget(
             .expect("Should have been able to read network type");
 
         let new_net = match *network_type {
-            BootstrapNet::Tx2 => BootstrapNet::Tx5,
-            BootstrapNet::Tx5 => BootstrapNet::Tx2,
+            // just kidding, does nothing, haha!
+            BootstrapNet::Tx5 => BootstrapNet::Tx5,
         };
 
         *network_type = new_net;

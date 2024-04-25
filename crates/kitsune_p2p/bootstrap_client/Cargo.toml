@@ -32,10 +32,6 @@ rand = "0.8.5"
 workspace = true
 
 [features]
-default = ["tx5"]
-
-tx2 = [ "kitsune_p2p_types/tx2" ]
-tx5 = [ "kitsune_p2p_types/tx5"]
 
 test_utils = [
     "kitsune_p2p_bin_data/fixt",

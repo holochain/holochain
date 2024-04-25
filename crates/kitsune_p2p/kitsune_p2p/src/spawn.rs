@@ -5,12 +5,13 @@ use crate::HostApiLegacy;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 mod actor;
-pub(crate) use actor::meta_net;
-use actor::*;
 
-#[cfg(any(test, feature = "test_utils"))]
+pub(crate) use actor::meta_net;
+
+#[cfg(feature = "test_utils")]
 pub use actor::MockKitsuneP2pEventHandler;
 
+use self::actor::Internal;
 use self::meta_net::PreflightUserData;
 
 /// Spawn a new KitsuneP2p actor.

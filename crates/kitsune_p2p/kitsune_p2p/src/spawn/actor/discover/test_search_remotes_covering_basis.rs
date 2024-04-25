@@ -1,7 +1,7 @@
 use super::*;
+use kitsune_p2p_types::tx_utils::TxUrl;
 use kitsune_p2p_types::{
     dht::{arq::ArqSize, spacetime::SpaceDimension},
-    tx2::tx2_utils::TxUrl,
 };
 use SearchRemotesCoveringBasisLogicResult::*;
 

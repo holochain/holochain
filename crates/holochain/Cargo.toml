@@ -116,7 +116,7 @@ sd-notify = "0.4"
 
 
 [dev-dependencies]
-holochain = { path = ".", default-features = false, features = ["test_utils", "slow_tests", "tx2", "tx5", "metrics_influxive"] }
+holochain = { path = ".", default-features = false, features = ["test_utils", "slow_tests", "tx5", "metrics_influxive"] }
 
 anyhow = "1.0"
 assert_cmd = "2"
@@ -163,10 +163,7 @@ path = "src/bin/holochain/main.rs"
 workspace = true
 
 [features]
-default = ["sqlite-encrypted", "tx2", "tx5", "metrics_influxive"]
-
-tx2 = [ "kitsune_p2p/tx2" ]
-tx5 = [ "kitsune_p2p/tx5", "tx5-go-pion-turn", "tx5-signal-srv" ]
+default = ["sqlite-encrypted", "metrics_influxive"]
 
 # Use the "Influxive" opentelemetry metrics binding to write metrics
 # to an InfluxDB time series database.

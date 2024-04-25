@@ -233,10 +233,11 @@ async fn test_network_inner<F>(
 where
     F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
 {
-    let mut config = holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pConfig::default();
+    let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv().await;
+    let mut config = holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pConfig::from_signal_addr(signal_url);
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-    tuning.tx2_implicit_timeout_ms = 500;
+    tuning.tx5_implicit_timeout_ms = 500;
     let tuning = std::sync::Arc::new(tuning);
     let cutoff = tuning.danger_gossip_recent_threshold();
     config.tuning_params = tuning;
@@ -447,8 +448,8 @@ pub async fn setup_app_inner(
                 allowed_origins: AllowedOrigins::Any,
             },
         }]),
-        network: network.unwrap_or_default(),
-        ..Default::default()
+        network: network.unwrap_or_else(KitsuneP2pConfig::empty),
+        ..ConductorConfig::empty()
     };
     let conductor_handle = ConductorBuilder::new()
         .config(config)

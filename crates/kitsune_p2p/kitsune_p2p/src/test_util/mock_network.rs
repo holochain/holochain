@@ -6,9 +6,9 @@ use futures::FutureExt;
 use futures::StreamExt;
 use kitsune_p2p_types::tx2::tx2_adapter::test_utils::*;
 use kitsune_p2p_types::tx2::tx2_adapter::*;
-use kitsune_p2p_types::tx2::tx2_utils::PoolBuf;
-use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::tx2::*;
+use kitsune_p2p_types::tx_utils::PoolBuf;
+use kitsune_p2p_types::tx_utils::TxUrl;
 use kitsune_p2p_types::KitsuneError;
 use kitsune_p2p_types::KitsuneResult;
 use kitsune_p2p_types::Tx2Cert;
@@ -433,7 +433,7 @@ fn k_error<E: std::fmt::Debug>(e: E) -> KitsuneError {
 
 fn url_to_cert(url: &TxUrl) -> Tx2Cert {
     Tx2Cert::from(
-        kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
+        kitsune_p2p_types::tx_utils::ProxyUrl::from_full(url.as_str())
             .expect("Mock network failed to parse url")
             .digest(),
     )

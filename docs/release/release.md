@@ -115,7 +115,7 @@ With
     @@ -226,7 +226,7 @@ jobs:
                     --no-verify-pre \
                     --force-tag-creation \
-                    --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+                    --match-filter="^(holochain|holochain_cli)$" \
     -                --disallowed-version-reqs=">=0.1" \
     +                --disallowed-version-reqs=">=0.2" \
                     --steps=BumpReleaseVersions

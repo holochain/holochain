@@ -16,7 +16,7 @@ use futures::StreamExt;
 use ghost_actor::{GhostError, GhostSender};
 use kitsune_p2p_fetch::{FetchKey, FetchPool, FetchResponseQueue};
 use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use std::error::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -24,12 +24,13 @@ use tracing::Instrument;
 
 pub struct MetaNetTask {
     host: HostApiLegacy,
-    config: KitsuneP2pConfig,
+    tuning_params: KitsuneP2pTuningParams,
     fetch_pool: FetchPool,
     fetch_response_queue: FetchResponseQueue<FetchResponseConfig>,
     ep_evt: Option<MetaNetEvtRecv>,
     i_s: GhostSender<Internal>,
     is_finished: Arc<AtomicBool>,
+    tracing_scope: Option<String>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -57,20 +58,22 @@ type MetaNetTaskResult<T> = Result<T, MetaNetTaskError>;
 impl MetaNetTask {
     pub fn new(
         host: HostApiLegacy,
-        config: KitsuneP2pConfig,
+        tuning_params: KitsuneP2pTuningParams,
         fetch_pool: FetchPool,
         fetch_response_queue: FetchResponseQueue<FetchResponseConfig>,
         ep_evt: MetaNetEvtRecv,
         i_s: GhostSender<Internal>,
+        tracing_scope: Option<String>,
     ) -> Self {
         Self {
             host,
-            config,
+            tuning_params,
             fetch_pool,
             fetch_response_queue,
             ep_evt: Some(ep_evt),
             i_s,
             is_finished: Arc::new(AtomicBool::new(false)),
+            tracing_scope,
         }
     }
 
@@ -2149,6 +2152,7 @@ mod tests {
             fetch_response_queue.clone(),
             ep_evt_rcv,
             internal_sender.clone(),
+            None,
         );
         let meta_net_task_finished = meta_net_task.is_finished.clone();
 

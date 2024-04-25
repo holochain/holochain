@@ -16,7 +16,6 @@ use crate::types::DnaHashExt;
 use futures::StreamExt;
 use holo_hash::{AgentPubKey, DnaHash};
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dependencies::kitsune_p2p_proxy::ProxyUrl;
 use kitsune_p2p::test_util::mock_network::to_kitsune_channel;
 use kitsune_p2p::test_util::mock_network::KitsuneMock;
 use kitsune_p2p::test_util::mock_network::ToKitsuneMockChannelRx;
@@ -24,8 +23,9 @@ use kitsune_p2p::test_util::mock_network::ToKitsuneMockChannelTx;
 use kitsune_p2p::test_util::mock_network::{FromKitsuneMockChannelTx, KitsuneMockRespond};
 use kitsune_p2p::wire as kwire;
 use kitsune_p2p::GossipModuleType;
-use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::tx2::MsgId;
+use kitsune_p2p_types::tx_utils::ProxyUrl;
+use kitsune_p2p_types::tx_utils::TxUrl;
 use kitsune_p2p_types::Tx2Cert;
 
 static MSG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
