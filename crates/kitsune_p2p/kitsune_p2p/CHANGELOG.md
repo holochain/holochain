@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.40
+
 - **BREAKING** - AgentInfo uses a quantized arc instead of an arc half-length to represent DHT coverage. This is a breaking protocol change, nodes on different versions will not be able to gossip with each other.
 
 ## 0.3.0-beta-dev.39

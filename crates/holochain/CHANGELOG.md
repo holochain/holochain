@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.3.0-beta-dev.48
+
 ## 0.3.0-beta-dev.47
 
 - Connections to Holochain app interfaces are now app specific, so anywhere that you used to have to provide an `installed_app_id` or `app_id` in requests, that is no longer required and has been removed. For example, `AppRequest::AppInfo` no longer takes any parameters and will return information about the app the connection is authenticated with. \#3643
