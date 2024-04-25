@@ -308,6 +308,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         }
     }
 
+    // Returns only actions that are referenced by at least one integrated dht op.
     fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>> {
         let action = self.txn.query_row(
             "
@@ -316,11 +317,12 @@ impl<'stmt> Store for Txn<'stmt, '_> {
             FROM Action
             JOIN DhtOp ON Action.hash = DhtOp.action_hash
             WHERE Action.hash = :hash
-            AND DhtOp.when_integrated IS NOT NULL
+            AND DhtOp.validation_status = :validation_status
             LIMIT 1
             ",
             named_params! {
                 ":hash": hash,
+                ":validation_status": ValidationStatus::Valid
             },
             |row| {
                 let action =

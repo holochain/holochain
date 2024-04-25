@@ -86,15 +86,15 @@ pub async fn app_validation_workflow(
     .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-    // if ops have been accepted or rejected, trigger integration
+    // If ops have been accepted or rejected, trigger integration.
     if outcome_summary.validated > 0 {
         trigger_integration.trigger(&"app_validation_workflow");
     }
 
     Ok(
-        // if not all ops have been validated
+        // If not all ops have been validated
         // and fetching missing hashes has not passed expiration,
-        // trigger app validation workflow again
+        // trigger app validation workflow again.
         if outcome_summary.validated < outcome_summary.ops_to_validate
             && !validation_dependencies
                 .lock()
@@ -140,7 +140,7 @@ async fn app_validation_workflow_inner(
     let rejected_ops = Arc::new(Mutex::new(0));
     let mut agent_activity = Vec::new();
 
-    // Validate ops sequentially
+    // Validate ops sequentially.
     for sorted_dht_op in sorted_dht_ops.into_iter() {
         let (dht_op, dht_op_hash) = sorted_dht_op.into_inner();
         let op_type = dht_op.get_type();
@@ -157,7 +157,7 @@ async fn app_validation_workflow_inner(
             )
         });
 
-        // Validate this op
+        // Validate this op.
         let validation_outcome = match dhtop_to_op(dht_op.clone(), cascade.clone()).await {
             Ok(op) => {
                 validate_op_outer(
@@ -173,7 +173,7 @@ async fn app_validation_workflow_inner(
             }
             Err(e) => Err(e),
         };
-        // Flatten nested app validation outcome to either ok or error
+        // Flatten nested app validation outcome to either ok or error.
         let validation_outcome = match validation_outcome {
             Ok(outcome) => AppValidationResult::Ok(outcome),
             Err(OutcomeOrError::Outcome(outcome)) => AppValidationResult::Ok(outcome),
@@ -185,7 +185,7 @@ async fn app_validation_workflow_inner(
             Ok(outcome) => {
                 // Collect all agent activity.
                 if let Some(activity) = activity {
-                    // If the activity is accepted or rejected then it's ready to integrate.
+                    // If the activity is accepted or rejected, then it's ready to integrate.
                     if matches!(&outcome, Outcome::Accepted | Outcome::Rejected(_)) {
                         agent_activity.push(activity);
                     }

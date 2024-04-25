@@ -15,7 +15,10 @@ use crate::{
 use fixt::fixt;
 use holo_hash::{AgentPubKey, AnyDhtHash, HashableContentExtSync};
 use holochain_p2p::{HolochainP2pDnaFixturator, MockHolochainP2pDnaT};
-use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, mutations::insert_op};
+use holochain_state::{
+    host_fn_workspace::HostFnWorkspaceRead,
+    mutations::{insert_op, set_validation_status},
+};
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
     dht_op::{DhtOp, DhtOpHashed, WireOps},
@@ -121,6 +124,7 @@ async fn validation_callback_must_get_action() {
     let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
     test_space.space.cache_db.test_write(move |txn| {
         insert_op(txn, &dht_op_hashed).unwrap();
+        set_validation_status(txn, &dht_op_hashed.hash, ValidationStatus::Valid)
     });
 
     // the same validation should now successfully validate the op

@@ -6,6 +6,7 @@ default_semver_increment_mode: !pre_minor beta-dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+- Actions and entries are written to the DHT database as part of the incoming ops workflow. Thus actions that have not been validated could previously be gotten from the database, for example when retrieving an action with `must_get_action`. Now actions are cross-checked against DHT ops and only returned when at least one validated op references them.
 
 ## 0.3.0-beta-dev.45
 

@@ -246,7 +246,6 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     let dht_delete_op = DhtOp::RegisterAgentActivity(fixt!(Signature), delete_action.clone());
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
-    let delete_action_hash = delete_action.to_hash();
 
     let entry_def = EntryDef::default_from_id("entry_def_id");
     let zomes = SweetInlineZomes::new(vec![entry_def.clone()], 0).integrity_function(
@@ -427,24 +426,6 @@ async fn validate_ops_in_sequence_must_get_action() {
     assert_eq!(ops_to_validate, 0);
 
     // create op that following delete op depends on
-    // let mut create = fixt!(Create);
-    // create.entry_type = EntryType::App(AppEntryDef {
-    //     entry_index: 0.into(),
-    //     zome_index: 0.into(),
-    //     visibility: EntryVisibility::Public,
-    // });
-    // let create_op = Action::Create(create);
-    // let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
-    // let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
-
-    // // create op that depends on previous create
-    // let mut delete = fixt!(Delete);
-    // delete.author = create_op.author().clone();
-    // delete.deletes_address = create_op.clone().to_hash();
-    // delete.deletes_entry_address = create_op.entry_hash().unwrap().clone();
-    // let dht_delete_op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
-    // let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
-    // let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
     let agent = fixt!(AgentPubKey);
     let create = Create {
         action_seq: 3,
@@ -478,7 +459,6 @@ async fn validate_ops_in_sequence_must_get_action() {
     let dht_delete_op = DhtOp::RegisterAgentActivity(fixt!(Signature), delete_action.clone());
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
-    let delete_action_hash = delete_action.to_hash();
 
     // insert create and delete op in dht db and mark ready for app validation
     app_validation_workspace.dht_db.test_write(move |txn| {

@@ -2,7 +2,7 @@ use crate::conductor::space::TestSpace;
 use crate::core::ribosome::{MockRibosomeT, ZomesToInvoke};
 use crate::core::validation::OutcomeOrError;
 use crate::core::workflow::app_validation_workflow::{
-    get_zomes_to_invoke, put_validation_limbo, Outcome,
+    get_zomes_to_invoke, set_validation_status, Outcome,
 };
 use crate::fixt::MetaLairClientFixturator;
 use crate::sweettest::{SweetDnaFile, SweetInlineZomes};
@@ -11,7 +11,6 @@ use holo_hash::{HasHash, HashableContentExtSync};
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::mutations::insert_op;
-use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
 use holochain_types::rate_limit::{EntryRateWeight, RateWeight};
 use holochain_zome_types::action::{AppEntryDef, Create, Delete, EntryType, Update, ZomeIndex};
@@ -26,6 +25,7 @@ use holochain_zome_types::op::{
 };
 use holochain_zome_types::record::{Record, RecordEntry, SignedActionHashed, SignedHashed};
 use holochain_zome_types::timestamp::Timestamp;
+use holochain_zome_types::validate::ValidationStatus;
 use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::sync::Arc;
@@ -757,7 +757,7 @@ async fn store_record_delete_without_entry() {
     ));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
+        set_validation_status(txn, dht_op.as_hash(), ValidationStatus::Valid).unwrap();
     });
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -814,7 +814,7 @@ async fn store_record_delete_non_app_entry() {
     ));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
+        set_validation_status(txn, dht_op.as_hash(), ValidationStatus::Valid).unwrap();
     });
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -874,7 +874,7 @@ async fn store_record_delete_link() {
     ));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
+        set_validation_status(txn, dht_op.as_hash(), ValidationStatus::Valid).unwrap();
     });
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -952,7 +952,7 @@ async fn store_record_delete_of_delete_entry() {
         DhtOpHashed::from_content_sync(DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
+        set_validation_status(txn, dht_op.as_hash(), ValidationStatus::Valid).unwrap();
     });
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -1030,7 +1030,7 @@ async fn store_record_delete_of_delete_without_entry() {
         DhtOpHashed::from_content_sync(DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
+        set_validation_status(txn, dht_op.as_hash(), ValidationStatus::Valid).unwrap();
     });
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -1210,7 +1210,7 @@ async fn register_delete_create_app_entry() {
     ));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
+        set_validation_status(txn, dht_op.as_hash(), ValidationStatus::Valid).unwrap();
     });
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -1277,7 +1277,7 @@ async fn register_delete_create_non_app_entry() {
     ));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
+        set_validation_status(txn, dht_op.as_hash(), ValidationStatus::Valid).unwrap();
     });
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -1348,7 +1348,7 @@ async fn register_delete_update_app_entry() {
     ));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
+        set_validation_status(txn, dht_op.as_hash(), ValidationStatus::Valid).unwrap();
     });
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -1415,7 +1415,7 @@ async fn register_delete_update_non_app_entry() {
     ));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
+        set_validation_status(txn, dht_op.as_hash(), ValidationStatus::Valid).unwrap();
     });
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
@@ -1472,7 +1472,7 @@ async fn register_delete_of_delete() {
     ));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
-        put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
+        set_validation_status(txn, dht_op.as_hash(), ValidationStatus::Valid).unwrap();
     });
 
     let zomes_to_invoke = get_zomes_to_invoke(&op, &workspace, network, &ribosome)
