@@ -317,11 +317,10 @@ impl<'stmt> Store for Txn<'stmt, '_> {
             JOIN DhtOp ON Action.hash = DhtOp.action_hash
             WHERE Action.hash = :hash
             AND DhtOp.when_integrated IS NOT NULL
-            AND DhtOp.type = :op_type
+            LIMIT 1
             ",
             named_params! {
                 ":hash": hash,
-                ":op_type": DhtOpType::RegisterAgentActivity,
             },
             |row| {
                 let action =
