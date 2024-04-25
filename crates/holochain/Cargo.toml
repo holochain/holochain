@@ -90,8 +90,8 @@ url2 = "0.0.6"
 uuid = { version = "1.8", features = ["serde", "v4"] }
 holochain_wasm_test_utils = { version = "^0.3.0-beta-dev.45", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
-wasmer = "=4.2.4"
-wasmer-middlewares = "=4.2.4"
+wasmer = "=4.2.8"
+wasmer-middlewares = "=4.2.8"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
 # Dependencies for test_utils
