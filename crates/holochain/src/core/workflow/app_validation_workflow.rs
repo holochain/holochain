@@ -166,7 +166,7 @@ async fn app_validation_workflow_inner(
                     &dht_op_hash,
                     &conductor,
                     &workspace,
-                    &network,
+                    network,
                     validation_dependencies.clone(),
                 )
                 .await
