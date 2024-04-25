@@ -916,7 +916,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.3.0-beta-dev.40"
+version = "0.3.0-beta-dev.41"
 dependencies = [
  "getrandom",
  "hdi",
@@ -1064,7 +1064,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.3.0-beta-dev.40"
+version = "0.3.0-beta-dev.41"
 dependencies = [
  "hdk",
  "serde",
@@ -1112,7 +1112,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.3.0-beta-dev.35"
+version = "0.3.0-beta-dev.36"
 dependencies = [
  "derive_builder",
  "derive_more",
@@ -1281,7 +1281,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.3.0-beta-dev.23"
+version = "0.3.0-beta-dev.24"
 dependencies = [
  "derivative",
  "derive_more",
@@ -3283,9 +3283,9 @@ checksum = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
 
 [[package]]
 name = "winapi-util"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "134306a13c5647ad6453e8deaec55d3a44d6021970129e6188735e74bf546697"
+checksum = "4d4cc384e1e73b93bafa6fb4f1df8c41695c8a91cf9c4c64358067d15a7b6c6b"
 dependencies = [
  "windows-sys 0.52.0",
 ]

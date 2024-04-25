@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Adds DPKI support. This is not fully hooked up, so the main implication for this particular implementation is that you must be using the same DPKI implementation as all other nodes on the network that you wish to talk to. If the DPKI version mismatches, you cannot establish connections, and will see so as an error in the logs. This work is in preparation for future work which will make it possible to restore your keys if you lose your device, and to revoke and replace your keys if your device is stolen or compromised.
 
+## 0.3.0-beta-dev.48
+
 ## 0.3.0-beta-dev.47
 
 - Connections to Holochain app interfaces are now app specific, so anywhere that you used to have to provide an `installed_app_id` or `app_id` in requests, that is no longer required and has been removed. For example, `AppRequest::AppInfo` no longer takes any parameters and will return information about the app the connection is authenticated with. \#3643
