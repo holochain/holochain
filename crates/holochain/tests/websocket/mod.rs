@@ -91,7 +91,8 @@ how_many: 42
         "role_name".into(),
         10000,
     )
-    .await.unwrap();
+    .await
+    .unwrap();
 
     // List Dnas
     let request = AdminRequest::ListDnas;
@@ -152,7 +153,8 @@ async fn call_zome() {
         "".into(),
         10000,
     )
-    .await.unwrap();
+    .await
+    .unwrap();
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
 
     // List Dnas
@@ -186,7 +188,8 @@ async fn call_zome() {
         fn_name.clone(),
         signing_key,
     )
-    .await.unwrap();
+    .await
+    .unwrap();
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
@@ -373,7 +376,8 @@ async fn emit_signals() {
         "".into(),
         10000,
     )
-    .await.unwrap();
+    .await
+    .unwrap();
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
 
     // Activate cells
@@ -399,7 +403,8 @@ async fn emit_signals() {
         fn_name.clone(),
         signing_key,
     )
-    .await.unwrap();
+    .await
+    .unwrap();
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
@@ -715,7 +720,9 @@ async fn concurrent_install_dna() {
             );
             let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-            let agent_key = generate_agent_pub_key(&mut client, REQ_TIMEOUT_MS).await.unwrap();
+            let agent_key = generate_agent_pub_key(&mut client, REQ_TIMEOUT_MS)
+                .await
+                .unwrap();
 
             let _dna_hash = register_and_install_dna_named(
                 &mut client,
@@ -808,7 +815,9 @@ async fn full_state_dump_cursor_works() {
 
     let (mut client, _rx) = conductor.admin_ws_client::<AppResponse>().await;
 
-    let full_state = dump_full_state(&mut client, cell_id.clone(), None).await.unwrap();
+    let full_state = dump_full_state(&mut client, cell_id.clone(), None)
+        .await
+        .unwrap();
 
     let integrated_ops_count = full_state.integration_dump.integrated.len();
     let validation_limbo_ops_count = full_state.integration_dump.validation_limbo.len();
@@ -824,7 +833,8 @@ async fn full_state_dump_cursor_works() {
         cell_id,
         Some(full_state.integration_dump.dht_ops_cursor - 1),
     )
-    .await.unwrap();
+    .await
+    .unwrap();
 
     let integrated_ops_count = full_state.integration_dump.integrated.len();
     let validation_limbo_ops_count = full_state.integration_dump.validation_limbo.len();

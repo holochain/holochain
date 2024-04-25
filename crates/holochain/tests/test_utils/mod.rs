@@ -197,9 +197,14 @@ pub async fn retry_admin_interface(
     }
 }
 
-pub async fn generate_agent_pub_key(client: &mut WebsocketSender, timeout: u64) -> std::io::Result<AgentPubKey> {
+pub async fn generate_agent_pub_key(
+    client: &mut WebsocketSender,
+    timeout: u64,
+) -> std::io::Result<AgentPubKey> {
     let request = AdminRequest::GenerateAgentPubKey;
-    let response = client.request_timeout(request, Duration::from_millis(timeout)).await?;
+    let response = client
+        .request_timeout(request, Duration::from_millis(timeout))
+        .await?;
 
     Ok(unwrap_to::unwrap_to!(response => AdminResponse::AgentPubKeyGenerated).clone())
 }
@@ -373,12 +378,10 @@ async fn check_timeout_named<T>(
     let timeout_millis = timeout_millis;
     match tokio::time::timeout(Duration::from_millis(timeout_millis), response).await {
         Ok(response) => response,
-        Err(_) => {
-            Err(std::io::Error::other(
-                format!("{}: Timed out on request after {}",
-                        name, timeout_millis)
-            ))
-        }
+        Err(_) => Err(std::io::Error::other(format!(
+            "{}: Timed out on request after {}",
+            name, timeout_millis
+        ))),
     }
 }
 
@@ -396,6 +399,9 @@ pub async fn dump_full_state(
 
     match response {
         AdminResponse::FullStateDumped(state) => Ok(state),
-        _ => Err(std::io::Error::other(format!("DumpFullState failed: {:?}", response))),
+        _ => Err(std::io::Error::other(format!(
+            "DumpFullState failed: {:?}",
+            response
+        ))),
     }
 }
