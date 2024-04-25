@@ -309,19 +309,15 @@ impl<'stmt> Store for Txn<'stmt, '_> {
     }
 
     fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>> {
-        let action = self.txn.query_row(
+        let shh = self.txn.query_row(
             "
             SELECT
             Action.blob, Action.hash
             FROM Action
-            JOIN DhtOp ON Action.hash = DhtOp.action_hash
-            WHERE Action.hash = :hash
-            AND DhtOp.when_integrated IS NOT NULL
-            AND DhtOp.type = :op_type
+            WHERE hash = :hash
             ",
             named_params! {
                 ":hash": hash,
-                ":op_type": DhtOpType::RegisterAgentActivity,
             },
             |row| {
                 let action =
@@ -335,10 +331,10 @@ impl<'stmt> Store for Txn<'stmt, '_> {
                 }))
             },
         );
-        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &action {
+        if let Err(holochain_sqlite::rusqlite::Error::QueryReturnedNoRows) = &shh {
             Ok(None)
         } else {
-            Ok(Some(action??))
+            Ok(Some(shh??))
         }
     }
 

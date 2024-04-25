@@ -2,7 +2,7 @@ use crate::conductor::{Conductor, ConductorHandle};
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::app_validation_workflow::{
-    app_validation_workflow_inner, check_app_entry_def, put_integrated, put_validation_limbo,
+    app_validation_workflow_inner, check_app_entry_def, put_validation_limbo,
     AppValidationWorkspace, OutcomeSummary, ValidationDependencies,
 };
 use crate::core::workflow::sys_validation_workflow::validation_query;
@@ -159,7 +159,7 @@ async fn main_workflow() {
     // as cascade would do with fetched dependent ops
     app_validation_workspace.cache.test_write(move |txn| {
         insert_op(txn, &dht_create_op_hashed).unwrap();
-        put_integrated(txn, &dht_create_op_hashed.hash, ValidationStatus::Valid).unwrap();
+        put_validation_limbo(txn, &dht_create_op_hashed.hash, ValidationStage::Pending).unwrap();
     });
 
     // there is still the 1 delete op to be validated
@@ -365,6 +365,10 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
 
 // test that app validation validates multiple ops in one workflow run where
 // one op depends on the other op
+// TODO this test only passes because actions are mistakenly written to the
+// Action table in the dht database before being validated. Once that is fixed
+// with issue https://github.com/holochain/holochain/issues/3724,
+// this test should fail.
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_ops_in_sequence_must_get_action() {
     holochain_trace::test_run();
@@ -427,58 +431,24 @@ async fn validate_ops_in_sequence_must_get_action() {
     assert_eq!(ops_to_validate, 0);
 
     // create op that following delete op depends on
-    // let mut create = fixt!(Create);
-    // create.entry_type = EntryType::App(AppEntryDef {
-    //     entry_index: 0.into(),
-    //     zome_index: 0.into(),
-    //     visibility: EntryVisibility::Public,
-    // });
-    // let create_op = Action::Create(create);
-    // let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
-    // let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
-
-    // // create op that depends on previous create
-    // let mut delete = fixt!(Delete);
-    // delete.author = create_op.author().clone();
-    // delete.deletes_address = create_op.clone().to_hash();
-    // delete.deletes_entry_address = create_op.entry_hash().unwrap().clone();
-    // let dht_delete_op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
-    // let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
-    // let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
-    let agent = fixt!(AgentPubKey);
-    let create = Create {
-        action_seq: 3,
-        prev_action: fixt!(ActionHash),
-        author: agent.clone(),
-        entry_type: EntryType::App(AppEntryDef {
-            entry_index: 0.into(),
-            zome_index: 0.into(),
-            visibility: EntryVisibility::Public,
-        }),
-        entry_hash: fixt!(EntryHash),
-        timestamp: Timestamp::now(),
-        weight: Default::default(),
-    };
-    let create_action = Action::Create(create);
-    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
+    let mut create = fixt!(Create);
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
+    let create_op = Action::Create(create);
+    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
-    let create_action_hash = create_action.to_hash();
 
     // create op that depends on previous create
-    let delete = Delete {
-        action_seq: 4,
-        prev_action: create_action_hash.clone(),
-        author: agent.clone(),
-        deletes_address: create_action_hash.clone(),
-        deletes_entry_address: create_action.entry_hash().unwrap().clone(),
-        timestamp: Timestamp::now(),
-        weight: Default::default(),
-    };
-    let delete_action = Action::Delete(delete);
-    let dht_delete_op = DhtOp::RegisterAgentActivity(fixt!(Signature), delete_action.clone());
+    let mut delete = fixt!(Delete);
+    delete.author = create_op.author().clone();
+    delete.deletes_address = create_op.clone().to_hash();
+    delete.deletes_entry_address = create_op.entry_hash().unwrap().clone();
+    let dht_delete_op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
-    let delete_action_hash = delete_action.to_hash();
 
     // insert create and delete op in dht db and mark ready for app validation
     app_validation_workspace.dht_db.test_write(move |txn| {
