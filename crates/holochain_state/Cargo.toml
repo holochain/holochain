@@ -24,7 +24,7 @@ holo_hash = { version = "^0.3.0-beta-dev.28", path = "../holo_hash", features = 
 fallible-iterator = "0.2.0"
 hc_sleuth = { version = "^0.2.0-beta-dev.17", path = "../hc_sleuth" }
 holochain_keystore = { version = "^0.3.0-beta-dev.37", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.53"
+holochain_serialized_bytes = "=0.0.54"
 holochain_p2p = { version = "^0.3.0-beta-dev.46", path = "../holochain_p2p" }
 holochain_types = { version = "^0.3.0-beta-dev.43", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.36", path = "../holochain_zome_types", features = [

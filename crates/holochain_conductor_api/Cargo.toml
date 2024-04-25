@@ -17,7 +17,7 @@ holo_hash = { version = "^0.3.0-beta-dev.28", path = "../holo_hash", features = 
     "full",
 ] }
 holochain_state_types = { version = "^0.3.0-beta-dev.40", path = "../holochain_state_types" }
-holochain_serialized_bytes = "=0.0.53"
+holochain_serialized_bytes = "=0.0.54"
 holochain_types = { version = "^0.3.0-beta-dev.43", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.36", path = "../holochain_zome_types" }
 serde = { version = "1.0", features = ["derive"] }

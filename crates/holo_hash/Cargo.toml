@@ -23,7 +23,7 @@ blake2b_simd = { version = "1.0", optional = true }
 derive_more = { version = "0.99", optional = true }
 fixt = { version = "^0.3.0-beta-dev.4", path = "../fixt", optional = true }
 futures = { version = "0.3", optional = true }
-holochain_serialized_bytes = { version = "=0.0.53", optional = true }
+holochain_serialized_bytes = { version = "=0.0.54", optional = true }
 holochain_util = { version = "^0.3.0-beta-dev.8", path = "../holochain_util", default-features = false }
 kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.20", path = "../kitsune_p2p/dht_arc" }
 must_future = { version = "0.1", optional = true }

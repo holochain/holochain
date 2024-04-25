@@ -36,11 +36,11 @@ holochain_conductor_api = { version = "^0.3.0-beta-dev.47", path = "../holochain
 holochain_keystore = { version = "^0.3.0-beta-dev.37", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.3.0-beta-dev.46", path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.3.0-beta-dev.43", path = "../holochain_sqlite" }
-holochain_serialized_bytes = "=0.0.53"
+holochain_serialized_bytes = "=0.0.54"
 holochain_state = { version = "^0.3.0-beta-dev.46", path = "../holochain_state" }
 holochain_types = { version = "^0.3.0-beta-dev.43", path = "../holochain_types" }
 holochain_util = { version = "^0.3.0-beta-dev.8", path = "../holochain_util" }
-holochain_wasmer_host = "=0.0.92"
+holochain_wasmer_host = "=0.0.93"
 holochain_websocket = { version = "^0.3.0-beta-dev.22", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.36", path = "../holochain_zome_types", features = [
   "full",
