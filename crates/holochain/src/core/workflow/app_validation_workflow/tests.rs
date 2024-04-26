@@ -246,7 +246,6 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     let dht_delete_op = DhtOp::RegisterAgentActivity(fixt!(Signature), delete_action.clone());
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
-    let delete_action_hash = delete_action.to_hash();
 
     let entry_def = EntryDef::default_from_id("entry_def_id");
     let zomes = SweetInlineZomes::new(vec![entry_def.clone()], 0).integrity_function(

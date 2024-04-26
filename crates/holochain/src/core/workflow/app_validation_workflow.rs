@@ -32,6 +32,8 @@ use parking_lot::Mutex;
 use rusqlite::Transaction;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
@@ -135,9 +137,9 @@ async fn app_validation_workflow_inner(
 
     let cascade = Arc::new(workspace.full_cascade(network.clone()));
     let validation_dependencies = validation_dependencies.clone();
-    let accepted_ops = Arc::new(Mutex::new(0));
-    let awaiting_ops = Arc::new(Mutex::new(0));
-    let rejected_ops = Arc::new(Mutex::new(0));
+    let accepted_ops = Arc::new(AtomicUsize::new(0));
+    let awaiting_ops = Arc::new(AtomicUsize::new(0));
+    let rejected_ops = Arc::new(AtomicUsize::new(0));
     let mut agent_activity = Vec::new();
 
     // Validate ops sequentially
@@ -203,9 +205,9 @@ async fn app_validation_workflow_inner(
 
                 let write_result = workspace
                     .dht_db
-                    .write_async(move |txn| match outcome {
+                    .write_async(move|txn| match outcome {
                         Outcome::Accepted => {
-                            *accepted_ops.lock() += 1;
+                            accepted_ops.fetch_add(1, Ordering::SeqCst);
                             aitia::trace!(&hc_sleuth::Event::AppValidated {
                                 by: sleuth_id.clone(),
                                 op: dht_op_hash.clone()
@@ -223,7 +225,7 @@ async fn app_validation_workflow_inner(
                             }
                         }
                         Outcome::AwaitingDeps(deps) => {
-                            *awaiting_ops.lock() += 1;
+                            awaiting_ops.fetch_add(1, Ordering::SeqCst);
                             put_validation_limbo(
                                 txn,
                                 &dht_op_hash,
@@ -231,7 +233,7 @@ async fn app_validation_workflow_inner(
                             )
                         }
                         Outcome::Rejected(_) => {
-                            *rejected_ops.lock() += 1;
+                            rejected_ops.fetch_add(1, Ordering::SeqCst);
                             tracing::info!(
                             "Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}"
                         );
@@ -269,9 +271,9 @@ async fn app_validation_workflow_inner(
         }
     }
 
-    let accepted_ops = *accepted_ops.lock();
-    let awaiting_ops = *awaiting_ops.lock();
-    let rejected_ops = *rejected_ops.lock();
+    let accepted_ops = accepted_ops.load(Ordering::SeqCst);
+    let awaiting_ops = awaiting_ops.load(Ordering::SeqCst);
+    let rejected_ops = rejected_ops.load(Ordering::SeqCst);
     let ops_validated = accepted_ops + rejected_ops;
     tracing::debug!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected.");
 
