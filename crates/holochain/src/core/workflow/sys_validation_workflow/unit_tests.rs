@@ -23,6 +23,7 @@ use holochain_sqlite::db::DbKindCache;
 use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::db::DbKindT;
 use holochain_sqlite::db::DbWrite;
+use holochain_state::mutations::set_validation_status;
 use holochain_state::mutations::StateMutationResult;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
@@ -90,7 +91,7 @@ async fn validate_op_with_dependency_held_in_cache() {
     let previous_op =
         DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action));
     test_case
-        .save_op_to_db(test_case.cache_db_handle(), previous_op)
+        .save_op_to_db_as_valid(test_case.cache_db_handle(), previous_op)
         .await
         .unwrap();
 
@@ -244,7 +245,7 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
         Action::AgentValidationPkg(validation_package_action),
     );
     test_case
-        .save_op_to_db(test_case.cache_db_handle(), previous_op)
+        .save_op_to_db_as_valid(test_case.cache_db_handle(), previous_op)
         .await
         .unwrap();
 
@@ -343,11 +344,6 @@ impl TestCase {
         db.write_async({
             move |txn| -> StateMutationResult<()> {
                 holochain_state::mutations::insert_op(txn, &op)?;
-                holochain_state::mutations::set_validation_status(
-                    txn,
-                    &op.hash,
-                    ValidationStatus::Valid,
-                )?;
                 Ok(())
             }
         })
@@ -355,6 +351,19 @@ impl TestCase {
         .unwrap();
 
         Ok(test_op_hash)
+    }
+
+    async fn save_op_to_db_as_valid<T: DbKindT>(
+        &self,
+        db: DbWrite<T>,
+        op: DhtOp,
+    ) -> StateMutationResult<DhtOpHash> {
+        let op_hash = self.save_op_to_db(db.clone(), op).await?;
+        let dht_op_hash = op_hash.clone();
+        db.test_write(move |txn| {
+            set_validation_status(txn, &dht_op_hash, ValidationStatus::Valid)
+        })?;
+        Ok(op_hash)
     }
 
     async fn run(&mut self) -> WorkComplete {
