@@ -18,5 +18,32 @@ teardown() {
 
 @test "expected scaffold an example to succeed" {
   set -e
-  hc scaffold example forum -t vue
+  TEMP_PATH="/tmp"
+
+  cleanup_tmp() {
+    rm -rf "${TEMP_PATH:?}/$1"
+  }
+
+  print_version() {
+    echo "$(hc-scaffold --version)"
+  }
+
+  setup_and_build_hello_world() {
+    print_version
+    cleanup_tmp hello-world
+
+    cd $TEMP_PATH
+    hc-scaffold example hello-world
+    cd hello-world
+
+    # TODO: override holochain version dynamically
+    nix develop --command bash -c "
+      set -e
+      npm install
+      npm test
+      "
+    cd ..
+  }
+
+  setup_and_build_hello_world
 }
