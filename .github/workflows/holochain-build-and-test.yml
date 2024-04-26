@@ -9,13 +9,13 @@ on:
         type: string
         default: "."
       fail_fast:
-        description: "whether all tests will be stopped on first failure occurence or run to completion"
+        description: "whether all tests will be stopped on first failure occurrence or run to completion"
         required: false
         type: boolean
         default: false
     secrets:
       GITHUB_ACCESS_TOKEN:
-        description: "A GitHub access toekn which can be used for cloning the project"
+        description: "A GitHub access token which can be used for cloning the project"
         required: true
       CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL:
         description: "The Cachix token for `holochain-ci-internal` to be used for caching Holochain CI runs"
