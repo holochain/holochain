@@ -37,6 +37,7 @@ use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::judged::Judged;
 use holochain_zome_types::record::SignedActionHashed;
 use holochain_zome_types::timestamp::Timestamp;
+use holochain_zome_types::validate::ValidationStatus;
 use holochain_zome_types::Action;
 use parking_lot::Mutex;
 use std::collections::HashSet;
@@ -342,6 +343,11 @@ impl TestCase {
         db.write_async({
             move |txn| -> StateMutationResult<()> {
                 holochain_state::mutations::insert_op(txn, &op)?;
+                holochain_state::mutations::set_validation_status(
+                    txn,
+                    &op.hash,
+                    ValidationStatus::Valid,
+                )?;
                 Ok(())
             }
         })
