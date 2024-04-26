@@ -367,6 +367,13 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::AppAuthenticationTokenIssued`]
     IssueAppAuthenticationToken(IssueAppAuthenticationTokenPayload),
+
+    /// Revoke an issued app authentication token.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::AppAuthenticationTokenRevoked`]
+    RevokeAppAuthenticationToken(AppAuthenticationToken),
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -512,6 +519,9 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::IssueAppAuthenticationToken`].
     AppAuthenticationTokenIssued(AppAuthenticationTokenIssued),
 
+    /// The successful response to an [`AdminRequest::RevokeAppAuthenticationToken`].
+    AppAuthenticationTokenRevoked,
+
     /// Successful response to whatever request was made, with no extra information included
     Ok,
 }
@@ -583,7 +593,7 @@ pub struct IssueAppAuthenticationTokenPayload {
     /// token will no longer be accepted by the conductor.
     ///
     /// This is 30s by default which is reasonably high but with [IssueAppAuthenticationTokenPayload::single_use]
-    /// set to `false`, the token will be invalidated after the first use anyway.
+    /// set to `true`, the token will be invalidated after the first use anyway.
     ///
     /// Set this to 0 to create a token that does not expire.
     #[serde(default = "default_expiry_seconds")]

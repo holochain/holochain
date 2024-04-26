@@ -126,7 +126,6 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
-    let dna_hash = dna_file.dna_hash().clone();
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
