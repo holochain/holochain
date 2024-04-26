@@ -87,7 +87,9 @@ how_many: 42
         "role_name".into(),
         10000,
     )
-    .await;
+    .await
+    .unwrap();
+
     let installed_dna_hash = installed_cell_id.dna_hash().clone();
 
     assert_ne!(installed_dna_hash, original_dna_hash);
@@ -95,7 +97,7 @@ how_many: 42
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
-    let response = check_timeout(response, 10000).await;
+    let response = check_timeout(response, 10000).await.unwrap();
 
     assert_matches!(response, AdminResponse::DnasListed(a) if a.contains(&installed_dna_hash));
 }
@@ -131,14 +133,15 @@ async fn call_zome() {
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let cell_id =
-        register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000).await;
+    let cell_id = register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000)
+        .await
+        .unwrap();
     let installed_dna_hash = cell_id.dna_hash().clone();
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = admin_tx.request(request);
-    let response = check_timeout(response, 15000).await;
+    let response = check_timeout(response, 15000).await.unwrap();
 
     assert_matches!(response, AdminResponse::DnasListed(a) if a.contains(&installed_dna_hash));
 
@@ -147,7 +150,7 @@ async fn call_zome() {
         installed_app_id: "test".to_string(),
     };
     let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await;
+    let response = check_timeout(response, 3000).await.unwrap();
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair
@@ -165,7 +168,8 @@ async fn call_zome() {
         fn_name.clone(),
         signing_key,
     )
-    .await;
+    .await
+    .unwrap();
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
@@ -199,22 +203,22 @@ async fn call_zome() {
     .is_err());
 
     // Shutdown holochain
-    std::mem::drop(holochain);
-    std::mem::drop(admin_tx);
+    drop(holochain);
+    drop(admin_tx);
 
     // Call zome after restart
-    tracing::info!("Restarting conductor");
+    info!("Restarting conductor");
     let (_holochain, admin_port) = start_holochain(config_path).await;
     let admin_port = admin_port.await.unwrap();
 
     let (admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
     let _admin_rx = WsPollRecv::new::<AdminResponse>(admin_rx);
 
-    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+    tokio::time::sleep(Duration::from_millis(1000)).await;
 
     let request = AdminRequest::ListAppInterfaces;
     let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await;
+    let response = check_timeout(response, 3000).await.unwrap();
     let app_port = match response {
         AdminResponse::AppInterfacesListed(ports) => ports.first().map(|i| i.port).unwrap(),
         _ => panic!("Unexpected response"),
@@ -333,15 +337,16 @@ async fn emit_signals() {
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
 
     // Install Dna
-    let cell_id =
-        register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000).await;
+    let cell_id = register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000)
+        .await
+        .unwrap();
 
     // Activate cells
     let request = AdminRequest::EnableApp {
         installed_app_id: "test".to_string(),
     };
     let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await;
+    let response = check_timeout(response, 3000).await.unwrap();
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair
@@ -359,7 +364,8 @@ async fn emit_signals() {
         fn_name.clone(),
         signing_key,
     )
-    .await;
+    .await
+    .unwrap();
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
@@ -759,7 +765,9 @@ async fn full_state_dump_cursor_works() {
 
     let (mut client, _rx) = conductor.admin_ws_client::<AppResponse>().await;
 
-    let full_state = dump_full_state(&mut client, cell_id.clone(), None).await;
+    let full_state = dump_full_state(&mut client, cell_id.clone(), None)
+        .await
+        .unwrap();
 
     let integrated_ops_count = full_state.integration_dump.integrated.len();
     let validation_limbo_ops_count = full_state.integration_dump.validation_limbo.len();
@@ -775,7 +783,8 @@ async fn full_state_dump_cursor_works() {
         cell_id,
         Some(full_state.integration_dump.dht_ops_cursor - 1),
     )
-    .await;
+    .await
+    .unwrap();
 
     let integrated_ops_count = full_state.integration_dump.integrated.len();
     let validation_limbo_ops_count = full_state.integration_dump.validation_limbo.len();
