@@ -91,12 +91,13 @@ how_many: 42
         "role_name".into(),
         10000,
     )
-    .await;
+    .await
+    .unwrap();
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
-    let response = check_timeout(response, 10000).await;
+    let response = check_timeout(response, 10000).await.unwrap();
 
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
     let mut tmp_dna = dna.dna_def().clone();
@@ -152,13 +153,14 @@ async fn call_zome() {
         "".into(),
         10000,
     )
-    .await;
+    .await
+    .unwrap();
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = admin_tx.request(request);
-    let response = check_timeout(response, 15000).await;
+    let response = check_timeout(response, 15000).await.unwrap();
 
     let expects = vec![original_dna_hash.clone()];
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
@@ -168,7 +170,7 @@ async fn call_zome() {
         installed_app_id: "test".to_string(),
     };
     let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await;
+    let response = check_timeout(response, 3000).await.unwrap();
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair
@@ -186,7 +188,8 @@ async fn call_zome() {
         fn_name.clone(),
         signing_key,
     )
-    .await;
+    .await
+    .unwrap();
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
@@ -220,22 +223,22 @@ async fn call_zome() {
     .is_err());
 
     // Shutdown holochain
-    std::mem::drop(holochain);
-    std::mem::drop(admin_tx);
+    drop(holochain);
+    drop(admin_tx);
 
     // Call zome after restart
-    tracing::info!("Restarting conductor");
+    info!("Restarting conductor");
     let (_holochain, admin_port) = start_holochain(config_path).await;
     let admin_port = admin_port.await.unwrap();
 
     let (admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
     let _admin_rx = WsPollRecv::new::<AdminResponse>(admin_rx);
 
-    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+    tokio::time::sleep(Duration::from_millis(1000)).await;
 
     let request = AdminRequest::ListAppInterfaces;
     let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await;
+    let response = check_timeout(response, 3000).await.unwrap();
     let app_port = match response {
         AdminResponse::AppInterfacesListed(ports) => ports.first().map(|i| i.port).unwrap(),
         _ => panic!("Unexpected response"),
@@ -373,7 +376,8 @@ async fn emit_signals() {
         "".into(),
         10000,
     )
-    .await;
+    .await
+    .unwrap();
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
 
     // Activate cells
@@ -381,7 +385,7 @@ async fn emit_signals() {
         installed_app_id: "test".to_string(),
     };
     let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await;
+    let response = check_timeout(response, 3000).await.unwrap();
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair
@@ -399,7 +403,8 @@ async fn emit_signals() {
         fn_name.clone(),
         signing_key,
     )
-    .await;
+    .await
+    .unwrap();
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
@@ -715,8 +720,9 @@ async fn concurrent_install_dna() {
             );
             let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-            let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;
-            // println!("[{}] Agent pub key generated", i);
+            let agent_key = generate_agent_pub_key(&mut client, REQ_TIMEOUT_MS)
+                .await
+                .unwrap();
 
             let _dna_hash = register_and_install_dna_named(
                 &mut client,
@@ -809,7 +815,9 @@ async fn full_state_dump_cursor_works() {
 
     let (mut client, _rx) = conductor.admin_ws_client::<AppResponse>().await;
 
-    let full_state = dump_full_state(&mut client, cell_id.clone(), None).await;
+    let full_state = dump_full_state(&mut client, cell_id.clone(), None)
+        .await
+        .unwrap();
 
     let integrated_ops_count = full_state.integration_dump.integrated.len();
     let validation_limbo_ops_count = full_state.integration_dump.validation_limbo.len();
@@ -825,7 +833,8 @@ async fn full_state_dump_cursor_works() {
         cell_id,
         Some(full_state.integration_dump.dht_ops_cursor - 1),
     )
-    .await;
+    .await
+    .unwrap();
 
     let integrated_ops_count = full_state.integration_dump.integrated.len();
     let validation_limbo_ops_count = full_state.integration_dump.validation_limbo.len();
