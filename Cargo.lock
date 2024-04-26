@@ -92,7 +92,7 @@ dependencies = [
  "derive_more",
  "holochain_trace",
  "maplit",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "petgraph",
  "pretty_assertions",
  "regex",
@@ -404,9 +404,9 @@ dependencies = [
 
 [[package]]
 name = "async-recursion"
-version = "1.1.0"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30c5ef0ede93efbf733c1a727f3b6b5a1060bbedd5600183e66f6e4be4af0ec5"
+checksum = "3b43422f69d8ff38f95f1b2bb76517c91589a924d1559a0e935d7c8ce0274c11"
 dependencies = [
  "proc-macro2 1.0.81",
  "quote 1.0.36",
@@ -1340,7 +1340,7 @@ dependencies = [
  "crossterm_winapi",
  "libc",
  "mio",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "signal-hook",
  "signal-hook-mio",
  "winapi 0.3.9",
@@ -1356,7 +1356,7 @@ dependencies = [
  "crossterm_winapi",
  "libc",
  "mio",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "signal-hook",
  "signal-hook-mio",
  "winapi 0.3.9",
@@ -1555,7 +1555,7 @@ dependencies = [
  "hashbrown 0.14.3",
  "lock_api",
  "once_cell",
- "parking_lot_core 0.9.9",
+ "parking_lot_core 0.9.10",
 ]
 
 [[package]]
@@ -2006,7 +2006,7 @@ version = "0.3.0-beta-dev.4"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "paste",
  "rand 0.8.5",
  "rand_core 0.6.4",
@@ -2025,9 +2025,9 @@ dependencies = [
 
 [[package]]
 name = "flate2"
-version = "1.0.28"
+version = "1.0.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46303f565772937ffe1d394a4fac6f411c6013172fadde9dcdb1e147a086940e"
+checksum = "4556222738635b7a3417ae6130d8f52201e45a0c4d1a907f0826383adb5f85e7"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
@@ -2535,7 +2535,7 @@ dependencies = [
 
 [[package]]
 name = "hc_sleuth"
-version = "0.2.0-beta-dev.16"
+version = "0.2.0-beta-dev.17"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2547,7 +2547,7 @@ dependencies = [
  "holochain_types",
  "kitsune_p2p",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "petgraph",
  "pretty_assertions",
  "regex",
@@ -2559,7 +2559,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.3.0-beta-dev.22"
+version = "0.3.0-beta-dev.23"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2602,7 +2602,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.3.0-beta-dev.40"
+version = "0.3.0-beta-dev.41"
 dependencies = [
  "fixt",
  "getrandom 0.2.14",
@@ -2744,7 +2744,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.3.0-beta-dev.47"
+version = "0.3.0-beta-dev.48"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2812,7 +2812,7 @@ dependencies = [
  "once_cell",
  "one_err",
  "opentelemetry_api",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "petgraph",
  "predicates 3.1.0",
  "pretty_assertions",
@@ -2857,7 +2857,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.3.0-beta-dev.46"
+version = "0.3.0-beta-dev.47"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2887,7 +2887,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.3.0-beta-dev.46"
+version = "0.3.0-beta-dev.47"
 dependencies = [
  "anyhow",
  "clap 4.5.4",
@@ -2901,7 +2901,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.3.0-beta-dev.43"
+version = "0.3.0-beta-dev.44"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2927,7 +2927,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_run_local_services"
-version = "0.3.0-beta-dev.28"
+version = "0.3.0-beta-dev.29"
 dependencies = [
  "clap 4.5.4",
  "futures",
@@ -2941,7 +2941,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.3.0-beta-dev.46"
+version = "0.3.0-beta-dev.47"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -2972,7 +2972,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.3.0-beta-dev.46"
+version = "0.3.0-beta-dev.47"
 dependencies = [
  "derive_more",
  "holo_hash",
@@ -2998,7 +2998,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_services"
-version = "0.2.0-beta-dev.16"
+version = "0.2.0-beta-dev.17"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3049,7 +3049,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.3.0-beta-dev.36"
+version = "0.3.0-beta-dev.37"
 dependencies = [
  "assert_cmd",
  "base64 0.22.0",
@@ -3065,7 +3065,7 @@ dependencies = [
  "must_future",
  "nanoid",
  "one_err",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "serde",
  "serde_bytes",
  "serde_yaml",
@@ -3105,7 +3105,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.3.0-beta-dev.45"
+version = "0.3.0-beta-dev.46"
 dependencies = [
  "aitia",
  "async-trait",
@@ -3173,7 +3173,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.3.0-beta-dev.42"
+version = "0.3.0-beta-dev.43"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3198,7 +3198,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "opentelemetry_api",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "pretty_assertions",
  "r2d2",
  "r2d2_sqlite_neonphog",
@@ -3218,7 +3218,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.3.0-beta-dev.45"
+version = "0.3.0-beta-dev.46"
 dependencies = [
  "aitia",
  "anyhow",
@@ -3247,7 +3247,7 @@ dependencies = [
  "matches",
  "nanoid",
  "one_err",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "pretty_assertions",
  "serde",
  "serde_json",
@@ -3269,7 +3269,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.3.0-beta-dev.40"
+version = "0.3.0-beta-dev.41"
 dependencies = [
  "hdk",
  "serde",
@@ -3298,7 +3298,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.3.0-beta-dev.42"
+version = "0.3.0-beta-dev.43"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3330,7 +3330,7 @@ dependencies = [
  "must_future",
  "nanoid",
  "one_err",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "pretty_assertions",
  "proptest",
  "proptest-derive 0.4.0",
@@ -3372,7 +3372,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.3.0-beta-dev.44"
+version = "0.3.0-beta-dev.45"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -3404,7 +3404,7 @@ checksum = "8c429e84a19ee446f47541a6fed10e1a4376a8a8ba6d3dbff7d07e4a7bb4c85f"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "paste",
  "serde",
  "tracing",
@@ -3421,7 +3421,7 @@ dependencies = [
  "hex",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "rand 0.8.5",
  "serde",
  "tracing",
@@ -3431,7 +3431,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.3.0-beta-dev.21"
+version = "0.3.0-beta-dev.22"
 dependencies = [
  "async-trait",
  "criterion",
@@ -3448,7 +3448,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.3.0-beta-dev.35"
+version = "0.3.0-beta-dev.36"
 dependencies = [
  "arbitrary",
  "contrafact",
@@ -4110,7 +4110,7 @@ dependencies = [
  "memchr",
  "num-cmp",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "percent-encoding",
  "regex",
  "reqwest 0.11.27",
@@ -4123,7 +4123,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.3.0-beta-dev.39"
+version = "0.3.0-beta-dev.40"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -4157,7 +4157,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "opentelemetry_api",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "pretty_assertions",
  "proptest",
  "proptest-derive 0.4.0",
@@ -4204,7 +4204,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap"
-version = "0.2.0-beta-dev.27"
+version = "0.2.0-beta-dev.28"
 dependencies = [
  "clap 4.5.4",
  "criterion",
@@ -4214,7 +4214,7 @@ dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_bootstrap",
  "kitsune_p2p_types",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "rand 0.8.5",
  "reqwest 0.12.4",
  "serde",
@@ -4226,7 +4226,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap_client"
-version = "0.3.0-beta-dev.33"
+version = "0.3.0-beta-dev.34"
 dependencies = [
  "arbitrary",
  "ed25519-dalek",
@@ -4245,7 +4245,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.3.0-beta-dev.23"
+version = "0.3.0-beta-dev.24"
 dependencies = [
  "arbitrary",
  "colored",
@@ -4295,7 +4295,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_fetch"
-version = "0.3.0-beta-dev.30"
+version = "0.3.0-beta-dev.31"
 dependencies = [
  "arbitrary",
  "backon",
@@ -4332,7 +4332,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_proxy"
-version = "0.3.0-beta-dev.27"
+version = "0.3.0-beta-dev.28"
 dependencies = [
  "base64 0.22.0",
  "criterion",
@@ -4366,7 +4366,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.3.0-beta-dev.27"
+version = "0.3.0-beta-dev.28"
 dependencies = [
  "blake2b_simd",
  "futures",
@@ -4380,7 +4380,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.3.0-beta-dev.27"
+version = "0.3.0-beta-dev.28"
 dependencies = [
  "arbitrary",
  "base64 0.22.0",
@@ -4398,7 +4398,7 @@ dependencies = [
  "lair_keystore_api",
  "mockall",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "paste",
  "proptest",
  "proptest-derive 0.4.0",
@@ -4452,7 +4452,7 @@ dependencies = [
  "lru 0.10.1",
  "nanoid",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "rcgen",
  "serde",
  "serde_json",
@@ -4606,9 +4606,9 @@ checksum = "01cda141df6706de531b6c46c3a33ecca755538219bd484262fa09410c13539c"
 
 [[package]]
 name = "lock_api"
-version = "0.4.11"
+version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c168f8615b12bc01f9c17e2eb0cc07dcae1940121185446edc3744920e8ef45"
+checksum = "07af8b9cdd281b7915f413fa73f29ebd5d55d0d3f0155584dade1ff18cea1b17"
 dependencies = [
  "autocfg 1.2.0",
  "scopeguard",
@@ -5366,12 +5366,12 @@ dependencies = [
 
 [[package]]
 name = "parking_lot"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3742b2c103b9f06bc9fff0a37ff4912935851bee6d36f3c02bcc755bcfec228f"
+checksum = "7e4af0ca4f6caed20e900d564c242b8e5d4903fdacf31d3daf527b66fe6f42fb"
 dependencies = [
  "lock_api",
- "parking_lot_core 0.9.9",
+ "parking_lot_core 0.9.10",
 ]
 
 [[package]]
@@ -5402,15 +5402,15 @@ dependencies = [
 
 [[package]]
 name = "parking_lot_core"
-version = "0.9.9"
+version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c42a9226546d68acdd9c0a280d17ce19bfe27a46bf68784e4066115788d008e"
+checksum = "1e401f977ab385c9e4e3ab30627d6f26d00e2c73eef317493c4ec6d468726cf8"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
- "redox_syscall 0.4.1",
+ "redox_syscall 0.5.1",
  "smallvec 1.13.2",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.5",
 ]
 
 [[package]]
@@ -5724,7 +5724,7 @@ dependencies = [
  "fnv",
  "lazy_static",
  "memchr",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "protobuf",
  "thiserror",
 ]
@@ -5910,7 +5910,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51de85fb3fb6524929c8a2eb85e6b6d363de4e8c48f9e2c2eac4944abc181c93"
 dependencies = [
  "log",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "scheduled-thread-pool",
 ]
 
@@ -6232,6 +6232,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4722d768eff46b75989dd134e5c353f0d6296e5aaa3132e776cbdb56be7731aa"
 dependencies = [
  "bitflags 1.3.2",
+]
+
+[[package]]
+name = "redox_syscall"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "469052894dcb553421e483e4209ee581a45100d31b4018de03e5a7ad86374a7e"
+dependencies = [
+ "bitflags 2.5.0",
 ]
 
 [[package]]
@@ -6797,7 +6806,7 @@ version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cbc66816425a074528352f5789333ecff06ca41b36b0b0efdfbb29edc391a19"
 dependencies = [
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
 ]
 
 [[package]]
@@ -7036,7 +7045,7 @@ dependencies = [
  "futures",
  "log",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "scc",
  "serial_test_derive",
 ]
@@ -7245,7 +7254,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "one_err",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "tokio",
 ]
 
@@ -7604,7 +7613,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7228e85537ffb5943539a46bf561786323f6112114005ba055e496192a6f8f41"
 dependencies = [
  "futures",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "tokio",
  "tracing",
 ]
@@ -7869,7 +7878,7 @@ dependencies = [
  "libc",
  "mio",
  "num_cpus",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2 0.5.6",
@@ -8262,7 +8271,7 @@ dependencies = [
  "influxive-otel-atomic-obs",
  "once_cell",
  "opentelemetry_api",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "rand 0.8.5",
  "rand-utf8",
  "serde",
@@ -8301,7 +8310,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5731de2cad3c014ddce4552f32c0b0c68b8682390b7ac57c55cbeddf6c1dbe50"
 dependencies = [
  "futures",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "tokio",
  "tracing",
  "tx5-go-pion-sys",
@@ -8354,7 +8363,7 @@ dependencies = [
  "futures",
  "lair_keystore_api",
  "once_cell",
- "parking_lot 0.12.1",
+ "parking_lot 0.12.2",
  "rand 0.8.5",
  "rand-utf8",
  "rcgen",
@@ -8510,11 +8519,11 @@ dependencies = [
 
 [[package]]
 name = "ureq"
-version = "2.9.6"
+version = "2.9.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11f214ce18d8b2cbe84ed3aa6486ed3f5b285cf8d8fbdbce9f3f767a724adc35"
+checksum = "d11a831e3c0b56e438a28308e7c810799e3c118417f342d30ecec080105395cd"
 dependencies = [
- "base64 0.21.7",
+ "base64 0.22.0",
  "log",
  "once_cell",
  "rustls 0.22.4",
@@ -9485,9 +9494,9 @@ dependencies = [
 
 [[package]]
 name = "zeroize"
-version = "1.8.0"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63381fa6624bf92130a6b87c0d07380116f80b565c42cf0d754136f0238359ef"
+checksum = "525b4ec142c6b68a2d10f01f7bbf6755599ca3f81ea53b8431b7dd348f5fdb2d"
 
 [[package]]
 name = "zip"

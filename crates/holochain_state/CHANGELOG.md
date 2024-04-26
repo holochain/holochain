@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 - Actions and entries are written to the DHT database as part of the incoming ops workflow. Thus actions that have not been validated could previously be gotten from the database, for example when retrieving an action with `must_get_action`. Now actions are cross-checked against DHT ops and only returned when at least one validated op references them. In effect an invalid op can no longer be used to falsely validate a depending op.
 
+## 0.3.0-beta-dev.46
+
 ## 0.3.0-beta-dev.45
 
 ## 0.3.0-beta-dev.44

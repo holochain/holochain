@@ -798,22 +798,17 @@ async fn check_app_entry_def_test() {
     );
 }
 
-const SELECT: &'static str = "SELECT count(hash) FROM DhtOp WHERE";
-
 // These are the expected invalid ops
 fn expected_invalid_entry(
     txn: &Transaction,
     invalid_action_hash: &ActionHash,
     invalid_entry_hash: &AnyDhtHash,
 ) -> bool {
-    let sql = format!(
-        "
-        {}
+    let sql = "
+        SELECT count(hash) FROM DhtOp WHERE
         type = :store_entry AND action_hash = :invalid_action_hash
             AND basis_hash = :invalid_entry_hash AND validation_status = :rejected
-    ",
-        SELECT
-    );
+    ";
 
     let count: usize = txn
         .query_row(
@@ -832,14 +827,11 @@ fn expected_invalid_entry(
 
 // Now we expect an invalid link
 fn expected_invalid_link(txn: &Transaction, invalid_link_hash: &ActionHash) -> bool {
-    let sql = format!(
-        "
-        {}
+    let sql = "
+        SELECT count(hash) FROM DhtOp WHERE
         type = :create_link AND action_hash = :invalid_link_hash
             AND validation_status = :rejected
-    ",
-        SELECT
-    );
+    ";
 
     let count: usize = txn
         .query_row(
@@ -857,14 +849,11 @@ fn expected_invalid_link(txn: &Transaction, invalid_link_hash: &ActionHash) -> b
 
 // Now we're trying to remove an invalid link
 fn expected_invalid_remove_link(txn: &Transaction, invalid_remove_hash: &ActionHash) -> bool {
-    let sql = format!(
-        "
-        {}
+    let sql = "
+        SELECT count(hash) FROM DhtOp WHERE
         (type = :delete_link AND action_hash = :invalid_remove_hash
             AND validation_status = :rejected)
-    ",
-        SELECT
-    );
+    ";
 
     let count: usize = txn
         .query_row(
