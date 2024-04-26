@@ -315,8 +315,11 @@ async fn test_zero_arc_no_gossip_2way() {
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_zero_arc_no_gossip_4way() {
     use futures::future::join_all;
+    use maplit::hashset;
 
     holochain_trace::test_run();
+
+    // XXX: We disable DPKI for this test just because it's so slow for 4 conductors.
 
     let configs = [
         // Standard config
@@ -327,6 +330,7 @@ async fn test_zero_arc_no_gossip_4way() {
             bootstrap: true,
             recent_threshold: None,
         })
+        .no_dpki()
         .tune_conductor(|params| {
             // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
             params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
@@ -339,6 +343,7 @@ async fn test_zero_arc_no_gossip_4way() {
             bootstrap: true,
             recent_threshold: None,
         })
+        .no_dpki()
         .tune_conductor(|params| {
             // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
             params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
@@ -353,6 +358,7 @@ async fn test_zero_arc_no_gossip_4way() {
                     params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
                 })
                 .set_tuning_params(tuning)
+                .no_dpki()
         },
         {
             // Publishing turned off, arc clamped to zero
@@ -364,6 +370,7 @@ async fn test_zero_arc_no_gossip_4way() {
                     params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
                 })
                 .set_tuning_params(tuning)
+                .no_dpki()
         },
     ];
 
@@ -381,7 +388,7 @@ async fn test_zero_arc_no_gossip_4way() {
 
     // Ensure that each node has one agent in its peer store, for the single app installed.
     for (i, cell) in cells.iter().enumerate() {
-        let stored_agents = holochain::conductor::p2p_agent_store::all_agent_infos(
+        let stored_agents: HashSet<_> = holochain::conductor::p2p_agent_store::all_agent_infos(
             conductors[i]
                 .get_spaces()
                 .p2p_agents_db(&dna_hash)
@@ -392,8 +399,14 @@ async fn test_zero_arc_no_gossip_4way() {
         .unwrap()
         .into_iter()
         .map(|i| AgentPubKey::from_kitsune(&i.agent()))
-        .collect::<Vec<_>>();
-        assert_eq!(stored_agents, vec![cell.agent_pubkey().clone()]);
+        .collect();
+
+        let expected = hashset![
+            // conductors[i].dpki_cell().unwrap().agent_pubkey().clone(),
+            cell.agent_pubkey().clone()
+        ];
+
+        assert_eq!(stored_agents, expected,);
     }
 
     conductors.exchange_peer_info().await;
