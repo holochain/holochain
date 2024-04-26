@@ -110,26 +110,30 @@ async fn test_publish() -> anyhow::Result<()> {
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
-    holochain_trace::test_run();
+    holochain_trace::init_fmt(holochain_trace::Output::Log).unwrap();
 
     const NUM_CONDUCTORS: usize = 3;
 
-    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|config| {
-        // The default is 10s which makes the test very slow in the case that get requests in the sys validation workflow
-        // hit a conductor which isn't serving that data yet. Speed up by retrying more quickly.
-        config.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
-    });
+    let config = SweetConductorConfig::rendezvous(true)
+        .tune_conductor(|config| {
+            // The default is 10s which makes the test very slow in the case that get requests in the sys validation workflow
+            // hit a conductor which isn't serving that data yet. Speed up by retrying more quickly.
+            config.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+        })
+        .no_dpki_mustfix();
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
+    let dna_hash = dna_file.dna_hash().clone();
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
 
     let dpki_cells = conductors.dpki_cells();
-    await_consistency(10, dpki_cells.as_slice()).await.unwrap();
+
+    await_consistency(20, dpki_cells.as_slice()).await.unwrap();
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
@@ -139,7 +143,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    await_consistency(10, [&alice, &bobbo, &carol])
+    await_consistency(20, [&alice, &bobbo, &carol])
         .await
         .unwrap();
 

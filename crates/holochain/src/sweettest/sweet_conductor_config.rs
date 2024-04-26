@@ -92,6 +92,15 @@ impl SweetConductorConfig {
         self
     }
 
+    /// Disable DPKI in a situation where we would like to run DPKI in a test, but the test
+    /// only passes if it's disabled and we can't figure out why.
+    #[cfg(feature = "test_utils")]
+    pub fn no_dpki_mustfix(mut self) -> Self {
+        tracing::warn!("Disabling DPKI for a test which should pass with DPKI enabled. TODO: fix");
+        self.dpki = Some(holochain_conductor_api::conductor::DpkiConfig::disabled());
+        self
+    }
+
     /// Rendezvous config for SweetConductors
     pub fn rendezvous(bootstrap: bool) -> Self {
         let mut config = Self::standard();

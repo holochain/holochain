@@ -249,6 +249,7 @@ impl ShardedGossip {
         Ok(AgentInfoSession::new(local_agents, all_agents))
     }
 
+    #[tracing::instrument(skip_all)]
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
         let (cert, how, gossip) = outgoing;
         match self.gossip.gossip_type {

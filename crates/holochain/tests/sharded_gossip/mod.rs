@@ -606,7 +606,7 @@ async fn three_way_gossip_historical() {
 /// - and then that same data passes from B to C.
 async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     // TODO: this fails miserably with DPKI enabled. Why?
-    let config = config.no_dpki();
+    let config = config.no_dpki_mustfix();
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config.clone()).await;
     let start = Instant::now();
