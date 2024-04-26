@@ -18,10 +18,13 @@ teardown() {
 
 @test "expected scaffold an example to succeed" {
   set -e
-  TEMP_PATH="$GITHUB_WORKSPACE/temporary"
+  TEMP_PATH="temporary"
 
-  cleanup_tmp() {
-    rm -rf "${TEMP_PATH:?}/$1"
+  cleanup() {
+    cd ..
+    rm -rf hello-world
+    cd ..
+    rm -rf $TEMP_PATH
   }
 
   print_version() {
@@ -30,7 +33,7 @@ teardown() {
 
   setup_and_build_hello_world() {
     print_version
-    mkdir TEMP_PATH
+    mkdir $TEMP_PATH
     cd $TEMP_PATH
 
     hc-scaffold example hello-world
@@ -42,8 +45,8 @@ teardown() {
       npm install
       npm test
       "
-    cd ..
-    cleanup_tmp hello-world
+
+    cleanup
   }
 
   setup_and_build_hello_world
