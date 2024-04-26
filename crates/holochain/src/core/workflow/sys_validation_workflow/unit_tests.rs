@@ -91,7 +91,7 @@ async fn validate_op_with_dependency_held_in_cache() {
     let previous_op =
         DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action));
     test_case
-        .save_op_to_db_as_valid(test_case.cache_db_handle(), previous_op)
+        .save_validated_op_to_db(test_case.cache_db_handle(), previous_op)
         .await
         .unwrap();
 
@@ -245,7 +245,7 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
         Action::AgentValidationPkg(validation_package_action),
     );
     test_case
-        .save_op_to_db_as_valid(test_case.cache_db_handle(), previous_op)
+        .save_validated_op_to_db(test_case.cache_db_handle(), previous_op)
         .await
         .unwrap();
 
@@ -353,7 +353,7 @@ impl TestCase {
         Ok(test_op_hash)
     }
 
-    async fn save_op_to_db_as_valid<T: DbKindT>(
+    async fn save_validated_op_to_db<T: DbKindT>(
         &self,
         db: DbWrite<T>,
         op: DhtOp,
