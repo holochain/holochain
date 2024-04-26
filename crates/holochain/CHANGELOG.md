@@ -29,6 +29,8 @@ Now it serializes to
   "value": "variant1"
 }
 ```
+- Adds a new admin interface call `RevokeAppAuthenticationToken` to revoke issued app authentication tokens. #3765
+- App validation workflow: Validate ops in sequence instead of in parallel. Ops validated one after the other have a higher chance of being validated if they depend on earlier ops. When validated in parallel, they potentially needed to await a next workflow run when the dependent op would have been validated.
 
 ## 0.3.0-beta-dev.48
 

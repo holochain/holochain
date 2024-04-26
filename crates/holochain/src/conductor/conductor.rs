@@ -2599,7 +2599,7 @@ mod accessor_impls {
 mod authenticate_token_impls {
     use super::*;
     use holochain_conductor_api::{
-        AppAuthenticationTokenIssued, IssueAppAuthenticationTokenPayload,
+        AppAuthenticationToken, AppAuthenticationTokenIssued, IssueAppAuthenticationTokenPayload,
     };
 
     impl Conductor {
@@ -2622,6 +2622,17 @@ mod authenticate_token_impls {
                     .and_then(|i| i.duration_since(std::time::UNIX_EPOCH).ok())
                     .map(|d| Timestamp::saturating_from_dur(&d)),
             })
+        }
+
+        /// Revoke an app interface authentication token.
+        pub fn revoke_app_authentication_token(
+            &self,
+            token: AppAuthenticationToken,
+        ) -> ConductorResult<()> {
+            self.app_auth_token_store
+                .share_mut(|app_connection_auth| app_connection_auth.revoke_token(token));
+
+            Ok(())
         }
 
         /// Authenticate the app interface authentication `token`, optionally requiring the token to

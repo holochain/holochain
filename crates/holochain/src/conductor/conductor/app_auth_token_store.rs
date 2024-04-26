@@ -32,8 +32,12 @@ impl AppAuthTokenStore {
         rand::thread_rng().fill_bytes(&mut token);
         let token = token.to_vec();
 
-        let expires_at =
-            SystemTime::now().checked_add(std::time::Duration::from_secs(expiry_seconds));
+        let expires_at = if expiry_seconds > 0 {
+            SystemTime::now().checked_add(std::time::Duration::from_secs(expiry_seconds))
+        } else {
+            None
+        };
+
         self.issued_tokens.insert(
             token.clone(),
             TokenMeta {
@@ -45,6 +49,16 @@ impl AppAuthTokenStore {
         self.remove_expired_tokens();
 
         (token, expires_at)
+    }
+
+    /// Revoke a token, making it invalid for future authentication. This should be used when a
+    /// token is no longer needed.
+    ///
+    /// It will not error when the token does
+    /// not exist, so that it is safe to revoke single-use tokens without needing a way to check if
+    /// they have been used.
+    pub fn revoke_token(&mut self, token: AppAuthenticationToken) {
+        self.issued_tokens.remove(&token);
     }
 
     /// Authenticate a token and return the `InstalledAppId` that the token was issued for.
@@ -102,6 +116,10 @@ impl AppAuthTokenStore {
     #[cfg(test)]
     fn age_tokens(&mut self) {
         self.issued_tokens.iter_mut().for_each(|(_, meta)| {
+            if meta.expires_at.is_none() {
+                return;
+            }
+
             meta.expires_at = Some(
                 SystemTime::now()
                     .checked_sub(std::time::Duration::from_secs(10))
@@ -240,5 +258,17 @@ mod tests {
 
         assert_eq!(1, auth.get_tokens().len());
         assert_eq!(token, *auth.get_tokens().iter().next().unwrap().0);
+    }
+
+    #[test]
+    fn create_token_which_does_not_expire() {
+        let mut auth = AppAuthTokenStore::new();
+        let (token, expiry) = auth.issue_token("test_app".to_string(), 0, false);
+        assert!(expiry.is_none());
+
+        for _ in 0..3 {
+            let r = auth.authenticate_token(token.clone(), None);
+            assert!(r.is_ok());
+        }
     }
 }

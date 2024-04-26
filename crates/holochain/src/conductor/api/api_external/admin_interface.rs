@@ -309,6 +309,11 @@ impl AdminInterfaceApi {
                         .issue_app_authentication_token(payload)?,
                 ))
             }
+            RevokeAppAuthenticationToken(token) => {
+                self.conductor_handle
+                    .revoke_app_authentication_token(token)?;
+                Ok(AdminResponse::AppAuthenticationTokenRevoked)
+            }
         }
     }
 }
