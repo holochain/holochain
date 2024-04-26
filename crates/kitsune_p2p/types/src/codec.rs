@@ -7,8 +7,7 @@ where
     W: std::io::Write,
     S: serde::Serialize,
 {
-    let mut se = rmp_serde::encode::Serializer::new(write)
-        .with_struct_map();
+    let mut se = rmp_serde::encode::Serializer::new(write).with_struct_map();
     item.serialize(&mut se)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
     Ok(())
