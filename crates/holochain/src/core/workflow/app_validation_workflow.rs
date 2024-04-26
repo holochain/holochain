@@ -246,11 +246,15 @@ async fn app_validation_workflow_inner(
                     })
                     .await;
                 if let Err(err) = write_result {
-                    tracing::error!("error updating dht op {dht_op:?} in database: {err:?}");
+                    tracing::error!(?dht_op, ?err, "Error updating dht op in database.");
                 }
             }
             Err(err) => {
-                tracing::error!("app validation error when validating dht op {dht_op:?}: {err}");
+                tracing::error!(
+                    ?dht_op,
+                    ?err,
+                    "App validation error when validating dht op."
+                );
             }
         }
     }
@@ -440,7 +444,7 @@ pub async fn validate_op(
 
     let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, network.clone(), ribosome).await;
     if let Err(OutcomeOrError::Err(err)) = &zomes_to_invoke {
-        tracing::error!("Error getting zomes to invoke to validate op {op:?}: {err}");
+        tracing::error!(?op, ?err, "Error getting zomes to invoke to validate op.");
     };
     let zomes_to_invoke = zomes_to_invoke?;
     let invocation = ValidateInvocation::new(zomes_to_invoke, op)
