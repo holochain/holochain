@@ -159,7 +159,7 @@ jobs:
           # See https://github.com/actions/cache/blob/main/examples.md#rust---cargo
           path: |
             .cargo/.crates.toml
-            .cargo/.crates2.toml
+            .cargo/.crates2.json
             .cargo/bin/
             .cargo/registry/index/
             .cargo/registry/cache/
