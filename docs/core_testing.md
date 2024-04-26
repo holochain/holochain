@@ -23,15 +23,15 @@ Either of these:
 CI runs all Holochain tests via the `nix build` command by referencing the various packages.
 As of 2023-03-02, we have the following test derivations:
 
-- build-holochain-tests-all
-- build-holochain-tests-static-all
-- build-holochain-tests-static-clippy
-- build-holochain-tests-static-doc
-- build-holochain-tests-static-fmt
-- build-holochain-tests-unit
-- build-holochain-tests-unit-all
-- build-holochain-tests-unit-tx5
-- build-holochain-tests-unit-wasm
+- test-all
+- test-static-all
+- test-static-clippy
+- test-static-doc
+- test-static-fmt
+- test-unit
+- test-unit-all
+- test-unit-tx5
+- test-unit-wasm
 
 The ones ending in *-all* are meta packages, combining all tests in the same category.
 
@@ -40,7 +40,7 @@ The following command builds the meta-package that incorporates all Holochain te
 ```
 nix build -L \
   --override-input holochain . \
-  .#build-holochain-tests-all
+  .#test-all
 ```
 
 ### Using test preconfigured impure test scripts
@@ -63,13 +63,13 @@ Or use `script-holochain-tests-unit-all` if you don't want to run the static che
 To run the tests for a specific package you can pass a filter to `nextest`
 
 ```shell
-env NEXTEST_EXTRA_ARGS="-E 'package(hdk)'" nix build --impure --override-input holochain . .#build-holochain-tests-unit
+env NEXTEST_EXTRA_ARGS="-E 'package(hdk)'" nix build --impure --override-input holochain . .#test-unit
 ```
 
 Or you can select a test by name
 
 ```shell
-env NEXTEST_EXTRA_ARGS="-E 'test(paths_exists)'" nix build --impure --override-input holochain . .#build-holochain-tests-unit
+env NEXTEST_EXTRA_ARGS="-E 'test(paths_exists)'" nix build --impure --override-input holochain . .#test-unit
 ```
 
 ### Using `cargo test` manually

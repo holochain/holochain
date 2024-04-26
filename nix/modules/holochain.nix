@@ -105,9 +105,9 @@
           '';
         });
 
-      build-holochain-tests-unit = lib.makeOverridable craneLib.cargoNextest holochainTestsNextestArgs;
+      test-unit = lib.makeOverridable craneLib.cargoNextest holochainTestsNextestArgs;
 
-      build-holochain-tests-static-fmt = craneLib.cargoFmt (commonArgs // {
+      test-static-fmt = craneLib.cargoFmt (commonArgs // {
         src = flake.config.srcCleanedHolochain;
         cargoArtifacts = null;
         doCheck = false;
@@ -116,7 +116,7 @@
         dontFixup = true;
       });
 
-      build-holochain-tests-static-clippy = craneLib.cargoClippy (commonArgs // {
+      test-static-clippy = craneLib.cargoClippy (commonArgs // {
         pname = "holochain-tests-clippy";
         src = flake.config.srcCleanedHolochain;
         cargoArtifacts = holochainDeps;
@@ -176,7 +176,7 @@
         cargoArtifacts = null;
       });
 
-      build-holochain-tests-unit-wasm = craneLib.cargoTest (holochainWasmArgs // {
+      test-unit-wasm = craneLib.cargoTest (holochainWasmArgs // {
         cargoArtifacts = holochainDepsWasm;
 
         dontPatchELF = true;
@@ -188,7 +188,7 @@
         '';
       });
 
-      build-holochain-tests-static-doc = craneLib.cargoDoc (commonArgs // {
+      test-static-doc = craneLib.cargoDoc (commonArgs // {
         pname = "holochain-tests-docs";
         cargoArtifacts = holochainDeps;
       });
@@ -196,20 +196,20 @@
 
 
       # meta packages to build multiple test packages at once
-      build-holochain-tests-unit-all = config.lib.mkMetaPkg "holochain-tests-unit-all" [
-        build-holochain-tests-unit
-        build-holochain-tests-unit-wasm
+      test-unit-all = config.lib.mkMetaPkg "holochain-tests-unit-all" [
+        test-unit
+        test-unit-wasm
       ];
 
-      build-holochain-tests-static-all = config.lib.mkMetaPkg "holochain-tests-static-all" [
-        build-holochain-tests-static-doc
-        build-holochain-tests-static-fmt
-        build-holochain-tests-static-clippy
+      test-static-all = config.lib.mkMetaPkg "holochain-tests-static-all" [
+        test-static-doc
+        test-static-fmt
+        test-static-clippy
       ];
 
-      build-holochain-tests-all = config.lib.mkMetaPkg "build-holochain-tests-all" [
-        build-holochain-tests-unit-all
-        build-holochain-tests-static-all
+      test-all = config.lib.mkMetaPkg "test-all" [
+        test-unit-all
+        test-static-all
       ];
 
     in
@@ -220,16 +220,16 @@
             holochain
             holochain_chc
 
-            build-holochain-tests-unit
-            build-holochain-tests-unit-wasm
-            build-holochain-tests-unit-all
+            test-unit
+            test-unit-wasm
+            test-unit-all
 
-            build-holochain-tests-static-doc
-            build-holochain-tests-static-fmt
-            build-holochain-tests-static-clippy
-            build-holochain-tests-static-all
+            test-static-doc
+            test-static-fmt
+            test-static-clippy
+            test-static-all
 
-            build-holochain-tests-all
+            test-all
             ;
         };
     };

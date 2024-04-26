@@ -60,7 +60,7 @@
               (
                 lib.attrsets.filterAttrs
                   (name: package:
-                    (builtins.match "^build-holochain-tests.*" name) != null
+                    (builtins.match "^test.*" name) != null
                   )
                   self'.packages
               );
