@@ -60,7 +60,7 @@ jobs:
           - cmd:
               pkgs:
                 - test-static-all
-                - build-release-automation-tests-unit
+                - release-automation-test-unit
               extra_arg: "--override-input versions './versions/weekly' --override-input holochain ${{ inputs.repo_path }}"
             platform:
               system: x86_64-linux
@@ -68,7 +68,7 @@ jobs:
           # TODO: can this be skipped during a release run because it duplicates the release-prepare job?
           - cmd:
               pkgs:
-                - build-release-automation-tests-repo
+                - release-automation-test-repo
               extra_arg: "--override-input repo-git 'path:.git'"
             platform:
               system: x86_64-linux

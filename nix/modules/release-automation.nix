@@ -87,7 +87,7 @@
       packages = {
         release-automation = package;
 
-        build-release-automation-tests-unit = tests;
+        release-automation-test-unit = tests;
 
         # check the state of the repository
         # this is using a dummy input like this:
@@ -96,7 +96,7 @@
         #     repo-git.flake = false;
         # ```
         # and then the test derivation is built it relies on that input being the local repo path. see the "holochain-build-and-test.yml" workflow.
-        build-release-automation-tests-repo =
+        release-automation-test-repo =
           let
             release-script = self'.packages.scripts-release-automation-check-and-bump;
             readmes-script = self'.packages.scripts-ci-generate-readmes;
