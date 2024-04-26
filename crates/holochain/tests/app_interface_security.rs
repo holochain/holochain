@@ -1,14 +1,116 @@
 use either::Either;
+use std::net::ToSocketAddrs;
+use std::sync::Arc;
 
 use holochain::sweettest::{websocket_client_by_port, SweetConductor, SweetDnaFile, WsPollRecv};
 use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, AppAuthenticationToken, AppRequest,
-    AppResponse,
+    AppResponse, IssueAppAuthenticationTokenPayload,
 };
 use holochain_types::prelude::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_websocket::ReceiveMessage;
+use holochain_websocket::{connect, ConnectRequest, ReceiveMessage, WebsocketConfig};
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_allowed_origins() {
+    holochain_trace::test_run();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let port = conductor
+        .clone()
+        .add_app_interface(
+            either::Either::Left(0),
+            "http://localhost:3000".to_string().into(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+    )
+    .await
+    .is_err());
+
+    let token = create_multi_use_token(&conductor, "test-app".into()).await;
+
+    check_app_port(port, "http://localhost:3000", token).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_allowed_origins_independence() {
+    holochain_trace::test_run();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let token = create_multi_use_token(&conductor, "test-app".into()).await;
+
+    let port_1 = conductor
+        .clone()
+        .add_app_interface(
+            Either::Left(0),
+            "http://localhost:3001".to_string().into(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    let port_2 = conductor
+        .clone()
+        .add_app_interface(
+            Either::Left(0),
+            "http://localhost:3002".to_string().into(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Check that access to another port's origin is blocked
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(
+            format!("localhost:{port_1}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+        .try_set_header("origin", "http://localhost:3002")
+        .unwrap()
+    )
+    .await
+    .is_err());
+
+    assert!(connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(
+            format!("localhost:{port_2}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+        .try_set_header("origin", "http://localhost:3001")
+        .unwrap()
+    )
+    .await
+    .is_err());
+
+    // Check that correct access is allowed
+
+    check_app_port(port_1, "http://localhost:3001", token.clone()).await;
+    check_app_port(port_2, "http://localhost:3002", token).await;
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_interface_requires_auth() {
@@ -396,6 +498,85 @@ async fn signals_are_restricted_by_app() {
     .unwrap_err();
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn revoke_app_auth_token() {
+    holochain_trace::test_run();
+
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let app_port = conductor
+        .clone()
+        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .await
+        .unwrap();
+
+    let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
+
+    // Create a multi-use token
+    let token = create_multi_use_token(&conductor, "test-app".into()).await;
+
+    // Demonstrate that the token is valid by connecting, authenticating and sending a request
+    app_tx
+        .authenticate(AppAuthenticationRequest {
+            token: token.clone(),
+        })
+        .await
+        .unwrap();
+
+    let listed: AppResponse = app_tx
+        .request(AppRequest::ListWasmHostFunctions)
+        .await
+        .unwrap();
+    assert!(matches!(listed, AppResponse::ListWasmHostFunctions(_)));
+
+    // Now revoke the token, although it would otherwise be valid for another use!
+    revoke_token(&conductor, token.clone()).await;
+
+    // Try to connect and authenticate again
+    let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
+
+    app_tx
+        .authenticate(AppAuthenticationRequest { token })
+        .await
+        .unwrap();
+
+    // Authentication should have failed
+    let err = app_tx
+        .request::<_, AppResponse>(AppRequest::ListWasmHostFunctions)
+        .await
+        .unwrap_err();
+    assert_eq!("ConnectionClosed", err.to_string());
+}
+
+async fn check_app_port(port: u16, origin: &str, token: AppAuthenticationToken) {
+    let (client, rx) = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        ConnectRequest::new(
+            format!("localhost:{port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .try_set_header("origin", origin)
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let _rx = WsPollRecv::new::<AppResponse>(rx);
+
+    client
+        .authenticate(AppAuthenticationRequest { token })
+        .await
+        .unwrap();
+
+    let request = AppRequest::ListWasmHostFunctions;
+    let _: AppResponse = client.request(request).await.unwrap();
+}
+
 async fn create_token(
     conductor: &SweetConductor,
     for_installed_app_id: InstalledAppId,
@@ -414,4 +595,39 @@ async fn create_token(
     };
 
     token
+}
+
+async fn create_multi_use_token(
+    conductor: &SweetConductor,
+    for_installed_app_id: InstalledAppId,
+) -> AppAuthenticationToken {
+    let (admin_sender, _admin_rx) = conductor.admin_ws_client::<AdminResponse>().await;
+
+    let token_response: AdminResponse = admin_sender
+        .request(AdminRequest::IssueAppAuthenticationToken(
+            IssueAppAuthenticationTokenPayload::for_installed_app_id(for_installed_app_id)
+                .single_use(false)
+                .expiry_seconds(0),
+        ))
+        .await
+        .unwrap();
+    let token = match token_response {
+        AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
+        _ => panic!("unexpected response"),
+    };
+
+    token
+}
+
+async fn revoke_token(conductor: &SweetConductor, token: AppAuthenticationToken) {
+    let (admin_sender, _admin_rx) = conductor.admin_ws_client::<AdminResponse>().await;
+
+    let token_response: AdminResponse = admin_sender
+        .request(AdminRequest::RevokeAppAuthenticationToken(token))
+        .await
+        .unwrap();
+    match token_response {
+        AdminResponse::AppAuthenticationTokenRevoked => (),
+        _ => panic!("unexpected response"),
+    };
 }
