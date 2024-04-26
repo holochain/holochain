@@ -22,7 +22,7 @@
       };
     in
     {
-      packages.build-holonix-tests-integration = pkgs.mkShell {
+      packages.holonix-test-integration = pkgs.mkShell {
         inputsFrom = [ self'.devShells.holonix ];
         phases = [
           "buildPhase"

@@ -30,18 +30,18 @@ jobs:
           # ensure functionality on multiple platforms
           - pkgs:
               - test-unit-all
-              - build-holonix-tests-integration
+              - holonix-test-integration
             extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
 
           # ensure that any Nix changes on this branch don't cause problems for maintenance versions
           - pkgs:
-              - build-holonix-tests-integration
+              - holonix-test-integration
             extra_arg: "--override-input versions ./versions/0_1"
           - pkgs:
-              - build-holonix-tests-integration
+              - holonix-test-integration
             extra_arg: "--override-input versions ./versions/0_2"
           - pkgs:
-              - build-holonix-tests-integration
+              - holonix-test-integration
             extra_arg: "--override-input versions ./versions/weekly"
         platform:
           - system: aarch64-darwin
