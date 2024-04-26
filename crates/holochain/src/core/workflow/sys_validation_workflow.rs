@@ -132,14 +132,12 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     config: Arc<ConductorConfig>,
 ) -> WorkflowResult<WorkComplete> {
     // Run the actual sys validation using data we have locally
-    println!("start wf");
     let outcome_summary = sys_validation_workflow_inner(
         workspace.clone(),
         current_validation_dependencies.clone(),
         config,
     )
     .await?;
-    println!("after wf");
 
     // trigger app validation to process any ops that have been processed so far
     if outcome_summary.accepted > 0 {
@@ -154,7 +152,6 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     let num_fetched: usize = futures::stream::iter(missing_action_hashes.into_iter().map(|hash| {
         let network_cascade = network_cascade.clone();
         let current_validation_dependencies = current_validation_dependencies.clone();
-        println!("now it's getting bollixed");
         async move {
             match network_cascade
                 .retrieve_action(hash, Default::default())
@@ -338,7 +335,6 @@ async fn retrieve_actions(
             }
             .boxed()
         });
-    println!("fetching hashes");
     let new_deps: ValidationDependencies = futures::future::join_all(action_fetches)
         .await
         .into_iter()

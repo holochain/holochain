@@ -312,7 +312,6 @@ impl Cascade for CascadeImpl {
                 move |store| Ok(store.get_action(&hash)?)
             })
             .await?;
-        println!("found a result in a store {result:?}");
         if result.is_some() {
             return Ok(result.map(|a| (a, CascadeSource::Local)));
         }
