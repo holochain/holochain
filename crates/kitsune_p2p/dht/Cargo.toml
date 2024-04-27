@@ -5,9 +5,9 @@ description = "Kitsune P2p DHT definition"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/kitsune_p2p_dht"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
-categories = [ "network-programming" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "p2p", "dht", "networking"]
+categories = ["network-programming"]
 edition = "2021"
 
 # reminder - do not use workspace deps
@@ -16,12 +16,12 @@ colored = { version = "2.1", optional = true }
 derivative = "2.2.0"
 derive_more = "0.99"
 futures = "0.3"
-kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.20", path = "../dht_arc"}
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.10", path = "../timestamp"}
+kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.20", path = "../dht_arc" }
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.10", path = "../timestamp" }
 must_future = "0.1"
 num-traits = "0.2.14"
 rand = "0.8.4"
-serde = { version = "1.0", features = [ "derive" ] }
+serde = { version = "1.0", features = ["derive"] }
 statrs = "0.16.0"
 thiserror = "1.0"
 tracing = "0.1.29"
@@ -31,10 +31,10 @@ proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 
 [dev-dependencies]
-kitsune_p2p_dht = { path = ".", features = ["test_utils", "sqlite"]}
+kitsune_p2p_dht = { path = ".", features = ["test_utils", "sqlite"] }
 
-kitsune_p2p_dht_arc = { path = "../dht_arc", features = ["test_utils"]}
-holochain_serialized_bytes = "=0.0.53"
+kitsune_p2p_dht_arc = { path = "../dht_arc", features = ["test_utils"] }
+holochain_serialized_bytes = "=0.0.54"
 maplit = "1"
 holochain_trace = { version = "^0.3.0-beta-dev.11", path = "../../holochain_trace" }
 pretty_assertions = "1.4.0"
@@ -45,13 +45,8 @@ test-case = "3.3"
 workspace = true
 
 [features]
-default = [
-  "kitsune_p2p_timestamp/now"
-]
-test_utils = [
-  "colored",
-  "fuzzing",
-]
+default = ["kitsune_p2p_timestamp/now"]
+test_utils = ["colored", "fuzzing"]
 fuzzing = [
   "arbitrary",
   "proptest",
@@ -63,7 +58,4 @@ sqlite-encrypted = [
   "kitsune_p2p_timestamp/sqlite-encrypted",
   "kitsune_p2p_dht_arc/sqlite-encrypted",
 ]
-sqlite = [
-  "kitsune_p2p_timestamp/sqlite",
-  "kitsune_p2p_dht_arc/sqlite",
-]
+sqlite = ["kitsune_p2p_timestamp/sqlite", "kitsune_p2p_dht_arc/sqlite"]
