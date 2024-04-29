@@ -240,3 +240,12 @@ jobs:
           limit-access-to-actor: true
           ## limits ssh access and adds the ssh public keys of the listed GitHub users
           limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
+
+      - name: Check cache dirs
+        run:
+          pwd
+          ls -al .cargo
+          ls -al .cargo/
+          ls -al .cargo/registry/
+          ls -al .cargo/git/
+          ls -al target
