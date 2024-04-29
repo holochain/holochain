@@ -158,13 +158,13 @@ jobs:
           # See https://doc.rust-lang.org/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci
           # See https://github.com/actions/cache/blob/main/examples.md#rust---cargo
           path: |
-            ${HOLOCHAIN_REPO}/.cargo/.crates.toml
-            ${HOLOCHAIN_REPO}/.cargo/.crates2.json
-            ${HOLOCHAIN_REPO}/.cargo/bin/
-            ${HOLOCHAIN_REPO}/.cargo/registry/index/
-            ${HOLOCHAIN_REPO}/.cargo/registry/cache/
-            ${HOLOCHAIN_REPO}/.cargo/git/db/
-            ${HOLOCHAIN_REPO}/target/
+            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/.crates.toml
+            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/.crates2.json
+            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/bin/
+            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/registry/index/
+            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/registry/cache/
+            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/git/db/
+            ${{ inputs.HOLOCHAIN_REPO }}/target/
           key: "${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}"
 
       - name: Generate READMEs and bump the crate versions
