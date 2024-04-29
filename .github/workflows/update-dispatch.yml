@@ -33,8 +33,6 @@ jobs:
           - name: ${{ github.ref_name }}
             skip: true
         update:
-          - source: "versions/0_1"
-            cmd: "nix run .#scripts-repo-flake-update 0_1"
           - source: "versions/0_2"
             cmd: "nix run .#scripts-repo-flake-update 0_2"
           - source: "versions/0_2_rc"

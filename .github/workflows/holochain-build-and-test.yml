@@ -36,9 +36,6 @@ jobs:
           # ensure that any Nix changes on this branch don't cause problems for maintenance versions
           - pkgs:
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/0_1"
-          - pkgs:
-              - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/0_2"
           - pkgs:
               - build-holonix-tests-integration
