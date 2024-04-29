@@ -3,9 +3,12 @@
 #! nix-shell -i bash --pure
 #! nix-shell -p bash taplo
 
+# Usage to format: ./scripts/format-toml.sh
+# Usage to check: ./scripts/format-toml.sh --check
+
 set -eux
 
-EXTRA_ARGS=$1
+EXTRA_ARG=${1:-}
 
-taplo format ./*.toml "$EXTRA_ARGS"
-taplo format ./crates/**/*.toml "$EXTRA_ARGS"
+taplo format "$EXTRA_ARG" ./*.toml
+taplo format "$EXTRA_ARG" ./crates/**/*.toml
