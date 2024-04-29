@@ -227,4 +227,14 @@ jobs:
           ## limits ssh access and adds the ssh public key for the user which triggered the workflow
           limit-access-to-actor: true
           ## limits ssh access and adds the ssh public keys of the listed GitHub users
-          limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
+          limit-access-to-users: steveeJ,jost-s,neonphog,thedavidmeister,maackle,ThetaSinner
+
+      - name: debug paths
+        run: |
+          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/.crates.toml
+          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/.crates2.json
+          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/bin/
+          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/registry/index/
+          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/registry/cache/
+          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/git/db/
+          ls -al ${{ inputs.HOLOCHAIN_REPO }}/target/
