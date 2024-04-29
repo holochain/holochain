@@ -230,18 +230,19 @@ jobs:
           cp -v $HOME/work/holochain/holochain/.git/config ${HOLOCHAIN_REPO}/.git/config
 
       - name: Restore Cargo cache
+        if: ${{ inputs.skip_prepare_logic != 'true' }}
         uses: actions/cache@v4
         with:
           # See https://doc.rust-lang.org/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci
           # See https://github.com/actions/cache/blob/main/examples.md#rust---cargo
           path: |
-            .cargo/.crates.toml
-            .cargo/.crates2.toml
-            .cargo/bin/
-            .cargo/registry/index/
-            .cargo/registry/cache/
-            .cargo/git/db/
-            target/
+            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/.crates.toml
+            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/.crates2.json
+            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/bin/
+            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/registry/index/
+            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/registry/cache/
+            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/git/db/
+            ${{ inputs.HOLOCHAIN_REPO }}/target/
           key: "${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}"
 
       - name: Ensure the git credentials are set
