@@ -158,13 +158,13 @@ jobs:
           # See https://doc.rust-lang.org/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci
           # See https://github.com/actions/cache/blob/main/examples.md#rust---cargo
           path: |
-            .cargo/.crates.toml
-            .cargo/.crates2.json
-            .cargo/bin/
-            .cargo/registry/index/
-            .cargo/registry/cache/
-            .cargo/git/db/
-            target/
+            ${HOLOCHAIN_REPO}/.cargo/.crates.toml
+            ${HOLOCHAIN_REPO}/.cargo/.crates2.json
+            ${HOLOCHAIN_REPO}/.cargo/bin/
+            ${HOLOCHAIN_REPO}/.cargo/registry/index/
+            ${HOLOCHAIN_REPO}/.cargo/registry/cache/
+            ${HOLOCHAIN_REPO}/.cargo/git/db/
+            ${HOLOCHAIN_REPO}/target/
           key: "${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}"
 
       - name: Generate READMEs and bump the crate versions
@@ -240,12 +240,3 @@ jobs:
           limit-access-to-actor: true
           ## limits ssh access and adds the ssh public keys of the listed GitHub users
           limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
-
-      - name: Check cache dirs
-        run:
-          pwd
-          ls -al .cargo
-          ls -al .cargo/
-          ls -al .cargo/registry/
-          ls -al .cargo/git/
-          ls -al target
