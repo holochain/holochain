@@ -22,6 +22,17 @@ on:
         required: true
 
 jobs:
+  static:
+    runs-on: [ self-hosted, multi-arch ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Check TOML formatting
+        run: ./scripts/format-toml.sh --check
+
   test:
     strategy:
       fail-fast: ${{ inputs.fail_fast }}
@@ -58,7 +69,6 @@ jobs:
               pkgs:
                 - build-holochain-tests-static-all
                 - build-release-automation-tests-unit
-                - format-toml-check
               extra_arg: "--override-input versions './versions/weekly' --override-input holochain ${{ inputs.repo_path }}"
             platform:
               system: x86_64-linux
