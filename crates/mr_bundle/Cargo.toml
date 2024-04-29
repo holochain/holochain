@@ -12,10 +12,10 @@ documentation = "https://docs.rs/mr_bundle"
 [dependencies]
 derive_more = "0.99"
 flate2 = "1.0"
-holochain_util = { path = "../holochain_util", version = "^0.3.0-beta-dev.8"}
+holochain_util = { path = "../holochain_util", version = "^0.3.0-beta-dev.8" }
 futures = "0.3"
 reqwest = "0.12"
-rmp-serde = "=0.15.5"
+rmp-serde = "=1.1.2"
 serde = { version = "1.0", features = ["serde_derive", "derive"] }
 serde_bytes = "0.11"
 thiserror = "1.0"
@@ -41,9 +41,4 @@ workspace = true
 
 packing = ["serde_yaml", "holochain_util/tokio"]
 
-fuzzing = [
-    "arbitrary",
-    "proptest",
-    "proptest-derive",
-    "test-strategy",
-]
+fuzzing = ["arbitrary", "proptest", "proptest-derive", "test-strategy"]

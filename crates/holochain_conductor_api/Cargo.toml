@@ -5,7 +5,7 @@ description = "Message types for Holochain admin and app interface protocols"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_conductor_api"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
 # reminder - do not use workspace deps
@@ -13,12 +13,14 @@ edition = "2021"
 derive_more = "0.99"
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.28", path = "../kitsune_p2p/types" }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.21", path = "../kitsune_p2p/bin_data" }
-holo_hash = { version = "^0.3.0-beta-dev.28", path = "../holo_hash", features = ["full"] }
+holo_hash = { version = "^0.3.0-beta-dev.28", path = "../holo_hash", features = [
+    "full",
+] }
 holochain_state_types = { version = "^0.3.0-beta-dev.40", path = "../holochain_state_types" }
-holochain_serialized_bytes = "=0.0.53"
+holochain_serialized_bytes = "=0.0.54"
 holochain_types = { version = "^0.3.0-beta-dev.43", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.36", path = "../holochain_zome_types" }
-serde = { version = "1.0", features = [ "derive" ] }
+serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 tracing = "0.1.26"
 thiserror = "1.0.22"
@@ -29,7 +31,7 @@ shrinkwraprs = "0.3.0"
 [dev-dependencies]
 serde_json = "1.0"
 rmp-serde = "1.1"
-matches = {version = "0.1.8"}
+matches = { version = "0.1.8" }
 holochain_trace = { version = "^0.3.0-beta-dev.11", path = "../holochain_trace" }
 kitsune_p2p = { version = "^0.3.0-beta-dev.40", path = "../kitsune_p2p/kitsune_p2p" }
 
@@ -50,4 +52,3 @@ sqlite = [
     "holochain_zome_types/sqlite",
     "holochain_keystore/sqlite",
 ]
-
