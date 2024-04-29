@@ -5,6 +5,7 @@
 
 EXTRA_ARGS=$1
 
+set -eux
+
 taplo format ./*.toml "$EXTRA_ARGS"
 taplo format ./crates/**/*.toml "$EXTRA_ARGS"
-
