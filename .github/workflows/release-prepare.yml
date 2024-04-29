@@ -158,12 +158,12 @@ jobs:
           # See https://doc.rust-lang.org/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci
           # See https://github.com/actions/cache/blob/main/examples.md#rust---cargo
           path: |
-            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/.crates.toml
-            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/.crates2.json
-            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/bin/
-            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/registry/index/
-            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/registry/cache/
-            ${{ inputs.HOLOCHAIN_REPO }}/.cargo/git/db/
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
             ${{ inputs.HOLOCHAIN_REPO }}/target/
           key: "${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}"
 
@@ -228,10 +228,3 @@ jobs:
           limit-access-to-actor: true
           ## limits ssh access and adds the ssh public keys of the listed GitHub users
           limit-access-to-users: steveeJ,jost-s,neonphog,thedavidmeister,maackle,ThetaSinner
-
-      - name: debug paths
-        run: |
-          ls -al ${{ inputs.HOLOCHAIN_REPO }}/
-          ls -al ~/
-          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/
-          ls -al ${{ inputs.HOLOCHAIN_REPO }}/target/
