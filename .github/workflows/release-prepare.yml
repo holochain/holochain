@@ -231,10 +231,7 @@ jobs:
 
       - name: debug paths
         run: |
-          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/.crates.toml
-          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/.crates2.json
-          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/bin/
-          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/registry/index/
-          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/registry/cache/
-          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/git/db/
+          ls -al ${{ inputs.HOLOCHAIN_REPO }}/
+          ls -al ~/
+          ls -al ${{ inputs.HOLOCHAIN_REPO }}/.cargo/
           ls -al ${{ inputs.HOLOCHAIN_REPO }}/target/
