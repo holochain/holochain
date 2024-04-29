@@ -18,7 +18,6 @@ teardown() {
 
 @test "expected scaffold an example to succeed" {
   set -e
-  TEMP_PATH="temporary"
 
   print_version() {
     echo "$(hc-scaffold --version)"
@@ -26,8 +25,6 @@ teardown() {
 
   setup_and_build_hello_world() {
     print_version
-    mkdir $TEMP_PATH
-    cd $TEMP_PATH
 
     hc-scaffold example hello-world
     cd hello-world
