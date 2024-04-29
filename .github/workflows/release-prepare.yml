@@ -193,18 +193,6 @@ jobs:
         if: ${{ failure() }}
         run: sudo dmesg
 
-      - name: Cache cargo related build files
-        uses: steveeJ-forks/actions-cache/save@main
-        if: ${{ inputs.skip_prepare_logic != 'true' }}
-        with:
-          path: |
-            /var/tmp/holochain_repo/.cargo/bin/
-            /var/tmp/holochain_repo/.cargo/registry/index/
-            /var/tmp/holochain_repo/.cargo/registry/cache/
-            /var/tmp/holochain_repo/.cargo/git/db/
-            /var/tmp/holochain_repo/target/
-          key: ${{ runner.os }}-prepare-${{ github.run_id }}-${{ github.run_number }}
-
       - name: cache the repo and set outputs
         id: write-env-and-tag
         env:
