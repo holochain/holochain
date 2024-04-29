@@ -72,9 +72,9 @@ resolver = "2"
 
 [workspace.lints.clippy]
 nursery = "allow"
-cargo  = "allow"
+cargo = "allow"
 pedantic = "allow"
-restriction  = "allow"
+restriction = "allow"
 style = "deny"
 complexity = "deny"
 perf = "deny"

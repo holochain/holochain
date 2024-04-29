@@ -47,10 +47,10 @@ default = ["serialization", "holochain-wasmer"]
 full = ["fixturators", "hashing", "encoding", "sqlite"]
 
 fuzzing = [
-    "arbitrary",
-    "proptest",
-    "proptest-derive",
-    "holochain_serialized_bytes?/fuzzing",
+  "arbitrary",
+  "proptest",
+  "proptest-derive",
+  "holochain_serialized_bytes?/fuzzing",
 ]
 
 fixturators = ["fixt", "rand", "hashing", "encoding"]
@@ -61,8 +61,8 @@ test_utils = ["fixturators"]
 holochain-wasmer = ["holochain_wasmer_common"]
 
 sqlite-encrypted = [
-    "rusqlite",
-    "rusqlite/bundled-sqlcipher-vendored-openssl",
-    "kitsune_p2p_dht_arc/sqlite-encrypted",
+  "rusqlite",
+  "rusqlite/bundled-sqlcipher-vendored-openssl",
+  "kitsune_p2p_dht_arc/sqlite-encrypted",
 ]
 sqlite = ["rusqlite", "rusqlite/bundled", "kitsune_p2p_dht_arc/sqlite"]

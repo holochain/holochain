@@ -12,14 +12,14 @@ edition = "2021"
 [dependencies]
 aitia = { version = "^0.2.0-beta-dev.9", path = "../aitia" }
 chrono = { version = "0.4.22", default-features = false, features = [
-    "clock",
-    "std",
-    "oldtime",
-    "serde",
+  "clock",
+  "std",
+  "oldtime",
+  "serde",
 ] }
 holochain_sqlite = { version = "^0.3.0-beta-dev.43", path = "../holochain_sqlite" }
 holo_hash = { version = "^0.3.0-beta-dev.28", path = "../holo_hash", features = [
-    "full",
+  "full",
 ] }
 fallible-iterator = "0.2.0"
 hc_sleuth = { version = "^0.2.0-beta-dev.17", path = "../hc_sleuth" }
@@ -28,7 +28,7 @@ holochain_serialized_bytes = "=0.0.54"
 holochain_p2p = { version = "^0.3.0-beta-dev.46", path = "../holochain_p2p" }
 holochain_types = { version = "^0.3.0-beta-dev.43", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.36", path = "../holochain_zome_types", features = [
-    "full",
+  "full",
 ] }
 kitsune_p2p = { version = "^0.3.0-beta-dev.40", path = "../kitsune_p2p/kitsune_p2p" }
 holochain_state_types = { version = "^0.3.0-beta-dev.40", path = "../holochain_state_types" }
@@ -73,32 +73,32 @@ default = []
 fuzzing = ["holochain_types/fuzzing", "holochain_zome_types/fuzzing"]
 
 test_utils = [
-    "holochain_keystore/test_utils",
-    "holochain_types/test_utils",
-    "holochain_zome_types/test_utils",
-    "holochain_sqlite/test_utils",
-    "holochain_p2p/test_utils",
-    "base64",
-    "contrafact",
-    "tempfile",
-    "nanoid",
+  "holochain_keystore/test_utils",
+  "holochain_types/test_utils",
+  "holochain_zome_types/test_utils",
+  "holochain_sqlite/test_utils",
+  "holochain_p2p/test_utils",
+  "base64",
+  "contrafact",
+  "tempfile",
+  "nanoid",
 ]
 
 sqlite-encrypted = [
-    "holo_hash/sqlite-encrypted",
-    "holochain_sqlite/sqlite-encrypted",
-    "holochain_keystore/sqlite-encrypted",
-    "holochain_p2p/sqlite-encrypted",
-    "holochain_types/sqlite-encrypted",
-    "holochain_zome_types/sqlite-encrypted",
-    "kitsune_p2p/sqlite-encrypted",
+  "holo_hash/sqlite-encrypted",
+  "holochain_sqlite/sqlite-encrypted",
+  "holochain_keystore/sqlite-encrypted",
+  "holochain_p2p/sqlite-encrypted",
+  "holochain_types/sqlite-encrypted",
+  "holochain_zome_types/sqlite-encrypted",
+  "kitsune_p2p/sqlite-encrypted",
 ]
 sqlite = [
-    "holo_hash/sqlite",
-    "holochain_sqlite/sqlite",
-    "holochain_keystore/sqlite",
-    "holochain_p2p/sqlite",
-    "holochain_types/sqlite",
-    "holochain_zome_types/sqlite",
-    "kitsune_p2p/sqlite",
+  "holo_hash/sqlite",
+  "holochain_sqlite/sqlite",
+  "holochain_keystore/sqlite",
+  "holochain_p2p/sqlite",
+  "holochain_types/sqlite",
+  "holochain_zome_types/sqlite",
+  "kitsune_p2p/sqlite",
 ]
