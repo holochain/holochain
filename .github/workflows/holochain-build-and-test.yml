@@ -58,6 +58,7 @@ jobs:
               pkgs:
                 - build-holochain-tests-static-all
                 - build-release-automation-tests-unit
+                - format-toml-check
               extra_arg: "--override-input versions './versions/weekly' --override-input holochain ${{ inputs.repo_path }}"
             platform:
               system: x86_64-linux
