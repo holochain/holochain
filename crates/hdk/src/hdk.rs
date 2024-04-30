@@ -96,6 +96,9 @@ pub trait HdkT: HdiT {
     fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()>;
     fn enable_clone_cell(&self, input: EnableCloneCellInput) -> ExternResult<ClonedCell>;
     fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()>;
+    // Migrate DNA
+    fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
+    fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
 }
 
 #[cfg(feature = "mock")]
@@ -453,6 +456,14 @@ impl HdkT for ErrHdk {
     }
 
     fn delete_clone_cell(&self, _input: DeleteCloneCellInput) -> ExternResult<()> {
+        Self::err()
+    }
+
+    // Migrate DNA
+    fn close_chain(&self, _input: CloseChainInput) -> ExternResult<ActionHash> {
+        Self::err()
+    }
+    fn open_chain(&self, _input: OpenChainInput) -> ExternResult<ActionHash> {
         Self::err()
     }
 }

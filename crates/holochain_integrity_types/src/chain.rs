@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use holo_hash::ActionHash;
+use holo_hash::{ActionHash, DnaHash};
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 
@@ -173,4 +173,16 @@ impl<H: Eq + Ord + std::hash::Hash> Default for ChainFilters<H> {
     fn default() -> Self {
         Self::ToGenesis
     }
+}
+
+/// Input to close a chain.
+pub struct CloseChainInput {
+    /// The hash of the DNA that will be migrated to.
+    pub new_dna_hash: DnaHash,
+}
+
+/// Input to open a chain.
+pub struct OpenChainInput {
+    /// The hash of the DNA that was migrated from.
+    pub prev_dna_hash: DnaHash,
 }

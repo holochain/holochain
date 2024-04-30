@@ -2598,6 +2598,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_migrate_initial"
+version = "0.0.1"
+dependencies = [
+ "hdi",
+ "hdk",
+ "holochain_test_wasm_common",
+ "serde",
+]
+
+[[package]]
+name = "test_wasm_migrate_new"
+version = "0.0.1"
+dependencies = [
+ "hdi",
+ "hdk",
+ "holochain_test_wasm_common",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_multiple_calls"
 version = "0.0.1"
 dependencies = [
