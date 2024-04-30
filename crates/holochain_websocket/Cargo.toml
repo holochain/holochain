@@ -1,6 +1,6 @@
 [package]
 name = "holochain_websocket"
-version = "0.2.8-rc.1"
+version = "0.2.8"
 description = "Holochain utilities for serving and connection with websockets"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -19,7 +19,7 @@ tracing = { workspace = true }
 async-trait = { workspace = true }
 
 [dev-dependencies]
-holochain_trace = { version = "^0.2.7", path = "../holochain_trace" }
+holochain_trace = { version = "^0.2.8", path = "../holochain_trace" }
 criterion = "0.3.4"
 
 [[bench]]
