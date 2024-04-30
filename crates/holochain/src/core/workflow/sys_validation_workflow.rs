@@ -220,8 +220,7 @@ async fn sys_validation_workflow_inner(
     config: Arc<ConductorConfig>,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
-    let mut sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
-    sorted_ops.sort_by_cached_key(|op| OpOrder::new(op.get_type(), op.timestamp()));
+    let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
     let sleuth_id = config.sleuth_id();
 
     // Forget what dependencies are currently in use
