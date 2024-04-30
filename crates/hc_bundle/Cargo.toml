@@ -8,9 +8,9 @@ documentation = "https://docs.rs/holochain_cli_bundle"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "holo"]
 categories = [
-    "command-line-utilities",
-    "development-tools::build-utils",
-    "filesystem",
+  "command-line-utilities",
+  "development-tools::build-utils",
+  "filesystem",
 ]
 edition = "2021"
 
@@ -30,7 +30,7 @@ futures = "0.3"
 anyhow = "1.0"
 clap = { version = "4.0", features = ["derive"] }
 holochain_util = { path = "../holochain_util", features = [
-    "backtrace",
+  "backtrace",
 ], version = "^0.3.0-beta-dev.8" }
 holochain_serialized_bytes = "=0.0.54"
 holochain_types = { version = "^0.3.0-beta-dev.43", path = "../holochain_types" }

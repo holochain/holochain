@@ -10,7 +10,10 @@ crate-type = ["cdylib", "rlib"]
 # reminder - do not use workspace deps
 [dependencies]
 cfg-if = "1.0"
-clap = { version = "4.2.2", features = [ "derive", "wrap_help" ], optional = true }
+clap = { version = "4.2.2", features = [
+  "derive",
+  "wrap_help",
+], optional = true }
 flate2 = { version = "1.0.25", optional = true }
 hdi = { path = "../hdi", version = "^0.4.0-beta-dev.36", optional = true }
 hdk = { path = "../hdk", version = "^0.3.0-beta-dev.41", optional = true }
@@ -20,7 +23,7 @@ holochain_keystore = { path = "../holochain_keystore", version = "^0.3.0-beta-de
 rand = { version = "0.8.5", optional = true }
 rand-utf8 = { version = "0.0.1", optional = true }
 serde = { version = "1", optional = true }
-tokio = { version = "1.27", features = [ "full" ], optional = true }
+tokio = { version = "1.27", features = ["full"], optional = true }
 tracing = { version = "0.1.37", optional = true }
 tracing-subscriber = { version = "0.3.16", optional = true }
 
@@ -41,15 +44,31 @@ wasm-opt = "0.116"
 workspace = true
 
 [features]
-default = [ "build_demo" ]
+default = ["build_demo"]
 
 # The default demo feature builds the actual demo lib / executable.
-build_demo = [ "clap", "flate2", "hdi", "hdk", "serde", "tokio", "holochain", "holochain_types", "holochain/test_utils", "holochain/tx5", "holochain_keystore", "rand", "rand-utf8", "tracing", "tracing-subscriber" ]
+build_demo = [
+  "clap",
+  "flate2",
+  "hdi",
+  "hdk",
+  "serde",
+  "tokio",
+  "holochain",
+  "holochain_types",
+  "holochain/test_utils",
+  "holochain/tx5",
+  "holochain_keystore",
+  "rand",
+  "rand-utf8",
+  "tracing",
+  "tracing-subscriber",
+]
 
 # You probably won't use this directly, it is used by build.rs when
 # cfg(build_wasm) is enabled.
-build_integrity_wasm = [ "hdi", "serde" ]
+build_integrity_wasm = ["hdi", "serde"]
 
 # You probably won't use this directly, it is used by build.rs when
 # cfg(build_wasm) is enabled.
-build_coordinator_wasm = [ "hdi", "hdk", "serde" ]
+build_coordinator_wasm = ["hdi", "hdk", "serde"]

@@ -22,6 +22,17 @@ on:
         required: true
 
 jobs:
+  static:
+    runs-on: [ self-hosted, multi-arch ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Check TOML formatting
+        run: ./scripts/format-toml.sh --check
+
   test:
     strategy:
       fail-fast: ${{ inputs.fail_fast }}

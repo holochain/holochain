@@ -14,7 +14,7 @@ derive_more = "0.99"
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.28", path = "../kitsune_p2p/types" }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.21", path = "../kitsune_p2p/bin_data" }
 holo_hash = { version = "^0.3.0-beta-dev.28", path = "../holo_hash", features = [
-    "full",
+  "full",
 ] }
 holochain_state_types = { version = "^0.3.0-beta-dev.40", path = "../holochain_state_types" }
 holochain_serialized_bytes = "=0.0.54"
@@ -41,14 +41,14 @@ workspace = true
 [features]
 chc = []
 sqlite-encrypted = [
-    "holo_hash/sqlite-encrypted",
-    "holochain_types/sqlite-encrypted",
-    "holochain_zome_types/sqlite-encrypted",
-    "holochain_keystore/sqlite-encrypted",
+  "holo_hash/sqlite-encrypted",
+  "holochain_types/sqlite-encrypted",
+  "holochain_zome_types/sqlite-encrypted",
+  "holochain_keystore/sqlite-encrypted",
 ]
 sqlite = [
-    "holo_hash/sqlite",
-    "holochain_types/sqlite",
-    "holochain_zome_types/sqlite",
-    "holochain_keystore/sqlite",
+  "holo_hash/sqlite",
+  "holochain_types/sqlite",
+  "holochain_zome_types/sqlite",
+  "holochain_keystore/sqlite",
 ]

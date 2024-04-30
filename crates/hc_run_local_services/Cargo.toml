@@ -5,7 +5,11 @@ homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_run_local_services"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "holo"]
-categories = ["command-line-utilities", "development-tools::build-utils", "filesystem"]
+categories = [
+  "command-line-utilities",
+  "development-tools::build-utils",
+  "filesystem",
+]
 edition = "2021"
 license = "Apache-2.0"
 description = "Run a holochain webrtc signal server and bootstrap server."
@@ -16,7 +20,7 @@ path = "src/bin/hc-run-local-services.rs"
 
 # reminder - do not use workspace deps
 [dependencies]
-clap = { version = "4.0", features = [ "derive" ] }
+clap = { version = "4.0", features = ["derive"] }
 futures = "0.3"
 holochain_trace = { version = "^0.3.0-beta-dev.11", path = "../holochain_trace" }
 if-addrs = "0.12"

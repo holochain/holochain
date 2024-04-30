@@ -13,7 +13,7 @@ edition = "2021"
 fixt = { version = "^0.3.0-beta-dev.4", path = "../fixt" }
 futures = "0.3"
 holo_hash = { version = "^0.3.0-beta-dev.28", path = "../holo_hash", features = [
-    "full",
+  "full",
 ] }
 holochain_sqlite = { version = "^0.3.0-beta-dev.43", path = "../holochain_sqlite" }
 holochain_p2p = { version = "^0.3.0-beta-dev.46", path = "../holochain_p2p" }
@@ -48,25 +48,25 @@ workspace = true
 default = []
 
 test_utils = [
-    "mockall",
-    "holochain_types/test_utils",
-    "holochain_p2p/test_utils",
-    "holochain_state/test_utils",
+  "mockall",
+  "holochain_types/test_utils",
+  "holochain_p2p/test_utils",
+  "holochain_state/test_utils",
 ]
 
 sqlite-encrypted = [
-    "holo_hash/sqlite-encrypted",
-    "holochain_sqlite/sqlite-encrypted",
-    "holochain_state/sqlite-encrypted",
-    "holochain_types/sqlite-encrypted",
-    "holochain_zome_types/sqlite-encrypted",
-    "kitsune_p2p/sqlite-encrypted",
+  "holo_hash/sqlite-encrypted",
+  "holochain_sqlite/sqlite-encrypted",
+  "holochain_state/sqlite-encrypted",
+  "holochain_types/sqlite-encrypted",
+  "holochain_zome_types/sqlite-encrypted",
+  "kitsune_p2p/sqlite-encrypted",
 ]
 sqlite = [
-    "holo_hash/sqlite",
-    "holochain_sqlite/sqlite",
-    "holochain_state/sqlite",
-    "holochain_types/sqlite",
-    "holochain_zome_types/sqlite",
-    "kitsune_p2p/sqlite",
+  "holo_hash/sqlite",
+  "holochain_sqlite/sqlite",
+  "holochain_state/sqlite",
+  "holochain_types/sqlite",
+  "holochain_zome_types/sqlite",
+  "kitsune_p2p/sqlite",
 ]

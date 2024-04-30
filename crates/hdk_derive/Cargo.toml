@@ -5,9 +5,9 @@ description = "derive macros for the holochain hdk"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/hdk_derive"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo", "hdk" ]
-categories = [ "cryptography" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "hdk"]
+categories = ["cryptography"]
 edition = "2021"
 
 [lib]

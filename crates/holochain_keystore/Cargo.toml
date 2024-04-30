@@ -15,7 +15,7 @@ edition = "2021"
 base64 = "0.22"
 futures = "0.3"
 holo_hash = { version = "^0.3.0-beta-dev.28", path = "../holo_hash", features = [
-    "full",
+  "full",
 ] }
 holochain_serialized_bytes = "=0.0.54"
 holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.36" }
@@ -50,8 +50,8 @@ default = ["sqlite"]
 test_utils = []
 
 sqlite-encrypted = [
-    "holo_hash/sqlite-encrypted",
-    "lair_keystore/rusqlite-bundled-sqlcipher-vendored-openssl",
+  "holo_hash/sqlite-encrypted",
+  "lair_keystore/rusqlite-bundled-sqlcipher-vendored-openssl",
 ]
 
 sqlite = ["holo_hash/sqlite", "lair_keystore/rusqlite-bundled"]
