@@ -7,6 +7,10 @@
 //!
 //! # Sequential validation
 //!
+
+// This does not apply right now, because all actions are written to the database
+// straight away in the incoming dht ops workflow. See https://github.com/holochain/holochain/issues/3724
+
 //! Ops are validated in sequence based on their op type and the timestamp they
 //! were authored (see [`OpOrder`] and [`OpNumericalOrder`]). Validating one op
 //! after the other with this ordering ensures that ops that depend on earlier
@@ -18,14 +22,10 @@
 //! database. Otherwise the delete op could not be validated and its dependency,
 //! the create op, would be awaited first.
 //!
-
-// This does not apply right now, because all actions are written to the database
-// straight away in the incoming dht ops workflow. see https://github.com/holochain/holochain/issues/3724
-
 //! # Op validation
 //!
 //! For each op the [corresponding app validation function](https://docs.rs/hdi/latest/hdi/#data-validation)
-//! is executed. Entries and links, that the ops are derived from, have been
+//! is executed. Entry and link CRUD actions, which the ops are derived from, have been
 //! written with a particular integrity zome's entry and link types. Thus for
 //! op validation, the validation function of the same integrity zome must be
 //! used. Ops that do not relate to a specific entry or link like [`DhtOp::RegisterAgentActivity`]
@@ -50,10 +50,10 @@
 //! Finding the zomes to invoke for validation oftentimes involves fetching a
 //! referenced original action, like in the case of updates and deletes. Further
 //! the validation function may require actions, entries or agent activity
-// (segments of an agent's source chain) that currently are not stored in the
+//! (segments of an agent's source chain) that currently are not stored in the
 //! local databases. These are dependencies of the op. If they are missing
 //! locally, a network get request will be sent in the background. The op
-//! validation outcome will be [`Outcome::AwaitingDeps]. Validation of
+//! validation outcome will be [`Outcome::AwaitingDeps`]. Validation of
 //! remaining ops will carry on, as the network request's response is not
 //! awaited within the op validation loop. Instead the whole workflow triggers
 //! itself again after a delay.
@@ -71,10 +71,12 @@
 //!
 //! # Integration workflow
 //!
-//! If any ops have been validated (outcome valid or invalid), the [`integrate_dht_ops_workflow](crate::core::workflow::integrate_dht_ops_workflow)
-//! is triggered, that completes integration of ops after successful validation.
+
 // This seems to mainly affect ops with system dependencies, as ops without such
 // dependencies are set to integrated as part of this workflow.
+
+//! If any ops have been validated (outcome valid or invalid), [`integrate_dht_ops_workflow`](crate::core::workflow::integrate_dht_ops_workflow)
+//! is triggered, which completes integration of ops after successful validation.
 
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
