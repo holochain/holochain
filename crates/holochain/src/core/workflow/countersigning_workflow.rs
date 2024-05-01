@@ -48,7 +48,7 @@ struct Session {
 // block other incoming DhtOps if there are many active sessions.
 // We could create an incoming buffer if this actually becomes an issue.
 pub(crate) fn incoming_countersigning(
-    ops: Vec<(DhtOpHash, DhtOp)>,
+    ops: Vec<(DhtOpHash, ChainOp)>,
     workspace: &CountersigningWorkspace,
     trigger: TriggerSender,
 ) -> WorkflowResult<()> {
@@ -318,14 +318,14 @@ pub(crate) async fn countersigning_success(
 /// actions for this session and respond with a session complete.
 pub async fn countersigning_publish(
     network: &HolochainP2pDna,
-    op: DhtOp,
+    op: ChainOp,
     _author: AgentPubKey,
 ) -> Result<(), ZomeCallResponse> {
     if let Some(enzyme) = op.enzymatic_countersigning_enzyme() {
         if let Err(e) = network
             .countersigning_session_negotiation(
                 vec![enzyme.clone()],
-                CountersigningSessionNegotiationMessage::EnzymePush(Box::new(op)),
+                CountersigningSessionNegotiationMessage::EnzymePush(Box::new(op.into())),
             )
             .await
         {
@@ -337,7 +337,7 @@ pub async fn countersigning_publish(
         }
     } else {
         let basis = op.dht_basis();
-        if let Err(e) = network.publish_countersign(true, basis, op).await {
+        if let Err(e) = network.publish_countersign(true, basis, op.into()).await {
             tracing::error!(
                 "Failed to publish to entry authorities for countersigning session because of: {:?}",
                 e

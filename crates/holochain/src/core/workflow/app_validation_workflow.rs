@@ -145,10 +145,14 @@ async fn app_validation_workflow_inner(
     // Validate ops sequentially
     for sorted_dht_op in sorted_dht_ops.into_iter() {
         let (dht_op, dht_op_hash) = sorted_dht_op.into_inner();
-        let op_type = dht_op.get_type();
-        let action = dht_op.action();
-        let dependency = dht_op.sys_validation_dependency();
-        let dht_op_lite = dht_op.to_lite();
+        let chain_op = match dht_op {
+            DhtOp::ChainOp(chain_op) => chain_op,
+            _ => continue,
+        };
+        let op_type = chain_op.get_type();
+        let action = chain_op.action();
+        let dependency = op_type.sys_validation_dependency(&action);
+        let dht_op_lite = chain_op.to_lite();
 
         // If this is agent activity, track it for the cache.
         let activity = matches!(op_type, ChainOpType::RegisterAgentActivity).then(|| {
@@ -160,7 +164,7 @@ async fn app_validation_workflow_inner(
         });
 
         // Validate this op
-        let validation_outcome = match chain_op_to_op(dht_op.clone(), cascade.clone()).await {
+        let validation_outcome = match chain_op_to_op(chain_op.clone(), cascade.clone()).await {
             Ok(op) => {
                 validate_op_outer(
                     dna_hash.clone(),
@@ -246,12 +250,12 @@ async fn app_validation_workflow_inner(
                     })
                     .await;
                 if let Err(err) = write_result {
-                    tracing::error!(?dht_op, ?err, "Error updating dht op in database.");
+                    tracing::error!(?chain_op, ?err, "Error updating dht op in database.");
                 }
             }
             Err(err) => {
                 tracing::error!(
-                    ?dht_op,
+                    ?chain_op,
                     ?err,
                     "App validation error when validating dht op."
                 );
@@ -266,11 +270,11 @@ async fn app_validation_workflow_inner(
         // TODO: This will no longer be true when [#1212](https://github.com/holochain/holochain/pull/1212) lands.
         if has_no_dependency {
             dht_query_cache
-                .set_activity_to_integrated(&author, seq)
+                .set_activity_to_integrated(&author, Some(seq))
                 .await?;
         } else {
             dht_query_cache
-                .set_activity_ready_to_integrate(&author, seq)
+                .set_activity_ready_to_integrate(&author, Some(seq))
                 .await?;
         }
     }

@@ -866,7 +866,7 @@ where
 
     /// If there is a countersigning session get the
     /// StoreEntry op to send to the entry authorities.
-    pub fn countersigning_op(&self) -> SourceChainResult<Option<DhtOp>> {
+    pub fn countersigning_op(&self) -> SourceChainResult<Option<ChainOp>> {
         let r = self.scratch.apply(|scratch| {
             scratch
                 .entries()
@@ -881,14 +881,11 @@ where
                                 .unwrap_or(false)
                         })
                         .and_then(|shh| {
-                            Some(
-                                ChainOp::StoreEntry(
-                                    shh.signature().clone(),
-                                    shh.action().clone().try_into().ok()?,
-                                    (**entry).clone(),
-                                )
-                                .into(),
-                            )
+                            Some(ChainOp::StoreEntry(
+                                shh.signature().clone(),
+                                shh.action().clone().try_into().ok()?,
+                                (**entry).clone(),
+                            ))
                         })
                 })
         })?;

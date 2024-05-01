@@ -558,7 +558,7 @@ impl DhtOpSender for IncomingDhtOpSender {
     }
 
     async fn send_store_record(&self, record: Record) -> SysValidationResult<()> {
-        self.send_op(make_store_record(record)).await
+        self.send_op(make_store_record(record).into()).await
     }
 
     async fn send_store_entry(&self, record: Record) -> SysValidationResult<()> {
@@ -568,7 +568,7 @@ impl DhtOpSender for IncomingDhtOpSender {
         });
         if is_public_entry {
             if let Some(op) = make_store_entry(record) {
-                self.send_op(op).await?;
+                self.send_op(op.into()).await?;
             }
         }
         Ok(())
@@ -576,14 +576,15 @@ impl DhtOpSender for IncomingDhtOpSender {
 
     async fn send_register_add_link(&self, record: Record) -> SysValidationResult<()> {
         if let Some(op) = make_register_add_link(record) {
-            self.send_op(op).await?;
+            self.send_op(op.into()).await?;
         }
 
         Ok(())
     }
 
     async fn send_register_agent_activity(&self, record: Record) -> SysValidationResult<()> {
-        self.send_op(make_register_agent_activity(record)).await
+        self.send_op(make_register_agent_activity(record).into())
+            .await
     }
 }
 
