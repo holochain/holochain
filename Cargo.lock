@@ -582,9 +582,9 @@ checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
 name = "base64"
-version = "0.22.0"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9475866fec1451be56a3c2400fd081ff546538961565ccb5b7142cbd22bc7a51"
+checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "base64ct"
@@ -2719,7 +2719,7 @@ name = "holo_hash"
 version = "0.3.0"
 dependencies = [
  "arbitrary",
- "base64 0.22.0",
+ "base64 0.22.1",
  "blake2b_simd",
  "derive_more",
  "fixt",
@@ -2751,7 +2751,7 @@ dependencies = [
  "async-once-cell",
  "async-trait",
  "backtrace",
- "base64 0.22.0",
+ "base64 0.22.1",
  "bytes",
  "cfg-if 1.0.0",
  "chrono",
@@ -3050,7 +3050,7 @@ name = "holochain_keystore"
 version = "0.3.0"
 dependencies = [
  "assert_cmd",
- "base64 0.22.0",
+ "base64 0.22.1",
  "derive_more",
  "futures",
  "holo_hash",
@@ -3222,7 +3222,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "async-recursion",
- "base64 0.22.0",
+ "base64 0.22.1",
  "chrono",
  "contrafact",
  "cron",
@@ -4125,7 +4125,7 @@ version = "0.3.0"
 dependencies = [
  "arbitrary",
  "arrayref",
- "base64 0.22.0",
+ "base64 0.22.1",
  "blake2b_simd",
  "bloomfilter",
  "bytes",
@@ -4179,7 +4179,7 @@ name = "kitsune_p2p_bin_data"
 version = "0.3.0"
 dependencies = [
  "arbitrary",
- "base64 0.22.0",
+ "base64 0.22.1",
  "derive_more",
  "fixt",
  "holochain_util",
@@ -4319,7 +4319,7 @@ dependencies = [
 name = "kitsune_p2p_mdns"
 version = "0.3.0"
 dependencies = [
- "base64 0.22.0",
+ "base64 0.22.1",
  "err-derive 0.3.1",
  "futures",
  "libmdns",
@@ -4332,7 +4332,7 @@ dependencies = [
 name = "kitsune_p2p_proxy"
 version = "0.3.0"
 dependencies = [
- "base64 0.22.0",
+ "base64 0.22.1",
  "criterion",
  "crossterm 0.27.0",
  "derive_more",
@@ -4381,7 +4381,7 @@ name = "kitsune_p2p_types"
 version = "0.3.0"
 dependencies = [
  "arbitrary",
- "base64 0.22.0",
+ "base64 0.22.1",
  "criterion",
  "derive_more",
  "fixt",
@@ -6391,7 +6391,7 @@ version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "566cafdd92868e0939d3fb961bd0dc25fcfaaed179291093b3d43e6b3150ea10"
 dependencies = [
- "base64 0.22.0",
+ "base64 0.22.1",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -6684,7 +6684,7 @@ version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29993a25686778eb88d4189742cd713c9bce943bc54251a33509dc63cbacf73d"
 dependencies = [
- "base64 0.22.0",
+ "base64 0.22.1",
  "rustls-pki-types",
 ]
 
@@ -6973,7 +6973,7 @@ version = "3.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ad483d2ab0149d5a5ebcd9972a3852711e0153d863bf5a5d0391d28883c4a20"
 dependencies = [
- "base64 0.22.0",
+ "base64 0.22.1",
  "chrono",
  "hex",
  "indexmap 1.9.3",
@@ -8497,7 +8497,7 @@ version = "2.9.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d11a831e3c0b56e438a28308e7c810799e3c118417f342d30ecec080105395cd"
 dependencies = [
- "base64 0.22.0",
+ "base64 0.22.1",
  "log",
  "native-tls",
  "once_cell",
