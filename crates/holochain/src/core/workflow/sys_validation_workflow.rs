@@ -1023,7 +1023,7 @@ impl SysValidationWorkspace {
                 DatabaseResult::Ok(stmt.query_row(
                     named_params! {
                         ":author": author,
-                        ":activity": DhtOpType::RegisterAgentActivity,
+                        ":activity": ChainOpType::RegisterAgentActivity,
                     },
                     |row| row.get(0),
                 )?)

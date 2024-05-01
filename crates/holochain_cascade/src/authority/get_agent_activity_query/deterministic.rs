@@ -76,7 +76,7 @@ impl Query for DeterministicGetAgentActivityQuery {
             ":author": self.agent,
             ":hash_low": self.filter.range.0,
             ":hash_high": self.filter.range.1,
-            ":op_type": DhtOpType::RegisterAgentActivity,
+            ":op_type": ChainOpType::RegisterAgentActivity,
         })
         .to_vec()
     }

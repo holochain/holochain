@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 fn insert_action_and_op(txn: &mut Transaction, u: &mut Unstructured, action: &Action) -> DhtOpHash {
     let timestamp = Timestamp::arbitrary(u).unwrap();
-    let op_order = OpOrder::new(DhtOpType::RegisterAgentActivity, timestamp);
+    let op_order = OpOrder::new(ChainOpType::RegisterAgentActivity, timestamp);
     let basis_hash: OpBasis = EntryHash::arbitrary(u).unwrap().into();
     let action = SignedActionHashed::with_presigned(
         ActionHashed::from_content_sync(action.clone()),

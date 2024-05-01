@@ -881,11 +881,14 @@ where
                                 .unwrap_or(false)
                         })
                         .and_then(|shh| {
-                            Some(DhtOp::StoreEntry(
-                                shh.signature().clone(),
-                                shh.action().clone().try_into().ok()?,
-                                (**entry).clone(),
-                            ))
+                            Some(
+                                ChainOp::StoreEntry(
+                                    shh.signature().clone(),
+                                    shh.action().clone().try_into().ok()?,
+                                    (**entry).clone(),
+                                )
+                                .into(),
+                            )
                         })
                 })
         })?;
@@ -946,12 +949,13 @@ fn build_ops_from_actions(
         let mut h = Some(action);
         for op in ops_inner {
             let op_type = op.get_type();
+            let op = DhtOpLite::from(op);
             // Action is required by value to produce the DhtOpHash.
             let (action, op_hash) = UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
-            let op_order = OpOrder::new(op_type, action.timestamp());
+            let op_order = OpOrder::new(op_type.into(), action.timestamp());
             let timestamp = action.timestamp();
             // Put the action back by value.
-            let dependency = op.get_type().sys_validation_dependency(&action);
+            let dependency = op_type.sys_validation_dependency(&action);
             h = Some(action);
             // Collect the DhtOpLite, DhtOpHash and OpOrder.
             ops.push((op, op_hash, op_order, timestamp, dependency));
@@ -1094,7 +1098,7 @@ pub async fn genesis(
 pub fn put_raw(
     txn: &mut Transaction,
     shh: SignedActionHashed,
-    ops: Vec<DhtOpLite>,
+    ops: Vec<ChainOpLite>,
     entry: Option<Entry>,
 ) -> StateMutationResult<Vec<DhtOpHash>> {
     let (action, signature) = shh.into_inner();
@@ -1106,7 +1110,7 @@ pub fn put_raw(
         let op_type = op.get_type();
         let (h, op_hash) =
             UniqueForm::op_hash(op_type, action.take().expect("This can't be empty"))?;
-        let op_order = OpOrder::new(op_type, h.timestamp());
+        let op_order = OpOrder::new(op_type.into(), h.timestamp());
         let timestamp = h.timestamp();
         action = Some(h);
         hashes.push((op_hash.clone(), op_order, timestamp));
@@ -1121,7 +1125,7 @@ pub fn put_raw(
     }
     insert_action(txn, &shh)?;
     for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, &op, &op_hash, &op_order, &timestamp)?;
+        insert_op_lite(txn, &op.into(), &op_hash, &op_order, &timestamp)?;
     }
     Ok(ops_to_integrate)
 }

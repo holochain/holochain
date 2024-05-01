@@ -68,7 +68,7 @@ where
                 named_params! {
                     ":author": agent,
                     ":recency_threshold": recency_threshold,
-                    ":store_entry": DhtOpType::StoreEntry,
+                    ":store_entry": ChainOpType::StoreEntry,
                 },
                 |row| {
                     let action_size: usize = row.get("action_size")?;
@@ -76,7 +76,7 @@ where
                     let entry_size: Option<usize> = row.get("entry_size")?;
                     let op_size = (action_size + entry_size.unwrap_or(0)).into();
                     let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                    let op_type: DhtOpType = row.get("dht_type")?;
+                    let op_type: ChainOpType = row.get("dht_type")?;
                     let hash: DhtOpHash = row.get("dht_hash")?;
                     let op_hash_sized = OpHashSized::new(hash.to_kitsune(), Some(op_size));
                     let entry = match action.0.entry_type().map(|et| et.visibility()) {
@@ -121,7 +121,7 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
         ",
         named_params! {
             ":author": agent,
-            ":store_entry": DhtOpType::StoreEntry,
+            ":store_entry": ChainOpType::StoreEntry,
         },
         |row| row.get("num_ops"),
     )?;

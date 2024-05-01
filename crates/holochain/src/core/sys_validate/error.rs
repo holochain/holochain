@@ -128,7 +128,7 @@ pub enum ValidationOutcome {
     )]
     TagTooLarge(usize),
     #[error("An op with non-private entry type is missing its entry data. Action: {0:?}, Op type: {1:?} Reason: {2}")]
-    MalformedDhtOp(Box<Action>, DhtOpType, String),
+    MalformedDhtOp(Box<Action>, ChainOpType, String),
     #[error("The action with {0:?} was expected to be a link add action")]
     NotCreateLink(ActionHash),
     #[error("The action was expected to be a new entry action but was {0:?}")]

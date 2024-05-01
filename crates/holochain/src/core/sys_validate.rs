@@ -361,7 +361,7 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
         (Some(_), NA) => err("There is action entry data but the entry itself is N/A"),
         (Some(Private), Present(_)) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
         (Some(Public), NotStored) => {
-            if op.get_type() == DhtOpType::RegisterAgentActivity
+            if op.get_type() == ChainOpType::RegisterAgentActivity
                 || op.action().entry_type() == Some(&EntryType::AgentPubKey)
             {
                 // RegisterAgentActivity is a special case, where the entry data can be omitted.

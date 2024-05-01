@@ -151,7 +151,7 @@ async fn app_validation_workflow_inner(
         let dht_op_lite = dht_op.to_lite();
 
         // If this is agent activity, track it for the cache.
-        let activity = matches!(op_type, DhtOpType::RegisterAgentActivity).then(|| {
+        let activity = matches!(op_type, ChainOpType::RegisterAgentActivity).then(|| {
             (
                 action.author().clone(),
                 action.action_seq(),
@@ -293,13 +293,13 @@ async fn app_validation_workflow_inner(
 
 pub async fn record_to_op(
     record: Record,
-    op_type: DhtOpType,
+    op_type: ChainOpType,
     cascade: Arc<impl Cascade>,
 ) -> AppValidationOutcome<(Op, DhtOpHash, Option<Entry>)> {
-    use DhtOpType::*;
+    use ChainOpType::*;
 
     // Hide private data where appropriate
-    let (record, mut hidden_entry) = if matches!(op_type, DhtOpType::StoreEntry) {
+    let (record, mut hidden_entry) = if matches!(op_type, ChainOpType::StoreEntry) {
         // We don't want to hide private data for a StoreEntry, because when doing
         // inline validation as an author, we want to validate and integrate our own entry!
         // Publishing and gossip rules state that a private StoreEntry will never be transmitted

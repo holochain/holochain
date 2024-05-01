@@ -757,7 +757,7 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
         )
         .unwrap()
         .query_and_then(named_params! {}, |row| {
-            let op_type: DhtOpType = row.get("type")?;
+            let op_type: ChainOpType = row.get("type")?;
             let action: SignedAction = from_blob(row.get("action_blob")?)?;
             let entry: Option<Vec<u8>> = row.get("entry_blob")?;
             let entry: Option<Entry> = match entry {

@@ -55,7 +55,7 @@ impl WireRecordOps {
                 action,
                 signature,
                 status,
-                DhtOpType::StoreRecord,
+                ChainOpType::StoreRecord,
             )?);
             if let Some(entry_hash) = entry_hash {
                 for op in deletes {
@@ -68,7 +68,7 @@ impl WireRecordOps {
                         action,
                         signature,
                         status,
-                        DhtOpType::RegisterDeletedBy,
+                        ChainOpType::RegisterDeletedBy,
                     )?);
                 }
                 for op in updates {
@@ -80,7 +80,7 @@ impl WireRecordOps {
                         action,
                         signature,
                         status,
-                        DhtOpType::RegisterUpdatedRecord,
+                        ChainOpType::RegisterUpdatedRecord,
                     )?);
                 }
             }

@@ -3221,7 +3221,7 @@ fn query_dht_ops_from_statement(
     let r: Vec<DhtOp> = stmt
         .query_and_then([], |row| {
             let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-            let op_type: DhtOpType = row.get("dht_type")?;
+            let op_type: ChainOpType = row.get("dht_type")?;
             let entry = match action.0.entry_type().map(|et| et.visibility()) {
                 Some(EntryVisibility::Public) => {
                     let entry: Option<Vec<u8>> = row.get("entry_blob")?;

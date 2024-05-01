@@ -205,7 +205,7 @@ impl Db {
                                     ":basis": basis,
                                     ":hash": hash,
                                     ":status": ValidationStatus::Valid,
-                                    ":activity": DhtOpType::RegisterAgentActivity,
+                                    ":activity": ChainOpType::RegisterAgentActivity,
                                 },
                                 |row| row.get(0),
                             )
@@ -230,8 +230,8 @@ impl Db {
                                     ":basis": base,
                                     ":hash": hash,
                                     ":status": ValidationStatus::Valid,
-                                    ":update_content": DhtOpType::RegisterUpdatedContent,
-                                    ":update_record": DhtOpType::RegisterUpdatedRecord,
+                                    ":update_content": ChainOpType::RegisterUpdatedContent,
+                                    ":update_record": ChainOpType::RegisterUpdatedRecord,
                                 },
                                 |row| row.get(0),
                             )
@@ -259,8 +259,8 @@ impl Db {
                                     ":deleted_action_hash": deleted_action_hash,
                                     ":hash": hash,
                                     ":status": ValidationStatus::Valid,
-                                    ":deleted_by": DhtOpType::RegisterDeletedBy,
-                                    ":deleted_entry_action": DhtOpType::RegisterDeletedEntryAction,
+                                    ":deleted_by": ChainOpType::RegisterDeletedBy,
+                                    ":deleted_entry_action": ChainOpType::RegisterDeletedEntryAction,
                                 },
                                 |row| row.get(0),
                             )

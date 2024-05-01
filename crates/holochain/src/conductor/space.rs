@@ -590,7 +590,7 @@ impl Spaces {
                     let mut rows = stmt.query([hash])?;
                     if let Some(row) = rows.next()? {
                         let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                        let op_type: DhtOpType = row.get("dht_type")?;
+                        let op_type: ChainOpType = row.get("dht_type")?;
                         let hash: DhtOpHash = row.get("hash")?;
                         // Check the entry isn't private before gossiping it.
                         let mut entry: Option<Entry> = None;

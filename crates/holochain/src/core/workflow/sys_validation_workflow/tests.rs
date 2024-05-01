@@ -137,11 +137,11 @@ async fn run_test(
                 named_params!{
                     ":valid": ValidationStatus::Valid,
                     ":rejected": ValidationStatus::Rejected,
-                    ":store_entry": DhtOpType::StoreEntry,
-                    ":store_record": DhtOpType::StoreRecord,
-                    ":add_link": DhtOpType::RegisterAddLink,
-                    ":update_content": DhtOpType::RegisterUpdatedContent,
-                    ":update_record": DhtOpType::RegisterUpdatedRecord,
+                    ":store_entry": ChainOpType::StoreEntry,
+                    ":store_record": ChainOpType::StoreRecord,
+                    ":add_link": ChainOpType::RegisterAddLink,
+                    ":update_content": ChainOpType::RegisterUpdatedContent,
+                    ":update_record": ChainOpType::RegisterUpdatedRecord,
                     ":bad_update_entry_hash": bad_update_entry_hash,
                     ":bad_update_action": bad_update_action,
                     ":link_add_hash": link_add_hash,
@@ -316,7 +316,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     )
     .unwrap()
     .query_and_then([], |row| {
-        let op_type: DhtOpType = row.get("type")?;
+        let op_type: ChainOpType = row.get("type")?;
         let hash: ActionHash = row.get("hash")?;
         let action: SignedAction = from_blob(row.get("blob")?)?;
         Ok(DhtOpLite::from_type(op_type, hash, &action.0)?)

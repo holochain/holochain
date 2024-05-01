@@ -708,7 +708,7 @@ where
             ))?
             .query_and_then(
                 named_params! {
-                    ":store_entry": DhtOpType::StoreEntry,
+                    ":store_entry": ChainOpType::StoreEntry,
                     ":author": author,
                 },
                 |row| {
@@ -716,7 +716,7 @@ where
                     let loc: u32 = row.get("loc")?;
 
                     let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                    let op_type: DhtOpType = row.get("dht_type")?;
+                    let op_type: ChainOpType = row.get("dht_type")?;
                     let entry = match action.0.entry_type().map(|et| et.visibility()) {
                         Some(EntryVisibility::Public) => {
                             let entry: Option<Vec<u8>> = row.get("entry_blob")?;
@@ -737,14 +737,14 @@ where
             txn.prepare(sql_common)?
                 .query_and_then(
                     named_params! {
-                        ":store_entry": DhtOpType::StoreEntry,
+                        ":store_entry": ChainOpType::StoreEntry,
                     },
                     |row| {
                         let h: DhtOpHash = row.get("dht_op_hash")?;
                         let loc: u32 = row.get("loc")?;
 
                         let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                        let op_type: DhtOpType = row.get("dht_type")?;
+                        let op_type: ChainOpType = row.get("dht_type")?;
                         let entry = match action.0.entry_type().map(|et| et.visibility()) {
                             Some(EntryVisibility::Public) => {
                                 let entry: Option<Vec<u8>> = row.get("entry_blob")?;

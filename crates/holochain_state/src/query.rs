@@ -967,7 +967,7 @@ pub fn map_sql_dht_op_common(row: &Row) -> StateQueryResult<Option<DhtOp>> {
         .0
         .entry_type()
         .map_or(false, |et| *et.visibility() == EntryVisibility::Private)
-        && op_type == DhtOpType::StoreEntry
+        && op_type == DhtOpType::Chain(ChainOpType::StoreEntry)
     {
         return Ok(None);
     }
@@ -986,5 +986,7 @@ pub fn map_sql_dht_op_common(row: &Row) -> StateQueryResult<Option<DhtOp>> {
             None => None,
         };
     }
-    Ok(Some(DhtOp::from_type(op_type, action, entry)?))
+    match op_type {
+        DhtOpType::Chain(op_type) => Ok(Some(ChainOp::from_type(op_type, action, entry)?.into())),
+    }
 }

@@ -9,7 +9,7 @@ use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::test_keystore;
 use holochain_p2p::dht::prelude::*;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
-use holochain_types::facts::valid_dht_op;
+use holochain_types::facts::valid_chain_op;
 use holochain_types::prelude::*;
 use kitsune_p2p_types::dht::ArqStrat;
 use rand::Rng;
@@ -68,7 +68,7 @@ async fn test_region_queries() {
     let mut arbitrary_valid_op = |timestamp: Timestamp| -> DhtOp {
         let mut op = DhtOp::arbitrary(&mut g).unwrap();
         *op.author_mut() = agent.clone();
-        let mut fact = valid_dht_op(keystore.clone(), agent.clone(), true);
+        let mut fact = valid_chain_op(keystore.clone(), agent.clone(), true);
         op = fact.satisfy(&mut g, op).unwrap();
         *op.timestamp_mut() = timestamp;
         op

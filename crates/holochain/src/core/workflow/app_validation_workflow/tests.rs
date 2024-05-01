@@ -805,7 +805,7 @@ fn expected_invalid_entry(
             named_params! {
                 ":invalid_action_hash": invalid_action_hash,
                 ":invalid_entry_hash": invalid_entry_hash,
-                ":store_entry": DhtOpType::StoreEntry,
+                ":store_entry": ChainOpType::StoreEntry,
                 ":rejected": ValidationStatus::Rejected,
             },
             |row| row.get(0),
@@ -827,7 +827,7 @@ fn expected_invalid_link(txn: &Transaction, invalid_link_hash: &ActionHash) -> b
             &sql,
             named_params! {
                 ":invalid_link_hash": invalid_link_hash,
-                ":create_link": DhtOpType::RegisterAddLink,
+                ":create_link": ChainOpType::RegisterAddLink,
                 ":rejected": ValidationStatus::Rejected,
             },
             |row| row.get(0),
@@ -849,7 +849,7 @@ fn expected_invalid_remove_link(txn: &Transaction, invalid_remove_hash: &ActionH
             &sql,
             named_params! {
                 ":invalid_remove_hash": invalid_remove_hash,
-                ":delete_link": DhtOpType::RegisterRemoveLink,
+                ":delete_link": ChainOpType::RegisterRemoveLink,
                 ":rejected": ValidationStatus::Rejected,
             },
             |row| row.get(0),
@@ -881,7 +881,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     )
     .unwrap()
     .query_and_then([], |row| {
-        let op_type: DhtOpType = row.get("type")?;
+        let op_type: ChainOpType = row.get("type")?;
         let hash: ActionHash = row.get("hash")?;
         let action: SignedAction = from_blob(row.get("blob")?)?;
         Ok(DhtOpLite::from_type(op_type, hash, &action.0)?)
