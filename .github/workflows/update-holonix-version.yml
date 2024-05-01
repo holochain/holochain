@@ -11,6 +11,7 @@ on:
         options:
           - "0_2"
           - "0_2_rc"
+          - "0_3_rc"
           - "weekly"
 
 concurrency:
