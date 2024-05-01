@@ -4,7 +4,7 @@
 //! A Conductor is a dynamically changing group of [Cell]s.
 //!
 //! A Conductor can be managed:
-//! - externally, via an [`AppInterfaceApi`](super::api::AppInterfaceApi)
+//! - externally, via an [`AppInterfaceApi`]
 //! - from within a [`Cell`], via [`CellConductorApi`](super::api::CellConductorApi)
 //!
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
@@ -569,7 +569,7 @@ mod dna_impls {
             self.ribosome_store().share_ref(|ds| ds.get_dna_file(hash))
         }
 
-        /// Get an [`EntryDef`](holochain_integrity_types::prelude::EntryDef) from the [`EntryDefBufferKey`]
+        /// Get an [`EntryDef`] from the [`EntryDefBufferKey`]
         pub fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
             self.ribosome_store().share_ref(|ds| ds.get_entry_def(key))
         }

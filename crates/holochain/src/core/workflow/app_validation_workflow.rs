@@ -2,19 +2,20 @@
 //! app-defined validation function.
 //!
 //! Triggered by system validation, this workflow iterates over a list of
-//! [`DhtOp`]s to be validated, validates each op, updates its validation status
+//! [`DhtOp`]s that have passed system validation, validates each op, updates its validation status
 //! in the database accordingly, and triggers op integration if necessary.
 //!
 //! ### Sequential validation
 //!
 
-// This does not apply right now, because all actions are written to the database
-// straight away in the incoming dht ops workflow. See https://github.com/holochain/holochain/issues/3724
+// Even though ops are validated in sequence, they could all be validated in parallel too with the same result.
+// All actions are written to the database straight away in the incoming dht ops workflow and do not require validation to be available for validating other ops. See https://github.com/holochain/holochain/issues/3724
 
 //! Ops are validated in sequence based on their op type and the timestamp they
 //! were authored (see [`OpOrder`] and [`OpNumericalOrder`]). Validating one op
-//! after the other with this ordering ensures that ops that depend on earlier
-//! ops will be validated after the earlier ops. An example is an incoming delete
+//! after the other with this ordering was chosen so that ops that depend on earlier
+//! ops will be validated after the earlier ops, and therefore have a higher chance
+//! of being validated successfully. An example is an incoming delete
 //! op that depends on a create op. Validated in order of their authoring, the
 //! create op is validated first, followed at some stage by the delete op. If
 //! the validation function references the original action when validating
@@ -57,7 +58,7 @@
 //! conductor able to recover itself.
 //!
 //! Ops that have not been validated due to validation errors will be retried
-//! at the next occasion, when other ops from gossip or publish come in and
+//! the next time app validation runs, when other ops from gossip or publish come in and
 //! need to be validated.
 //!
 //! ### Missing dependencies
