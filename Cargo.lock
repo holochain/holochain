@@ -86,7 +86,7 @@ dependencies = [
 
 [[package]]
 name = "aitia"
-version = "0.2.0-dev.0"
+version = "0.3.0-dev.0"
 dependencies = [
  "anyhow",
  "derive_more",
@@ -2533,7 +2533,7 @@ dependencies = [
 
 [[package]]
 name = "hc_sleuth"
-version = "0.3.0-dev.0"
+version = "0.4.0-dev.0"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2742,7 +2742,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.3.0"
+version = "0.4.0-dev.0"
 dependencies = [
  "aitia",
  "anyhow",
@@ -3077,7 +3077,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_metrics"
-version = "0.3.0-dev.0"
+version = "0.4.0-dev.0"
 dependencies = [
  "influxive",
  "opentelemetry_api",
@@ -3134,7 +3134,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_secure_primitive"
-version = "0.3.0-dev.0"
+version = "0.4.0-dev.0"
 dependencies = [
  "paste",
  "serde",
@@ -3275,7 +3275,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_trace"
-version = "0.3.0-dev.0"
+version = "0.4.0-dev.0"
 dependencies = [
  "chrono",
  "derive_more",
@@ -3353,7 +3353,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.3.0-dev.0"
+version = "0.4.0-dev.0"
 dependencies = [
  "backtrace",
  "cfg-if 1.0.0",
