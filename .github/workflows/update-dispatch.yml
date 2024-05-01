@@ -37,6 +37,8 @@ jobs:
             cmd: "nix run .#scripts-repo-flake-update 0_2"
           - source: "versions/0_2_rc"
             cmd: "nix run .#scripts-repo-flake-update 0_2_rc"
+          - source: "versions/0_3_rc"
+            cmd: "nix run .#scripts-repo-flake-update 0_3_rc"
           - source: "versions/weekly"
             cmd: "nix run .#scripts-repo-flake-update weekly"
           - source: "rust-overlay"
