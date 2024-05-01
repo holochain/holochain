@@ -29,7 +29,7 @@ holochain_keystore = { version = "^0.4.0-dev.0", path = "../holochain_keystore" 
 holochain_nonce = { version = "^0.4.0-dev.0", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.54"
 holochain_sqlite = { path = "../holochain_sqlite", version = "^0.4.0-dev.0"}
-holochain_util = { version = "^0.3.0-dev.0", path = "../holochain_util", features = [
+holochain_util = { version = "^0.4.0-dev.0", path = "../holochain_util", features = [
   "backtrace",
 ] }
 holochain_zome_types = { path = "../holochain_zome_types", version = "^0.4.0-dev.0", features = [
@@ -42,7 +42,7 @@ mr_bundle = { path = "../mr_bundle", features = [
 ], version = "^0.4.0-dev.0"}
 must_future = "0.1.1"
 nanoid = "0.4"
-holochain_trace = { version = "^0.3.0-dev.0", path = "../holochain_trace" }
+holochain_trace = { version = "^0.4.0-dev.0", path = "../holochain_trace" }
 parking_lot = "0.12"
 rand = "0.8.5"
 regex = "1.4"

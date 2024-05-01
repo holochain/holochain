@@ -7,8 +7,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-## 0.3.0
-
 - **BREAKING** - Serialization: Update of serialization packages `holochain-serialization` and `holochain-wasmer-*` leads to general message format change for enums. Previously an enum value like
 
 <!-- end list -->
@@ -41,6 +39,10 @@ Now it serializes to
 
 - Adds a new admin interface call `RevokeAppAuthenticationToken` to revoke issued app authentication tokens. \#3765
 - App validation workflow: Validate ops in sequence instead of in parallel. Ops validated one after the other have a higher chance of being validated if they depend on earlier ops. When validated in parallel, they potentially needed to await a next workflow run when the dependent op would have been validated.
+
+## 0.4.0-dev.0
+
+## 0.3.0
 
 ## 0.3.0-beta-dev.48
 

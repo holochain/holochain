@@ -12,7 +12,7 @@ documentation = "https://docs.rs/mr_bundle"
 [dependencies]
 derive_more = "0.99"
 flate2 = "1.0"
-holochain_util = { path = "../holochain_util", version = "^0.3.0-dev.0"}
+holochain_util = { version = "^0.4.0-dev.0", path = "../holochain_util"}
 futures = "0.3"
 reqwest = "0.12"
 rmp-serde = "=1.1.2"
