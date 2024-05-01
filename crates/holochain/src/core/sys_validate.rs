@@ -587,14 +587,14 @@ impl DhtOpSender for IncomingDhtOpSender {
     }
 }
 
-/// Make a StoreRecord DhtOp from a Record.
+/// Make a StoreRecord ChainOp from a Record.
 /// Note that this can fail if the op is missing an
 /// Entry when it was supposed to have one.
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_record(record: Record) -> DhtOp {
+fn make_store_record(record: Record) -> ChainOp {
     // Extract the data
     let (shh, record_entry) = record.privatized().0.into_inner();
     let (action, signature) = shh.into_inner();
@@ -604,14 +604,14 @@ fn make_store_record(record: Record) -> DhtOp {
     ChainOp::StoreRecord(signature, action, record_entry)
 }
 
-/// Make a StoreEntry DhtOp from a Record.
+/// Make a StoreEntry ChainOp from a Record.
 /// Note that this can fail if the op is missing an Entry or
 /// the action is the wrong type.
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_entry(record: Record) -> Option<DhtOp> {
+fn make_store_entry(record: Record) -> Option<ChainOp> {
     // Extract the data
     let (shh, record_entry) = record.into_inner();
     let (action, signature) = shh.into_inner();
@@ -626,13 +626,13 @@ fn make_store_entry(record: Record) -> Option<DhtOp> {
     Some(op)
 }
 
-/// Make a RegisterAddLink DhtOp from a Record.
+/// Make a RegisterAddLink ChainOp from a Record.
 /// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_add_link(record: Record) -> Option<DhtOp> {
+fn make_register_add_link(record: Record) -> Option<ChainOp> {
     // Extract the data
     let (shh, _) = record.into_inner();
     let (action, signature) = shh.into_inner();
@@ -645,13 +645,13 @@ fn make_register_add_link(record: Record) -> Option<DhtOp> {
     Some(op)
 }
 
-/// Make a RegisterAgentActivity DhtOp from a Record.
+/// Make a RegisterAgentActivity ChainOp from a Record.
 /// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_agent_activity(record: Record) -> DhtOp {
+fn make_register_agent_activity(record: Record) -> ChainOp {
     // Extract the data
     let (shh, _) = record.into_inner();
     let (action, signature) = shh.into_inner();
