@@ -5,7 +5,7 @@
 //! [`DhtOp`]s to be validated, validates each op, updates its validation status
 //! in the database accordingly, and triggers op integration if necessary.
 //!
-//! # Sequential validation
+//! ### Sequential validation
 //!
 
 // This does not apply right now, because all actions are written to the database
@@ -22,7 +22,7 @@
 //! database. Otherwise the delete op could not be validated and its dependency,
 //! the create op, would be awaited first.
 //!
-//! # Op validation
+//! ### Op validation
 //!
 //! For each op the [corresponding app validation function](https://docs.rs/hdi/latest/hdi/#data-validation)
 //! is executed. Entry and link CRUD actions, which the ops are derived from, have been
@@ -35,7 +35,7 @@
 //! Having established the relevant integrity zomes for validating an op, each
 //! zome's validation callback is invoked.
 //!
-//! # Outcome
+//! ### Outcome
 //!
 //! An op can be valid or invalid, which is considered "validated", or it could not be
 //! validated because it is missing required dependencies such as actions,
@@ -45,7 +45,7 @@
 //! again after a delay, while missing dependencies are being fetched in the
 //! background.
 //!
-//! ## Errors
+//! #### Errors
 //!
 //! If the validate invocation of an integrity zome returns an error while
 //! validating an op, the op is considered not validated but also not missing
@@ -60,7 +60,7 @@
 //! at the next occasion, when other ops from gossip or publish come in and
 //! need to be validated.
 //!
-//! # Missing dependencies
+//! ### Missing dependencies
 //!
 //! Finding the zomes to invoke for validation oftentimes involves fetching a
 //! referenced original action, like in the case of updates and deletes. Further
@@ -73,7 +73,7 @@
 //! awaited within the op validation loop. Instead the whole workflow triggers
 //! itself again after a delay.
 //!
-//! # Workflow re-triggering
+//! ### Workflow re-triggering
 //!
 //! Awaiting missing ops re-triggers the validation workflow for a fixed period
 //! of time. After this period has elapsed without new missing ops having
@@ -84,7 +84,7 @@
 //! dependencies have all been fetched, these ops will be validated the next
 //! time the workflow runs.
 //!
-//! # Integration workflow
+//! ### Integration workflow
 //!
 
 // This seems to mainly affect ops with system dependencies, as ops without such
