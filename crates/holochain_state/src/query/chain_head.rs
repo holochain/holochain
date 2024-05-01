@@ -135,7 +135,7 @@ mod tests {
                 // A chain made entirely of InitZomesComplete actions is totally invalid,
                 // but we don't need a valid chain for this test,
                 // we just need an ordered sequence of actions
-                ActionHashed::from_content_sync(InitZomesComplete::from_builder(b).into()),
+                ActionHashed::from_content_sync(InitZomesComplete::from_builder(b)),
                 fixt!(Signature),
             )
         })

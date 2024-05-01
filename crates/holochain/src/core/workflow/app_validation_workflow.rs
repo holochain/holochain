@@ -160,7 +160,7 @@ async fn app_validation_workflow_inner(
         });
 
         // Validate this op
-        let validation_outcome = match dhtop_to_op(dht_op.clone(), cascade.clone()).await {
+        let validation_outcome = match chain_op_to_op(dht_op.clone(), cascade.clone()).await {
             Ok(op) => {
                 validate_op_outer(
                     dna_hash.clone(),
@@ -319,17 +319,17 @@ pub async fn record_to_op(
     if matches!(op_type, RegisterAgentActivity) {
         hidden_entry = entry.take().or(hidden_entry);
     }
-    let dht_op = ChainOp::from_type(op_type, action, entry)?;
-    let dht_op_hash = dht_op.clone().to_hash();
+    let chain_op = ChainOp::from_type(op_type, action, entry)?;
+    let chain_op_hash = chain_op.clone().to_hash();
     Ok((
-        dhtop_to_op(dht_op, cascade).await?,
-        dht_op_hash,
+        chain_op_to_op(chain_op, cascade).await?,
+        chain_op_hash,
         hidden_entry,
     ))
 }
 
-async fn dhtop_to_op(dht_op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
-    let op = match dht_op {
+async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
+    let op = match chain_op {
         ChainOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(

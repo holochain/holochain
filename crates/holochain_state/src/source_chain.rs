@@ -952,7 +952,7 @@ fn build_ops_from_actions(
             let op = DhtOpLite::from(op);
             // Action is required by value to produce the DhtOpHash.
             let (action, op_hash) = UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
-            let op_order = OpOrder::new(op_type.into(), action.timestamp());
+            let op_order = OpOrder::new(op_type, action.timestamp());
             let timestamp = action.timestamp();
             // Put the action back by value.
             let dependency = op_type.sys_validation_dependency(&action);
@@ -1110,7 +1110,7 @@ pub fn put_raw(
         let op_type = op.get_type();
         let (h, op_hash) =
             UniqueForm::op_hash(op_type, action.take().expect("This can't be empty"))?;
-        let op_order = OpOrder::new(op_type.into(), h.timestamp());
+        let op_order = OpOrder::new(op_type, h.timestamp());
         let timestamp = h.timestamp();
         action = Some(h);
         hashes.push((op_hash.clone(), op_order, timestamp));
@@ -1208,7 +1208,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
         action_seq,
         prev_action: prev_action.clone(),
     };
-    let action = action_builder.build(common).weightless().into();
+    let action = action_builder.build(common).weightless();
     let action = ActionHashed::from_content_sync(action);
     let action = SignedActionHashed::sign(keystore, action).await?;
     let record = Record::new(action, maybe_entry);

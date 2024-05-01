@@ -4,7 +4,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holochain_types::activity::ChainItems;
 use holochain_types::dht_op::ChainOp;
-use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::dht_op::ChainOpHashed;
 
 use holochain_zome_types::prelude::*;
 
@@ -12,11 +12,11 @@ use holochain_zome_types::prelude::*;
 #[derive(Debug)]
 pub struct ActivityTestData {
     /// AgentActivity ops to expect being able to get
-    pub hash_ops: Vec<DhtOpHashed>,
+    pub hash_ops: Vec<ChainOpHashed>,
     /// "Noise", to ensure that the query filter is doing its job
-    pub noise_ops: Vec<DhtOpHashed>,
+    pub noise_ops: Vec<ChainOpHashed>,
     /// StoreRecord ops to expect being able to get
-    pub store_ops: Vec<DhtOpHashed>,
+    pub store_ops: Vec<ChainOpHashed>,
     /// The author of the chain
     pub agent: AgentPubKey,
     /// The expected hash return values
@@ -39,13 +39,14 @@ impl ActivityTestData {
         let entry = Entry::App(fixt!(AppEntryBytes));
         let entry_hash = EntryHash::with_data_sync(&entry);
 
-        let to_op =
-            |h| DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(fixt!(Signature), h));
+        let to_op = |h| {
+            ChainOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(fixt!(Signature), h))
+        };
 
         let to_record_and_op = |h: Action| {
             let sig = fixt!(Signature);
             // let e = Entry::App(fixt!(AppEntryBytes));
-            let op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
+            let op = ChainOpHashed::from_content_sync(ChainOp::StoreRecord(
                 sig.clone(),
                 h.clone(),
                 entry.clone().into(),
@@ -56,7 +57,7 @@ impl ActivityTestData {
 
         let to_record_dna_op = |a: Action| {
             let sig = fixt!(Signature);
-            let op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
+            let op = ChainOpHashed::from_content_sync(ChainOp::StoreRecord(
                 sig.clone(),
                 a.clone(),
                 RecordEntry::NA,

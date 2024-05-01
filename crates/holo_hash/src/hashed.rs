@@ -76,6 +76,19 @@ where
     pub fn into_inner(self) -> (C, HoloHashOf<C>) {
         (self.content, self.hash)
     }
+
+    /// Convert to a different content type via From
+    #[cfg(feature = "test_utils")]
+    pub fn downcast<D>(&self) -> HoloHashed<D>
+    where
+        C: Clone,
+        D: HashableContent<HashType = C::HashType> + From<C>,
+    {
+        HoloHashed {
+            content: self.content.clone().into(),
+            hash: self.hash.clone(),
+        }
+    }
 }
 
 impl<C> Clone for HoloHashed<C>

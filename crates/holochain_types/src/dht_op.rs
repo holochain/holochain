@@ -371,7 +371,7 @@ impl DhtOp {
 
     fn to_order(&self) -> OpOrder {
         match self {
-            DhtOp::ChainOp(op) => OpOrder::new(op.get_type().into(), op.timestamp()),
+            DhtOp::ChainOp(op) => OpOrder::new(op.get_type(), op.timestamp()),
         }
     }
 
@@ -1271,8 +1271,11 @@ impl std::fmt::Display for OpOrder {
 
 impl OpOrder {
     /// Create a new ordering from a op type and timestamp.
-    pub fn new(op_type: DhtOpType, timestamp: holochain_zome_types::timestamp::Timestamp) -> Self {
-        let order = match op_type {
+    pub fn new(
+        op_type: impl Into<DhtOpType>,
+        timestamp: holochain_zome_types::timestamp::Timestamp,
+    ) -> Self {
+        let order = match op_type.into() {
             DhtOpType::Chain(ChainOpType::StoreRecord) => OpNumericalOrder::StoreRecord,
             DhtOpType::Chain(ChainOpType::StoreEntry) => OpNumericalOrder::StoreEntry,
             DhtOpType::Chain(ChainOpType::RegisterAgentActivity) => {

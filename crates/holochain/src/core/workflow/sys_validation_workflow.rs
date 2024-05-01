@@ -494,7 +494,10 @@ pub(crate) async fn validate_op(
     dna_def: &DnaDefHashed,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> WorkflowResult<Outcome> {
-    match validate_op_inner(op, dna_def, validation_dependencies).await {
+    let result = match op {
+        DhtOp::ChainOp(op) => validate_chain_op(op, dna_def, validation_dependencies).await,
+    };
+    match result {
         Ok(_) => Ok(Outcome::Accepted),
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
@@ -569,8 +572,8 @@ fn make_action_set_for_session_data(
         .collect())
 }
 
-async fn validate_op_inner(
-    op: &DhtOp,
+async fn validate_chain_op(
+    op: &ChainOp,
     dna_def: &DnaDefHashed,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> SysValidationResult<()> {

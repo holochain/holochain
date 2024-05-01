@@ -14,7 +14,7 @@ use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::store::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
-use holochain_types::dht_op::{ChainOpType, DhtOp, DhtOpHashed};
+use holochain_types::dht_op::{ChainOp, ChainOpType, DhtOp, DhtOpHashed};
 use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;

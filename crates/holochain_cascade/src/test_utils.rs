@@ -281,10 +281,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 /// Insert ops directly into the database and mark integrated as valid
 pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashed) {
     env.write_async(move |txn| -> DatabaseResult<()> {
-        let hash = op.as_hash();
-        insert_op(txn, &op).unwrap();
-        set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
-        set_when_integrated(txn, hash, Timestamp::now()).unwrap();
+        let hash = op.to_hash();
+        insert_op(txn, &op.downcast()).unwrap();
+        set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
+        set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
         Ok(())
     })
     .await
@@ -294,10 +294,10 @@ pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashe
 /// Insert ops directly into the database and mark integrated as rejected
 pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashed) {
     env.write_async(move |txn| -> DatabaseResult<()> {
-        let hash = op.as_hash();
-        insert_op(txn, &op).unwrap();
-        set_validation_status(txn, hash, ValidationStatus::Rejected).unwrap();
-        set_when_integrated(txn, hash, Timestamp::now()).unwrap();
+        let hash = op.to_hash();
+        insert_op(txn, &op.downcast()).unwrap();
+        set_validation_status(txn, &hash, ValidationStatus::Rejected).unwrap();
+        set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
         Ok(())
     })
     .await
@@ -307,9 +307,9 @@ pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: Cha
 /// Insert ops directly into the database and mark valid and pending integration
 pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashed) {
     env.write_async(move |txn| -> DatabaseResult<()> {
-        let hash = op.as_hash();
-        insert_op(txn, &op).unwrap();
-        set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
+        let hash = op.to_hash();
+        insert_op(txn, &op.downcast()).unwrap();
+        set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
         Ok(())
     })
     .await
@@ -319,7 +319,7 @@ pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: Chai
 /// Insert ops into the authored database
 pub async fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: ChainOpHashed) {
     env.write_async(move |txn| -> DatabaseResult<()> {
-        insert_op(txn, &op).unwrap();
+        insert_op(txn, &op.downcast()).unwrap();
         Ok(())
     })
     .await
@@ -403,7 +403,7 @@ pub fn commit_chain<Kind: DbKindT>(
                     txn,
                     &op_lite.into(),
                     &hash,
-                    &OpOrder::new(op_type.into(), timestamp),
+                    &OpOrder::new(op_type, timestamp),
                     &timestamp,
                 )
                 .unwrap();

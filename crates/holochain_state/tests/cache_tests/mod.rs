@@ -22,7 +22,7 @@ fn insert_action_and_op(txn: &mut Transaction, u: &mut Unstructured, action: &Ac
     mutations::insert_action(txn, &action).unwrap();
     mutations::insert_op_lite(
         txn,
-        &ChainOpLite::RegisterAgentActivity(hash, basis_hash.clone()),
+        &ChainOpLite::RegisterAgentActivity(hash, basis_hash.clone()).into(),
         &op_hash,
         &op_order,
         &timestamp,

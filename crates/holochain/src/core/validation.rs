@@ -2,6 +2,7 @@
 use std::convert::TryFrom;
 
 use holo_hash::DhtOpHash;
+use holochain_types::dht_op::ChainOp;
 use holochain_types::dht_op::DhtOp;
 
 use super::workflow::WorkflowResult;

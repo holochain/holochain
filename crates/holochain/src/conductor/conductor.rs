@@ -3232,7 +3232,7 @@ fn query_dht_ops_from_statement(
                 }
                 _ => None,
             };
-            Ok(ChainOp::from_type(op_type, action, entry)?)
+            Ok(ChainOp::from_type(op_type, action, entry)?.into())
         })?
         .collect::<StateQueryResult<Vec<_>>>()?;
     Ok(r)

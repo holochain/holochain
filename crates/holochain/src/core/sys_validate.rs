@@ -339,7 +339,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 }
 
 /// Check that the EntryVisibility is congruous with the presence or absence of entry data
-pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
+pub fn check_entry_visibility(op: &ChainOp) -> SysValidationResult<()> {
     use EntryVisibility::*;
     use RecordEntry::*;
 
