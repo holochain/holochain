@@ -1,13 +1,17 @@
 [package]
 name = "holochain_cli_bundle"
-version = "0.3.0-beta-dev.44"
+version = "0.4.0-dev.1"
 description = "DNA and hApp bundling functionality for the `hc` Holochain CLI utility"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_bundle"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo" ]
-categories = [ "command-line-utilities", "development-tools::build-utils", "filesystem" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo"]
+categories = [
+  "command-line-utilities",
+  "development-tools::build-utils",
+  "filesystem",
+]
 edition = "2021"
 
 [[bin]]
@@ -20,19 +24,21 @@ path = "src/bin/hc-dna.rs"
 
 # reminder - do not use workspace deps
 [dependencies]
-holochain_wasmer_host = "=0.0.92"
-wasmer = "=4.2.4"
+holochain_wasmer_host = "=0.0.93"
+wasmer = "=4.2.8"
 futures = "0.3"
 anyhow = "1.0"
-clap = { version = "4.0", features = [ "derive" ] }
-holochain_util = { path = "../holochain_util", features = ["backtrace"], version = "^0.3.0-beta-dev.8"}
-holochain_serialized_bytes = "=0.0.53"
-holochain_types = { version = "^0.3.0-beta-dev.43", path = "../holochain_types" }
-mr_bundle = {version = "^0.3.0-beta-dev.10", path = "../mr_bundle"}
+clap = { version = "4.0", features = ["derive"] }
+holochain_util = { version = "^0.4.0-dev.1", path = "../holochain_util", features = [
+  "backtrace",
+] }
+holochain_serialized_bytes = "=0.0.54"
+holochain_types = { version = "^0.4.0-dev.1", path = "../holochain_types" }
+mr_bundle = { version = "^0.4.0-dev.1", path = "../mr_bundle" }
 serde_yaml = "0.9"
 thiserror = "1.0.22"
 tracing = "0.1"
-tokio = { version = "1.27", features = [ "full" ] }
+tokio = { version = "1.27", features = ["full"] }
 
 [dev-dependencies]
 assert_cmd = "2.0"
@@ -47,9 +53,5 @@ walkdir = "2"
 workspace = true
 
 [features]
-sqlite-encrypted = [
-    "holochain_types/sqlite-encrypted",
-]
-sqlite = [
-    "holochain_types/sqlite",
-]
+sqlite-encrypted = ["holochain_types/sqlite-encrypted"]
+sqlite = ["holochain_types/sqlite"]

@@ -22,6 +22,17 @@ on:
         required: true
 
 jobs:
+  static:
+    runs-on: [ self-hosted, multi-arch ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Check TOML formatting
+        run: ./scripts/format-toml.sh --check
+
   test:
     strategy:
       fail-fast: ${{ inputs.fail_fast }}
@@ -34,9 +45,6 @@ jobs:
             extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
 
           # ensure that any Nix changes on this branch don't cause problems for maintenance versions
-          - pkgs:
-              - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/0_1"
           - pkgs:
               - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/0_2"

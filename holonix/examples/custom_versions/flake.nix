@@ -5,12 +5,12 @@
   #
   # nix develop \
   #   github:holochain/holochain#holonix \
-  #   --override-input versions 'github:holochain/holochain/?dir=versions/0_1' \
-  #   --override-input versions/holochain 'github:holochain/holochain/holochain-0.1.5-beta-rc.0'
+  #   --override-input versions 'github:holochain/holochain/?dir=versions/0_2' \
+  #   --override-input versions/holochain 'github:holochain/holochain/holochain-0.2.6'
 
   inputs = {
-    versions.url = "github:holochain/holochain?dir=versions/0_1";
-    versions.inputs.holochain.url = "github:holochain/holochain/holochain-0.1.5-beta-rc.0";
+    versions.url = "github:holochain/holochain?dir=versions/0_2";
+    versions.inputs.holochain.url = "github:holochain/holochain/holochain-0.2.6";
 
     holochain-flake.url = "github:holochain/holochain";
     holochain-flake.inputs.versions.follows = "versions";

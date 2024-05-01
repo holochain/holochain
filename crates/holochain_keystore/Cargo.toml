@@ -1,35 +1,37 @@
 [package]
 name = "holochain_keystore"
-version = "0.3.0-beta-dev.37"
+version = "0.4.0-dev.1"
 description = "keystore for libsodium keypairs"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_keystore"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo", "nacl", "libsodium", "cryptography" ]
-categories = [ "cryptography" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "nacl", "libsodium", "cryptography"]
+categories = ["cryptography"]
 edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
 base64 = "0.22"
 futures = "0.3"
-holo_hash = { version = "^0.3.0-beta-dev.28", path = "../holo_hash", features = ["full"] }
-holochain_serialized_bytes = "=0.0.53"
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.36"}
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.28", path = "../kitsune_p2p/types" }
-holochain_secure_primitive = { version = "^0.3.0-beta-dev.23", path = "../holochain_secure_primitive"}
-holochain_util = { version = "^0.3.0-beta-dev.8", path = "../holochain_util" }
+holo_hash = { version = "^0.4.0-dev.1", path = "../holo_hash", features = [
+  "full",
+] }
+holochain_serialized_bytes = "=0.0.54"
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.4.0-dev.1" }
+kitsune_p2p_types = { version = "^0.4.0-dev.1", path = "../kitsune_p2p/types" }
+holochain_secure_primitive = { version = "^0.4.0-dev.1", path = "../holochain_secure_primitive" }
+holochain_util = { version = "^0.4.0-dev.1", path = "../holochain_util" }
 lair_keystore = { version = "0.4.4", default-features = false }
 must_future = "0.1.2"
 nanoid = "0.4.0"
 one_err = "0.0.8"
 parking_lot = "0.12"
-serde = { version = "1.0", features = [ "derive" ] }
+serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
 sodoken = "=0.0.11"
 thiserror = "1.0.22"
-tokio = { version = "1.27", features = [ "full" ] }
+tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
 shrinkwraprs = "0.3"
 derive_more = "0.99"
@@ -43,16 +45,13 @@ tempdir = "0.3.7"
 workspace = true
 
 [features]
-default = [ "sqlite" ]
+default = ["sqlite"]
 
 test_utils = []
 
 sqlite-encrypted = [
-    "holo_hash/sqlite-encrypted",
-    "lair_keystore/rusqlite-bundled-sqlcipher-vendored-openssl",
+  "holo_hash/sqlite-encrypted",
+  "lair_keystore/rusqlite-bundled-sqlcipher-vendored-openssl",
 ]
 
-sqlite = [
-    "holo_hash/sqlite",
-    "lair_keystore/rusqlite-bundled",
-]
+sqlite = ["holo_hash/sqlite", "lair_keystore/rusqlite-bundled"]
