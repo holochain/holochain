@@ -8,30 +8,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Validation: Remove unused type `DhtOpOrder`. This type is superseded by `OpOrder`.
+
+## 0.4.0-dev.1
+
 - **BREAKING** - Serialization: Update of serialization packages `holochain-serialization` and `holochain-wasmer-*` leads to general message format change for enums. Previously an enum value like
-```rust
+
+<!-- end list -->
+
+``` rust
 enum Enum {
   Variant1,
   Variant2,
 }
 let value = Enum::Variant1;
 ```
+
 was serialized as (JSON representation)
-```json
+
+``` json
 {
   "value": {
     "variant1": null
   }
 }
 ```
+
 Now it serializes to
-```json
+
+``` json
 {
   "value": "variant1"
 }
 ```
-- Adds a new admin interface call `RevokeAppAuthenticationToken` to revoke issued app authentication tokens. #3765
+
+- Adds a new admin interface call `RevokeAppAuthenticationToken` to revoke issued app authentication tokens. \#3765
 - App validation workflow: Validate ops in sequence instead of in parallel. Ops validated one after the other have a higher chance of being validated if they depend on earlier ops. When validated in parallel, they potentially needed to await a next workflow run when the dependent op would have been validated.
+
+## 0.4.0-dev.0
+
+## 0.3.0
 
 ## 0.3.0-beta-dev.48
 
