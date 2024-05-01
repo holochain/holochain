@@ -173,7 +173,9 @@ macro_rules! holochain_externs {
             create_clone_cell:1,
             disable_clone_cell:1,
             enable_clone_cell:1,
-            delete_clone_cell:1
+            delete_clone_cell:1,
+            close_chain:1,
+            open_chain:1
         );
     };
 }

@@ -176,12 +176,14 @@ impl<H: Eq + Ord + std::hash::Hash> Default for ChainFilters<H> {
 }
 
 /// Input to close a chain.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct CloseChainInput {
     /// The hash of the DNA that will be migrated to.
     pub new_dna_hash: DnaHash,
 }
 
 /// Input to open a chain.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct OpenChainInput {
     /// The hash of the DNA that was migrated from.
     pub prev_dna_hash: DnaHash,

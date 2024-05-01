@@ -10,7 +10,12 @@ fn create(_: ()) -> ExternResult<ActionHash> {
 }
 
 #[hdk_extern]
-fn init() -> ExternResult<ActionHash> {
-    // open_chain(dna_hash)
-    todo!("Need to get previous DNA hash from somewhere!")
+fn init() -> ExternResult<()> {
+    // TODO Need to get previous DNA hash from somewhere
+    Ok(())
+}
+
+#[hdk_extern]
+fn open_chain_from_prev(prev_dna_hash: DnaHash) -> ExternResult<ActionHash> {
+    open_chain(prev_dna_hash)
 }

@@ -55,3 +55,54 @@ pub fn close_chain(
             .into()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use fixt::{fixt, Unpredictable};
+    use holochain_util::tokio_helper;
+    use holochain_wasm_test_utils::{TestWasm, TestWasmPair};
+    use holochain_zome_types::prelude::{CoordinatorZome, IntegrityZome};
+    use crate::core::CloseChainInput;
+    use crate::fixt::{CallContextFixturator, RealRibosomeFixturator};
+    use super::close_chain;
+    use holo_hash::fixt::DnaHashFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use fixt::Predictable;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn call_close_chain() {
+        // Note that any zome will do here, we're not calling its functions!
+        let ribosome =
+            RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::MigrateInitial]))
+                .next()
+                .unwrap();
+        let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
+        call_context.zome = TestWasmPair::<IntegrityZome, CoordinatorZome>::from(TestWasm::MigrateInitial)
+            .coordinator
+            .erase_type();
+        let host_access = fixt!(ZomeCallHostAccess, Predictable);
+        let host_access_2 = host_access.clone();
+        call_context.host_context = host_access.into();
+        let input = CloseChainInput {
+            new_dna_hash: fixt!(DnaHash),
+        };
+
+        let output = close_chain(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
+
+        // the chain head should be the committed chain close action
+        let chain_head = tokio_helper::block_forever_on(async move {
+            host_access_2
+                .workspace
+                .source_chain()
+                .as_ref()
+                .unwrap()
+                .chain_head()
+                .unwrap()
+                .unwrap()
+                .action
+        });
+
+        assert_eq!(chain_head, output);
+    }
+}
