@@ -290,7 +290,10 @@ async fn cache_set_integrated() {
         dbg!(activity);
     })
     .await;
-    cache.set_activity_to_integrated(&author, 0).await.unwrap();
+    cache
+        .set_activity_to_integrated(&author, Some(0))
+        .await
+        .unwrap();
 
     check_state(&cache, |activity| {
         dbg!(activity);
@@ -321,7 +324,10 @@ async fn cache_set_integrated() {
     assert_eq!(*to_integrate[0].0, author);
     assert_eq!(to_integrate[0].1, 1..=2);
 
-    cache.set_activity_to_integrated(&author, 1).await.unwrap();
+    cache
+        .set_activity_to_integrated(&author, Some(1))
+        .await
+        .unwrap();
 
     check_state(&cache, |activity| {
         let b = activity.get(&author).unwrap();
@@ -335,7 +341,10 @@ async fn cache_set_integrated() {
     assert_eq!(*to_integrate[0].0, author);
     assert_eq!(to_integrate[0].1, 2..=2);
 
-    cache.set_activity_to_integrated(&author, 2).await.unwrap();
+    cache
+        .set_activity_to_integrated(&author, Some(2))
+        .await
+        .unwrap();
 
     check_state(&cache, |activity| {
         let b = activity.get(&author).unwrap();

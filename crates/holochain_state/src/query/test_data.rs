@@ -75,14 +75,14 @@ impl LinkTestData {
         later_create_link.target_address = target_hash.clone().into();
 
         let create_link_sig = fixt!(Signature);
-        let create_link_op = DhtOp::RegisterAddLink(create_link_sig.clone(), create_link.clone());
+        let create_link_op = ChainOp::RegisterAddLink(create_link_sig.clone(), create_link.clone());
         let create_link_action = SignedActionHashed::with_presigned(
             ActionHashed::from_content_sync(Action::CreateLink(create_link.clone())),
             create_link_sig,
         );
         let later_create_link_sig = fixt!(Signature);
         let later_create_link_op =
-            DhtOp::RegisterAddLink(later_create_link_sig.clone(), later_create_link.clone());
+            ChainOp::RegisterAddLink(later_create_link_sig.clone(), later_create_link.clone());
 
         let later_create_link_action = SignedActionHashed::with_presigned(
             ActionHashed::from_content_sync(Action::CreateLink(later_create_link.clone())),
@@ -96,15 +96,15 @@ impl LinkTestData {
         delete_link.link_add_address = create_link_hash.clone();
         delete_link.base_address = base_hash.clone().into();
 
-        let delete_link_op = DhtOp::RegisterRemoveLink(fixt!(Signature), delete_link.clone());
+        let delete_link_op = ChainOp::RegisterRemoveLink(fixt!(Signature), delete_link.clone());
 
-        let base_op = DhtOp::StoreEntry(
+        let base_op = ChainOp::StoreEntry(
             fixt!(Signature),
             NewEntryAction::Create(create_base.clone()),
             base.clone(),
         );
 
-        let target_op = DhtOp::StoreEntry(
+        let target_op = ChainOp::StoreEntry(
             fixt!(Signature),
             NewEntryAction::Create(create_target.clone()),
             target.clone(),
@@ -188,7 +188,7 @@ impl EntryTestData {
         delete.deletes_address = create_hash.clone();
 
         let signature = fixt!(Signature);
-        let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
+        let store_entry_op = DhtOpHashed::from_content_sync(ChainOp::StoreEntry(
             signature.clone(),
             NewEntryAction::Create(create.clone()),
             entry.clone(),
@@ -201,11 +201,11 @@ impl EntryTestData {
 
         let signature = fixt!(Signature);
         let delete_entry_action_op = DhtOpHashed::from_content_sync(
-            DhtOp::RegisterDeletedEntryAction(signature.clone(), delete.clone()),
+            ChainOp::RegisterDeletedEntryAction(signature.clone(), delete.clone()),
         );
 
         let signature = fixt!(Signature);
-        let update_store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
+        let update_store_entry_op = DhtOpHashed::from_content_sync(ChainOp::StoreEntry(
             signature.clone(),
             NewEntryAction::Update(update.clone()),
             entry.clone(),
@@ -247,7 +247,7 @@ impl RecordTestData {
         delete.deletes_address = create_hash.clone();
 
         let signature = fixt!(Signature);
-        let store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+        let store_record_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
             signature.clone(),
             Action::Create(create.clone()),
             entry.clone().into(),
@@ -259,13 +259,13 @@ impl RecordTestData {
         );
 
         let signature = fixt!(Signature);
-        let delete_by_op = DhtOpHashed::from_content_sync(DhtOp::RegisterDeletedBy(
+        let delete_by_op = DhtOpHashed::from_content_sync(ChainOp::RegisterDeletedBy(
             signature.clone(),
             delete.clone(),
         ));
 
         let signature = fixt!(Signature);
-        let update_store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+        let update_store_record_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
             signature.clone(),
             Action::Update(update.clone()),
             entry.clone().into(),

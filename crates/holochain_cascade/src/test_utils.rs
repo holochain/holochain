@@ -279,7 +279,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 }
 
 /// Insert ops directly into the database and mark integrated as valid
-pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
+pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashed) {
     env.write_async(move |txn| -> DatabaseResult<()> {
         let hash = op.as_hash();
         insert_op(txn, &op).unwrap();
@@ -292,7 +292,7 @@ pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed)
 }
 
 /// Insert ops directly into the database and mark integrated as rejected
-pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
+pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashed) {
     env.write_async(move |txn| -> DatabaseResult<()> {
         let hash = op.as_hash();
         insert_op(txn, &op).unwrap();
@@ -305,7 +305,7 @@ pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: Dht
 }
 
 /// Insert ops directly into the database and mark valid and pending integration
-pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
+pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashed) {
     env.write_async(move |txn| -> DatabaseResult<()> {
         let hash = op.as_hash();
         insert_op(txn, &op).unwrap();
@@ -317,7 +317,7 @@ pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtO
 }
 
 /// Insert ops into the authored database
-pub async fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
+pub async fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: ChainOpHashed) {
     env.write_async(move |txn| -> DatabaseResult<()> {
         insert_op(txn, &op).unwrap();
         Ok(())
@@ -384,7 +384,7 @@ pub fn commit_chain<Kind: DbKindT>(
     db.test_write(move |txn| {
         for data in &data {
             for op in data {
-                let op_light = DhtOpLite::RegisterAgentActivity(
+                let op_lite = ChainOpLite::RegisterAgentActivity(
                     op.action.action_address().clone(),
                     op.action
                         .hashed
@@ -395,15 +395,15 @@ pub fn commit_chain<Kind: DbKindT>(
                 );
 
                 let timestamp = Timestamp::now();
+                let op_type = op_lite.get_type();
                 let (_, hash) =
-                    UniqueForm::op_hash(op_light.get_type(), op.action.hashed.content.clone())
-                        .unwrap();
+                    UniqueForm::op_hash(op_type, op.action.hashed.content.clone()).unwrap();
                 insert_action(txn, &op.action).unwrap();
                 insert_op_lite(
                     txn,
-                    &op_light,
+                    &op_lite.into(),
                     &hash,
-                    &OpOrder::new(op_light.get_type(), timestamp),
+                    &OpOrder::new(op_type.into(), timestamp),
                     &timestamp,
                 )
                 .unwrap();

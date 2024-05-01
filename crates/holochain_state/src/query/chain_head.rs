@@ -148,7 +148,11 @@ mod tests {
 
         for action in &actions[..6] {
             let hash = action.action_address();
-            let op = DhtOpLite::StoreRecord(hash.clone(), None, hash.clone().into());
+            let op = DhtOpLite::from(ChainOpLite::StoreRecord(
+                hash.clone(),
+                None,
+                hash.clone().into(),
+            ));
             let op_order = OpOrder::new(op.get_type(), action.action().timestamp());
             insert_action(&mut txn, action).unwrap();
             insert_op_lite(

@@ -189,7 +189,7 @@ async fn insert_op_equivalence() {
     create_action.entry_hash = create_entry_hash.clone();
 
     let sig = fixt!(Signature);
-    let op = DhtOp::StoreEntry(
+    let op = ChainOp::StoreEntry(
         sig.clone(),
         NewEntryAction::Create(create_action.clone()),
         create_entry.clone(),

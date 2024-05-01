@@ -10,20 +10,20 @@ use ::fixt::prelude::*;
 #[derive(Debug)]
 #[allow(missing_docs)]
 pub struct EntryTestData {
-    pub store_entry_op: DhtOpHashed,
+    pub store_entry_op: ChainOpHashed,
     pub wire_create: Judged<WireNewEntryAction>,
     pub create_hash: ActionHash,
-    pub delete_entry_action_op: DhtOpHashed,
+    pub delete_entry_action_op: ChainOpHashed,
     pub wire_delete: Judged<WireDelete>,
     pub delete_hash: ActionHash,
-    pub update_content_op: DhtOpHashed,
+    pub update_content_op: ChainOpHashed,
     pub wire_update: Judged<WireUpdateRelationship>,
     pub update_hash: ActionHash,
     pub hash: EntryHash,
     pub entry: EntryData,
     // Links
-    pub create_link_op: DhtOpHashed,
-    pub delete_link_op: DhtOpHashed,
+    pub create_link_op: ChainOpHashed,
+    pub delete_link_op: ChainOpHashed,
     pub wire_create_link: WireCreateLink,
     pub wire_create_link_base: WireCreateLink,
     pub wire_delete_link: WireDeleteLink,
@@ -87,7 +87,7 @@ impl EntryTestData {
         let delete_link_action = Action::DeleteLink(delete_link.clone());
 
         let signature = fixt!(Signature);
-        let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
+        let store_entry_op = ChainOpHashed::from_content_sync(ChainOp::StoreEntry(
             signature.clone(),
             NewEntryAction::Create(create.clone()),
             entry.clone(),
@@ -96,14 +96,14 @@ impl EntryTestData {
         let wire_create = Judged::valid(SignedAction(create_action, signature).try_into().unwrap());
 
         let signature = fixt!(Signature);
-        let delete_entry_action_op = DhtOpHashed::from_content_sync(
-            DhtOp::RegisterDeletedEntryAction(signature.clone(), delete),
+        let delete_entry_action_op = ChainOpHashed::from_content_sync(
+            ChainOp::RegisterDeletedEntryAction(signature.clone(), delete),
         );
 
         let wire_delete = Judged::valid(SignedAction(delete_action, signature).try_into().unwrap());
 
         let signature = fixt!(Signature);
-        let update_content_op = DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedContent(
+        let update_content_op = ChainOpHashed::from_content_sync(ChainOp::RegisterUpdatedContent(
             signature.clone(),
             update,
             update_entry.into(),
@@ -111,7 +111,7 @@ impl EntryTestData {
         let wire_update = Judged::valid(SignedAction(update_action, signature).try_into().unwrap());
 
         let signature = fixt!(Signature);
-        let create_link_op = DhtOpHashed::from_content_sync(DhtOp::RegisterAddLink(
+        let create_link_op = ChainOpHashed::from_content_sync(ChainOp::RegisterAddLink(
             signature.clone(),
             create_link.clone(),
         ));
@@ -132,7 +132,7 @@ impl EntryTestData {
         );
 
         let signature = fixt!(Signature);
-        let delete_link_op = DhtOpHashed::from_content_sync(DhtOp::RegisterRemoveLink(
+        let delete_link_op = ChainOpHashed::from_content_sync(ChainOp::RegisterRemoveLink(
             signature.clone(),
             delete_link.clone(),
         ));

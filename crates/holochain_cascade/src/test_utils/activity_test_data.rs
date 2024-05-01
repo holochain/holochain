@@ -3,7 +3,7 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holochain_types::activity::ChainItems;
-use holochain_types::dht_op::DhtOp;
+use holochain_types::dht_op::ChainOp;
 use holochain_types::dht_op::DhtOpHashed;
 
 use holochain_zome_types::prelude::*;
@@ -40,12 +40,12 @@ impl ActivityTestData {
         let entry_hash = EntryHash::with_data_sync(&entry);
 
         let to_op =
-            |h| DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(fixt!(Signature), h));
+            |h| DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(fixt!(Signature), h));
 
         let to_record_and_op = |h: Action| {
             let sig = fixt!(Signature);
             // let e = Entry::App(fixt!(AppEntryBytes));
-            let op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+            let op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
                 sig.clone(),
                 h.clone(),
                 entry.clone().into(),
@@ -56,7 +56,7 @@ impl ActivityTestData {
 
         let to_record_dna_op = |a: Action| {
             let sig = fixt!(Signature);
-            let op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+            let op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
                 sig.clone(),
                 a.clone(),
                 RecordEntry::NA,
