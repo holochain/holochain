@@ -13,7 +13,9 @@ edition = "2021"
 derive_more = "0.99"
 kitsune_p2p_types = { version = "^0.4.0-dev.0", path = "../kitsune_p2p/types" }
 kitsune_p2p_bin_data = { version = "^0.4.0-dev.0", path = "../kitsune_p2p/bin_data" }
-holo_hash = { version = "^0.4.0-dev.0", path = "../holo_hash", features = ["full"] }
+holo_hash = { version = "^0.4.0-dev.0", path = "../holo_hash", features = [
+  "full",
+] }
 holochain_state_types = { version = "^0.4.0-dev.0", path = "../holochain_state_types" }
 holochain_serialized_bytes = "=0.0.54"
 holochain_types = { version = "^0.4.0-dev.0", path = "../holochain_types" }

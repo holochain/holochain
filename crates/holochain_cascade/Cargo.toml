@@ -12,7 +12,9 @@ edition = "2021"
 [dependencies]
 fixt = { version = "^0.4.0-dev.0", path = "../fixt" }
 futures = "0.3"
-holo_hash = { version = "^0.4.0-dev.0", path = "../holo_hash", features = ["full"] }
+holo_hash = { version = "^0.4.0-dev.0", path = "../holo_hash", features = [
+  "full",
+] }
 holochain_sqlite = { version = "^0.4.0-dev.0", path = "../holochain_sqlite" }
 holochain_p2p = { version = "^0.4.0-dev.0", path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.54"
