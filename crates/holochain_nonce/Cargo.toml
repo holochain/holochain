@@ -12,7 +12,7 @@ documentation = "https://docs.rs/holochain_nonces"
 [dependencies]
 getrandom = { version = "0.2.7", default-features = false, features = ["std"] }
 kitsune_p2p_timestamp = { version = "^0.4.0-dev.0", path = "../kitsune_p2p/timestamp" }
-holochain_secure_primitive = { version = "^0.3.0-dev.0", path = "../holochain_secure_primitive", default-features = false }
+holochain_secure_primitive = { version = "^0.4.0-dev.0", path = "../holochain_secure_primitive", default-features = false }
 
 [lints]
 workspace = true

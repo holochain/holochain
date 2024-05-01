@@ -1,5 +1,6 @@
 [package]
 name = "hc_service_check"
+description = "A tool for checking the health of tx5 network services"
 version = "0.1.0-beta-rc.0"
 edition = "2021"
 license = "Apache-2.0"

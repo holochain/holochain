@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [holochain\_cli-0.4.0-dev.0](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.0)
 
-## [holochain-0.3.0](crates/holochain/CHANGELOG.md#0.3.0)
+## [holochain-0.4.0-dev.0](crates/holochain/CHANGELOG.md#0.4.0-dev.0)
 
 - **BREAKING** - Serialization: Update of serialization packages `holochain-serialization` and `holochain-wasmer-*` leads to general message format change for enums. Previously an enum value like
 

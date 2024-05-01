@@ -35,7 +35,7 @@ kitsune_p2p_fetch = { path = ".", features = [
 ] }
 
 holochain_serialized_bytes = "=0.0.54"
-holochain_trace = { version = "^0.3.0-dev.0", path = "../../holochain_trace" }
+holochain_trace = { version = "^0.4.0-dev.0", path = "../../holochain_trace" }
 pretty_assertions = "1.4.0"
 test-case = "3.3"
 tokio = { version = "1.27", features = ["full", "test-util"] }

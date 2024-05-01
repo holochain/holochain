@@ -10,7 +10,7 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-aitia = { version = "^0.2.0-dev.0", path = "../aitia" }
+aitia = { version = "^0.3.0-dev.0", path = "../aitia" }
 chrono = { version = "0.4.22", default-features = false, features = [
   "clock",
   "std",
@@ -18,9 +18,11 @@ chrono = { version = "0.4.22", default-features = false, features = [
   "serde",
 ] }
 holochain_sqlite = { version = "^0.4.0-dev.0", path = "../holochain_sqlite" }
-holo_hash = { version = "^0.4.0-dev.0", path = "../holo_hash", features = ["full"] }
+holo_hash = { version = "^0.4.0-dev.0", path = "../holo_hash", features = [
+  "full",
+] }
 fallible-iterator = "0.2.0"
-hc_sleuth = { version = "^0.3.0-dev.0", path = "../hc_sleuth" }
+hc_sleuth = { version = "^0.4.0-dev.0", path = "../hc_sleuth" }
 holochain_keystore = { version = "^0.4.0-dev.0", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.54"
 holochain_p2p = { version = "^0.4.0-dev.0", path = "../holochain_p2p" }
@@ -57,7 +59,7 @@ arbitrary = "1.0"
 fixt = { path = "../fixt" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm" }
 matches = "0.1.8"
-holochain_trace = { version = "^0.3.0-dev.0", path = "../holochain_trace" }
+holochain_trace = { version = "^0.4.0-dev.0", path = "../holochain_trace" }
 pretty_assertions = "1.4"
 
 tempfile = "3.3"

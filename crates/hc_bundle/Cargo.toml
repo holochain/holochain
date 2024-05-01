@@ -29,9 +29,9 @@ wasmer = "=4.2.8"
 futures = "0.3"
 anyhow = "1.0"
 clap = { version = "4.0", features = ["derive"] }
-holochain_util = { path = "../holochain_util", features = [
+holochain_util = { version = "^0.4.0-dev.0", path = "../holochain_util", features = [
   "backtrace",
-], version = "^0.3.0-dev.0"}
+] }
 holochain_serialized_bytes = "=0.0.54"
 holochain_types = { version = "^0.4.0-dev.0", path = "../holochain_types" }
 mr_bundle = { version = "^0.4.0-dev.0", path = "../mr_bundle" }

@@ -21,7 +21,7 @@ tracing = "0.1"
 async-trait = "0.1"
 
 [dev-dependencies]
-holochain_trace = { version = "^0.3.0-dev.0", path = "../holochain_trace" }
+holochain_trace = { version = "^0.4.0-dev.0", path = "../holochain_trace" }
 criterion = "0.5"
 
 [lints]

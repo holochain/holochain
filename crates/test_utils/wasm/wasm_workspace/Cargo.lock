@@ -1027,7 +1027,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_secure_primitive"
-version = "0.3.0-dev.0"
+version = "0.4.0-dev.0"
 dependencies = [
  "paste",
  "serde",
@@ -1069,7 +1069,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.3.0-dev.0"
+version = "0.4.0-dev.0"
 dependencies = [
  "cfg-if",
  "colored",

@@ -1,6 +1,6 @@
 [package]
 name = "hc_sleuth"
-version = "0.3.0-dev.0"
+version = "0.4.0-dev.0"
 description = "Tool for diagnosing problems with Holochain"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -12,11 +12,11 @@ edition = "2021"
 # reminder - do not use workspace deps
 [dependencies]
 anyhow = "1.0"
-aitia = { version = "^0.2.0-dev.0", path = "../aitia" }
+aitia = { version = "^0.3.0-dev.0", path = "../aitia" }
 derive_more = "0.99"
 holochain_state_types = { version = "^0.4.0-dev.0", path = "../holochain_state_types" }
 holochain_types = { version = "^0.4.0-dev.0", path = "../holochain_types" }
-holochain_trace = { version = "^0.3.0-dev.0", path = "../holochain_trace" }
+holochain_trace = { version = "^0.4.0-dev.0", path = "../holochain_trace" }
 kitsune_p2p = { version = "^0.4.0-dev.0", path = "../kitsune_p2p/kitsune_p2p" }
 once_cell = "1.18"
 parking_lot = "0.12"
