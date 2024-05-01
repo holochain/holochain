@@ -58,6 +58,7 @@ pub use crate::time::sleep;
 pub use crate::time::sys_time;
 
 pub use crate::clone::*;
+pub use crate::migrate::*;
 pub use crate::x_salsa20_poly1305::create_x25519_keypair;
 pub use crate::x_salsa20_poly1305::ed_25519_x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::ed_25519_x_salsa20_poly1305_encrypt;
@@ -108,7 +109,6 @@ pub use std::collections::HashSet;
 pub use std::convert::TryFrom;
 pub use tracing;
 pub use tracing::{debug, error, info, instrument, trace, warn};
-pub use crate::migrate::*;
 
 #[cfg(feature = "mock")]
 pub use mockall;

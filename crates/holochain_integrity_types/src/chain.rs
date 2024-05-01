@@ -3,8 +3,8 @@
 
 use std::collections::HashSet;
 
-use holo_hash::{ActionHash, DnaHash};
 use holo_hash::AgentPubKey;
+use holo_hash::{ActionHash, DnaHash};
 use holochain_serialized_bytes::prelude::*;
 
 #[cfg(test)]

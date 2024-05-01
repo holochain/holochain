@@ -542,8 +542,8 @@ pub struct DeleteLink {
 /// old chain to declare the migration path taken.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(
-feature = "fuzzing",
-derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub struct CloseChain {
     pub author: AgentPubKey,

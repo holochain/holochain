@@ -101,7 +101,9 @@ use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
 
+use crate::core::ribosome::host_fn::close_chain::close_chain;
 use crate::core::ribosome::host_fn::count_links::count_links;
+use crate::core::ribosome::host_fn::open_chain::open_chain;
 use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
@@ -115,8 +117,6 @@ use std::sync::Arc;
 use wasmer_middlewares::metering::get_remaining_points;
 use wasmer_middlewares::metering::set_remaining_points;
 use wasmer_middlewares::metering::MeteringPoints;
-use crate::core::ribosome::host_fn::close_chain::close_chain;
-use crate::core::ribosome::host_fn::open_chain::open_chain;
 
 pub type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
 
