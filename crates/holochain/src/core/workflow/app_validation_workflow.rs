@@ -45,6 +45,21 @@
 //! again after a delay, while missing dependencies are being fetched in the
 //! background.
 //!
+//! ## Errors
+//!
+//! If the validate invocation of an integrity zome returns an error while
+//! validating an op, the op is considered not validated but also not missing
+//! dependencies. In effect the workflow will not re-trigger itself.
+//!
+//! Such errors do not depend on op validity or presence of ops, but indicate
+//! a more fundamental problem with either the conductor state, like a missing
+//! zome or ribosome or DNA, or network access. For none of these errors is the
+//! conductor able to recover itself.
+//!
+//! Ops that have not been validated due to validation errors will be retried
+//! at the next occasion, when other ops from gossip or publish come in and
+//! need to be validated.
+//!
 //! # Missing dependencies
 //!
 //! Finding the zomes to invoke for validation oftentimes involves fetching a
@@ -60,14 +75,14 @@
 //!
 //! # Workflow re-triggering
 //!
+//! Awaiting missing ops re-triggers the validation workflow for a fixed period
+//! of time. After this period has elapsed without new missing ops having
+//! arrived, workflow re-triggering ends.
+//!
 //! Ops that are known to have missing dependencies are omitted from a workflow
 //! run, because they cannot be validated without them. Once their missing
 //! dependencies have all been fetched, these ops will be validated the next
 //! time the workflow runs.
-//!
-//! Awaiting missing ops re-triggers the validation workflow for a fixed period
-//! of time. After this period has elapsed without new missing ops having
-//! arrived, workflow re-triggering ends.
 //!
 //! # Integration workflow
 //!
