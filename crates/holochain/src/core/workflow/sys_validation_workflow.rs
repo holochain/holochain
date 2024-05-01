@@ -10,32 +10,32 @@
 //!
 //! The workflow operates on [`DhtOp`]s which are roughly equivalent to [`Record`]s but catered to the needs of a specific type of Authority.
 //! Checks that you can rely on sys validation having performed are:
-//! - For a [`DhtOp::StoreRecord`]
+//! - For a [`ChainOp::StoreRecord`]
 //!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op can progress.
 //!    - The [`Action`] must be either a [`Action::Create`] or an [`Action::Update`].
 //!    - Run the [store entry checks](#store-entry-checks).
-//! - For a [`DhtOp::StoreEntry`]
+//! - For a [`ChainOp::StoreEntry`]
 //!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op is accepted.
 //!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //!    - Run the [store entry checks](#store-entry-checks).
-//! - For a [`DhtOp::RegisterAgentActivity`]
+//! - For a [`ChainOp::RegisterAgentActivity`]
 //!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //!    - If the [`Action`] is a [`Action::Dna`], then verify the contained DNA hash matches the DNA hash that sys validation is being run for.
 //!    - Run the [store record checks](#store-record-checks).
-//! - For a [`DhtOp::RegisterUpdatedContent`]
+//! - For a [`ChainOp::RegisterUpdatedContent`]
 //!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
 //!    - If there is an [`Entry`], then the [store entry checks](#store-entry-checks) are run.
-//! - For a [`DhtOp::RegisterUpdatedRecord`]
+//! - For a [`ChainOp::RegisterUpdatedRecord`]
 //!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
 //!    - If there is an [`Entry`], then the [store entry checks](#store-entry-checks) are run.
-//! - For a [`DhtOp::RegisterDeletedBy`]
+//! - For a [`ChainOp::RegisterDeletedBy`]
 //!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`Action::Create`] or [`Action::Update`].
-//! - For a [`DhtOp::RegisterDeletedEntryAction`]
+//! - For a [`ChainOp::RegisterDeletedEntryAction`]
 //!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`Action::Create`] or [`Action::Update`].
-//! - For a [`DhtOp::RegisterAddLink`]
+//! - For a [`ChainOp::RegisterAddLink`]
 //!   - The size of the [`CreateLink::tag`] must be less than or equal to the maximum size that is accepted for this link tag. This is specified in the constant [`MAX_TAG_SIZE`].
-//! - For a [`DhtOp::RegisterRemoveLink`]
+//! - For a [`ChainOp::RegisterRemoveLink`]
 //!   - The [`DeleteLink::link_add_address`] reference to the [`Action`] of the link being deleted must point to an [`Action`] that can be found locally. That action being deleted must also
 //!     be a [`Action::CreateLink`].
 //!
@@ -400,7 +400,7 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
         .filter_map(|op| {
             // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
             match &op.content {
-                DhtOp::StoreRecord(_, action, entry) => {
+                ChainOp::StoreRecord(_, action, entry) => {
                     let mut actions = match entry {
                         RecordEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
                             // Discard errors here because we'll check later whether the input is valid. If it's not then it
@@ -427,7 +427,7 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                     }
                     Some(actions)
                 }
-                DhtOp::StoreEntry(_, action, entry) => {
+                ChainOp::StoreEntry(_, action, entry) => {
                     let mut actions = match entry {
                         Entry::CounterSign(session_data, _) => {
                             // Discard errors here because we'll check later whether the input is valid. If it's not then it
@@ -450,20 +450,22 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                     }
                     Some(actions)
                 }
-                DhtOp::RegisterAgentActivity(_, action) => action
+                ChainOp::RegisterAgentActivity(_, action) => action
                     .prev_action()
                     .map(|action| vec![action.as_hash().clone()]),
-                DhtOp::RegisterUpdatedContent(_, action, _) => {
+                ChainOp::RegisterUpdatedContent(_, action, _) => {
                     Some(vec![action.original_action_address.clone()])
                 }
-                DhtOp::RegisterUpdatedRecord(_, action, _) => {
+                ChainOp::RegisterUpdatedRecord(_, action, _) => {
                     Some(vec![action.original_action_address.clone()])
                 }
-                DhtOp::RegisterDeletedBy(_, action) => Some(vec![action.deletes_address.clone()]),
-                DhtOp::RegisterDeletedEntryAction(_, action) => {
+                ChainOp::RegisterDeletedBy(_, action) => Some(vec![action.deletes_address.clone()]),
+                ChainOp::RegisterDeletedEntryAction(_, action) => {
                     Some(vec![action.deletes_address.clone()])
                 }
-                DhtOp::RegisterRemoveLink(_, action) => Some(vec![action.link_add_address.clone()]),
+                ChainOp::RegisterRemoveLink(_, action) => {
+                    Some(vec![action.link_add_address.clone()])
+                }
                 _ => None,
             }
         })
@@ -574,7 +576,7 @@ async fn validate_op_inner(
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
     match op {
-        DhtOp::StoreRecord(_, action, entry) => {
+        ChainOp::StoreRecord(_, action, entry) => {
             check_prev_action(action)?;
             if let Some(entry) = entry.as_option() {
                 // Retrieve for all other actions on countersigned entry.
@@ -606,7 +608,7 @@ async fn validate_op_inner(
             }
             Ok(())
         }
-        DhtOp::StoreEntry(_, action, entry) => {
+        ChainOp::StoreEntry(_, action, entry) => {
             // Check and hold for all other actions on countersigned entry.
             if let Entry::CounterSign(session_data, _) = entry {
                 for action_hash in make_action_set_for_session_data(
@@ -628,11 +630,11 @@ async fn validate_op_inner(
             check_prev_action(&action.clone().into())?;
             store_entry(action.into(), entry, validation_dependencies.clone()).await
         }
-        DhtOp::RegisterAgentActivity(_, action) => {
+        ChainOp::RegisterAgentActivity(_, action) => {
             register_agent_activity(action, validation_dependencies.clone(), dna_def)?;
             store_record(action, validation_dependencies)
         }
-        DhtOp::RegisterUpdatedContent(_, action, entry) => {
+        ChainOp::RegisterUpdatedContent(_, action, entry) => {
             register_updated_content(action, validation_dependencies.clone())?;
             if let Some(entry) = entry.as_option() {
                 store_entry(
@@ -645,7 +647,7 @@ async fn validate_op_inner(
 
             Ok(())
         }
-        DhtOp::RegisterUpdatedRecord(_, action, entry) => {
+        ChainOp::RegisterUpdatedRecord(_, action, entry) => {
             register_updated_record(action, validation_dependencies.clone())?;
             if let Some(entry) = entry.as_option() {
                 store_entry(
@@ -658,12 +660,14 @@ async fn validate_op_inner(
 
             Ok(())
         }
-        DhtOp::RegisterDeletedBy(_, action) => register_deleted_by(action, validation_dependencies),
-        DhtOp::RegisterDeletedEntryAction(_, action) => {
+        ChainOp::RegisterDeletedBy(_, action) => {
+            register_deleted_by(action, validation_dependencies)
+        }
+        ChainOp::RegisterDeletedEntryAction(_, action) => {
             register_deleted_entry_action(action, validation_dependencies)
         }
-        DhtOp::RegisterAddLink(_, action) => register_add_link(action),
-        DhtOp::RegisterRemoveLink(_, action) => {
+        ChainOp::RegisterAddLink(_, action) => register_add_link(action),
+        ChainOp::RegisterRemoveLink(_, action) => {
             register_delete_link(action, validation_dependencies)
         }
     }

@@ -727,7 +727,7 @@ where
                         }
                         _ => None,
                     };
-                    let op = DhtOp::from_type(op_type, action, entry)?;
+                    let op = ChainOp::from_type(op_type, action, entry)?;
 
                     StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
                 },
@@ -755,7 +755,7 @@ where
                             }
                             _ => None,
                         };
-                        let op = DhtOp::from_type(op_type, action, entry)?;
+                        let op = ChainOp::from_type(op_type, action, entry)?;
 
                         StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
                     },

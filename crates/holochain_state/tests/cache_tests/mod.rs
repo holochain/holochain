@@ -22,7 +22,7 @@ fn insert_action_and_op(txn: &mut Transaction, u: &mut Unstructured, action: &Ac
     mutations::insert_action(txn, &action).unwrap();
     mutations::insert_op_lite(
         txn,
-        &DhtOpLite::RegisterAgentActivity(hash, basis_hash.clone()),
+        &ChainOpLite::RegisterAgentActivity(hash, basis_hash.clone()),
         &op_hash,
         &op_order,
         &timestamp,
@@ -275,7 +275,7 @@ async fn cache_set_integrated() {
     let cache = DhtDbQueryCache::new(db.clone().into());
 
     cache
-        .set_activity_ready_to_integrate(&author, 0)
+        .set_activity_ready_to_integrate(&author, Some(0))
         .await
         .unwrap();
 
@@ -304,11 +304,11 @@ async fn cache_set_integrated() {
     .await;
 
     cache
-        .set_activity_ready_to_integrate(&author, 1)
+        .set_activity_ready_to_integrate(&author, Some(1))
         .await
         .unwrap();
     cache
-        .set_activity_ready_to_integrate(&author, 2)
+        .set_activity_ready_to_integrate(&author, Some(2))
         .await
         .unwrap();
 
@@ -394,7 +394,7 @@ async fn check_none_integrated_with_awaiting_deps() {
     let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
     let cache = DhtDbQueryCache::new(db.clone().into());
     cache
-        .set_activity_ready_to_integrate(author.as_ref(), 3)
+        .set_activity_ready_to_integrate(author.as_ref(), Some(3))
         .await
         .unwrap();
     check_state(&cache, |activity| {

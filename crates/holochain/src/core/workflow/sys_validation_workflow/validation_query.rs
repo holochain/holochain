@@ -87,7 +87,7 @@ async fn get_ops_to_validate(
                 None => None,
             };
             WorkflowResult::Ok(DhtOpHashed::with_pre_hashed(
-                DhtOp::from_type(op_type, action, entry)?,
+                ChainOp::from_type(op_type, action, entry)?,
                 hash,
             ))
         })?;
@@ -274,7 +274,7 @@ mod tests {
     }
 
     async fn create_and_insert_op(db: &DbWrite<DbKindDht>, facts: Facts) -> DhtOpHashed {
-        let state = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+        let state = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));

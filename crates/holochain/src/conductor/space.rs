@@ -606,7 +606,7 @@ impl Spaces {
                                 None => None,
                             };
                         }
-                        let op = DhtOp::from_type(op_type, action, entry)?;
+                        let op = ChainOp::from_type(op_type, action, entry)?;
                         out.push((hash, op))
                     } else {
                         return Err(holochain_state::query::StateQueryError::Sql(

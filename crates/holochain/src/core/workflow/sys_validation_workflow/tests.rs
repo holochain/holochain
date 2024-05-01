@@ -319,7 +319,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
         let op_type: ChainOpType = row.get("type")?;
         let hash: ActionHash = row.get("hash")?;
         let action: SignedAction = from_blob(row.get("blob")?)?;
-        Ok(DhtOpLite::from_type(op_type, hash, &action.0)?)
+        Ok(ChainOpLite::from_type(op_type, hash, &action.0)?)
     })
     .unwrap()
     .collect::<StateQueryResult<Vec<DhtOpLite>>>()

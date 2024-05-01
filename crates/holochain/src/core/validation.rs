@@ -100,15 +100,15 @@ impl From<&DhtOp> for DhtOpOrder {
     fn from(op: &DhtOp) -> Self {
         use DhtOpOrder::*;
         match op {
-            DhtOp::StoreRecord(_, h, _) => StoreRecord(h.timestamp()),
-            DhtOp::StoreEntry(_, h, _) => StoreEntry(h.timestamp()),
-            DhtOp::RegisterAgentActivity(_, h) => RegisterAgentActivity(h.timestamp()),
-            DhtOp::RegisterUpdatedContent(_, h, _) => RegisterUpdatedContent(h.timestamp),
-            DhtOp::RegisterUpdatedRecord(_, h, _) => RegisterUpdatedRecord(h.timestamp),
-            DhtOp::RegisterDeletedBy(_, h) => RegisterDeletedBy(h.timestamp),
-            DhtOp::RegisterDeletedEntryAction(_, h) => RegisterDeletedEntryAction(h.timestamp),
-            DhtOp::RegisterAddLink(_, h) => RegisterAddLink(h.timestamp),
-            DhtOp::RegisterRemoveLink(_, h) => RegisterRemoveLink(h.timestamp),
+            ChainOp::StoreRecord(_, h, _) => StoreRecord(h.timestamp()),
+            ChainOp::StoreEntry(_, h, _) => StoreEntry(h.timestamp()),
+            ChainOp::RegisterAgentActivity(_, h) => RegisterAgentActivity(h.timestamp()),
+            ChainOp::RegisterUpdatedContent(_, h, _) => RegisterUpdatedContent(h.timestamp),
+            ChainOp::RegisterUpdatedRecord(_, h, _) => RegisterUpdatedRecord(h.timestamp),
+            ChainOp::RegisterDeletedBy(_, h) => RegisterDeletedBy(h.timestamp),
+            ChainOp::RegisterDeletedEntryAction(_, h) => RegisterDeletedEntryAction(h.timestamp),
+            ChainOp::RegisterAddLink(_, h) => RegisterAddLink(h.timestamp),
+            ChainOp::RegisterRemoveLink(_, h) => RegisterRemoveLink(h.timestamp),
         }
     }
 }

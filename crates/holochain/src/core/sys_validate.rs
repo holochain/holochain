@@ -601,7 +601,7 @@ fn make_store_record(record: Record) -> DhtOp {
     let action = action.into_content();
 
     // Create the op
-    DhtOp::StoreRecord(signature, action, record_entry)
+    ChainOp::StoreRecord(signature, action, record_entry)
 }
 
 /// Make a StoreEntry DhtOp from a Record.
@@ -622,7 +622,7 @@ fn make_store_entry(record: Record) -> Option<DhtOp> {
     let action = action.into_content().try_into().ok()?;
 
     // Create the op
-    let op = DhtOp::StoreEntry(signature, action, entry_box);
+    let op = ChainOp::StoreEntry(signature, action, entry_box);
     Some(op)
 }
 
@@ -641,7 +641,7 @@ fn make_register_add_link(record: Record) -> Option<DhtOp> {
     let action = action.into_content().try_into().ok()?;
 
     // Create the op
-    let op = DhtOp::RegisterAddLink(signature, action);
+    let op = ChainOp::RegisterAddLink(signature, action);
     Some(op)
 }
 
@@ -661,7 +661,7 @@ fn make_register_agent_activity(record: Record) -> DhtOp {
     let action = action.into_content();
 
     // Create the op
-    DhtOp::RegisterAgentActivity(signature, action)
+    ChainOp::RegisterAgentActivity(signature, action)
 }
 
 #[cfg(test)]

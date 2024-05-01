@@ -89,7 +89,7 @@ where
                         }
                         _ => None,
                     };
-                    let op = DhtOp::from_type(op_type, action, entry)?;
+                    let op = ChainOp::from_type(op_type, action, entry)?;
                     let basis = op.dht_basis();
                     WorkflowResult::Ok((basis, op_hash_sized, op))
                 },
@@ -230,13 +230,13 @@ mod tests {
         };
 
         let state = if facts.store_entry {
-            DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
+            DhtOpHashed::from_content_sync(ChainOp::StoreEntry(
                 fixt!(Signature),
                 NewEntryAction::Create(action.clone()),
                 entry.clone(),
             ))
         } else {
-            DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+            DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
                 fixt!(Signature),
                 Action::Create(action.clone()),
                 entry.clone().into(),

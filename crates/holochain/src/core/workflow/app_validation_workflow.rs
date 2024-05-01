@@ -319,7 +319,7 @@ pub async fn record_to_op(
     if matches!(op_type, RegisterAgentActivity) {
         hidden_entry = entry.take().or(hidden_entry);
     }
-    let dht_op = DhtOp::from_type(op_type, action, entry)?;
+    let dht_op = ChainOp::from_type(op_type, action, entry)?;
     let dht_op_hash = dht_op.clone().to_hash();
     Ok((
         dhtop_to_op(dht_op, cascade).await?,
@@ -330,7 +330,7 @@ pub async fn record_to_op(
 
 async fn dhtop_to_op(dht_op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
     let op = match dht_op {
-        DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
+        ChainOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(
                     ActionHashed::from_content_sync(action),
@@ -339,11 +339,11 @@ async fn dhtop_to_op(dht_op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidation
                 entry.into_option(),
             ),
         }),
-        DhtOp::StoreEntry(signature, action, entry) => Op::StoreEntry(StoreEntry {
+        ChainOp::StoreEntry(signature, action, entry) => Op::StoreEntry(StoreEntry {
             action: SignedHashed::new_unchecked(action.into(), signature),
             entry,
         }),
-        DhtOp::RegisterAgentActivity(signature, action) => {
+        ChainOp::RegisterAgentActivity(signature, action) => {
             Op::RegisterAgentActivity(RegisterAgentActivity {
                 action: SignedActionHashed::with_presigned(
                     ActionHashed::from_content_sync(action),
@@ -352,8 +352,8 @@ async fn dhtop_to_op(dht_op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidation
                 cached_entry: None,
             })
         }
-        DhtOp::RegisterUpdatedContent(signature, update, entry)
-        | DhtOp::RegisterUpdatedRecord(signature, update, entry) => {
+        ChainOp::RegisterUpdatedContent(signature, update, entry)
+        | ChainOp::RegisterUpdatedRecord(signature, update, entry) => {
             let new_entry = match update.entry_type.visibility() {
                 EntryVisibility::Public => match entry.into_option() {
                     Some(entry) => Some(entry),
@@ -372,18 +372,18 @@ async fn dhtop_to_op(dht_op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidation
                 new_entry,
             })
         }
-        DhtOp::RegisterDeletedBy(signature, delete)
-        | DhtOp::RegisterDeletedEntryAction(signature, delete) => {
+        ChainOp::RegisterDeletedBy(signature, delete)
+        | ChainOp::RegisterDeletedEntryAction(signature, delete) => {
             Op::RegisterDelete(RegisterDelete {
                 delete: SignedHashed::new_unchecked(delete, signature),
             })
         }
-        DhtOp::RegisterAddLink(signature, create_link) => {
+        ChainOp::RegisterAddLink(signature, create_link) => {
             Op::RegisterCreateLink(RegisterCreateLink {
                 create_link: SignedHashed::new_unchecked(create_link, signature),
             })
         }
-        DhtOp::RegisterRemoveLink(signature, delete_link) => {
+        ChainOp::RegisterRemoveLink(signature, delete_link) => {
             let create_link = cascade
                 .retrieve_action(delete_link.link_add_address.clone(), Default::default())
                 .await?

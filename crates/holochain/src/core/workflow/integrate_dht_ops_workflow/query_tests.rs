@@ -200,7 +200,7 @@ async fn create_and_insert_op(
 
     data.last_action = ActionHash::with_data_sync(&action);
     let state = DhtOpHashed::from_content_sync(
-        DhtOp::from_type(op, SignedAction(action.clone(), fixt!(Signature)), entry).unwrap(),
+        ChainOp::from_type(op, SignedAction(action.clone(), fixt!(Signature)), entry).unwrap(),
     );
 
     // TODO unexpected write in data setup, was a DbRead

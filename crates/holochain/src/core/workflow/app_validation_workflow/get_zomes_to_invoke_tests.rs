@@ -750,7 +750,7 @@ async fn store_record_delete_without_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -807,7 +807,7 @@ async fn store_record_delete_non_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -867,7 +867,7 @@ async fn store_record_delete_link() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -948,8 +948,10 @@ async fn store_record_delete_of_delete_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op =
-        DhtOpHashed::from_content_sync(DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete));
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::RegisterDeletedEntryAction(
+        fixt!(Signature),
+        delete,
+    ));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
@@ -1026,8 +1028,10 @@ async fn store_record_delete_of_delete_without_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op =
-        DhtOpHashed::from_content_sync(DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete));
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::RegisterDeletedEntryAction(
+        fixt!(Signature),
+        delete,
+    ));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
@@ -1203,7 +1207,7 @@ async fn register_delete_create_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -1270,7 +1274,7 @@ async fn register_delete_create_non_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -1341,7 +1345,7 @@ async fn register_delete_update_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -1408,7 +1412,7 @@ async fn register_delete_update_non_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -1465,7 +1469,7 @@ async fn register_delete_of_delete() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,

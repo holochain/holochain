@@ -505,7 +505,7 @@ fn get_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
         // Check the entry isn't private before gossiping it.
         let e: Option<Vec<u8>> = row.get("entry_blob")?;
         let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
-        let op = DhtOp::from_type(op_type, action, entry).unwrap();
+        let op = ChainOp::from_type(op_type, action, entry).unwrap();
         let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
         Ok((Arc::new(hash), op))
     })
@@ -537,7 +537,7 @@ fn get_authored_ops(
         // Check the entry isn't private before gossiping it.
         let e: Option<Vec<u8>> = row.get("entry_blob")?;
         let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
-        let op = DhtOp::from_type(op_type, action, entry).unwrap();
+        let op = ChainOp::from_type(op_type, action, entry).unwrap();
         let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
         Ok((Arc::new(hash), op))
     })

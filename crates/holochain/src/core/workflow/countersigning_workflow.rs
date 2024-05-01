@@ -58,7 +58,7 @@ pub(crate) fn incoming_countersigning(
     // entry hash, required actions and expires time.
     for (hash, op) in ops {
         // Must be a store entry op.
-        if let DhtOp::StoreEntry(_, _, entry) = &op {
+        if let ChainOp::StoreEntry(_, _, entry) = &op {
             // Must have a counter sign entry type.
             if let Entry::CounterSign(session_data, _) = entry {
                 let entry_hash = EntryHash::with_data_sync(entry);
@@ -291,7 +291,7 @@ pub(crate) async fn countersigning_success(
             if *action.author() == author {
                 continue;
             }
-            let op = DhtOp::RegisterAgentActivity(signature, action);
+            let op = ChainOp::RegisterAgentActivity(signature, action);
             let basis = op.dht_basis();
             if let Err(e) = network.publish_countersign(false, basis, op).await {
                 tracing::error!(

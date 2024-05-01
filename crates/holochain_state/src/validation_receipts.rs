@@ -125,7 +125,7 @@ mod tests {
         let env = test_db.to_db();
         let keystore = test_keystore();
 
-        let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+        let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));
@@ -210,7 +210,7 @@ mod tests {
         modifier: fn(txn: &mut Transaction, op_hash: HoloHashOf<DhtOp>) -> StateMutationResult<()>,
     ) -> StateMutationResult<DhtOpHash> {
         // The actual op does not matter, just some of the status fields
-        let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+        let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));

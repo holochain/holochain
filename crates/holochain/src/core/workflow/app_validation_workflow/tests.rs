@@ -102,14 +102,14 @@ async fn main_workflow() {
         visibility: Default::default(),
     });
     let create_action = Action::Create(create);
-    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
+    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
 
     // create op that depends on previous create
     let mut delete = fixt!(Delete);
     delete.author = create_action.author().clone();
     delete.deletes_address = create_action.clone().to_hash();
-    let dht_delete_op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
+    let dht_delete_op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
 
@@ -228,7 +228,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         weight: Default::default(),
     };
     let create_action = Action::Create(create);
-    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
+    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
     let create_action_hash = create_action.to_hash();
 
@@ -243,7 +243,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         weight: Default::default(),
     };
     let delete_action = Action::Delete(delete);
-    let dht_delete_op = DhtOp::RegisterAgentActivity(fixt!(Signature), delete_action.clone());
+    let dht_delete_op = ChainOp::RegisterAgentActivity(fixt!(Signature), delete_action.clone());
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
 
@@ -437,7 +437,7 @@ async fn validate_ops_in_sequence_must_get_action() {
         visibility: EntryVisibility::Public,
     });
     let create_op = Action::Create(create);
-    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
+    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
 
     // create op that depends on previous create
@@ -445,7 +445,7 @@ async fn validate_ops_in_sequence_must_get_action() {
     delete.author = create_op.author().clone();
     delete.deletes_address = create_op.clone().to_hash();
     delete.deletes_entry_address = create_op.entry_hash().unwrap().clone();
-    let dht_delete_op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
+    let dht_delete_op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
 
@@ -884,7 +884,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
         let op_type: ChainOpType = row.get("type")?;
         let hash: ActionHash = row.get("hash")?;
         let action: SignedAction = from_blob(row.get("blob")?)?;
-        Ok(DhtOpLite::from_type(op_type, hash, &action.0)?)
+        Ok(ChainOpLite::from_type(op_type, hash, &action.0)?)
     })
     .unwrap()
     .collect::<StateQueryResult<Vec<DhtOpLite>>>()

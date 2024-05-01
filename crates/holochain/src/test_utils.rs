@@ -764,7 +764,7 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
                 Some(entry) => Some(from_blob::<Entry>(entry)?),
                 None => None,
             };
-            Ok(DhtOp::from_type(op_type, action, entry)?)
+            Ok(ChainOp::from_type(op_type, action, entry)?)
         })
         .unwrap()
         .collect::<StateQueryResult<_>>()

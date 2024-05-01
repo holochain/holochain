@@ -932,7 +932,7 @@ pub fn get_public_entry_from_db(
 
 /// Get a [`DhtOp`] from the database
 /// filtering out private entries and
-/// [`DhtOp::StoreEntry`] where the entry
+/// [`ChainOp::StoreEntry`] where the entry
 /// is private.
 /// The ops are suitable for publishing / gossiping.
 pub fn get_public_op_from_db(

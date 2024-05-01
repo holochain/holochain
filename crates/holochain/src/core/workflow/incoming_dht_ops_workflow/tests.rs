@@ -24,7 +24,7 @@ async fn incoming_ops_to_limbo() {
         let action = Action::CreateLink(action);
         let signature = author.sign(&keystore, &action).await.unwrap();
 
-        let op = DhtOp::RegisterAgentActivity(signature, action);
+        let op = ChainOp::RegisterAgentActivity(signature, action);
         let hash = DhtOpHash::with_data_sync(&op);
         hash_list.push(hash);
         op_list.push(op);
@@ -67,7 +67,7 @@ async fn can_retry_failed_op() {
     // Create a dummy signature that will fail validation
     let signature = Signature([0; SIGNATURE_BYTES]);
 
-    let op = DhtOp::RegisterAgentActivity(signature, action.clone());
+    let op = ChainOp::RegisterAgentActivity(signature, action.clone());
     let hash = DhtOpHash::with_data_sync(&op);
 
     // Try running the workflow and...
@@ -85,7 +85,7 @@ async fn can_retry_failed_op() {
 
     // Now fix the signature
     let signature = author.sign(&keystore, &action).await.unwrap();
-    let op = DhtOp::RegisterAgentActivity(signature, action);
+    let op = ChainOp::RegisterAgentActivity(signature, action);
     let hash = DhtOpHash::with_data_sync(&op);
 
     // Run the workflow again to simulate a re-send of the op...
@@ -117,7 +117,7 @@ async fn republish_to_request_validation_receipt() {
     action.author = author.clone();
     let action = Action::CreateLink(action);
     let signature = author.sign(&keystore, &action).await.unwrap();
-    let op = DhtOp::RegisterAgentActivity(signature, action);
+    let op = ChainOp::RegisterAgentActivity(signature, action);
     let hash = DhtOpHash::with_data_sync(&op);
 
     incoming_dht_ops_workflow(
