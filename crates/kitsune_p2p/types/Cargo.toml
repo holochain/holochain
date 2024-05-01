@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_types"
-version = "0.3.0"
+version = "0.4.0-dev.0"
 description = "types subcrate for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -17,12 +17,12 @@ base64 = "0.22"
 derive_more = "0.99"
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.6"
-kitsune_p2p_dht = { version = "^0.3.0", path = "../dht" }
-kitsune_p2p_dht_arc = { version = "^0.3.0", path = "../dht_arc" }
-kitsune_p2p_bin_data = { version = "^0.3.0", path = "../bin_data" }
-kitsune_p2p_timestamp = { version = "^0.3.0", path = "../timestamp" }
+kitsune_p2p_dht = { version = "^0.4.0-dev.0", path = "../dht" }
+kitsune_p2p_dht_arc = { version = "^0.4.0-dev.0", path = "../dht_arc" }
+kitsune_p2p_bin_data = { version = "^0.4.0-dev.0", path = "../bin_data" }
+kitsune_p2p_timestamp = { version = "^0.4.0-dev.0", path = "../timestamp" }
 mockall = { version = "0.11.3", optional = true }
-holochain_trace = { version = "^0.3.0-beta-dev.11", path = "../../holochain_trace" }
+holochain_trace = { version = "^0.3.0-dev.0", path = "../../holochain_trace" }
 once_cell = "1.4"
 parking_lot = "0.12.1"
 paste = "1.0.12"
@@ -37,7 +37,7 @@ tokio = { version = "1.27", features = ["full"] }
 url = "2"
 url2 = "0.0.6"
 
-fixt = { version = "^0.3.0", path = "../../fixt", optional = true }
+fixt = { version = "^0.4.0-dev.0", path = "../../fixt", optional = true }
 
 # arbitrary
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
