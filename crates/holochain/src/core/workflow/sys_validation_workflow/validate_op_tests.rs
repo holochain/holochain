@@ -2159,9 +2159,13 @@ async fn action_after_close_chain() {
     assert_eq!(
         Outcome::Rejected(
             ValidationOutcome::PrevActionError(
-                (PrevActionErrorKind::ActionAfterChainClose, Action::Create(create)).into()
+                (
+                    PrevActionErrorKind::ActionAfterChainClose,
+                    Action::Create(create)
+                )
+                    .into()
             )
-                .to_string()
+            .to_string()
         ),
         outcome
     );

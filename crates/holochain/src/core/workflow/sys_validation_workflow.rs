@@ -788,7 +788,10 @@ fn register_agent_activity(
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
 
         match prev_action {
-            Action::CloseChain(_) => Err(ValidationOutcome::PrevActionError((PrevActionErrorKind::ActionAfterChainClose, action.clone()).into()).into()),
+            Action::CloseChain(_) => Err(ValidationOutcome::PrevActionError(
+                (PrevActionErrorKind::ActionAfterChainClose, action.clone()).into(),
+            )
+            .into()),
             _ => Ok(()),
         }
     } else {
