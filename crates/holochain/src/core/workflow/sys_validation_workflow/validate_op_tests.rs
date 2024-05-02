@@ -2122,6 +2122,51 @@ async fn validate_remove_link_with_wrong_target_type() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn action_after_close_chain() {
+    holochain_trace::test_run();
+
+    let mut test_case = TestCase::new().await;
+
+    // Previous action
+    let dna_action = CloseChain {
+        author: test_case.agent.clone().into(),
+        timestamp: Timestamp::now().into(),
+        action_seq: 23,
+        prev_action: fixt!(ActionHash),
+        new_dna_hash: fixt!(DnaHash),
+    };
+    let previous_action = test_case.sign_action(Action::CloseChain(dna_action)).await;
+
+    let mut create = fixt!(Create);
+    create.prev_action = previous_action.as_hash().clone();
+    create.action_seq = 24;
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
+    // Use agent activity so that we'll validate the previous action
+    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create.clone()));
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![previous_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::PrevActionError(
+                (PrevActionErrorKind::ActionAfterChainClose, Action::Create(create)).into()
+            )
+                .to_string()
+        ),
+        outcome
+    );
+}
+
 // TODO this hits code which claims to be unreachable. Clearly it isn't so investigate the code path.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "TODO fix this test"]
