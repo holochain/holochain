@@ -78,17 +78,18 @@ async fn get_ops_to_validate(
         let mut stmt = txn.prepare(&sql)?;
         let r = stmt.query_and_then([], |row| {
             let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-            let op_type: ChainOpType = row.get("dht_type")?;
+            let op_type: DhtOpType = row.get("dht_type")?;
             let hash: DhtOpHash = row.get("dht_hash")?;
             let entry: Option<Vec<u8>> = row.get("entry_blob")?;
             let entry = match entry {
                 Some(entry) => Some(from_blob::<Entry>(entry)?),
                 None => None,
             };
-            WorkflowResult::Ok(DhtOpHashed::with_pre_hashed(
-                ChainOp::from_type(op_type, action, entry)?,
-                hash,
-            ))
+            // WorkflowResult::Ok(DhtOpHashed::with_pre_hashed(
+            //     ChainOp::from_type(op_type, action, entry)?,
+            //     hash,
+            // ));
+            todo!("handle non-chain ops")
         })?;
         let r = r.collect();
         WorkflowResult::Ok(r)

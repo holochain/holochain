@@ -256,12 +256,10 @@ async fn sys_validation_workflow_inner(
     let mut validation_outcomes = Vec::with_capacity(sorted_ops.len());
     for hashed_op in sorted_ops {
         let (op, op_hash) = hashed_op.into_inner();
-        let op_type = op.get_type();
-        let action = op.action();
 
         // This is an optimization to skip app validation and integration for ops that are
         // rejected and don't have dependencies.
-        let dependency = op_type.sys_validation_dependency(&action);
+        let dependency = op.sys_validation_dependency();
 
         // Note that this is async only because of the signature checks done during countersigning.
         // In most cases this will be a fast synchronous call.
@@ -399,14 +397,41 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
         .filter_map(|op| {
             // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
             match &op.content {
-                ChainOp::StoreRecord(_, action, entry) => {
-                    let mut actions = match entry {
-                        RecordEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
-                            // Discard errors here because we'll check later whether the input is valid. If it's not then it
-                            // won't matter that we've skipped fetching deps for it
-                            if let Ok(entry_rate_weight) = action_to_entry_rate_weight(action) {
+                DhtOp::ChainOp(op) => match op {
+                    ChainOp::StoreRecord(_, action, entry) => {
+                        let mut actions = match entry {
+                            RecordEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
+                                // Discard errors here because we'll check later whether the input is valid. If it's not then it
+                                // won't matter that we've skipped fetching deps for it
+                                if let Ok(entry_rate_weight) = action_to_entry_rate_weight(action) {
+                                    make_action_set_for_session_data(
+                                        entry_rate_weight,
+                                        entry,
+                                        session_data,
+                                    )
+                                    .unwrap_or_else(|_| vec![])
+                                    .into_iter()
+                                    .map(|action| action.into_hash())
+                                    .collect::<Vec<_>>()
+                                } else {
+                                    vec![]
+                                }
+                            }
+                            _ => vec![],
+                        };
+
+                        if let Action::Update(update) = action {
+                            actions.push(update.original_action_address.clone());
+                        }
+                        Some(actions)
+                    }
+                    ChainOp::StoreEntry(_, action, entry) => {
+                        let mut actions = match entry {
+                            Entry::CounterSign(session_data, _) => {
+                                // Discard errors here because we'll check later whether the input is valid. If it's not then it
+                                // won't matter that we've skipped fetching deps for it
                                 make_action_set_for_session_data(
-                                    entry_rate_weight,
+                                    new_entry_action_to_entry_rate_weight(action),
                                     entry,
                                     session_data,
                                 )
@@ -414,58 +439,35 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                                 .into_iter()
                                 .map(|action| action.into_hash())
                                 .collect::<Vec<_>>()
-                            } else {
-                                vec![]
                             }
-                        }
-                        _ => vec![],
-                    };
+                            _ => vec![],
+                        };
 
-                    if let Action::Update(update) = action {
-                        actions.push(update.original_action_address.clone());
-                    }
-                    Some(actions)
-                }
-                ChainOp::StoreEntry(_, action, entry) => {
-                    let mut actions = match entry {
-                        Entry::CounterSign(session_data, _) => {
-                            // Discard errors here because we'll check later whether the input is valid. If it's not then it
-                            // won't matter that we've skipped fetching deps for it
-                            make_action_set_for_session_data(
-                                new_entry_action_to_entry_rate_weight(action),
-                                entry,
-                                session_data,
-                            )
-                            .unwrap_or_else(|_| vec![])
-                            .into_iter()
-                            .map(|action| action.into_hash())
-                            .collect::<Vec<_>>()
+                        if let NewEntryAction::Update(update) = action {
+                            actions.push(update.original_action_address.clone());
                         }
-                        _ => vec![],
-                    };
-
-                    if let NewEntryAction::Update(update) = action {
-                        actions.push(update.original_action_address.clone());
+                        Some(actions)
                     }
-                    Some(actions)
-                }
-                ChainOp::RegisterAgentActivity(_, action) => action
-                    .prev_action()
-                    .map(|action| vec![action.as_hash().clone()]),
-                ChainOp::RegisterUpdatedContent(_, action, _) => {
-                    Some(vec![action.original_action_address.clone()])
-                }
-                ChainOp::RegisterUpdatedRecord(_, action, _) => {
-                    Some(vec![action.original_action_address.clone()])
-                }
-                ChainOp::RegisterDeletedBy(_, action) => Some(vec![action.deletes_address.clone()]),
-                ChainOp::RegisterDeletedEntryAction(_, action) => {
-                    Some(vec![action.deletes_address.clone()])
-                }
-                ChainOp::RegisterRemoveLink(_, action) => {
-                    Some(vec![action.link_add_address.clone()])
-                }
-                _ => None,
+                    ChainOp::RegisterAgentActivity(_, action) => action
+                        .prev_action()
+                        .map(|action| vec![action.as_hash().clone()]),
+                    ChainOp::RegisterUpdatedContent(_, action, _) => {
+                        Some(vec![action.original_action_address.clone()])
+                    }
+                    ChainOp::RegisterUpdatedRecord(_, action, _) => {
+                        Some(vec![action.original_action_address.clone()])
+                    }
+                    ChainOp::RegisterDeletedBy(_, action) => {
+                        Some(vec![action.deletes_address.clone()])
+                    }
+                    ChainOp::RegisterDeletedEntryAction(_, action) => {
+                        Some(vec![action.deletes_address.clone()])
+                    }
+                    ChainOp::RegisterRemoveLink(_, action) => {
+                        Some(vec![action.link_add_address.clone()])
+                    }
+                    _ => None,
+                },
             }
         })
         .flatten()

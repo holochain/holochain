@@ -553,14 +553,15 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     timeout: Duration,
 ) -> ConsistencyResult {
     fn display_op(op: &DhtOp) -> String {
-        format!(
-            "{} {:>3}  {} ({})",
-            op.action().author(),
-            op.action().action_seq(),
-            // op.to_light().action_hash().clone(),
-            op.get_type(),
-            op.action().action_type(),
-        )
+        match op {
+            DhtOp::ChainOp(op) => format!(
+                "{} {:>3}  {} ({})",
+                op.action().author(),
+                op.action().action_seq(),
+                op.get_type(),
+                op.action().action_type(),
+            ),
+        }
     }
 
     let header = format!("{:54} {:>3}  {}", "author", "seq", "op_type (action_type)",);
@@ -757,14 +758,15 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
         )
         .unwrap()
         .query_and_then(named_params! {}, |row| {
-            let op_type: ChainOpType = row.get("type")?;
+            let op_type: DhtOpType = row.get("type")?;
             let action: SignedAction = from_blob(row.get("action_blob")?)?;
             let entry: Option<Vec<u8>> = row.get("entry_blob")?;
             let entry: Option<Entry> = match entry {
                 Some(entry) => Some(from_blob::<Entry>(entry)?),
                 None => None,
             };
-            Ok(ChainOp::from_type(op_type, action, entry)?)
+            // Ok(ChainOp::from_type(op_type, action, entry)?);
+            todo!("handle non-chain ops")
         })
         .unwrap()
         .collect::<StateQueryResult<_>>()

@@ -43,7 +43,6 @@ mod tests;
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
-#[non_exhaustive]
 pub enum DhtOp {
     /// An op representing storage of some record information.
     ChainOp(ChainOp),

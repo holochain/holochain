@@ -93,7 +93,7 @@ where
                         DhtOpType::Chain(op_type) => ChainOp::from_type(op_type, action, entry)?,
                     };
                     let basis = op.dht_basis();
-                    WorkflowResult::Ok((basis, op_hash_sized, op))
+                    WorkflowResult::Ok((basis, op_hash_sized, op.into()))
                 },
             )?;
             WorkflowResult::Ok(r.collect())

@@ -590,7 +590,7 @@ impl Spaces {
                     let mut rows = stmt.query([hash])?;
                     if let Some(row) = rows.next()? {
                         let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                        let op_type: ChainOpType = row.get("dht_type")?;
+                        let op_type: DhtOpType = row.get("dht_type")?;
                         let hash: DhtOpHash = row.get("hash")?;
                         // Check the entry isn't private before gossiping it.
                         let mut entry: Option<Entry> = None;
@@ -634,9 +634,18 @@ impl Spaces {
         // send it to the incoming ops workflow.
         if countersigning_session {
             use futures::StreamExt;
-            let ops = futures::stream::iter(ops.into_iter().map(|op| {
-                let hash = DhtOpHash::with_data_sync(&op);
-                (hash, op)
+            let ops = futures::stream::iter(ops.into_iter().filter_map(|op| match op {
+                DhtOp::ChainOp(op) => {
+                    let hash = DhtOpHash::with_data_sync(&op);
+                    Some((hash, op))
+                }
+                _ => {
+                    tracing::warn!(
+                        ?op,
+                        "Invalid DhtOp in countersigning session, only ChainOps will be handled"
+                    );
+                    None
+                }
             }))
             .collect()
             .await;

@@ -594,8 +594,8 @@ impl Cell {
         message: CountersigningSessionNegotiationMessage,
     ) -> CellResult<()> {
         match message {
-            CountersigningSessionNegotiationMessage::EnzymePush(dht_op) => {
-                let ops = vec![*dht_op]
+            CountersigningSessionNegotiationMessage::EnzymePush(chain_op) => {
+                let ops = vec![*chain_op]
                     .into_iter()
                     .map(|op| {
                         let hash = DhtOpHash::with_data_sync(&op);

@@ -37,7 +37,7 @@ struct Session {
     /// Map of action hash for a each signers action to the
     /// [`DhtOp`] and other required actions for this session to be
     /// considered complete.
-    map: HashMap<ActionHash, (DhtOpHash, DhtOp, Vec<ActionHash>)>,
+    map: HashMap<ActionHash, (DhtOpHash, ChainOp, Vec<ActionHash>)>,
     /// When this session expires.
     /// If this is none the session is empty.
     expires: Option<Timestamp>,
@@ -81,7 +81,7 @@ pub(crate) fn incoming_countersigning(
                     // Check if already timed out.
                     if holochain_zome_types::prelude::Timestamp::now() < expires {
                         // Put this op in the pending map.
-                        workspace.put(entry_hash, hash, op, required_actions, expires);
+                        workspace.put(entry_hash, hash, op.into(), required_actions, expires);
                         // We have new ops so we should trigger the workflow.
                         should_trigger = true;
                     }
@@ -118,7 +118,10 @@ pub(crate) async fn countersigning_workflow(
             incoming_dht_ops_workflow(
                 space.clone(),
                 sys_validation_trigger.clone(),
-                non_enzymatic_ops.into_iter().map(|(_h, o)| o).collect(),
+                non_enzymatic_ops
+                    .into_iter()
+                    .map(|(_h, o)| o.into())
+                    .collect(),
                 false,
             )
             .await?;
@@ -293,7 +296,7 @@ pub(crate) async fn countersigning_success(
             }
             let op = ChainOp::RegisterAgentActivity(signature, action);
             let basis = op.dht_basis();
-            if let Err(e) = network.publish_countersign(false, basis, op).await {
+            if let Err(e) = network.publish_countersign(false, basis, op.into()).await {
                 tracing::error!(
                     "Failed to publish to other countersigners agent authorities because of: {:?}",
                     e
@@ -349,7 +352,7 @@ pub async fn countersigning_publish(
 }
 
 type AgentsToNotify = Vec<AgentPubKey>;
-type Ops = Vec<(DhtOpHash, DhtOp)>;
+type Ops = Vec<(DhtOpHash, ChainOp)>;
 type SignedActions = Vec<SignedAction>;
 
 impl CountersigningWorkspace {
@@ -365,7 +368,7 @@ impl CountersigningWorkspace {
         &self,
         entry_hash: EntryHash,
         op_hash: DhtOpHash,
-        op: DhtOp,
+        op: ChainOp,
         required_actions: Vec<ActionHash>,
         expires: Timestamp,
     ) {

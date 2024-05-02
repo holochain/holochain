@@ -716,7 +716,7 @@ where
                     let loc: u32 = row.get("loc")?;
 
                     let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                    let op_type: ChainOpType = row.get("dht_type")?;
+                    let op_type: DhtOpType = row.get("dht_type")?;
                     let entry = match action.0.entry_type().map(|et| et.visibility()) {
                         Some(EntryVisibility::Public) => {
                             let entry: Option<Vec<u8>> = row.get("entry_blob")?;
@@ -729,7 +729,11 @@ where
                     };
                     let op = ChainOp::from_type(op_type, action, entry)?;
 
-                    StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
+                    StateQueryResult::Ok((
+                        loc.into(),
+                        h.into_kitsune_raw(),
+                        todo!("handle non-chain ops"),
+                    ))
                 },
             )?
             .collect::<StateQueryResult<_>>()?
@@ -744,7 +748,7 @@ where
                         let loc: u32 = row.get("loc")?;
 
                         let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                        let op_type: ChainOpType = row.get("dht_type")?;
+                        let op_type: DhtOpType = row.get("dht_type")?;
                         let entry = match action.0.entry_type().map(|et| et.visibility()) {
                             Some(EntryVisibility::Public) => {
                                 let entry: Option<Vec<u8>> = row.get("entry_blob")?;
@@ -757,7 +761,9 @@ where
                         };
                         let op = ChainOp::from_type(op_type, action, entry)?;
 
-                        StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
+                        // StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
+
+                        todo!("handle non-chain ops")
                     },
                 )?
                 .collect::<StateQueryResult<_>>()?

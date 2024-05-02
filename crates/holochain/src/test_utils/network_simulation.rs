@@ -14,7 +14,7 @@ use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::store::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
-use holochain_types::dht_op::{ChainOp, ChainOpType, DhtOp, DhtOpHashed};
+use holochain_types::dht_op::{ChainOp, ChainOpType, DhtOp, DhtOpHashed, DhtOpType};
 use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
@@ -500,7 +500,7 @@ fn get_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
     .unwrap()
     .query_map([], |row| {
         let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
-        let op_type: ChainOpType = row.get("dht_type")?;
+        let op_type: DhtOpType = row.get("dht_type")?;
         let hash: DhtOpHash = row.get("hash")?;
         // Check the entry isn't private before gossiping it.
         let e: Option<Vec<u8>> = row.get("entry_blob")?;
@@ -532,7 +532,7 @@ fn get_authored_ops(
     .unwrap()
     .query_map([author], |row| {
         let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
-        let op_type: ChainOpType = row.get("dht_type")?;
+        let op_type: DhtOpType = row.get("dht_type")?;
         let hash: DhtOpHash = row.get("hash")?;
         // Check the entry isn't private before gossiping it.
         let e: Option<Vec<u8>> = row.get("entry_blob")?;
