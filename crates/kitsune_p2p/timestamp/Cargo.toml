@@ -16,10 +16,10 @@ serde = { version = "1.0", features = ["derive"] }
 
 # Dependencies not needed for integrity.
 chrono = { version = "0.4.22", default-features = false, features = [
-    "clock",
-    "std",
-    "oldtime",
-    "serde",
+  "clock",
+  "std",
+  "oldtime",
+  "serde",
 ], optional = true }
 
 # Dependencies only needed for full.

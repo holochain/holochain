@@ -1,4 +1,98 @@
-//! The workflow and queue consumer for sys validation
+//! Holochain workflow to validate all incoming DHT operations with an
+//! app-defined validation function.
+//!
+//! Triggered by system validation, this workflow iterates over a list of
+//! [`DhtOp`]s that have passed system validation, validates each op, updates its validation status
+//! in the database accordingly, and triggers op integration if necessary.
+//!
+//! ### Sequential validation
+//!
+
+// Even though ops are validated in sequence, they could all be validated in parallel too with the same result.
+// All actions are written to the database straight away in the incoming dht ops workflow and do not require validation to be available for validating other ops. See https://github.com/holochain/holochain/issues/3724
+
+//! Ops are validated in sequence based on their op type and the timestamp they
+//! were authored (see [`OpOrder`] and [`OpNumericalOrder`]). Validating one op
+//! after the other with this ordering was chosen so that ops that depend on earlier
+//! ops will be validated after the earlier ops, and therefore have a higher chance
+//! of being validated successfully. An example is an incoming delete
+//! op that depends on a create op. Validated in order of their authoring, the
+//! create op is validated first, followed at some stage by the delete op. If
+//! the validation function references the original action when validating
+//! delete ops, the create op will have been validated and is available in the
+//! database. Otherwise the delete op could not be validated and its dependency,
+//! the create op, would be awaited first.
+//!
+//! ### Op validation
+//!
+//! For each op the [corresponding app validation function](https://docs.rs/hdi/latest/hdi/#data-validation)
+//! is executed. Entry and link CRUD actions, which the ops are derived from, have been
+//! written with a particular integrity zome's entry and link types. Thus for
+//! op validation, the validation function of the same integrity zome must be
+//! used. Ops that do not relate to a specific entry or link like [`DhtOp::RegisterAgentActivity`]
+//! or non-app entries like [`EntryType::CapGrant`] are validated with all
+//! validation functions of the DNA's integrity zomes.
+//!
+//! Having established the relevant integrity zomes for validating an op, each
+//! zome's validation callback is invoked.
+//!
+//! ### Outcome
+//!
+//! An op can be valid or invalid, which is considered "validated", or it could not be
+//! validated because it is missing required dependencies such as actions,
+//! entries, links or agent activity that the validation function is referencing. If
+//! all ops were validated, the workflow completes with no further action. If
+//! however some ops could not be validated, the workflow will trigger itself
+//! again after a delay, while missing dependencies are being fetched in the
+//! background.
+//!
+//! #### Errors
+//!
+//! If the validate invocation of an integrity zome returns an error while
+//! validating an op, the op is considered not validated but also not missing
+//! dependencies. In effect the workflow will not re-trigger itself.
+//!
+//! Such errors do not depend on op validity or presence of ops, but indicate
+//! a more fundamental problem with either the conductor state, like a missing
+//! zome or ribosome or DNA, or network access. For none of these errors is the
+//! conductor able to recover itself.
+//!
+//! Ops that have not been validated due to validation errors will be retried
+//! the next time app validation runs, when other ops from gossip or publish come in and
+//! need to be validated.
+//!
+//! ### Missing dependencies
+//!
+//! Finding the zomes to invoke for validation oftentimes involves fetching a
+//! referenced original action, like in the case of updates and deletes. Further
+//! the validation function may require actions, entries or agent activity
+//! (segments of an agent's source chain) that currently are not stored in the
+//! local databases. These are dependencies of the op. If they are missing
+//! locally, a network get request will be sent in the background. The op
+//! validation outcome will be [`Outcome::AwaitingDeps`]. Validation of
+//! remaining ops will carry on, as the network request's response is not
+//! awaited within the op validation loop. Instead the whole workflow triggers
+//! itself again after a delay.
+//!
+//! ### Workflow re-triggering
+//!
+//! Awaiting missing ops re-triggers the validation workflow for a fixed period
+//! of time. After this period has elapsed without new missing ops having
+//! arrived, workflow re-triggering ends.
+//!
+//! Ops that are known to have missing dependencies are omitted from a workflow
+//! run, because they cannot be validated without them. Once their missing
+//! dependencies have all been fetched, these ops will be validated the next
+//! time the workflow runs.
+//!
+//! ### Integration workflow
+//!
+
+// This seems to mainly affect ops with system dependencies, as ops without such
+// dependencies are set to integrated as part of this workflow.
+
+//! If any ops have been validated (outcome valid or invalid), [`integrate_dht_ops_workflow`](crate::core::workflow::integrate_dht_ops_workflow)
+//! is triggered, which completes integration of ops after successful validation.
 
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
@@ -88,21 +182,21 @@ pub async fn app_validation_workflow(
     .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-    // if ops have been accepted or rejected, trigger integration
+    // If ops have been accepted or rejected, trigger integration.
     if outcome_summary.validated > 0 {
         trigger_integration.trigger(&"app_validation_workflow");
     }
 
     Ok(
-        // if not all ops have been validated
+        // If not all ops have been validated
         // and fetching missing hashes has not passed expiration,
-        // trigger app validation workflow again
+        // trigger app validation workflow again.
         if outcome_summary.validated < outcome_summary.ops_to_validate
             && !validation_dependencies
                 .lock()
                 .fetch_missing_hashes_timed_out()
         {
-            // trigger app validation workflow again in 10 seconds
+            // Trigger app validation workflow again in 10 seconds.
             WorkComplete::Incomplete(Some(Duration::from_secs(10)))
         } else {
             WorkComplete::Complete
@@ -279,7 +373,7 @@ async fn app_validation_workflow_inner(
     let awaiting_ops = awaiting_ops.load(Ordering::SeqCst);
     let rejected_ops = rejected_ops.load(Ordering::SeqCst);
     let ops_validated = accepted_ops + rejected_ops;
-    tracing::debug!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected.");
+    tracing::info!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected.");
 
     let outcome_summary = OutcomeSummary {
         ops_to_validate: num_ops_to_validate,
@@ -291,6 +385,7 @@ async fn app_validation_workflow_inner(
     Ok(outcome_summary)
 }
 
+// This fn is only used in the zome call workflow's inline validation.
 pub async fn record_to_op(
     record: Record,
     op_type: DhtOpType,
