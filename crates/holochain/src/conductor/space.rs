@@ -565,7 +565,7 @@ impl Spaces {
             SELECT DhtOp.hash, DhtOp.type AS dht_type,
             Action.blob AS action_blob, Entry.blob AS entry_blob
             FROM DHtOp
-            JOIN Action ON DhtOp.action_hash = Action.hash
+            LEFT JOIN Action ON DhtOp.action_hash = Action.hash
             LEFT JOIN Entry ON Action.entry_hash = Entry.hash
             WHERE
             DhtOp.hash = ?
@@ -589,25 +589,29 @@ impl Spaces {
                     let mut stmt = txn.prepare_cached(&sql)?;
                     let mut rows = stmt.query([hash])?;
                     if let Some(row) = rows.next()? {
-                        let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                         let op_type: DhtOpType = row.get("dht_type")?;
-                        let hash: DhtOpHash = row.get("hash")?;
-                        // Check the entry isn't private before gossiping it.
-                        let mut entry: Option<Entry> = None;
-                        if action
-                            .0
-                            .entry_type()
-                            .filter(|et| *et.visibility() == EntryVisibility::Public)
-                            .is_some()
-                        {
-                            let e: Option<Vec<u8>> = row.get("entry_blob")?;
-                            entry = match e {
-                                Some(entry) => Some(from_blob::<Entry>(entry)?),
-                                None => None,
-                            };
+                        match op_type {
+                            DhtOpType::Chain(op_type) => {
+                                let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
+                                let hash: DhtOpHash = row.get("hash")?;
+                                // Check the entry isn't private before gossiping it.
+                                let mut entry: Option<Entry> = None;
+                                if action
+                                    .0
+                                    .entry_type()
+                                    .filter(|et| *et.visibility() == EntryVisibility::Public)
+                                    .is_some()
+                                {
+                                    let e: Option<Vec<u8>> = row.get("entry_blob")?;
+                                    entry = match e {
+                                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                                        None => None,
+                                    };
+                                }
+                                let op = ChainOp::from_type(op_type, action, entry)?.into();
+                                out.push((hash, op))
+                            }
                         }
-                        let op = ChainOp::from_type(op_type, action, entry)?.into();
-                        out.push((hash, op))
                     } else {
                         return Err(holochain_state::query::StateQueryError::Sql(
                             rusqlite::Error::QueryReturnedNoRows,

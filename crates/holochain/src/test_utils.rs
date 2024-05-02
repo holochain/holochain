@@ -747,7 +747,7 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
             SELECT
             DhtOp.type, Action.blob as action_blob, Entry.blob as entry_blob
             FROM DhtOp
-            JOIN
+            LEFT JOIN
             Action ON DhtOp.action_hash = Action.hash
             LEFT JOIN
             Entry ON Action.entry_hash = Entry.hash
@@ -759,14 +759,17 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
         .unwrap()
         .query_and_then(named_params! {}, |row| {
             let op_type: DhtOpType = row.get("type")?;
-            let action: SignedAction = from_blob(row.get("action_blob")?)?;
-            let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-            let entry: Option<Entry> = match entry {
-                Some(entry) => Some(from_blob::<Entry>(entry)?),
-                None => None,
-            };
-            // Ok(ChainOp::from_type(op_type, action, entry)?);
-            todo!("handle non-chain ops")
+            match op_type {
+                DhtOpType::Chain(op_type) => {
+                    let action: SignedAction = from_blob(row.get("action_blob")?)?;
+                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                    let entry: Option<Entry> = match entry {
+                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                        None => None,
+                    };
+                    Ok(ChainOp::from_type(op_type, action, entry)?.into())
+                }
+            }
         })
         .unwrap()
         .collect::<StateQueryResult<_>>()

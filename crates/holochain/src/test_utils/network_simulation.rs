@@ -492,22 +492,26 @@ fn get_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
         "
                 SELECT DhtOp.hash, DhtOp.type AS dht_type,
                 Action.blob AS action_blob, Entry.blob AS entry_blob
-                FROM DHtOp
-                JOIN Action ON DhtOp.action_hash = Action.hash
+                FROM DhtOp
+                LEFT JOIN Action ON DhtOp.action_hash = Action.hash
                 LEFT JOIN Entry ON Action.entry_hash = Entry.hash
             ",
     )
     .unwrap()
     .query_map([], |row| {
-        let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
         let op_type: DhtOpType = row.get("dht_type")?;
-        let hash: DhtOpHash = row.get("hash")?;
-        // Check the entry isn't private before gossiping it.
-        let e: Option<Vec<u8>> = row.get("entry_blob")?;
-        let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
-        let op = ChainOp::from_type(op_type, action, entry).unwrap();
-        let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
-        Ok((Arc::new(hash), op))
+        match op_type {
+            DhtOpType::Chain(op_type) => {
+                let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
+                let hash: DhtOpHash = row.get("hash")?;
+                // Check the entry isn't private before gossiping it.
+                let e: Option<Vec<u8>> = row.get("entry_blob")?;
+                let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
+                let op = ChainOp::from_type(op_type, action, entry).unwrap().into();
+                let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
+                Ok((Arc::new(hash), op))
+            }
+        }
     })
     .unwrap()
     .collect::<Result<HashMap<_, _>, _>>()
@@ -523,7 +527,7 @@ fn get_authored_ops(
                 SELECT DhtOp.hash, DhtOp.type AS dht_type,
                 Action.blob AS action_blob, Entry.blob AS entry_blob
                 FROM DHtOp
-                JOIN Action ON DhtOp.action_hash = Action.hash
+                LEFT JOIN Action ON DhtOp.action_hash = Action.hash
                 LEFT JOIN Entry ON Action.entry_hash = Entry.hash
                 WHERE
                 Action.author = ?
@@ -531,15 +535,19 @@ fn get_authored_ops(
     )
     .unwrap()
     .query_map([author], |row| {
-        let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
         let op_type: DhtOpType = row.get("dht_type")?;
-        let hash: DhtOpHash = row.get("hash")?;
-        // Check the entry isn't private before gossiping it.
-        let e: Option<Vec<u8>> = row.get("entry_blob")?;
-        let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
-        let op = ChainOp::from_type(op_type, action, entry).unwrap();
-        let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
-        Ok((Arc::new(hash), op))
+        match op_type {
+            DhtOpType::Chain(op_type) => {
+                let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
+                let hash: DhtOpHash = row.get("hash")?;
+                // Check the entry isn't private before gossiping it.
+                let e: Option<Vec<u8>> = row.get("entry_blob")?;
+                let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
+                let op = ChainOp::from_type(op_type, action, entry).unwrap().into();
+                let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
+                Ok((Arc::new(hash), op))
+            }
+        }
     })
     .unwrap()
     .collect::<Result<HashMap<_, _>, _>>()
