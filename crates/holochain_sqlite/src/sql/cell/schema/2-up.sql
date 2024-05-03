@@ -17,4 +17,4 @@ SET
 ALTER TABLE
   DhtOp DROP COLUMN action_hash_old;
 -- Recreate index
-CREATE INDEX IF NOT EXISTS DhtOp_action_hash_idx ON DhtOp ( action_hash );
+CREATE INDEX IF NOT EXISTS DhtOp_action_hash_idx ON DhtOp (action_hash);
