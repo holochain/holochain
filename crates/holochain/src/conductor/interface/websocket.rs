@@ -1,6 +1,7 @@
 //! Module for establishing Websocket-based Interfaces,
 //! i.e. those configured with `InterfaceDriver::Websocket`
 
+use std::io::ErrorKind;
 use super::error::InterfaceResult;
 use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::manager::TaskManagerClient;
@@ -20,6 +21,7 @@ use holochain_conductor_api::{
 use holochain_types::app::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;
 use std::sync::Arc;
+use tokio::pin;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::*;
@@ -322,26 +324,28 @@ fn spawn_app_signals_handler(
         }
     });
 
-    // TODO - metrics to indicate if we're getting overloaded here.
     task_list
         .lock()
-        .push(tokio::task::spawn(rx_from_cell.for_each_concurrent(
-            CONCURRENCY_COUNT,
-            move |signal| {
-                let tx_to_iface = tx_to_iface.clone();
-                async move {
+        .push(tokio::task::spawn(async move {
+            pin!(rx_from_cell);
+            loop {
+                if let Some(signal) = rx_from_cell.next().await {
                     trace!(msg = "Sending signal!", ?signal);
-                    if let Err(err) = async move {
-                        tx_to_iface.signal(signal).await?;
-                        InterfaceResult::Ok(())
-                    }
-                    .await
+                    if let Err(err) = tx_to_iface.signal(signal).await
                     {
-                        error!(?err, "error emitting signal");
+                        if err.kind() == ErrorKind::Other && err.to_string() == "WebsocketClosed" {
+                            info!("Client has closed their websocket connection, closing signal handler");
+                        } else {
+                            error!(?err, "failed to emit signal, closing emitter");
+                        }
+                        break;
                     }
+                } else {
+                    trace!("No more signals from this cell, closing signal handler");
+                    break;
                 }
-            },
-        )));
+            }
+        }));
 }
 
 /// Starts a task that listens for messages coming from the external client on `rx_from_iface`
@@ -460,6 +464,11 @@ async fn handle_incoming_app_message(
 /// Test items needed by other crates
 #[cfg(any(test, feature = "test_utils"))]
 pub use crate::test_utils::setup_app_in_new_conductor;
+
+#[cfg(feature = "test_utils")]
+pub fn active_ws_tasks_count() -> usize {
+
+}
 
 #[cfg(test)]
 pub mod test {
