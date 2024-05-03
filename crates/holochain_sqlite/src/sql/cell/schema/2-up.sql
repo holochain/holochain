@@ -13,4 +13,4 @@ SET
   action_hash = action_hash_old;
 -- drop old column
 ALTER TABLE
-  DhtOp REMOVE COLUMN action_hash_old;
+  DhtOp DROP COLUMN action_hash_old;
