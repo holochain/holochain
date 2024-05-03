@@ -12,7 +12,9 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-kitsune_p2p_bootstrap = { version = "^0.3.0-dev.1", path = "../bootstrap", features = ["sqlite"] }
+kitsune_p2p_bootstrap = { version = "^0.3.0-dev.1", path = "../bootstrap", features = [
+  "sqlite",
+] }
 kitsune_p2p_types = { version = "^0.4.0-dev.1", path = "../types" }
 kitsune_p2p_bin_data = { version = "^0.4.0-dev.1", path = "../bin_data" }
 serde_bytes = "0.11"
@@ -34,10 +36,7 @@ workspace = true
 [features]
 default = ["tx5"]
 
-tx2 = [ "kitsune_p2p_types/tx2" ]
-tx5 = [ "kitsune_p2p_types/tx5"]
+tx2 = ["kitsune_p2p_types/tx2"]
+tx5 = ["kitsune_p2p_types/tx5"]
 
-test_utils = [
-    "kitsune_p2p_bin_data/fixt",
-    "kitsune_p2p_types/fixt"
-]
+test_utils = ["kitsune_p2p_bin_data/fixt", "kitsune_p2p_types/fixt"]

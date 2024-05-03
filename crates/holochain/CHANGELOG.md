@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- App validation workflow: Add module-level documentation.
 - Validation: Remove unused type `DhtOpOrder`. This type is superseded by `OpOrder`.
 
 ## 0.4.0-dev.1
