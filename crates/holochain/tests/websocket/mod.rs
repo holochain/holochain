@@ -994,7 +994,10 @@ async fn emit_signal_after_app_connection_closed() {
         .await
         .0;
     let installed_app_id: InstalledAppId = "app".into();
-    let app = conductor.setup_app(&installed_app_id, &[dna_file]).await.unwrap();
+    let app = conductor
+        .setup_app(&installed_app_id, &[dna_file])
+        .await
+        .unwrap();
     let cells = app.into_cells();
     let cell = cells.first().unwrap();
 
@@ -1008,19 +1011,16 @@ async fn emit_signal_after_app_connection_closed() {
 
     authenticate_app_ws_client(
         tx.clone(),
-        conductor.get_arbitrary_admin_websocket_port()
+        conductor
+            .get_arbitrary_admin_websocket_port()
             .expect("No admin ports on this conductor"),
         installed_app_id.clone(),
     )
-        .await;
+    .await;
 
     // Emit a signal
     let _: () = conductor
-        .call(
-            &cell.zome(TestWasm::EmitSignal),
-            "emit",
-            (),
-        )
+        .call(&cell.zome(TestWasm::EmitSignal), "emit", ())
         .await;
 
     // That should be received because the app interface is connected
@@ -1033,11 +1033,7 @@ async fn emit_signal_after_app_connection_closed() {
 
     // Emit another signal
     let _: () = conductor
-        .call(
-            &cell.zome(TestWasm::EmitSignal),
-            "emit",
-            (),
-        )
+        .call(&cell.zome(TestWasm::EmitSignal), "emit", ())
         .await;
 
     // That should not be received because the app interface is disconnected

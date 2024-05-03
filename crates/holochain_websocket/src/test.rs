@@ -349,9 +349,7 @@ async fn handle_client_close() {
 
         let (send, mut recv) = l.accept().await.unwrap();
         let s_task =
-            tokio::task::spawn(
-                async move { while let Ok(_r) = recv.recv::<TestMsg>().await {} },
-            );
+            tokio::task::spawn(async move { while let Ok(_r) = recv.recv::<TestMsg>().await {} });
 
         let sender = tokio::task::spawn(async move {
             loop {
@@ -359,7 +357,9 @@ async fn handle_client_close() {
                     Ok(_) => {
                         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                     }
-                    Err(e) if e.kind() == ErrorKind::Other && e.to_string() == "WebsocketClosed" => {
+                    Err(e)
+                        if e.kind() == ErrorKind::Other && e.to_string() == "WebsocketClosed" =>
+                    {
                         break;
                     }
                     Err(e) => {
@@ -391,7 +391,8 @@ async fn handle_client_close() {
     // Listens for one signal then stops listening without closing the connection
     r_task.await.unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(5), l_task).await
+    tokio::time::timeout(std::time::Duration::from_secs(5), l_task)
+        .await
         .expect("Timeout waiting for shutdown")
         .expect("Error joining the signal sender task")
         .expect("Other error than WebsocketClosed while sending signals");

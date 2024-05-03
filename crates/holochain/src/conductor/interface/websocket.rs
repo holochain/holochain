@@ -1,7 +1,6 @@
 //! Module for establishing Websocket-based Interfaces,
 //! i.e. those configured with `InterfaceDriver::Websocket`
 
-use std::io::ErrorKind;
 use super::error::InterfaceResult;
 use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::manager::TaskManagerClient;
@@ -12,6 +11,7 @@ use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
+use std::io::ErrorKind;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 
 use crate::conductor::api::{AdminInterfaceApi, AppAuthentication, AppInterfaceApi};
@@ -324,28 +324,27 @@ fn spawn_app_signals_handler(
         }
     });
 
-    task_list
-        .lock()
-        .push(tokio::task::spawn(async move {
-            pin!(rx_from_cell);
-            loop {
-                if let Some(signal) = rx_from_cell.next().await {
-                    trace!(msg = "Sending signal!", ?signal);
-                    if let Err(err) = tx_to_iface.signal(signal).await
-                    {
-                        if err.kind() == ErrorKind::Other && err.to_string() == "WebsocketClosed" {
-                            info!("Client has closed their websocket connection, closing signal handler");
-                        } else {
-                            error!(?err, "failed to emit signal, closing emitter");
-                        }
-                        break;
+    task_list.lock().push(tokio::task::spawn(async move {
+        pin!(rx_from_cell);
+        loop {
+            if let Some(signal) = rx_from_cell.next().await {
+                trace!(msg = "Sending signal!", ?signal);
+                if let Err(err) = tx_to_iface.signal(signal).await {
+                    if err.kind() == ErrorKind::Other && err.to_string() == "WebsocketClosed" {
+                        info!(
+                            "Client has closed their websocket connection, closing signal handler"
+                        );
+                    } else {
+                        error!(?err, "failed to emit signal, closing emitter");
                     }
-                } else {
-                    trace!("No more signals from this cell, closing signal handler");
                     break;
                 }
+            } else {
+                trace!("No more signals from this cell, closing signal handler");
+                break;
             }
-        }));
+        }
+    }));
 }
 
 /// Starts a task that listens for messages coming from the external client on `rx_from_iface`
