@@ -465,11 +465,6 @@ async fn handle_incoming_app_message(
 #[cfg(any(test, feature = "test_utils"))]
 pub use crate::test_utils::setup_app_in_new_conductor;
 
-#[cfg(feature = "test_utils")]
-pub fn active_ws_tasks_count() -> usize {
-
-}
-
 #[cfg(test)]
 pub mod test {
     use super::*;
