@@ -2,7 +2,6 @@
 name = "test_wasm_migrate_new"
 description = "Test wasm for DNA migration, intended to be the migration target"
 version = "0.0.1"
-authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2021"
 
 [lib]
