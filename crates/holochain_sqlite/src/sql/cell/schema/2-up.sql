@@ -1,3 +1,5 @@
+-- Drop index on old column
+DROP INDEX DhtOp_action_hash_idx;
 -- backup existing column
 ALTER TABLE
   DhtOp RENAME COLUMN action_hash TO action_hash_old;
@@ -14,3 +16,5 @@ SET
 -- drop old column
 ALTER TABLE
   DhtOp DROP COLUMN action_hash_old;
+-- Recreate index
+CREATE INDEX IF NOT EXISTS DhtOp_action_hash_idx ON DhtOp ( action_hash );
