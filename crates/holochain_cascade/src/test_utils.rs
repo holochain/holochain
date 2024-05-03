@@ -8,7 +8,6 @@ use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::AnyDhtHashPrimitive;
 use holo_hash::EntryHash;
-use holo_hash::HasHash;
 use holochain_nonce::Nonce256Bits;
 use holochain_p2p::actor;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;

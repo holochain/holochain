@@ -561,6 +561,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
                 op.get_type(),
                 op.action().action_type(),
             ),
+            DhtOp::WarrantOp(_op) => unreachable!("todo: warrants"),
         }
     }
 

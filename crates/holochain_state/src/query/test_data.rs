@@ -1,8 +1,8 @@
 #![allow(clippy::clippy::redundant_clone)]
 use ::fixt::prelude::*;
 use holo_hash::*;
+use holochain_types::action::NewEntryAction;
 use holochain_types::dht_op::{ChainOp, ChainOpHashed};
-use holochain_types::{action::NewEntryAction, dht_op::DhtOp};
 use holochain_zome_types::prelude::*;
 
 use super::link::*;

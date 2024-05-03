@@ -8,7 +8,6 @@ use holochain_cascade::test_utils::fill_db;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::test_keystore;
 use holochain_p2p::dht::prelude::*;
-use holochain_types::dht_op::{DhtOp, DhtOpHashed};
 use holochain_types::facts::valid_chain_op;
 use holochain_types::prelude::*;
 use kitsune_p2p_types::dht::ArqStrat;
@@ -65,8 +64,8 @@ async fn test_region_queries() {
     let strat = ArqStrat::default();
 
     // Builds an arbitrary valid op at the given timestamp
-    let mut arbitrary_valid_op = |timestamp: Timestamp| -> DhtOp {
-        let mut op = DhtOp::arbitrary(&mut g).unwrap();
+    let mut arbitrary_valid_chain_op = |timestamp: Timestamp| -> ChainOp {
+        let mut op = ChainOp::arbitrary(&mut g).unwrap();
         *op.author_mut() = agent.clone();
         let mut fact = valid_chain_op(keystore.clone(), agent.clone(), true);
         op = fact.satisfy(&mut g, op).unwrap();
@@ -93,22 +92,22 @@ async fn test_region_queries() {
     for _ in 0..NUM_OPS {
         // timestamp is between 1 and 4 time quanta ago, which is the historical
         // window
-        let op = arbitrary_valid_op(
+        let op = arbitrary_valid_chain_op(
             (five_quanta_ago + Duration::from_millis(rand::thread_rng().gen_range(0..tq_ms * 4)))
                 .unwrap(),
         );
-        let op = DhtOpHashed::from_content_sync(op);
+        let op = ChainOpHashed::from_content_sync(op);
         fill_db(&db, op.clone()).await;
         ops.push(op.clone());
 
         // also construct ops which are in the recent time window,
         // to test that these ops don't get returned in region queries.
-        let op2 = arbitrary_valid_op(
+        let op2 = arbitrary_valid_chain_op(
             (five_quanta_ago
                 + Duration::from_millis(rand::thread_rng().gen_range(tq_ms * 4..=tq_ms * 5)))
             .unwrap(),
         );
-        let op2 = DhtOpHashed::from_content_sync(op2);
+        let op2 = ChainOpHashed::from_content_sync(op2);
         fill_db(&db, op2).await;
     }
     let region_set = query_region_set(

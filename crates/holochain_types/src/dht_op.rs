@@ -46,6 +46,8 @@ mod tests;
 pub enum DhtOp {
     /// An op representing storage of some record information.
     ChainOp(ChainOp),
+    /// TODO, new type of op
+    WarrantOp(Warrant),
 }
 
 /// A unit of DHT gossip concerning source chain data.
@@ -339,6 +341,7 @@ impl DhtOp {
     fn as_unique_form(&self) -> UniqueForm<'_> {
         match self {
             Self::ChainOp(op) => op.as_unique_form(),
+            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
         }
     }
 
@@ -346,6 +349,7 @@ impl DhtOp {
     pub fn as_chain_op(&self) -> Option<&ChainOp> {
         match self {
             Self::ChainOp(op) => Some(op),
+            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
         }
     }
 
@@ -353,6 +357,7 @@ impl DhtOp {
     pub fn get_type(&self) -> DhtOpType {
         match self {
             Self::ChainOp(op) => DhtOpType::Chain(op.get_type()),
+            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
         }
     }
 
@@ -365,12 +370,14 @@ impl DhtOp {
     pub fn signature(&self) -> &Signature {
         match self {
             Self::ChainOp(op) => op.signature(),
+            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
         }
     }
 
     fn to_order(&self) -> OpOrder {
         match self {
-            DhtOp::ChainOp(op) => OpOrder::new(op.get_type(), op.timestamp()),
+            Self::ChainOp(op) => OpOrder::new(op.get_type(), op.timestamp()),
+            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
         }
     }
 
@@ -378,6 +385,7 @@ impl DhtOp {
     pub fn author(&self) -> AgentPubKey {
         match self {
             Self::ChainOp(op) => op.action().author().clone(),
+            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
         }
     }
 
@@ -385,6 +393,7 @@ impl DhtOp {
     pub fn timestamp(&self) -> Timestamp {
         match self {
             Self::ChainOp(op) => op.timestamp(),
+            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
         }
     }
 
@@ -392,6 +401,7 @@ impl DhtOp {
     pub fn to_lite(&self) -> DhtOpLite {
         match self {
             Self::ChainOp(op) => DhtOpLite::Chain(op.to_lite()),
+            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
         }
     }
 
@@ -399,6 +409,7 @@ impl DhtOp {
     pub fn sys_validation_dependency(&self) -> SysValDep {
         match self {
             Self::ChainOp(op) => op.get_type().sys_validation_dependency(&op.action()),
+            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
         }
     }
 }

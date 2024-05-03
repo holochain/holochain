@@ -21,7 +21,7 @@ use holochain_state::mutations::insert_op;
 use holochain_state::prelude::{from_blob, StateQueryResult};
 use holochain_state::test_utils::test_db_dir;
 use holochain_state::validation_db::ValidationStage;
-use holochain_types::dht_op::{DhtOp, DhtOpHashed};
+use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::{TestWasm, TestWasmPair, TestZomes};
@@ -883,8 +883,12 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     .query_and_then([], |row| {
         let op_type: DhtOpType = row.get("type")?;
         let hash: ActionHash = row.get("hash")?;
-        let action: SignedAction = from_blob(row.get("blob")?)?;
-        Ok(ChainOpLite::from_type(op_type, hash, &action.0)?)
+        match op_type {
+            DhtOpType::Chain(op_type) => {
+                let action: SignedAction = from_blob(row.get("blob")?)?;
+                Ok(ChainOpLite::from_type(op_type, hash, &action.0)?.into())
+            }
+        }
     })
     .unwrap()
     .collect::<StateQueryResult<Vec<DhtOpLite>>>()

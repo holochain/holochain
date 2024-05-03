@@ -329,8 +329,8 @@ mod tests {
     async fn assert_sorted_by_op_order(ops: &Vec<DhtOpHashed>) {
         let mut ops_sorted = ops.clone();
         ops_sorted.sort_by_key(|d| {
-            let op_type = d.as_content().get_type();
-            let timestamp = d.as_content().action().timestamp();
+            let op_type = d.get_type();
+            let timestamp = d.timestamp();
             OpOrder::new(op_type, timestamp)
         });
         assert_eq!(ops, &ops_sorted);

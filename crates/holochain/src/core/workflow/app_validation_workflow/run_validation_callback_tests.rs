@@ -18,7 +18,7 @@ use holochain_p2p::{HolochainP2pDnaFixturator, MockHolochainP2pDnaT};
 use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, mutations::insert_op};
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
-    dht_op::{DhtOp, DhtOpHashed, WireOps},
+    dht_op::{ChainOp, DhtOpHashed, WireOps},
     record::WireRecordOps,
 };
 use holochain_wasmer_host::module::ModuleCache;
@@ -713,7 +713,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     );
 
     // filtering out ops with missing dependencies should not filter anything
-    let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
+    let ops_to_validate = vec![DhtOpHashed::from_content_sync(delete_dht_op.clone())];
     let filtered_ops_to_validate = validation_dependencies
         .lock()
         .filter_ops_missing_dependencies(ops_to_validate.clone());
@@ -744,7 +744,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     );
 
     // filtering out ops with missing dependencies should filter out delete
-    let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
+    let ops_to_validate = vec![DhtOpHashed::from_content_sync(delete_dht_op.clone())];
     let filtered_ops_to_validate = validation_dependencies
         .lock()
         .filter_ops_missing_dependencies(ops_to_validate.clone());
@@ -775,7 +775,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     );
 
     // filtering out ops with missing dependencies should not filter anything
-    let ops_to_validate = vec![delete_dht_op.into_hashed()];
+    let ops_to_validate = vec![DhtOpHashed::from_content_sync(delete_dht_op)];
     let filtered_ops_to_validate = validation_dependencies
         .lock()
         .filter_ops_missing_dependencies(ops_to_validate.clone());

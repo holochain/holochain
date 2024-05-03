@@ -81,7 +81,7 @@ pub(crate) fn incoming_countersigning(
                     // Check if already timed out.
                     if holochain_zome_types::prelude::Timestamp::now() < expires {
                         // Put this op in the pending map.
-                        workspace.put(entry_hash, hash, op.into(), required_actions, expires);
+                        workspace.put(entry_hash, hash, op, required_actions, expires);
                         // We have new ops so we should trigger the workflow.
                         should_trigger = true;
                     }
@@ -328,7 +328,7 @@ pub async fn countersigning_publish(
         if let Err(e) = network
             .countersigning_session_negotiation(
                 vec![enzyme.clone()],
-                CountersigningSessionNegotiationMessage::EnzymePush(Box::new(op.into())),
+                CountersigningSessionNegotiationMessage::EnzymePush(Box::new(op)),
             )
             .await
         {
@@ -474,7 +474,7 @@ mod tests {
         // - Create the ops.
         let data = |u: &mut arbitrary::Unstructured| {
             let op_hash = DhtOpHash::arbitrary(u).unwrap();
-            let op = DhtOp::arbitrary(u).unwrap();
+            let op = ChainOp::arbitrary(u).unwrap();
             let action = op.action();
             (op_hash, op, action)
         };
@@ -525,7 +525,7 @@ mod tests {
 
         // - Create an op for a session that has expired in the past.
         let op_hash = DhtOpHash::arbitrary(&mut u).unwrap();
-        let op = DhtOp::arbitrary(&mut u).unwrap();
+        let op = ChainOp::arbitrary(&mut u).unwrap();
         let action = op.action();
         let entry_hash = EntryHash::arbitrary(&mut u).unwrap();
         let action_hash = ActionHash::with_data_sync(&action);

@@ -5,9 +5,9 @@ use holo_hash::*;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::rusqlite::TransactionBehavior;
 use holochain_sqlite::{rusqlite::Connection, schema::SCHEMA_CELL};
+use holochain_types::action::NewEntryAction;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::OpOrder;
-use holochain_types::{action::NewEntryAction, dht_op::DhtOp};
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::prelude::*;
 

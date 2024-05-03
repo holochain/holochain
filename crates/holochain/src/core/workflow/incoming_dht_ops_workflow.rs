@@ -215,6 +215,7 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
             let signature = op.signature();
             Ok(counterfeit_check(signature, &action).await?)
         }
+        DhtOp::WarrantOp(_op) => unreachable!("todo: warrants"),
     }
 }
 

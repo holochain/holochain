@@ -546,11 +546,11 @@ mod tests {
                                         let op_hash = DhtOpHash::with_data_sync(&op);
                                         match expected.get(&op_hash) {
                                             Some((expected_op, count)) => {
-                                                assert_eq!(&op, expected_op);
+                                                assert_eq!(op, DhtOp::from(expected_op.clone()));
                                                 count.fetch_add(1, Ordering::SeqCst);
                                             }
                                             None => {
-                                                if let ChainOp::StoreEntry(_, h, _) = op {
+                                                if let ChainOp::StoreEntry(_, h, _) = op.as_chain_op().expect("warrants not handled here") {
                                                     if *h.visibility() == EntryVisibility::Private {
                                                         panic!(
                                                             "A private op has been published: {:?}",

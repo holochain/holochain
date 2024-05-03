@@ -468,6 +468,7 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                     }
                     _ => None,
                 },
+                DhtOp::WarrantOp(_op) => unreachable!("todo: warrants"),
             }
         })
         .flatten()
@@ -497,6 +498,7 @@ pub(crate) async fn validate_op(
 ) -> WorkflowResult<Outcome> {
     let result = match op {
         DhtOp::ChainOp(op) => validate_chain_op(op, dna_def, validation_dependencies).await,
+        DhtOp::WarrantOp(_op) => unreachable!("todo: warrants"),
     };
     match result {
         Ok(_) => Ok(Outcome::Accepted),

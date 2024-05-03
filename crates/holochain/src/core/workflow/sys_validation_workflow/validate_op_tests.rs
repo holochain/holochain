@@ -28,7 +28,7 @@ async fn validate_valid_dna_op() {
         timestamp: Timestamp::now().into(),
         hash: test_case.dna_def_hash().hash,
     };
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action)).into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -59,7 +59,7 @@ async fn validate_dna_op_mismatched_dna_hash() {
         // Will not match the space hash from the test_case
         hash: mismatched_dna_hash.clone(),
     };
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action)).into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -90,7 +90,8 @@ async fn validate_dna_op_before_origin_time() {
         timestamp: Timestamp::now().into(),
         hash: test_case.dna_def_hash().hash,
     };
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action.clone()));
+    let op =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action.clone())).into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -131,7 +132,8 @@ async fn non_dna_op_as_first_action() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create.clone()));
+    let op =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create.clone())).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -173,7 +175,8 @@ async fn validate_valid_agent_validation_package_op() {
         prev_action: previous_action.as_hash().clone(),
         membrane_proof: None,
     };
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::AgentValidationPkg(action));
+    let op =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::AgentValidationPkg(action)).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -219,7 +222,7 @@ async fn validate_valid_create_op() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -265,7 +268,7 @@ async fn validate_create_op_with_prev_from_network() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
 
     test_case
         .cascade_mut()
@@ -318,7 +321,7 @@ async fn validate_create_op_with_prev_action_not_found() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
 
     test_case
         .cascade_mut()
@@ -369,7 +372,8 @@ async fn validate_create_op_author_mismatch_with_prev() {
         visibility: EntryVisibility::Public,
     });
     let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()))
+            .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -425,7 +429,8 @@ async fn validate_create_op_with_timestamp_same_as_prev() {
         visibility: EntryVisibility::Public,
     });
     let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()))
+            .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -468,7 +473,8 @@ async fn validate_create_op_with_timestamp_before_prev() {
         visibility: EntryVisibility::Public,
     });
     let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()))
+            .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -521,7 +527,8 @@ async fn validate_create_op_seq_number_decrements() {
         visibility: EntryVisibility::Public,
     });
     let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()))
+            .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -571,7 +578,8 @@ async fn validate_create_op_seq_number_reused() {
         visibility: EntryVisibility::Public,
     });
     let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()))
+            .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -623,7 +631,8 @@ async fn validate_create_op_not_preceeded_by_avp() {
     create_action.timestamp = Timestamp::now().into();
     create_action.entry_type = EntryType::AgentPubKey;
     let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()))
+            .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action.clone()])
@@ -678,7 +687,8 @@ async fn validate_avp_op_not_followed_by_create() {
     let op = ChainOp::RegisterAgentActivity(
         fixt!(Signature),
         Action::CreateLink(create_link_action.clone()),
-    );
+    )
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action.clone()])
@@ -736,7 +746,8 @@ async fn validate_valid_store_record_with_no_entry() {
         fixt!(Signature),
         Action::Create(create_action),
         holochain_zome_types::record::RecordEntry::NotStored,
-    );
+    )
+    .into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -781,7 +792,8 @@ async fn validate_store_record_leaks_entry() {
         fixt!(Signature),
         Action::Create(create_action),
         holochain_zome_types::record::RecordEntry::Present(Entry::App(fixt!(AppEntryBytes))), // but go ahead and provide the entry data anyway
-    );
+    )
+    .into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -823,7 +835,8 @@ async fn validate_store_record_with_entry_having_wrong_entry_type() {
         fixt!(Signature),
         Action::Create(create_action),
         holochain_zome_types::record::RecordEntry::Present(app_entry),
-    );
+    )
+    .into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -880,7 +893,8 @@ async fn validate_store_record_with_entry_having_wrong_entry_hash() {
         Action::Create(create_action),
         // Create some new data which will have a different hash
         holochain_zome_types::record::RecordEntry::Present(mismatched_entry),
-    );
+    )
+    .into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -940,7 +954,8 @@ async fn validate_store_record_with_large_entry() {
         fixt!(Signature),
         Action::Create(create_action),
         holochain_zome_types::record::RecordEntry::Present(app_entry),
-    );
+    )
+    .into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -1009,7 +1024,8 @@ async fn validate_valid_store_record_update() {
         fixt!(Signature),
         Action::Update(update_action),
         holochain_zome_types::record::RecordEntry::Present(app_entry),
-    );
+    )
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_update_signed_action])
@@ -1068,7 +1084,8 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
         fixt!(Signature),
         Action::Update(update_action),
         holochain_zome_types::record::RecordEntry::Present(app_entry),
-    );
+    )
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone()])
@@ -1145,7 +1162,8 @@ async fn validate_store_record_update_changes_entry_type() {
         fixt!(Signature),
         Action::Update(update_action.clone()),
         holochain_zome_types::record::RecordEntry::Present(app_entry),
-    );
+    )
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_update_signed_action])
@@ -1199,7 +1217,8 @@ async fn validate_store_entry_with_entry_having_wrong_entry_type() {
         fixt!(Signature),
         holochain_types::action::NewEntryAction::Create(create_action),
         app_entry,
-    );
+    )
+    .into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -1256,7 +1275,8 @@ async fn validate_store_entry_with_entry_having_wrong_entry_hash() {
         holochain_types::action::NewEntryAction::Create(create_action),
         // Create some new data which will have a different hash
         mismatched_entry,
-    );
+    )
+    .into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -1316,7 +1336,8 @@ async fn validate_store_entry_with_large_entry() {
         fixt!(Signature),
         holochain_types::action::NewEntryAction::Create(create_action),
         app_entry,
-    );
+    )
+    .into();
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -1385,7 +1406,8 @@ async fn validate_valid_store_entry_update() {
         fixt!(Signature),
         holochain_types::action::NewEntryAction::Update(update_action),
         app_entry,
-    );
+    )
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_update_signed_action])
@@ -1440,7 +1462,8 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
         fixt!(Signature),
         holochain_types::action::NewEntryAction::Update(update_action),
         app_entry,
-    );
+    )
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone()])
@@ -1517,7 +1540,8 @@ async fn validate_store_entry_update_changes_entry_type() {
         fixt!(Signature),
         holochain_types::action::NewEntryAction::Update(update_action.clone()),
         app_entry,
-    );
+    )
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone()])
@@ -1581,7 +1605,8 @@ async fn validate_valid_register_updated_content() {
         fixt!(Signature),
         update_action,
         RecordEntry::Present(app_entry),
-    );
+    )
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_update_signed_action])
@@ -1633,7 +1658,8 @@ async fn validate_register_updated_content_missing_updates_ref() {
         fixt!(Signature),
         update_action,
         RecordEntry::Present(app_entry),
-    );
+    )
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_prev_action])
@@ -1688,7 +1714,8 @@ async fn validate_valid_register_updated_record() {
         fixt!(Signature),
         update_action,
         RecordEntry::Present(app_entry),
-    );
+    )
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_update_signed_action])
@@ -1740,7 +1767,8 @@ async fn validate_register_updated_record_missing_updates_ref() {
         fixt!(Signature),
         update_action,
         RecordEntry::Present(app_entry),
-    );
+    )
+    .into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_prev_action])
@@ -1782,7 +1810,7 @@ async fn validate_valid_register_deleted_by() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
     delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = ChainOp::RegisterDeletedBy(fixt!(Signature), delete_action);
+    let op = ChainOp::RegisterDeletedBy(fixt!(Signature), delete_action).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
@@ -1822,7 +1850,7 @@ async fn validate_register_deleted_by_with_missing_deletes_ref() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
     delete_action.deletes_address = mismatched_action_hash;
-    let op = ChainOp::RegisterDeletedBy(fixt!(Signature), delete_action);
+    let op = ChainOp::RegisterDeletedBy(fixt!(Signature), delete_action).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_action])
@@ -1853,7 +1881,7 @@ async fn validate_register_deleted_by_wrong_delete_target() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
     delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = ChainOp::RegisterDeletedBy(fixt!(Signature), delete_action);
+    let op = ChainOp::RegisterDeletedBy(fixt!(Signature), delete_action).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action.clone()])
@@ -1896,7 +1924,7 @@ async fn validate_valid_register_deleted_entry_action() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
     delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete_action);
+    let op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete_action).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
@@ -1936,7 +1964,7 @@ async fn validate_register_deleted_entry_action_with_missing_deletes_ref() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
     delete_action.deletes_address = mismatched_action_hash;
-    let op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete_action);
+    let op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete_action).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_action])
@@ -1967,7 +1995,7 @@ async fn validate_register_deleted_entry_action_wrong_delete_target() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
     delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete_action);
+    let op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete_action).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action.clone()])
@@ -1994,7 +2022,7 @@ async fn validate_valid_add_link() {
     let mut create_link_action = fixt!(CreateLink);
     create_link_action.tag = "hello".as_bytes().to_vec().into();
     create_link_action.timestamp = Timestamp::now().into();
-    let op = ChainOp::RegisterAddLink(fixt!(Signature), create_link_action);
+    let op = ChainOp::RegisterAddLink(fixt!(Signature), create_link_action).into();
 
     // Note that no mocking is configured so the base and target addressed for the link aren't not going to be checked.
     // This is intentional as the validation isn't meant to check them but not very obvious from this test, hence the comment!
@@ -2013,7 +2041,7 @@ async fn validate_add_link_tag_too_large() {
     let mut create_link_action = fixt!(CreateLink);
     create_link_action.tag = vec![0; 2_000].into();
     create_link_action.timestamp = Timestamp::now().into();
-    let op = ChainOp::RegisterAddLink(fixt!(Signature), create_link_action);
+    let op = ChainOp::RegisterAddLink(fixt!(Signature), create_link_action).into();
 
     // Note that no mocking is configured so the base and target addressed for the link aren't not going to be checked.
     // This is intentional as the validation isn't meant to check them but not very obvious from this test, hence the comment!
@@ -2041,7 +2069,7 @@ async fn validate_valid_remove_link() {
     let mut delete_link_action = fixt!(DeleteLink);
     delete_link_action.timestamp = Timestamp::now().into();
     delete_link_action.link_add_address = previous_action.as_hash().clone();
-    let op = ChainOp::RegisterRemoveLink(fixt!(Signature), delete_link_action);
+    let op = ChainOp::RegisterRemoveLink(fixt!(Signature), delete_link_action).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -2079,7 +2107,7 @@ async fn validate_remove_link_missing_link_add_ref() {
     let mut delete_link_action = fixt!(DeleteLink);
     delete_link_action.timestamp = Timestamp::now().into();
     delete_link_action.link_add_address = mismatched_action_hash;
-    let op = ChainOp::RegisterRemoveLink(fixt!(Signature), delete_link_action);
+    let op = ChainOp::RegisterRemoveLink(fixt!(Signature), delete_link_action).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_action])
@@ -2111,7 +2139,7 @@ async fn validate_remove_link_with_wrong_target_type() {
     let mut delete_link_action = fixt!(DeleteLink);
     delete_link_action.timestamp = Timestamp::now().into();
     delete_link_action.link_add_address = previous_action.as_hash().clone();
-    let op = ChainOp::RegisterRemoveLink(fixt!(Signature), delete_link_action);
+    let op = ChainOp::RegisterRemoveLink(fixt!(Signature), delete_link_action).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action.clone()])
@@ -2307,5 +2335,5 @@ fn test_op(previous: SignedHashed<Action>) -> DhtOp {
     });
     let action = Action::Create(create_action);
 
-    ChainOp::RegisterAgentActivity(fixt!(Signature), action)
+    ChainOp::RegisterAgentActivity(fixt!(Signature), action).into()
 }
