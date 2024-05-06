@@ -1,5 +1,5 @@
 use super::sys_validation_workflow;
-use super::validation_deps::ValDeps;
+use super::validation_deps::SysValDeps;
 use super::validation_query::get_ops_to_app_validate;
 use super::SysValidationWorkspace;
 use crate::conductor::space::TestSpace;
@@ -277,7 +277,7 @@ struct TestCase {
     test_space: TestSpace,
     keystore: MetaLairClient,
     agent: AgentPubKey,
-    current_validation_dependencies: ValDeps,
+    current_validation_dependencies: SysValDeps,
     app_validation_trigger: (TriggerSender, TriggerReceiver),
     self_trigger: (TriggerSender, TriggerReceiver),
     actual_network: Option<MockHolochainP2pDnaT>,
@@ -299,7 +299,7 @@ impl TestCase {
             test_space,
             keystore,
             agent,
-            current_validation_dependencies: ValDeps::default(),
+            current_validation_dependencies: SysValDeps::default(),
             app_validation_trigger: TriggerSender::new(),
             self_trigger: TriggerSender::new(),
             actual_network: None,

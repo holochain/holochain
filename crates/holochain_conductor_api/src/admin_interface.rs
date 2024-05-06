@@ -521,9 +521,6 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::RevokeAppAuthenticationToken`].
     AppAuthenticationTokenRevoked,
-
-    /// Successful response to whatever request was made, with no extra information included
-    Ok,
 }
 
 /// Error type that goes over the websocket wire.

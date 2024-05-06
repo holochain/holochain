@@ -97,7 +97,7 @@ use std::time::Duration;
 use tracing::*;
 use types::Outcome;
 
-use self::validation_deps::ValDeps;
+use self::validation_deps::SysValDeps;
 use self::validation_deps::ValidationDependencies;
 use self::validation_deps::ValidationDependencyState;
 
@@ -126,7 +126,7 @@ mod validate_op_tests;
 ))]
 pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     workspace: Arc<SysValidationWorkspace>,
-    current_validation_dependencies: ValDeps,
+    current_validation_dependencies: SysValDeps,
     trigger_app_validation: TriggerSender,
     trigger_self: TriggerSender,
     network: Network,
@@ -220,7 +220,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
 
 async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
-    current_validation_dependencies: ValDeps,
+    current_validation_dependencies: SysValDeps,
     config: Arc<ConductorConfig>,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
@@ -337,7 +337,7 @@ async fn sys_validation_workflow_inner(
 }
 
 async fn retrieve_actions(
-    current_validation_dependencies: ValDeps,
+    current_validation_dependencies: SysValDeps,
     cascade: Arc<impl Cascade + Send + Sync>,
     action_hashes: impl Iterator<Item = ActionHash>,
 ) {
@@ -403,7 +403,7 @@ fn get_dependency_hashes_from_actions(actions: impl Iterator<Item = Action>) -> 
 /// Examine the list of provided actions and create a list of actions which are sys validation dependencies for those actions.
 /// The actions are merged into `current_validation_dependencies`.
 async fn fetch_previous_actions(
-    current_validation_dependencies: ValDeps,
+    current_validation_dependencies: SysValDeps,
     cascade: Arc<impl Cascade + Send + Sync>,
     actions: impl Iterator<Item = Action>,
 ) {
@@ -494,7 +494,7 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
 /// Examine the list of provided ops and create a list of actions which are sys validation dependencies for those ops.
 /// The actions are merged into `current_validation_dependencies`.
 async fn retrieve_previous_actions_for_ops(
-    current_validation_dependencies: ValDeps,
+    current_validation_dependencies: SysValDeps,
     cascade: Arc<impl Cascade + Send + Sync>,
     ops: impl Iterator<Item = DhtOpHashed>,
 ) {
@@ -510,7 +510,7 @@ async fn retrieve_previous_actions_for_ops(
 pub(crate) async fn validate_op(
     op: &DhtOp,
     dna_def: &DnaDefHashed,
-    validation_dependencies: ValDeps,
+    validation_dependencies: SysValDeps,
     dpki: Option<DpkiImpl>,
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(op, dna_def, validation_dependencies, dpki).await {
@@ -565,7 +565,7 @@ fn make_action_set_for_session_data(
 async fn validate_op_inner(
     op: &DhtOp,
     dna_def: &DnaDefHashed,
-    validation_dependencies: ValDeps,
+    validation_dependencies: SysValDeps,
     dpki: Option<DpkiImpl>,
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
@@ -712,7 +712,7 @@ async fn sys_validate_record_inner(
         maybe_entry: Option<&Entry>,
         cascade: Arc<impl Cascade + Send + Sync>,
     ) -> SysValidationResult<()> {
-        let validation_dependencies = ValDeps::default();
+        let validation_dependencies = SysValDeps::default();
         fetch_previous_actions(
             validation_dependencies.clone(),
             cascade.clone(),
@@ -772,7 +772,7 @@ pub async fn counterfeit_check(signature: &Signature, action: &Action) -> SysVal
 
 fn register_agent_activity(
     action: &Action,
-    validation_dependencies: ValDeps,
+    validation_dependencies: SysValDeps,
     dna_def: &DnaDefHashed,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -793,7 +793,7 @@ fn register_agent_activity(
     Ok(())
 }
 
-fn store_record(action: &Action, validation_dependencies: ValDeps) -> SysValidationResult<()> {
+fn store_record(action: &Action, validation_dependencies: SysValDeps) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_action_hash = action.prev_action();
 
@@ -817,7 +817,7 @@ fn store_record(action: &Action, validation_dependencies: ValDeps) -> SysValidat
 async fn store_entry(
     action: NewEntryActionRef<'_>,
     entry: &Entry,
-    validation_dependencies: ValDeps,
+    validation_dependencies: SysValDeps,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let entry_type = action.entry_type();
@@ -851,7 +851,7 @@ async fn store_entry(
 
 fn register_updated_content(
     entry_update: &Update,
-    validation_dependencies: ValDeps,
+    validation_dependencies: SysValDeps,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let original_action_address = &entry_update.original_action_address;
@@ -869,7 +869,7 @@ fn register_updated_content(
 
 fn register_updated_record(
     record_update: &Update,
-    validation_dependencies: ValDeps,
+    validation_dependencies: SysValDeps,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let original_action_address = &record_update.original_action_address;
@@ -887,7 +887,7 @@ fn register_updated_record(
 
 fn register_deleted_by(
     record_delete: &Delete,
-    validation_dependencies: ValDeps,
+    validation_dependencies: SysValDeps,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
@@ -905,7 +905,7 @@ fn register_deleted_by(
 
 fn register_deleted_entry_action(
     record_delete: &Delete,
-    validation_dependencies: ValDeps,
+    validation_dependencies: SysValDeps,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
@@ -927,7 +927,7 @@ fn register_add_link(link_add: &CreateLink) -> SysValidationResult<()> {
 
 fn register_delete_link(
     link_remove: &DeleteLink,
-    validation_dependencies: ValDeps,
+    validation_dependencies: SysValDeps,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let link_add_address = &link_remove.link_add_address;

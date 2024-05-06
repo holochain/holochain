@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::retrieve_previous_actions_for_ops;
-use super::validation_deps::ValDeps;
+use super::validation_deps::SysValDeps;
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::core::workflow::sys_validation_workflow::validate_op;
 use crate::core::workflow::WorkflowResult;
@@ -2174,7 +2174,7 @@ async fn crash_case() {
             .boxed()
         });
 
-    let validation_outcome = validate_op(&op, &dna_def, ValDeps::default(), None)
+    let validation_outcome = validate_op(&op, &dna_def, SysValDeps::default(), None)
         .await
         .unwrap();
 
@@ -2185,7 +2185,7 @@ struct TestCase {
     op: Option<DhtOp>,
     keystore: holochain_keystore::MetaLairClient,
     cascade: MockCascade,
-    current_validation_dependencies: ValDeps,
+    current_validation_dependencies: SysValDeps,
     dna_def: DnaDef,
     agent: AgentPubKey,
 }
@@ -2201,7 +2201,7 @@ impl TestCase {
             op: None,
             keystore,
             cascade: MockCascade::new(),
-            current_validation_dependencies: ValDeps::default(),
+            current_validation_dependencies: SysValDeps::default(),
             dna_def,
             agent,
         }

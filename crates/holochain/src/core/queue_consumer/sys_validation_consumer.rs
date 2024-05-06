@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::core::workflow::sys_validation_workflow::sys_validation_workflow;
-use crate::core::workflow::sys_validation_workflow::validation_deps::ValDeps;
+use crate::core::workflow::sys_validation_workflow::validation_deps::SysValDeps;
 use crate::core::workflow::sys_validation_workflow::SysValidationWorkspace;
 use tracing::*;
 
@@ -21,7 +21,7 @@ pub fn spawn_sys_validation_consumer(
     let space = Arc::new(space);
     let config = conductor.config.clone();
 
-    let current_validation_dependencies = ValDeps::default();
+    let current_validation_dependencies = SysValDeps::default();
 
     super::queue_consumer_dna_bound(
         "sys_validation_consumer",

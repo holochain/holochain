@@ -1451,6 +1451,10 @@ mod app_impls {
             ops: AppRoleResolution,
             ignore_genesis_failure: bool,
         ) -> ConductorResult<StoppedApp> {
+            if !is_app(&installed_app_id) {
+                return Err(ConductorError::Other(format!("Can't install app with reserved id '{installed_app_id}'")));
+            }
+
             let dpki = self.running_services().dpki.clone();
 
             let mut dpki = if let Some(d) = dpki.as_ref() {
@@ -2346,8 +2350,10 @@ mod service_impls {
                 tag
             };
 
-            let (derivation_path, dst_tag) =
-                derivation_path_for_dpki_instance(0, &device_seed_lair_tag);
+
+                let path = [0].into();
+                let dst_tag = format!("{tag}.0");
+            
             let seed_info = self
                 .keystore()
                 .lair_client()

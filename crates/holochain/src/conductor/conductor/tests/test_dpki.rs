@@ -64,9 +64,7 @@ fn make_mock_dpki_impl(u: &mut Unstructured<'_>, state: DpkiKeyState) -> DpkiImp
 
 async fn make_dpki_conductor_builder(
     u: &mut Unstructured<'_>,
-    // dpki: DpkiImpl,
     config: ConductorConfig,
-    // keystore: MetaLairClient,
     state: DpkiKeyState,
 ) -> ConductorBuilder {
     let keystore = test_keystore();

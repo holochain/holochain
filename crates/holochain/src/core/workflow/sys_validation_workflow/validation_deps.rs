@@ -10,7 +10,7 @@ use std::{
 /// The sources of all dependencies needed in sys validation.
 /// Currently this comprises only action hashes within the same DHT, but could
 /// some day include items from other DHTs or other sources.
-pub struct ValDeps {
+pub struct SysValDeps {
     /// Dependencies found in the same DHT as the dependent
     pub same_dht: Arc<parking_lot::Mutex<ValidationDependencies<SignedActionHashed>>>,
     /// Dependencies found in the DPKI service's Deepkey DNA
@@ -21,7 +21,7 @@ pub struct ValDeps {
     pub _deepkey_dht: Arc<parking_lot::Mutex<ValidationDependencies<EntryHashed>>>,
 }
 
-impl Default for ValDeps {
+impl Default for SysValDeps {
     fn default() -> Self {
         Self {
             same_dht: Arc::new(parking_lot::Mutex::new(ValidationDependencies::new())),
