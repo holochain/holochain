@@ -939,7 +939,7 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn emit_signal_after_app_connection_closed() {
-    holochain_trace::test_run();
+    holochain_trace::test_run().unwrap();
 
     let mut conductor = SweetConductor::from_standard_config().await;
 
@@ -958,19 +958,10 @@ async fn emit_signal_after_app_connection_closed() {
     // Connect to the app interface
     let port = conductor
         .clone()
-        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .add_app_interface(Either::Left(0))
         .await
         .expect("Couldn't create app interface");
     let (tx, mut rx) = websocket_client_by_port(port).await.unwrap();
-
-    authenticate_app_ws_client(
-        tx.clone(),
-        conductor
-            .get_arbitrary_admin_websocket_port()
-            .expect("No admin ports on this conductor"),
-        installed_app_id.clone(),
-    )
-    .await;
 
     // Emit a signal
     let _: () = conductor

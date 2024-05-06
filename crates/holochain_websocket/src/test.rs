@@ -216,7 +216,7 @@ async fn ipv6_or_ipv4_connect_on_specific_port() {
 // to drop that send handle.
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_client_close() {
-    holochain_trace::test_run();
+    holochain_trace::test_run().unwrap();
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq)]
     enum TestMsg {
