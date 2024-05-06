@@ -1,13 +1,18 @@
 -- no-sql-format --
 
-PRAGMA foreign_keys = off;
+DROP INDEX DhtOp_type_dep_idx;
+DROP INDEX DhtOp_type_when_int_idx;
+DROP INDEX DhtOp_validation_stage_idx;
+DROP INDEX DhtOp_stage_type_status_idx;
+DROP INDEX DhtOp_validation_status_idx;
+DROP INDEX DhtOp_authored_timestamp_idx;
+DROP INDEX DhtOp_storage_center_loc_idx;
+DROP INDEX DhtOp_action_hash_idx;
+DROP INDEX DhtOp_basis_hash_idx;
 
--- backup existing table
-ALTER TABLE
-  DhtOp RENAME TO DhtOp_old;
 
 -- create new table
-CREATE TABLE DhtOp (
+CREATE TABLE DhtOp_2up (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             TEXT           NOT NULL,
     basis_hash       BLOB           NOT NULL,
@@ -55,18 +60,22 @@ CREATE TABLE DhtOp (
 
     FOREIGN KEY(action_hash) REFERENCES Action(hash) ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS DhtOp_type_dep_idx ON DhtOp ( type, dependency );
-CREATE INDEX IF NOT EXISTS DhtOp_type_when_int_idx ON DhtOp ( type, when_integrated );
-CREATE INDEX IF NOT EXISTS DhtOp_validation_stage_idx ON DhtOp ( validation_stage, type, dependency );
-CREATE INDEX IF NOT EXISTS DhtOp_stage_type_status_idx ON DhtOp ( validation_stage, type, validation_status);
-CREATE INDEX IF NOT EXISTS DhtOp_validation_status_idx ON DhtOp ( validation_status );
-CREATE INDEX IF NOT EXISTS DhtOp_authored_timestamp_idx ON DhtOp ( authored_timestamp );
-CREATE INDEX IF NOT EXISTS DhtOp_storage_center_loc_idx ON DhtOp ( storage_center_loc );
-CREATE INDEX IF NOT EXISTS DhtOp_action_hash_idx ON DhtOp ( action_hash );
-CREATE INDEX IF NOT EXISTS DhtOp_basis_hash_idx ON DhtOp ( basis_hash );
 
--- copy data
-INSERT INTO DhtOp SELECT * FROM DhtOp_old;
+INSERT INTO DhtOp_2up SELECT * FROM DhtOp;
 
--- cleanup
-PRAGMA foreign_keys = on;
+DROP TABLE DhtOp;
+
+ALTER TABLE DhtOp_2up RENAME TO DhtOp;
+
+CREATE INDEX DhtOp_type_dep_idx ON DhtOp ( type, dependency );
+CREATE INDEX DhtOp_type_when_int_idx ON DhtOp ( type, when_integrated );
+CREATE INDEX DhtOp_validation_stage_idx ON DhtOp ( validation_stage, type, dependency );
+CREATE INDEX DhtOp_stage_type_status_idx ON DhtOp ( validation_stage, type, validation_status);
+CREATE INDEX DhtOp_validation_status_idx ON DhtOp ( validation_status );
+CREATE INDEX DhtOp_authored_timestamp_idx ON DhtOp ( authored_timestamp );
+CREATE INDEX DhtOp_storage_center_loc_idx ON DhtOp ( storage_center_loc );
+CREATE INDEX DhtOp_action_hash_idx ON DhtOp ( action_hash );
+CREATE INDEX DhtOp_basis_hash_idx ON DhtOp ( basis_hash );
+
+PRAGMA foreign_key_check;
+

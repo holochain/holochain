@@ -79,6 +79,7 @@ impl Schema {
         match migrations_applied.cmp(&(num_migrations)) {
             std::cmp::Ordering::Less => {
                 let mut txn = conn.transaction()?;
+
                 // run forward migrations
                 for v in migrations_applied..num_migrations {
                     self.migrations[v].run_forward(&mut txn)?;
