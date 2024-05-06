@@ -226,7 +226,7 @@ async fn handle_client_close() {
     let (addr_s, addr_r) = tokio::sync::oneshot::channel();
 
     let l_task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
-        let l = WebsocketListener::bind(Arc::new(WebsocketConfig::LISTENER_DEFAULT), "localhost:0")
+        let l = WebsocketListener::bind(Arc::new(WebsocketConfig::default()), "localhost:0")
             .await
             .unwrap();
 
@@ -266,7 +266,7 @@ async fn handle_client_close() {
     println!("addr: {}", addr);
 
     let r_task = tokio::task::spawn(async move {
-        let (_send, mut recv) = connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), addr)
+        let (_send, mut recv) = connect(Arc::new(WebsocketConfig::default()), addr)
             .await
             .unwrap();
 
