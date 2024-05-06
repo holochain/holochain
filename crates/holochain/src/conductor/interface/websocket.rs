@@ -214,29 +214,27 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
         }
     });
 
-    task_list
-        .0
-        .push(tokio::task::spawn(async move {
-            pin!(rx_from_cell);
-            loop {
-                if let Some(signal) = rx_from_cell.next().await {
-                    trace!(msg = "Sending signal!", ?signal);
-                    if let Err(err) = tx_to_iface.signal(signal).await {
-                        if err.kind() == ErrorKind::Other && err.to_string() == "WebsocketClosed" {
-                            info!(
+    task_list.0.push(tokio::task::spawn(async move {
+        pin!(rx_from_cell);
+        loop {
+            if let Some(signal) = rx_from_cell.next().await {
+                trace!(msg = "Sending signal!", ?signal);
+                if let Err(err) = tx_to_iface.signal(signal).await {
+                    if err.kind() == ErrorKind::Other && err.to_string() == "WebsocketClosed" {
+                        info!(
                             "Client has closed their websocket connection, closing signal handler"
                         );
-                        } else {
-                            error!(?err, "failed to emit signal, closing emitter");
-                        }
-                        break;
+                    } else {
+                        error!(?err, "failed to emit signal, closing emitter");
                     }
-                } else {
-                    trace!("No more signals from this cell, closing signal handler");
                     break;
                 }
+            } else {
+                trace!("No more signals from this cell, closing signal handler");
+                break;
             }
-        }));
+        }
+    }));
 
     let rx_from_iface =
         futures::stream::unfold(rx_from_iface, move |mut rx_from_iface| async move {
