@@ -11,9 +11,11 @@ use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
+use std::io::ErrorKind;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 
 use std::sync::Arc;
+use tokio::pin;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::*;
@@ -21,7 +23,7 @@ use tracing::*;
 /// Concurrency count for websocket message processing.
 /// This could represent a significant memory investment for
 /// e.g. app installations, but we also need enough buffer
-/// to accomodate interdependent operations.
+/// to accommodate interdependent operations.
 const CONCURRENCY_COUNT: usize = 128;
 
 // TODO: This is arbitrary, choose reasonable size.
@@ -31,6 +33,7 @@ const CONCURRENCY_COUNT: usize = 128;
 /// Number of signals in buffer before applying
 /// back pressure.
 pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
+
 /// The maximum number of connections allowed to the admin interface
 pub const MAX_CONNECTIONS: usize = 400;
 
@@ -211,26 +214,27 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
         }
     });
 
-    // TODO - metrics to indicate if we're getting overloaded here.
-    task_list
-        .0
-        .push(tokio::task::spawn(rx_from_cell.for_each_concurrent(
-            CONCURRENCY_COUNT,
-            move |signal| {
-                let tx_to_iface = tx_to_iface.clone();
-                async move {
-                    trace!(msg = "Sending signal!", ?signal);
-                    if let Err(err) = async move {
-                        tx_to_iface.signal(signal).await?;
-                        InterfaceResult::Ok(())
+    task_list.0.push(tokio::task::spawn(async move {
+        pin!(rx_from_cell);
+        loop {
+            if let Some(signal) = rx_from_cell.next().await {
+                trace!(msg = "Sending signal!", ?signal);
+                if let Err(err) = tx_to_iface.signal(signal).await {
+                    if err.kind() == ErrorKind::Other && err.to_string() == "WebsocketClosed" {
+                        info!(
+                            "Client has closed their websocket connection, closing signal handler"
+                        );
+                    } else {
+                        error!(?err, "failed to emit signal, closing emitter");
                     }
-                    .await
-                    {
-                        error!(?err, "error emitting signal");
-                    }
+                    break;
                 }
-            },
-        )));
+            } else {
+                trace!("No more signals from this cell, closing signal handler");
+                break;
+            }
+        }
+    }));
 
     let rx_from_iface =
         futures::stream::unfold(rx_from_iface, move |mut rx_from_iface| async move {

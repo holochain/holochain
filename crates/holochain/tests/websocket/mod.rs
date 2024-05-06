@@ -936,3 +936,52 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
         _ => panic!("unexpected response"),
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn emit_signal_after_app_connection_closed() {
+    holochain_trace::test_run().unwrap();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+
+    // Install an app to emit signals from
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+        .await
+        .0;
+    let installed_app_id: InstalledAppId = "app".into();
+    let app = conductor
+        .setup_app(&installed_app_id, &[dna_file])
+        .await
+        .unwrap();
+    let cells = app.into_cells();
+    let cell = cells.first().unwrap();
+
+    // Connect to the app interface
+    let port = conductor
+        .clone()
+        .add_app_interface(Either::Left(0))
+        .await
+        .expect("Couldn't create app interface");
+    let (tx, mut rx) = websocket_client_by_port(port).await.unwrap();
+
+    // Emit a signal
+    let _: () = conductor
+        .call(&cell.zome(TestWasm::EmitSignal), "emit", ())
+        .await;
+
+    // That should be received because the app interface is connected
+    let received = rx.recv::<AppResponse>().await.unwrap();
+    assert_matches!(received, ReceiveMessage::Signal(_));
+
+    // Drop the app interface connection
+    drop(tx);
+    drop(rx);
+
+    // Emit another signal
+    let _: () = conductor
+        .call(&cell.zome(TestWasm::EmitSignal), "emit", ())
+        .await;
+
+    // That should not be received because the app interface is disconnected
+    // TODO assert that the tasks for this connection were shutdown and removed by this point.
+    //      Can't currently do that with TaskMotel which I think is the right thing to query here.
+}
