@@ -2180,8 +2180,10 @@ async fn action_after_close_chain() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
+
     // Use agent activity so that we'll validate the previous action
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create.clone()));
+    let op =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create.clone())).into();
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
