@@ -1,8 +1,8 @@
+use ::fixt::prelude::*;
 use criterion::criterion_group;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::Throughput;
-use fixt::prelude::*;
 use hdk::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain::core::ribosome::RibosomeT;

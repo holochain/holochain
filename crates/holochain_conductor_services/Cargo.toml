@@ -24,7 +24,7 @@ thiserror = "1.0"
 tokio = "1"
 tracing = "0.1"
 
-holochain_deepkey_dna = "0.0.6-dev.1"
+holochain_deepkey_dna = "0.0.6-dev.2"
 holochain_keystore = { version = "^0.3.0-beta-dev.37", path = "../holochain_keystore" }
 holochain_types = { version = "^0.3.0-beta-dev.43", path = "../holochain_types" }
 holochain_util = { version = "^0.3.0-beta-dev.6", path = "../holochain_util", features = ["time"] }

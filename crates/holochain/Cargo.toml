@@ -33,7 +33,7 @@ holo_hash = { version = "^0.3.0-beta-dev.28", path = "../holo_hash", features = 
 ] }
 holochain_cascade = { version = "^0.3.0-beta-dev.47", path = "../holochain_cascade" }
 holochain_conductor_api = { version = "^0.3.0-beta-dev.47", path = "../holochain_conductor_api" }
-holochain_deepkey_dna = "0.0.6-dev.1"
+holochain_deepkey_dna = "0.0.6-dev.2"
 holochain_keystore = { version = "^0.3.0-beta-dev.37", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.3.0-beta-dev.46", path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.3.0-beta-dev.43", path = "../holochain_sqlite" }
