@@ -1454,9 +1454,11 @@ mod app_impls {
             let dpki = self.running_services().dpki.clone();
 
             let mut dpki = if let Some(d) = dpki.as_ref() {
-                if &installed_app_id == DPKI_APP_ID {
+                if installed_app_id == DPKI_APP_ID {
                     return Err(ConductorError::Other(
-                        format!("Can't install app with reserved id 'DPKI'").into(),
+                        "Can't install app with reserved id 'DPKI'"
+                            .to_string()
+                            .into(),
                     ));
                 }
                 let lock = d.state().await;
