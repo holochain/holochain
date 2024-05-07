@@ -3140,9 +3140,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_deepkey_dna"
-version = "0.0.6-dev.3"
+version = "0.0.6-dev.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eddf4adffbdd01b64380a0d2c6c0267d1386cdb78e9b064044fb3c042ef68b89"
+checksum = "1ca4e463ad4f10fa2cca091b8f2212fbb49e4e4dcdbe2813ad528289bcc1177b"
 dependencies = [
  "hc_deepkey_sdk",
 ]
