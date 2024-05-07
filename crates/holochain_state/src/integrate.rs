@@ -145,7 +145,8 @@ fn filter_private_entry(dht_op: DhtOpHashed) -> DhtOpResult<DhtOpHashed> {
             let (signature, action) = (op.signature(), op.action());
             let hash = dht_op.as_hash().clone();
             Ok(DhtOpHashed::with_pre_hashed(
-                ChainOp::from_type(op_type, SignedAction(action, signature.clone()), None)?.into(),
+                ChainOp::from_type(op_type, SignedAction::new(action, signature.clone()), None)?
+                    .into(),
                 hash,
             ))
         } else {
@@ -157,7 +158,6 @@ fn filter_private_entry(dht_op: DhtOpHashed) -> DhtOpResult<DhtOpHashed> {
 }
 
 fn is_private_store_entry(op: &DhtOp) -> bool {
-    #[allow(irrefutable_let_patterns)]
     if let DhtOp::ChainOp(op) = op {
         op.action()
             .entry_type()

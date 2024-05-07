@@ -719,7 +719,7 @@ where
                     match op_type {
                         DhtOpType::Chain(op_type) => {
                             let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                            let entry = match action.0.entry_type().map(|et| et.visibility()) {
+                            let entry = match action.entry_type().map(|et| et.visibility()) {
                                 Some(EntryVisibility::Public) => {
                                     let entry: Option<Vec<u8>> = row.get("entry_blob")?;
                                     match entry {
@@ -732,6 +732,7 @@ where
                             let op = ChainOp::from_type(op_type, action, entry)?.into();
                             StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
                         }
+                        DhtOpType::Warrant(_) => todo!("todo: warrants"),
                     }
                 },
             )?
@@ -749,7 +750,7 @@ where
                         match op_type {
                             DhtOpType::Chain(op_type) => {
                                 let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                                let entry = match action.0.entry_type().map(|et| et.visibility()) {
+                                let entry = match action.entry_type().map(|et| et.visibility()) {
                                     Some(EntryVisibility::Public) => {
                                         let entry: Option<Vec<u8>> = row.get("entry_blob")?;
                                         match entry {
@@ -762,6 +763,7 @@ where
                                 let op = ChainOp::from_type(op_type, action, entry)?.into();
                                 StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
                             }
+                            DhtOpType::Warrant(_) => todo!("todo: warrants"),
                         }
                     },
                 )?

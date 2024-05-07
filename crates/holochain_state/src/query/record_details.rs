@@ -55,7 +55,7 @@ impl Query for GetRecordDetailsQuery {
         let f = |row: &Row| {
             let action =
                 from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?)?;
-            let SignedAction(action, signature) = action;
+            let (action, signature) = action.into();
             let action = ActionHashed::from_content_sync(action);
             let shh = SignedActionHashed::with_presigned(action, signature);
             let status = row.get(row.as_ref().column_index("status")?)?;

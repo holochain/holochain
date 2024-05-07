@@ -542,7 +542,7 @@ pub(crate) async fn validate_op(
 fn handle_failed(error: &ValidationOutcome) -> Outcome {
     use Outcome::*;
     match error {
-        ValidationOutcome::Counterfeit(_, _) => {
+        ValidationOutcome::CounterfeitAction(_, _) => {
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
         ValidationOutcome::DepMissingFromDht(dep) => MissingDhtDep(dep.clone()),
@@ -714,7 +714,7 @@ async fn sys_validate_record_inner(
     let signature = record.signature();
     let action = record.action();
     let maybe_entry = record.entry().as_option();
-    counterfeit_check(signature, action).await?;
+    counterfeit_check_action(signature, action).await?;
 
     async fn validate(
         action: &Action,
@@ -772,11 +772,21 @@ async fn sys_validate_record_inner(
     }
 }
 
-/// Check if the op has valid signature and author.
+/// Check if the chain op has valid signature and author.
 /// Ops that fail this check should be dropped.
-pub async fn counterfeit_check(signature: &Signature, action: &Action) -> SysValidationResult<()> {
+pub async fn counterfeit_check_action(
+    signature: &Signature,
+    action: &Action,
+) -> SysValidationResult<()> {
     verify_action_signature(signature, action).await?;
     author_key_is_valid(action.author()).await?;
+    Ok(())
+}
+
+/// Check if the warrant op has valid signature and author.
+pub async fn counterfeit_check_warrant(warrant_op: &WarrantOp) -> SysValidationResult<()> {
+    verify_warrant_signature(warrant_op).await?;
+    author_key_is_valid(&warrant_op.author).await?;
     Ok(())
 }
 

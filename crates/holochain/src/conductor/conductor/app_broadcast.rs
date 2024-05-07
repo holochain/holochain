@@ -1,5 +1,5 @@
 use holochain_types::app::InstalledAppId;
-use holochain_types::prelude::Signal;
+use holochain_types::prelude::*;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -80,8 +80,7 @@ impl Default for AppBroadcast {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::ExternIO;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use hdk::prelude::CellIdFixturator;
     use hdk::prelude::ZomeNameFixturator;
     use holochain_zome_types::signal::AppSignal;

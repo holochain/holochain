@@ -9,6 +9,7 @@ use std::str::FromStr;
 use crate::action::NewEntryAction;
 use crate::prelude::*;
 use crate::record::RecordGroup;
+use crate::warrant::WarrantOp;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::types::FromSql;
 use holochain_sqlite::rusqlite::ToSql;
@@ -28,16 +29,7 @@ mod tests;
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
 #[derive(
-    Clone,
-    Debug,
-    Serialize,
-    Deserialize,
-    SerializedBytes,
-    Eq,
-    PartialEq,
-    Hash,
-    derive_more::Display,
-    derive_more::From,
+    Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::From,
 )]
 #[cfg_attr(
     feature = "fuzzing",
@@ -47,7 +39,7 @@ pub enum DhtOp {
     /// An op representing storage of some record information.
     ChainOp(ChainOp),
     /// TODO, new type of op
-    WarrantOp(Warrant),
+    WarrantOp(WarrantOp),
 }
 
 /// A unit of DHT gossip concerning source chain data.
@@ -258,6 +250,7 @@ pub enum ChainOpType {
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, derive_more::From)]
 pub enum DhtOpType {
     Chain(ChainOpType),
+    Warrant(WarrantOpType),
 }
 
 impl ToSql for DhtOpType {
@@ -266,6 +259,7 @@ impl ToSql for DhtOpType {
     ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
         match self {
             DhtOpType::Chain(op) => op.to_sql(),
+            DhtOpType::Warrant(op) => op.to_sql(),
         }
     }
 }
@@ -565,7 +559,7 @@ impl ChainOp {
         action: SignedAction,
         entry: Option<Entry>,
     ) -> DhtOpResult<Self> {
-        let SignedAction(action, signature) = action;
+        let (action, signature) = action.into();
         let entry = RecordEntry::new(action.entry_visibility(), entry);
         let r = match op_type {
             ChainOpType::StoreRecord => Self::StoreRecord(signature, action, entry),
@@ -1256,6 +1250,7 @@ pub enum OpNumericalOrder {
     RegisterDeletedEntryAction,
     RegisterAddLink,
     RegisterRemoveLink,
+    ChainIntegrityWarrant,
 }
 
 /// This is used as an index for ordering ops in our database.
@@ -1304,6 +1299,9 @@ impl OpOrder {
             DhtOpType::Chain(ChainOpType::RegisterAddLink) => OpNumericalOrder::RegisterAddLink,
             DhtOpType::Chain(ChainOpType::RegisterRemoveLink) => {
                 OpNumericalOrder::RegisterRemoveLink
+            }
+            DhtOpType::Warrant(WarrantOpType::ChainIntegrityWarrant) => {
+                OpNumericalOrder::ChainIntegrityWarrant
             }
         };
         Self { order, timestamp }

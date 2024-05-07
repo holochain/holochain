@@ -561,7 +561,9 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
                 op.get_type(),
                 op.action().action_type(),
             ),
-            DhtOp::WarrantOp(_op) => unreachable!("todo: warrants"),
+            DhtOp::WarrantOp(op) => {
+                format!("{} WARRANT ({})", op.author, op.get_type(),)
+            }
         }
     }
 
@@ -770,6 +772,7 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
                     };
                     Ok(ChainOp::from_type(op_type, action, entry)?.into())
                 }
+                DhtOpType::Warrant(_) => todo!("todo: warrants"),
             }
         })
         .unwrap()

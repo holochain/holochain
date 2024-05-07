@@ -813,7 +813,7 @@ where
                             args.iter().map(|a| (a.0.as_str(), a.1.as_ref())).collect::<Vec<(&str, &dyn rusqlite::ToSql)>>().as_slice(),
                             |row| {
                                 let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                                let SignedAction(action, signature) = action;
+                                let (action, signature) = action.into();
                                 let private_entry = action
                                     .entry_type()
                                     .map_or(false, |e| *e.visibility() == EntryVisibility::Private);
@@ -1268,7 +1268,8 @@ pub async fn dump_state(
                         ":author": author,
                     },
                     |row| {
-                        let SignedAction(action, signature) = from_blob(row.get("action_blob")?)?;
+                        let action: SignedAction = from_blob(row.get("action_blob")?)?;
+                        let (action, signature) = action.into();
                         let action_address = row.get("action_hash")?;
                         let entry: Option<Vec<u8>> = row.get("entry_blob")?;
                         let entry: Option<Entry> = match entry {

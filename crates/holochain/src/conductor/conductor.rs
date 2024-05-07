@@ -3224,7 +3224,7 @@ fn query_dht_ops_from_statement(
             match op_type {
                 DhtOpType::Chain(op_type) => {
                     let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                    let entry = match action.0.entry_type().map(|et| et.visibility()) {
+                    let entry = match action.entry_type().map(|et| et.visibility()) {
                         Some(EntryVisibility::Public) => {
                             let entry: Option<Vec<u8>> = row.get("entry_blob")?;
                             match entry {
@@ -3236,6 +3236,7 @@ fn query_dht_ops_from_statement(
                     };
                     Ok(ChainOp::from_type(op_type, action, entry)?.into())
                 }
+                DhtOpType::Warrant(_) => todo!("todo: warrants"),
             }
         })?
         .collect::<StateQueryResult<Vec<_>>>()?;

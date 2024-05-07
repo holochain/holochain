@@ -530,13 +530,19 @@ mod tests {
         .unwrap();
 
         let test_1 = WireOps::Record(WireRecordOps {
-            action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
+            action: Some(Judged::valid(SignedAction::new(
+                fixt!(Action),
+                fixt!(Signature),
+            ))),
             deletes: vec![],
             updates: vec![],
             entry: None,
         });
         let test_2 = WireOps::Record(WireRecordOps {
-            action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
+            action: Some(Judged::valid(SignedAction::new(
+                fixt!(Action),
+                fixt!(Signature),
+            ))),
             deletes: vec![],
             updates: vec![],
             entry: None,

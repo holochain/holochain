@@ -17,6 +17,7 @@ CREATE TABLE DhtOp_2up (
     type             TEXT           NOT NULL,
     basis_hash       BLOB           NOT NULL,
     action_hash      BLOB           NULL,
+    warrant_hash     BLOB           NULL,
     require_receipt  INTEGER        NOT NULL,      -- BOOLEAN
 
     storage_center_loc          INTEGER   NOT NULL,
@@ -77,5 +78,16 @@ CREATE INDEX DhtOp_storage_center_loc_idx ON DhtOp ( storage_center_loc );
 CREATE INDEX DhtOp_action_hash_idx ON DhtOp ( action_hash );
 CREATE INDEX DhtOp_basis_hash_idx ON DhtOp ( basis_hash );
 
-PRAGMA foreign_key_check;
 
+CREATE TABLE Warrant (
+    hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
+
+    -- it is best if these two fields match the analogous fields 
+    -- in the Action table
+    type             TEXT           NOT NULL,
+    author           BLOB           NOT NULL,
+
+    -- the offending thing that the warrant is for,
+    -- e.g. an ActionHash or an AgentPubKey
+    target           BLOB           NOT NULL,
+);

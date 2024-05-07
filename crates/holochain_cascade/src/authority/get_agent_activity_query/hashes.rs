@@ -76,7 +76,7 @@ impl Query for GetAgentActivityQuery {
             let hash: ActionHash = row.get("hash")?;
             from_blob::<SignedAction>(row.get("action_blob")?).and_then(|action| {
                 let integrated: Option<Timestamp> = row.get("when_integrated")?;
-                let action = ActionHashed::with_pre_hashed(action.0, hash);
+                let action = ActionHashed::with_pre_hashed(action.into_data(), hash);
                 let item = if integrated.is_some() {
                     Item::Integrated(action)
                 } else {

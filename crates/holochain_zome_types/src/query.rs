@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use crate::prelude::*;
+use crate::warrant::Warrant;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};

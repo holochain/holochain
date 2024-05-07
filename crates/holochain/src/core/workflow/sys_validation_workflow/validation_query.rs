@@ -92,6 +92,7 @@ async fn get_ops_to_validate(
                         hash,
                     ))
                 }
+                DhtOpType::Warrant(_) => todo!("todo: warrants"),
             }
         })?;
         let r = r.collect();

@@ -79,3 +79,47 @@ impl SignEphemeral {
         self.0
     }
 }
+
+/// Some data with a signature attached
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    derive_more::Constructor,
+    derive_more::Deref,
+    derive_more::From,
+    derive_more::Into,
+)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+pub struct Signed<T>
+where
+    T: serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[deref]
+    #[serde(bound(deserialize = "T: serde::de::DeserializeOwned"))]
+    data: T,
+    signature: Signature,
+}
+
+impl<T> Signed<T>
+where
+    T: serde::Serialize + serde::de::DeserializeOwned,
+{
+    /// Accessor for the signed data
+    pub fn data(&self) -> &T {
+        &self.data
+    }
+
+    /// Accessor for the signed data
+    pub fn into_data(self) -> T {
+        self.data
+    }
+
+    /// Accessor for the Signature
+    pub fn signature(&self) -> &Signature {
+        &self.signature
+    }
+}

@@ -79,7 +79,7 @@ where
                     let op_type: DhtOpType = row.get("dht_type")?;
                     let hash: DhtOpHash = row.get("dht_hash")?;
                     let op_hash_sized = OpHashSized::new(hash.to_kitsune(), Some(op_size));
-                    let entry = match action.0.entry_type().map(|et| et.visibility()) {
+                    let entry = match action.entry_type().map(|et| et.visibility()) {
                         Some(EntryVisibility::Public) => {
                             let entry: Option<Vec<u8>> = row.get("entry_blob")?;
                             match entry {
@@ -91,6 +91,7 @@ where
                     };
                     let op = match op_type {
                         DhtOpType::Chain(op_type) => ChainOp::from_type(op_type, action, entry)?,
+                        DhtOpType::Warrant(_) => todo!("todo: warrants"),
                     };
                     let basis = op.dht_basis();
                     WorkflowResult::Ok((basis, op_hash_sized, op.into()))

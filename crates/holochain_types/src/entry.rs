@@ -69,9 +69,10 @@ impl WireEntryOps {
                 let entry_hashed = EntryHashed::from_content_sync(entry);
                 for op in creates {
                     let status = op.validation_status();
-                    let SignedAction(action, signature) = op
+                    let (action, signature) = op
                         .data
-                        .into_signed_action(entry_type.clone(), entry_hashed.as_hash().clone());
+                        .into_signed_action(entry_type.clone(), entry_hashed.as_hash().clone())
+                        .into();
 
                     ops.push(RenderedOp::new(
                         action,
@@ -95,8 +96,10 @@ impl WireEntryOps {
                 }
                 for op in updates {
                     let status = op.validation_status();
-                    let SignedAction(action, signature) =
-                        op.data.into_signed_action(entry_hashed.as_hash().clone());
+                    let (action, signature) = op
+                        .data
+                        .into_signed_action(entry_hashed.as_hash().clone())
+                        .into();
 
                     ops.push(RenderedOp::new(
                         action,

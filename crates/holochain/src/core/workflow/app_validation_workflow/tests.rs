@@ -886,8 +886,9 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
         match op_type {
             DhtOpType::Chain(op_type) => {
                 let action: SignedAction = from_blob(row.get("blob")?)?;
-                Ok(ChainOpLite::from_type(op_type, hash, &action.0)?.into())
+                Ok(ChainOpLite::from_type(op_type, hash, &action)?.into())
             }
+            DhtOpType::Warrant(_) => todo!("todo: warrants"),
         }
     })
     .unwrap()

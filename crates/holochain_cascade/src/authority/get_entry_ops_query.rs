@@ -77,7 +77,6 @@ impl Query for GetEntryOpsQuery {
                 if dht_op
                     .data
                     .action
-                    .0
                     .entry_type()
                     .filter(|et| *et.visibility() == EntryVisibility::Public)
                     .is_some()
@@ -87,7 +86,6 @@ impl Query for GetEntryOpsQuery {
                         state.entry_data = dht_op
                             .data
                             .action
-                            .0
                             .entry_data()
                             .map(|(h, t)| (h.clone(), t.clone()));
                     }

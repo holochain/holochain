@@ -597,7 +597,6 @@ impl Spaces {
                                 // Check the entry isn't private before gossiping it.
                                 let mut entry: Option<Entry> = None;
                                 if action
-                                    .0
                                     .entry_type()
                                     .filter(|et| *et.visibility() == EntryVisibility::Public)
                                     .is_some()
@@ -610,6 +609,9 @@ impl Spaces {
                                 }
                                 let op = ChainOp::from_type(op_type, action, entry)?.into();
                                 out.push((hash, op))
+                            }
+                            DhtOpType::Warrant(op_type) => {
+                                todo!("todo: warrants")
                             }
                         }
                     } else {

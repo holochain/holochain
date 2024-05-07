@@ -102,7 +102,7 @@ impl Query for DeterministicGetAgentActivityQuery {
                 },
             signature,
         } = shh;
-        let sh = SignedAction(action, signature);
+        let sh = SignedAction::new(action, signature);
         // By tracking the prev_action of the last action we added to the chain,
         // we can filter out branches. If we performed branch detection in this
         // query, it would not be deterministic.
