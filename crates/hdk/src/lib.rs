@@ -578,3 +578,6 @@ pub mod hdk;
 /// Clone cells are a way to create a new cell that is a copy of an existing cell. They are based on the DNA of an existing cell, and run
 /// with the same agent key, but have a unique name or properties that distinguish them from the original cell.
 pub mod clone;
+
+/// Tools for working with migrations from one DNA to another.
+mod migrate;
