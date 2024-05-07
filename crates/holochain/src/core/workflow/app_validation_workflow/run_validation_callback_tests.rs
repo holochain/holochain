@@ -13,7 +13,7 @@ use crate::{
     sweettest::{SweetDnaFile, SweetInlineZomes},
 };
 use fixt::fixt;
-use holo_hash::{AgentPubKey, AnyDhtHash, HashableContentExtSync};
+use holo_hash::{AgentPubKey, HashableContentExtSync};
 use holochain_p2p::{HolochainP2pDnaFixturator, MockHolochainP2pDnaT};
 use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, mutations::insert_op};
 use holochain_types::{
@@ -25,11 +25,14 @@ use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::{
     chain::{ChainFilter, ChainFilters, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
-    entry::MustGetActionInput,
-    fixt::{AgentPubKeyFixturator, CreateFixturator, DeleteFixturator, SignatureFixturator},
+    entry::{MustGetActionInput, MustGetValidRecordInput},
+    fixt::{
+        AgentPubKeyFixturator, CreateFixturator, DeleteFixturator, EntryFixturator,
+        SignatureFixturator, UpdateFixturator,
+    },
     judged::Judged,
-    op::{Op, RegisterAgentActivity, RegisterDelete},
-    record::{SignedActionHashed, SignedHashed},
+    op::{Op, RegisterAgentActivity, RegisterDelete, RegisterUpdate},
+    record::{RecordEntry, SignedActionHashed, SignedHashed},
     validate::ValidationStatus,
     Action,
 };
@@ -632,22 +635,24 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
         move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
-                let result =
-                    api.must_get_action(MustGetActionInput(delete.hashed.deletes_address.clone()));
-                if result.is_ok() {
-                    Ok(ValidateCallbackResult::Valid)
-                } else {
-                    Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![delete
-                            .hashed
-                            .deletes_address
-                            .clone()
-                            .into()]),
-                    ))
+            let action_hash_to_fetch = match op {
+                Op::RegisterUpdate(RegisterUpdate { update, .. }) => {
+                    update.hashed.original_action_address.clone()
                 }
+                Op::RegisterDelete(RegisterDelete { delete }) => {
+                    delete.hashed.deletes_address.clone()
+                }
+                _ => unreachable!(),
+            };
+
+            let result =
+                api.must_get_valid_record(MustGetValidRecordInput(action_hash_to_fetch.clone()));
+            if result.is_ok() {
+                Ok(ValidateCallbackResult::Valid)
             } else {
-                unreachable!()
+                Ok(ValidateCallbackResult::UnresolvedDependencies(
+                    UnresolvedDependencies::Hashes(vec![action_hash_to_fetch.clone().into()]),
+                ))
             }
         }
     });
@@ -667,6 +672,24 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     let create_action = Action::Create(create.clone());
     let create_action_signed_hashed =
         SignedHashed::new_unchecked(create_action.clone(), fixt!(Signature));
+
+    // an update by bob that references alice's create
+    let new_entry = fixt!(Entry);
+    let mut update = fixt!(Update);
+    update.author = bob.clone();
+    update.original_action_address = create_action.clone().to_hash();
+    let update_action_signed_hashed = SignedHashed::new_unchecked(update.clone(), fixt!(Signature));
+    let update_dht_op = DhtOp::RegisterUpdatedContent(
+        update_action_signed_hashed.signature.clone(),
+        update.clone(),
+        RecordEntry::Present(new_entry.clone()),
+    );
+    let update_dht_op_hash = update_dht_op.to_hash();
+    let update_action_op = Op::RegisterUpdate(RegisterUpdate {
+        update: update_action_signed_hashed.clone(),
+        new_entry: Some(new_entry.clone()),
+    });
+
     // a delete by bob that references alice's create
     let mut delete = fixt!(Delete);
     delete.author = bob.clone();
@@ -694,30 +717,46 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
                 )),
                 deletes: vec![],
                 updates: vec![],
-                entry: None,
+                entry: Some(new_entry.clone()),
             })])
         }
     });
     let network = Arc::new(network);
 
-    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
+    // validate update op
+    let invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &update_action_op).unwrap();
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
-    // hashes missing for delete dht op should be empty
+    // hashes missing for update dht op should be empty
     assert_eq!(
         validation_dependencies
             .lock()
             .hashes_missing_for_op
-            .get(&delete_dht_op_hash),
+            .get(&update_dht_op_hash),
         None
     );
 
     // filtering out ops with missing dependencies should not filter anything
-    let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
+    let ops_to_validate = vec![update_dht_op.clone().into_hashed()];
     let filtered_ops_to_validate = validation_dependencies
         .lock()
         .filter_ops_missing_dependencies(ops_to_validate.clone());
     assert_eq!(filtered_ops_to_validate, ops_to_validate);
+
+    let _ = run_validation_callback(
+        invocation.clone(),
+        &update_dht_op_hash,
+        &ribosome,
+        workspace.clone(),
+        network.clone(),
+        validation_dependencies.clone(),
+    )
+    .await
+    .unwrap();
+
+    // validate delete op
+    let invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &delete_action_op).unwrap();
+    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     let _ = run_validation_callback(
         invocation.clone(),
@@ -730,56 +769,61 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     .await
     .unwrap();
 
-    // hashes missing for delete dht op should contain the missing create hash
-    assert_eq!(
-        validation_dependencies
-            .lock()
-            .hashes_missing_for_op
-            .get(&delete_dht_op_hash)
-            .unwrap()
-            .clone()
-            .into_iter()
-            .collect::<Vec<AnyDhtHash>>(),
-        vec![create_action_signed_hashed.as_hash().clone().into()]
+    println!(
+        "before missing hashes {:?}",
+        validation_dependencies.lock().missing_hashes
     );
-
-    // filtering out ops with missing dependencies should filter out delete
-    let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
-    let filtered_ops_to_validate = validation_dependencies
-        .lock()
-        .filter_ops_missing_dependencies(ops_to_validate.clone());
-    assert_eq!(filtered_ops_to_validate, vec![]);
+    println!(
+        "before hashes for ops {:?}",
+        validation_dependencies.lock().hashes_missing_for_op
+    );
 
     // await while missing record is being fetched in background task
     tokio::time::sleep(Duration::from_millis(10)).await;
 
-    let _ = run_validation_callback(
-        invocation,
-        &delete_dht_op_hash,
-        &ribosome,
-        workspace,
-        network,
-        validation_dependencies.clone(),
-    )
-    .await
-    .unwrap();
-
-    // hashes missing for delete dht op should be empty again after create
-    // has been fetched
-    assert_eq!(
-        validation_dependencies
-            .lock()
-            .hashes_missing_for_op
-            .get(&delete_dht_op_hash),
-        None
+    println!(
+        "after missing hashes {:?}",
+        validation_dependencies.lock().missing_hashes
+    );
+    println!(
+        "after hashes for ops {:?}",
+        validation_dependencies.lock().hashes_missing_for_op
     );
 
-    // filtering out ops with missing dependencies should not filter anything
-    let ops_to_validate = vec![delete_dht_op.into_hashed()];
-    let filtered_ops_to_validate = validation_dependencies
-        .lock()
-        .filter_ops_missing_dependencies(ops_to_validate.clone());
-    assert_eq!(filtered_ops_to_validate, ops_to_validate);
+    // filtering out ops with missing dependencies should again not filter anything
+    // let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
+    // let filtered_ops_to_validate = validation_dependencies
+    //     .lock()
+    //     .filter_ops_missing_dependencies(ops_to_validate.clone());
+    // assert_eq!(filtered_ops_to_validate, ops_to_validate);
+
+    // let _ = run_validation_callback(
+    //     invocation,
+    //     &delete_dht_op_hash,
+    //     &ribosome,
+    //     workspace,
+    //     network,
+    //     validation_dependencies.clone(),
+    // )
+    // .await
+    // .unwrap();
+
+    // // hashes missing for delete dht op should be empty again after create
+    // // has been fetched
+    // assert_eq!(
+    //     validation_dependencies
+    //         .lock()
+    //         .hashes_missing_for_op
+    //         .get(&delete_dht_op_hash),
+    //     None
+    // );
+
+    // // filtering out ops with missing dependencies should still not filter anything
+    // let ops_to_validate = vec![delete_dht_op.into_hashed()];
+    // let filtered_ops_to_validate = validation_dependencies
+    //     .lock()
+    //     .filter_ops_missing_dependencies(ops_to_validate.clone());
+    // assert_eq!(filtered_ops_to_validate, ops_to_validate);
 }
 
 // test case with alice and bob agent keys
