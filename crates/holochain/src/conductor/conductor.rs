@@ -1451,15 +1451,14 @@ mod app_impls {
             ops: AppRoleResolution,
             ignore_genesis_failure: bool,
         ) -> ConductorResult<StoppedApp> {
-            if !is_app(&installed_app_id) {
-                return Err(ConductorError::Other(
-                    format!("Can't install app with reserved id '{installed_app_id}'").into(),
-                ));
-            }
-
             let dpki = self.running_services().dpki.clone();
 
             let mut dpki = if let Some(d) = dpki.as_ref() {
+                if &installed_app_id == DPKI_APP_ID {
+                    return Err(ConductorError::Other(
+                        format!("Can't install app with reserved id 'DPKI'").into(),
+                    ));
+                }
                 let lock = d.state().await;
                 Some((d.clone(), lock))
             } else {
