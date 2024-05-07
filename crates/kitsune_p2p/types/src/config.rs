@@ -355,7 +355,7 @@ pub mod tuning_params_struct {
             let local_storage = LocalStorageConfig {
                 arc_clamping: self.arc_clamping(),
             };
-            ArqStrat::standard(local_storage)
+            ArqStrat::standard(local_storage, self.gossip_redundancy_target)
         }
     }
 }
