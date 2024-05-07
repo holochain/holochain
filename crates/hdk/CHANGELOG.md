@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Adds two new HDK functions `close_chain` and `open_chain` that allow `Action::CloseChain` and `Action::OpenChain` respectively, to be created.
+  These are intended to be used for DNA migrations. There is an example in the Holochain functions tests in 'migration.rs' #3804
+
 ## 0.3.1
 
 ## 0.3.1-rc.1
