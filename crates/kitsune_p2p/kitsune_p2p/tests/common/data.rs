@@ -113,7 +113,6 @@ fn generated_hash() -> KitsuneOpHash {
 }
 
 // Ideally this would match the implementation in `holo_dht_location_bytes`
-#[cfg(feature = "test_utils")]
 pub fn dht_location(data: &[u8; 32]) -> [u8; 4] {
     let hash = blake2b_simd::Params::new()
         .hash_length(16)

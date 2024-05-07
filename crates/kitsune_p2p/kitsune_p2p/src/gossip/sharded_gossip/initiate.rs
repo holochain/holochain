@@ -38,6 +38,7 @@ impl ShardedGossipLocal {
 
         // Choose a remote agent to gossip with.
         let remote_agent = self
+            // TODO want to set a test up so that we know who this should be
             .find_remote_agent_within_arcset(ArqSet::new(intervals.clone()), agent_info_session)
             .await?;
 
