@@ -17,6 +17,7 @@ use crate::core::SysValidationError;
 use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
 pub use error::*;
+pub use validation_dependencies::ValidationDependencies;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
@@ -193,10 +194,7 @@ async fn app_validation_workflow_inner(
                     }
                 }
                 if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
-                    warn!(
-                        msg = "DhtOp has failed app validation",
-                        outcome = ?outcome,
-                    );
+                    warn!(?outcome, ?op_lite, "DhtOp has failed app validation");
                 }
 
                 let accepted_ops = accepted_ops.clone();
@@ -671,19 +669,9 @@ async fn run_validation_callback(
             // hashes
             let validation_deps = validation_dependencies.clone();
             let dht_op_hash = dht_op_hash.clone();
-            let fetches = hashes
-                .clone()
-                .into_iter()
-                .filter(move |hash| {
-                    // keep track of which dependencies are being fetched to
-                    // prevent multiple fetches of the same hash
-                    let is_new_dependency = validation_deps
+            let new_hashes_to_fetch = validation_dependencies
                         .lock()
-                        .insert_missing_hash(hash.clone())
-                        .is_none();
-                    is_new_dependency
-                })
-                .map(move |hash| {
+                .get_new_hashes_to_fetch(hashes.clone());
                     let cascade = cascade.clone();
                     let validation_dependencies = validation_dependencies.clone();
                     let dht_op_hash = dht_op_hash.clone();
@@ -783,82 +771,6 @@ impl OutcomeSummary {
 impl Default for OutcomeSummary {
     fn default() -> Self {
         OutcomeSummary::new()
-    }
-}
-
-/// Dependencies required for app validating an op.
-pub struct ValidationDependencies {
-    /// Missing hashes that are being fetched, along with
-    /// the last Instant a fetch was attempted
-    missing_hashes: HashMap<AnyDhtHash, Instant>,
-    /// Dependencies that are missing to app validate an op.
-    hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
-}
-
-impl Default for ValidationDependencies {
-    fn default() -> Self {
-        ValidationDependencies::new()
-    }
-}
-
-impl ValidationDependencies {
-    const FETCH_TIMEOUT: Duration = Duration::from_secs(60);
-
-    pub fn new() -> Self {
-        Self {
-            missing_hashes: HashMap::new(),
-            hashes_missing_for_op: HashMap::new(),
-        }
-    }
-
-    pub fn insert_missing_hash(&mut self, hash: AnyDhtHash) -> Option<Instant> {
-        self.missing_hashes.insert(hash, Instant::now())
-    }
-
-    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) {
-        self.missing_hashes.remove(hash);
-    }
-
-    pub fn fetch_missing_hashes_timed_out(&self) -> bool {
-        self.missing_hashes
-            .iter()
-            .all(|(_, instant)| instant.elapsed() > Self::FETCH_TIMEOUT)
-    }
-
-    pub fn insert_hash_missing_for_op(&mut self, dht_op_hash: DhtOpHash, hash: AnyDhtHash) {
-        self.hashes_missing_for_op
-            .entry(dht_op_hash)
-            .and_modify(|hashes| {
-                hashes.insert(hash.clone());
-            })
-            .or_insert_with(|| {
-                let mut set = HashSet::new();
-                set.insert(hash.clone());
-                set
-            });
-    }
-
-    pub fn remove_hash_missing_for_op(&mut self, dht_op_hash: DhtOpHash, hash: &AnyDhtHash) {
-        self.hashes_missing_for_op
-            .entry(dht_op_hash.clone())
-            .and_modify(|hashes| {
-                hashes.remove(hash);
-            });
-
-        // if there are no hashes left for this dht op hash,
-        // remove the entry
-        if let Some(hashes) = self.hashes_missing_for_op.get(&dht_op_hash) {
-            if hashes.is_empty() {
-                self.hashes_missing_for_op.remove(&dht_op_hash);
-            }
-        }
-    }
-
-    // filter out ops that have missing dependencies
-    pub fn filter_ops_missing_dependencies(&self, ops: Vec<DhtOpHashed>) -> Vec<DhtOpHashed> {
-        ops.into_iter()
-            .filter(|op| !self.hashes_missing_for_op.contains_key(op.as_hash()))
-            .collect()
     }
 }
 
