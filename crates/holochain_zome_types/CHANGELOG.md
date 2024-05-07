@@ -1,5 +1,5 @@
 ---
-default_semver_increment_mode: !pre_minor beta-dev
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 
 - **BREAKING**: `CloneCellId::CellId` has become `CloneCellId::DnaHash`. Now that it's required that all cells in an app be installed under the same agent key, and because we don't yet support sharing cells across apps, the DnaHash is sufficient to identify a clone cell within an app. If we allow cell sharing, this may change.
+
+## 0.4.0-dev.1
+
+## 0.4.0-dev.0
+
+## 0.3.0
 
 ## 0.3.0-beta-dev.36
 

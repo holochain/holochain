@@ -1,19 +1,19 @@
 [package]
 name = "kitsune_p2p_block"
-version = "0.3.0-beta-dev.23"
+version = "0.4.0-dev.1"
 description = "(un)Block datatype for kitsune_p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/kitsune_p2p_block"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
-categories = [ "network-programming" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "p2p", "dht", "networking"]
+categories = ["network-programming"]
 edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.10", path = "../timestamp" }
-kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.21", path = "../bin_data" }
+kitsune_p2p_timestamp = { version = "^0.4.0-dev.0", path = "../timestamp" }
+kitsune_p2p_bin_data = { version = "^0.4.0-dev.1", path = "../bin_data" }
 serde = { version = "1.0", features = ["derive"] }
 
 [lints]
@@ -21,10 +21,7 @@ workspace = true
 
 [features]
 sqlite-encrypted = [
-    "kitsune_p2p_timestamp/sqlite-encrypted",
-    "kitsune_p2p_bin_data/sqlite-encrypted"
+  "kitsune_p2p_timestamp/sqlite-encrypted",
+  "kitsune_p2p_bin_data/sqlite-encrypted",
 ]
-sqlite = [
-    "kitsune_p2p_timestamp/sqlite",
-    "kitsune_p2p_bin_data/sqlite"
-]
+sqlite = ["kitsune_p2p_timestamp/sqlite", "kitsune_p2p_bin_data/sqlite"]

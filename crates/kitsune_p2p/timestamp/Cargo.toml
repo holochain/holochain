@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_timestamp"
-version = "0.3.0-beta-dev.10"
+version = "0.4.0-dev.0"
 description = "Microsecond-precision timestamp datatype for kitsune_p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -16,10 +16,10 @@ serde = { version = "1.0", features = ["derive"] }
 
 # Dependencies not needed for integrity.
 chrono = { version = "0.4.22", default-features = false, features = [
-    "clock",
-    "std",
-    "oldtime",
-    "serde",
+  "clock",
+  "std",
+  "oldtime",
+  "serde",
 ], optional = true }
 
 # Dependencies only needed for full.

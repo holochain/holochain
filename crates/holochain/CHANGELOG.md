@@ -1,5 +1,5 @@
 ---
-default_semver_increment_mode: !pre_minor beta-dev
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
@@ -8,30 +8,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Adds DPKI support. This is not fully hooked up, so the main implication for this particular implementation is that you must be using the same DPKI implementation as all other nodes on the network that you wish to talk to. If the DPKI version mismatches, you cannot establish connections, and will see so as an error in the logs. This work is in preparation for future work which will make it possible to restore your keys if you lose your device, and to revoke and replace your keys if your device is stolen or compromised.
+- System validation: Added a new rule that no new actions are allowed following a chain close action.
+- App validation workflow: Add module-level documentation.
+- Validation: Remove unused type `DhtOpOrder`. This type is superseded by `OpOrder`.
+
+## 0.4.0-dev.1
+
 - **BREAKING** - Serialization: Update of serialization packages `holochain-serialization` and `holochain-wasmer-*` leads to general message format change for enums. Previously an enum value like
-```rust
+
+<!-- end list -->
+
+``` rust
 enum Enum {
   Variant1,
   Variant2,
 }
 let value = Enum::Variant1;
 ```
+
 was serialized as (JSON representation)
-```json
+
+``` json
 {
   "value": {
     "variant1": null
   }
 }
 ```
+
 Now it serializes to
-```json
+
+``` json
 {
   "value": "variant1"
 }
 ```
-- Adds a new admin interface call `RevokeAppAuthenticationToken` to revoke issued app authentication tokens. #3765
+
+- Adds a new admin interface call `RevokeAppAuthenticationToken` to revoke issued app authentication tokens. \#3765
 - App validation workflow: Validate ops in sequence instead of in parallel. Ops validated one after the other have a higher chance of being validated if they depend on earlier ops. When validated in parallel, they potentially needed to await a next workflow run when the dependent op would have been validated.
+
+## 0.4.0-dev.0
+
+## 0.3.0
 
 ## 0.3.0-beta-dev.48
 

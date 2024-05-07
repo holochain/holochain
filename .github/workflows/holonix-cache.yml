@@ -20,6 +20,7 @@ jobs:
           - ""
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_2"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_2_rc"
+          - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3_rc"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly"
         platform:
           - x86_64-darwin
@@ -70,6 +71,7 @@ jobs:
           - ""
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_2"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_2_rc"
+          - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3_rc"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly"
         platform:
           - x86_64-darwin
@@ -77,8 +79,8 @@ jobs:
           - x86_64-linux
     runs-on: ubuntu-latest
     steps:
-      - uses: cachix/install-nix-action@v22
-      - uses: cachix/cachix-action@v12
+      - uses: cachix/install-nix-action@v26
+      - uses: cachix/cachix-action@v14
         with:
           name: holochain-ci
       - name: Check the Holonix cache

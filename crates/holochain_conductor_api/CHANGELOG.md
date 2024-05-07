@@ -1,5 +1,5 @@
 ---
-default_semver_increment_mode: !pre_minor beta-dev
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 
 - BREAKING: In the `InstallApp` request, the `agent_key` is now optional. When not specified, an agent key will be provided. This is especially applicable when using DPKI, which requires that all keys are generated rather than externally provided.
+
+## 0.4.0-dev.1
+
+## 0.4.0-dev.0
+
+## 0.3.0
 
 ## 0.3.0-beta-dev.47
 

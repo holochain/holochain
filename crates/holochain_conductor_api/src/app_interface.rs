@@ -438,10 +438,12 @@ pub enum ScottyPanel {
     GossipInfo { last_round: Option<Timestamp> },
 }
 
-/// The request payload that should be sent in a [WireMessage::Authenticate](holochain_websocket::WireMessage::Authenticate) message.
+// once this is in stable, replace the pinned version in the URL by `latest``
+/// The request payload that should be sent in a [`WireMessage::Authenticate`](https://docs.rs/holochain_websocket/0.3.0-beta-dev.22/holochain_websocket/enum.WireMessage.html#variant.Authenticate) message.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppAuthenticationRequest {
-    /// The authentication token that was provided by the conductor when [AdminRequest::IssueAppInterfaceToken] was called.
+    // once this is in stable, replace the pinned version in the URL by `latest``
+    /// The authentication token that was provided by the conductor when [`AdminRequest::IssueAppInterfaceToken`](https://docs.rs/holochain_conductor_api/0.3.0-beta-dev.47/holochain_conductor_api/enum.AdminRequest.html#variant.IssueAppAuthenticationToken) was called.
     pub token: AppAuthenticationToken,
 }
 
