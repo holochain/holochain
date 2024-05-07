@@ -44,14 +44,12 @@ async fn validate_with_dpki() {
 
     let (app_dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
-    dbg!(Timestamp::now());
 
     let ((alice,), (bob,), (carol,)) = conductors
         .setup_app("app", [&app_dna_file])
         .await
         .unwrap()
         .into_tuples();
-    dbg!(Timestamp::now());
 
     async fn key_state(conductor: &SweetConductor, agent: &AgentPubKey) -> KeyState {
         conductor
@@ -65,7 +63,6 @@ async fn validate_with_dpki() {
             .await
             .unwrap()
     }
-    dbg!(Timestamp::now());
 
     assert!(matches!(
         key_state(&conductors[0], alice.agent_pubkey()).await,
@@ -86,21 +83,13 @@ async fn validate_with_dpki() {
 
     conductors.exchange_peer_info().await;
 
-    dbg!(Timestamp::now());
-
     await_consistency(10, [&alice, &bob]).await.unwrap();
-
-    dbg!(Timestamp::now());
 
     let hash: ActionHash = conductors[0]
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    dbg!(Timestamp::now());
-
     await_consistency(60, [&alice, &bob]).await.unwrap();
-
-    dbg!(Timestamp::now());
 
     // Both see each other in DPKI
     assert!(matches!(
