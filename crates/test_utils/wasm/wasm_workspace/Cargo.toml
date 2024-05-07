@@ -33,6 +33,8 @@ members = [
   "link",
   "migrate_agent_fail",
   "migrate_agent_pass",
+  "migrate_initial",
+  "migrate_new",
   "multiple_calls",
   "must_get",
   "must_get_agent_activity",
