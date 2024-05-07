@@ -29,7 +29,7 @@
 //! is executed. Entry and link CRUD actions, which the ops are derived from, have been
 //! written with a particular integrity zome's entry and link types. Thus for
 //! op validation, the validation function of the same integrity zome must be
-//! used. Ops that do not relate to a specific entry or link like [`DhtOp::RegisterAgentActivity`]
+//! used. Ops that do not relate to a specific entry or link like [`ChainOp::RegisterAgentActivity`]
 //! or non-app entries like [`EntryType::CapGrant`] are validated with all
 //! validation functions of the DNA's integrity zomes.
 //!
