@@ -117,10 +117,6 @@ impl Context {
         self.op_info.get(op).ok_or(format!("op_info({op})"))
     }
 
-    // pub fn op_to_action(&self, op: &OpRef) -> ContextResult<ChainOpAction> {
-    //     Ok(ChainOpAction::from((**self.op_info(op)?).clone()))
-    // }
-
     pub fn op_from_action(&self, action: ActionHash, op_type: ChainOpType) -> ContextResult<OpRef> {
         let oa = ChainOpAction(action, op_type);
         self.map_action_to_op

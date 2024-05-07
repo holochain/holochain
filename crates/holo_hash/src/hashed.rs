@@ -82,12 +82,14 @@ where
     pub fn downcast<D>(&self) -> HoloHashed<D>
     where
         C: Clone,
+        C::HashType: crate::hash_type::HashTypeSync,
         D: HashableContent<HashType = C::HashType> + From<C>,
     {
-        HoloHashed {
-            content: self.content.clone().into(),
-            hash: self.hash.clone(),
-        }
+        let old_hash = &self.hash;
+        let content: D = self.content.clone().into();
+        let hashed = HoloHashed::from_content_sync_exact(content);
+        assert_eq!(&hashed.hash, old_hash);
+        hashed
     }
 }
 
