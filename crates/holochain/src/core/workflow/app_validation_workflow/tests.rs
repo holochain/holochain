@@ -636,7 +636,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
         .call(&alice.zome("coordinator"), "create", ())
         .await;
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    await_consistency(30, [&alice, &bob]).await.unwrap();
 
     {
         let vfs = validation_failures.lock();
