@@ -783,39 +783,39 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     );
 
     // filtering out ops with missing dependencies should again not filter anything
-    // let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
-    // let filtered_ops_to_validate = validation_dependencies
-    //     .lock()
-    //     .filter_ops_missing_dependencies(ops_to_validate.clone());
-    // assert_eq!(filtered_ops_to_validate, ops_to_validate);
+    let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
+    let filtered_ops_to_validate = validation_dependencies
+        .lock()
+        .filter_ops_missing_dependencies(ops_to_validate.clone());
+    assert_eq!(filtered_ops_to_validate, ops_to_validate);
 
-    // let _ = run_validation_callback(
-    //     invocation,
-    //     &delete_dht_op_hash,
-    //     &ribosome,
-    //     workspace,
-    //     network,
-    //     validation_dependencies.clone(),
-    // )
-    // .await
-    // .unwrap();
+    let _ = run_validation_callback(
+        invocation,
+        &delete_dht_op_hash,
+        &ribosome,
+        workspace,
+        network,
+        validation_dependencies.clone(),
+    )
+    .await
+    .unwrap();
 
-    // // hashes missing for delete dht op should be empty again after create
-    // // has been fetched
-    // assert_eq!(
-    //     validation_dependencies
-    //         .lock()
-    //         .hashes_missing_for_op
-    //         .get(&delete_dht_op_hash),
-    //     None
-    // );
+    // hashes missing for delete dht op should be empty again after create
+    // has been fetched
+    assert_eq!(
+        validation_dependencies
+            .lock()
+            .get_missing_hashes()
+            .is_empty(),
+        true
+    );
 
-    // // filtering out ops with missing dependencies should still not filter anything
-    // let ops_to_validate = vec![delete_dht_op.into_hashed()];
-    // let filtered_ops_to_validate = validation_dependencies
-    //     .lock()
-    //     .filter_ops_missing_dependencies(ops_to_validate.clone());
-    // assert_eq!(filtered_ops_to_validate, ops_to_validate);
+    // filtering out ops with missing dependencies should still not filter anything
+    let ops_to_validate = vec![delete_dht_op.into_hashed()];
+    let filtered_ops_to_validate = validation_dependencies
+        .lock()
+        .filter_ops_missing_dependencies(ops_to_validate.clone());
+    assert_eq!(filtered_ops_to_validate, ops_to_validate);
 }
 
 // test case with alice and bob agent keys

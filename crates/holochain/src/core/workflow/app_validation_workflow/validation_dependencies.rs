@@ -31,19 +31,20 @@ impl ValidationDependencies {
 
     // returns true if this is a new missing hash
     pub fn insert_missing_hash_for_op(&mut self, hash: AnyDhtHash, dht_op_hash: DhtOpHash) -> bool {
-        if self.missing_hashes.contains_key(&hash) {
+        if let std::collections::hash_map::Entry::Vacant(entry) =
+            self.missing_hashes.entry(hash.clone())
+        {
+            let mut dht_op_hashes = HashSet::new();
+            dht_op_hashes.insert(dht_op_hash);
+            entry.insert((dht_op_hashes, Instant::now()));
+            true
+        } else {
             self.missing_hashes
                 .entry(hash)
                 .and_modify(|(dht_op_hashes, _)| {
                     dht_op_hashes.insert(dht_op_hash.clone());
                 });
             false
-        } else {
-            let mut dht_op_hashes = HashSet::new();
-            dht_op_hashes.insert(dht_op_hash);
-            self.missing_hashes
-                .insert(hash, (dht_op_hashes, Instant::now()));
-            true
         }
     }
 
