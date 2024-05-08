@@ -1,4 +1,5 @@
 use crate::sweettest::SweetConductorBatch;
+use crate::sweettest::SweetConductorConfig;
 use crate::sweettest::SweetDnaFile;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::wait_for_integration;
@@ -23,7 +24,8 @@ async fn sys_validation_workflow_test() {
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let config = SweetConductorConfig::standard().no_dpki_mustfix();
+    let mut conductors = SweetConductorBatch::from_config(2, config).await;
     let apps = conductors
         .setup_app(&"test_app", [&dna_file])
         .await
