@@ -1454,13 +1454,6 @@ mod app_impls {
             let dpki = self.running_services().dpki.clone();
 
             let mut dpki = if let Some(d) = dpki.as_ref() {
-                if installed_app_id == DPKI_APP_ID {
-                    return Err(ConductorError::Other(
-                        "Can't install app with reserved id 'DPKI'"
-                            .to_string()
-                            .into(),
-                    ));
-                }
                 let lock = d.state().await;
                 Some((d.clone(), lock))
             } else {
@@ -1637,6 +1630,14 @@ mod app_impls {
 
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
+
+            if installed_app_id == DPKI_APP_ID {
+                return Err(ConductorError::Other(
+                    "Can't install app with reserved id 'DPKI'"
+                        .to_string()
+                        .into(),
+                ));
+            }
 
             // NOTE: for testing with inline zomes when the conductor is restarted, it's
             //       essential that the installed_hash is included in the app manifest,
