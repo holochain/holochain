@@ -769,18 +769,8 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     .await
     .unwrap();
 
-    println!(
-        "before missing hashes {:?}",
-        validation_dependencies.lock().get_missing_hashes()
-    );
-
     // await while missing record is being fetched in background task
     tokio::time::sleep(Duration::from_millis(10)).await;
-
-    println!(
-        "after missing hashes {:?}",
-        validation_dependencies.lock().get_missing_hashes()
-    );
 
     // filtering out ops with missing dependencies should again not filter anything
     let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
