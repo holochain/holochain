@@ -103,6 +103,29 @@ async fn only_gossip_with_agents_having_overlapping_arc() {
     let basis = Arc::new(kitsune_basis);
 
     let test_data = TestHostOp::new(space.clone());
+
+    let mut in_range_for_agent = vec![];
+    for i in 0..5 {
+        let agent_store_lock = agents[i].0.agent_store();
+        let agent_store = agent_store_lock.read();
+        let agent_info = agent_store.first().unwrap();
+        let edges = agent_info.storage_arq.to_edge_locs(dim);
+
+        if edges.0 < edges.1 {
+            if edges.0 >= test_data.location() && test_data.location() <= edges.1 {
+                in_range_for_agent.push(i);
+            }
+        } else {
+            if test_data.location() >= edges.0 || test_data.location() <= edges.1 {
+                in_range_for_agent.push(i);
+            }
+        }
+    }
+
+    assert_eq!(2, in_range_for_agent.len(), "Test op should have been in range for two agents but got: {}", in_range_for_agent.len());
+
+    println!("Expect to send to agents {:?}", in_range_for_agent);
+
     agents[sender_idx]
         .0
         .op_store()
