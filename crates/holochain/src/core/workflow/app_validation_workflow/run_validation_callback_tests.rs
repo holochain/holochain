@@ -795,9 +795,9 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     assert_eq!(
         validation_dependencies
             .lock()
-            .hashes_missing_for_op
-            .get(&delete_dht_op_hash),
-        None
+            .get_missing_hashes()
+            .is_empty(),
+        true
     );
 
     // filtering out ops with missing dependencies should still not filter anything
