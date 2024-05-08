@@ -6781,9 +6781,9 @@ dependencies = [
 
 [[package]]
 name = "sbd-client"
-version = "0.0.1-alpha"
+version = "0.0.2-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a53e255b3ef2ae08df6c30a5969ea3f7bd8824888bcac0782900b572288a9d26"
+checksum = "7e746e1f5449240c91aa6c113bcb405ad16e9095bef88d86baf9632c8071ae32"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -6799,9 +6799,9 @@ dependencies = [
 
 [[package]]
 name = "sbd-e2e-crypto-client"
-version = "0.0.1-alpha"
+version = "0.0.2-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1dcdc1c0e5b7d325fc595e6d2ff8054f9967c6433ec7e00fa971837cc8f9781"
+checksum = "1932be3776d7b2a152e84fbfc26e668c7c6e8b6e4a62d73a0105ca5b430b893c"
 dependencies = [
  "sbd-client",
  "sodoken 0.0.901-alpha",
@@ -6810,9 +6810,9 @@ dependencies = [
 
 [[package]]
 name = "sbd-server"
-version = "0.0.1-alpha"
+version = "0.0.2-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caab024c5dde2e762b2577e927f980df891960b2be5751a17f87097bb33d3e7d"
+checksum = "13aee4589ca4fd5c64a61e243c36bc4b928a037692b4ca9f85dcb8fa1dad3d93"
 dependencies = [
  "anstyle",
  "base64 0.22.1",

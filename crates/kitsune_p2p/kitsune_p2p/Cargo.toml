@@ -74,7 +74,7 @@ kitsune_p2p_timestamp = { path = "../timestamp", features = [
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 maplit = "1"
 pretty_assertions = "1.4.0"
-sbd-server = "=0.0.1-alpha"
+sbd-server = "=0.0.2-alpha"
 test-case = "3.3"
 tokio = { version = "1.11", features = ["full", "test-util"] }
 tracing-subscriber = "0.3.16"

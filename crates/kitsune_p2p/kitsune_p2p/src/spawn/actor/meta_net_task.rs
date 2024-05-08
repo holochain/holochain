@@ -101,6 +101,9 @@ impl MetaNetTask {
                         let span = span.clone();
                         async move {
                             if let Err(MetaNetTaskError::RequiredChannelClosed) = match event {
+                                MetaNetEvt::NewAddress { local_url } => {
+                                    this.handle_new_address(local_url).await
+                                }
                                 MetaNetEvt::Connected { remote_url, con } => {
                                     this.handle_connect(remote_url, con).await
                                 }
@@ -144,6 +147,13 @@ impl MetaNetTask {
             }
             .instrument(span_outer)
         });
+    }
+
+    async fn handle_new_address(&self, local_url: String) -> MetaNetTaskResult<()> {
+        match self.i_s.new_address(local_url).await {
+            Err(e) => Err(e.into()),
+            Ok(_) => Ok(()),
+        }
     }
 
     async fn handle_connect(&self, remote_url: String, con: MetaNetCon) -> MetaNetTaskResult<()> {

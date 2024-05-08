@@ -53,6 +53,9 @@ const UNAUTHORIZED_DISCONNECT_REASON: &str = "unauthorized";
 ghost_actor::ghost_chan! {
     #[allow(clippy::too_many_arguments)]
     pub chan Internal<crate::KitsuneP2pError> {
+        /// Notification that we have a new address to be identified at
+        fn new_address(local_url: String) -> ();
+
         /// Register space event handler
         fn register_space_event_handler(recv: EvtRcv) -> ();
 
@@ -279,6 +282,20 @@ impl ghost_actor::GhostControlHandler for KitsuneP2pActor {
 impl ghost_actor::GhostHandler<Internal> for KitsuneP2pActor {}
 
 impl InternalHandler for KitsuneP2pActor {
+    fn handle_new_address(&mut self, local_url: String) -> InternalHandlerResult<()> {
+        let spaces = self.spaces.values().map(|s| s.get()).collect::<Vec<_>>();
+        Ok(async move {
+            let mut all = Vec::new();
+            for (_, space) in futures::future::join_all(spaces).await {
+                all.push(space.new_address(local_url.clone()));
+            }
+            let _ = futures::future::join_all(all).await;
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
     fn handle_register_space_event_handler(
         &mut self,
         recv: futures::channel::mpsc::Receiver<KitsuneP2pEvent>,
@@ -594,13 +611,6 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
 impl ghost_actor::GhostHandler<KitsuneP2p> for KitsuneP2pActor {}
 
 impl KitsuneP2pHandler for KitsuneP2pActor {
-    fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
-        let this_addr = self.ep_hnd.local_addr()?;
-        let url = url2::Url2::try_parse(&this_addr)
-            .map_err(|e| KitsuneError::bad_input(e, format!("{:?}", this_addr)))?;
-        Ok(async move { Ok(vec![url]) }.boxed().into())
-    }
-
     fn handle_join(
         &mut self,
         space: Arc<KitsuneSpace>,
