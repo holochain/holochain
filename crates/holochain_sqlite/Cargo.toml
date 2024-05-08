@@ -15,7 +15,7 @@ anyhow = "1.0"
 derive_more = "0.99"
 fallible-iterator = "0.2.0"
 futures = "0.3"
-holo_hash = { path = "../holo_hash", version = "^0.4.0-dev.2"}
+holo_hash = { path = "../holo_hash", version = "^0.4.0-dev.2" }
 holochain_serialized_bytes = "=0.0.54"
 holochain_util = { version = "^0.4.0-dev.1", path = "../holochain_util", features = [
   "backtrace",
