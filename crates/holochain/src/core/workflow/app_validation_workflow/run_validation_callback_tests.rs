@@ -495,7 +495,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
 
     assert_eq!(times_same_hash_is_fetched.load(Ordering::Relaxed), 1);
     // after successfully fetching dependencies, the set should be empty
-    assert_eq!(validation_dependencies.lock().missing_hashes.len(), 0);
+    assert_eq!(validation_dependencies.lock().get_missing_hashes().len(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -626,7 +626,7 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
 
     assert_eq!(times_same_hash_is_fetched.load(Ordering::Relaxed), 1);
     // after successfully fetching dependencies, the set should be empty
-    assert_eq!(validation_dependencies.lock().missing_hashes.len(), 0);
+    assert_eq!(validation_dependencies.lock().get_missing_hashes().len(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -731,9 +731,9 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     assert_eq!(
         validation_dependencies
             .lock()
-            .hashes_missing_for_op
-            .get(&update_dht_op_hash),
-        None
+            .get_missing_hashes()
+            .is_empty(),
+        true
     );
 
     // filtering out ops with missing dependencies should not filter anything
@@ -771,11 +771,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
 
     println!(
         "before missing hashes {:?}",
-        validation_dependencies.lock().missing_hashes
-    );
-    println!(
-        "before hashes for ops {:?}",
-        validation_dependencies.lock().hashes_missing_for_op
+        validation_dependencies.lock().get_missing_hashes()
     );
 
     // await while missing record is being fetched in background task
@@ -783,11 +779,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
 
     println!(
         "after missing hashes {:?}",
-        validation_dependencies.lock().missing_hashes
-    );
-    println!(
-        "after hashes for ops {:?}",
-        validation_dependencies.lock().hashes_missing_for_op
+        validation_dependencies.lock().get_missing_hashes()
     );
 
     // filtering out ops with missing dependencies should again not filter anything
