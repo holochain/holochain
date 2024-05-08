@@ -101,10 +101,7 @@ mod tests {
     use fixt::fixt;
     use holo_hash::fixt::{AnyDhtHashFixturator, DhtOpHashFixturator};
     use holochain_types::dht_op::DhtOp;
-    use holochain_zome_types::{
-        fixt::{ActionFixturator, ActionHashedFixturator, SignatureFixturator},
-        Action,
-    };
+    use holochain_zome_types::fixt::{ActionFixturator, SignatureFixturator};
 
     #[test]
     fn filter_missing_hashes_to_fetch_for_op() {

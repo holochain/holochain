@@ -23,6 +23,7 @@ pub enum TestCoordinatorWasm {
 pub enum TestWasm {
     AgentInfo,
     Anchor,
+    AppValidation,
     Bench,
     Capability,
     Clone,
@@ -129,6 +130,7 @@ impl From<TestWasm> for ZomeName {
         ZomeName::from(match test_wasm {
             TestWasm::AgentInfo => "agent_info",
             TestWasm::Anchor => "anchor",
+            TestWasm::AppValidation => "app_validation",
             TestWasm::Bench => "bench",
             TestWasm::Capability => "capability",
             TestWasm::Clone => "clone",
@@ -200,6 +202,7 @@ impl From<TestWasm> for PathBuf {
         PathBuf::from(match test_wasm {
             TestWasm::AgentInfo => "wasm32-unknown-unknown/release/test_wasm_agent_info.wasm",
             TestWasm::Anchor => "wasm32-unknown-unknown/release/test_wasm_anchor.wasm",
+            TestWasm::AppValidation => "wasm32-unknown-unknown/release/test_wasm_app_validation.wasm",
             TestWasm::Bench => "wasm32-unknown-unknown/release/test_wasm_bench.wasm",
             TestWasm::Capability => "wasm32-unknown-unknown/release/test_wasm_capability.wasm",
             TestWasm::Clone => "wasm32-unknown-unknown/release/test_wasm_clone.wasm",
