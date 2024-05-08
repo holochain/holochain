@@ -30,11 +30,13 @@ CREATE TABLE IF NOT EXISTS Entry (
 CREATE TABLE IF NOT EXISTS Action (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             TEXT           NOT NULL,
-    seq              INTEGER        NOT NULL,
     author           BLOB           NOT NULL,
 
     blob             BLOB           NOT NULL,
     prev_hash        BLOB           NULL,
+
+    -- Actions
+    seq              INTEGER        NULL,
 
     -- Create / Update
     entry_hash       BLOB           NULL,
@@ -86,8 +88,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             TEXT           NOT NULL,
     basis_hash       BLOB           NOT NULL,
-    action_hash      BLOB           NULL,
-    warrant_hash     BLOB           NULL,
+    action_hash      BLOB           NOT NULL,
     require_receipt  INTEGER        NOT NULL,      -- BOOLEAN
 
     storage_center_loc          INTEGER   NOT NULL,
@@ -165,19 +166,4 @@ CREATE TABLE IF NOT EXISTS ScheduledFunctions (
     end INTEGER NOT NULL,
     ephemeral BOOLEAN NOT NULL,
     PRIMARY KEY (zome_name, scheduled_fn, author) ON CONFLICT ROLLBACK
-);
-
-CREATE TABLE IF NOT EXISTS Warrant (
-    hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
-
-    -- it is best if these two fields match the analogous fields 
-    -- in the Action table
-    type             TEXT           NOT NULL,
-    author           BLOB           NOT NULL,
-
-    -- the offending thing that the warrant is for,
-    -- e.g. an ActionHash or an AgentPubKey
-    target           BLOB           NOT NULL,
-
-    blob             BLOB           NOT NULL,
 );

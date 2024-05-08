@@ -748,9 +748,9 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
         txn.prepare(
             "
             SELECT
-            DhtOp.type, Action.blob as action_blob, Entry.blob as entry_blob
+            DhtOp.type, Action.author as author, Action.blob as action_blob, Entry.blob as entry_blob
             FROM DhtOp
-            LEFT JOIN
+            JOIN
             Action ON DhtOp.action_hash = Action.hash
             LEFT JOIN
             Entry ON Action.entry_hash = Entry.hash
@@ -761,19 +761,7 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
         )
         .unwrap()
         .query_and_then(named_params! {}, |row| {
-            let op_type: DhtOpType = row.get("type")?;
-            match op_type {
-                DhtOpType::Chain(op_type) => {
-                    let action: SignedAction = from_blob(row.get("action_blob")?)?;
-                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                    let entry: Option<Entry> = match entry {
-                        Some(entry) => Some(from_blob::<Entry>(entry)?),
-                        None => None,
-                    };
-                    Ok(ChainOp::from_type(op_type, action, entry)?.into())
-                }
-                DhtOpType::Warrant(_) => todo!("todo: warrants"),
-            }
+            Ok(holochain_state::query::map_sql_dht_op(true, "type", row).unwrap())
         })
         .unwrap()
         .collect::<StateQueryResult<_>>()

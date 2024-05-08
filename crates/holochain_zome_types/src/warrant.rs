@@ -1,6 +1,7 @@
 //! Types for warrants
 use holo_hash::ActionHash;
 pub use holochain_serialized_bytes::prelude::*;
+use kitsune_p2p_timestamp::Timestamp;
 
 use crate::signature::Signed;
 
@@ -48,5 +49,5 @@ pub enum ValidationType {
     App,
 }
 
-/// A signed warrant
-pub type SignedWarrant = Signed<Warrant>;
+/// A signed warrant with timestamp
+pub type SignedWarrant = Signed<(Warrant, Timestamp)>;

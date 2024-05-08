@@ -343,7 +343,7 @@ impl DhtOp {
     pub fn as_chain_op(&self) -> Option<&ChainOp> {
         match self {
             Self::ChainOp(op) => Some(op),
-            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
+            _ => None,
         }
     }
 
@@ -351,7 +351,7 @@ impl DhtOp {
     pub fn get_type(&self) -> DhtOpType {
         match self {
             Self::ChainOp(op) => DhtOpType::Chain(op.get_type()),
-            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
+            Self::WarrantOp(op) => DhtOpType::Warrant(op.get_type()),
         }
     }
 
@@ -364,7 +364,7 @@ impl DhtOp {
     pub fn signature(&self) -> &Signature {
         match self {
             Self::ChainOp(op) => op.signature(),
-            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
+            Self::WarrantOp(op) => &op.signature,
         }
     }
 
@@ -379,7 +379,7 @@ impl DhtOp {
     pub fn author(&self) -> AgentPubKey {
         match self {
             Self::ChainOp(op) => op.action().author().clone(),
-            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
+            Self::WarrantOp(op) => op.author.clone(),
         }
     }
 
@@ -387,7 +387,7 @@ impl DhtOp {
     pub fn timestamp(&self) -> Timestamp {
         match self {
             Self::ChainOp(op) => op.timestamp(),
-            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
+            Self::WarrantOp(op) => op.timestamp,
         }
     }
 
@@ -395,7 +395,7 @@ impl DhtOp {
     pub fn to_lite(&self) -> DhtOpLite {
         match self {
             Self::ChainOp(op) => DhtOpLite::Chain(op.to_lite()),
-            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
+            Self::WarrantOp(_op) => unreachable!("todo: warrants lite"),
         }
     }
 

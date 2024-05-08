@@ -16,8 +16,7 @@ CREATE TABLE DhtOp_2up (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             TEXT           NOT NULL,
     basis_hash       BLOB           NOT NULL,
-    action_hash      BLOB           NULL,
-    warrant_hash     BLOB           NULL,
+    action_hash      BLOB           NOT NULL,
     require_receipt  INTEGER        NOT NULL,      -- BOOLEAN
 
     storage_center_loc          INTEGER   NOT NULL,

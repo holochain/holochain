@@ -31,7 +31,7 @@ async fn get_ops_to_validate(
         DhtOp.type as dht_type,
         DhtOp.hash as dht_hash
         FROM DhtOp
-        LEFT JOIN
+        JOIN
         Action ON DhtOp.action_hash = Action.hash
         LEFT JOIN
         Entry ON Action.entry_hash = Entry.hash
@@ -77,23 +77,11 @@ async fn get_ops_to_validate(
     db.read_async(move |txn| {
         let mut stmt = txn.prepare(&sql)?;
         let r = stmt.query_and_then([], |row| {
-            let op_type: DhtOpType = row.get("dht_type")?;
-            match op_type {
-                DhtOpType::Chain(op_type) => {
-                    let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                    let hash: DhtOpHash = row.get("dht_hash")?;
-                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                    let entry = match entry {
-                        Some(entry) => Some(from_blob::<Entry>(entry)?),
-                        None => None,
-                    };
-                    WorkflowResult::Ok(DhtOpHashed::with_pre_hashed(
-                        ChainOp::from_type(op_type, action, entry)?.into(),
-                        hash,
-                    ))
-                }
-                DhtOpType::Warrant(_) => todo!("todo: warrants"),
-            }
+            let op = WorkflowResult::Ok(holochain_state::query::map_sql_dht_op(
+                true, "dht_type", row,
+            )?)?;
+            let hash = row.get("dht_hash")?;
+            Ok(DhtOpHashed::with_pre_hashed(op, hash))
         })?;
         let r = r.collect();
         WorkflowResult::Ok(r)

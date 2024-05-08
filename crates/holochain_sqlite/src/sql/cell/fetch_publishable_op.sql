@@ -2,10 +2,11 @@ SELECT
   DhtOp.hash,
   DhtOp.type,
   Action.blob AS action_blob,
+  Action.author AS author,
   Entry.blob AS entry_blob
 FROM
   DhtOp
-  LEFT JOIN Action ON DhtOp.action_hash = Action.hash
+  JOIN Action ON DhtOp.action_hash = Action.hash
   LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE
   DhtOp.hash = :hash

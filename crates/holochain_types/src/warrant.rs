@@ -25,8 +25,10 @@ pub struct WarrantOp {
     pub warrant: Warrant,
     /// author of the warrant
     pub author: AgentPubKey,
-    /// signature of the Warrant by the author
+    /// signature of (Warrant, Timestamp) by the author
     pub signature: Signature,
+    /// time when the warrant was issued
+    pub timestamp: Timestamp,
 }
 
 impl WarrantOp {
@@ -37,9 +39,9 @@ impl WarrantOp {
         }
     }
 
-    /// Convert the WarrantOp into a Signed<Warrant>
-    pub fn into_signed_warrant(self) -> Signed<Warrant> {
-        Signed::new(self.warrant, self.signature)
+    /// Convert the WarrantOp into a SignedWarrant
+    pub fn into_signed_warrant(self) -> SignedWarrant {
+        Signed::new((self.warrant, self.timestamp), self.signature)
     }
 }
 

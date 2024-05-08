@@ -874,7 +874,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
         "
         SELECT DhtOp.type, Action.hash, Action.blob
         FROM DhtOp
-        LEFT JOIN Action ON DhtOp.action_hash = Action.hash
+        JOIN Action ON DhtOp.action_hash = Action.hash
         WHERE
         when_integrated IS NULL
     ",
@@ -888,7 +888,10 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
                 let action: SignedAction = from_blob(row.get("blob")?)?;
                 Ok(ChainOpLite::from_type(op_type, hash, &action)?.into())
             }
-            DhtOpType::Warrant(_) => todo!("todo: warrants"),
+            DhtOpType::Warrant(_) => {
+                let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
+                Ok(todo!("todo: warrants lite"))
+            }
         }
     })
     .unwrap()

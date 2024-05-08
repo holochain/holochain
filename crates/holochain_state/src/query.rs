@@ -946,8 +946,8 @@ pub fn get_public_op_from_db(
         },
         |row| {
             let hash: DhtOpHash = row.get("hash")?;
-            let op_hashed =
-                map_sql_dht_op_common(row)?.map(|op| DhtOpHashed::with_pre_hashed(op, hash));
+            let op_hashed = map_sql_dht_op_common(false, false, "type", row)?
+                .map(|op| DhtOpHashed::with_pre_hashed(op, hash));
             StateQueryResult::Ok(op_hashed)
         },
     );
@@ -960,15 +960,27 @@ pub fn get_public_op_from_db(
     }
 }
 
-pub fn map_sql_dht_op_common(row: &Row) -> StateQueryResult<Option<DhtOp>> {
-    let op_type: DhtOpType = row.get("type")?;
+pub fn map_sql_dht_op(
+    include_private_entries: bool,
+    type_fieldname: &str,
+    row: &Row,
+) -> StateQueryResult<DhtOp> {
+    Ok(map_sql_dht_op_common(true, include_private_entries, type_fieldname, row)?.unwrap())
+}
+
+pub fn map_sql_dht_op_common(
+    return_private_entry_ops: bool,
+    include_private_entries: bool,
+    type_fieldname: &str,
+    row: &Row,
+) -> StateQueryResult<Option<DhtOp>> {
+    let op_type: DhtOpType = row.get(type_fieldname)?;
     match op_type {
         DhtOpType::Chain(op_type) => {
             let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-            if action
-                .entry_type()
-                .map_or(false, |et| *et.visibility() == EntryVisibility::Private)
-                && op_type == ChainOpType::StoreEntry
+            if action.entry_type().map_or(false, |et| {
+                !return_private_entry_ops && *et.visibility() == EntryVisibility::Private
+            }) && op_type == ChainOpType::StoreEntry
             {
                 return Ok(None);
             }
@@ -977,7 +989,7 @@ pub fn map_sql_dht_op_common(row: &Row) -> StateQueryResult<Option<DhtOp>> {
             let mut entry: Option<Entry> = None;
             if action
                 .entry_type()
-                .filter(|et| *et.visibility() == EntryVisibility::Public)
+                .filter(|et| include_private_entries || *et.visibility() == EntryVisibility::Public)
                 .is_some()
             {
                 let e: Option<Vec<u8>> = row.get("entry_blob")?;
@@ -989,9 +1001,13 @@ pub fn map_sql_dht_op_common(row: &Row) -> StateQueryResult<Option<DhtOp>> {
 
             Ok(Some(ChainOp::from_type(op_type, action, entry)?.into()))
         }
-        DhtOpType::Warrant(op_type) => {
+        DhtOpType::Warrant(_) => {
             let warrant = from_blob::<SignedWarrant>(row.get("action_blob")?)?;
-            Ok(Some(WarrantOp::new(todo!(), todo!(), todo!()).into()))
+            let author: AgentPubKey = row.get("author")?;
+            let ((warrant, timestamp), signature) = warrant.into();
+            Ok(Some(
+                WarrantOp::new(warrant, author, signature, timestamp).into(),
+            ))
         }
     }
 }
