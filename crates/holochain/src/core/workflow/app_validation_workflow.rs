@@ -192,7 +192,7 @@ async fn app_validation_workflow_inner(
                     }
                 }
                 if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
-                    warn!(?outcome, ?op_lite, "DhtOp has failed app validation");
+                    warn!(?outcome, ?dht_op_lite, "DhtOp has failed app validation");
                 }
 
                 let accepted_ops = accepted_ops.clone();
