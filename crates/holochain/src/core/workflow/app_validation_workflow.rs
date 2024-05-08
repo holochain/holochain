@@ -751,7 +751,6 @@ async fn run_validation_callback(
                 ?hashes,
                 "Op validation returned unresolved dependencies -  AgentActivity"
             );
-            println!("missing hashes {hashes:?} for op {dht_op_hash}");
             // fetch all missing hashes in the background without awaiting them
             let cascade_workspace = workspace.clone();
             let cascade =
@@ -763,15 +762,10 @@ async fn run_validation_callback(
                 .lock()
                 .filter_missing_hashes_to_fetch_for_op(hashes.clone(), dht_op_hash.clone());
 
-            let validation_deps = validation_dependencies.clone();
-            let dht_op_hash = dht_op_hash.clone();
-
-            // build a collection of futures to fetch the individual missing
-            // hashes
+            // build a collection of futures to fetch the missing hashes
             let fetches = new_hashes_to_fetch.into_iter().map(move |hash| {
                 let cascade = cascade.clone();
                 let validation_dependencies = validation_dependencies.clone();
-                let dht_op_hash = dht_op_hash.clone();
                 async move {
                     let result = cascade
                         .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
