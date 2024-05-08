@@ -65,11 +65,7 @@ async fn main_workflow() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let dna_hash = dna_file.dna_hash().clone();
 
-    let mut conductor = SweetConductor::from_config_rendezvous(
-        SweetConductorConfig::rendezvous(true),
-        SweetLocalRendezvous::new().await,
-    )
-    .await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
@@ -275,11 +271,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let dna_hash = dna_file.dna_hash().clone();
 
-    let mut conductor = SweetConductor::from_config_rendezvous(
-        SweetConductorConfig::rendezvous(true),
-        SweetLocalRendezvous::new().await,
-    )
-    .await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
@@ -400,11 +392,7 @@ async fn validate_ops_in_sequence_must_get_action() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let dna_hash = dna_file.dna_hash().clone();
 
-    let mut conductor = SweetConductor::from_config_rendezvous(
-        SweetConductorConfig::rendezvous(true),
-        SweetLocalRendezvous::new().await,
-    )
-    .await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
@@ -523,11 +511,7 @@ async fn handle_error_in_op_validation() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let dna_hash = dna_file.dna_hash().clone();
 
-    let mut conductor = SweetConductor::from_config_rendezvous(
-        SweetConductorConfig::rendezvous(true),
-        SweetLocalRendezvous::new().await,
-    )
-    .await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
