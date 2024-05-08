@@ -25,9 +25,9 @@ futures = "0.3"
 holochain_trace = { version = "^0.4.0-dev.1", path = "../holochain_trace" }
 if-addrs = "0.12"
 kitsune_p2p_bootstrap = { version = "^0.3.0-dev.2", path = "../kitsune_p2p/bootstrap" }
+sbd-server = "=0.0.1-alpha"
 tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1"
-tx5-signal-srv = "=0.0.9-alpha"
 
 [lints]
 workspace = true
