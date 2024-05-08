@@ -353,7 +353,6 @@ pub async fn setup_app_in_new_conductor(
     dnas: DnasWithProofs,
 ) -> (Arc<TempDir>, AppInterfaceApi, ConductorHandle, AgentPubKey) {
     let db_dir = test_db_dir();
-
     let conductor_handle = ConductorBuilder::new()
         .with_data_root_path(db_dir.path().to_path_buf().into())
         .test(&[])
