@@ -1,5 +1,7 @@
 //! Types for warrants
-use holo_hash::ActionHash;
+
+use holo_hash::*;
+use holochain_integrity_types::Signature;
 pub use holochain_serialized_bytes::prelude::*;
 use kitsune_p2p_timestamp::Timestamp;
 
@@ -25,14 +27,32 @@ pub enum Warrant {
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub enum ChainIntegrityWarrant {
-    /// Something invalid was authored on a chain, according to
-    /// a specific op type.
-    /// When we receive this warrant, we validate the data as the specified type of Op.
-    InvalidChainOp(ActionHash, /* DhtOpType, */ ValidationType),
+    /// Something invalid was authored on a chain.
+    /// When we receive this warrant, we fetch the Action and validate it
+    /// under every applicable DhtOpType.
+    // TODO: include ChainOpType, which allows the receipient to only run
+    //       validation for that op type. At the time of writing, this was
+    //       non-trivial because ChainOpType is in a downstream crate.
+    InvalidChainOp {
+        /// The author of the action
+        action_author: AgentPubKey,
+        /// The hash of the action to fetch by
+        action: ActionHashAndSig,
+        /// Whether to run app or sys validation
+        validation_type: ValidationType,
+    },
 
     /// Proof of chain fork.
-    ChainFork(ActionHash, ActionHash),
+    ChainFork {
+        /// Author of the chain which is forked
+        chain_author: AgentPubKey,
+        /// Two actions of the same seq number which prove the fork
+        action_pair: (ActionHashAndSig, ActionHashAndSig),
+    },
 }
+
+/// Action hash with the signature of the action at that hash
+pub type ActionHashAndSig = (ActionHash, Signature);
 
 /// Not necessary but nice to have
 #[derive(

@@ -291,7 +291,7 @@ impl SourceChain {
 
         let ops_to_integrate = ops
             .iter()
-            .map(|op| (op.1.clone(), op.0.dht_basis().clone()))
+            .map(|op| (op.1.clone(), op.0.dht_basis()))
             .collect::<Vec<_>>();
 
         // Write the entries, actions and ops to the database in one transaction.

@@ -103,8 +103,10 @@ impl<E> TryFrom<OutcomeOrError<ValidationOutcome, E>> for ValidationOutcome {
 pub enum ValidationOutcome {
     #[error("The record with signature {0:?} and action {1:?} was found to be counterfeit")]
     CounterfeitAction(Signature, Action),
-    #[error("The warrant op with signature {0:?} and warrant {1:?} was found to be counterfeit")]
-    CounterfeitWarrant(Signature, Warrant),
+    #[error("A warrant op was found to be counterfeit. Warrant: {0:?}")]
+    CounterfeitWarrant(WarrantOp),
+    #[error("A warrant op was found to be invalid. Reason: {1}, Warrant: {0:?}")]
+    InvalidWarrantOp(WarrantOp, String),
     #[error("The action {1:?} is not found in the countersigning session data {0:?}")]
     ActionNotInCounterSigningSession(CounterSigningSessionData, NewEntryAction),
     #[error(transparent)]

@@ -1,4 +1,3 @@
-use holo_hash::DhtOpHash;
 use holochain_sqlite::db::DbKindDht;
 use holochain_state::prelude::*;
 

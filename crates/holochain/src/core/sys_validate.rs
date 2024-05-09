@@ -54,7 +54,7 @@ pub async fn verify_warrant_signature(warrant_op: &WarrantOp) -> SysValidationRe
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::CounterfeitWarrant((*signature).clone(), (*warrant).clone()),
+            ValidationOutcome::CounterfeitWarrant(warrant_op.clone()),
         ))
     }
 }

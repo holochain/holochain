@@ -154,7 +154,7 @@ impl aitia::logging::Log for Context {
                 let op_hash = op.as_hash();
                 let a = match &op.op {
                     DhtOpLite::Chain(op) => ChainOpAction::from(op.clone()),
-                    // _ => unimplemented!("hc_sleuth can only handle chain ops"),
+                    _ => unimplemented!("hc_sleuth can only handle chain ops"),
                 };
                 self.map_dep_hash_to_op
                     .insert(op.fetch_dependency_hash(), op_hash.clone());

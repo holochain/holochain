@@ -152,19 +152,11 @@ pub type DhtOpLight = DhtOpLite;
 /// A type for storing in databases that doesn't need the actual
 /// data. Everything is a hash of the type except the signatures.
 #[allow(missing_docs)]
-#[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    derive_more::Display,
-    derive_more::From,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::From)]
 pub enum DhtOpLite {
     Chain(ChainOpLite),
+    /// Note: WarrantOps are already "lite", as they only contain hashes
+    Warrant(WarrantOp),
 }
 
 /// A type for storing in databases that doesn't need the actual
@@ -210,41 +202,6 @@ impl std::hash::Hash for ChainOpLite {
     }
 }
 
-/// This enum is used to encode just the enum variant of ChainOp
-#[allow(missing_docs)]
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    Serialize,
-    Deserialize,
-    Eq,
-    PartialEq,
-    Hash,
-    derive_more::Display,
-    strum_macros::EnumString,
-)]
-pub enum ChainOpType {
-    #[display(fmt = "StoreRecord")]
-    StoreRecord,
-    #[display(fmt = "StoreEntry")]
-    StoreEntry,
-    #[display(fmt = "RegisterAgentActivity")]
-    RegisterAgentActivity,
-    #[display(fmt = "RegisterUpdatedContent")]
-    RegisterUpdatedContent,
-    #[display(fmt = "RegisterUpdatedRecord")]
-    RegisterUpdatedRecord,
-    #[display(fmt = "RegisterDeletedBy")]
-    RegisterDeletedBy,
-    #[display(fmt = "RegisterDeletedEntryAction")]
-    RegisterDeletedEntryAction,
-    #[display(fmt = "RegisterAddLink")]
-    RegisterAddLink,
-    #[display(fmt = "RegisterRemoveLink")]
-    RegisterRemoveLink,
-}
-
 /// Unit enum type corresponding to the different types of DhtOp
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, derive_more::From)]
@@ -280,8 +237,43 @@ impl FromSql for DhtOpType {
 /// A sys validation dependency
 pub type SysValDep = Option<ActionHash>;
 
+/// This enum is used to encode just the enum variant of ChainOp
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Hash,
+    derive_more::Display,
+    strum_macros::EnumString,
+)]
+pub enum ChainOpType {
+    #[display(fmt = "StoreRecord")]
+    StoreRecord,
+    #[display(fmt = "StoreEntry")]
+    StoreEntry,
+    #[display(fmt = "RegisterAgentActivity")]
+    RegisterAgentActivity,
+    #[display(fmt = "RegisterUpdatedContent")]
+    RegisterUpdatedContent,
+    #[display(fmt = "RegisterUpdatedRecord")]
+    RegisterUpdatedRecord,
+    #[display(fmt = "RegisterDeletedBy")]
+    RegisterDeletedBy,
+    #[display(fmt = "RegisterDeletedEntryAction")]
+    RegisterDeletedEntryAction,
+    #[display(fmt = "RegisterAddLink")]
+    RegisterAddLink,
+    #[display(fmt = "RegisterRemoveLink")]
+    RegisterRemoveLink,
+}
 impl ChainOpType {
     /// Calculate the op's sys validation dependency action hash
+    // TODO: this must be generalized to support multiple dependencies
     pub fn sys_validation_dependency(&self, action: &Action) -> SysValDep {
         match self {
             ChainOpType::StoreRecord | ChainOpType::StoreEntry => None,
@@ -310,7 +302,7 @@ impl ChainOpType {
     }
 }
 
-impl ToSql for ChainOpType {
+impl rusqlite::ToSql for ChainOpType {
     fn to_sql(
         &self,
     ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
@@ -320,7 +312,7 @@ impl ToSql for ChainOpType {
     }
 }
 
-impl FromSql for ChainOpType {
+impl rusqlite::types::FromSql for ChainOpType {
     fn column_result(
         value: holochain_sqlite::rusqlite::types::ValueRef<'_>,
     ) -> holochain_sqlite::rusqlite::types::FromSqlResult<Self> {
@@ -395,15 +387,26 @@ impl DhtOp {
     pub fn to_lite(&self) -> DhtOpLite {
         match self {
             Self::ChainOp(op) => DhtOpLite::Chain(op.to_lite()),
-            Self::WarrantOp(_op) => unreachable!("todo: warrants lite"),
+            Self::WarrantOp(op) => DhtOpLite::Warrant(op.clone()),
         }
     }
 
     /// Calculate the op's sys validation dependency action hash
+    // TODO: this must be generalized to support multiple dependencies
     pub fn sys_validation_dependency(&self) -> SysValDep {
         match self {
             Self::ChainOp(op) => op.get_type().sys_validation_dependency(&op.action()),
-            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
+            Self::WarrantOp(op) => match &op.warrant {
+                Warrant::ChainIntegrity(w) => match w {
+                    ChainIntegrityWarrant::InvalidChainOp {
+                        action: action_hash,
+                        ..
+                    } => Some(action_hash.0.clone()),
+                    ChainIntegrityWarrant::ChainFork { action_pair, .. } => {
+                        Some(action_pair.0 .0.clone())
+                    }
+                },
+            },
         }
     }
 }
@@ -633,9 +636,10 @@ impl ChainOp {
 
 impl DhtOpLite {
     /// Get the dht basis for where to send this op
-    pub fn dht_basis(&self) -> &OpBasis {
+    pub fn dht_basis(&self) -> OpBasis {
         match self {
-            Self::Chain(op) => op.dht_basis(),
+            Self::Chain(op) => op.dht_basis().clone(),
+            Self::Warrant(op) => op.dht_basis(),
         }
     }
 
@@ -643,6 +647,7 @@ impl DhtOpLite {
     pub fn as_chain_op(&self) -> Option<&ChainOpLite> {
         match self {
             Self::Chain(op) => Some(op),
+            _ => None,
         }
     }
 
@@ -650,6 +655,7 @@ impl DhtOpLite {
     pub fn get_type(&self) -> DhtOpType {
         match self {
             Self::Chain(op) => op.get_type().into(),
+            Self::Warrant(op) => op.get_type().into(),
         }
     }
 
@@ -658,11 +664,27 @@ impl DhtOpLite {
     /// For instance, `must_get_entry` will use an EntryHash, and requires a
     /// StoreEntry record to be integrated to succeed. All other must_gets take
     /// an ActionHash.
+    //
+    // TODO: this must be generalized to support multiple dependencies
     pub fn fetch_dependency_hash(&self) -> AnyDhtHash {
         match self {
             Self::Chain(op) => match op {
                 ChainOpLite::StoreEntry(_, entry_hash, _) => entry_hash.clone().into(),
                 other => other.action_hash().clone().into(),
+            },
+            Self::Warrant(op) => match &op.warrant {
+                Warrant::ChainIntegrity(w) => match w {
+                    ChainIntegrityWarrant::InvalidChainOp {
+                        action: action_hash,
+                        ..
+                    } => action_hash.0.clone().into(),
+                    ChainIntegrityWarrant::ChainFork { action_pair, .. } => {
+                        tracing::warn!(
+                            "ChainFork warrant only lists one of two dependencies. TODO: refactor"
+                        );
+                        action_pair.0 .0.clone().into()
+                    }
+                },
             },
         }
     }

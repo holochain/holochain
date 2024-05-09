@@ -158,7 +158,7 @@ pub fn insert_op_lite(
     timestamp: &Timestamp,
 ) -> StateMutationResult<()> {
     let action_hash = op_lite.as_chain_op().map(|op| op.action_hash().clone());
-    let basis = op_lite.dht_basis().to_owned();
+    let basis = op_lite.dht_basis();
     sql_insert!(txn, DhtOp, {
         "hash": hash,
         "type": op_lite.get_type(),
