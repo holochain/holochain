@@ -4,7 +4,9 @@ use kitsune_p2p::event::{
     full_time_window, FetchOpDataEvt, FetchOpDataEvtQuery, KitsuneP2pEvent, PutAgentInfoSignedEvt,
     QueryAgentsEvt, QueryOpHashesEvt, SignNetworkDataEvt,
 };
-use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneBinType, KitsuneOpData, KitsuneSignature, KitsuneSpace};
+use kitsune_p2p_bin_data::{
+    KitsuneAgent, KitsuneBinType, KitsuneOpData, KitsuneSignature, KitsuneSpace,
+};
 use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::bootstrap::AgentInfoPut;
