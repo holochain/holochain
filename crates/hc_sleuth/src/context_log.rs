@@ -153,7 +153,7 @@ impl aitia::logging::Log for Context {
                 // TODO: add check that the same op is not authored twice?
                 let op_hash = op.as_hash();
                 let a = match &op.op {
-                    DhtOpLite::Chain(op) => ChainOpAction::from(op.clone()),
+                    DhtOpLite::Chain(op) => ChainOpAction::from((**op).clone()),
                     _ => unimplemented!("hc_sleuth can only handle chain ops"),
                 };
                 self.map_dep_hash_to_op

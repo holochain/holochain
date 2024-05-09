@@ -398,7 +398,7 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
         .filter_map(|op| {
             // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
             match &op.content {
-                DhtOp::ChainOp(op) => match op {
+                DhtOp::ChainOp(op) => match &**op {
                     ChainOp::StoreRecord(_, action, entry) => {
                         let mut actions = match entry {
                             RecordEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
@@ -742,7 +742,7 @@ async fn validate_warrant_op(
                         .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a2.clone().into()))?;
 
                     // chain_author basis must match the author of the action
-                    if !(action1.author() == chain_author) {
+                    if action1.author() != chain_author {
                         return Err(ValidationOutcome::InvalidWarrantOp(
                             op.clone(),
                             "chain author mismatch".into(),
@@ -751,7 +751,7 @@ async fn validate_warrant_op(
                     }
 
                     // Both actions must be by same author
-                    if !(action1.author() == action2.author()) {
+                    if action1.author() != action2.author() {
                         return Err(ValidationOutcome::InvalidWarrantOp(
                             op.clone(),
                             "action pair author mismatch".into(),
@@ -765,7 +765,7 @@ async fn validate_warrant_op(
                     // attack where someone authors a warrant using two actions from two different DNAs.
                     // Using seq numbers makes it easier to detect and prove a fork, but using prev_action
                     // prevents the attack.
-                    if !(action1.prev_action() == action2.prev_action()) {
+                    if action1.prev_action() != action2.prev_action() {
                         return Err(ValidationOutcome::InvalidWarrantOp(
                             op.clone(),
                             "action pair seq mismatch".into(),

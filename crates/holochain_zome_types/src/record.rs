@@ -16,7 +16,7 @@ pub type SignedAction = Signed<Action>;
 impl SignedAction {
     /// Accessor for the Action
     pub fn action(&self) -> &Action {
-        &*self
+        self
     }
 }
 

@@ -37,9 +37,9 @@ mod tests;
 )]
 pub enum DhtOp {
     /// An op representing storage of some record information.
-    ChainOp(ChainOp),
+    ChainOp(Box<ChainOp>),
     /// TODO, new type of op
-    WarrantOp(WarrantOp),
+    WarrantOp(Box<WarrantOp>),
 }
 
 /// A unit of DHT gossip concerning source chain data.
@@ -127,6 +127,18 @@ pub enum ChainOp {
     RegisterRemoveLink(Signature, action::DeleteLink),
 }
 
+impl From<ChainOp> for DhtOp {
+    fn from(op: ChainOp) -> Self {
+        DhtOp::ChainOp(Box::new(op))
+    }
+}
+
+impl From<WarrantOp> for DhtOp {
+    fn from(op: WarrantOp) -> Self {
+        DhtOp::WarrantOp(Box::new(op))
+    }
+}
+
 impl kitsune_p2p_dht::prelude::OpRegion for DhtOp {
     fn loc(&self) -> Loc {
         self.dht_basis().get_loc()
@@ -154,9 +166,9 @@ pub type DhtOpLight = DhtOpLite;
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::From)]
 pub enum DhtOpLite {
-    Chain(ChainOpLite),
+    Chain(Box<ChainOpLite>),
     /// Note: WarrantOps are already "lite", as they only contain hashes
-    Warrant(WarrantOp),
+    Warrant(Box<WarrantOp>),
 }
 
 /// A type for storing in databases that doesn't need the actual
@@ -182,6 +194,18 @@ pub enum ChainOpLite {
     RegisterAddLink(ActionHash, OpBasis),
     #[display(fmt = "RegisterRemoveLink")]
     RegisterRemoveLink(ActionHash, OpBasis),
+}
+
+impl From<ChainOpLite> for DhtOpLite {
+    fn from(op: ChainOpLite) -> Self {
+        DhtOpLite::Chain(Box::new(op))
+    }
+}
+
+impl From<WarrantOp> for DhtOpLite {
+    fn from(op: WarrantOp) -> Self {
+        DhtOpLite::Warrant(Box::new(op))
+    }
 }
 
 impl PartialEq for ChainOpLite {
@@ -386,7 +410,7 @@ impl DhtOp {
     /// Convert a [DhtOp] to a [DhtOpLite] and basis
     pub fn to_lite(&self) -> DhtOpLite {
         match self {
-            Self::ChainOp(op) => DhtOpLite::Chain(op.to_lite()),
+            Self::ChainOp(op) => DhtOpLite::Chain(op.to_lite().into()),
             Self::WarrantOp(op) => DhtOpLite::Warrant(op.clone()),
         }
     }
@@ -672,7 +696,7 @@ impl DhtOpLite {
     // TODO: this must be generalized to support multiple dependencies
     pub fn fetch_dependency_hash(&self) -> AnyDhtHash {
         match self {
-            Self::Chain(op) => match op {
+            Self::Chain(op) => match &**op {
                 ChainOpLite::StoreEntry(_, entry_hash, _) => entry_hash.clone().into(),
                 other => other.action_hash().clone().into(),
             },

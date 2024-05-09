@@ -244,7 +244,7 @@ pub(crate) async fn countersigning_success(
     // Hash actions.
     let incoming_actions: Vec<_> = signed_actions
         .iter()
-        .map(|a| ActionHash::with_data_sync(a))
+        .map(ActionHash::with_data_sync)
         .collect();
 
     let result = authored_db

@@ -621,8 +621,8 @@ impl Spaces {
             use futures::StreamExt;
             let ops = futures::stream::iter(ops.into_iter().filter_map(|op| match op {
                 DhtOp::ChainOp(op) => {
-                    let hash = DhtOpHash::with_data_sync(&op);
-                    Some((hash, op))
+                    let hash = DhtOpHash::with_data_sync(&*op);
+                    Some((hash, *op))
                 }
                 _ => {
                     tracing::warn!(
