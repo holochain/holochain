@@ -199,10 +199,18 @@ write_test_struct! {
         }
     }
     InternalHandler {
+        fn handle_new_address(
+            &mut Self,
+            _local_url: String,
+        ) -> InternalHandlerResult<()>, InternalHandlerResult<()> {
+            Ok(futures::future::FutureExt::boxed(async move {
+                Ok(())
+            }).into())
+        }
         fn handle_register_space_event_handler(
             &mut Self,
             _recv: futures::channel::mpsc::Receiver<KitsuneP2pEvent>,
-        ) -> InternalHandlerResult<()>, InternalHandlerResult<()>{
+        ) -> InternalHandlerResult<()>, InternalHandlerResult<()> {
             Ok(futures::future::FutureExt::boxed(async move {
                 Ok(())
             }).into())
@@ -390,22 +398,20 @@ impl Test {
     }
 }
 
-async fn start_signal_srv() -> (std::net::SocketAddr, tx5_signal_srv::SrvHnd) {
-    let mut config = tx5_signal_srv::Config::default();
-    config.interfaces = "127.0.0.1".to_string();
-    config.port = 0;
-    config.demo = false;
-    let (sig_hnd, addr_list, err_list) = tx5_signal_srv::exec_tx5_signal_srv(config).await.unwrap();
+async fn start_signal_srv() -> (std::net::SocketAddr, sbd_server::SbdServer) {
+    let server = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
+        bind: vec!["127.0.0.1:0".to_string(), "[::1]:0".to_string()],
+        ..Default::default()
+    }))
+    .await
+    .unwrap();
 
-    assert!(err_list.is_empty());
-    assert_eq!(1, addr_list.len());
-
-    (addr_list.first().unwrap().clone(), sig_hnd)
+    (*server.bind_addrs().first().unwrap(), server)
 }
 
 struct Setup2Nodes {
     tuning_params: KitsuneP2pTuningParams,
-    _sig_hnd: tx5_signal_srv::SrvHnd,
+    _sig_hnd: sbd_server::SbdServer,
     pub addr1: String,
     pub send1: MetaNet,
     pub addr2: String,
@@ -434,7 +440,9 @@ impl Setup2Nodes {
         let (sig_addr, _sig_hnd) = start_signal_srv().await;
         let (test, i_s, evt_sender) = test.spawn().await;
 
-        let (send1, recv1) = MetaNet::new_tx5(
+        tracing::warn!("-- test -- init node 1");
+
+        let (send1, mut recv1) = MetaNet::new_tx5(
             tuning_params.clone(),
             HostApiLegacy {
                 api: Arc::new(test.clone()),
@@ -446,10 +454,22 @@ impl Setup2Nodes {
         )
         .await
         .unwrap();
-        test.spawn_receiver(recv1);
-        let addr1 = send1.local_addr().unwrap();
 
-        let (send2, recv2) = MetaNet::new_tx5(
+        let mut addr1 = None;
+        while let Some(evt) = recv1.next().await {
+            tracing::warn!("-- test -- node 1 pre-recv {evt:?}");
+            if let MetaNetEvt::NewAddress { local_url } = evt {
+                addr1 = Some(local_url);
+                break;
+            }
+        }
+        let addr1 = addr1.unwrap();
+
+        test.spawn_receiver(recv1);
+
+        tracing::warn!("-- test -- init node 2");
+
+        let (send2, mut recv2) = MetaNet::new_tx5(
             tuning_params.clone(),
             HostApiLegacy {
                 api: Arc::new(test.clone()),
@@ -461,8 +481,18 @@ impl Setup2Nodes {
         )
         .await
         .unwrap();
+
+        let mut addr2 = None;
+        while let Some(evt) = recv2.next().await {
+            tracing::warn!("-- test -- node 2 pre-recv {evt:?}");
+            if let MetaNetEvt::NewAddress { local_url } = evt {
+                addr2 = Some(local_url);
+                break;
+            }
+        }
+        let addr2 = addr2.unwrap();
+
         test.spawn_receiver(recv2);
-        let addr2 = send2.local_addr().unwrap();
 
         Self {
             tuning_params,
@@ -625,6 +655,8 @@ async fn basic_notify() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn basic_broadcast() {
+    holochain_trace::test_run();
+
     let recv_done = Arc::new(atomic::AtomicUsize::new(0));
 
     let mut test = Test::default();

@@ -556,6 +556,10 @@ mod tests {
     impl GhostControlHandler for DummySpaceInternalImpl {}
     impl GhostHandler<SpaceInternal> for DummySpaceInternalImpl {}
     impl SpaceInternalHandler for DummySpaceInternalImpl {
+        fn handle_new_address(&mut self, _: String) -> SpaceInternalHandlerResult<()> {
+            unreachable!()
+        }
+
         fn handle_list_online_agents_for_basis_hash(
             &mut self,
             _space: KSpace,

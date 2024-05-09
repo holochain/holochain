@@ -233,7 +233,9 @@ impl MetaNetEvt {
             MetaNetEvt::Request { data, .. } | MetaNetEvt::Notify { data, .. } => {
                 data.maybe_space()
             }
-            MetaNetEvt::NewAddress { .. } | MetaNetEvt::Connected { .. } | MetaNetEvt::Disconnected { .. } => None,
+            MetaNetEvt::NewAddress { .. }
+            | MetaNetEvt::Connected { .. }
+            | MetaNetEvt::Disconnected { .. } => None,
         }
     }
 }
@@ -984,8 +986,18 @@ impl MetaNet {
             while let Some(evt) = ep_evt.recv().await {
                 match evt {
                     tx5::EndpointEvent::ListeningAddressOpen { local_url } => {
+                        if evt_send
+                            .send(MetaNetEvt::NewAddress {
+                                local_url: local_url.to_string(),
+                            })
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
                     }
                     tx5::EndpointEvent::ListeningAddressClosed { .. } => {
+                        // TODO: publish close agent_info
                     }
                     tx5::EndpointEvent::Connected { peer_url } => {
                         if evt_send
