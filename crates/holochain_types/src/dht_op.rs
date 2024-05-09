@@ -324,10 +324,10 @@ impl rusqlite::types::FromSql for ChainOpType {
 }
 
 impl DhtOp {
-    fn as_unique_form(&self) -> UniqueForm<'_> {
+    fn as_unique_form(&self) -> DhtOpUniqueForm<'_> {
         match self {
             Self::ChainOp(op) => op.as_unique_form(),
-            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
+            Self::WarrantOp(op) => DhtOpUniqueForm::Warrant(&op.warrant, &op.author, op.timestamp),
         }
     }
 
@@ -363,7 +363,7 @@ impl DhtOp {
     fn to_order(&self) -> OpOrder {
         match self {
             Self::ChainOp(op) => OpOrder::new(op.get_type(), op.timestamp()),
-            Self::WarrantOp(_op) => unreachable!("todo: warrants"),
+            Self::WarrantOp(op) => OpOrder::new(op.get_type(), op.timestamp),
         }
     }
 
@@ -424,21 +424,25 @@ impl Ord for DhtOp {
 }
 
 impl ChainOp {
-    fn as_unique_form(&self) -> UniqueForm<'_> {
+    fn as_unique_form(&self) -> DhtOpUniqueForm<'_> {
         match self {
-            Self::StoreRecord(_, action, _) => UniqueForm::StoreRecord(action),
-            Self::StoreEntry(_, action, _) => UniqueForm::StoreEntry(action),
-            Self::RegisterAgentActivity(_, action) => UniqueForm::RegisterAgentActivity(action),
+            Self::StoreRecord(_, action, _) => DhtOpUniqueForm::StoreRecord(action),
+            Self::StoreEntry(_, action, _) => DhtOpUniqueForm::StoreEntry(action),
+            Self::RegisterAgentActivity(_, action) => {
+                DhtOpUniqueForm::RegisterAgentActivity(action)
+            }
             Self::RegisterUpdatedContent(_, action, _) => {
-                UniqueForm::RegisterUpdatedContent(action)
+                DhtOpUniqueForm::RegisterUpdatedContent(action)
             }
-            Self::RegisterUpdatedRecord(_, action, _) => UniqueForm::RegisterUpdatedRecord(action),
-            Self::RegisterDeletedBy(_, action) => UniqueForm::RegisterDeletedBy(action),
+            Self::RegisterUpdatedRecord(_, action, _) => {
+                DhtOpUniqueForm::RegisterUpdatedRecord(action)
+            }
+            Self::RegisterDeletedBy(_, action) => DhtOpUniqueForm::RegisterDeletedBy(action),
             Self::RegisterDeletedEntryAction(_, action) => {
-                UniqueForm::RegisterDeletedEntryAction(action)
+                DhtOpUniqueForm::RegisterDeletedEntryAction(action)
             }
-            Self::RegisterAddLink(_, action) => UniqueForm::RegisterAddLink(action),
-            Self::RegisterRemoveLink(_, action) => UniqueForm::RegisterRemoveLink(action),
+            Self::RegisterAddLink(_, action) => DhtOpUniqueForm::RegisterAddLink(action),
+            Self::RegisterRemoveLink(_, action) => DhtOpUniqueForm::RegisterRemoveLink(action),
         }
     }
 
@@ -639,7 +643,7 @@ impl DhtOpLite {
     pub fn dht_basis(&self) -> OpBasis {
         match self {
             Self::Chain(op) => op.dht_basis().clone(),
-            Self::Warrant(op) => op.dht_basis(),
+            Self::Warrant(op) => op.warrant.dht_basis(),
         }
     }
 
@@ -814,7 +818,7 @@ impl ChainOpLite {
 
 #[allow(missing_docs)]
 #[derive(Serialize, Debug)]
-pub enum UniqueForm<'a> {
+pub enum DhtOpUniqueForm<'a> {
     // As an optimization, we don't include signatures. They would be redundant
     // with actions and therefore would waste hash/comparison time to include.
     StoreRecord(&'a Action),
@@ -826,26 +830,30 @@ pub enum UniqueForm<'a> {
     RegisterDeletedEntryAction(&'a action::Delete),
     RegisterAddLink(&'a action::CreateLink),
     RegisterRemoveLink(&'a action::DeleteLink),
+
+    Warrant(&'a Warrant, &'a AgentPubKey, Timestamp),
 }
 
-impl<'a> UniqueForm<'a> {
+impl<'a> DhtOpUniqueForm<'a> {
     fn basis(&'a self) -> OpBasis {
         match self {
-            UniqueForm::StoreRecord(action) => ActionHash::with_data_sync(*action).into(),
-            UniqueForm::StoreEntry(action) => action.entry().clone().into(),
-            UniqueForm::RegisterAgentActivity(action) => action.author().clone().into(),
-            UniqueForm::RegisterUpdatedContent(action) => {
+            DhtOpUniqueForm::StoreRecord(action) => ActionHash::with_data_sync(*action).into(),
+            DhtOpUniqueForm::StoreEntry(action) => action.entry().clone().into(),
+            DhtOpUniqueForm::RegisterAgentActivity(action) => action.author().clone().into(),
+            DhtOpUniqueForm::RegisterUpdatedContent(action) => {
                 action.original_entry_address.clone().into()
             }
-            UniqueForm::RegisterUpdatedRecord(action) => {
+            DhtOpUniqueForm::RegisterUpdatedRecord(action) => {
                 action.original_action_address.clone().into()
             }
-            UniqueForm::RegisterDeletedBy(action) => action.deletes_address.clone().into(),
-            UniqueForm::RegisterDeletedEntryAction(action) => {
+            DhtOpUniqueForm::RegisterDeletedBy(action) => action.deletes_address.clone().into(),
+            DhtOpUniqueForm::RegisterDeletedEntryAction(action) => {
                 action.deletes_entry_address.clone().into()
             }
-            UniqueForm::RegisterAddLink(action) => action.base_address.clone(),
-            UniqueForm::RegisterRemoveLink(action) => action.base_address.clone(),
+            DhtOpUniqueForm::RegisterAddLink(action) => action.base_address.clone(),
+            DhtOpUniqueForm::RegisterRemoveLink(action) => action.base_address.clone(),
+
+            DhtOpUniqueForm::Warrant(warrant, _, _) => warrant.dht_basis(),
         }
     }
 
@@ -853,47 +861,51 @@ impl<'a> UniqueForm<'a> {
     pub fn op_hash(op_type: ChainOpType, action: Action) -> DhtOpResult<(Action, DhtOpHash)> {
         match op_type {
             ChainOpType::StoreRecord => {
-                let hash = DhtOpHash::with_data_sync(&UniqueForm::StoreRecord(&action));
+                let hash = DhtOpHash::with_data_sync(&DhtOpUniqueForm::StoreRecord(&action));
                 Ok((action, hash))
             }
             ChainOpType::StoreEntry => {
                 let action = action.try_into()?;
-                let hash = DhtOpHash::with_data_sync(&UniqueForm::StoreEntry(&action));
+                let hash = DhtOpHash::with_data_sync(&DhtOpUniqueForm::StoreEntry(&action));
                 Ok((action.into(), hash))
             }
             ChainOpType::RegisterAgentActivity => {
-                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterAgentActivity(&action));
+                let hash =
+                    DhtOpHash::with_data_sync(&DhtOpUniqueForm::RegisterAgentActivity(&action));
                 Ok((action, hash))
             }
             ChainOpType::RegisterUpdatedContent => {
                 let action = action.try_into()?;
-                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterUpdatedContent(&action));
+                let hash =
+                    DhtOpHash::with_data_sync(&DhtOpUniqueForm::RegisterUpdatedContent(&action));
                 Ok((action.into(), hash))
             }
             ChainOpType::RegisterUpdatedRecord => {
                 let action = action.try_into()?;
-                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterUpdatedRecord(&action));
+                let hash =
+                    DhtOpHash::with_data_sync(&DhtOpUniqueForm::RegisterUpdatedRecord(&action));
                 Ok((action.into(), hash))
             }
             ChainOpType::RegisterDeletedBy => {
                 let action = action.try_into()?;
-                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterDeletedBy(&action));
+                let hash = DhtOpHash::with_data_sync(&DhtOpUniqueForm::RegisterDeletedBy(&action));
                 Ok((action.into(), hash))
             }
             ChainOpType::RegisterDeletedEntryAction => {
                 let action = action.try_into()?;
-                let hash =
-                    DhtOpHash::with_data_sync(&UniqueForm::RegisterDeletedEntryAction(&action));
+                let hash = DhtOpHash::with_data_sync(&DhtOpUniqueForm::RegisterDeletedEntryAction(
+                    &action,
+                ));
                 Ok((action.into(), hash))
             }
             ChainOpType::RegisterAddLink => {
                 let action = action.try_into()?;
-                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterAddLink(&action));
+                let hash = DhtOpHash::with_data_sync(&DhtOpUniqueForm::RegisterAddLink(&action));
                 Ok((action.into(), hash))
             }
             ChainOpType::RegisterRemoveLink => {
                 let action = action.try_into()?;
-                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterRemoveLink(&action));
+                let hash = DhtOpHash::with_data_sync(&DhtOpUniqueForm::RegisterRemoveLink(&action));
                 Ok((action.into(), hash))
             }
         }
@@ -1007,7 +1019,7 @@ pub fn produce_op_lites_from_iter<'a>(
             .filter_map(|op_type| {
                 let op_light = match (op_type, action) {
                     (ChainOpType::StoreRecord, _) => {
-                        let store_record_basis = UniqueForm::StoreRecord(action).basis();
+                        let store_record_basis = DhtOpUniqueForm::StoreRecord(action).basis();
                         ChainOpLite::StoreRecord(
                             action_hash.clone(),
                             maybe_entry_hash.clone(),
@@ -1016,7 +1028,7 @@ pub fn produce_op_lites_from_iter<'a>(
                     }
                     (ChainOpType::RegisterAgentActivity, _) => {
                         let register_activity_basis =
-                            UniqueForm::RegisterAgentActivity(action).basis();
+                            DhtOpUniqueForm::RegisterAgentActivity(action).basis();
                         ChainOpLite::RegisterAgentActivity(
                             action_hash.clone(),
                             register_activity_basis,
@@ -1025,49 +1037,51 @@ pub fn produce_op_lites_from_iter<'a>(
                     (ChainOpType::StoreEntry, Action::Create(create)) => ChainOpLite::StoreEntry(
                         action_hash.clone(),
                         maybe_entry_hash.clone()?,
-                        UniqueForm::StoreEntry(&NewEntryAction::Create(create.clone())).basis(),
+                        DhtOpUniqueForm::StoreEntry(&NewEntryAction::Create(create.clone()))
+                            .basis(),
                     ),
                     (ChainOpType::StoreEntry, Action::Update(update)) => ChainOpLite::StoreEntry(
                         action_hash.clone(),
                         maybe_entry_hash.clone()?,
-                        UniqueForm::StoreEntry(&NewEntryAction::Update(update.clone())).basis(),
+                        DhtOpUniqueForm::StoreEntry(&NewEntryAction::Update(update.clone()))
+                            .basis(),
                     ),
                     (ChainOpType::RegisterUpdatedContent, Action::Update(update)) => {
                         ChainOpLite::RegisterUpdatedContent(
                             action_hash.clone(),
                             maybe_entry_hash.clone()?,
-                            UniqueForm::RegisterUpdatedContent(update).basis(),
+                            DhtOpUniqueForm::RegisterUpdatedContent(update).basis(),
                         )
                     }
                     (ChainOpType::RegisterUpdatedRecord, Action::Update(update)) => {
                         ChainOpLite::RegisterUpdatedRecord(
                             action_hash.clone(),
                             maybe_entry_hash.clone()?,
-                            UniqueForm::RegisterUpdatedRecord(update).basis(),
+                            DhtOpUniqueForm::RegisterUpdatedRecord(update).basis(),
                         )
                     }
                     (ChainOpType::RegisterDeletedBy, Action::Delete(delete)) => {
                         ChainOpLite::RegisterDeletedBy(
                             action_hash.clone(),
-                            UniqueForm::RegisterDeletedBy(delete).basis(),
+                            DhtOpUniqueForm::RegisterDeletedBy(delete).basis(),
                         )
                     }
                     (ChainOpType::RegisterDeletedEntryAction, Action::Delete(delete)) => {
                         ChainOpLite::RegisterDeletedEntryAction(
                             action_hash.clone(),
-                            UniqueForm::RegisterDeletedEntryAction(delete).basis(),
+                            DhtOpUniqueForm::RegisterDeletedEntryAction(delete).basis(),
                         )
                     }
                     (ChainOpType::RegisterAddLink, Action::CreateLink(create_link)) => {
                         ChainOpLite::RegisterAddLink(
                             action_hash.clone(),
-                            UniqueForm::RegisterAddLink(create_link).basis(),
+                            DhtOpUniqueForm::RegisterAddLink(create_link).basis(),
                         )
                     }
                     (ChainOpType::RegisterRemoveLink, Action::DeleteLink(delete_link)) => {
                         ChainOpLite::RegisterRemoveLink(
                             action_hash.clone(),
-                            UniqueForm::RegisterRemoveLink(delete_link).basis(),
+                            DhtOpUniqueForm::RegisterRemoveLink(delete_link).basis(),
                         )
                     }
                     _ => return None,
@@ -1124,9 +1138,9 @@ pub fn action_to_op_types(action: &Action) -> Vec<ChainOpType> {
 // This has to be done manually because the macro
 // implements both directions and that isn't possible with references
 // TODO: Maybe add a one-way version to holochain_serialized_bytes?
-impl<'a> TryFrom<&UniqueForm<'a>> for SerializedBytes {
+impl<'a> TryFrom<&DhtOpUniqueForm<'a>> for SerializedBytes {
     type Error = SerializedBytesError;
-    fn try_from(u: &UniqueForm<'a>) -> Result<Self, Self::Error> {
+    fn try_from(u: &DhtOpUniqueForm<'a>) -> Result<Self, Self::Error> {
         match holochain_serialized_bytes::encode(u) {
             Ok(v) => Ok(SerializedBytes::from(
                 holochain_serialized_bytes::UnsafeBytes::from(v),
@@ -1174,7 +1188,7 @@ impl HashableContent for ChainOp {
     }
 }
 
-impl HashableContent for UniqueForm<'_> {
+impl HashableContent for DhtOpUniqueForm<'_> {
     type HashType = hash_type::DhtOp;
 
     fn hash_type(&self) -> Self::HashType {
@@ -1231,7 +1245,7 @@ impl RenderedOp {
         validation_status: Option<ValidationStatus>,
         op_type: ChainOpType,
     ) -> DhtOpResult<Self> {
-        let (action, op_hash) = UniqueForm::op_hash(op_type, action)?;
+        let (action, op_hash) = DhtOpUniqueForm::op_hash(op_type, action)?;
         let action_hashed = ActionHashed::from_content_sync(action);
         // TODO: Verify signature?
         let action = SignedActionHashed::with_presigned(action_hashed, signature);

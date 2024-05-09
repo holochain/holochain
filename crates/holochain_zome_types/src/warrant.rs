@@ -54,6 +54,24 @@ pub enum ChainIntegrityWarrant {
 /// Action hash with the signature of the action at that hash
 pub type ActionHashAndSig = (ActionHash, Signature);
 
+impl Warrant {
+    /// Basis hash where this warrant should be delivered.
+    /// Warrants always have the authoring agent as a basis, so that warrants
+    /// can be accumulated by the agent activity authorities.
+    pub fn dht_basis(&self) -> OpBasis {
+        match self {
+            Warrant::ChainIntegrity(w) => match w {
+                ChainIntegrityWarrant::InvalidChainOp { action_author, .. } => {
+                    action_author.clone().into()
+                }
+                ChainIntegrityWarrant::ChainFork { chain_author, .. } => {
+                    chain_author.clone().into()
+                }
+            },
+        }
+    }
+}
+
 /// Not necessary but nice to have
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,

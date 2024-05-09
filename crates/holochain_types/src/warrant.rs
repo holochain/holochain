@@ -43,16 +43,6 @@ impl WarrantOp {
     pub fn into_signed_warrant(self) -> SignedWarrant {
         Signed::new((self.warrant, self.timestamp), self.signature)
     }
-
-    /// Warrants always have the authoring agent as the basis
-    pub fn dht_basis(&self) -> OpBasis {
-        match &self.warrant {
-            Warrant::ChainIntegrity(w) => match w {
-                ChainIntegrityWarrant::InvalidChainOp { action_author, .. } => action_author.clone().into(),
-                ChainIntegrityWarrant::ChainFork { chain_author, .. } => chain_author.clone().into(),
-            },
-        }
-    }
 }
 
 /// Different types of warrants

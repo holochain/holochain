@@ -396,7 +396,7 @@ pub fn commit_chain<Kind: DbKindT>(
                 let timestamp = Timestamp::now();
                 let op_type = op_lite.get_type();
                 let (_, hash) =
-                    UniqueForm::op_hash(op_type, op.action.hashed.content.clone()).unwrap();
+                    DhtOpUniqueForm::op_hash(op_type, op.action.hashed.content.clone()).unwrap();
                 insert_action(txn, &op.action).unwrap();
                 insert_op_lite(
                     txn,

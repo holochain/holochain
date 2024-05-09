@@ -948,7 +948,8 @@ fn build_ops_from_actions(
             let op_type = op.get_type();
             let op = DhtOpLite::from(op);
             // Action is required by value to produce the DhtOpHash.
-            let (action, op_hash) = UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
+            let (action, op_hash) =
+                DhtOpUniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
             let op_order = OpOrder::new(op_type, action.timestamp());
             let timestamp = action.timestamp();
             // Put the action back by value.
@@ -1106,7 +1107,7 @@ pub fn put_raw(
     for op in &ops {
         let op_type = op.get_type();
         let (h, op_hash) =
-            UniqueForm::op_hash(op_type, action.take().expect("This can't be empty"))?;
+            DhtOpUniqueForm::op_hash(op_type, action.take().expect("This can't be empty"))?;
         let op_order = OpOrder::new(op_type, h.timestamp());
         let timestamp = h.timestamp();
         action = Some(h);
