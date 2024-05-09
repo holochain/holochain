@@ -7,7 +7,7 @@ use kitsune_p2p::dht::arq::LocalStorageConfig;
 use kitsune_p2p::dht::prelude::SpaceDimension;
 use kitsune_p2p::dht_arc::DhtLocation;
 use kitsune_p2p_bin_data::fixt::KitsuneSpaceFixturator;
-use kitsune_p2p_bin_data::{KitsuneBasis, KitsuneBinType};
+use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneBasis, KitsuneBinType};
 use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_types::config::tuning_params_struct;
 use kitsune_p2p_types::dht::{Arq, ArqStrat};
@@ -17,6 +17,13 @@ use std::sync::Arc;
 
 mod common;
 
+/// Test scenario steps:
+///   1. Set up 5 nodes, each with one agent.
+///   2. Assign a DHT arc to each agent such that they overlap with the next agent's start location.
+///   3. Connect each agent to the next agent (circular), so that we know they are aware of each other.
+///   4. Publish an op with a basis location set to the location of the 4th agent. This should also be visible to the 3rd agent by 2. above.
+///   5. Wait for the 3rd to receive the data.
+///   6. Assert that the op was never published to the 1st, 2nd, or 5th agents. (Note that we cannot check if we sent it to ourselves because the op was already in our store)
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn publish_to_basis_from_inside() {
@@ -92,6 +99,7 @@ async fn publish_to_basis_from_inside() {
     // Each agent should be connected to the next agent because that's how the arcs were set up
     // above.
     for i in 0..5 {
+        // A circular `next` so that the last agent is connected to the first agent
         let next = (i + 1) % 5;
 
         wait_for_connected(agents[i].1.clone(), agents[next].2.clone(), space.clone()).await
@@ -122,7 +130,7 @@ async fn publish_to_basis_from_inside() {
         .1
         .broadcast(
             space.clone(),
-            basis,
+            basis.clone(),
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agents[sender_idx].2.clone(),
@@ -154,6 +162,16 @@ async fn publish_to_basis_from_inside() {
             continue;
         }
 
+        // We've filtered out the sender and the receiver, who are expected to have the data.
+        // Now we check that the agent at the current index does not have the basis that the op was
+        // published to in its arc. That would make the test wrong, not Kitsune, so fail here!
+        let should_this_agent_hold_the_op = should_agent_hold_op_at_basis(&agents[i].0, agents[i].2.clone(), basis.clone());
+
+        // If this assertion fails, it means that the agent at index `i` has the basis in its arc which is not intended by the test setup.
+        assert!(!should_this_agent_hold_the_op, "Agent {i} should receive the data, this is a setup issue with the test");
+
+        // Now make the important assertion that the agent at index `i` did not receive the data! If it's not in the agents arc
+        // (which we just asserted above) then it should not have been received.
         let store_lock = agents[i].0.op_store();
         let store = store_lock.read();
         assert!(
@@ -165,6 +183,10 @@ async fn publish_to_basis_from_inside() {
     }
 }
 
+/// Very similar to the test above except the publisher is does not have the basis in its arc.
+/// This is a valid scenario because any hash might be produced by creating data and the publish
+/// should still go to the correct agents. It also says with the publisher, so we need to account
+/// for that when checking the op stores at the end of the test.
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn publish_to_basis_from_outside() {
@@ -272,7 +294,7 @@ async fn publish_to_basis_from_outside() {
         .1
         .broadcast(
             space.clone(),
-            basis,
+            basis.clone(),
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agents[sender_idx].2.clone(),
@@ -320,6 +342,16 @@ async fn publish_to_basis_from_outside() {
             continue;
         }
 
+        // We've filtered out the sender and the receivers, who are expected to have the data.
+        // Now we check that the agent at the current index does not have the basis that the op was
+        // published to in its arc. That would make the test wrong, not Kitsune.
+        let should_this_agent_hold_the_op = should_agent_hold_op_at_basis(&agents[i].0, agents[i].2.clone(), basis.clone());
+
+        // If this assertion fails, it means that the agent at index `i` has the basis in its arc which is not intended by the test setup.
+        assert!(!should_this_agent_hold_the_op, "Agent {i} should receive the data, this is a setup issue with the test");
+
+        // Now make the important assertion that the agent at index `i` did not receive the data! If it's not in the agents arc
+        // (which we just asserted above) then it should not have been received.
         let store_lock = agents[i].0.op_store();
         let store = store_lock.read();
         assert!(
@@ -329,4 +361,21 @@ async fn publish_to_basis_from_outside() {
             store.len()
         );
     }
+}
+
+fn should_agent_hold_op_at_basis(
+    kitsune_test_harness: &KitsuneTestHarness,
+    agent: Arc<KitsuneAgent>,
+    basis: Arc<KitsuneBasis>,
+) -> bool {
+    // Find the agent info for the given agent
+    let agent_store = kitsune_test_harness.agent_store();
+    let agent_store_lock = agent_store.read();
+    let agent_info = agent_store_lock.iter().find(|info| info.agent == agent).unwrap();
+
+    // Get the DHT arc that the agent is currently declaring it holds
+    let range = agent_info.storage_arq.to_dht_arc_range_std();
+
+    // Is the basis within the range of the agent's arc?
+    range.contains(&basis.get_loc())
 }
