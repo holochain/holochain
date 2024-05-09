@@ -779,8 +779,6 @@ async fn run_validation_callback(
                     // the collection so that it will be tried again to be
                     // fetched in the subsequent workflow run.
                     validation_dependencies.lock().remove_missing_hash(&hash);
-                    // Secondly remove the just fetched hash from the set
-                    // of missing hashes for the op
                 }
             });
             // await all fetches in a separate task in the background
