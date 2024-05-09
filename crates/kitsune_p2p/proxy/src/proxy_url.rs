@@ -45,7 +45,10 @@ impl ProxyUrl {
         }
         let full = url2::try_url2!("{}", full).map_err(|_| err!("parse"))?;
         if full.scheme() == "wss" || full.scheme() == "ws" {
-            return Ok(Self { full: full.clone(), base: full });
+            return Ok(Self {
+                full: full.clone(),
+                base: full,
+            });
         }
         let base_scheme = match full.path_segments() {
             None => return Err(err!("read scheme")),

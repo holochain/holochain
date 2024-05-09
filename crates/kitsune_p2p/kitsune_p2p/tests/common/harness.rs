@@ -167,6 +167,7 @@ pub async fn start_bootstrap() -> (SocketAddr, AbortHandle) {
 pub async fn start_signal_srv() -> (SocketAddr, sbd_server::SbdServer) {
     let server = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
         bind: vec!["127.0.0.1:0".to_string(), "[::1]:0".to_string()],
+        limit_clients: 100,
         ..Default::default()
     }))
     .await

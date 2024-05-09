@@ -1,7 +1,7 @@
 use clap::Parser;
-use tokio::io::AsyncWriteExt;
 use std::io::{Error, Result};
 use std::sync::Arc;
+use tokio::io::AsyncWriteExt;
 
 /// Helper for running local Holochain bootstrap and WebRTC signal servers.
 #[derive(Debug, Parser)]
@@ -133,7 +133,8 @@ impl HcRunLocalServices {
         }
 
         if !self.disable_signal {
-            let bind = self.signal_interfaces
+            let bind = self
+                .signal_interfaces
                 .split(",")
                 .map(|i| format!("{}:{}", i.trim(), self.signal_port))
                 .collect();
