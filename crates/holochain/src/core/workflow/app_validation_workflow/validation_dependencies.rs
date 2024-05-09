@@ -6,12 +6,18 @@ use std::{
 use holo_hash::{AnyDhtHash, DhtOpHash};
 use holochain_types::dht_op::DhtOpHashed;
 
+#[derive(Debug)]
+pub(super) struct MissingHashProperties {
+    depending_ops: HashSet<DhtOpHash>,
+    when_fetched: Instant,
+}
+
 /// In-memory struct to keep track of missing DHT hashes, which DhtOp depends on them
 /// and when the fetches for them were most recently tried.
 pub struct ValidationDependencies {
     /// Missing hashes that are being fetched, along with a set of DhtOps that depend
-    /// on the hash and the last Instant a fetch was attempted.
-    pub(super) missing_hashes: HashMap<AnyDhtHash, (HashSet<DhtOpHash>, Instant)>,
+    /// on the hash and the timestamp a fetch was attempted.
+    pub(super) missing_hashes: HashMap<AnyDhtHash, MissingHashProperties>,
 }
 
 impl Default for ValidationDependencies {
@@ -34,13 +40,16 @@ impl ValidationDependencies {
         if let Entry::Vacant(entry) = self.missing_hashes.entry(hash.clone()) {
             let mut dht_op_hashes = HashSet::new();
             dht_op_hashes.insert(dht_op_hash);
-            entry.insert((dht_op_hashes, Instant::now()));
+            entry.insert(MissingHashProperties {
+                depending_ops: dht_op_hashes,
+                when_fetched: Instant::now(),
+            });
             true
         } else {
             self.missing_hashes
                 .entry(hash)
-                .and_modify(|(dht_op_hashes, _)| {
-                    dht_op_hashes.insert(dht_op_hash.clone());
+                .and_modify(|missing_hash_props| {
+                    missing_hash_props.depending_ops.insert(dht_op_hash.clone());
                 });
             false
         }
@@ -70,7 +79,9 @@ impl ValidationDependencies {
         }
         self.missing_hashes
             .iter()
-            .all(|(_, (_, instant))| instant.elapsed() > Self::FETCH_TIMEOUT)
+            .all(|(_, MissingHashProperties { when_fetched, .. })| {
+                when_fetched.elapsed() > Self::FETCH_TIMEOUT
+            })
     }
 
     /// filter out dht_ops that have missing dependencies
@@ -78,9 +89,11 @@ impl ValidationDependencies {
         dht_ops
             .into_iter()
             .filter(|dht_op| {
-                self.missing_hashes
-                    .iter()
-                    .all(|(_, (dht_op_hashes, _))| !dht_op_hashes.contains(&dht_op.hash))
+                self.missing_hashes.iter().all(
+                    |(_, MissingHashProperties { depending_ops, .. })| {
+                        !depending_ops.contains(&dht_op.hash)
+                    },
+                )
             })
             .collect()
     }
@@ -220,11 +233,13 @@ mod tests {
             let hash = fixt!(AnyDhtHash);
             validation_dependencies.missing_hashes.insert(
                 hash,
-                (
-                    HashSet::new(),
+                MissingHashProperties {
+                    depending_ops: HashSet::new(),
                     // 1 second longer than fetch timeout
-                    Instant::now() - ValidationDependencies::FETCH_TIMEOUT - Duration::from_secs(1),
-                ),
+                    when_fetched: Instant::now()
+                        - ValidationDependencies::FETCH_TIMEOUT
+                        - Duration::from_secs(1),
+                },
             );
             assert_eq!(
                 validation_dependencies.fetch_missing_hashes_timed_out(),
@@ -239,10 +254,11 @@ mod tests {
             // 1 second before than fetch timeout
             validation_dependencies.missing_hashes.insert(
                 hash,
-                (
-                    HashSet::new(),
-                    Instant::now() - ValidationDependencies::FETCH_TIMEOUT + Duration::from_secs(1),
-                ),
+                MissingHashProperties {
+                    depending_ops: HashSet::new(),
+                    when_fetched: Instant::now() - ValidationDependencies::FETCH_TIMEOUT
+                        + Duration::from_secs(1),
+                },
             );
             assert_eq!(
                 validation_dependencies.fetch_missing_hashes_timed_out(),
@@ -257,17 +273,20 @@ mod tests {
             let expired_hash = fixt!(AnyDhtHash);
             validation_dependencies.missing_hashes.insert(
                 unexpired_hash,
-                (
-                    HashSet::new(),
-                    Instant::now() - ValidationDependencies::FETCH_TIMEOUT + Duration::from_secs(1),
-                ),
+                MissingHashProperties {
+                    depending_ops: HashSet::new(),
+                    when_fetched: Instant::now() - ValidationDependencies::FETCH_TIMEOUT
+                        + Duration::from_secs(1),
+                },
             );
             validation_dependencies.missing_hashes.insert(
                 expired_hash,
-                (
-                    HashSet::new(),
-                    Instant::now() - ValidationDependencies::FETCH_TIMEOUT - Duration::from_secs(1),
-                ),
+                MissingHashProperties {
+                    depending_ops: HashSet::new(),
+                    when_fetched: Instant::now()
+                        - ValidationDependencies::FETCH_TIMEOUT
+                        - Duration::from_secs(1),
+                },
             );
             assert_eq!(
                 validation_dependencies.fetch_missing_hashes_timed_out(),
