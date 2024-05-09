@@ -862,7 +862,7 @@ impl MetaNet {
         kitsune_internal_sender: ghost_actor::GhostSender<crate::spawn::Internal>,
         signal_url: String,
         preflight_user_data: PreflightUserData,
-    ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
+    ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv, Option<String>)> {
         use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
 
         let (mut evt_send, evt_recv) =
@@ -974,7 +974,10 @@ impl MetaNet {
         let (ep_hnd, mut ep_evt) = tx5::Endpoint::new(Arc::new(tx5_config));
         let ep_hnd = Arc::new(ep_hnd);
 
-        ep_hnd.listen(tx5::SigUrl::parse(&signal_url)?);
+        let maybe_peer_url = ep_hnd
+            .listen(tx5::SigUrl::parse(&signal_url)?)
+            .await
+            .map(|p| p.to_string());
 
         let res_store = Arc::new(Mutex::new(HashMap::new()));
 
@@ -1148,6 +1151,7 @@ impl MetaNet {
                 tun: tuning_params,
             },
             evt_recv,
+            maybe_peer_url,
         ))
     }
 

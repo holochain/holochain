@@ -128,6 +128,7 @@ pub(crate) struct KitsuneP2pActor {
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     fetch_pool: FetchPool,
+    local_url: Arc<std::sync::Mutex<Option<String>>>,
 }
 
 impl KitsuneP2pActor {
@@ -141,7 +142,10 @@ impl KitsuneP2pActor {
         ep_hnd: MetaNet,
         ep_evt: MetaNetEvtRecv,
         bootstrap_net: BootstrapNet,
+        maybe_peer_url: Option<String>,
     ) -> KitsuneP2pResult<Self> {
+        let local_url = Arc::new(std::sync::Mutex::new(maybe_peer_url));
+
         crate::types::metrics::init();
 
         let fetch_response_queue =
@@ -186,6 +190,7 @@ impl KitsuneP2pActor {
             bandwidth_throttles,
             parallel_notify_permit,
             fetch_pool,
+            local_url,
         })
     }
 }
@@ -196,10 +201,11 @@ pub(super) async fn create_meta_net(
     internal_sender: ghost_actor::GhostSender<Internal>,
     host: HostApiLegacy,
     preflight_user_data: PreflightUserData,
-) -> KitsuneP2pResult<(MetaNet, MetaNetEvtRecv, BootstrapNet)> {
+) -> KitsuneP2pResult<(MetaNet, MetaNetEvtRecv, BootstrapNet, Option<String>)> {
     let mut ep_hnd = None;
     let mut ep_evt = None;
     let mut bootstrap_net = None;
+    let mut maybe_peer_url = None;
 
     #[cfg(feature = "tx2")]
     if ep_hnd.is_none() && config.is_tx2() {
@@ -234,7 +240,7 @@ pub(super) async fn create_meta_net(
             TransportConfig::WebRTC { signal_url } => signal_url.clone(),
             _ => unreachable!(),
         };
-        let (h, e) = MetaNet::new_tx5(
+        let (h, e, p) = MetaNet::new_tx5(
             config.tuning_params.clone(),
             host.clone(),
             internal_sender.clone(),
@@ -245,10 +251,11 @@ pub(super) async fn create_meta_net(
         ep_hnd = Some(h);
         ep_evt = Some(e);
         bootstrap_net = Some(BootstrapNet::Tx5);
+        maybe_peer_url = p;
     }
 
     match (ep_hnd, ep_evt, bootstrap_net) {
-        (Some(h), Some(e), Some(n)) => Ok((h, e, n)),
+        (Some(h), Some(e), Some(n)) => Ok((h, e, n, maybe_peer_url)),
         _ => Err("tx2 or tx5 feature must be enabled".into()),
     }
 }
@@ -627,6 +634,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let bandwidth_throttles = self.bandwidth_throttles.clone();
         let parallel_notify_permit = self.parallel_notify_permit.clone();
         let fetch_pool = self.fetch_pool.clone();
+        let local_url = self.local_url.clone();
 
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
@@ -640,6 +648,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
                     bandwidth_throttles,
                     parallel_notify_permit,
                     fetch_pool,
+                    local_url,
                 )
                 .await
                 .expect("cannot fail to create space");
@@ -1092,6 +1101,7 @@ mod tests {
             PreflightUserData::default(),
         )
         .await
+        .map(|(n, r, b, _)| (n, r, b))
     }
 
     async fn start_signal_srv() -> (SocketAddr, sbd_server::SbdServer) {

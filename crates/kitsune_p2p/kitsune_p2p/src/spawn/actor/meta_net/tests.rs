@@ -443,7 +443,7 @@ impl Setup2Nodes {
 
         tracing::warn!("-- test -- init node 1");
 
-        let (send1, mut recv1) = MetaNet::new_tx5(
+        let (send1, recv1, addr1) = MetaNet::new_tx5(
             tuning_params.clone(),
             HostApiLegacy {
                 api: Arc::new(test.clone()),
@@ -456,21 +456,13 @@ impl Setup2Nodes {
         .await
         .unwrap();
 
-        let mut addr1 = None;
-        while let Some(evt) = recv1.next().await {
-            tracing::warn!("-- test -- node 1 pre-recv {evt:?}");
-            if let MetaNetEvt::NewAddress { local_url } = evt {
-                addr1 = Some(local_url);
-                break;
-            }
-        }
         let addr1 = addr1.unwrap();
 
         test.spawn_receiver(recv1);
 
         tracing::warn!("-- test -- init node 2");
 
-        let (send2, mut recv2) = MetaNet::new_tx5(
+        let (send2, recv2, addr2) = MetaNet::new_tx5(
             tuning_params.clone(),
             HostApiLegacy {
                 api: Arc::new(test.clone()),
@@ -483,14 +475,6 @@ impl Setup2Nodes {
         .await
         .unwrap();
 
-        let mut addr2 = None;
-        while let Some(evt) = recv2.next().await {
-            tracing::warn!("-- test -- node 2 pre-recv {evt:?}");
-            if let MetaNetEvt::NewAddress { local_url } = evt {
-                addr2 = Some(local_url);
-                break;
-            }
-        }
         let addr2 = addr2.unwrap();
 
         test.spawn_receiver(recv2);

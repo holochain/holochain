@@ -130,6 +130,7 @@ pub(crate) async fn spawn_space(
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     fetch_pool: FetchPool,
+    local_url: Arc<std::sync::Mutex<Option<String>>>,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     ghost_actor::GhostSender<SpaceInternal>,
@@ -161,6 +162,7 @@ pub(crate) async fn spawn_space(
         bandwidth_throttles,
         parallel_notify_permit,
         fetch_pool,
+        local_url,
     )));
 
     Ok((sender, i_s, evt_recv))
@@ -1382,6 +1384,7 @@ impl Space {
         bandwidth_throttles: BandwidthThrottles,
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
         fetch_pool: FetchPool,
+        local_url: Arc<std::sync::Mutex<Option<String>>>,
     ) -> Self {
         let metrics = MetricsSync::default();
 
@@ -1485,7 +1488,7 @@ impl Space {
         }
 
         let ro_inner = Arc::new(SpaceReadOnlyInner {
-            local_url: Arc::new(std::sync::Mutex::new(None)),
+            local_url,
             space: space.clone(),
             i_s: i_s.clone(),
             host_api: host_api.clone(),
