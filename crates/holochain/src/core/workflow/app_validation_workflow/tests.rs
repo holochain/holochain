@@ -148,7 +148,8 @@ async fn main_workflow() {
             accepted: 0,
             rejected: 0,
             missing: 1,
-        }
+            failed: empty_set,
+        } if empty_set == HashSet::<DhtOpHash>::new()
     );
 
     // insert dependent create op in dht cache db
@@ -189,7 +190,8 @@ async fn main_workflow() {
             accepted: 1,
             rejected: 0,
             missing: 0,
-        }
+            failed: empty_set,
+        } if empty_set == HashSet::<DhtOpHash>::new()
     );
 
     // check ops to validate is 0 now after having been validated
@@ -342,7 +344,8 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             accepted: 2,
             rejected: 0,
             missing: 0,
-        }
+            failed: empty_set,
+        } if empty_set == HashSet::<DhtOpHash>::new()
     );
 
     // check ops to validate is also 0
@@ -483,7 +486,8 @@ async fn validate_ops_in_sequence_must_get_action() {
             accepted: 2,
             rejected: 0,
             missing: 0,
-        }
+            failed: empty_set,
+        } if empty_set == HashSet::<DhtOpHash>::new()
     );
 
     // check ops to validate is also 0
@@ -553,6 +557,7 @@ async fn handle_error_in_op_validation() {
     let dht_store_entry_op_hashed = DhtOpHashed::from_content_sync(dht_store_entry_op);
 
     // insert both ops in dht db and mark ready for app validation
+    let expected_failed_dht_op_hash = dht_create_op_hash.clone();
     app_validation_workspace.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_create_op_hashed).unwrap();
         put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
@@ -572,6 +577,7 @@ async fn handle_error_in_op_validation() {
 
     // running validation workflow should finish without errors
     // outcome summary should show 1 validated and accepted op and the error-causing op as still to validate
+    // the failed op should be among the failed op hashes
     let outcome_summary = app_validation_workflow_inner(
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
@@ -585,6 +591,8 @@ async fn handle_error_in_op_validation() {
     )
     .await
     .unwrap();
+    let mut expected_failed = HashSet::new();
+    expected_failed.insert(expected_failed_dht_op_hash);
     assert_matches!(
         outcome_summary,
         OutcomeSummary {
@@ -592,8 +600,9 @@ async fn handle_error_in_op_validation() {
             validated: 1,
             accepted: 1,
             missing: 0,
-            rejected: 0
-        }
+            rejected: 0,
+            failed: actual_failed,
+        } if actual_failed == expected_failed
     );
 
     let ops_to_validate =
