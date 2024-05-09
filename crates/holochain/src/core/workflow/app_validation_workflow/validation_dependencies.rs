@@ -37,23 +37,20 @@ impl ValidationDependencies {
 
     /// Returns true if this is a new missing hash.
     pub fn insert_missing_hash_for_op(&mut self, hash: AnyDhtHash, dht_op_hash: DhtOpHash) -> bool {
-        if let std::collections::hash_map::Entry::Vacant(entry) =
-            self.missing_hashes.entry(hash.clone())
-        {
-            let mut dht_op_hashes = HashSet::new();
-            dht_op_hashes.insert(dht_op_hash);
-            entry.insert(MissingHashProperties {
-                depending_ops: dht_op_hashes,
-                when_fetched: Instant::now(),
-            });
-            true
-        } else {
-            self.missing_hashes
-                .entry(hash)
-                .and_modify(|missing_hash_props| {
-                    missing_hash_props.depending_ops.insert(dht_op_hash.clone());
+        match self.missing_hashes.entry(hash.clone()) {
+            Entry::Vacant(entry) => {
+                let mut dht_op_hashes = HashSet::new();
+                dht_op_hashes.insert(dht_op_hash);
+                entry.insert(MissingHashProperties {
+                    depending_ops: dht_op_hashes,
+                    when_fetched: Instant::now(),
                 });
-            false
+                true
+            }
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().depending_ops.insert(dht_op_hash.clone());
+                false
+            }
         }
     }
 
