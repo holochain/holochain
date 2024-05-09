@@ -7,7 +7,7 @@ use holo_hash::{AnyDhtHash, DhtOpHash};
 use holochain_types::dht_op::DhtOpHashed;
 
 /// In-memory struct to keep track of missing DHT hashes, which DhtOp depends on them
-/// and when they were started being fetched.
+/// and when the fetches for them were most recently tried.
 pub struct ValidationDependencies {
     /// Missing hashes that are being fetched, along with a set of DhtOps that depend
     /// on the hash and the last Instant a fetch was attempted.
