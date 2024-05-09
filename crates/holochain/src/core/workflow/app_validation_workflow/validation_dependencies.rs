@@ -29,7 +29,7 @@ impl ValidationDependencies {
         }
     }
 
-    // returns true if this is a new missing hash
+    /// returns true if this is a new missing hash
     pub fn insert_missing_hash_for_op(&mut self, hash: AnyDhtHash, dht_op_hash: DhtOpHash) -> bool {
         if let Entry::Vacant(entry) = self.missing_hashes.entry(hash.clone()) {
             let mut dht_op_hashes = HashSet::new();
@@ -54,7 +54,7 @@ impl ValidationDependencies {
         &self.missing_hashes
     }
 
-    // filter out hashes that are known to be missing
+    /// filter out hashes that are known to be missing
     pub fn filter_missing_hashes_to_fetch_for_op(
         &mut self,
         hashes: Vec<AnyDhtHash>,
@@ -81,7 +81,7 @@ impl ValidationDependencies {
             .all(|(_, (_, instant))| instant.elapsed() > Self::FETCH_TIMEOUT)
     }
 
-    // filter out dht_ops that have missing dependencies
+    /// filter out dht_ops that have missing dependencies
     pub fn filter_ops_missing_dependencies(&self, dht_ops: Vec<DhtOpHashed>) -> Vec<DhtOpHashed> {
         dht_ops
             .into_iter()
