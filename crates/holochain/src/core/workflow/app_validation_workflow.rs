@@ -225,7 +225,7 @@ async fn app_validation_workflow_inner(
     );
     tracing::trace!(
         "missing hashes: {:?}",
-        validation_dependencies.lock().get_missing_hashes()
+        validation_dependencies.lock().missing_hashes
     );
     let sleuth_id = conductor.config.sleuth_id();
 
@@ -760,7 +760,7 @@ async fn run_validation_callback(
             // prevent multiple fetches of the same hash
             let new_hashes_to_fetch = validation_dependencies
                 .lock()
-                .filter_missing_hashes_to_fetch_for_op(hashes.clone(), dht_op_hash.clone());
+                .insert_missing_hashes_for_op(hashes.clone(), dht_op_hash.clone());
 
             // build a collection of futures to fetch the missing hashes
             let fetches = new_hashes_to_fetch.into_iter().map(move |hash| {
