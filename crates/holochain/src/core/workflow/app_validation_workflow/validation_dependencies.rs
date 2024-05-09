@@ -11,7 +11,7 @@ use holochain_types::dht_op::DhtOpHashed;
 pub struct ValidationDependencies {
     /// Missing hashes that are being fetched, along with a set of DhtOps that depend
     /// on the hash and the last Instant a fetch was attempted.
-    missing_hashes: HashMap<AnyDhtHash, (HashSet<DhtOpHash>, Instant)>,
+    pub(super) missing_hashes: HashMap<AnyDhtHash, (HashSet<DhtOpHash>, Instant)>,
 }
 
 impl Default for ValidationDependencies {
@@ -29,7 +29,7 @@ impl ValidationDependencies {
         }
     }
 
-    /// returns true if this is a new missing hash
+    /// Returns true if this is a new missing hash.
     pub fn insert_missing_hash_for_op(&mut self, hash: AnyDhtHash, dht_op_hash: DhtOpHash) -> bool {
         if let Entry::Vacant(entry) = self.missing_hashes.entry(hash.clone()) {
             let mut dht_op_hashes = HashSet::new();
@@ -46,30 +46,22 @@ impl ValidationDependencies {
         }
     }
 
-    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) {
-        self.missing_hashes.remove(hash);
-    }
-
-    pub fn get_missing_hashes(&self) -> &HashMap<AnyDhtHash, (HashSet<DhtOpHash>, Instant)> {
-        &self.missing_hashes
-    }
-
-    /// filter out hashes that are known to be missing
-    pub fn filter_missing_hashes_to_fetch_for_op(
+    /// Iterates over given missing hashes and adds them to the internal collection if they are not present.
+    /// A collection of new missing hashes is returned.
+    /// Takes missing hashes and the depending op as parameters.
+    pub fn insert_missing_hashes_for_op(
         &mut self,
         hashes: Vec<AnyDhtHash>,
         dht_op_hash: DhtOpHash,
     ) -> Vec<AnyDhtHash> {
         hashes
             .into_iter()
-            .filter(|hash| {
-                if self.missing_hashes.contains_key(hash) {
-                    false
-                } else {
-                    self.insert_missing_hash_for_op(hash.clone(), dht_op_hash.clone())
-                }
-            })
+            .filter(|hash| self.insert_missing_hash_for_op(hash.clone(), dht_op_hash.clone()))
             .collect()
+    }
+
+    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) {
+        self.missing_hashes.remove(hash);
     }
 
     pub fn fetch_missing_hashes_timed_out(&self) -> bool {
@@ -111,35 +103,33 @@ mod tests {
         // hash 1 should be only new hash
         let missing_hash_1 = fixt!(AnyDhtHash);
         let filtered_hashes_to_fetch = validation_dependencies
-            .filter_missing_hashes_to_fetch_for_op(vec![missing_hash_1.clone()], op.clone());
+            .insert_missing_hashes_for_op(vec![missing_hash_1.clone()], op.clone());
         assert_eq!(filtered_hashes_to_fetch, [missing_hash_1.clone()].to_vec());
 
         // hash 1 is still present
         // new hashes should be empty
         let filtered_hashes_to_fetch = validation_dependencies
-            .filter_missing_hashes_to_fetch_for_op(vec![missing_hash_1.clone()], op.clone());
+            .insert_missing_hashes_for_op(vec![missing_hash_1.clone()], op.clone());
         assert_eq!(filtered_hashes_to_fetch, Vec::<AnyDhtHash>::new());
 
         // hash 1 is still present
         // hash 2 is missing now too
         // hash 2 should be only new hash
         let missing_hash_2 = fixt!(AnyDhtHash);
-        let filtered_hashes_to_fetch = validation_dependencies
-            .filter_missing_hashes_to_fetch_for_op(
-                vec![missing_hash_1.clone(), missing_hash_2.clone()],
-                op.clone(),
-            );
+        let filtered_hashes_to_fetch = validation_dependencies.insert_missing_hashes_for_op(
+            vec![missing_hash_1.clone(), missing_hash_2.clone()],
+            op.clone(),
+        );
         assert_eq!(filtered_hashes_to_fetch, [missing_hash_2.clone()].to_vec());
 
         // hash 1 has been fetched/removed in the meantime
         // hash 2 is still present
         // only hash 1 should be new
         validation_dependencies.remove_missing_hash(&missing_hash_1);
-        let filtered_hashes_to_fetch = validation_dependencies
-            .filter_missing_hashes_to_fetch_for_op(
-                vec![missing_hash_1.clone(), missing_hash_2.clone()],
-                op.clone(),
-            );
+        let filtered_hashes_to_fetch = validation_dependencies.insert_missing_hashes_for_op(
+            vec![missing_hash_1.clone(), missing_hash_2.clone()],
+            op.clone(),
+        );
         assert_eq!(filtered_hashes_to_fetch, [missing_hash_1.clone()].to_vec());
     }
 

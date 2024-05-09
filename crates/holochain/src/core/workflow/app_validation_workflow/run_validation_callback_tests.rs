@@ -495,7 +495,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
 
     assert_eq!(times_same_hash_is_fetched.load(Ordering::Relaxed), 1);
     // after successfully fetching dependencies, the set should be empty
-    assert_eq!(validation_dependencies.lock().get_missing_hashes().len(), 0);
+    assert_eq!(validation_dependencies.lock().missing_hashes.len(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -626,7 +626,7 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
 
     assert_eq!(times_same_hash_is_fetched.load(Ordering::Relaxed), 1);
     // after successfully fetching dependencies, the set should be empty
-    assert_eq!(validation_dependencies.lock().get_missing_hashes().len(), 0);
+    assert_eq!(validation_dependencies.lock().missing_hashes.len(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -727,12 +727,9 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     let invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &update_action_op).unwrap();
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
-    // hashes missing for update dht op should be empty
+    // missing hashes should be empty
     assert_eq!(
-        validation_dependencies
-            .lock()
-            .get_missing_hashes()
-            .is_empty(),
+        validation_dependencies.lock().missing_hashes.is_empty(),
         true
     );
 
@@ -793,10 +790,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     // hashes missing for delete dht op should be empty again after create
     // has been fetched
     assert_eq!(
-        validation_dependencies
-            .lock()
-            .get_missing_hashes()
-            .is_empty(),
+        validation_dependencies.lock().missing_hashes.is_empty(),
         true
     );
 
