@@ -38,6 +38,8 @@ async fn publish_to_basis_from_inside() {
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
         params.gossip_arc_clamping = "none".to_string();
         params.gossip_dynamic_arcs = false; // Don't update the arcs dynamically, use the initial value
+        params.disable_recent_gossip = true;
+        params.disable_historical_gossip = true;
         params
     };
 
@@ -202,6 +204,8 @@ async fn publish_to_basis_from_outside() {
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
         params.gossip_arc_clamping = "none".to_string();
         params.gossip_dynamic_arcs = false; // Don't update the arcs dynamically, use the initial value
+        params.disable_recent_gossip = true;
+        params.disable_historical_gossip = true;
         params
     };
 
