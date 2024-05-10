@@ -19,21 +19,23 @@ jobs:
         run: |
           set -euo pipefail
           
-          if echo "$ALLOWED_USERS" | grep -q "${USER}"; then
-            echo "User $USER is allowed to run commands"
-          else
-            echo "User $USER is not allowed to run commands"
-            exit 0
-          fi
-          
           COMMAND=""
           if [[ "$COMMENT" == @hra* ]]; then
             echo "Comment is a command"
             COMMAND=$(echo "$COMMENT" | cut -b 6- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          else
+            echo "Comment is not a command"
+            exit 0
           fi
           
-          echo "Setting command '$COMMAND'"
-          
+          if echo "$ALLOWED_USERS" | grep -q "${USER}"; then
+            echo "User $USER is allowed to run commands"
+          else
+            echo "User $USER is not allowed to run commands"
+            exit 1
+          fi
+
+          echo "Setting command '$COMMAND'"  
           echo "action=${COMMAND}" >> "$GITHUB_OUTPUT"
     outputs:
       action: ${{ steps.dispatch.outputs.action }}
