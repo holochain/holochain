@@ -33,6 +33,8 @@ jobs:
           - name: ${{ github.ref_name }}
             skip: true
         update:
+          - source: "versions/weekly"
+            cmd: "nix run .#scripts-repo-flake-update weekly"
           - source: "rust-overlay"
             cmd: "nix flake lock --update-input rust-overlay"
           - source: "nixpkgs"
