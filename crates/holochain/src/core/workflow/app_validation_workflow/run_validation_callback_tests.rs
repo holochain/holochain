@@ -13,11 +13,12 @@ use crate::{
     sweettest::{SweetDnaFile, SweetInlineZomes},
 };
 use fixt::fixt;
-use holo_hash::{AgentPubKey, HashableContentExtSync};
+use holo_hash::{ActionHash, AgentPubKey, HashableContentExtSync};
 use holochain_p2p::{HolochainP2pDnaFixturator, MockHolochainP2pDnaT};
 use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, mutations::insert_op};
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
+    db::{DbKindCache, DbWrite},
     dht_op::{DhtOp, DhtOpHashed, WireOps},
     record::WireRecordOps,
 };
@@ -38,6 +39,7 @@ use holochain_zome_types::{
 };
 use matches::assert_matches;
 use parking_lot::{Mutex, RwLock};
+use rusqlite::named_params;
 use std::{
     collections::HashSet,
     sync::{
@@ -663,7 +665,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
         alice,
         workspace,
         bob,
-        ..
+        test_space,
     } = TestCase::new(zomes).await;
 
     // a create by alice
@@ -723,16 +725,12 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     });
     let network = Arc::new(network);
 
-    // validate update op
-    let invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &update_action_op).unwrap();
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
-
     // missing hashes should be empty
     assert_eq!(
         validation_dependencies.lock().missing_hashes.is_empty(),
         true
     );
-
     // filtering out ops with missing dependencies should not filter anything
     let ops_to_validate = vec![update_dht_op.clone().into_hashed()];
     let filtered_ops_to_validate = validation_dependencies
@@ -740,6 +738,8 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
         .filter_ops_missing_dependencies(ops_to_validate.clone());
     assert_eq!(filtered_ops_to_validate, ops_to_validate);
 
+    // validate update op will not be able to validate due to missing original create action
+    let invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &update_action_op).unwrap();
     let _ = run_validation_callback(
         invocation.clone(),
         &update_dht_op_hash,
@@ -751,7 +751,21 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     .await
     .unwrap();
 
-    // validate delete op
+    // while create action has not been fetched, filtering out ops with missing dependencies should filter out update op
+    let ops_to_validate = vec![update_dht_op.clone().into_hashed()];
+    let filtered_ops_to_validate = validation_dependencies
+        .lock()
+        .filter_ops_missing_dependencies(ops_to_validate.clone());
+    assert_eq!(filtered_ops_to_validate, vec![]);
+
+    // wait for missing create record being fetched by background task
+    await_action_in_cache(
+        &test_space.space.cache_db,
+        create_action_signed_hashed.as_hash(),
+    )
+    .await;
+
+    // validate delete op should succeed as it is referencing the already fetched create action
     let invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &delete_action_op).unwrap();
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
@@ -761,27 +775,6 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
         &ribosome,
         workspace.clone(),
         network.clone(),
-        validation_dependencies.clone(),
-    )
-    .await
-    .unwrap();
-
-    // await while missing record is being fetched in background task
-    tokio::time::sleep(Duration::from_millis(10)).await;
-
-    // filtering out ops with missing dependencies should again not filter anything
-    let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
-    let filtered_ops_to_validate = validation_dependencies
-        .lock()
-        .filter_ops_missing_dependencies(ops_to_validate.clone());
-    assert_eq!(filtered_ops_to_validate, ops_to_validate);
-
-    let _ = run_validation_callback(
-        invocation,
-        &delete_dht_op_hash,
-        &ribosome,
-        workspace,
-        network,
         validation_dependencies.clone(),
     )
     .await
@@ -850,5 +843,22 @@ impl TestCase {
             bob,
             workspace,
         }
+    }
+}
+
+async fn await_action_in_cache(cache_db: &DbWrite<DbKindCache>, hash: &ActionHash) {
+    loop {
+        let hash = hash.clone();
+        let result = cache_db.test_read(move |txn| {
+            txn.query_row(
+                "SELECT hash FROM Action WHERE hash = :hash",
+                named_params! {":hash": hash},
+                |row| Ok(row.get::<_, ActionHash>(0)),
+            )
+        });
+        if result.is_ok() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
     }
 }
