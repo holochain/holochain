@@ -107,7 +107,7 @@ impl ArqStrat {
     /// Standard arq strat
     pub fn standard(local_storage: LocalStorageConfig, min_coverage: f64) -> Self {
         Self {
-            // TODO This is refered to as min_coverage, min_peers and redundancy_target. Pick one name and make this consistent.
+            // TODO This is referred to as min_coverage, min_peers and redundancy_target. Pick one name and make this consistent.
             min_coverage,
             // this buffer implies min-max chunk count of 8-16
             buffer: 0.143,

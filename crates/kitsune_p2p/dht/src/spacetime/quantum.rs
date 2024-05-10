@@ -24,7 +24,7 @@ pub struct SpaceQuantum(u32);
 impl SpaceQuantum {
     /// The inclusive locations at either end of this quantum
     pub fn to_loc_bounds(&self, topo: &Topology) -> (Loc, Loc) {
-        let (a, b): (u32, u32) = bounds(topo.space.into(), 0, self.0.into(), 1);
+        let (a, b): (u32, u32) = space_bounds(topo.space.into(), 0, self.0.into(), 1);
         (Loc::from(a), Loc::from(b))
     }
 }
@@ -59,7 +59,7 @@ impl TimeQuantum {
 
     /// The inclusive timestamps at either end of this quantum
     pub fn to_timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
-        let (a, b): (i64, i64) = bounds64(topo.time.into(), 0, self.0.into(), 1);
+        let (a, b): (i64, i64) = time_bounds64(topo.time.into(), 0, self.0.into(), 1);
         (
             Timestamp::from_micros(a + topo.time_origin.as_micros()),
             Timestamp::from_micros(b + topo.time_origin.as_micros()),
