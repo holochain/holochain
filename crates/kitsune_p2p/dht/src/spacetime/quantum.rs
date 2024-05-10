@@ -82,7 +82,7 @@ pub trait Quantum:
     fn inner(&self) -> u32;
 
     /// If this coord is beyond the max value for its dimension, wrap it around
-    /// the max value
+    /// the max value. See [Quantum::max_value].
     fn normalized(self, dim: impl Into<Self::Dim>) -> Self;
 
     /// The maximum quantum for this dimension.
