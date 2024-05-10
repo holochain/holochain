@@ -25,7 +25,6 @@ mod common;
 ///   5. Wait for the 3rd to receive the data.
 ///   6. Assert that the op was never published to the 1st, 2nd, or 5th agents. (Note that we cannot check if we sent it to ourselves because the op was already in our store)
 #[cfg(feature = "tx5")]
-#[ignore = "This test is flaky, possibly because what it is testing is flaky"]
 #[tokio::test(flavor = "multi_thread")]
 async fn publish_to_basis_from_inside() {
     holochain_trace::test_run();
@@ -191,7 +190,6 @@ async fn publish_to_basis_from_inside() {
 /// should still go to the correct agents. It also says with the publisher, so we need to account
 /// for that when checking the op stores at the end of the test.
 #[cfg(feature = "tx5")]
-#[ignore = "This test is flaky, possibly because what it is testing is flaky"]
 #[tokio::test(flavor = "multi_thread")]
 async fn publish_to_basis_from_outside() {
     holochain_trace::test_run();

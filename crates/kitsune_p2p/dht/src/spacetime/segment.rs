@@ -198,7 +198,7 @@ impl<O: Offset> Segment<O> {
 impl SpaceSegment {
     /// Get the start and end bounds, in absolute Loc coordinates, for this segment
     pub fn loc_bounds(&self, dim: impl SpaceDim) -> (Loc, Loc) {
-        let (a, b): (u32, u32) = bounds(dim.into().into(), self.power, self.offset, 1);
+        let (a, b): (u32, u32) = space_bounds(dim.into().into(), self.power, self.offset, 1);
         (Loc::from(a), Loc::from(b))
     }
 }
@@ -206,7 +206,7 @@ impl SpaceSegment {
 impl TimeSegment {
     /// Get the start and end bounds, in absolute Timestamp coordinates, for this segment
     pub fn timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
-        let (a, b): (i64, i64) = bounds64(topo.time.into(), self.power, self.offset, 1);
+        let (a, b): (i64, i64) = time_bounds64(topo.time.into(), self.power, self.offset, 1);
         let o = topo.time_origin.as_micros();
         (Timestamp::from_micros(a + o), Timestamp::from_micros(b + o))
     }
@@ -214,10 +214,22 @@ impl TimeSegment {
 
 /// Alias
 pub type SpaceSegment = Segment<SpaceOffset>;
+
 /// Alias
 pub type TimeSegment = Segment<TimeOffset>;
 
-pub(super) fn bounds<N: From<u32>>(
+/// Convert to a literal location in space using the given [Dimension] and optionally a power value
+/// which can further quantize the space. The power can be set to 0 to use the [Dimension]'s quantum
+/// as is.
+///
+/// The quantized input location is expressed as an offset and a count of quanta. The quantum is
+/// computed first, then the locations are then computed as:
+/// (`offset * quantum`, `offset * quantum + count * quantum`).
+///
+/// When the `power` is used, it should be a power of two, between 1 and 31. The locations are then
+/// computed as:
+/// (`offset * quantum * 2^power`, `offset * quantum * 2^power + count * quantum * 2^power`).
+pub(super) fn space_bounds<N: From<u32>>(
     dim: Dimension,
     power: u8,
     offset: SpaceOffset,
@@ -231,7 +243,8 @@ pub(super) fn bounds<N: From<u32>>(
     (start.into(), start.wrapping_add(len).wrapping_sub(1).into())
 }
 
-pub(super) fn bounds64<N: From<i64>>(
+// TODO is wrapping meaningful for time? Should we saturate instead?
+pub(super) fn time_bounds64<N: From<i64>>(
     dim: Dimension,
     power: u8,
     offset: TimeOffset,
@@ -243,4 +256,64 @@ pub(super) fn bounds64<N: From<i64>>(
     let start = (*offset as i64).wrapping_mul(q);
     let len = (count as i64).wrapping_mul(q);
     (start.into(), start.wrapping_add(len).wrapping_sub(1).into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn simple_space_bounds() {
+        let dim = SpaceDimension::standard();
+        let (lower, upper) = space_bounds::<u32>(dim.into(), 0, 5.into(), 2);
+
+        assert_eq!(lower, dim.quantum * 5);
+        assert_eq!(upper, dim.quantum * 5 + dim.quantum * 2 - 1);
+    }
+
+    #[test]
+    fn simple_wrapping_space_bounds() {
+        let dim = SpaceDimension::standard();
+        let (lower, upper) = space_bounds::<u32>(dim.into(), 0, 5.into(), pow2(32 - dim.quantum_power) - 5 + 1);
+
+        assert!(upper < lower, "lower: {lower}, upper: {upper}");
+
+        assert_eq!(lower, dim.quantum * 5);
+        assert_eq!(upper, dim.quantum - 1);
+    }
+
+    #[test]
+    fn space_bounds_with_quantization() {
+        let dim = SpaceDimension::standard();
+
+        // This power further scales the quantum size.
+        // This is used to apply Arq quantization on top of the space's own quantization.
+        let (lower, upper) = space_bounds::<u32>(dim.into(), 2, 5.into(), 2);
+
+        let scaled_quantum = dim.quantum * pow2(2);
+        assert_eq!(lower, scaled_quantum * 5);
+        assert_eq!(upper, scaled_quantum * 5 + scaled_quantum * 2 - 1);
+    }
+
+    #[test]
+    fn simple_time_bounds() {
+        let dim = TimeDimension::standard();
+        let (lower, upper) = time_bounds64::<i64>(dim.into(), 0, 5.into(), 2);
+
+        assert_eq!(lower, dim.quantum as i64 * 5);
+        assert_eq!(upper, dim.quantum as i64 * 5 + dim.quantum as i64  * 2 - 1);
+    }
+
+    #[test]
+    fn time_bounds_with_quantization() {
+        let dim = TimeDimension::standard();
+
+        // This power further scales the quantum size.
+        // This is used to apply Arq quantization on top of the time's own quantization.
+        let (lower, upper) = time_bounds64::<i64>(dim.into(), 2, 5.into(), 2);
+
+        let scaled_quantum = (dim.quantum * pow2(2)) as i64;
+        assert_eq!(lower, scaled_quantum * 5);
+        assert_eq!(upper, scaled_quantum * 5 + scaled_quantum * 2 - 1);
+    }
 }

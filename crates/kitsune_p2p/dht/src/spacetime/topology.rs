@@ -37,6 +37,28 @@ pub struct Topology {
 }
 
 impl Topology {
+    /// Standard dimensions with the given time origin
+    pub fn standard(time_origin: Timestamp, time_cutoff: Duration) -> Self {
+        Self {
+            space: SpaceDimension::standard(),
+            time: TimeDimension::standard(),
+            time_origin,
+            time_cutoff,
+        }
+    }
+
+    /// Returns the time quantum which contains this timestamp
+    pub fn time_quantum(&self, t: Timestamp) -> TimeQuantum {
+        let t = (t.as_micros() - self.time_origin.as_micros()).max(0);
+        ((t / self.time.quantum as i64) as u32).into()
+    }
+
+    /// The maximum power to use in "exponential coordinates".
+    /// This is 17 for standard space topology. (32 - 12 - 3)
+    pub fn max_space_power(&self, strat: &ArqStrat) -> u8 {
+        32 - self.space.quantum_power - strat.max_chunks_log2()
+    }
+
     /// Unit dimensions with the given time origin
     #[cfg(feature = "test_utils")]
     pub fn unit(time_origin: Timestamp) -> Self {
@@ -59,22 +81,14 @@ impl Topology {
         }
     }
 
-    /// Standard dimensions with the given time origin
-    pub fn standard(time_origin: Timestamp, time_cutoff: Duration) -> Self {
-        Self {
-            space: SpaceDimension::standard(),
-            time: TimeDimension::standard(),
-            time_origin,
-            time_cutoff,
-        }
-    }
-
     /// Standard dimensions with the [`HOLOCHAIN_EPOCH`](Timestamp::HOLOCHAIN_EPOCH) as the time origin
+    #[cfg(feature = "test_utils")]
     pub fn standard_epoch(time_cutoff: Duration) -> Self {
         Self::standard(Timestamp::HOLOCHAIN_EPOCH, time_cutoff)
     }
 
     /// Standard dimensions with the [`HOLOCHAIN_EPOCH`](Timestamp::HOLOCHAIN_EPOCH) as the time origin
+    #[cfg(feature = "test_utils")]
     pub fn standard_epoch_full() -> Self {
         Self::standard(Timestamp::HOLOCHAIN_EPOCH, Duration::ZERO)
     }
@@ -86,36 +100,9 @@ impl Topology {
     }
 
     /// Returns the space quantum which contains this location
+    #[cfg(feature = "test_utils")]
     pub fn space_quantum(&self, x: Loc) -> SpaceQuantum {
         self.space.quantum(x)
-    }
-
-    /// Returns the time quantum which contains this timestamp
-    pub fn time_quantum(&self, t: Timestamp) -> TimeQuantum {
-        let t = (t.as_micros() - self.time_origin.as_micros()).max(0);
-        ((t / self.time.quantum as i64) as u32).into()
-    }
-
-    /// Returns the time quantum which contains this timestamp
-    pub fn time_quantum_duration(&self, d: std::time::Duration) -> TimeQuantum {
-        self.time.quantum_duration(d)
-    }
-
-    /// The minimum power to use in "exponentional coordinates".
-    pub fn min_space_power(&self) -> u8 {
-        // If space.quantum_power is 0, then min has to be at least 1, because
-        // in that case we can talk about 2^32 quanta at power 0, which would
-        // overflow a `u32`.
-        //
-        // If space.quantum_power is greater than 0 (the standard is 12), then
-        // the min power can be 0.
-        1u8.saturating_sub(self.space.quantum_power)
-    }
-
-    /// The maximum power to use in "exponentional coordinates".
-    /// This is 17 for standard space topology. (32 - 12 - 3)
-    pub fn max_space_power(&self, strat: &ArqStrat) -> u8 {
-        32 - self.space.quantum_power - strat.max_chunks_log2()
     }
 }
 
@@ -189,7 +176,7 @@ impl SpaceDimension {
         })
     }
 
-    /// The minimum power to use in "exponentional coordinates".
+    /// The minimum power to use in "exponential coordinates".
     pub fn min_power(&self) -> u8 {
         // If space.quantum_power is 0, then min has to be at least 1, because
         // in that case we can talk about 2^32 quanta at power 0, which would
@@ -200,7 +187,7 @@ impl SpaceDimension {
         1u8.saturating_sub(self.quantum_power)
     }
 
-    /// The maximum power to use in "exponentional coordinates".
+    /// The maximum power to use in "exponential coordinates".
     /// This is 17 for standard space topology. (32 - 12 - 3)
     pub fn max_power(&self, strat: &ArqStrat) -> u8 {
         32 - self.quantum_power - strat.max_chunks_log2()
@@ -254,11 +241,6 @@ impl TimeDimension {
         }
         .into()
     }
-
-    /// Returns the time quantum which falls in this Duration in the past
-    pub fn quantum_duration(&self, d: std::time::Duration) -> TimeQuantum {
-        ((d.as_micros() as i64 / self.quantum as i64) as u32).into()
-    }
 }
 
 impl Default for TimeDimension {
@@ -273,6 +255,7 @@ pub trait SpaceDim: Copy + Into<SpaceDimension> {
     /// Alias for `into`
     fn get(self) -> SpaceDimension;
 }
+
 impl<T> SpaceDim for T
 where
     T: Copy + Into<SpaceDimension>,
@@ -288,6 +271,7 @@ pub trait TimeDim: Copy + Into<TimeDimension> {
     /// Alias for `into`
     fn get(self) -> TimeDimension;
 }
+
 impl<T> TimeDim for T
 where
     T: Copy + Into<TimeDimension>,
@@ -330,7 +314,7 @@ pub struct GossipParams {
     /// a time buffer of 2 will allow +/- 10 min discrepancies with gossip partners.
     pub max_time_offset: TimeQuantum,
 
-    /// What difference in power will you accept for other agents' Arqs?
+    /// What is the difference in power will you accept for other agents' Arqs?
     /// e.g. if the power I use in my arq is 14, and this offset is 2,
     /// I won't talk to anyone whose arq is expressed with a power lower
     /// than 12 or greater than 16
