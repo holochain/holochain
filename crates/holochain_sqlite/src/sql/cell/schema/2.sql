@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS Action (
     blob             BLOB           NOT NULL,
     prev_hash        BLOB           NULL,
 
-    -- Actions
+    -- Actions only
     seq              INTEGER        NULL,
 
     -- Create / Update
