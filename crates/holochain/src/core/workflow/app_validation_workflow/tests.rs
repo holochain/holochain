@@ -647,14 +647,12 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
             let visibility = EntryVisibility::from(&input);
             assert_eq!(visibility, EntryVisibility::Private);
             let entry = input.try_into().unwrap();
-            dbg!();
             h.create(CreateInput::new(
                 location.clone(),
                 visibility,
                 entry,
                 ChainTopOrdering::default(),
             ))?;
-            dbg!();
             h.create(CreateInput::new(
                 EntryDefLocation::CapClaim,
                 visibility,
