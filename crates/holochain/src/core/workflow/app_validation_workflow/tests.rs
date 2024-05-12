@@ -66,11 +66,7 @@ async fn main_workflow() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let dna_hash = dna_file.dna_hash().clone();
 
-    let mut conductor = SweetConductor::from_config_rendezvous(
-        SweetConductorConfig::rendezvous(true),
-        SweetLocalRendezvous::new().await,
-    )
-    .await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
@@ -153,7 +149,8 @@ async fn main_workflow() {
             accepted: 0,
             rejected: 0,
             missing: 1,
-        }
+            failed: empty_set,
+        } if empty_set == HashSet::<DhtOpHash>::new()
     );
 
     // insert dependent create op in dht cache db
@@ -194,7 +191,8 @@ async fn main_workflow() {
             accepted: 1,
             rejected: 0,
             missing: 0,
-        }
+            failed: empty_set,
+        } if empty_set == HashSet::<DhtOpHash>::new()
     );
 
     // check ops to validate is 0 now after having been validated
@@ -276,11 +274,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let dna_hash = dna_file.dna_hash().clone();
 
-    let mut conductor = SweetConductor::from_config_rendezvous(
-        SweetConductorConfig::rendezvous(true),
-        SweetLocalRendezvous::new().await,
-    )
-    .await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
@@ -351,7 +345,8 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             accepted: 2,
             rejected: 0,
             missing: 0,
-        }
+            failed: empty_set,
+        } if empty_set == HashSet::<DhtOpHash>::new()
     );
 
     // check ops to validate is also 0
@@ -401,11 +396,7 @@ async fn validate_ops_in_sequence_must_get_action() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let dna_hash = dna_file.dna_hash().clone();
 
-    let mut conductor = SweetConductor::from_config_rendezvous(
-        SweetConductorConfig::rendezvous(true),
-        SweetLocalRendezvous::new().await,
-    )
-    .await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
@@ -496,7 +487,8 @@ async fn validate_ops_in_sequence_must_get_action() {
             accepted: 2,
             rejected: 0,
             missing: 0,
-        }
+            failed: empty_set,
+        } if empty_set == HashSet::<DhtOpHash>::new()
     );
 
     // check ops to validate is also 0
@@ -552,6 +544,120 @@ async fn multi_create_link_validation() {
         links[2].target.clone().into_action_hash().unwrap(),
         record.signed_action.hashed.hash
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn handle_error_in_op_validation() {
+    holochain_trace::test_run();
+
+    let entry_def = EntryDef::default_from_id("entry_def_id");
+    let zomes = SweetInlineZomes::new(vec![entry_def], 0).integrity_function(
+        "validate",
+        move |_, op: Op| match op {
+            Op::RegisterAgentActivity(_) => Err(InlineZomeError::TestError("kaputt".to_string())),
+            _ => Ok(ValidateCallbackResult::Valid),
+        },
+    );
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let dna_hash = dna_file.dna_hash().clone();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
+    let cell_id = app.cells()[0].cell_id().clone();
+
+    let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
+        conductor
+            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
+            .unwrap()
+            .into(),
+        conductor.get_dht_db(&dna_hash).unwrap(),
+        conductor.get_dht_db_cache(&dna_hash).unwrap(),
+        conductor.get_cache_db(&cell_id).await.unwrap(),
+        conductor.keystore(),
+        Arc::new(dna_file.dna_def().clone()),
+    ));
+
+    // create register agent activity op that will return an error during validation
+    let mut create = fixt!(Create);
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: Default::default(),
+    });
+    let create_action = Action::Create(create);
+    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
+    let dht_create_op_hash = DhtOpHash::with_data_sync(&dht_create_op);
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+
+    // create another op that will be validated successfully
+    let mut create = fixt!(Create);
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: Default::default(),
+    });
+    let entry = fixt!(Entry);
+    let dht_store_entry_op =
+        DhtOp::StoreEntry(fixt!(Signature), NewEntryAction::Create(create), entry);
+    let dht_store_entry_op_hash = DhtOpHash::with_data_sync(&dht_store_entry_op);
+    let dht_store_entry_op_hashed = DhtOpHashed::from_content_sync(dht_store_entry_op);
+
+    // insert both ops in dht db and mark ready for app validation
+    let expected_failed_dht_op_hash = dht_create_op_hash.clone();
+    app_validation_workspace.dht_db.test_write(move |txn| {
+        insert_op(txn, &dht_create_op_hashed).unwrap();
+        put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
+        insert_op(txn, &dht_store_entry_op_hashed).unwrap();
+        put_validation_limbo(txn, &dht_store_entry_op_hash, ValidationStage::SysValidated).unwrap();
+    });
+
+    // check ops are now counted as ops to validate
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 2);
+
+    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+
+    // running validation workflow should finish without errors
+    // outcome summary should show 1 validated and accepted op and the error-causing op as still to validate
+    // the failed op should be among the failed op hashes
+    let outcome_summary = app_validation_workflow_inner(
+        Arc::new(dna_hash.clone()),
+        app_validation_workspace.clone(),
+        conductor.raw_handle(),
+        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        conductor
+            .get_or_create_space(&dna_hash)
+            .unwrap()
+            .dht_query_cache,
+        validation_dependencies.clone(),
+    )
+    .await
+    .unwrap();
+    let mut expected_failed = HashSet::new();
+    expected_failed.insert(expected_failed_dht_op_hash);
+    assert_matches!(
+        outcome_summary,
+        OutcomeSummary {
+            ops_to_validate: 2,
+            validated: 1,
+            accepted: 1,
+            missing: 0,
+            rejected: 0,
+            failed: actual_failed,
+        } if actual_failed == expected_failed
+    );
+
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]

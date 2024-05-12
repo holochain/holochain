@@ -234,6 +234,7 @@ async fn app_validation_workflow_inner(
     let accepted_ops = Arc::new(AtomicUsize::new(0));
     let awaiting_ops = Arc::new(AtomicUsize::new(0));
     let rejected_ops = Arc::new(AtomicUsize::new(0));
+    let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity = Vec::new();
 
     // Validate ops sequentially
@@ -346,6 +347,7 @@ async fn app_validation_workflow_inner(
                     ?err,
                     "App validation error when validating dht op."
                 );
+                failed_ops.lock().insert(dht_op_hash);
             }
         }
     }
@@ -370,7 +372,10 @@ async fn app_validation_workflow_inner(
     let awaiting_ops = awaiting_ops.load(Ordering::SeqCst);
     let rejected_ops = rejected_ops.load(Ordering::SeqCst);
     let ops_validated = accepted_ops + rejected_ops;
-    tracing::info!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected.");
+    let failed_ops = Arc::try_unwrap(failed_ops)
+        .expect("must be only reference")
+        .into_inner();
+    tracing::info!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected, failed ops {failed_ops:?}.");
 
     let outcome_summary = OutcomeSummary {
         ops_to_validate: num_ops_to_validate,
@@ -378,6 +383,7 @@ async fn app_validation_workflow_inner(
         accepted: accepted_ops,
         missing: awaiting_ops,
         rejected: rejected_ops,
+        failed: failed_ops,
     };
     Ok(outcome_summary)
 }
@@ -844,6 +850,7 @@ struct OutcomeSummary {
     accepted: usize,
     missing: usize,
     rejected: usize,
+    failed: HashSet<DhtOpHash>,
 }
 
 impl OutcomeSummary {
@@ -854,6 +861,7 @@ impl OutcomeSummary {
             accepted: 0,
             missing: 0,
             rejected: 0,
+            failed: HashSet::new(),
         }
     }
 }
