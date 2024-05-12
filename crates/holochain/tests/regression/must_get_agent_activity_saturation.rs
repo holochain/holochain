@@ -3,7 +3,6 @@ use holochain::sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFi
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::Record;
 use rand::{thread_rng, Rng};
-use std::time::Duration;
 
 // Intended to keep https://github.com/holochain/holochain/issues/3028 fixed.
 // ensure that multiple `must_get_agent_activity` calls do not oversaturate the
