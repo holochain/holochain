@@ -10,8 +10,9 @@ use std::time::Duration;
 // fetch pool and bring gossip to a halt
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
-#[ignore = "temporarily while working on app validation refactor; to be reinstated along the refactor"]
 async fn must_get_agent_activity_saturation() {
+    use holochain::sweettest::await_consistency;
+
     holochain_trace::test_run();
     let mut rng = thread_rng();
     let (dna, _, _) =
@@ -24,15 +25,15 @@ async fn must_get_agent_activity_saturation() {
         .await
         .unwrap()
         .cells_flattened();
-    let alice_app = &apps[0];
-    let bob_app = &apps[1];
+    let alice_cell = &apps[0];
+    let bob_cell = &apps[1];
 
     let mut hash = ActionHash::from_raw_32(vec![0; 32]);
     for _ in 0..100 {
         let content: u32 = rng.gen();
         let record: Record = conductors[0]
             .call(
-                &alice_app.zome(TestWasm::MustGetAgentActivity.coordinator_zome_name()),
+                &alice_cell.zome(TestWasm::MustGetAgentActivity.coordinator_zome_name()),
                 "create_thing",
                 content,
             )
@@ -41,11 +42,11 @@ async fn must_get_agent_activity_saturation() {
     }
 
     // let conductors catch up
-    tokio::time::sleep(Duration::from_secs(60)).await;
+    await_consistency(60, [alice_cell, bob_cell]).await.unwrap();
 
     let record: Option<Record> = conductors[1]
         .call(
-            &bob_app.zome(TestWasm::MustGetAgentActivity.coordinator_zome_name()),
+            &bob_cell.zome(TestWasm::MustGetAgentActivity.coordinator_zome_name()),
             "get_thing",
             hash,
         )
