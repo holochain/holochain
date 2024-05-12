@@ -15,6 +15,7 @@ use crate::{
 use fixt::fixt;
 use holo_hash::{ActionHash, AgentPubKey, HashableContentExtSync};
 use holochain_p2p::{HolochainP2pDnaFixturator, MockHolochainP2pDnaT};
+use holochain_sqlite::exports::FallibleIterator;
 use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, mutations::insert_op};
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
@@ -39,7 +40,6 @@ use holochain_zome_types::{
 };
 use matches::assert_matches;
 use parking_lot::{Mutex, RwLock};
-use rusqlite::named_params;
 use std::{
     collections::HashSet,
     sync::{
@@ -177,7 +177,7 @@ async fn validation_callback_awaiting_deps_hashes() {
         alice,
         bob,
         workspace,
-        ..
+        test_space,
     } = TestCase::new(zomes).await;
 
     // a create by alice
@@ -203,11 +203,12 @@ async fn validation_callback_awaiting_deps_hashes() {
 
     // mock network that returns the requested create action
     let mut network = MockHolochainP2pDnaT::new();
+    let action_to_return = create_action_signed_hashed.clone();
     network.expect_get().returning(move |hash, _| {
-        assert_eq!(hash, create_action_signed_hashed.as_hash().clone().into());
+        assert_eq!(hash, action_to_return.as_hash().clone().into());
         Ok(vec![WireOps::Record(WireRecordOps {
             action: Some(Judged::new(
-                create_action_signed_hashed.clone().into(),
+                action_to_return.clone().into(),
                 ValidationStatus::Valid,
             )),
             deletes: vec![],
@@ -233,7 +234,11 @@ async fn validation_callback_awaiting_deps_hashes() {
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![create_action.clone().to_hash().into()]);
 
     // await while missing record is being fetched in background task
-    tokio::time::sleep(Duration::from_millis(10)).await;
+    await_actions_in_cache(
+        &test_space.space.cache_db,
+        vec![create_action_signed_hashed.as_hash().clone()],
+    )
+    .await;
 
     // app validation outcome should be accepted, now that the missing record
     // has been fetched
@@ -291,6 +296,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         ribosome,
         alice,
         workspace,
+        test_space,
         ..
     } = TestCase::new(zomes).await;
 
@@ -332,6 +338,8 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     network.expect_must_get_agent_activity().returning({
         let times_same_hash_is_fetched = times_same_hash_is_fetched.clone();
         let expected_chain_top = expected_chain_top.clone();
+        let create_action_signed_hashed = create_action_signed_hashed.clone();
+        let delete_action_signed_hashed = delete_action_signed_hashed.clone();
         move |author, filter| {
             assert_eq!(author, alice);
             assert_eq!(&filter.chain_top, expected_chain_top.as_hash());
@@ -369,7 +377,14 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![expected_chain_top.hashed.author().clone().into()]);
 
     // await while bob's chain is being fetched in background task
-    tokio::time::sleep(Duration::from_millis(10)).await;
+    await_actions_in_cache(
+        &test_space.space.cache_db,
+        vec![
+            create_action_signed_hashed.as_hash().clone(),
+            delete_action_signed_hashed.as_hash().clone(),
+        ],
+    )
+    .await;
 
     // app validation outcome should be accepted, now that bob's missing agent
     // activity is available in alice's cache
@@ -422,7 +437,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
         alice,
         bob,
         workspace,
-        ..
+        test_space,
     } = TestCase::new(zomes).await;
 
     // a create by alice
@@ -446,7 +461,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
-    let action_to_be_fetched = create_action_signed_hashed;
+    let action_to_be_fetched = create_action_signed_hashed.clone();
     let times_same_hash_is_fetched = Arc::new(AtomicI8::new(0));
 
     // mock network that returns the requested create action and increments
@@ -456,7 +471,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
         let times_same_hash_is_fetched = times_same_hash_is_fetched.clone();
         move |hash, _| {
             if hash == action_to_be_fetched.as_hash().clone().into() {
-                times_same_hash_is_fetched.fetch_add(1, Ordering::Relaxed);
+                times_same_hash_is_fetched.fetch_add(1, Ordering::SeqCst);
             };
             Ok(vec![WireOps::Record(WireRecordOps {
                 action: Some(Judged::new(
@@ -493,9 +508,13 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
     futures::future::join_all([validate_1, validate_2]).await;
 
     // await while missing records are being fetched in background task
-    tokio::time::sleep(Duration::from_millis(10)).await;
+    await_actions_in_cache(
+        &test_space.space.cache_db,
+        vec![create_action_signed_hashed.as_hash().clone()],
+    )
+    .await;
 
-    assert_eq!(times_same_hash_is_fetched.load(Ordering::Relaxed), 1);
+    assert_eq!(times_same_hash_is_fetched.load(Ordering::SeqCst), 1);
     // after successfully fetching dependencies, the set should be empty
     assert_eq!(validation_dependencies.lock().missing_hashes.len(), 0);
 }
@@ -540,6 +559,7 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
         ribosome,
         alice,
         workspace,
+        test_space,
         ..
     } = TestCase::new(zomes).await;
 
@@ -581,6 +601,8 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     network.expect_must_get_agent_activity().returning({
         let times_same_hash_is_fetched = times_same_hash_is_fetched.clone();
         let expected_chain_top = expected_chain_top.clone();
+        let create_action_signed_hashed = create_action_signed_hashed.clone();
+        let delete_action_signed_hashed = delete_action_signed_hashed.clone();
         move |author, filter| {
             assert_eq!(author, alice);
             assert_eq!(&filter.chain_top, expected_chain_top.as_hash());
@@ -624,7 +646,14 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     futures::future::join_all([validate_1, validate_2]).await;
 
     // await while missing records are being fetched in background task
-    tokio::time::sleep(Duration::from_millis(20)).await;
+    await_actions_in_cache(
+        &test_space.space.cache_db,
+        vec![
+            create_action_signed_hashed.as_hash().clone(),
+            delete_action_signed_hashed.as_hash().clone(),
+        ],
+    )
+    .await;
 
     assert_eq!(times_same_hash_is_fetched.load(Ordering::Relaxed), 1);
     // after successfully fetching dependencies, the set should be empty
@@ -759,9 +788,9 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     assert_eq!(filtered_ops_to_validate, vec![]);
 
     // wait for missing create record being fetched by background task
-    await_action_in_cache(
+    await_actions_in_cache(
         &test_space.space.cache_db,
-        create_action_signed_hashed.as_hash(),
+        vec![create_action_signed_hashed.as_hash().clone()],
     )
     .await;
 
@@ -846,17 +875,21 @@ impl TestCase {
     }
 }
 
-async fn await_action_in_cache(cache_db: &DbWrite<DbKindCache>, hash: &ActionHash) {
+// wait for provided actions to arrive in cache db
+async fn await_actions_in_cache(cache_db: &DbWrite<DbKindCache>, hashes: Vec<ActionHash>) {
+    let hashes = Arc::new(hashes.clone());
     loop {
-        let hash = hash.clone();
-        let result = cache_db.test_read(move |txn| {
-            txn.query_row(
-                "SELECT hash FROM Action WHERE hash = :hash",
-                named_params! {":hash": hash},
-                |row| Ok(row.get::<_, ActionHash>(0)),
-            )
+        let hashes = hashes.clone();
+        let all_actions_in_cache = cache_db.test_read(move |txn| {
+            let mut stmt = txn.prepare("SELECT hash FROM Action").unwrap();
+            let rows = stmt.query([]).unwrap();
+            let action_hashes_in_cache: Vec<ActionHash> =
+                rows.map(|row| row.get(0)).collect().unwrap();
+            hashes
+                .iter()
+                .all(|hash| action_hashes_in_cache.contains(hash))
         });
-        if result.is_ok() {
+        if all_actions_in_cache {
             return;
         }
         tokio::time::sleep(Duration::from_millis(5)).await;
