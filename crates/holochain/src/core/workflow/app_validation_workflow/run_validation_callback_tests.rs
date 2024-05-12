@@ -498,6 +498,24 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
         validation_dependencies.clone(),
     )
     .await;
+
+    // Await while missing records are being fetched in background task.
+    // This is sort of cheating, because it is part of what this test is supposed to ascertain. However, tests
+    // have shown that it is possible that an identical hash is fetched due to unfortunate timing:
+    // - Validate 1 fails due to missing hash, which is added to the validation dependencies and then fetched but
+    // not awaited.
+    // - Validate 2 fails as well, because the missing hash had not made it into the cache yet, but at the time of
+    // determining missing hashes to fetch, it was added to the cache and removed from validation dependencies.
+    // - With this specific sequence of events, the missing hash will be fetched again, despite being present in
+    // the cache.
+    // In real networks this should happen negligibly seldom, as network fetches will sufficiently delay a fetched
+    // missing hash from being removed from validation dependencies.
+    await_actions_in_cache(
+        &test_space.space.cache_db,
+        vec![create_action_signed_hashed.as_hash().clone()],
+    )
+    .await;
+
     let _validate_2 = run_validation_callback(
         invocation,
         &delete_dht_op_hash,
@@ -505,13 +523,6 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
         workspace,
         network,
         validation_dependencies.clone(),
-    )
-    .await;
-
-    // await while missing records are being fetched in background task
-    await_actions_in_cache(
-        &test_space.space.cache_db,
-        vec![create_action_signed_hashed.as_hash().clone()],
     )
     .await;
 
