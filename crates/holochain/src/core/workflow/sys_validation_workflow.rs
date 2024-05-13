@@ -760,7 +760,7 @@ async fn validate_warrant_op(
                     }
 
                     // A fork is evidenced by two actions with a common predecessor.
-                    // TODO: we could also check sequence numbers, but then we'd have to traverse
+                    // NOTE: we could also check sequence numbers, but then we'd have to traverse
                     // both forks backwards until reaching a common ancestor to protect against an
                     // attack where someone authors a warrant using two actions from two different DNAs.
                     // Using seq numbers makes it easier to detect and prove a fork, but using prev_action
