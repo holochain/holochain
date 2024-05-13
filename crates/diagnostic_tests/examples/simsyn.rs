@@ -60,7 +60,7 @@ impl App {
         let signal_rxs = conductors
             .iter_mut()
             .map(|c| c.subscribe_to_app_signals("basic".to_string()))
-            .map(|rx| tokio_stream::wrappers::BroadcastStream::new(rx))
+            .map(tokio_stream::wrappers::BroadcastStream::new)
             .collect::<Vec<_>>();
         let nodes = std::iter::zip(conductors.into_iter().map(Arc::new), zomes.into_iter())
             .map(|(conductor, zome)| Node { conductor, zome })

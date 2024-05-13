@@ -80,7 +80,7 @@ async fn bloom_windows() {
     match r {
         Batch::Complete(v) => {
             assert_eq!(v.len(), 2);
-            let r = v.get(0).unwrap();
+            let r = v.first().unwrap();
             let TimedBloomFilter { bloom, time } = r;
             assert!(bloom.is_some());
             assert_eq!(
@@ -175,7 +175,7 @@ async fn bloom_windows() {
     match r {
         Batch::Complete(v) => {
             assert_eq!(v.len(), 1);
-            let r = v.get(0).unwrap();
+            let r = v.first().unwrap();
             let TimedBloomFilter { bloom, time } = r;
             assert!(bloom.is_some());
             assert_eq!(*time, last_cursor..search_window.end);

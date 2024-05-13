@@ -139,7 +139,7 @@ impl Consumer {
             // dump_tmp(prod.env());
         }
         self.last = num;
-        dbg!(start.elapsed());
+        start.elapsed();
         self.tx.send(num).await.unwrap();
     }
 }
