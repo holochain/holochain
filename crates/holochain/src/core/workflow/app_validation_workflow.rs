@@ -96,6 +96,7 @@
 
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
+
 use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::Conductor;
 use crate::conductor::ConductorHandle;
@@ -110,7 +111,11 @@ use crate::core::validation::OutcomeOrError;
 use crate::core::SysValidationError;
 use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
+
 pub use error::*;
+pub use types::Outcome;
+pub use validation_dependencies::ValidationDependencies;
+
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
@@ -122,17 +127,17 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
+
 use parking_lot::Mutex;
 use rusqlite::Transaction;
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
-use std::time::Instant;
 use tracing::*;
-pub use types::Outcome;
+
+mod validation_dependencies;
 
 #[cfg(todo_redo_old_tests)]
 mod network_call_tests;
@@ -147,9 +152,6 @@ mod get_zomes_to_invoke_tests;
 
 #[cfg(test)]
 mod run_validation_callback_tests;
-
-#[cfg(test)]
-mod unit_tests;
 
 mod error;
 mod types;
@@ -189,7 +191,7 @@ pub async fn app_validation_workflow(
 
     Ok(
         // If not all ops have been validated
-        // and fetching missing hashes has not passed expiration,
+        // and fetching missing hashes has not timed out,
         // trigger app validation workflow again.
         if outcome_summary.validated < outcome_summary.ops_to_validate
             && !validation_dependencies
@@ -225,7 +227,7 @@ async fn app_validation_workflow_inner(
     );
     tracing::trace!(
         "missing hashes: {:?}",
-        validation_dependencies.lock().hashes_missing_for_op
+        validation_dependencies.lock().missing_hashes
     );
     let sleuth_id = conductor.config.sleuth_id();
 
@@ -288,10 +290,7 @@ async fn app_validation_workflow_inner(
                     }
                 }
                 if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
-                    warn!(
-                        msg = "DhtOp has failed app validation",
-                        outcome = ?outcome,
-                    );
+                    warn!(?outcome, ?dht_op_lite, "DhtOp has failed app validation");
                 }
 
                 let accepted_ops = accepted_ops.clone();
@@ -756,58 +755,40 @@ async fn run_validation_callback(
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(hashes)) => {
+            tracing::debug!(
+                ?hashes,
+                "Op validation returned unresolved dependencies -  AgentActivity"
+            );
             // fetch all missing hashes in the background without awaiting them
             let cascade_workspace = workspace.clone();
             let cascade =
                 CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
 
-            // add hashes missing to validate an op to hash map
-            hashes.iter().for_each(|hash| {
-                validation_dependencies
-                    .lock()
-                    .insert_hash_missing_for_op(dht_op_hash.clone(), hash.clone());
-            });
+            // keep track of which dependencies are being fetched for which dht op and to
+            // prevent multiple fetches of the same hash
+            let new_hashes_to_fetch = validation_dependencies
+                .lock()
+                .insert_missing_hashes_for_op(hashes.clone(), dht_op_hash.clone());
 
-            // build a collection of futures to fetch the individual missing
-            // hashes
-            let validation_deps = validation_dependencies.clone();
-            let dht_op_hash = dht_op_hash.clone();
-            let fetches = hashes
-                .clone()
-                .into_iter()
-                .filter(move |hash| {
-                    // keep track of which dependencies are being fetched to
-                    // prevent multiple fetches of the same hash
-                    let is_new_dependency = validation_deps
-                        .lock()
-                        .insert_missing_hash(hash.clone())
-                        .is_none();
-                    is_new_dependency
-                })
-                .map(move |hash| {
-                    let cascade = cascade.clone();
-                    let validation_dependencies = validation_dependencies.clone();
-                    let dht_op_hash = dht_op_hash.clone();
-                    async move {
-                        let result = cascade
-                            .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
-                            .await;
-                        if let Err(err) = result {
-                            tracing::warn!("error fetching dependent hash {hash:?}: {err}");
-                        }
-                        // Dependency has been fetched and added to the cache
-                        // or an error occurred along the way.
-                        // In case of an error the hash is still removed from
-                        // the collection so that it will be tried again to be
-                        // fetched in the subsequent workflow run.
-                        validation_dependencies.lock().remove_missing_hash(&hash);
-                        // Secondly remove the just fetched hash from the set
-                        // of missing hashes for the op
-                        validation_dependencies
-                            .lock()
-                            .remove_hash_missing_for_op(dht_op_hash, &hash);
+            // build a collection of futures to fetch the missing hashes
+            let fetches = new_hashes_to_fetch.into_iter().map(move |hash| {
+                let cascade = cascade.clone();
+                let validation_dependencies = validation_dependencies.clone();
+                async move {
+                    let result = cascade
+                        .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
+                        .await;
+                    if let Err(err) = result {
+                        tracing::warn!("error fetching dependent hash {hash:?}: {err}");
                     }
-                });
+                    // Dependency has been fetched and added to the cache
+                    // or an error occurred along the way.
+                    // In case of an error the hash is still removed from
+                    // the collection so that it will be tried again to be
+                    // fetched in the subsequent workflow run.
+                    validation_dependencies.lock().remove_missing_hash(&hash);
+                }
+            });
             // await all fetches in a separate task in the background
             tokio::spawn(async { futures::future::join_all(fetches).await });
             Ok(Outcome::AwaitingDeps(hashes))
@@ -816,6 +797,11 @@ async fn run_validation_callback(
             author,
             filter,
         )) => {
+            tracing::debug!(
+                ?author,
+                ?filter,
+                "Op validation returned unresolved dependencies -  AgentActivity"
+            );
             // fetch missing agent activities in the background without awaiting them
             let cascade_workspace = workspace.clone();
             let author = author.clone();
@@ -827,8 +813,7 @@ async fn run_validation_callback(
             let validation_dependencies = validation_dependencies.clone();
             let is_new_dependency = validation_dependencies
                 .lock()
-                .insert_missing_hash(author.clone().into())
-                .is_none();
+                .insert_missing_hash_for_op(author.clone().into(), dht_op_hash.clone());
             // fetch dependency if it is not being fetched yet
             if is_new_dependency {
                 tokio::spawn({
@@ -886,82 +871,6 @@ impl OutcomeSummary {
 impl Default for OutcomeSummary {
     fn default() -> Self {
         OutcomeSummary::new()
-    }
-}
-
-/// Dependencies required for app validating an op.
-pub struct ValidationDependencies {
-    /// Missing hashes that are being fetched, along with
-    /// the last Instant a fetch was attempted
-    missing_hashes: HashMap<AnyDhtHash, Instant>,
-    /// Dependencies that are missing to app validate an op.
-    hashes_missing_for_op: HashMap<DhtOpHash, HashSet<AnyDhtHash>>,
-}
-
-impl Default for ValidationDependencies {
-    fn default() -> Self {
-        ValidationDependencies::new()
-    }
-}
-
-impl ValidationDependencies {
-    const FETCH_TIMEOUT: Duration = Duration::from_secs(60);
-
-    pub fn new() -> Self {
-        Self {
-            missing_hashes: HashMap::new(),
-            hashes_missing_for_op: HashMap::new(),
-        }
-    }
-
-    pub fn insert_missing_hash(&mut self, hash: AnyDhtHash) -> Option<Instant> {
-        self.missing_hashes.insert(hash, Instant::now())
-    }
-
-    pub fn remove_missing_hash(&mut self, hash: &AnyDhtHash) {
-        self.missing_hashes.remove(hash);
-    }
-
-    pub fn fetch_missing_hashes_timed_out(&self) -> bool {
-        self.missing_hashes
-            .iter()
-            .all(|(_, instant)| instant.elapsed() > Self::FETCH_TIMEOUT)
-    }
-
-    pub fn insert_hash_missing_for_op(&mut self, dht_op_hash: DhtOpHash, hash: AnyDhtHash) {
-        self.hashes_missing_for_op
-            .entry(dht_op_hash)
-            .and_modify(|hashes| {
-                hashes.insert(hash.clone());
-            })
-            .or_insert_with(|| {
-                let mut set = HashSet::new();
-                set.insert(hash.clone());
-                set
-            });
-    }
-
-    pub fn remove_hash_missing_for_op(&mut self, dht_op_hash: DhtOpHash, hash: &AnyDhtHash) {
-        self.hashes_missing_for_op
-            .entry(dht_op_hash.clone())
-            .and_modify(|hashes| {
-                hashes.remove(hash);
-            });
-
-        // if there are no hashes left for this dht op hash,
-        // remove the entry
-        if let Some(hashes) = self.hashes_missing_for_op.get(&dht_op_hash) {
-            if hashes.is_empty() {
-                self.hashes_missing_for_op.remove(&dht_op_hash);
-            }
-        }
-    }
-
-    // filter out ops that have missing dependencies
-    pub fn filter_ops_missing_dependencies(&self, ops: Vec<DhtOpHashed>) -> Vec<DhtOpHashed> {
-        ops.into_iter()
-            .filter(|op| !self.hashes_missing_for_op.contains_key(op.as_hash()))
-            .collect()
     }
 }
 

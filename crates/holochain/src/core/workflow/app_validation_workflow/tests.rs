@@ -15,6 +15,7 @@ use hdk::hdi::test_utils::set_zome_types;
 use hdk::prelude::*;
 use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, EntryHash};
 use holochain_conductor_api::conductor::paths::DataRootPath;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations::insert_op;
@@ -500,6 +501,52 @@ async fn validate_ops_in_sequence_must_get_action() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn multi_create_link_validation() {
+    holochain_trace::test_run();
+
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    pub struct Post(String);
+    holochain_serial!(Post);
+    app_entry!(Post);
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AppValidation]).await;
+
+    let mut conductors = SweetConductorBatch::from_config(2, ConductorConfig::default()).await;
+    let apps = conductors.setup_app("posts_test", &[dna]).await.unwrap();
+    conductors.exchange_peer_info().await;
+
+    let ((alice,), (bobbo,)) = apps.into_tuples();
+
+    let alice_zome = alice.zome(TestWasm::AppValidation.coordinator_zome_name());
+    let bob_zome = bobbo.zome(TestWasm::AppValidation.coordinator_zome_name());
+
+    let post = Post("test_the_validation".to_string());
+
+    // Alice creates posts to trigger link validations
+    let _: Record = conductors[0]
+        .call(&alice_zome, "create_post", post.clone())
+        .await;
+    let _: Record = conductors[0]
+        .call(&alice_zome, "create_post", post.clone())
+        .await;
+    let record: Record = conductors[0]
+        .call(&alice_zome, "create_post", post.clone())
+        .await;
+
+    await_consistency(Duration::from_secs(60), [&alice, &bobbo])
+        .await
+        .expect("Timed out waiting for consistency");
+
+    let links: Vec<Link> = conductors[1].call(&bob_zome, "get_all_posts", ()).await;
+
+    assert_eq!(links.len(), 3);
+    assert_eq!(
+        links[2].target.clone().into_action_hash().unwrap(),
+        record.signed_action.hashed.hash
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_error_in_op_validation() {
     holochain_trace::test_run();
 
@@ -706,14 +753,12 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
             let visibility = EntryVisibility::from(&input);
             assert_eq!(visibility, EntryVisibility::Private);
             let entry = input.try_into().unwrap();
-            dbg!();
             h.create(CreateInput::new(
                 location.clone(),
                 visibility,
                 entry,
                 ChainTopOrdering::default(),
             ))?;
-            dbg!();
             h.create(CreateInput::new(
                 EntryDefLocation::CapClaim,
                 visibility,
