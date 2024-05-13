@@ -554,10 +554,12 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
 ) -> ConsistencyResult {
     fn display_op(op: &DhtOp) -> String {
         match op {
-            DhtOp::ChainOp(op) => format!(
-                "{} {:>3}  {} ({})",
+            DhtOp::ChainOp(op) =>         format!(
+                "{} {:>3} {} {} {} ({})",
                 op.action().author(),
                 op.action().action_seq(),
+                op.to_hash(),
+                op.action().to_hash(),
                 op.get_type(),
                 op.action().action_type(),
             ),
@@ -565,7 +567,10 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         }
     }
 
-    let header = format!("{:54} {:>3}  {}", "author", "seq", "op_type (action_type)",);
+    let header = format!(
+        "{:53} {:>3} {:53} {:53} {}",
+        "author", "seq", "op_hash", "action_hash", "op_type (action_type)",
+    );
     let start = tokio::time::Instant::now();
 
     let num_published = published.len();

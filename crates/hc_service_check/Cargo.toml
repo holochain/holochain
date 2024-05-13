@@ -1,7 +1,7 @@
 [package]
 name = "hc_service_check"
 description = "A tool for checking the health of tx5 network services"
-version = "0.1.0-dev.0"
+version = "0.1.0-dev.1"
 edition = "2021"
 license = "Apache-2.0"
 
@@ -9,7 +9,7 @@ license = "Apache-2.0"
 [dependencies]
 clap = { version = "4.5.3", features = ["derive", "wrap_help"] }
 tokio = { version = "1.36.0", features = ["full"] }
-kitsune_p2p_bootstrap_client = { version = "^0.4.0-dev.1", path = "../kitsune_p2p/bootstrap_client" }
+kitsune_p2p_bootstrap_client = { version = "^0.4.0-dev.2", path = "../kitsune_p2p/bootstrap_client" }
 tx5-go-pion = { version = "0.0.9-alpha" }
 tx5-signal = { version = "0.0.9-alpha" }
 url2 = "0.0.6"
