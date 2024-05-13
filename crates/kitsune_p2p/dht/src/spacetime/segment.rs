@@ -274,7 +274,12 @@ mod tests {
     #[test]
     fn simple_wrapping_space_bounds() {
         let dim = SpaceDimension::standard();
-        let (lower, upper) = space_bounds::<u32>(dim.into(), 0, 5.into(), pow2(32 - dim.quantum_power) - 5 + 1);
+        let (lower, upper) = space_bounds::<u32>(
+            dim.into(),
+            0,
+            5.into(),
+            pow2(32 - dim.quantum_power) - 5 + 1,
+        );
 
         assert!(upper < lower, "lower: {lower}, upper: {upper}");
 
@@ -301,7 +306,7 @@ mod tests {
         let (lower, upper) = time_bounds64::<i64>(dim.into(), 0, 5.into(), 2);
 
         assert_eq!(lower, dim.quantum as i64 * 5);
-        assert_eq!(upper, dim.quantum as i64 * 5 + dim.quantum as i64  * 2 - 1);
+        assert_eq!(upper, dim.quantum as i64 * 5 + dim.quantum as i64 * 2 - 1);
     }
 
     #[test]
