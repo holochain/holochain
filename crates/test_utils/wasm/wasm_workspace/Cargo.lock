@@ -2337,6 +2337,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_app_validation"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "hdk",
+ "holochain_test_wasm_common",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_bench"
 version = "0.0.1"
 dependencies = [
