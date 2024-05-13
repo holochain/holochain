@@ -154,8 +154,8 @@ async fn publish_to_basis_from_inside() {
             }
         }
     })
-        .await
-        .unwrap();
+    .await
+    .unwrap();
 
     assert_eq!(1, agents[should_recv_idx].0.op_store().read().len());
 
@@ -167,10 +167,14 @@ async fn publish_to_basis_from_inside() {
         // We've filtered out the sender and the receiver, who are expected to have the data.
         // Now we check that the agent at the current index does not have the basis that the op was
         // published to in its arc. That would make the test wrong, not Kitsune, so fail here!
-        let should_this_agent_hold_the_op = should_agent_hold_op_at_basis(&agents[i].0, agents[i].2.clone(), basis.clone());
+        let should_this_agent_hold_the_op =
+            should_agent_hold_op_at_basis(&agents[i].0, agents[i].2.clone(), basis.clone());
 
         // If this assertion fails, it means that the agent at index `i` has the basis in its arc which is not intended by the test setup.
-        assert!(!should_this_agent_hold_the_op, "Agent {i} should receive the data, this is a setup issue with the test");
+        assert!(
+            !should_this_agent_hold_the_op,
+            "Agent {i} should receive the data, this is a setup issue with the test"
+        );
 
         // Now make the important assertion that the agent at index `i` did not receive the data! If it's not in the agents arc
         // (which we just asserted above) then it should not have been received.
@@ -349,10 +353,14 @@ async fn publish_to_basis_from_outside() {
         // We've filtered out the sender and the receivers, who are expected to have the data.
         // Now we check that the agent at the current index does not have the basis that the op was
         // published to in its arc. That would make the test wrong, not Kitsune.
-        let should_this_agent_hold_the_op = should_agent_hold_op_at_basis(&agents[i].0, agents[i].2.clone(), basis.clone());
+        let should_this_agent_hold_the_op =
+            should_agent_hold_op_at_basis(&agents[i].0, agents[i].2.clone(), basis.clone());
 
         // If this assertion fails, it means that the agent at index `i` has the basis in its arc which is not intended by the test setup.
-        assert!(!should_this_agent_hold_the_op, "Agent {i} should receive the data, this is a setup issue with the test");
+        assert!(
+            !should_this_agent_hold_the_op,
+            "Agent {i} should receive the data, this is a setup issue with the test"
+        );
 
         // Now make the important assertion that the agent at index `i` did not receive the data! If it's not in the agents arc
         // (which we just asserted above) then it should not have been received.
@@ -375,7 +383,10 @@ fn should_agent_hold_op_at_basis(
     // Find the agent info for the given agent
     let agent_store = kitsune_test_harness.agent_store();
     let agent_store_lock = agent_store.read();
-    let agent_info = agent_store_lock.iter().find(|info| info.agent == agent).unwrap();
+    let agent_info = agent_store_lock
+        .iter()
+        .find(|info| info.agent == agent)
+        .unwrap();
 
     // Get the DHT arc that the agent is currently declaring it holds
     let range = agent_info.storage_arq.to_dht_arc_range_std();
