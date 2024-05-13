@@ -80,7 +80,13 @@ impl SignEphemeral {
     }
 }
 
-/// Some data with a signature attached
+/// Some data with a signature attached.
+///
+/// Note that this is not a desirable pattern, because we sign serialized data,
+/// and associating the signature with the unserialized data means that if the
+/// serialization changes at all, the signature will no longer be valid.
+/// We should structure our flows to only handle signatures in the context of
+/// serialized data, and this kind of type should reflect that.
 #[derive(
     Clone,
     Debug,
