@@ -153,8 +153,7 @@ pub trait CellConductorApiT: Send + Sync {
     /// Get a [`Zome`](holochain_types::prelude::Zome) from this cell's Dna
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 
-    /// Get a [`EntryDef`](holochain_integrity_types::prelude::EntryDef) from the
-    /// [`EntryDefBufferKey`](holochain_types::dna::ribosome_store::EntryDefBufferKey)
+    /// Get a [`EntryDef`] from the [`EntryDefBufferKey`]
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Turn this into a call zome handle
@@ -182,8 +181,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Get a zome from this cell's Dna
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 
-    /// Get a [`EntryDef`](holochain_integrity_types::prelude::EntryDef) from the
-    /// [`EntryDefBufferKey`](holochain_types::dna::ribosome_store::EntryDefBufferKey)
+    /// Get a [`EntryDef`] from the [`EntryDefBufferKey`]
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Try to put the nonce from a calling agent in the db. Fails with a stale result if a newer nonce exists.

@@ -58,6 +58,7 @@ pub use crate::time::sleep;
 pub use crate::time::sys_time;
 
 pub use crate::clone::*;
+pub use crate::migrate::*;
 pub use crate::x_salsa20_poly1305::create_x25519_keypair;
 pub use crate::x_salsa20_poly1305::ed_25519_x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::ed_25519_x_salsa20_poly1305_encrypt;
@@ -172,7 +173,9 @@ macro_rules! holochain_externs {
             create_clone_cell:1,
             disable_clone_cell:1,
             enable_clone_cell:1,
-            delete_clone_cell:1
+            delete_clone_cell:1,
+            close_chain:1,
+            open_chain:1
         );
     };
 }

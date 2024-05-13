@@ -352,20 +352,20 @@ pub mod wasm_test {
         let entry: Entry = (&Post("foo".into())).try_into().unwrap();
         let entry_hash = EntryHash::with_data_sync(&entry);
         assert_eq!(
-            "uhCEkBh-9u8jkmvhguGWPKQLm-9jhoOg_JJyRC6qwEWW4B0IRPjyr",
+            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
             &entry_hash.to_string()
         );
         let sb: SerializedBytes = entry_hash.try_into().unwrap();
         let entry_hash: EntryHash = sb.try_into().unwrap();
         assert_eq!(
-            "uhCEkBh-9u8jkmvhguGWPKQLm-9jhoOg_JJyRC6qwEWW4B0IRPjyr",
+            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
             &entry_hash.to_string()
         );
 
         // Now I can convert to AnyDhtHash
         let any_hash: AnyDhtHash = entry_hash.clone().into();
         assert_eq!(
-            "uhCEkBh-9u8jkmvhguGWPKQLm-9jhoOg_JJyRC6qwEWW4B0IRPjyr",
+            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
             &entry_hash.to_string()
         );
 
@@ -374,14 +374,14 @@ pub mod wasm_test {
         tracing::debug!(any_sb = ?sb);
         let any_hash: AnyDhtHash = sb.try_into().unwrap();
         assert_eq!(
-            "uhCEkBh-9u8jkmvhguGWPKQLm-9jhoOg_JJyRC6qwEWW4B0IRPjyr",
+            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
             &any_hash.to_string()
         );
 
         // Converting directly works
         let any_hash: AnyDhtHash = entry_hash.clone().try_into().unwrap();
         assert_eq!(
-            "uhCEkBh-9u8jkmvhguGWPKQLm-9jhoOg_JJyRC6qwEWW4B0IRPjyr",
+            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
             &any_hash.to_string()
         );
     }

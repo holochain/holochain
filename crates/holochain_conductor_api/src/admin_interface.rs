@@ -367,6 +367,13 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::AppAuthenticationTokenIssued`]
     IssueAppAuthenticationToken(IssueAppAuthenticationTokenPayload),
+
+    /// Revoke an issued app authentication token.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::AppAuthenticationTokenRevoked`]
+    RevokeAppAuthenticationToken(AppAuthenticationToken),
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -511,6 +518,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::IssueAppAuthenticationToken`].
     AppAuthenticationTokenIssued(AppAuthenticationTokenIssued),
+
+    /// The successful response to an [`AdminRequest::RevokeAppAuthenticationToken`].
+    AppAuthenticationTokenRevoked,
 }
 
 /// Error type that goes over the websocket wire.
@@ -580,7 +590,7 @@ pub struct IssueAppAuthenticationTokenPayload {
     /// token will no longer be accepted by the conductor.
     ///
     /// This is 30s by default which is reasonably high but with [IssueAppAuthenticationTokenPayload::single_use]
-    /// set to `false`, the token will be invalidated after the first use anyway.
+    /// set to `true`, the token will be invalidated after the first use anyway.
     ///
     /// Set this to 0 to create a token that does not expire.
     #[serde(default = "default_expiry_seconds")]
@@ -673,14 +683,13 @@ mod tests {
         assert_eq!(
             serialized_request,
             vec![
-                130, 164, 116, 121, 112, 101, 129, 171, 100, 105, 115, 97, 98, 108, 101, 95, 97,
-                112, 112, 192, 164, 100, 97, 116, 97, 129, 176, 105, 110, 115, 116, 97, 108, 108,
-                101, 100, 95, 97, 112, 112, 95, 105, 100, 167, 115, 111, 109, 101, 95, 105, 100
+                130, 164, 116, 121, 112, 101, 171, 100, 105, 115, 97, 98, 108, 101, 95, 97, 112,
+                112, 164, 100, 97, 116, 97, 129, 176, 105, 110, 115, 116, 97, 108, 108, 101, 100,
+                95, 97, 112, 112, 95, 105, 100, 167, 115, 111, 109, 101, 95, 105, 100
             ]
         );
 
-        let json_expected =
-            r#"{"type":{"disable_app":null},"data":{"installed_app_id":"some_id"}}"#;
+        let json_expected = r#"{"type":"disable_app","data":{"installed_app_id":"some_id"}}"#;
         let mut deserializer = Deserializer::new(&*serialized_request);
         let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
         let json_actual = serde_json::to_string(&json_value).unwrap();
@@ -695,14 +704,15 @@ mod tests {
         assert_eq!(
             serialized_response,
             vec![
-                130, 164, 116, 121, 112, 101, 129, 165, 101, 114, 114, 111, 114, 192, 164, 100, 97,
-                116, 97, 130, 164, 116, 121, 112, 101, 129, 174, 114, 105, 98, 111, 115, 111, 109,
-                101, 95, 101, 114, 114, 111, 114, 192, 164, 100, 97, 116, 97, 170, 101, 114, 114,
-                111, 114, 95, 116, 101, 120, 116
+                130, 164, 116, 121, 112, 101, 165, 101, 114, 114, 111, 114, 164, 100, 97, 116, 97,
+                130, 164, 116, 121, 112, 101, 174, 114, 105, 98, 111, 115, 111, 109, 101, 95, 101,
+                114, 114, 111, 114, 164, 100, 97, 116, 97, 170, 101, 114, 114, 111, 114, 95, 116,
+                101, 120, 116
             ]
         );
 
-        let json_expected = r#"{"type":{"error":null},"data":{"type":{"ribosome_error":null},"data":"error_text"}}"#;
+        let json_expected =
+            r#"{"type":"error","data":{"type":"ribosome_error","data":"error_text"}}"#;
         let mut deserializer = Deserializer::new(&*serialized_response);
         let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
         let json_actual = serde_json::to_string(&json_value).unwrap();

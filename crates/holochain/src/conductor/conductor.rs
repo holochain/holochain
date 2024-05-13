@@ -4,7 +4,7 @@
 //! A Conductor is a dynamically changing group of [Cell]s.
 //!
 //! A Conductor can be managed:
-//! - externally, via an [`AppInterfaceApi`](super::api::AppInterfaceApi)
+//! - externally, via an [`AppInterfaceApi`]
 //! - from within a [`Cell`], via [`CellConductorApi`](super::api::CellConductorApi)
 //!
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
@@ -569,7 +569,7 @@ mod dna_impls {
             self.ribosome_store().share_ref(|ds| ds.get_dna_file(hash))
         }
 
-        /// Get an [`EntryDef`](holochain_integrity_types::prelude::EntryDef) from the [`EntryDefBufferKey`]
+        /// Get an [`EntryDef`] from the [`EntryDefBufferKey`]
         pub fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
             self.ribosome_store().share_ref(|ds| ds.get_entry_def(key))
         }
@@ -2599,7 +2599,7 @@ mod accessor_impls {
 mod authenticate_token_impls {
     use super::*;
     use holochain_conductor_api::{
-        AppAuthenticationTokenIssued, IssueAppAuthenticationTokenPayload,
+        AppAuthenticationToken, AppAuthenticationTokenIssued, IssueAppAuthenticationTokenPayload,
     };
 
     impl Conductor {
@@ -2622,6 +2622,17 @@ mod authenticate_token_impls {
                     .and_then(|i| i.duration_since(std::time::UNIX_EPOCH).ok())
                     .map(|d| Timestamp::saturating_from_dur(&d)),
             })
+        }
+
+        /// Revoke an app interface authentication token.
+        pub fn revoke_app_authentication_token(
+            &self,
+            token: AppAuthenticationToken,
+        ) -> ConductorResult<()> {
+            self.app_auth_token_store
+                .share_mut(|app_connection_auth| app_connection_auth.revoke_token(token));
+
+            Ok(())
         }
 
         /// Authenticate the app interface authentication `token`, optionally requiring the token to

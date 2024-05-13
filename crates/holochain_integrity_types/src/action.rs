@@ -46,8 +46,8 @@ pub enum Action {
     InitZomesComplete(InitZomesComplete),
     CreateLink(CreateLink),
     DeleteLink(DeleteLink),
-    OpenChain(OpenChain),
     CloseChain(CloseChain),
+    OpenChain(OpenChain),
     Create(Create),
     Update(Update),
     Delete(Delete),
@@ -539,23 +539,7 @@ pub struct DeleteLink {
 }
 
 /// When migrating to a new version of a DNA, this action is committed to the
-/// new chain to declare the migration path taken. **Currently unused**
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
-pub struct OpenChain {
-    pub author: AgentPubKey,
-    pub timestamp: Timestamp,
-    pub action_seq: u32,
-    pub prev_action: ActionHash,
-
-    pub prev_dna_hash: DnaHash,
-}
-
-/// When migrating to a new version of a DNA, this action is committed to the
-/// old chain to declare the migration path taken. **Currently unused**
+/// old chain to declare the migration path taken.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(
     feature = "fuzzing",
@@ -568,6 +552,22 @@ pub struct CloseChain {
     pub prev_action: ActionHash,
 
     pub new_dna_hash: DnaHash,
+}
+
+/// When migrating to a new version of a DNA, this action is committed to the
+/// new chain to declare the migration path taken.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
+pub struct OpenChain {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub action_seq: u32,
+    pub prev_action: ActionHash,
+
+    pub prev_dna_hash: DnaHash,
 }
 
 /// An action which "speaks" Entry content into being. The same content can be

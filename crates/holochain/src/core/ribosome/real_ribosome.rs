@@ -101,7 +101,9 @@ use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
 
+use crate::core::ribosome::host_fn::close_chain::close_chain;
 use crate::core::ribosome::host_fn::count_links::count_links;
+use crate::core::ribosome::host_fn::open_chain::open_chain;
 use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
@@ -601,7 +603,9 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__create_clone_cell_1", create_clone_cell)
             .with_host_function(&mut ns, "__hc__disable_clone_cell_1", disable_clone_cell)
             .with_host_function(&mut ns, "__hc__enable_clone_cell_1", enable_clone_cell)
-            .with_host_function(&mut ns, "__hc__delete_clone_cell_1", delete_clone_cell);
+            .with_host_function(&mut ns, "__hc__delete_clone_cell_1", delete_clone_cell)
+            .with_host_function(&mut ns, "__hc__close_chain_1", close_chain)
+            .with_host_function(&mut ns, "__hc__open_chain_1", open_chain);
 
         imports.register_namespace("env", ns);
 
@@ -1254,6 +1258,7 @@ pub mod wasm_test {
                 "__hc__capability_claims_1",
                 "__hc__capability_grants_1",
                 "__hc__capability_info_1",
+                "__hc__close_chain_1",
                 "__hc__count_links_1",
                 "__hc__create_1",
                 "__hc__create_clone_cell_1",
@@ -1279,6 +1284,7 @@ pub mod wasm_test {
                 "__hc__must_get_agent_activity_1",
                 "__hc__must_get_entry_1",
                 "__hc__must_get_valid_record_1",
+                "__hc__open_chain_1",
                 "__hc__query_1",
                 "__hc__random_bytes_1",
                 "__hc__schedule_1",

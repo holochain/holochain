@@ -20,7 +20,8 @@ fn simple_bench(bench: &mut Criterion) {
 
     let runtime = rt();
 
-    let (listener_address, jh) = runtime.block_on(setup());
+    let (listener_addresses, jh) = runtime.block_on(setup());
+    let listener_address = listener_addresses.first().unwrap().clone();
     let (mut send, mut recv, cjh) = runtime.block_on(setup_client(listener_address));
 
     let mut group = bench.benchmark_group("simple_bench");
@@ -67,7 +68,7 @@ async fn client_response(recv: &mut tokio::sync::mpsc::Receiver<ReceiveMessage<T
     }
 }
 
-async fn setup() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
+async fn setup() -> (Vec<std::net::SocketAddr>, tokio::task::JoinHandle<()>) {
     // Create a new server listening for connections
     let listener = WebsocketListener::bind(
         std::sync::Arc::new(WebsocketConfig::LISTENER_DEFAULT),

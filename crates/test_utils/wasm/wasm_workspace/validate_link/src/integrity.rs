@@ -53,7 +53,6 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             let base: MaybeLinkable = must_get_entry(
                 create_link
                     .base_address
-                    .clone()
                     .into_entry_hash()
                     .expect("must be entry hash"),
             )?

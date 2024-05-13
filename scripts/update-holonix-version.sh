@@ -22,7 +22,7 @@ elif [ "$SEP_COUNT" == "2" ] && [[ "$VERSION_STR" =~ rc$ ]]; then
   SEARCH_PATTERN=$(echo "$VERSION_STR" | awk -F _ 'BEGIN { OFS="" } {print "^holochain-", $1, ".", $2, ".[0-9]+-rc.[0-9]+$"}')
 elif [ "$VERSION_STR" == "weekly" ]; then
   # Special case, weekly tracks the latest pre-release version
-  SEARCH_PATTERN="^holochain-[0-9]+.[0-9]+.[0-9]+-beta-dev.[0-9]+$"
+  SEARCH_PATTERN="^holochain-[0-9]+.[0-9]+.[0-9]+-dev.[0-9]+$"
 else
     echo "Invalid version format: $VERSION_STR"
     exit 1

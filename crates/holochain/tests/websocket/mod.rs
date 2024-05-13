@@ -18,10 +18,7 @@ use holochain::{
 use std::net::{Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 
 use either::Either;
-use holochain_conductor_api::{
-    AdminInterfaceConfig, AppAuthenticationRequest, AppAuthenticationToken, AppRequest,
-    InterfaceDriver, IssueAppAuthenticationTokenPayload,
-};
+use holochain_conductor_api::{AdminInterfaceConfig, AppRequest, InterfaceDriver};
 use holochain_types::websocket::AllowedOrigins;
 use holochain_types::{
     prelude::*,
@@ -900,124 +897,6 @@ async fn admin_allowed_origins() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn app_allowed_origins() {
-    holochain_trace::test_run();
-
-    let conductor = SweetConductor::from_standard_config().await;
-
-    let port = conductor
-        .clone()
-        .add_app_interface(
-            either::Either::Left(0),
-            "http://localhost:3000".to_string().into(),
-            None,
-        )
-        .await
-        .unwrap();
-
-    assert!(connect(
-        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(
-            format!("localhost:{port}")
-                .to_socket_addrs()
-                .unwrap()
-                .next()
-                .unwrap()
-        )
-    )
-    .await
-    .is_err());
-
-    let token = create_multi_use_token(&conductor).await;
-
-    check_app_port(port, "http://localhost:3000", token).await;
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn app_allowed_origins_independence() {
-    holochain_trace::test_run();
-
-    let conductor = SweetConductor::from_standard_config().await;
-
-    let token = create_multi_use_token(&conductor).await;
-
-    let port_1 = conductor
-        .clone()
-        .add_app_interface(
-            either::Either::Left(0),
-            "http://localhost:3001".to_string().into(),
-            None,
-        )
-        .await
-        .unwrap();
-
-    let port_2 = conductor
-        .clone()
-        .add_app_interface(
-            either::Either::Left(0),
-            "http://localhost:3002".to_string().into(),
-            None,
-        )
-        .await
-        .unwrap();
-
-    // Check that access to another port's origin is blocked
-
-    assert!(connect(
-        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(
-            format!("localhost:{port_1}")
-                .to_socket_addrs()
-                .unwrap()
-                .next()
-                .unwrap()
-        )
-        .try_set_header("origin", "http://localhost:3002")
-        .unwrap()
-    )
-    .await
-    .is_err());
-
-    assert!(connect(
-        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(
-            format!("localhost:{port_2}")
-                .to_socket_addrs()
-                .unwrap()
-                .next()
-                .unwrap()
-        )
-        .try_set_header("origin", "http://localhost:3001")
-        .unwrap()
-    )
-    .await
-    .is_err());
-
-    // Check that correct access is allowed
-
-    check_app_port(port_1, "http://localhost:3001", token.clone()).await;
-    check_app_port(port_2, "http://localhost:3002", token).await;
-}
-
-async fn create_multi_use_token(conductor: &SweetConductor) -> AppAuthenticationToken {
-    let (admin_sender, _admin_rx) = conductor.admin_ws_client::<AdminResponse>().await;
-
-    let token_response: AdminResponse = admin_sender
-        .request(AdminRequest::IssueAppAuthenticationToken(
-            IssueAppAuthenticationTokenPayload::for_installed_app_id("test_app".into())
-                .single_use(false),
-        ))
-        .await
-        .unwrap();
-    let token = match token_response {
-        AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
-        _ => panic!("unexpected response"),
-    };
-
-    token
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     holochain_trace::test_run();
 
@@ -1104,29 +983,60 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     }
 }
 
-async fn check_app_port(port: u16, origin: &str, token: AppAuthenticationToken) {
-    let (client, rx) = connect(
-        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-        ConnectRequest::new(
-            format!("localhost:{port}")
-                .to_socket_addrs()
-                .unwrap()
-                .next()
-                .unwrap(),
-        )
-        .try_set_header("origin", origin)
-        .unwrap(),
-    )
-    .await
-    .unwrap();
+#[tokio::test(flavor = "multi_thread")]
+async fn emit_signal_after_app_connection_closed() {
+    holochain_trace::test_run();
 
-    let _rx = WsPollRecv::new::<AppResponse>(rx);
+    let mut conductor = SweetConductor::from_standard_config().await;
 
-    client
-        .authenticate(AppAuthenticationRequest { token })
+    // Install an app to emit signals from
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+        .await
+        .0;
+    let installed_app_id: InstalledAppId = "app".into();
+    let app = conductor
+        .setup_app(&installed_app_id, &[dna_file])
         .await
         .unwrap();
+    let cells = app.into_cells();
+    let cell = cells.first().unwrap();
 
-    let request = AppRequest::ListWasmHostFunctions;
-    let _: AppResponse = client.request(request).await.unwrap();
+    // Connect to the app interface
+    let port = conductor
+        .clone()
+        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .await
+        .expect("Couldn't create app interface");
+    let (tx, mut rx) = websocket_client_by_port(port).await.unwrap();
+
+    authenticate_app_ws_client(
+        tx.clone(),
+        conductor
+            .get_arbitrary_admin_websocket_port()
+            .expect("No admin ports on this conductor"),
+        installed_app_id.clone(),
+    )
+    .await;
+
+    // Emit a signal
+    let _: () = conductor
+        .call(&cell.zome(TestWasm::EmitSignal), "emit", ())
+        .await;
+
+    // That should be received because the app interface is connected
+    let received = rx.recv::<AppResponse>().await.unwrap();
+    assert_matches!(received, ReceiveMessage::Signal(_));
+
+    // Drop the app interface connection
+    drop(tx);
+    drop(rx);
+
+    // Emit another signal
+    let _: () = conductor
+        .call(&cell.zome(TestWasm::EmitSignal), "emit", ())
+        .await;
+
+    // That should not be received because the app interface is disconnected
+    // TODO assert that the tasks for this connection were shutdown and removed by this point.
+    //      Can't currently do that with TaskMotel which I think is the right thing to query here.
 }

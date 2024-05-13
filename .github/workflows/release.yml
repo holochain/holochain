@@ -22,7 +22,7 @@ name: release holochain
 
 on:
   schedule:
-    - cron: "0 0 * * 3" # at 0 AM on wednesday
+    - cron: "0 0 * * 3" # At 12:00am on Wednesday
   workflow_dispatch:
     inputs:
       # holochain_url:
@@ -198,9 +198,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install nix
-        uses: cachix/install-nix-action@v20
+        uses: cachix/install-nix-action@v26
       - name: Setup cachix
-        uses: cachix/cachix-action@v12
+        uses: cachix/cachix-action@v14
         if: ${{ ! contains(matrix.platform.runs-on, 'self-hosted') }}
         with:
           name: holochain-ci
@@ -229,20 +229,20 @@ jobs:
           chmod --recursive u+w ${HOLOCHAIN_REPO}
           cp -v $HOME/work/holochain/holochain/.git/config ${HOLOCHAIN_REPO}/.git/config
 
-      - name: Restore cargo related state and build files
-        uses: steveeJ-forks/actions-cache/restore@retry
+      - name: Restore Cargo cache
+        uses: actions/cache@v4
         with:
+          # See https://doc.rust-lang.org/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci
+          # See https://github.com/actions/cache/blob/main/examples.md#rust---cargo
           path: |
-            /var/tmp/holochain_repo/.cargo/bin/
-            /var/tmp/holochain_repo/.cargo/registry/index/
-            /var/tmp/holochain_repo/.cargo/registry/cache/
-            /var/tmp/holochain_repo/.cargo/git/db/
-            /var/tmp/holochain_repo/target/
-          key: ${{ runner.os }}-prepare-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-test-
-            ${{ runner.os }}-prepare-
-          required: false
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ${{ env.HOLOCHAIN_REPO }}/target/
+          key: "${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}"
 
       - name: Ensure the git credentials are set
         env:

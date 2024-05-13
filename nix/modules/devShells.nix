@@ -129,7 +129,6 @@
             )
             ;
 
-
             packages = with pkgs; [
               cargo-nextest
               graph-easy

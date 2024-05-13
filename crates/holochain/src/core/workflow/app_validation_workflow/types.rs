@@ -4,15 +4,13 @@ use holo_hash::AnyDhtHash;
 
 use crate::core::validation::OutcomeOrError;
 
-use super::AppValidationOutcome;
-
 #[derive(Debug)]
-/// The outcome of sys validation
+/// The outcome of app validation
 pub enum Outcome {
     /// Moves to integration
     Accepted,
     /// Stays in limbo because a
-    /// dependency needs is required to validate
+    /// dependency is required to validate
     /// and could not be found
     AwaitingDeps(Vec<AnyDhtHash>),
     /// Moves to integration with status rejected
@@ -28,22 +26,6 @@ impl Outcome {
     /// Helper function for creating rejected outcomes
     pub fn rejected<E, I: Into<String>>(s: I) -> OutcomeOrError<Self, E> {
         OutcomeOrError::Outcome(Outcome::Rejected(s.into()))
-    }
-    /// Exit early with an awaiting outcome
-    pub fn exit_with_awaiting<T, I: Into<AnyDhtHash>, It: IntoIterator<Item = I>>(
-        h: It,
-    ) -> AppValidationOutcome<T> {
-        Err(OutcomeOrError::Outcome(Outcome::AwaitingDeps(
-            h.into_iter().map(Into::into).collect(),
-        )))
-    }
-    /// Early exits with an accepted outcome
-    pub fn accepted<T>() -> AppValidationOutcome<T> {
-        Err(OutcomeOrError::Outcome(Outcome::Accepted))
-    }
-    /// Exit early with a rejected outcome
-    pub fn exit_with_rejected<T, I: Into<String>>(reason: I) -> AppValidationOutcome<T> {
-        Err(OutcomeOrError::Outcome(Outcome::Rejected(reason.into())))
     }
 }
 

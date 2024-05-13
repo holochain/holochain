@@ -28,14 +28,14 @@ jobs:
         if: ${{ github.event.inputs.runs-on == 'ubuntu-latest'  && github.event.inputs.extend-space == 'true' }}
 
       - name: Install nix
-        uses: cachix/install-nix-action@v20
+        uses: cachix/install-nix-action@v26
         if: ${{ github.event.inputs.runs-on != 'multi-arch' }}
         with:
           extra_nix_config: |
             experimental-features = flakes nix-command
 
       - name: Setup cachix
-        uses: cachix/cachix-action@v12
+        uses: cachix/cachix-action@v14
         if: ${{ matrix.platform.runs-on != 'multi-arch' }}
         with:
           name: holochain-ci

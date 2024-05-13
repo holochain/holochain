@@ -433,10 +433,12 @@ pub enum ScottyPanel {
     GossipInfo { last_round: Option<Timestamp> },
 }
 
-/// The request payload that should be sent in a [WireMessage::Authenticate](holochain_websocket::WireMessage::Authenticate) message.
+// once this is in stable, replace the pinned version in the URL by `latest``
+/// The request payload that should be sent in a [`WireMessage::Authenticate`](https://docs.rs/holochain_websocket/0.3.0-beta-dev.22/holochain_websocket/enum.WireMessage.html#variant.Authenticate) message.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppAuthenticationRequest {
-    /// The authentication token that was provided by the conductor when [AdminRequest::IssueAppInterfaceToken] was called.
+    // once this is in stable, replace the pinned version in the URL by `latest``
+    /// The authentication token that was provided by the conductor when [`AdminRequest::IssueAppInterfaceToken`](https://docs.rs/holochain_conductor_api/0.3.0-beta-dev.47/holochain_conductor_api/enum.AdminRequest.html#variant.IssueAppAuthenticationToken) was called.
     pub token: AppAuthenticationToken,
 }
 
@@ -455,10 +457,10 @@ mod tests {
         let serialized_request = holochain_serialized_bytes::encode(&request).unwrap();
         assert_eq!(
             serialized_request,
-            vec![129, 164, 116, 121, 112, 101, 129, 168, 97, 112, 112, 95, 105, 110, 102, 111, 192]
+            vec![129, 164, 116, 121, 112, 101, 168, 97, 112, 112, 95, 105, 110, 102, 111]
         );
 
-        let json_expected = r#"{"type":{"app_info":null}}"#;
+        let json_expected = r#"{"type":"app_info"}"#;
         let mut deserializer = Deserializer::new(&*serialized_request);
         let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
         let json_actual = serde_json::to_string(&json_value).unwrap();
@@ -474,15 +476,15 @@ mod tests {
         assert_eq!(
             serialized_response,
             vec![
-                130, 164, 116, 121, 112, 101, 129, 184, 108, 105, 115, 116, 95, 119, 97, 115, 109,
-                95, 104, 111, 115, 116, 95, 102, 117, 110, 99, 116, 105, 111, 110, 115, 192, 164,
-                100, 97, 116, 97, 146, 169, 104, 111, 115, 116, 95, 102, 110, 95, 49, 169, 104,
-                111, 115, 116, 95, 102, 110, 95, 50
+                130, 164, 116, 121, 112, 101, 184, 108, 105, 115, 116, 95, 119, 97, 115, 109, 95,
+                104, 111, 115, 116, 95, 102, 117, 110, 99, 116, 105, 111, 110, 115, 164, 100, 97,
+                116, 97, 146, 169, 104, 111, 115, 116, 95, 102, 110, 95, 49, 169, 104, 111, 115,
+                116, 95, 102, 110, 95, 50
             ]
         );
 
         let json_expected =
-            r#"{"type":{"list_wasm_host_functions":null},"data":["host_fn_1","host_fn_2"]}"#;
+            r#"{"type":"list_wasm_host_functions","data":["host_fn_1","host_fn_2"]}"#;
         let mut deserializer = Deserializer::new(&*serialized_response);
         let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
         let json_actual = serde_json::to_string(&json_value).unwrap();
