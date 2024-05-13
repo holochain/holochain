@@ -31,11 +31,14 @@
 
         doCheck = true;
 
+        __noChroot = pkgs.stdenv.isLinux;
+
         nativeCheckInputs = [
           pkgs.coreutils
           pkgs.procps
           pkgs.killall
           pkgs.bats
+          pkgs.nix
         ];
 
         checkPhase = ''

@@ -3,6 +3,9 @@
 setup() {
   BATS_TMPDIR="$(mktemp -d)"
   cd "${BATS_TMPDIR:?}"
+
+  HOME="${BATS_TMPDIR}/.home"
+  mkdir "${HOME}"
 }
 
 teardown() {
@@ -17,15 +20,22 @@ teardown() {
 }
 
 @test "expected scaffold an example to succeed" {
-  set -e
+  set -eE -o pipefail
 
   print_version() {
-    echo "$(hc-scaffold --version)"
+    hc-scaffold --version
   }
 
   setup_and_build_hello_world() {
     print_version
 
+    pwd
+    echo HOME: $HOME
+    ls -lha
+    umask
+    id
+
+    # strace -fDDD
     hc-scaffold example hello-world
     cd hello-world
 
