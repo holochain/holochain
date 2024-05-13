@@ -689,7 +689,7 @@ where
         Action.blob as action_blob,
         Entry.blob as entry_blob
         FROM DhtOp
-        JOIN
+        LEFT JOIN
         Action ON DhtOp.action_hash = Action.hash
         LEFT JOIN
         Entry ON Action.entry_hash = Entry.hash
@@ -708,28 +708,31 @@ where
             ))?
             .query_and_then(
                 named_params! {
-                    ":store_entry": DhtOpType::StoreEntry,
+                    ":store_entry": ChainOpType::StoreEntry,
                     ":author": author,
                 },
                 |row| {
                     let h: DhtOpHash = row.get("dht_op_hash")?;
                     let loc: u32 = row.get("loc")?;
-
-                    let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                     let op_type: DhtOpType = row.get("dht_type")?;
-                    let entry = match action.0.entry_type().map(|et| et.visibility()) {
-                        Some(EntryVisibility::Public) => {
-                            let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                            match entry {
-                                Some(entry) => Some(from_blob::<Entry>(entry)?),
-                                None => None,
-                            }
-                        }
-                        _ => None,
-                    };
-                    let op = DhtOp::from_type(op_type, action, entry)?;
 
-                    StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
+                    match op_type {
+                        DhtOpType::Chain(op_type) => {
+                            let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
+                            let entry = match action.0.entry_type().map(|et| et.visibility()) {
+                                Some(EntryVisibility::Public) => {
+                                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                                    match entry {
+                                        Some(entry) => Some(from_blob::<Entry>(entry)?),
+                                        None => None,
+                                    }
+                                }
+                                _ => None,
+                            };
+                            let op = ChainOp::from_type(op_type, action, entry)?.into();
+                            StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
+                        }
+                    }
                 },
             )?
             .collect::<StateQueryResult<_>>()?
@@ -737,27 +740,29 @@ where
             txn.prepare(sql_common)?
                 .query_and_then(
                     named_params! {
-                        ":store_entry": DhtOpType::StoreEntry,
+                        ":store_entry": ChainOpType::StoreEntry,
                     },
                     |row| {
                         let h: DhtOpHash = row.get("dht_op_hash")?;
                         let loc: u32 = row.get("loc")?;
-
-                        let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                         let op_type: DhtOpType = row.get("dht_type")?;
-                        let entry = match action.0.entry_type().map(|et| et.visibility()) {
-                            Some(EntryVisibility::Public) => {
-                                let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                                match entry {
-                                    Some(entry) => Some(from_blob::<Entry>(entry)?),
-                                    None => None,
-                                }
+                        match op_type {
+                            DhtOpType::Chain(op_type) => {
+                                let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
+                                let entry = match action.0.entry_type().map(|et| et.visibility()) {
+                                    Some(EntryVisibility::Public) => {
+                                        let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                                        match entry {
+                                            Some(entry) => Some(from_blob::<Entry>(entry)?),
+                                            None => None,
+                                        }
+                                    }
+                                    _ => None,
+                                };
+                                let op = ChainOp::from_type(op_type, action, entry)?.into();
+                                StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
                             }
-                            _ => None,
-                        };
-                        let op = DhtOp::from_type(op_type, action, entry)?;
-
-                        StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
+                        }
                     },
                 )?
                 .collect::<StateQueryResult<_>>()?

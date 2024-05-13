@@ -11,19 +11,19 @@ use ::fixt::prelude::*;
 #[derive(Debug)]
 #[allow(missing_docs)]
 pub struct RecordTestData {
-    pub store_record_op: DhtOpHashed,
+    pub store_record_op: ChainOpHashed,
     pub wire_create: Judged<SignedAction>,
     pub create_hash: ActionHash,
-    pub deleted_by_op: DhtOpHashed,
+    pub deleted_by_op: ChainOpHashed,
     pub wire_delete: Judged<WireDelete>,
     pub delete_hash: ActionHash,
-    pub update_record_op: DhtOpHashed,
+    pub update_record_op: ChainOpHashed,
     pub wire_update: Judged<WireUpdateRelationship>,
     pub update_hash: ActionHash,
     pub hash: EntryHash,
     pub entry: Entry,
     /// An Op from any_record
-    pub any_store_record_op: DhtOpHashed,
+    pub any_store_record_op: ChainOpHashed,
     /// An arbitrary Action
     pub any_action: Judged<SignedAction>,
     /// The hash of any_action
@@ -75,7 +75,7 @@ impl RecordTestData {
         let update_hash = ActionHash::with_data_sync(&update_action);
 
         let signature = fixt!(Signature);
-        let store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+        let store_record_op = ChainOpHashed::from_content_sync(ChainOp::StoreRecord(
             signature.clone(),
             create_action.clone(),
             entry.clone().into(),
@@ -85,12 +85,12 @@ impl RecordTestData {
 
         let signature = fixt!(Signature);
         let deleted_by_op =
-            DhtOpHashed::from_content_sync(DhtOp::RegisterDeletedBy(signature.clone(), delete));
+            ChainOpHashed::from_content_sync(ChainOp::RegisterDeletedBy(signature.clone(), delete));
 
         let wire_delete = Judged::valid(SignedAction(delete_action, signature).try_into().unwrap());
 
         let signature = fixt!(Signature);
-        let update_record_op = DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedRecord(
+        let update_record_op = ChainOpHashed::from_content_sync(ChainOp::RegisterUpdatedRecord(
             signature.clone(),
             update,
             update_entry.into(),
@@ -127,7 +127,7 @@ impl RecordTestData {
         let any_action_hash = ActionHash::with_data_sync(&any_action);
 
         let signature = fixt!(Signature);
-        let any_store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+        let any_store_record_op = ChainOpHashed::from_content_sync(ChainOp::StoreRecord(
             signature.clone(),
             any_action.clone(),
             RecordEntry::new(any_action.entry_visibility(), any_entry.clone()),

@@ -45,7 +45,7 @@ pub struct Context {
     pub map_dep_hash_to_op: HashMap<AnyDhtHash, OpRef>,
 
     /// Map the (action hash + op type) representation to the actual op hash
-    pub map_action_to_op: HashMap<OpAction, OpRef>,
+    pub map_action_to_op: HashMap<ChainOpAction, OpRef>,
 
     /// The full info associated with each op hash
     pub op_info: HashMap<OpRef, OpInfo>,
@@ -117,12 +117,8 @@ impl Context {
         self.op_info.get(op).ok_or(format!("op_info({op})"))
     }
 
-    pub fn op_to_action(&self, op: &OpRef) -> ContextResult<OpAction> {
-        Ok(OpAction::from((**self.op_info(op)?).clone()))
-    }
-
-    pub fn op_from_action(&self, action: ActionHash, op_type: DhtOpType) -> ContextResult<OpRef> {
-        let oa = OpAction(action, op_type);
+    pub fn op_from_action(&self, action: ActionHash, op_type: ChainOpType) -> ContextResult<OpRef> {
+        let oa = ChainOpAction(action, op_type);
         self.map_action_to_op
             .get(&oa)
             .cloned()
@@ -156,7 +152,10 @@ impl aitia::logging::Log for Context {
             Event::Authored { by: _, op } => {
                 // TODO: add check that the same op is not authored twice?
                 let op_hash = op.as_hash();
-                let a = OpAction::from((*op).clone());
+                let a = match &op.op {
+                    DhtOpLite::Chain(op) => ChainOpAction::from(op.clone()),
+                    // _ => unimplemented!("hc_sleuth can only handle chain ops"),
+                };
                 self.map_dep_hash_to_op
                     .insert(op.fetch_dependency_hash(), op_hash.clone());
                 self.map_action_to_op.insert(a, op_hash.clone());

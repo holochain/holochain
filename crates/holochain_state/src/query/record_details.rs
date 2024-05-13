@@ -1,6 +1,6 @@
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
-use holochain_types::dht_op::DhtOpType;
+use holochain_types::dht_op::ChainOpType;
 use holochain_types::prelude::Judged;
 use holochain_zome_types::prelude::*;
 use std::fmt::Debug;
@@ -43,9 +43,9 @@ impl Query for GetRecordDetailsQuery {
     }
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":create_type": DhtOpType::StoreRecord,
-            ":delete_type": DhtOpType::RegisterDeletedBy,
-            ":update_type": DhtOpType::RegisterUpdatedRecord,
+            ":create_type": ChainOpType::StoreRecord,
+            ":delete_type": ChainOpType::RegisterDeletedBy,
+            ":update_type": ChainOpType::RegisterUpdatedRecord,
             ":action_hash": self.0,
         };
         params.to_vec()

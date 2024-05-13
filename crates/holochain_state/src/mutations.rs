@@ -12,6 +12,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
+use holochain_types::dht_op::ChainOpHashed;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpLite;
 use holochain_types::dht_op::OpOrder;
@@ -65,11 +66,11 @@ macro_rules! dht_op_update {
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the [`Scratch`].
 pub fn insert_op_scratch(
     scratch: &mut Scratch,
-    op: DhtOpHashed,
+    op: ChainOpHashed,
     chain_top_ordering: ChainTopOrdering,
 ) -> StateMutationResult<()> {
     let (op, _) = op.into_inner();
-    let op_light = op.to_lite();
+    let op_lite = op.to_lite();
     let action = op.action();
     let signature = op.signature().clone();
     if let Some(entry) = op.entry().into_option() {
@@ -82,7 +83,7 @@ pub fn insert_op_scratch(
         );
         scratch.add_entry(entry_hashed, chain_top_ordering);
     }
-    let action_hashed = ActionHashed::with_pre_hashed(action, op_light.action_hash().to_owned());
+    let action_hashed = ActionHashed::with_pre_hashed(action, op_lite.action_hash().to_owned());
     let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
     scratch.add_action(action_hashed, chain_top_ordering);
     Ok(())
@@ -104,23 +105,27 @@ pub fn insert_record_scratch(
 pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
     let hash = op.as_hash();
     let op = op.as_content();
-    let op_light = op.to_lite();
-    let action = op.action();
-    let timestamp = action.timestamp();
+    let op_type = op.get_type();
+    let op_lite = op.to_lite();
+    let timestamp = op.timestamp();
     let signature = op.signature().clone();
-    if let Some(entry) = op.entry().into_option() {
-        let entry_hash = action
-            .entry_hash()
-            .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+    let op_order = OpOrder::new(op_type, op.timestamp());
 
-        insert_entry(txn, entry_hash, entry)?;
+    if let (Some(op), Some(op_lite)) = (op.as_chain_op(), op_lite.as_chain_op()) {
+        let action = op.action();
+        if let Some(entry) = op.entry().into_option() {
+            let entry_hash = action
+                .entry_hash()
+                .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+            insert_entry(txn, entry_hash, entry)?;
+        }
+        let action_hashed = ActionHashed::with_pre_hashed(action, op_lite.action_hash().to_owned());
+        let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
+        insert_action(txn, &action_hashed)?;
     }
+
     let dependency = op.sys_validation_dependency();
-    let action_hashed = ActionHashed::with_pre_hashed(action, op_light.action_hash().to_owned());
-    let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
-    let op_order = OpOrder::new(op_light.get_type(), action_hashed.action().timestamp());
-    insert_action(txn, &action_hashed)?;
-    insert_op_lite(txn, &op_light, hash, &op_order, &timestamp)?;
+    insert_op_lite(txn, &op_lite, hash, &op_order, &timestamp)?;
     set_dependency(txn, hash, dependency)?;
     Ok(())
 }
@@ -152,7 +157,7 @@ pub fn insert_op_lite(
     order: &OpOrder,
     timestamp: &Timestamp,
 ) -> StateMutationResult<()> {
-    let action_hash = op_lite.action_hash().clone();
+    let action_hash = op_lite.as_chain_op().map(|op| op.action_hash().clone());
     let basis = op_lite.dht_basis().to_owned();
     sql_insert!(txn, DhtOp, {
         "hash": hash,

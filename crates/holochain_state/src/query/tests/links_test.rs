@@ -291,7 +291,7 @@ impl TestData {
     }
 
     async fn add_link(&self) {
-        let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAddLink(
+        let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAddLink(
             fixt!(Signature),
             self.link_add.clone(),
         ));
@@ -320,7 +320,7 @@ impl TestData {
     }
 
     async fn delete_link(&self) {
-        let op = DhtOpHashed::from_content_sync(DhtOp::RegisterRemoveLink(
+        let op = DhtOpHashed::from_content_sync(ChainOp::RegisterRemoveLink(
             fixt!(Signature),
             self.link_remove.clone(),
         ));

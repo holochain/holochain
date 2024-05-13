@@ -88,7 +88,7 @@ fn find_bounds(
             }
         }
         let result = statement
-                .query_row(named_params! {":hash": hash, ":author": author, ":activity": DhtOpType::RegisterAgentActivity}, |row| {
+                .query_row(named_params! {":hash": hash, ":author": author, ":activity": ChainOpType::RegisterAgentActivity}, |row| {
                     row.get(0)
                 })
                 .optional()?;
@@ -112,7 +112,7 @@ fn get_activity(
         .query_and_then(
             named_params! {
                  ":author": author,
-                 ":op_type": DhtOpType::RegisterAgentActivity,
+                 ":op_type": ChainOpType::RegisterAgentActivity,
                  ":lower_seq": range.start(),
                  ":upper_seq": range.end(),
 

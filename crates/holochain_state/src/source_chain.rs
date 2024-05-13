@@ -866,7 +866,7 @@ where
 
     /// If there is a countersigning session get the
     /// StoreEntry op to send to the entry authorities.
-    pub fn countersigning_op(&self) -> SourceChainResult<Option<DhtOp>> {
+    pub fn countersigning_op(&self) -> SourceChainResult<Option<ChainOp>> {
         let r = self.scratch.apply(|scratch| {
             scratch
                 .entries()
@@ -881,7 +881,7 @@ where
                                 .unwrap_or(false)
                         })
                         .and_then(|shh| {
-                            Some(DhtOp::StoreEntry(
+                            Some(ChainOp::StoreEntry(
                                 shh.signature().clone(),
                                 shh.action().clone().try_into().ok()?,
                                 (**entry).clone(),
@@ -946,12 +946,13 @@ fn build_ops_from_actions(
         let mut h = Some(action);
         for op in ops_inner {
             let op_type = op.get_type();
+            let op = DhtOpLite::from(op);
             // Action is required by value to produce the DhtOpHash.
             let (action, op_hash) = UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
             let op_order = OpOrder::new(op_type, action.timestamp());
             let timestamp = action.timestamp();
             // Put the action back by value.
-            let dependency = op.get_type().sys_validation_dependency(&action);
+            let dependency = op_type.sys_validation_dependency(&action);
             h = Some(action);
             // Collect the DhtOpLite, DhtOpHash and OpOrder.
             ops.push((op, op_hash, op_order, timestamp, dependency));
@@ -1094,7 +1095,7 @@ pub async fn genesis(
 pub fn put_raw(
     txn: &mut Transaction,
     shh: SignedActionHashed,
-    ops: Vec<DhtOpLite>,
+    ops: Vec<ChainOpLite>,
     entry: Option<Entry>,
 ) -> StateMutationResult<Vec<DhtOpHash>> {
     let (action, signature) = shh.into_inner();
@@ -1121,7 +1122,7 @@ pub fn put_raw(
     }
     insert_action(txn, &shh)?;
     for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, &op, &op_hash, &op_order, &timestamp)?;
+        insert_op_lite(txn, &op.into(), &op_hash, &op_order, &timestamp)?;
     }
     Ok(ops_to_integrate)
 }
@@ -1204,7 +1205,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
         action_seq,
         prev_action: prev_action.clone(),
     };
-    let action = action_builder.build(common).weightless().into();
+    let action = action_builder.build(common).weightless();
     let action = ActionHashed::from_content_sync(action);
     let action = SignedActionHashed::sign(keystore, action).await?;
     let record = Record::new(action, maybe_entry);
@@ -1286,7 +1287,7 @@ pub async fn dump_state(
             let published_ops_count = txn.query_row(
                 "
                 SELECT COUNT(DhtOp.hash) FROM DhtOp
-                JOIN Action ON DhtOp.action_hash = Action.hash
+                LEFT JOIN Action ON DhtOp.action_hash = Action.hash
                 WHERE
                 Action.author = :author
                 AND

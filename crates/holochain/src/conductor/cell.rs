@@ -594,8 +594,8 @@ impl Cell {
         message: CountersigningSessionNegotiationMessage,
     ) -> CellResult<()> {
         match message {
-            CountersigningSessionNegotiationMessage::EnzymePush(dht_op) => {
-                let ops = vec![*dht_op]
+            CountersigningSessionNegotiationMessage::EnzymePush(chain_op) => {
+                let ops = vec![*chain_op]
                     .into_iter()
                     .map(|op| {
                         let hash = DhtOpHash::with_data_sync(&op);
@@ -760,7 +760,7 @@ impl Cell {
                         .query_row(
                             "SELECT Action.blob as action_blob
                     FROM DhtOp
-                    JOIN Action ON Action.hash = DhtOp.action_hash
+                    LEFT JOIN Action ON Action.hash = DhtOp.action_hash
                     WHERE DhtOp.hash = :hash",
                             named_params! {
                                 ":hash": hash,

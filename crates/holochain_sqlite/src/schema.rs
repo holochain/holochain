@@ -25,6 +25,10 @@ pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| Schema {
             forward: include_str!("sql/cell/schema/1-up.sql").into(),
             _schema: include_str!("sql/cell/schema/1.sql").into(),
         },
+        M {
+            forward: include_str!("sql/cell/schema/2-up.sql").into(),
+            _schema: include_str!("sql/cell/schema/2.sql").into(),
+        },
     ],
 });
 
@@ -75,6 +79,7 @@ impl Schema {
         match migrations_applied.cmp(&(num_migrations)) {
             std::cmp::Ordering::Less => {
                 let mut txn = conn.transaction()?;
+
                 // run forward migrations
                 for v in migrations_applied..num_migrations {
                     self.migrations[v].run_forward(&mut txn)?;

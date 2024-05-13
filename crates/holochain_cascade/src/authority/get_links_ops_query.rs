@@ -31,7 +31,7 @@ impl GetLinksOpsQuery {
 
 pub struct Item {
     action: SignedAction,
-    op_type: DhtOpType,
+    op_type: ChainOpType,
 }
 
 impl Query for GetLinksOpsQuery {
@@ -98,8 +98,8 @@ impl Query for GetLinksOpsQuery {
 
     fn params(&self) -> Vec<Params> {
         named_params! {
-            ":create": DhtOpType::RegisterAddLink,
-            ":delete": DhtOpType::RegisterRemoveLink,
+            ":create": ChainOpType::RegisterAddLink,
+            ":delete": ChainOpType::RegisterRemoveLink,
             ":base_hash": self.base,
         }
         .to_vec()
@@ -122,7 +122,7 @@ impl Query for GetLinksOpsQuery {
 
     fn fold(&self, mut state: Self::State, dht_op: Self::Item) -> StateQueryResult<Self::State> {
         match &dht_op.data.op_type {
-            DhtOpType::RegisterAddLink => {
+            ChainOpType::RegisterAddLink => {
                 let validation_status = dht_op.validation_status();
                 let item = dht_op.data.action;
                 if let (
@@ -137,7 +137,7 @@ impl Query for GetLinksOpsQuery {
                     ));
                 }
             }
-            DhtOpType::RegisterRemoveLink => {
+            ChainOpType::RegisterRemoveLink => {
                 let validation_status = dht_op.validation_status();
                 let item = dht_op.data.action;
                 if let (

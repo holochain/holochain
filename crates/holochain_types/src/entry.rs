@@ -11,8 +11,8 @@ use holochain_zome_types::prelude::*;
 use crate::action::WireDelete;
 use crate::action::WireNewEntryAction;
 use crate::action::WireUpdateRelationship;
+use crate::dht_op::ChainOpType;
 use crate::dht_op::DhtOpResult;
-use crate::dht_op::DhtOpType;
 use crate::dht_op::RenderedOp;
 use crate::dht_op::RenderedOps;
 
@@ -77,7 +77,7 @@ impl WireEntryOps {
                         action,
                         signature,
                         status,
-                        DhtOpType::StoreEntry,
+                        ChainOpType::StoreEntry,
                     )?);
                 }
                 for op in deletes {
@@ -90,7 +90,7 @@ impl WireEntryOps {
                         action,
                         signature,
                         status,
-                        DhtOpType::RegisterDeletedEntryAction,
+                        ChainOpType::RegisterDeletedEntryAction,
                     )?);
                 }
                 for op in updates {
@@ -102,7 +102,7 @@ impl WireEntryOps {
                         action,
                         signature,
                         status,
-                        DhtOpType::RegisterUpdatedContent,
+                        ChainOpType::RegisterUpdatedContent,
                     )?);
                 }
                 Ok(RenderedOps {

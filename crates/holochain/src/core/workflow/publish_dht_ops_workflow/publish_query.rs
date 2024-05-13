@@ -68,7 +68,7 @@ where
                 named_params! {
                     ":author": agent,
                     ":recency_threshold": recency_threshold,
-                    ":store_entry": DhtOpType::StoreEntry,
+                    ":store_entry": ChainOpType::StoreEntry,
                 },
                 |row| {
                     let action_size: usize = row.get("action_size")?;
@@ -89,9 +89,11 @@ where
                         }
                         _ => None,
                     };
-                    let op = DhtOp::from_type(op_type, action, entry)?;
+                    let op = match op_type {
+                        DhtOpType::Chain(op_type) => ChainOp::from_type(op_type, action, entry)?,
+                    };
                     let basis = op.dht_basis();
-                    WorkflowResult::Ok((basis, op_hash_sized, op))
+                    WorkflowResult::Ok((basis, op_hash_sized, op.into()))
                 },
             )?;
             WorkflowResult::Ok(r.collect())
@@ -121,7 +123,7 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
         ",
         named_params! {
             ":author": agent,
-            ":store_entry": DhtOpType::StoreEntry,
+            ":store_entry": ChainOpType::StoreEntry,
         },
         |row| row.get("num_ops"),
     )?;
@@ -230,13 +232,13 @@ mod tests {
         };
 
         let state = if facts.store_entry {
-            DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
+            DhtOpHashed::from_content_sync(ChainOp::StoreEntry(
                 fixt!(Signature),
                 NewEntryAction::Create(action.clone()),
                 entry.clone(),
             ))
         } else {
-            DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+            DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
                 fixt!(Signature),
                 Action::Create(action.clone()),
                 entry.clone().into(),

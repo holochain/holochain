@@ -18,7 +18,7 @@ use holochain_p2p::{HolochainP2pDnaFixturator, MockHolochainP2pDnaT};
 use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, mutations::insert_op};
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
-    dht_op::{DhtOp, DhtOpHashed, WireOps},
+    dht_op::{ChainOp, DhtOpHashed, WireOps},
     record::WireRecordOps,
 };
 use holochain_wasmer_host::module::ModuleCache;
@@ -92,7 +92,7 @@ async fn validation_callback_must_get_action() {
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
-    let delete_dht_op = DhtOp::RegisterDeletedBy(
+    let delete_dht_op = ChainOp::RegisterDeletedBy(
         delete_action_signed_hashed.signature.clone(),
         delete.clone(),
     );
@@ -117,7 +117,7 @@ async fn validation_callback_must_get_action() {
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![create_action.to_hash().into()]);
 
     // write action to be must got during validation to dht cache db
-    let dht_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
+    let dht_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
     test_space.space.cache_db.test_write(move |txn| {
         insert_op(txn, &dht_op_hashed).unwrap();
@@ -186,7 +186,7 @@ async fn validation_callback_awaiting_deps_hashes() {
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
-    let delete_dht_op = DhtOp::RegisterDeletedBy(
+    let delete_dht_op = ChainOp::RegisterDeletedBy(
         delete_action_signed_hashed.signature.clone(),
         delete.clone(),
     );
@@ -307,7 +307,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     let delete_action = Action::Delete(delete.clone());
     let delete_action_signed_hashed =
         SignedActionHashed::new_unchecked(delete_action.clone(), fixt!(Signature));
-    let delete_dht_op = DhtOp::RegisterDeletedBy(
+    let delete_dht_op = ChainOp::RegisterDeletedBy(
         delete_action_signed_hashed.signature.clone(),
         delete.clone(),
     );
@@ -431,7 +431,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
-    let delete_dht_op = DhtOp::RegisterDeletedBy(
+    let delete_dht_op = ChainOp::RegisterDeletedBy(
         delete_action_signed_hashed.signature.clone(),
         delete.clone(),
     );
@@ -556,7 +556,7 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     let delete_action = Action::Delete(delete.clone());
     let delete_action_signed_hashed =
         SignedActionHashed::new_unchecked(delete_action.clone(), fixt!(Signature));
-    let delete_dht_op = DhtOp::RegisterDeletedBy(
+    let delete_dht_op = ChainOp::RegisterDeletedBy(
         delete_action_signed_hashed.signature.clone(),
         delete.clone(),
     );
@@ -672,7 +672,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
-    let delete_dht_op = DhtOp::RegisterDeletedBy(
+    let delete_dht_op = ChainOp::RegisterDeletedBy(
         delete_action_signed_hashed.signature.clone(),
         delete.clone(),
     );
@@ -713,7 +713,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     );
 
     // filtering out ops with missing dependencies should not filter anything
-    let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
+    let ops_to_validate = vec![DhtOpHashed::from_content_sync(delete_dht_op.clone())];
     let filtered_ops_to_validate = validation_dependencies
         .lock()
         .filter_ops_missing_dependencies(ops_to_validate.clone());
@@ -744,7 +744,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     );
 
     // filtering out ops with missing dependencies should filter out delete
-    let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
+    let ops_to_validate = vec![DhtOpHashed::from_content_sync(delete_dht_op.clone())];
     let filtered_ops_to_validate = validation_dependencies
         .lock()
         .filter_ops_missing_dependencies(ops_to_validate.clone());
@@ -775,7 +775,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     );
 
     // filtering out ops with missing dependencies should not filter anything
-    let ops_to_validate = vec![delete_dht_op.into_hashed()];
+    let ops_to_validate = vec![DhtOpHashed::from_content_sync(delete_dht_op)];
     let filtered_ops_to_validate = validation_dependencies
         .lock()
         .filter_ops_missing_dependencies(ops_to_validate.clone());

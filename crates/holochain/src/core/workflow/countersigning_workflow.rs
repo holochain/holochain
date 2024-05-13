@@ -37,7 +37,7 @@ struct Session {
     /// Map of action hash for a each signers action to the
     /// [`DhtOp`] and other required actions for this session to be
     /// considered complete.
-    map: HashMap<ActionHash, (DhtOpHash, DhtOp, Vec<ActionHash>)>,
+    map: HashMap<ActionHash, (DhtOpHash, ChainOp, Vec<ActionHash>)>,
     /// When this session expires.
     /// If this is none the session is empty.
     expires: Option<Timestamp>,
@@ -48,7 +48,7 @@ struct Session {
 // block other incoming DhtOps if there are many active sessions.
 // We could create an incoming buffer if this actually becomes an issue.
 pub(crate) fn incoming_countersigning(
-    ops: Vec<(DhtOpHash, DhtOp)>,
+    ops: Vec<(DhtOpHash, ChainOp)>,
     workspace: &CountersigningWorkspace,
     trigger: TriggerSender,
 ) -> WorkflowResult<()> {
@@ -58,7 +58,7 @@ pub(crate) fn incoming_countersigning(
     // entry hash, required actions and expires time.
     for (hash, op) in ops {
         // Must be a store entry op.
-        if let DhtOp::StoreEntry(_, _, entry) = &op {
+        if let ChainOp::StoreEntry(_, _, entry) = &op {
             // Must have a counter sign entry type.
             if let Entry::CounterSign(session_data, _) = entry {
                 let entry_hash = EntryHash::with_data_sync(entry);
@@ -118,7 +118,10 @@ pub(crate) async fn countersigning_workflow(
             incoming_dht_ops_workflow(
                 space.clone(),
                 sys_validation_trigger.clone(),
-                non_enzymatic_ops.into_iter().map(|(_h, o)| o).collect(),
+                non_enzymatic_ops
+                    .into_iter()
+                    .map(|(_h, o)| o.into())
+                    .collect(),
                 false,
             )
             .await?;
@@ -291,9 +294,9 @@ pub(crate) async fn countersigning_success(
             if *action.author() == author {
                 continue;
             }
-            let op = DhtOp::RegisterAgentActivity(signature, action);
+            let op = ChainOp::RegisterAgentActivity(signature, action);
             let basis = op.dht_basis();
-            if let Err(e) = network.publish_countersign(false, basis, op).await {
+            if let Err(e) = network.publish_countersign(false, basis, op.into()).await {
                 tracing::error!(
                     "Failed to publish to other countersigners agent authorities because of: {:?}",
                     e
@@ -318,7 +321,7 @@ pub(crate) async fn countersigning_success(
 /// actions for this session and respond with a session complete.
 pub async fn countersigning_publish(
     network: &HolochainP2pDna,
-    op: DhtOp,
+    op: ChainOp,
     _author: AgentPubKey,
 ) -> Result<(), ZomeCallResponse> {
     if let Some(enzyme) = op.enzymatic_countersigning_enzyme() {
@@ -337,7 +340,7 @@ pub async fn countersigning_publish(
         }
     } else {
         let basis = op.dht_basis();
-        if let Err(e) = network.publish_countersign(true, basis, op).await {
+        if let Err(e) = network.publish_countersign(true, basis, op.into()).await {
             tracing::error!(
                 "Failed to publish to entry authorities for countersigning session because of: {:?}",
                 e
@@ -349,7 +352,7 @@ pub async fn countersigning_publish(
 }
 
 type AgentsToNotify = Vec<AgentPubKey>;
-type Ops = Vec<(DhtOpHash, DhtOp)>;
+type Ops = Vec<(DhtOpHash, ChainOp)>;
 type SignedActions = Vec<SignedAction>;
 
 impl CountersigningWorkspace {
@@ -365,7 +368,7 @@ impl CountersigningWorkspace {
         &self,
         entry_hash: EntryHash,
         op_hash: DhtOpHash,
-        op: DhtOp,
+        op: ChainOp,
         required_actions: Vec<ActionHash>,
         expires: Timestamp,
     ) {
@@ -471,7 +474,7 @@ mod tests {
         // - Create the ops.
         let data = |u: &mut arbitrary::Unstructured| {
             let op_hash = DhtOpHash::arbitrary(u).unwrap();
-            let op = DhtOp::arbitrary(u).unwrap();
+            let op = ChainOp::arbitrary(u).unwrap();
             let action = op.action();
             (op_hash, op, action)
         };
@@ -522,7 +525,7 @@ mod tests {
 
         // - Create an op for a session that has expired in the past.
         let op_hash = DhtOpHash::arbitrary(&mut u).unwrap();
-        let op = DhtOp::arbitrary(&mut u).unwrap();
+        let op = ChainOp::arbitrary(&mut u).unwrap();
         let action = op.action();
         let entry_hash = EntryHash::arbitrary(&mut u).unwrap();
         let action_hash = ActionHash::with_data_sync(&action);

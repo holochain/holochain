@@ -209,9 +209,14 @@ pub async fn incoming_dht_ops_workflow(
 #[instrument(skip(op))]
 /// If this op fails the counterfeit check it should be dropped
 async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
-    let action = op.action();
-    let signature = op.signature();
-    Ok(counterfeit_check(signature, &action).await?)
+    match op {
+        DhtOp::ChainOp(op) => {
+            let action = op.action();
+            let signature = op.signature();
+            Ok(counterfeit_check(signature, &action).await?)
+        }
+        DhtOp::WarrantOp(_op) => unreachable!("todo: warrants"),
+    }
 }
 
 fn add_to_pending(

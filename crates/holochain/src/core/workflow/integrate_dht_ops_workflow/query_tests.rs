@@ -36,13 +36,13 @@ struct Facts {
 #[derive(Debug, Clone, Copy)]
 struct Scenario {
     facts: Facts,
-    op: DhtOpType,
+    op: ChainOpType,
 }
 
 impl Scenario {
-    fn with_dep(op_type: DhtOpType) -> [Self; 2] {
+    fn with_dep(op_type: ChainOpType) -> [Self; 2] {
         match op_type {
-            DhtOpType::RegisterAgentActivity => {
+            ChainOpType::RegisterAgentActivity => {
                 let mut dep = Self::without_dep(op_type);
                 let mut op = Self::without_dep(op_type);
                 dep.facts.integrated = true;
@@ -51,24 +51,24 @@ impl Scenario {
                 op.facts.sequential = true;
                 [dep, op]
             }
-            DhtOpType::RegisterDeletedEntryAction | DhtOpType::RegisterUpdatedContent => {
-                let mut dep = Self::without_dep(DhtOpType::StoreEntry);
+            ChainOpType::RegisterDeletedEntryAction | ChainOpType::RegisterUpdatedContent => {
+                let mut dep = Self::without_dep(ChainOpType::StoreEntry);
                 let mut op = Self::without_dep(op_type);
                 dep.facts.integrated = true;
                 dep.facts.awaiting_integration = false;
                 op.facts.last_action = true;
                 [dep, op]
             }
-            DhtOpType::RegisterDeletedBy | DhtOpType::RegisterUpdatedRecord => {
-                let mut dep = Self::without_dep(DhtOpType::StoreRecord);
+            ChainOpType::RegisterDeletedBy | ChainOpType::RegisterUpdatedRecord => {
+                let mut dep = Self::without_dep(ChainOpType::StoreRecord);
                 let mut op = Self::without_dep(op_type);
                 dep.facts.integrated = true;
                 dep.facts.awaiting_integration = false;
                 op.facts.last_action = true;
                 [dep, op]
             }
-            DhtOpType::RegisterRemoveLink => {
-                let mut dep = Self::without_dep(DhtOpType::RegisterAddLink);
+            ChainOpType::RegisterRemoveLink => {
+                let mut dep = Self::without_dep(ChainOpType::RegisterAddLink);
                 let mut op = Self::without_dep(op_type);
                 dep.facts.integrated = true;
                 dep.facts.awaiting_integration = false;
@@ -79,7 +79,7 @@ impl Scenario {
         }
     }
 
-    fn without_dep(op_type: DhtOpType) -> Self {
+    fn without_dep(op_type: ChainOpType) -> Self {
         Self {
             facts: Facts {
                 integrated: false,
@@ -133,10 +133,10 @@ async fn create_and_insert_op(
     let Scenario { facts, op } = scenario;
     let entry = matches!(
         op,
-        DhtOpType::StoreRecord
-            | DhtOpType::StoreEntry
-            | DhtOpType::RegisterUpdatedContent
-            | DhtOpType::RegisterUpdatedRecord
+        ChainOpType::StoreRecord
+            | ChainOpType::StoreEntry
+            | ChainOpType::RegisterUpdatedContent
+            | ChainOpType::RegisterUpdatedRecord
     )
     .then(|| Entry::App(fixt!(AppEntryBytes)));
 
@@ -147,11 +147,11 @@ async fn create_and_insert_op(
     };
 
     let mut action: Action = match op {
-        DhtOpType::RegisterAgentActivity
-        | DhtOpType::StoreRecord
-        | DhtOpType::StoreEntry
-        | DhtOpType::RegisterUpdatedContent
-        | DhtOpType::RegisterUpdatedRecord => {
+        ChainOpType::RegisterAgentActivity
+        | ChainOpType::StoreRecord
+        | ChainOpType::StoreEntry
+        | ChainOpType::RegisterUpdatedContent
+        | ChainOpType::RegisterUpdatedRecord => {
             let mut update = fixt!(Update);
             seq_not_zero(&mut update.action_seq);
             if facts.last_action {
@@ -163,7 +163,7 @@ async fn create_and_insert_op(
             data.last_entry = update.entry_hash.clone();
             update.into()
         }
-        DhtOpType::RegisterDeletedBy | DhtOpType::RegisterDeletedEntryAction => {
+        ChainOpType::RegisterDeletedBy | ChainOpType::RegisterDeletedEntryAction => {
             let mut delete = fixt!(Delete);
             seq_not_zero(&mut delete.action_seq);
             if facts.last_action {
@@ -171,7 +171,7 @@ async fn create_and_insert_op(
             }
             delete.into()
         }
-        DhtOpType::RegisterAddLink => {
+        ChainOpType::RegisterAddLink => {
             let mut create_link = fixt!(CreateLink);
             seq_not_zero(&mut create_link.action_seq);
             if facts.last_entry {
@@ -180,7 +180,7 @@ async fn create_and_insert_op(
             data.last_link = ActionHash::with_data_sync(&Action::CreateLink(create_link.clone()));
             create_link.into()
         }
-        DhtOpType::RegisterRemoveLink => {
+        ChainOpType::RegisterRemoveLink => {
             let mut delete_link = fixt!(DeleteLink);
             seq_not_zero(&mut delete_link.action_seq);
             if facts.last_link {
@@ -200,7 +200,7 @@ async fn create_and_insert_op(
 
     data.last_action = ActionHash::with_data_sync(&action);
     let state = DhtOpHashed::from_content_sync(
-        DhtOp::from_type(op, SignedAction(action.clone(), fixt!(Signature)), entry).unwrap(),
+        ChainOp::from_type(op, SignedAction(action.clone(), fixt!(Signature)), entry).unwrap(),
     );
 
     // TODO unexpected write in data setup, was a DbRead
@@ -240,12 +240,12 @@ async fn test_data(db: &DbWrite<DbKindDht>) -> Expected {
         last_link: fixt!(ActionHash),
     };
     let ops_with_deps = [
-        DhtOpType::RegisterAgentActivity,
-        DhtOpType::RegisterRemoveLink,
-        DhtOpType::RegisterUpdatedContent,
-        DhtOpType::RegisterUpdatedRecord,
-        DhtOpType::RegisterDeletedBy,
-        DhtOpType::RegisterDeletedEntryAction,
+        ChainOpType::RegisterAgentActivity,
+        ChainOpType::RegisterRemoveLink,
+        ChainOpType::RegisterUpdatedContent,
+        ChainOpType::RegisterUpdatedRecord,
+        ChainOpType::RegisterDeletedBy,
+        ChainOpType::RegisterDeletedEntryAction,
     ];
     for op_type in ops_with_deps {
         let scenario = Scenario::without_dep(op_type);
