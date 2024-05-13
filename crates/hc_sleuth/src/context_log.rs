@@ -155,8 +155,9 @@ impl aitia::logging::Log for Context {
                     DhtOpLite::Chain(op) => ChainOpAction::from((**op).clone()),
                     _ => unimplemented!("hc_sleuth can only handle chain ops"),
                 };
-                self.map_dep_hash_to_op
-                    .insert(op.fetch_dependency_hash(), op_hash.clone());
+                for h in op.fetch_dependency_hashes() {
+                    self.map_dep_hash_to_op.insert(h, op_hash.clone());
+                }
                 self.map_action_to_op.insert(a, op_hash.clone());
                 self.map_op_to_sysval_dep_hashes
                     .insert(op_hash.clone(), op.dep.clone());

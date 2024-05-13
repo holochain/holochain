@@ -296,8 +296,7 @@ pub enum ChainOpType {
     RegisterRemoveLink,
 }
 impl ChainOpType {
-    /// Calculate the op's sys validation dependency action hash
-    // TODO: this must be generalized to support multiple dependencies
+    /// Calculate the op's sys validation dependencies (action hashes)
     pub fn sys_validation_dependencies(&self, action: &Action) -> SysValDeps {
         match self {
             ChainOpType::StoreRecord | ChainOpType::StoreEntry => vec![],
@@ -416,7 +415,6 @@ impl DhtOp {
     }
 
     /// Calculate the op's sys validation dependency action hash
-    // TODO: this must be generalized to support multiple dependencies
     pub fn sys_validation_dependencies(&self) -> SysValDeps {
         match self {
             Self::ChainOp(op) => op.get_type().sys_validation_dependencies(&op.action()),
@@ -692,25 +690,23 @@ impl DhtOpLite {
     /// For instance, `must_get_entry` will use an EntryHash, and requires a
     /// StoreEntry record to be integrated to succeed. All other must_gets take
     /// an ActionHash.
-    //
-    // TODO: this must be generalized to support multiple dependencies
-    pub fn fetch_dependency_hash(&self) -> AnyDhtHash {
+    pub fn fetch_dependency_hashes(&self) -> Vec<AnyDhtHash> {
         match self {
             Self::Chain(op) => match &**op {
-                ChainOpLite::StoreEntry(_, entry_hash, _) => entry_hash.clone().into(),
-                other => other.action_hash().clone().into(),
+                ChainOpLite::StoreEntry(_, entry_hash, _) => vec![entry_hash.clone().into()],
+                other => vec![other.action_hash().clone().into()],
             },
             Self::Warrant(op) => match &op.warrant {
                 Warrant::ChainIntegrity(w) => match w {
                     ChainIntegrityWarrant::InvalidChainOp {
                         action: action_hash,
                         ..
-                    } => action_hash.0.clone().into(),
+                    } => vec![action_hash.0.clone().into()],
                     ChainIntegrityWarrant::ChainFork { action_pair, .. } => {
-                        tracing::warn!(
-                            "ChainFork warrant only lists one of two dependencies. TODO: refactor"
-                        );
-                        action_pair.0 .0.clone().into()
+                        vec![
+                            action_pair.0 .0.clone().into(),
+                            action_pair.1 .0.clone().into(),
+                        ]
                     }
                 },
             },
