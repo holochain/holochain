@@ -139,7 +139,7 @@ pub fn run_one_epoch(
                 continue;
             }
         }
-        let mut arq = peers.get_mut(i).unwrap();
+        let arq = peers.get_mut(i).unwrap();
         let before = arq.absolute_length(topo) as f64;
         let before_pow = arq.power();
 
