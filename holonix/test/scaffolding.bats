@@ -20,7 +20,7 @@ teardown() {
   set -e
 
   print_version() {
-    echo "$(hc-scaffold --version)"
+    hc-scaffold --version
   }
 
   setup_and_build_hello_world() {
@@ -29,7 +29,6 @@ teardown() {
     hc-scaffold example hello-world
     cd hello-world
 
-    # TODO: override holochain version dynamically
     nix develop --command bash -c "
       set -e
       npm install
