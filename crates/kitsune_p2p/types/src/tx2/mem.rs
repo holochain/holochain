@@ -609,8 +609,8 @@ mod tests {
         println!("GOT RESPONSE: {}", String::from_utf8_lossy(&buf[..]));
         assert_eq!(b"world", &buf[..]);
 
-        ep1.close(0, "");
-        ep2.close(0, "");
+        ep1.close(0, "").await;
+        ep2.close(0, "").await;
 
         rt.await.unwrap().unwrap();
     }

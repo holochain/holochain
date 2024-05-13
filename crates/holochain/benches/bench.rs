@@ -59,9 +59,11 @@ static HOST_ACCESS_FIXTURATOR: Lazy<
 pub fn wasm_call_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("wasm_call_n");
 
-    for n in [1,         // 1 byte
-        1_000,     // 1 kb
-        1_000_000] {
+    for n in [
+        1,     // 1 byte
+        1_000, // 1 kb
+        1_000_000,
+    ] {
         group.throughput(Throughput::Bytes(n as _));
 
         group.bench_function(BenchmarkId::from_parameter(n), |b| {

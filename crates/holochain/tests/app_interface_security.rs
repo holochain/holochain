@@ -589,8 +589,6 @@ async fn create_token(
         .await
         .unwrap();
 
-    
-
     match issued {
         AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
         _ => panic!("Unexpected response"),
@@ -611,7 +609,6 @@ async fn create_multi_use_token(
         ))
         .await
         .unwrap();
-    
 
     match token_response {
         AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,

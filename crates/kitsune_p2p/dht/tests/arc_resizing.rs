@@ -273,7 +273,7 @@ fn test_degenerate_asymmetrical_coverage() {
     let extrapolated = view.extrapolated_coverage(&arq);
     assert_eq!(extrapolated, 5.0);
     let old = arq.clone();
-    let mut new = arq.clone();
+    let mut new = *arq;
     let resized = view.update_arq(&mut new);
     assert_eq!(old, new);
     assert!(!resized);

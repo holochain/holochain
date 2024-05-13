@@ -743,7 +743,7 @@ mod tests {
                     to_agent: test_agent(2),
                     data: wire::WireData(vec![]),
                 }),
-                respond: Box::new(|_| async move {  }.boxed()),
+                respond: Box::new(|_| async move {}.boxed()),
             })
             .await
             .unwrap();
@@ -949,7 +949,7 @@ mod tests {
                     to_agent: test_agent(1),
                     data: BroadcastData::User(test_agent(2).to_vec()),
                 }),
-                respond: Box::new(|_| async move {  }.boxed()),
+                respond: Box::new(|_| async move {}.boxed()),
             })
             .await
             .unwrap();
@@ -2176,7 +2176,6 @@ mod tests {
                 respond: Box::new(|r| {
                     async move {
                         send_res.send(r).unwrap();
-                        
                     }
                     .boxed()
                 }),

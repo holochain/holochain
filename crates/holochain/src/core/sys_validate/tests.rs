@@ -328,7 +328,7 @@ async fn check_valid_if_dna_test() {
     let keystore = test_keystore();
     let db = tmp.to_db();
     // Test data
-    let _activity_return = vec![ActionHash::arbitrary(&mut g).unwrap()];
+    let _activity_return = [ActionHash::arbitrary(&mut g).unwrap()];
 
     let mut dna_def = DnaDef::arbitrary(&mut g).unwrap();
     dna_def.modifiers.origin_time = Timestamp::MIN;
@@ -787,7 +787,7 @@ fn valid_chain_test() {
 
         // Test without dna at root gets rejected.
         let mut dna_not_at_root = actions.clone();
-        dna_not_at_root.push(actions[0].clone());
+        dna_not_at_root.push(*actions[0]);
         let err = validate_chain(dna_not_at_root.iter(), &None).expect_err("Dna not at root");
         assert_matches!(
             err,
