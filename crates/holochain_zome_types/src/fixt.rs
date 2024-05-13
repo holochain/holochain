@@ -359,7 +359,7 @@ fixturator!(
             CapAccessVariant::Unrestricted => CapAccess::from(()),
             CapAccessVariant::Transferable => CapAccess::from(CapSecretFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()),
             CapAccessVariant::Assigned => CapAccess::from((
-                CapSecretFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
+                Some(CapSecretFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()),
                 BTreeSet::new()
             ))
         }
@@ -376,7 +376,7 @@ fixturator!(
                 let number_of_assigned = rng.gen_range(0..5);
 
                 CapAccess::from((
-                    CapSecretFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
+                    Some(CapSecretFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
                     {
                         let mut set: BTreeSet<AgentPubKey> = BTreeSet::new();
                         for _ in 0..number_of_assigned {
@@ -394,7 +394,7 @@ fixturator!(
             CapAccessVariant::Unrestricted => CapAccess::from(()),
             CapAccessVariant::Transferable => CapAccess::from(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
             CapAccessVariant::Assigned => CapAccess::from((
-                CapSecretFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+                Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
             {
                 let mut set: BTreeSet<AgentPubKey> = BTreeSet::new();
                 for _ in 0..get_fixt_index!() % 3 {

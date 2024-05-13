@@ -111,13 +111,19 @@ impl CapGrant {
                     // The grant has no assignees so is always valid…
                     _ => true,
                 }
-                // The secret needs to match…
-                && match access {
-                    // Unless the extern is unrestricted.
-                    CapAccess::Unrestricted => true,
-                    // note the PartialEq implementation is constant time for secrets
-                    CapAccess::Transferable { secret, .. } => check_secret.map(|given| secret == given).unwrap_or(false),
-                    CapAccess::Assigned { secret, .. } => check_secret.map(|given| secret == given).unwrap_or(false),
+                // The secret needs to match, if provided
+                && {
+                    if let Some(given_secret) = check_secret {
+                        match access {
+                            // Unless the extern is unrestricted.
+                            CapAccess::Unrestricted => true,
+                            // note the PartialEq implementation is constant time for secrets
+                            CapAccess::Transferable { secret, .. } => secret == given_secret,
+                            CapAccess::Assigned { secret, .. } => secret.map(|secret| secret == *given_secret).unwrap_or(true)
+                        }
+                    } else {
+                        true
+                    }
                 }
             }
         }
@@ -141,7 +147,7 @@ pub enum CapAccess {
     /// Callable by anyone in the list of assignees who possesses the secret.
     Assigned {
         /// The secret.
-        secret: CapSecret,
+        secret: Option<CapSecret>,
         /// Agents who can use this grant.
         assignees: BTreeSet<AgentPubKey>,
     },
@@ -162,16 +168,16 @@ impl From<CapSecret> for CapAccess {
 }
 
 /// Implements (secret, assignees).into() shorthand for CapAccess::Assigned { secret, assignees }
-impl From<(CapSecret, BTreeSet<AgentPubKey>)> for CapAccess {
-    fn from((secret, assignees): (CapSecret, BTreeSet<AgentPubKey>)) -> Self {
+impl From<(Option<CapSecret>, BTreeSet<AgentPubKey>)> for CapAccess {
+    fn from((secret, assignees): (Option<CapSecret>, BTreeSet<AgentPubKey>)) -> Self {
         Self::Assigned { secret, assignees }
     }
 }
 
 /// Implements (secret, agent_pub_key).into() shorthand for
 /// CapAccess::Assigned { secret, assignees: hashset!{ agent } }
-impl From<(CapSecret, AgentPubKey)> for CapAccess {
-    fn from((secret, assignee): (CapSecret, AgentPubKey)) -> Self {
+impl From<(Option<CapSecret>, AgentPubKey)> for CapAccess {
+    fn from((secret, assignee): (Option<CapSecret>, AgentPubKey)) -> Self {
         let mut assignees = BTreeSet::new();
         assignees.insert(assignee);
         Self::from((secret, assignees))
