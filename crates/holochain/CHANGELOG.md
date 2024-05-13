@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- App validation workflow: Fix bug where ops were stuck in app validation when multiple ops were requiring the same action or entry hash. Such ops were erroneously filtered out from validation for being marked as ops awaiting hashes and not unmarked as awaiting once the hashes had arrived.
+
+## 0.4.0-dev.2
+
 - System validation: Added a new rule that no new actions are allowed following a chain close action.
 - App validation workflow: Add module-level documentation.
 - Validation: Remove unused type `DhtOpOrder`. This type is superseded by `OpOrder`.
