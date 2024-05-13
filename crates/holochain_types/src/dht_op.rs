@@ -259,7 +259,7 @@ impl FromSql for DhtOpType {
 }
 
 /// A sys validation dependency
-pub type SysValDep = Option<ActionHash>;
+pub type SysValDeps = Vec<ActionHash>;
 
 /// This enum is used to encode just the enum variant of ChainOp
 #[allow(missing_docs)]
@@ -298,29 +298,29 @@ pub enum ChainOpType {
 impl ChainOpType {
     /// Calculate the op's sys validation dependency action hash
     // TODO: this must be generalized to support multiple dependencies
-    pub fn sys_validation_dependency(&self, action: &Action) -> SysValDep {
+    pub fn sys_validation_dependencies(&self, action: &Action) -> SysValDeps {
         match self {
-            ChainOpType::StoreRecord | ChainOpType::StoreEntry => None,
+            ChainOpType::StoreRecord | ChainOpType::StoreEntry => vec![],
             ChainOpType::RegisterAgentActivity => action
                 .prev_action()
-                .map(|p| Some(p.clone()))
-                .unwrap_or_else(|| None),
+                .map(|p| vec![p.clone()])
+                .unwrap_or_else(|| vec![]),
             ChainOpType::RegisterUpdatedContent | ChainOpType::RegisterUpdatedRecord => {
                 match action {
-                    Action::Update(update) => Some(update.original_action_address.clone()),
-                    _ => None,
+                    Action::Update(update) => vec![update.original_action_address.clone()],
+                    _ => vec![],
                 }
             }
             ChainOpType::RegisterDeletedBy | ChainOpType::RegisterDeletedEntryAction => {
                 match action {
-                    Action::Delete(delete) => Some(delete.deletes_address.clone()),
-                    _ => None,
+                    Action::Delete(delete) => vec![delete.deletes_address.clone()],
+                    _ => vec![],
                 }
             }
-            ChainOpType::RegisterAddLink => None,
+            ChainOpType::RegisterAddLink => vec![],
             ChainOpType::RegisterRemoveLink => match action {
-                Action::DeleteLink(delete_link) => Some(delete_link.link_add_address.clone()),
-                _ => None,
+                Action::DeleteLink(delete_link) => vec![delete_link.link_add_address.clone()],
+                _ => vec![],
             },
         }
     }
@@ -417,17 +417,17 @@ impl DhtOp {
 
     /// Calculate the op's sys validation dependency action hash
     // TODO: this must be generalized to support multiple dependencies
-    pub fn sys_validation_dependency(&self) -> SysValDep {
+    pub fn sys_validation_dependencies(&self) -> SysValDeps {
         match self {
-            Self::ChainOp(op) => op.get_type().sys_validation_dependency(&op.action()),
+            Self::ChainOp(op) => op.get_type().sys_validation_dependencies(&op.action()),
             Self::WarrantOp(op) => match &op.warrant {
                 Warrant::ChainIntegrity(w) => match w {
                     ChainIntegrityWarrant::InvalidChainOp {
                         action: action_hash,
                         ..
-                    } => Some(action_hash.0.clone()),
+                    } => vec![action_hash.0.clone()],
                     ChainIntegrityWarrant::ChainFork { action_pair, .. } => {
-                        Some(action_pair.0 .0.clone())
+                        vec![action_pair.0 .0.clone()]
                     }
                 },
             },

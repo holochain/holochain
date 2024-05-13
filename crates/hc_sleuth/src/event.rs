@@ -25,7 +25,7 @@ pub struct OpInfo {
     #[deref]
     pub(crate) op: DhtOpLite,
     pub(crate) hash: DhtOpHash,
-    pub(crate) dep: SysValDep,
+    pub(crate) dep: SysValDeps,
 }
 
 impl OpInfo {
@@ -199,7 +199,7 @@ impl aitia::Fact for Event {
             // Ops can only be sys validated after being fetched from an authority, and after
             // its dependency has been integrated
             SysValidated { by, op } => {
-                let dep = ctx.sysval_op_dep(&op).map_err(mapper)?;
+                let dep = ctx.sysval_op_deps(&op).map_err(mapper)?;
 
                 let fetched = Fetched {
                     by: by.clone(),
@@ -207,7 +207,9 @@ impl aitia::Fact for Event {
                 }
                 .into();
 
-                if let Some(dep) = dep {
+                // TODO: this must be generalized to support multiple dependencies.
+                //       we're only using the first here.
+                if let Some(dep) = dep.first() {
                     let integrated = Dep::from(Integrated {
                         by,
                         op: dep.hash.clone(),

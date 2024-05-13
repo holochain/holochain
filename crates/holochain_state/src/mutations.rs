@@ -18,7 +18,7 @@ use holochain_types::dht_op::DhtOpLite;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
-use holochain_types::prelude::SysValDep;
+use holochain_types::prelude::SysValDeps;
 use holochain_types::prelude::{DhtOpError, SignedValidationReceipt};
 use holochain_types::sql::AsSql;
 use holochain_zome_types::block::Block;
@@ -124,7 +124,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
         insert_action(txn, &action_hashed)?;
     }
 
-    let dependency = op.sys_validation_dependency();
+    let dependency = op.sys_validation_dependencies();
     insert_op_lite(txn, &op_lite, hash, &op_order, &timestamp)?;
     set_dependency(txn, hash, dependency)?;
     Ok(())
@@ -387,9 +387,12 @@ pub fn set_validation_status(
 pub fn set_dependency(
     txn: &mut Transaction,
     hash: &DhtOpHash,
-    dependency: SysValDep,
+    deps: SysValDeps,
 ) -> StateMutationResult<()> {
-    if let Some(dep) = dependency {
+    // NOTE: this is only the FIRST dependency. This was written at a time when sys validation
+    // only had a notion of one dependency. This db field is not used, so we're not putting too
+    // much effort into getting all deps into the database.
+    if let Some(dep) = deps.first() {
         dht_op_update!(txn, hash, {
             "dependency": dep,
         })?;

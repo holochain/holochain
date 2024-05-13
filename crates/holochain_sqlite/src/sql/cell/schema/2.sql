@@ -127,7 +127,8 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     num_validation_attempts     INTEGER     NULL,
     last_validation_attempt     INTEGER     NULL,
 
-    -- The integration dependency if there is one.
+    -- The FIRST integration dependency if there is one.
+    -- if there are more than one dependency, only the first will be listed here.
     dependency          BLOB           NULL,
 
 
