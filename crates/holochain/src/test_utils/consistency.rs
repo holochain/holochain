@@ -689,7 +689,7 @@ where
         Action.blob as action_blob,
         Entry.blob as entry_blob
         FROM DhtOp
-        JOIN
+        LEFT JOIN
         Action ON DhtOp.action_hash = Action.hash
         LEFT JOIN
         Entry ON Action.entry_hash = Entry.hash
@@ -716,7 +716,7 @@ where
                     let loc: u32 = row.get("loc")?;
                     let op = holochain_state::query::map_sql_dht_op(false, "dht_type", row)?;
 
-                    StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
+                    Ok((loc.into(), h.into_kitsune_raw(), op))
                 },
             )?
             .collect::<StateQueryResult<_>>()?

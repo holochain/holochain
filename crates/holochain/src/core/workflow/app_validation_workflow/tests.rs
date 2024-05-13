@@ -1025,7 +1025,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
         "
         SELECT DhtOp.type, Action.hash, Action.blob
         FROM DhtOp
-        JOIN Action ON DhtOp.action_hash = Action.hash
+        LEFT JOIN Action ON DhtOp.action_hash = Action.hash
         WHERE
         when_integrated IS NULL
     ",

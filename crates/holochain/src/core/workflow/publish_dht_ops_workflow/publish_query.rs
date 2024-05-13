@@ -80,7 +80,7 @@ where
                     let hash: DhtOpHash = row.get("dht_hash")?;
                     let op_hash_sized = OpHashSized::new(hash.to_kitsune(), Some(op_size));
                     let basis = op.dht_basis();
-                    WorkflowResult::Ok((basis, op_hash_sized, op))
+                    WorkflowResult::Ok((basis, op_hash_sized, op.into()))
                 },
             )?;
             WorkflowResult::Ok(r.collect())

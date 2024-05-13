@@ -30,7 +30,7 @@ async fn get_ops_to_validate(
         DhtOp.type as dht_type,
         DhtOp.hash as dht_hash
         FROM DhtOp
-        JOIN
+        LEFT JOIN
         Action ON DhtOp.action_hash = Action.hash
         LEFT JOIN
         Entry ON Action.entry_hash = Entry.hash
