@@ -303,7 +303,7 @@ impl ChainOpType {
             ChainOpType::RegisterAgentActivity => action
                 .prev_action()
                 .map(|p| vec![p.clone()])
-                .unwrap_or_else(|| vec![]),
+                .unwrap_or_else(Vec::new),
             ChainOpType::RegisterUpdatedContent | ChainOpType::RegisterUpdatedRecord => {
                 match action {
                     Action::Update(update) => vec![update.original_action_address.clone()],

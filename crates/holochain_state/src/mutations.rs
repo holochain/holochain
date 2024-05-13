@@ -124,9 +124,9 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
         insert_action(txn, &action_hashed)?;
     }
 
-    let dependency = op.sys_validation_dependencies();
+    let deps = op.sys_validation_dependencies();
     insert_op_lite(txn, &op_lite, hash, &op_order, &timestamp)?;
-    set_dependency(txn, hash, dependency)?;
+    set_dependency(txn, hash, deps)?;
     Ok(())
 }
 

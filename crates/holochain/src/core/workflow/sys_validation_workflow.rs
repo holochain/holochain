@@ -260,14 +260,14 @@ async fn sys_validation_workflow_inner(
 
         // This is an optimization to skip app validation and integration for ops that are
         // rejected and don't have dependencies.
-        let dependency = op.sys_validation_dependencies();
+        let deps = op.sys_validation_dependencies();
 
         // Note that this is async only because of the signature checks done during countersigning.
         // In most cases this will be a fast synchronous call.
         let r = validate_op(&op, &dna_def, current_validation_dependencies.clone()).await;
 
         match r {
-            Ok(outcome) => validation_outcomes.push((op_hash, outcome, dependency)),
+            Ok(outcome) => validation_outcomes.push((op_hash, outcome, deps)),
             Err(e) => {
                 tracing::error!(error = ?e, "Error validating op");
             }
