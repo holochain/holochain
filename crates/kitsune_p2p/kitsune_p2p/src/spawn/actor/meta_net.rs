@@ -964,6 +964,7 @@ impl MetaNet {
         tracing::info!(?tx5_config, "meta net startup tx5");
 
         if let Err(err) = (tx5::Tx5InitConfig {
+            tracing_enabled: tuning_params.tx5_backend_tracing_enabled,
             ephemeral_udp_port_min: tuning_params.tx5_min_ephemeral_udp_port,
             ephemeral_udp_port_max: tuning_params.tx5_max_ephemeral_udp_port,
         })

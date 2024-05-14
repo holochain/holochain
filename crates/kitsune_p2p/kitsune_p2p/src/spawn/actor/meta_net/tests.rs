@@ -436,6 +436,7 @@ impl Setup2Nodes {
     ) -> Self {
         let mut tuning_params = config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning_params.tx2_implicit_timeout_ms = 500;
+        tuning_params.tx5_timeout_s = 4;
         let tuning_params = Arc::new(tuning_params);
 
         let (sig_addr, _sig_hnd) = start_signal_srv().await;
@@ -806,6 +807,7 @@ async fn preflight_user_data_mismatch() {
     let ud1 = PreflightUserData {
         bytes: vec![1, 2, 3],
         comparator: Box::new(|_, r| {
+            println!("want 1, 2, 3, got {r:?}");
             (r == &[1, 2, 3])
                 .then_some(())
                 .ok_or("preflight mismatch".into())
@@ -814,6 +816,7 @@ async fn preflight_user_data_mismatch() {
     let ud2 = PreflightUserData {
         bytes: vec![9, 8, 7, 6, 5],
         comparator: Box::new(|_, r| {
+            println!("want 9, 8, 7, 6, 5, got {r:?}");
             (r == &[9, 8, 7, 6, 5])
                 .then_some(())
                 .ok_or("preflight mismatch".into())
@@ -822,12 +825,14 @@ async fn preflight_user_data_mismatch() {
 
     let nodes = Setup2Nodes::new_with_user_data(test, ud1, ud2).await;
 
+    println!("get con");
     let con = nodes
         .send1
         .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
         .await
         .unwrap();
 
+    println!("notify");
     // This should error out because preflight failed due to user data mismatch
     if con
         .notify(
@@ -837,6 +842,7 @@ async fn preflight_user_data_mismatch() {
         .await
         .is_ok()
     {
+        println!("WARN! notify was OKAY");
         // ...but if it *doesn't* error, the request should at least timeout because
         // preflight user data doesn't match
         //

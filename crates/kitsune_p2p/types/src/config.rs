@@ -273,6 +273,9 @@ pub mod tuning_params_struct {
         /// Tx5 max ephemeral port
         tx5_max_ephemeral_udp_port: u16 = 65535,
 
+        /// Set this to `true` to enable verbose webrtc backend tracing.
+        tx5_backend_tracing_enabled: bool = false,
+
         /// if you would like to be able to use an external tool
         /// to debug the QUIC messages sent and received by kitsune
         /// you'll need the decryption keys.
