@@ -2,6 +2,7 @@
 members = [
   "agent_info",
   "anchor",
+  "app_validation",
   "bench",
   "capability",
   "clone",
