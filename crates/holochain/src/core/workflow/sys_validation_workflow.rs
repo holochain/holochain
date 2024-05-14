@@ -398,7 +398,7 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
         .filter_map(|op| {
             // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
             match &op.content {
-                DhtOp::ChainOp(op) => match op {
+                DhtOp::ChainOp(op) => match &**op {
                     ChainOp::StoreRecord(_, action, entry) => {
                         let mut actions = match entry {
                             RecordEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
@@ -469,7 +469,18 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                     }
                     _ => None,
                 },
-                DhtOp::WarrantOp(_op) => unreachable!("todo: warrants"),
+                DhtOp::WarrantOp(op) => match &op.warrant {
+                    Warrant::ChainIntegrity(warrant) => match warrant {
+                        ChainIntegrityWarrant::InvalidChainOp {
+                            action: (action_hash, _),
+                            ..
+                        } => Some(vec![action_hash.clone()]),
+                        ChainIntegrityWarrant::ChainFork {
+                            action_pair: ((a1, _), (a2, _)),
+                            ..
+                        } => Some(vec![a1.clone(), a2.clone()]),
+                    },
+                },
             }
         })
         .flatten()
@@ -499,7 +510,7 @@ pub(crate) async fn validate_op(
 ) -> WorkflowResult<Outcome> {
     let result = match op {
         DhtOp::ChainOp(op) => validate_chain_op(op, dna_def, validation_dependencies).await,
-        DhtOp::WarrantOp(_op) => unreachable!("todo: warrants"),
+        DhtOp::WarrantOp(op) => validate_warrant_op(op, dna_def, validation_dependencies).await,
     };
     match result {
         Ok(_) => Ok(Outcome::Accepted),
@@ -542,7 +553,7 @@ pub(crate) async fn validate_op(
 fn handle_failed(error: &ValidationOutcome) -> Outcome {
     use Outcome::*;
     match error {
-        ValidationOutcome::Counterfeit(_, _) => {
+        ValidationOutcome::CounterfeitAction(_, _) => {
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
         ValidationOutcome::DepMissingFromDht(dep) => MissingDhtDep(dep.clone()),
@@ -594,7 +605,7 @@ async fn validate_chain_op(
                         session_data,
                     )? {
                         // Just require that we are holding all the other actions
-                        let mut validation_dependencies = validation_dependencies.lock();
+                        let validation_dependencies = validation_dependencies.lock();
                         validation_dependencies
                             .get(&action_hash)
                             .and_then(|s| s.as_action())
@@ -624,7 +635,7 @@ async fn validate_chain_op(
                     session_data,
                 )? {
                     // Just require that we are holding all the other actions
-                    let mut validation_dependencies = validation_dependencies.lock();
+                    let validation_dependencies = validation_dependencies.lock();
                     validation_dependencies
                         .get(&action_hash)
                         .and_then(|s| s.as_action())
@@ -680,6 +691,100 @@ async fn validate_chain_op(
     }
 }
 
+async fn validate_warrant_op(
+    op: &WarrantOp,
+    _dna_def: &DnaDefHashed,
+    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+) -> SysValidationResult<()> {
+    match &op.warrant {
+        Warrant::ChainIntegrity(warrant) => match warrant {
+            ChainIntegrityWarrant::InvalidChainOp {
+                action: (action_hash, action_sig),
+                action_author,
+                ..
+            } => {
+                let action = {
+                    let deps = validation_dependencies.lock();
+                    let action = deps
+                        .get(action_hash)
+                        .and_then(|s| s.as_action())
+                        .ok_or_else(|| {
+                            ValidationOutcome::DepMissingFromDht(action_hash.clone().into())
+                        })?;
+
+                    if action.author() != action_author {
+                        return Err(ValidationOutcome::InvalidWarrantOp(
+                            op.clone(),
+                            "action author mismatch".into(),
+                        )
+                        .into());
+                    }
+                    action.clone()
+                };
+                verify_action_signature(action_sig, &action).await?;
+
+                Ok(())
+            }
+            ChainIntegrityWarrant::ChainFork {
+                action_pair: ((a1, a1_sig), (a2, a2_sig)),
+                chain_author,
+                ..
+            } => {
+                let (action1, action2) = {
+                    let deps = validation_dependencies.lock();
+                    let action1 = deps
+                        .get(a1)
+                        .and_then(|s| s.as_action())
+                        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a1.clone().into()))?;
+                    let action2 = deps
+                        .get(a2)
+                        .and_then(|s| s.as_action())
+                        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a2.clone().into()))?;
+
+                    // chain_author basis must match the author of the action
+                    if action1.author() != chain_author {
+                        return Err(ValidationOutcome::InvalidWarrantOp(
+                            op.clone(),
+                            "chain author mismatch".into(),
+                        )
+                        .into());
+                    }
+
+                    // Both actions must be by same author
+                    if action1.author() != action2.author() {
+                        return Err(ValidationOutcome::InvalidWarrantOp(
+                            op.clone(),
+                            "action pair author mismatch".into(),
+                        )
+                        .into());
+                    }
+
+                    // A fork is evidenced by two actions with a common predecessor.
+                    // NOTE: we could also check sequence numbers, but then we'd have to traverse
+                    // both forks backwards until reaching a common ancestor to protect against an
+                    // attack where someone authors a warrant using two actions from two different DNAs.
+                    // Using seq numbers makes it easier to detect and prove a fork, but using prev_action
+                    // prevents the attack.
+                    if action1.prev_action() != action2.prev_action() {
+                        return Err(ValidationOutcome::InvalidWarrantOp(
+                            op.clone(),
+                            "action pair seq mismatch".into(),
+                        )
+                        .into());
+                    }
+
+                    (action1.clone(), action2.clone())
+                };
+
+                verify_action_signature(a1_sig, &action1).await?;
+                verify_action_signature(a2_sig, &action2).await?;
+
+                Ok(())
+            }
+        },
+    }
+}
+
 /// Run system validation for a single [`Record`] instead of the usual [`DhtOp`] input for the system validation workflow.
 /// It is expected that the provided cascade will include a network so that dependencies which we either do not hold yet, or
 /// should not hold, can be fetched and cached for use in validation.
@@ -714,7 +819,7 @@ async fn sys_validate_record_inner(
     let signature = record.signature();
     let action = record.action();
     let maybe_entry = record.entry().as_option();
-    counterfeit_check(signature, action).await?;
+    counterfeit_check_action(signature, action).await?;
 
     async fn validate(
         action: &Action,
@@ -772,11 +877,21 @@ async fn sys_validate_record_inner(
     }
 }
 
-/// Check if the op has valid signature and author.
+/// Check if the chain op has valid signature and author.
 /// Ops that fail this check should be dropped.
-pub async fn counterfeit_check(signature: &Signature, action: &Action) -> SysValidationResult<()> {
+pub async fn counterfeit_check_action(
+    signature: &Signature,
+    action: &Action,
+) -> SysValidationResult<()> {
     verify_action_signature(signature, action).await?;
     author_key_is_valid(action.author()).await?;
+    Ok(())
+}
+
+/// Check if the warrant op has valid signature and author.
+pub async fn counterfeit_check_warrant(warrant_op: &WarrantOp) -> SysValidationResult<()> {
+    verify_warrant_signature(warrant_op).await?;
+    author_key_is_valid(&warrant_op.author).await?;
     Ok(())
 }
 
@@ -792,7 +907,7 @@ fn register_agent_activity(
     check_prev_action(action)?;
     check_valid_if_dna(action, dna_def)?;
     if let Some(prev_action_hash) = prev_action_hash {
-        let mut validation_dependencies = validation_dependencies.lock();
+        let validation_dependencies = validation_dependencies.lock();
         let prev_action = validation_dependencies
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
@@ -820,7 +935,7 @@ fn store_record(
     // Checks
     check_prev_action(action)?;
     if let Some(prev_action_hash) = prev_action_hash {
-        let mut validation_dependencies = validation_dependencies.lock();
+        let validation_dependencies = validation_dependencies.lock();
         let prev_action = validation_dependencies
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
@@ -851,7 +966,7 @@ async fn store_entry(
     // Additional checks if this is an Update
     if let NewEntryActionRef::Update(entry_update) = action {
         let original_action_address = &entry_update.original_action_address;
-        let mut validation_dependencies = validation_dependencies.lock();
+        let validation_dependencies = validation_dependencies.lock();
         let original_action = validation_dependencies
             .get(original_action_address)
             .and_then(|s| s.as_action())
@@ -876,7 +991,7 @@ fn register_updated_content(
     // Get data ready to validate
     let original_action_address = &entry_update.original_action_address;
 
-    let mut validation_dependencies = validation_dependencies.lock();
+    let validation_dependencies = validation_dependencies.lock();
     let original_action = validation_dependencies
         .get(original_action_address)
         .and_then(|s| s.as_action())
@@ -894,7 +1009,7 @@ fn register_updated_record(
     // Get data ready to validate
     let original_action_address = &record_update.original_action_address;
 
-    let mut validation_dependencies = validation_dependencies.lock();
+    let validation_dependencies = validation_dependencies.lock();
     let original_action = validation_dependencies
         .get(original_action_address)
         .and_then(|s| s.as_action())
@@ -912,7 +1027,7 @@ fn register_deleted_by(
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
-    let mut validation_dependencies = validation_dependencies.lock();
+    let validation_dependencies = validation_dependencies.lock();
     let action = validation_dependencies
         .get(removed_action_address)
         .and_then(|s| s.as_action())
@@ -930,7 +1045,7 @@ fn register_deleted_entry_action(
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
-    let mut validation_dependencies = validation_dependencies.lock();
+    let validation_dependencies = validation_dependencies.lock();
     let action = validation_dependencies
         .get(removed_action_address)
         .and_then(|s| s.as_action())
@@ -953,7 +1068,7 @@ fn register_delete_link(
     let link_add_address = &link_remove.link_add_address;
 
     // Just require that this link exists, don't need to check anything else about it here
-    let mut validation_dependencies = validation_dependencies.lock();
+    let validation_dependencies = validation_dependencies.lock();
     let add_link_action = validation_dependencies
         .get(link_add_address)
         .and_then(|s| s.as_action())

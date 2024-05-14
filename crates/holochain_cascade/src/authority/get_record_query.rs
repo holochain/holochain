@@ -109,7 +109,6 @@ impl Query for GetRecordOpsQuery {
         let entry_hash = state.action.as_ref().and_then(|wire_op| {
             wire_op
                 .data
-                .0
                 .entry_data()
                 .map(|(hash, et)| (hash, et.visibility()))
         });

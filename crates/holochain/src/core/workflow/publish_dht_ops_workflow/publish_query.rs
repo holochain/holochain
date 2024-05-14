@@ -7,6 +7,7 @@ use holochain_p2p::DhtOpHashExt;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::prelude::ReadAccess;
 use holochain_state::prelude::*;
+use holochain_state::query::map_sql_dht_op;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use rusqlite::named_params;
 use rusqlite::Transaction;
@@ -71,29 +72,15 @@ where
                     ":store_entry": ChainOpType::StoreEntry,
                 },
                 |row| {
+                    let op = map_sql_dht_op(false, "dht_type", row)?;
                     let action_size: usize = row.get("action_size")?;
                     // will be NULL if the op has no associated entry
                     let entry_size: Option<usize> = row.get("entry_size")?;
                     let op_size = (action_size + entry_size.unwrap_or(0)).into();
-                    let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                    let op_type: DhtOpType = row.get("dht_type")?;
                     let hash: DhtOpHash = row.get("dht_hash")?;
                     let op_hash_sized = OpHashSized::new(hash.to_kitsune(), Some(op_size));
-                    let entry = match action.0.entry_type().map(|et| et.visibility()) {
-                        Some(EntryVisibility::Public) => {
-                            let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                            match entry {
-                                Some(entry) => Some(from_blob::<Entry>(entry)?),
-                                None => None,
-                            }
-                        }
-                        _ => None,
-                    };
-                    let op = match op_type {
-                        DhtOpType::Chain(op_type) => ChainOp::from_type(op_type, action, entry)?,
-                    };
                     let basis = op.dht_basis();
-                    WorkflowResult::Ok((basis, op_hash_sized, op.into()))
+                    WorkflowResult::Ok((basis, op_hash_sized, op))
                 },
             )?;
             WorkflowResult::Ok(r.collect())

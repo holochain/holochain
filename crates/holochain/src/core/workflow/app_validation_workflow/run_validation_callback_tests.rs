@@ -724,7 +724,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     update.author = bob.clone();
     update.original_action_address = create_action.clone().to_hash();
     let update_action_signed_hashed = SignedHashed::new_unchecked(update.clone(), fixt!(Signature));
-    let update_dht_op = DhtOp::RegisterUpdatedContent(
+    let update_dht_op = ChainOp::RegisterUpdatedContent(
         update_action_signed_hashed.signature.clone(),
         update.clone(),
         RecordEntry::Present(new_entry.clone()),
@@ -795,7 +795,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
     .unwrap();
 
     // while create action has not been fetched, filtering out ops with missing dependencies should filter out update op
-    let ops_to_validate = vec![update_dht_op.clone().into_hashed()];
+    let ops_to_validate = vec![DhtOpHashed::from_content_sync(update_dht_op.clone())];
     let filtered_ops_to_validate = validation_dependencies
         .lock()
         .filter_ops_missing_dependencies(ops_to_validate.clone());

@@ -30,11 +30,13 @@ CREATE TABLE IF NOT EXISTS Entry (
 CREATE TABLE IF NOT EXISTS Action (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             TEXT           NOT NULL,
-    seq              INTEGER        NOT NULL,
     author           BLOB           NOT NULL,
 
     blob             BLOB           NOT NULL,
     prev_hash        BLOB           NULL,
+
+    -- Actions only
+    seq              INTEGER        NULL,
 
     -- Create / Update
     entry_hash       BLOB           NULL,
@@ -86,7 +88,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             TEXT           NOT NULL,
     basis_hash       BLOB           NOT NULL,
-    action_hash      BLOB           NULL,
+    action_hash      BLOB           NOT NULL,
     require_receipt  INTEGER        NOT NULL,      -- BOOLEAN
 
     storage_center_loc          INTEGER   NOT NULL,
@@ -165,4 +167,3 @@ CREATE TABLE IF NOT EXISTS ScheduledFunctions (
     ephemeral BOOLEAN NOT NULL,
     PRIMARY KEY (zome_name, scheduled_fn, author) ON CONFLICT ROLLBACK
 );
-

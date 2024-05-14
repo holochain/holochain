@@ -71,11 +71,11 @@ pub(crate) fn incoming_countersigning(
 
                 // Get the entry hash from an action.
                 // If the actions have different entry hashes they will fail validation.
-                if let Some(entry_hash) = action_set.first().and_then(|h| h.entry_hash().cloned()) {
+                if let Some(entry_hash) = action_set.first().and_then(|a| a.entry_hash().cloned()) {
                     // Hash the required actions.
                     let required_actions: Vec<_> = action_set
                         .into_iter()
-                        .map(|h| ActionHash::with_data_sync(&h))
+                        .map(|a| ActionHash::with_data_sync(&a))
                         .collect();
 
                     // Check if already timed out.
@@ -169,13 +169,13 @@ pub(crate) async fn countersigning_success(
     // Using iterators is fine in this function as there can only be a maximum of 8 actions.
     let (this_cells_action_hash, entry_hash) = match signed_actions
         .iter()
-        .find(|h| *h.0.author() == author)
-        .and_then(|sh| {
-            sh.0.entry_hash()
+        .find(|a| *a.author() == author)
+        .and_then(|sa| {
+            sa.entry_hash()
                 .cloned()
-                .map(|eh| (ActionHash::with_data_sync(&sh.0), eh))
+                .map(|eh| (ActionHash::with_data_sync(sa), eh))
         }) {
-        Some(h) => h,
+        Some(a) => a,
         None => return Ok(()),
     };
 
@@ -223,11 +223,16 @@ pub(crate) async fn countersigning_success(
 
     // Verify signatures of actions.
     let mut i_am_an_author = false;
-    for SignedAction(action, signature) in &signed_actions {
-        if !action.author().verify_signature(signature, action).await? {
+    for sa in &signed_actions {
+        if !sa
+            .action()
+            .author()
+            .verify_signature(sa.signature(), sa.action())
+            .await?
+        {
             return Ok(());
         }
-        if action.author() == &author {
+        if sa.action().author() == &author {
             i_am_an_author = true;
         }
     }
@@ -239,7 +244,7 @@ pub(crate) async fn countersigning_success(
     // Hash actions.
     let incoming_actions: Vec<_> = signed_actions
         .iter()
-        .map(|SignedAction(h, _)| ActionHash::with_data_sync(h))
+        .map(ActionHash::with_data_sync)
         .collect();
 
     let result = authored_db
@@ -254,9 +259,9 @@ pub(crate) async fn countersigning_success(
                     let stored_actions = cs.build_action_set(entry_hash, weight)?;
                     if stored_actions.len() == incoming_actions.len() {
                         // Check all stored action hashes match an incoming action hash.
-                        if stored_actions.iter().all(|h| {
-                            let h = ActionHash::with_data_sync(h);
-                            incoming_actions.iter().any(|i| *i == h)
+                        if stored_actions.iter().all(|a| {
+                            let a = ActionHash::with_data_sync(a);
+                            incoming_actions.iter().any(|i| *i == a)
                         }) {
                             // All checks have passed so unlock the chain.
                             mutations::unlock_chain(txn, &author)?;
@@ -290,7 +295,8 @@ pub(crate) async fn countersigning_success(
         .await?;
         integration_trigger.trigger(&"countersigning_success");
         // Publish other signers agent activity ops to their agent activity authorities.
-        for SignedAction(action, signature) in signed_actions {
+        for sa in signed_actions {
+            let (action, signature) = sa.into();
             if *action.author() == author {
                 continue;
             }
@@ -436,7 +442,7 @@ impl CountersigningWorkspace {
                                 // Agents to notify.
                                 agents.push(action.author().clone());
                                 // Signed actions to notify them with.
-                                actions.push(SignedAction(action, signature));
+                                actions.push(SignedAction::new(action, signature));
                                 // Ops to validate.
                                 ops.push((op_hash, op));
                                 (agents, ops, actions)

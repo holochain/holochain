@@ -13,7 +13,6 @@ pub use error::*;
 pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-pub use holochain_zome_types::prelude::*;
 
 #[allow(missing_docs)]
 mod error;
@@ -38,7 +37,24 @@ pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysVal
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::Counterfeit((*sig).clone(), (*action).clone()),
+            ValidationOutcome::CounterfeitAction((*sig).clone(), (*action).clone()),
+        ))
+    }
+}
+
+/// Verify the signature for this warrant
+pub async fn verify_warrant_signature(warrant_op: &WarrantOp) -> SysValidationResult<()> {
+    let WarrantOp {
+        author,
+        signature,
+        warrant,
+        timestamp: _,
+    } = warrant_op;
+    if author.verify_signature(signature, warrant).await? {
+        Ok(())
+    } else {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::CounterfeitWarrant(warrant_op.clone()),
         ))
     }
 }

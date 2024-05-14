@@ -777,7 +777,7 @@ impl Cell {
 
             // If the action has an app entry type get the entry def
             // from the conductor.
-            let required_receipt_count = match action.as_ref().and_then(|h| h.0.entry_type()) {
+            let required_receipt_count = match action.as_ref().and_then(|h| h.entry_type()) {
                 Some(EntryType::App(AppEntryDef {
                     zome_index,
                     entry_index,

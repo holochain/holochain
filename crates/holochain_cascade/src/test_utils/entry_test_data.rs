@@ -93,14 +93,22 @@ impl EntryTestData {
             entry.clone(),
         ));
 
-        let wire_create = Judged::valid(SignedAction(create_action, signature).try_into().unwrap());
+        let wire_create = Judged::valid(
+            SignedAction::new(create_action, signature)
+                .try_into()
+                .unwrap(),
+        );
 
         let signature = fixt!(Signature);
         let delete_entry_action_op = ChainOpHashed::from_content_sync(
             ChainOp::RegisterDeletedEntryAction(signature.clone(), delete),
         );
 
-        let wire_delete = Judged::valid(SignedAction(delete_action, signature).try_into().unwrap());
+        let wire_delete = Judged::valid(
+            SignedAction::new(delete_action, signature)
+                .try_into()
+                .unwrap(),
+        );
 
         let signature = fixt!(Signature);
         let update_content_op = ChainOpHashed::from_content_sync(ChainOp::RegisterUpdatedContent(
@@ -108,7 +116,11 @@ impl EntryTestData {
             update,
             update_entry.into(),
         ));
-        let wire_update = Judged::valid(SignedAction(update_action, signature).try_into().unwrap());
+        let wire_update = Judged::valid(
+            SignedAction::new(update_action, signature)
+                .try_into()
+                .unwrap(),
+        );
 
         let signature = fixt!(Signature);
         let create_link_op = ChainOpHashed::from_content_sync(ChainOp::RegisterAddLink(

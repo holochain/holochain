@@ -2,6 +2,7 @@ SELECT
   DhtOp.hash,
   DhtOp.type,
   Action.blob AS action_blob,
+  Action.author AS author,
   Entry.blob AS entry_blob
 FROM
   DhtOp

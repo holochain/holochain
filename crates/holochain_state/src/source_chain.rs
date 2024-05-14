@@ -291,7 +291,7 @@ impl SourceChain {
 
         let ops_to_integrate = ops
             .iter()
-            .map(|op| (op.1.clone(), op.0.dht_basis().clone()))
+            .map(|op| (op.1.clone(), op.0.dht_basis()))
             .collect::<Vec<_>>();
 
         // Write the entries, actions and ops to the database in one transaction.
@@ -813,7 +813,7 @@ where
                             args.iter().map(|a| (a.0.as_str(), a.1.as_ref())).collect::<Vec<(&str, &dyn rusqlite::ToSql)>>().as_slice(),
                             |row| {
                                 let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                                let SignedAction(action, signature) = action;
+                                let (action, signature) = action.into();
                                 let private_entry = action
                                     .entry_type()
                                     .map_or(false, |e| *e.visibility() == EntryVisibility::Private);
@@ -948,7 +948,8 @@ fn build_ops_from_actions(
             let op_type = op.get_type();
             let op = DhtOpLite::from(op);
             // Action is required by value to produce the DhtOpHash.
-            let (action, op_hash) = UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
+            let (action, op_hash) =
+                DhtOpUniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
             let op_order = OpOrder::new(op_type, action.timestamp());
             let timestamp = action.timestamp();
             // Put the action back by value.
@@ -1106,7 +1107,7 @@ pub fn put_raw(
     for op in &ops {
         let op_type = op.get_type();
         let (h, op_hash) =
-            UniqueForm::op_hash(op_type, action.take().expect("This can't be empty"))?;
+            DhtOpUniqueForm::op_hash(op_type, action.take().expect("This can't be empty"))?;
         let op_order = OpOrder::new(op_type, h.timestamp());
         let timestamp = h.timestamp();
         action = Some(h);
@@ -1268,7 +1269,8 @@ pub async fn dump_state(
                         ":author": author,
                     },
                     |row| {
-                        let SignedAction(action, signature) = from_blob(row.get("action_blob")?)?;
+                        let action: SignedAction = from_blob(row.get("action_blob")?)?;
+                        let (action, signature) = action.into();
                         let action_address = row.get("action_hash")?;
                         let entry: Option<Vec<u8>> = row.get("entry_blob")?;
                         let entry: Option<Entry> = match entry {

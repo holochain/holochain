@@ -79,3 +79,53 @@ impl SignEphemeral {
         self.0
     }
 }
+
+/// Some data with a signature attached.
+///
+/// Note that this is not a desirable pattern, because we sign serialized data,
+/// and associating the signature with the unserialized data means that if the
+/// serialization changes at all, the signature will no longer be valid.
+/// We should structure our flows to only handle signatures in the context of
+/// serialized data, and this kind of type should reflect that.
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    derive_more::Constructor,
+    derive_more::Deref,
+    derive_more::From,
+    derive_more::Into,
+)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+pub struct Signed<T>
+where
+    T: serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[deref]
+    #[serde(bound(deserialize = "T: serde::de::DeserializeOwned"))]
+    data: T,
+    signature: Signature,
+}
+
+impl<T> Signed<T>
+where
+    T: serde::Serialize + serde::de::DeserializeOwned,
+{
+    /// Accessor for the signed data
+    pub fn data(&self) -> &T {
+        &self.data
+    }
+
+    /// Accessor for the signed data
+    pub fn into_data(self) -> T {
+        self.data
+    }
+
+    /// Accessor for the Signature
+    pub fn signature(&self) -> &Signature {
+        &self.signature
+    }
+}

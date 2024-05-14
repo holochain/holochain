@@ -304,7 +304,7 @@ impl TestData {
     }
 
     fn add_link_scratch(&mut self) {
-        let action = SignedActionHashed::from_content_sync(SignedAction(
+        let action = SignedActionHashed::from_content_sync(SignedAction::new(
             Action::CreateLink(self.link_add.clone()),
             fixt!(Signature),
         ));
@@ -312,7 +312,7 @@ impl TestData {
     }
 
     fn add_link_given_scratch(&mut self, scratch: &mut Scratch) {
-        let action = SignedActionHashed::from_content_sync(SignedAction(
+        let action = SignedActionHashed::from_content_sync(SignedAction::new(
             Action::CreateLink(self.link_add.clone()),
             fixt!(Signature),
         ));
@@ -333,7 +333,7 @@ impl TestData {
     }
 
     fn delete_link_scratch(&mut self) {
-        let action = SignedActionHashed::from_content_sync(SignedAction(
+        let action = SignedActionHashed::from_content_sync(SignedAction::new(
             Action::DeleteLink(self.link_remove.clone()),
             fixt!(Signature),
         ));

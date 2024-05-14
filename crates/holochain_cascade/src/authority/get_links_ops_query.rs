@@ -125,10 +125,8 @@ impl Query for GetLinksOpsQuery {
             ChainOpType::RegisterAddLink => {
                 let validation_status = dht_op.validation_status();
                 let item = dht_op.data.action;
-                if let (
-                    SignedAction(Action::CreateLink(action), signature),
-                    Some(validation_status),
-                ) = (item, validation_status)
+                if let ((Action::CreateLink(action), signature), Some(validation_status)) =
+                    (item.into(), validation_status)
                 {
                     state.creates.push(WireCreateLink::condense(
                         action,
@@ -140,10 +138,8 @@ impl Query for GetLinksOpsQuery {
             ChainOpType::RegisterRemoveLink => {
                 let validation_status = dht_op.validation_status();
                 let item = dht_op.data.action;
-                if let (
-                    SignedAction(Action::DeleteLink(action), signature),
-                    Some(validation_status),
-                ) = (item, validation_status)
+                if let ((Action::DeleteLink(action), signature), Some(validation_status)) =
+                    (item.into(), validation_status)
                 {
                     state.deletes.push(WireDeleteLink::condense(
                         action,

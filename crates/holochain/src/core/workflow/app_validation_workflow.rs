@@ -261,7 +261,7 @@ async fn app_validation_workflow_inner(
         });
 
         // Validate this op
-        let validation_outcome = match chain_op_to_op(chain_op.clone(), cascade.clone()).await {
+        let validation_outcome = match chain_op_to_op(*chain_op.clone(), cascade.clone()).await {
             Ok(op) => {
                 validate_op_outer(
                     dna_hash.clone(),

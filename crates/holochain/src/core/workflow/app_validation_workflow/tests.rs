@@ -586,7 +586,7 @@ async fn handle_error_in_op_validation() {
         visibility: Default::default(),
     });
     let create_action = Action::Create(create);
-    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
+    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_create_op_hash = DhtOpHash::with_data_sync(&dht_create_op);
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
 
@@ -599,7 +599,7 @@ async fn handle_error_in_op_validation() {
     });
     let entry = fixt!(Entry);
     let dht_store_entry_op =
-        DhtOp::StoreEntry(fixt!(Signature), NewEntryAction::Create(create), entry);
+        ChainOp::StoreEntry(fixt!(Signature), NewEntryAction::Create(create), entry);
     let dht_store_entry_op_hash = DhtOpHash::with_data_sync(&dht_store_entry_op);
     let dht_store_entry_op_hashed = DhtOpHashed::from_content_sync(dht_store_entry_op);
 
@@ -1037,7 +1037,13 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
         match op_type {
             DhtOpType::Chain(op_type) => {
                 let action: SignedAction = from_blob(row.get("blob")?)?;
-                Ok(ChainOpLite::from_type(op_type, hash, &action.0)?.into())
+                Ok(ChainOpLite::from_type(op_type, hash, &action)?.into())
+            }
+            DhtOpType::Warrant(_) => {
+                let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
+                let author: AgentPubKey = from_blob(row.get("author")?)?;
+                let ((warrant, timestamp), signature) = warrant.into();
+                Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
             }
         }
     })

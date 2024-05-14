@@ -307,7 +307,7 @@ async fn bob_makes_a_large_link(
 fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     txn.prepare(
         "
-        SELECT DhtOp.type, Action.hash, Action.blob
+        SELECT DhtOp.type, Action.hash, Action.blob, Action.author
         FROM DhtOp
         LEFT JOIN Action ON DhtOp.action_hash = Action.hash
         WHERE
@@ -321,7 +321,13 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
         match op_type {
             DhtOpType::Chain(op_type) => {
                 let action: SignedAction = from_blob(row.get("blob")?)?;
-                Ok(ChainOpLite::from_type(op_type, hash, &action.0)?.into())
+                Ok(ChainOpLite::from_type(op_type, hash, &action)?.into())
+            }
+            DhtOpType::Warrant(_) => {
+                let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
+                let author: AgentPubKey = row.get("author")?;
+                let ((warrant, timestamp), signature) = warrant.into();
+                Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
             }
         }
     })

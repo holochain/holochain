@@ -537,7 +537,8 @@ impl Spaces {
                             |row| {
                                 let hash: DhtOpHash =
                                     row.get("hash").map_err(StateQueryError::from)?;
-                                Ok(map_sql_dht_op_common(row)?.map(|op| (hash, op)))
+                                Ok(map_sql_dht_op_common(false, false, "type", row)?
+                                    .map(|op| (hash, op)))
                             },
                         )
                         .map_err(StateQueryError::from)?
@@ -589,29 +590,9 @@ impl Spaces {
                     let mut stmt = txn.prepare_cached(&sql)?;
                     let mut rows = stmt.query([hash])?;
                     if let Some(row) = rows.next()? {
-                        let op_type: DhtOpType = row.get("dht_type")?;
-                        match op_type {
-                            DhtOpType::Chain(op_type) => {
-                                let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                                let hash: DhtOpHash = row.get("hash")?;
-                                // Check the entry isn't private before gossiping it.
-                                let mut entry: Option<Entry> = None;
-                                if action
-                                    .0
-                                    .entry_type()
-                                    .filter(|et| *et.visibility() == EntryVisibility::Public)
-                                    .is_some()
-                                {
-                                    let e: Option<Vec<u8>> = row.get("entry_blob")?;
-                                    entry = match e {
-                                        Some(entry) => Some(from_blob::<Entry>(entry)?),
-                                        None => None,
-                                    };
-                                }
-                                let op = ChainOp::from_type(op_type, action, entry)?.into();
-                                out.push((hash, op))
-                            }
-                        }
+                        let op = holochain_state::query::map_sql_dht_op(false, "dht_type", row)?;
+                        let hash: DhtOpHash = row.get("hash")?;
+                        out.push((hash, op));
                     } else {
                         return Err(holochain_state::query::StateQueryError::Sql(
                             rusqlite::Error::QueryReturnedNoRows,
@@ -640,8 +621,8 @@ impl Spaces {
             use futures::StreamExt;
             let ops = futures::stream::iter(ops.into_iter().filter_map(|op| match op {
                 DhtOp::ChainOp(op) => {
-                    let hash = DhtOpHash::with_data_sync(&op);
-                    Some((hash, op))
+                    let hash = DhtOpHash::with_data_sync(&*op);
+                    Some((hash, *op))
                 }
                 _ => {
                     tracing::warn!(

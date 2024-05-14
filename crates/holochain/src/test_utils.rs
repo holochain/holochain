@@ -33,7 +33,6 @@ use holochain_p2p::HolochainP2pSender;
 use holochain_p2p::NetworkCompatParams;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
-use holochain_state::prelude::from_blob;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::prelude::SourceChainResult;
 use holochain_state::prelude::StateQueryResult;
@@ -554,7 +553,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
 ) -> ConsistencyResult {
     fn display_op(op: &DhtOp) -> String {
         match op {
-            DhtOp::ChainOp(op) =>         format!(
+            DhtOp::ChainOp(op) => format!(
                 "{} {:>3} {} {} {} ({})",
                 op.action().author(),
                 op.action().action_seq(),
@@ -563,7 +562,9 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
                 op.get_type(),
                 op.action().action_type(),
             ),
-            DhtOp::WarrantOp(_op) => unreachable!("todo: warrants"),
+            DhtOp::WarrantOp(op) => {
+                format!("{} WARRANT ({})", op.author, op.get_type(),)
+            }
         }
     }
 
@@ -751,7 +752,7 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
         txn.prepare(
             "
             SELECT
-            DhtOp.type, Action.blob as action_blob, Entry.blob as entry_blob
+            DhtOp.type, Action.author as author, Action.blob as action_blob, Entry.blob as entry_blob
             FROM DhtOp
             LEFT JOIN
             Action ON DhtOp.action_hash = Action.hash
@@ -764,18 +765,7 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
         )
         .unwrap()
         .query_and_then(named_params! {}, |row| {
-            let op_type: DhtOpType = row.get("type")?;
-            match op_type {
-                DhtOpType::Chain(op_type) => {
-                    let action: SignedAction = from_blob(row.get("action_blob")?)?;
-                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                    let entry: Option<Entry> = match entry {
-                        Some(entry) => Some(from_blob::<Entry>(entry)?),
-                        None => None,
-                    };
-                    Ok(ChainOp::from_type(op_type, action, entry)?.into())
-                }
-            }
+            Ok(holochain_state::query::map_sql_dht_op(true, "type", row).unwrap())
         })
         .unwrap()
         .collect::<StateQueryResult<_>>()

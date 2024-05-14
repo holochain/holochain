@@ -81,13 +81,17 @@ impl RecordTestData {
             entry.clone().into(),
         ));
 
-        let wire_create = Judged::valid(SignedAction(create_action, signature));
+        let wire_create = Judged::valid(SignedAction::new(create_action, signature));
 
         let signature = fixt!(Signature);
         let deleted_by_op =
             ChainOpHashed::from_content_sync(ChainOp::RegisterDeletedBy(signature.clone(), delete));
 
-        let wire_delete = Judged::valid(SignedAction(delete_action, signature).try_into().unwrap());
+        let wire_delete = Judged::valid(
+            SignedAction::new(delete_action, signature)
+                .try_into()
+                .unwrap(),
+        );
 
         let signature = fixt!(Signature);
         let update_record_op = ChainOpHashed::from_content_sync(ChainOp::RegisterUpdatedRecord(
@@ -95,7 +99,11 @@ impl RecordTestData {
             update,
             update_entry.into(),
         ));
-        let wire_update = Judged::valid(SignedAction(update_action, signature).try_into().unwrap());
+        let wire_update = Judged::valid(
+            SignedAction::new(update_action, signature)
+                .try_into()
+                .unwrap(),
+        );
 
         let mut any_entry = None;
         let mut any_entry_hash = None;
@@ -141,7 +149,7 @@ impl RecordTestData {
             any_entry.clone(),
         );
 
-        let any_action = Judged::valid(SignedAction(any_action, signature));
+        let any_action = Judged::valid(SignedAction::new(any_action, signature));
 
         Self {
             store_record_op,

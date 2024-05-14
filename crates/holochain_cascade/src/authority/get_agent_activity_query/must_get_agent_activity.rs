@@ -118,7 +118,8 @@ fn get_activity(
 
             },
             |row| {
-                let SignedAction(action, signature) = from_blob(row.get("blob")?)?;
+                let action: SignedAction = from_blob(row.get("blob")?)?;
+                let (action, signature) = action.into();
                 let hash: ActionHash = row.get("hash")?;
                 let hashed = ActionHashed::with_pre_hashed(action, hash);
                 let action = SignedActionHashed::with_presigned(hashed, signature);
