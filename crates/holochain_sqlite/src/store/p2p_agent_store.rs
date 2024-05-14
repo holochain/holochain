@@ -255,6 +255,7 @@ impl AgentStore {
 
         Ok(out
             .into_iter()
+            .filter(|(dist, _)| *dist != u32::MAX) // Filter out Zero arcs
             .take(limit as usize)
             .map(|(_, v)| v.clone())
             .collect())
