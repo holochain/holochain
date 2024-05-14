@@ -1,13 +1,13 @@
 [package]
 name = "kitsune_p2p_transport_quic"
-version = "0.3.0-beta-dev.26"
+version = "0.4.0-dev.2"
 description = "QUIC transport module for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/kitsune_p2p_transport_quic"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
-categories = [ "network-programming" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "p2p", "dht", "networking"]
+categories = ["network-programming"]
 edition = "2021"
 
 # reminder - do not use workspace deps
@@ -15,19 +15,15 @@ edition = "2021"
 blake2b_simd = "1.0.0"
 futures = "0.3"
 if-addrs = "0.12"
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.26", path = "../types" }
+kitsune_p2p_types = { version = "^0.4.0-dev.2", path = "../types" }
 quinn = "0.8.1"
-webpki = "=0.22.2" # pinned until other libraries upgrade to ring 0.17
-rustls = { version = "0.20.4", features = [ "dangerous_configuration" ] }
-tokio = { version = "1.27", features = [ "full" ] }
+webpki = "=0.22.2"                                                      # pinned until other libraries upgrade to ring 0.17
+rustls = { version = "0.20.4", features = ["dangerous_configuration"] }
+tokio = { version = "1.27", features = ["full"] }
 
 [lints]
 workspace = true
 
 [features]
-sqlite-encrypted = [
-    "kitsune_p2p_types/sqlite-encrypted",
-]
-sqlite = [
-    "kitsune_p2p_types/sqlite",
-]
+sqlite-encrypted = ["kitsune_p2p_types/sqlite-encrypted"]
+sqlite = ["kitsune_p2p_types/sqlite"]

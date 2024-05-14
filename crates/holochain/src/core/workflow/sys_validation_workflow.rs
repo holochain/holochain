@@ -22,6 +22,7 @@
 //! - For a [`DhtOp::RegisterAgentActivity`]
 //!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //!    - If the [`Action`] is a [`Action::Dna`], then verify the contained DNA hash matches the DNA hash that sys validation is being run for.
+//!    - Check that the previous action is never a [`Action::CloseChain`], since this is always required to be the last action in a chain.
 //!    - Run the [store record checks](#store-record-checks).
 //! - For a [`DhtOp::RegisterUpdatedContent`]
 //!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
@@ -220,8 +221,7 @@ async fn sys_validation_workflow_inner(
     config: Arc<ConductorConfig>,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
-    let mut sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
-    sorted_ops.sort_by_cached_key(|op| OpOrder::new(op.get_type(), op.timestamp()));
+    let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
     let sleuth_id = config.sleuth_id();
 
     // Forget what dependencies are currently in use
@@ -781,15 +781,22 @@ fn register_agent_activity(
     check_prev_action(action)?;
     check_valid_if_dna(action, dna_def)?;
     if let Some(prev_action_hash) = prev_action_hash {
-        // Just make sure we have the dependency and if not then don't mark this action as valid yet
         let mut validation_dependencies = validation_dependencies.lock();
-        validation_dependencies
+        let prev_action = validation_dependencies
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
-    }
 
-    Ok(())
+        match prev_action {
+            Action::CloseChain(_) => Err(ValidationOutcome::PrevActionError(
+                (PrevActionErrorKind::ActionAfterChainClose, action.clone()).into(),
+            )
+            .into()),
+            _ => Ok(()),
+        }
+    } else {
+        Ok(())
+    }
 }
 
 fn store_record(

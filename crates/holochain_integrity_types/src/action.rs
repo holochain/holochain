@@ -46,8 +46,8 @@ pub enum Action {
     InitZomesComplete(InitZomesComplete),
     CreateLink(CreateLink),
     DeleteLink(DeleteLink),
-    OpenChain(OpenChain),
     CloseChain(CloseChain),
+    OpenChain(OpenChain),
     Create(Create),
     Update(Update),
     Delete(Delete),
@@ -483,7 +483,7 @@ pub struct AgentValidationPkg {
     pub membrane_proof: Option<MembraneProof>,
 }
 
-/// A action which declares that all zome init functions have successfully
+/// An action which declares that all zome init functions have successfully
 /// completed, and the chain is ready for commits. Contains no explicit data.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(
@@ -539,23 +539,7 @@ pub struct DeleteLink {
 }
 
 /// When migrating to a new version of a DNA, this action is committed to the
-/// new chain to declare the migration path taken. **Currently unused**
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
-pub struct OpenChain {
-    pub author: AgentPubKey,
-    pub timestamp: Timestamp,
-    pub action_seq: u32,
-    pub prev_action: ActionHash,
-
-    pub prev_dna_hash: DnaHash,
-}
-
-/// When migrating to a new version of a DNA, this action is committed to the
-/// old chain to declare the migration path taken. **Currently unused**
+/// old chain to declare the migration path taken.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(
     feature = "fuzzing",
@@ -570,7 +554,23 @@ pub struct CloseChain {
     pub new_dna_hash: DnaHash,
 }
 
-/// A action which "speaks" Entry content into being. The same content can be
+/// When migrating to a new version of a DNA, this action is committed to the
+/// new chain to declare the migration path taken.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
+pub struct OpenChain {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub action_seq: u32,
+    pub prev_action: ActionHash,
+
+    pub prev_dna_hash: DnaHash,
+}
+
+/// An action which "speaks" Entry content into being. The same content can be
 /// referenced by multiple such actions.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(
@@ -589,7 +589,7 @@ pub struct Create<W = EntryRateWeight> {
     pub weight: W,
 }
 
-/// A action which specifies that some new Entry content is intended to be an
+/// An action which specifies that some new Entry content is intended to be an
 /// update to some old Entry.
 ///
 /// This action semantically updates an entry to a new entry.

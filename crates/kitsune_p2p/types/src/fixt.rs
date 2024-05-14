@@ -6,6 +6,7 @@ use ::fixt::prelude::*;
 use kitsune_p2p_bin_data::fixt::KitsuneAgentFixturator;
 use kitsune_p2p_bin_data::fixt::KitsuneSignatureFixturator;
 use kitsune_p2p_bin_data::fixt::KitsuneSpaceFixturator;
+use kitsune_p2p_dht::arq::ArqSize;
 use std::sync::Arc;
 use url2::url2;
 
@@ -43,7 +44,10 @@ fixturator!(
             AgentInfoSigned::sign(
                 Arc::new(fixt!(KitsuneSpace, Empty)),
                 Arc::new(fixt!(KitsuneAgent, Empty)),
-                u32::MAX / 4,
+                ArqSize {
+                    count: 8.into(),
+                    power: 17
+                },
                 fixt!(UrlList, Empty),
                 0,
                 0,
@@ -58,7 +62,10 @@ fixturator!(
             AgentInfoSigned::sign(
                 Arc::new(fixt!(KitsuneSpace, Unpredictable)),
                 Arc::new(fixt!(KitsuneAgent, Unpredictable)),
-                u32::MAX / 4,
+                ArqSize {
+                    count: 8.into(),
+                    power: 17,
+                },
                 fixt!(UrlList, Unpredictable),
                 0,
                 0,
@@ -73,7 +80,10 @@ fixturator!(
             AgentInfoSigned::sign(
                 Arc::new(fixt!(KitsuneSpace, Predictable)),
                 Arc::new(fixt!(KitsuneAgent, Predictable)),
-                u32::MAX / 4,
+                ArqSize {
+                    count: 8.into(),
+                    power: 17,
+                },
                 fixt!(UrlList, Empty),
                 0,
                 0,

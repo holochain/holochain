@@ -65,6 +65,7 @@ pub struct RegisterDnaPayload {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NetworkInfoRequestPayload {
     /// The calling agent
+    // TODO should this be restricted to the agent for the current app?
     pub agent_pub_key: AgentPubKey,
     /// Get gossip info for these DNAs
     pub dnas: Vec<DnaHash>,
@@ -86,8 +87,6 @@ pub struct UpdateCoordinatorsPayload {
 /// The arguments to create a clone of an existing cell.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateCloneCellPayload {
-    /// The app id that the DNA to clone belongs to
-    pub app_id: InstalledAppId,
     /// The DNA's role name to clone
     pub role_name: RoleName,
     /// Modifiers to set for the new cell.
@@ -103,8 +102,6 @@ pub struct CreateCloneCellPayload {
 /// Arguments to specify the clone cell to be disabled.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct DisableCloneCellPayload {
-    /// The app id that the clone cell belongs to
-    pub app_id: InstalledAppId,
     /// The clone id or cell id of the clone cell
     pub clone_cell_id: CloneCellId,
 }
@@ -113,7 +110,14 @@ pub struct DisableCloneCellPayload {
 pub type EnableCloneCellPayload = DisableCloneCellPayload;
 
 /// Arguments to delete a disabled clone cell of an app.
-pub type DeleteCloneCellPayload = DisableCloneCellPayload;
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DeleteCloneCellPayload {
+    /// The app id that the DNA to clone belongs to
+    pub app_id: InstalledAppId,
+
+    /// The clone id or cell id of the clone cell
+    pub clone_cell_id: CloneCellId,
+}
 
 /// An [AppBundle] along with an [AgentPubKey] and optional [InstalledAppId]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

@@ -73,6 +73,10 @@ async fn connect_cli(connection_url: url2::Url2) -> Cli {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "path too long error, broken on macos inside a Nix shell"
+)]
 async fn test_reconnect() {
     let tmpdir = tempdir::TempDir::new("lair keystore test").unwrap();
     let tag: Arc<str> = "test-tag".into();

@@ -11,7 +11,6 @@ use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holochain_nonce::Nonce256Bits;
 use holochain_p2p::actor;
-use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
@@ -23,6 +22,7 @@ use holochain_types::test_utils::chain::entry_hash;
 use holochain_types::test_utils::chain::TestChainItem;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
+use kitsune_p2p::dht::Arq;
 use std::collections::HashSet;
 use std::sync::Arc;
 use QueryFilter;
@@ -249,7 +249,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         &self,
         _agent: AgentPubKey,
         _maybe_agent_info: Option<AgentInfoSigned>,
-        _initial_arc: Option<DhtArc>,
+        _initial_arq: Option<Arq>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }

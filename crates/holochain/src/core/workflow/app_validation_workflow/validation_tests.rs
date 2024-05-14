@@ -227,20 +227,16 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterUpdate(RegisterUpdate {
-                        update,
-                        original_action,
-                        ..
-                    }) => {
-                        let (with_entry_def_index, with_zome_index) =
-                            match original_action.app_entry_def().cloned() {
-                                Some(AppEntryDef {
-                                    entry_index,
-                                    zome_index,
-                                    ..
-                                }) => (Some(entry_index), Some(zome_index)),
-                                _ => (None, None),
-                            };
+                    Op::RegisterUpdate(RegisterUpdate { update, .. }) => {
+                        let (with_entry_def_index, with_zome_index) = match update.hashed.entry_type
+                        {
+                            EntryType::App(AppEntryDef {
+                                entry_index,
+                                zome_index,
+                                ..
+                            }) => (Some(entry_index), Some(zome_index)),
+                            _ => (None, None),
+                        };
                         Event {
                             action: ActionLocation::new(update.hashed.content.clone(), &agents),
                             op_type: DhtOpType::RegisterUpdatedContent,
@@ -249,18 +245,14 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterDelete(RegisterDelete {
-                        delete,
-                        original_action,
-                        ..
-                    }) => {
+                    Op::RegisterDelete(RegisterDelete { delete, .. }) => {
                         let (with_entry_def_index, with_zome_index) =
-                            match original_action.app_entry_def().cloned() {
-                                Some(AppEntryDef {
+                            match (*delete.hashed).clone().into_action().entry_type() {
+                                Some(EntryType::App(AppEntryDef {
                                     entry_index,
                                     zome_index,
                                     ..
-                                }) => (Some(entry_index), Some(zome_index)),
+                                })) => (Some(entry_index.clone()), Some(zome_index.clone())),
                                 _ => (None, None),
                             };
                         Event {
