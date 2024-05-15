@@ -785,6 +785,7 @@ mod dna_impls {
         }
 
         /// Install a [`DnaFile`] in this Conductor
+        #[instrument(skip_all)]
         pub async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
             if self.get_ribosome(dna.dna_hash()).is_ok() {
                 // ribosome for dna is already registered in store
@@ -1410,6 +1411,7 @@ mod app_impls {
         /// Install an app from minimal elements, without needing construct a whole AppBundle.
         /// (This function constructs a bundle under the hood.)
         /// This is just a convenience for testing.
+        #[instrument(skip_all)]
         pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
