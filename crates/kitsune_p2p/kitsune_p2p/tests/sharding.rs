@@ -63,7 +63,9 @@ async fn publish_to_basis_from_inside() {
         let mut found_loc = false;
         for _ in 0..1000 {
             let loc = agent.get_loc().as_();
-            if loc > base_len * i && loc < base_len * (i + 1) {
+            // Search from the start of our agent, up to halfway through it. Agents that are in the
+            // upper part of their range are less likely to overlap with the previous agent.
+            if (loc) > base_len * i && (loc as f64) < base_len as f64 * (i as f64 + 0.5) {
                 found_loc = true;
                 break;
             }
@@ -77,7 +79,7 @@ async fn publish_to_basis_from_inside() {
             "Failed to find a location in the right range after 1000 tries"
         );
 
-        // Distance to the end of the segment, plus the length of the next segment. Guaranteed to
+        // Distance to the end of the segment, plus the length of the next segment. Likely to
         // overlap with the next agent and not the one after that.
         // Because of arc quantisation, the layout won't be perfect, but we can expect overlap at
         // the start of the agent's arc, with the previous agent.
@@ -98,13 +100,15 @@ async fn publish_to_basis_from_inside() {
         agents.push((harness, sender, agent));
     }
 
+    tracing::info!("Created agents {:?}", agents.iter().map(|a| a.2.clone()).collect::<Vec<_>>());
+
     // Each agent should be connected to the next agent because that's how the arcs were set up
     // above.
-    for i in 0..5 {
+    for i in 4..=0 {
         // A circular `next` so that the last agent is connected to the first agent
-        let next = (i + 1) % 5;
+        let prev = (i - 1) % 5;
 
-        wait_for_connected(agents[i].1.clone(), agents[next].2.clone(), space.clone()).await
+        wait_for_connected(agents[i].1.clone(), agents[prev].2.clone(), space.clone()).await
     }
 
     let sender_idx = 3;
@@ -121,6 +125,7 @@ async fn publish_to_basis_from_inside() {
     assert_eq!(agents[sender_idx].2.get_loc(), basis.get_loc());
 
     let test_op = TestHostOp::new(space.clone());
+    println!("Test op: {:?}, with location {:?}", test_op, basis.get_loc());
 
     agents[sender_idx]
         .0
@@ -182,9 +187,10 @@ async fn publish_to_basis_from_inside() {
         let store = store_lock.read();
         assert!(
             store.is_empty(),
-            "Agent {} should not have received any data but has {} ops",
+            "Agent {} should not have received any data but has {} ops. Ops store: {:?}",
             i,
-            store.len()
+            store.len(),
+            store,
         );
     }
 }
@@ -291,6 +297,7 @@ async fn publish_to_basis_from_outside() {
     assert_eq!(agents[should_recv_idx_1].2.get_loc(), basis.get_loc());
 
     let test_op = TestHostOp::new(space.clone());
+    println!("Test op: {:?}", test_op);
 
     agents[sender_idx]
         .0
@@ -368,9 +375,10 @@ async fn publish_to_basis_from_outside() {
         let store = store_lock.read();
         assert!(
             store.is_empty(),
-            "Agent {} should not have received any data but has {} ops",
+            "Agent {} should not have received any data but has {} ops. Ops stare: {:?}",
             i,
-            store.len()
+            store.len(),
+            store,
         );
     }
 }
