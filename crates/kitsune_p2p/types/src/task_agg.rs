@@ -21,9 +21,6 @@ struct TaskAggInner {
 #[derive(Clone)]
 pub struct TaskAgg(Arc<Mutex<TaskAggInner>>);
 
-trait S: 'static + Send + Sync {}
-impl S for TaskAgg {}
-
 impl TaskAgg {
     /// Construct a new Task Aggregation driver and handle.
     pub fn new() -> (Driver, Self) {
