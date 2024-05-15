@@ -59,6 +59,11 @@ impl Topology {
         32 - self.space.quantum_power - strat.max_chunks_log2()
     }
 
+    /// Returns the space quantum which contains this location
+    pub fn space_quantum(&self, x: Loc) -> SpaceQuantum {
+        self.space.quantum(x)
+    }
+
     /// Unit dimensions with the given time origin
     #[cfg(feature = "test_utils")]
     pub fn unit(time_origin: Timestamp) -> Self {
@@ -97,12 +102,6 @@ impl Topology {
     #[cfg(feature = "test_utils")]
     pub fn standard_zero() -> Self {
         Self::standard(Timestamp::ZERO, Duration::ZERO)
-    }
-
-    /// Returns the space quantum which contains this location
-    #[cfg(feature = "test_utils")]
-    pub fn space_quantum(&self, x: Loc) -> SpaceQuantum {
-        self.space.quantum(x)
     }
 }
 

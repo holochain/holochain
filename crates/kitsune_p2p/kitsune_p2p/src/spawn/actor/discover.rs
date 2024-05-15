@@ -289,12 +289,13 @@ impl SearchRemotesCoveringBasisLogic {
                 continue;
             }
 
-            // skip nodes that can't tell us about any peers
+            // skip nodes that aren't willing to store data
             if node.storage_arc().range().is_empty() {
                 continue;
             }
 
             if node.storage_arc().contains(self.basis_loc) {
+                tracing::info!("found node covering basis_loc {:?} {:?}", node, self.basis_loc);
                 cover_nodes.push(node);
             } else {
                 near_nodes.push(node);

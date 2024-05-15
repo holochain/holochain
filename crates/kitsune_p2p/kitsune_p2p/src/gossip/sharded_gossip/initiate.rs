@@ -10,6 +10,8 @@ impl ShardedGossipLocal {
         &self,
         agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Option<Outgoing>> {
+        tracing::warn!("Initiating gossip, even though you told me not to, haha!");
+
         // Get local agents
         let (has_target, local_agents) = self.inner.share_mut(|i, _| {
             i.check_tgt_expired(self.gossip_type, self.tuning_params.gossip_round_timeout());
