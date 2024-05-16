@@ -273,4 +273,4 @@ chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_types/chc"]
 # Transitional feature flag for code that is only ready when DPKI integration lands.
 dpki = []
 
-sweetest = ["test_utils", "sqlite"]
+sweettest = ["test_utils", "sqlite"]
