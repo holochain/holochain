@@ -135,7 +135,7 @@ impl HcRunLocalServices {
         if !self.disable_signal {
             let bind = self
                 .signal_interfaces
-                .split(",")
+                .split(',')
                 .map(|i| format!("{}:{}", i.trim(), self.signal_port))
                 .collect();
             println!("BIND: {bind:?}");
@@ -147,7 +147,7 @@ impl HcRunLocalServices {
 
             let sig_hnd = sbd_server::SbdServer::new(Arc::new(config)).await?;
 
-            let addr_list = sig_hnd.bind_addrs().iter().cloned().collect::<Vec<_>>();
+            let addr_list = sig_hnd.bind_addrs().to_vec();
 
             // there is no real task here... just fake it
             task_list.push(Box::pin(async move {

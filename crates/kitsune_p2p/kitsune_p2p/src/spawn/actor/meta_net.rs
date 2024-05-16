@@ -382,7 +382,7 @@ impl MetaNetCon {
                 ep, rem_url, tun, ..
             } = self
             {
-                ep.close(&rem_url);
+                ep.close(rem_url);
                 return;
             }
         }
