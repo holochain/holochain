@@ -1,5 +1,6 @@
 use crate::sweettest::SweetConductorBatch;
 use crate::sweettest::SweetDnaFile;
+use crate::sweettest::SweetInlineZomes;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::wait_for_integration;
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
@@ -9,6 +10,7 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::prelude::*;
+use holochain_types::inline_zome::InlineZomeSet;
 use holochain_wasm_test_utils::TestWasm;
 use rusqlite::named_params;
 use rusqlite::Transaction;
@@ -22,6 +24,53 @@ async fn sys_validation_workflow_test() {
     holochain_trace::test_run();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let apps = conductors
+        .setup_app(&"test_app", [&dna_file])
+        .await
+        .unwrap();
+    let ((alice,), (bob,)) = apps.into_tuples();
+    let alice_cell_id = alice.cell_id().clone();
+    let bob_cell_id = bob.cell_id().clone();
+
+    conductors.exchange_peer_info().await;
+
+    run_test(alice_cell_id, bob_cell_id, conductors, dna_file).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sys_validation_produces_warrants() {
+    holochain_trace::test_run();
+
+    let string_entry_def = EntryDef::default_from_id("string");
+
+    #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
+    struct AppString(String);
+
+    let zome_sans_validation = SweetInlineZomes::new(vec![string_entry_def], 0).function(
+        "create_string",
+        move |api, s: AppString| {
+            let entry = Entry::app(s.try_into().unwrap()).unwrap();
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                EntryVisibility::Public,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        },
+    );
+    let zome_with_validation = zome_sans_validation
+        .clone()
+        .function("validate", move |api, op: Op| Ok(todo!()));
+
+    let network_seed = "seed";
+
+    let (dna_sans, _, _) = SweetDnaFile::from_inline_zomes(network_seed, zome_sans_validation).await;
+    let (dna_with, _, _) = SweetDnaFile::from_inline_zomes(network_seed, zome_with_validation).await;
+
+    let entry = Entry::app(AppString("entry1".into()).try_into().unwrap()).unwrap();
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let apps = conductors
