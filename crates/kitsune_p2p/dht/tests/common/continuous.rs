@@ -314,7 +314,7 @@ impl RunBatch {
                 num_epochs,
                 redundancy_stats: Stats::new(DataVec::new(
                     self.histories()
-                        .map(|hs| {
+                        .flat_map(|hs| {
                             let mut hs = hs.clone();
                             hs.reverse();
                             hs.into_iter()
@@ -322,7 +322,6 @@ impl RunBatch {
                                 .map(|e| e.min_redundancy as f64)
                                 .collect::<Vec<_>>()
                         })
-                        .flatten()
                         .collect(),
                 )),
             },
@@ -401,7 +400,7 @@ pub struct EpochStats {
 
 impl EpochStats {
     pub fn oneline_header() -> String {
-        format!("rdun   net Δ%   gross Δ%   min Δ%   max Δ%")
+        "rdun   net Δ%   gross Δ%   min Δ%   max Δ%".to_string()
     }
 
     pub fn oneline(&self) -> String {
@@ -445,7 +444,7 @@ impl ArcLenStrategy {
 
 /// View ascii for all arcs
 pub fn print_arcs(dim: impl SpaceDim, arcs: &Peers) {
-    for (i, arc) in arcs.into_iter().enumerate() {
+    for (i, arc) in arcs.iter().enumerate() {
         println!("|{}| {}", arc.to_ascii(dim, 64), i);
     }
 }

@@ -77,12 +77,12 @@ async fn test_cell_handle_publish() {
     });
     let hh = ActionHashed::from_content_sync(action.clone());
     let shh = SignedActionHashed::sign(&keystore, hh).await.unwrap();
-    let op = DhtOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
+    let op = ChainOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
     spaces
         .spaces
-        .handle_publish(&dna, true, false, vec![op.clone()])
+        .handle_publish(&dna, true, false, vec![op.clone().into()])
         .await
         .unwrap();
 

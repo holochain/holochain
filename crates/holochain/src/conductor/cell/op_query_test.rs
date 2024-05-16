@@ -27,7 +27,7 @@ async fn test_dht_op_query() {
     let values = times.into_iter().map(|when_integrated| {
         (
             ValidationStatus::Valid,
-            DhtOpLite::RegisterAgentActivity(fixt!(ActionHash), basis.next().unwrap()),
+            ChainOpLite::RegisterAgentActivity(fixt!(ActionHash), basis.next().unwrap()),
             Timestamp::from(when_integrated),
         )
     });
@@ -42,7 +42,7 @@ async fn test_dht_op_query() {
                 .unwrap();
             buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
             expected.push(value.clone());
-            value.op = DhtOpLite::RegisterAgentActivity(fixt!(ActionHash), same_basis.clone());
+            value.op = ChainOpLite::RegisterAgentActivity(fixt!(ActionHash), same_basis.clone());
             buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
             expected.push(value.clone());
         }

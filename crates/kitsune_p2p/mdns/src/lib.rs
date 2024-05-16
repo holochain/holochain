@@ -89,7 +89,6 @@ pub fn mdns_create_broadcast_thread(
     can_run
 }
 
-///
 #[derive(Debug, Clone)]
 pub struct MdnsResponse {
     /// Service type used

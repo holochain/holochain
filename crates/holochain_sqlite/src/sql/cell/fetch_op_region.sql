@@ -1,6 +1,7 @@
 SELECT
   COUNT(DhtOp.hash) AS count,
   REDUCE_XOR(DhtOp.hash) AS xor_hash,
+  -- TODO: account for ops without actions (e.g. Warrants)
   TOTAL(LENGTH(Action.blob)) AS total_action_size,
   -- We need to only account for entry data in the size count when the op contains the entry itself.
   -- Other ops refer to actions that refer to entries, but we don't want to include that in the size.
@@ -12,7 +13,7 @@ SELECT
   ) AS total_entry_size
 FROM
   DhtOp
-  JOIN Action ON DhtOp.action_hash = Action.hash
+  LEFT JOIN Action ON DhtOp.action_hash = Action.hash
   LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE
   (

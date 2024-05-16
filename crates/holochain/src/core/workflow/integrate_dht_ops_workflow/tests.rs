@@ -54,7 +54,7 @@ impl TestData {
         }
 
         let original_action_hash =
-            ActionHashed::from_content_sync(original_action.clone().into()).into_hash();
+            ActionHashed::from_content_sync(original_action.clone()).into_hash();
 
         // Action for the new entry
         let mut new_entry_action = fixt!(NewEntryAction, PublicCurve);
@@ -86,7 +86,7 @@ impl TestData {
         link_add.target_address = new_entry_hash.clone().into();
         link_add.tag = fixt!(LinkTag);
 
-        let link_add_hash = ActionHashed::from_content_sync(link_add.clone().into()).into_hash();
+        let link_add_hash = ActionHashed::from_content_sync(link_add.clone()).into_hash();
 
         // Link remove
         let mut link_remove = fixt!(DeleteLink);
@@ -205,7 +205,7 @@ impl Db {
                                     ":basis": basis,
                                     ":hash": hash,
                                     ":status": ValidationStatus::Valid,
-                                    ":activity": DhtOpType::RegisterAgentActivity,
+                                    ":activity": ChainOpType::RegisterAgentActivity,
                                 },
                                 |row| row.get(0),
                             )
@@ -230,8 +230,8 @@ impl Db {
                                     ":basis": base,
                                     ":hash": hash,
                                     ":status": ValidationStatus::Valid,
-                                    ":update_content": DhtOpType::RegisterUpdatedContent,
-                                    ":update_record": DhtOpType::RegisterUpdatedRecord,
+                                    ":update_content": ChainOpType::RegisterUpdatedContent,
+                                    ":update_record": ChainOpType::RegisterUpdatedRecord,
                                 },
                                 |row| row.get(0),
                             )
@@ -259,8 +259,8 @@ impl Db {
                                     ":deleted_action_hash": deleted_action_hash,
                                     ":hash": hash,
                                     ":status": ValidationStatus::Valid,
-                                    ":deleted_by": DhtOpType::RegisterDeletedBy,
-                                    ":deleted_entry_action": DhtOpType::RegisterDeletedEntryAction,
+                                    ":deleted_by": ChainOpType::RegisterDeletedBy,
+                                    ":deleted_entry_action": ChainOpType::RegisterDeletedEntryAction,
                                 },
                                 |row| row.get(0),
                             )
@@ -381,12 +381,14 @@ async fn clear_dbs(env: DbWrite<DbKindDht>) {
 
 fn register_agent_activity(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     a.link_add.action_seq = 5;
-    let dep = DhtOp::RegisterAgentActivity(a.signature.clone(), a.link_add.clone().into());
+    let dep: DhtOp =
+        ChainOp::RegisterAgentActivity(a.signature.clone(), a.link_add.clone().into()).into();
     let hash = ActionHash::with_data_sync(&Action::CreateLink(a.link_add.clone()));
     let mut new_action = a.link_add.clone();
     new_action.prev_action = hash;
     new_action.action_seq += 1;
-    let op = DhtOp::RegisterAgentActivity(a.signature.clone(), new_action.clone().into());
+    let op: DhtOp =
+        ChainOp::RegisterAgentActivity(a.signature.clone(), new_action.clone().into()).into();
     let pre_state = vec![Db::Integrated(dep.clone()), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::Integrated(dep.clone()),
@@ -398,16 +400,18 @@ fn register_agent_activity(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) 
 }
 
 fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreRecord(
+    let original_op = ChainOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
         a.original_entry.clone().into(),
-    );
-    let op = DhtOp::RegisterUpdatedRecord(
+    )
+    .into();
+    let op: DhtOp = ChainOp::RegisterUpdatedRecord(
         a.signature.clone(),
         a.entry_update_action.clone(),
         a.new_entry.clone().into(),
-    );
+    )
+    .into();
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::Integrated(op.clone()),
@@ -420,16 +424,18 @@ fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreEntry(
+    let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
         a.original_action.clone(),
         a.original_entry.clone().into(),
-    );
-    let op = DhtOp::RegisterUpdatedContent(
+    )
+    .into();
+    let op: DhtOp = ChainOp::RegisterUpdatedContent(
         a.signature.clone(),
         a.entry_update_entry.clone(),
         a.new_entry.clone().into(),
-    );
+    )
+    .into();
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::Integrated(op.clone()),
@@ -442,12 +448,14 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
 }
 
 fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreEntry(
+    let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
         a.original_action.clone(),
         a.original_entry.clone().into(),
-    );
-    let op = DhtOp::RegisterDeletedEntryAction(a.signature.clone(), a.entry_delete.clone());
+    )
+    .into();
+    let op: DhtOp =
+        ChainOp::RegisterDeletedEntryAction(a.signature.clone(), a.entry_delete.clone()).into();
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::IntQueueEmpty,
@@ -461,12 +469,13 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreRecord(
+    let original_op = ChainOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
         a.original_entry.clone().into(),
-    );
-    let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
+    )
+    .into();
+    let op: DhtOp = ChainOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone()).into();
     let pre_state = vec![Db::IntQueue(op.clone()), Db::Integrated(original_op)];
     let expect = vec![
         Db::Integrated(op.clone()),
@@ -479,13 +488,14 @@ fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreEntry(
+    let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
         a.original_action.clone(),
         a.original_entry.clone().into(),
-    );
-    let original_link_op = DhtOp::RegisterAddLink(a.signature.clone(), a.link_add.clone());
-    let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
+    )
+    .into();
+    let original_link_op = ChainOp::RegisterAddLink(a.signature.clone(), a.link_add.clone()).into();
+    let op: DhtOp = ChainOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone()).into();
     let pre_state = vec![
         Db::Integrated(original_op),
         Db::Integrated(original_link_op),
@@ -500,7 +510,7 @@ fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 
 // Link remove when not an author
 fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
+    let op: DhtOp = ChainOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone()).into();
     let pre_state = vec![Db::IntQueue(op.clone())];
     let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
     (

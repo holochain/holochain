@@ -648,16 +648,16 @@ impl ShardedGossipState {
 
     pub fn push_incoming<I: Clone + IntoIterator<Item = Incoming>>(&mut self, incoming: I) {
         if let Some(history) = &mut self.history {
-            history.incoming.extend(incoming.clone().into_iter());
+            history.incoming.extend(incoming.clone());
         }
-        self.queues.incoming.extend(incoming.into_iter());
+        self.queues.incoming.extend(incoming);
     }
 
     pub fn push_outgoing<I: Clone + IntoIterator<Item = Outgoing>>(&mut self, outgoing: I) {
         if let Some(history) = &mut self.history {
-            history.outgoing.extend(outgoing.clone().into_iter());
+            history.outgoing.extend(outgoing.clone());
         }
-        self.queues.outgoing.extend(outgoing.into_iter());
+        self.queues.outgoing.extend(outgoing);
     }
 
     pub fn pop(&mut self) -> (Option<Incoming>, Option<Outgoing>) {

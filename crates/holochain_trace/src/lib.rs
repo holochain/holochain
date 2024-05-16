@@ -330,7 +330,10 @@ where
 {
     let filter = standard_filter()?;
 
-    println!("Initialising formatting with args {:?}", output);
+    println!(
+        "Initialising log output formatting with option {:?}",
+        output
+    );
 
     match output {
         Output::Json => Registry::default()

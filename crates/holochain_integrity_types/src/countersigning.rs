@@ -705,7 +705,7 @@ pub mod test {
         // making the the start non-zero should fix it.
         *session_times.start_mut() =
             (session_times.start() + core::time::Duration::from_millis(1)).unwrap();
-        assert_eq!(session_times.check_integrity().unwrap(), (),);
+        session_times.check_integrity().unwrap();
 
         // making the diff between start and end less than the action offset will break it again.
         *session_times.start_mut() =
@@ -722,7 +722,7 @@ pub mod test {
         let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
 
         // Empty optional agents is a pass.
-        assert_eq!(preflight_request.check_agents_optional().unwrap(), ());
+        preflight_request.check_agents_optional().unwrap();
 
         // Adding a single agent with a minimum of zero is a fail.
         let data: Vec<_> = (0u8..255).cycle().take(100000).collect();
@@ -742,14 +742,14 @@ pub mod test {
 
         preflight_request.minimum_optional_signing_agents = 1;
 
-        assert_eq!(preflight_request.check_agents_optional().unwrap(), ());
+        preflight_request.check_agents_optional().unwrap();
 
         // 1 of 2 optional agents is a pass
         preflight_request
             .optional_signing_agents
             .push((alice.clone(), vec![]));
 
-        assert_eq!(preflight_request.check_agents_optional().unwrap(), ());
+        preflight_request.check_agents_optional().unwrap();
 
         // 1 of 3 optional agents is a fail
         preflight_request
@@ -764,7 +764,7 @@ pub mod test {
         // 2 of 3 optional agents is a pass
         preflight_request.minimum_optional_signing_agents = 2;
 
-        assert_eq!(preflight_request.check_agents_optional().unwrap(), ());
+        preflight_request.check_agents_optional().unwrap();
 
         // 4 of 3 optional agents is a fail
         preflight_request.minimum_optional_signing_agents = 4;
@@ -781,7 +781,7 @@ pub mod test {
         let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
 
         // Non enzymatic with no signers is always pass.
-        assert_eq!(preflight_request.check_enzyme().unwrap(), ());
+        preflight_request.check_enzyme().unwrap();
 
         let data: Vec<_> = (0u8..255).cycle().take(100000).collect();
         let mut uk = arbitrary::Unstructured::new(&data);
@@ -793,7 +793,7 @@ pub mod test {
             .signing_agents
             .push((alice.clone(), vec![]));
 
-        assert_eq!(preflight_request.check_enzyme().unwrap(), (),);
+        preflight_request.check_enzyme().unwrap();
 
         // Non enzymatic with optional signers is a fail.
         preflight_request
@@ -809,12 +809,12 @@ pub mod test {
         preflight_request.optional_signing_agents = vec![];
         preflight_request.enzymatic = true;
 
-        assert_eq!(preflight_request.check_enzyme().unwrap(), ());
+        preflight_request.check_enzyme().unwrap();
 
         // Enzymatic with optional signers is a pass.
         preflight_request.optional_signing_agents = vec![(alice.clone(), vec![])];
 
-        assert_eq!(preflight_request.check_enzyme().unwrap(), ());
+        preflight_request.check_enzyme().unwrap();
 
         // Enzymatic with first signer mismatch is a fail.
         preflight_request.optional_signing_agents = vec![(bob.clone(), vec![])];
@@ -851,7 +851,7 @@ pub mod test {
         let bob = AgentPubKey::arbitrary(&mut u).unwrap();
         preflight_request.signing_agents.push((bob.clone(), vec![]));
 
-        assert_eq!(preflight_request.check_agents_len().unwrap(), (),);
+        preflight_request.check_agents_len().unwrap();
     }
 
     #[test]
@@ -864,15 +864,15 @@ pub mod test {
         let alice = AgentPubKey::arbitrary(&mut uk).unwrap();
         let bob = AgentPubKey::arbitrary(&mut uk).unwrap();
 
-        assert_eq!(preflight_request.check_agents_dupes().unwrap(), (),);
+        preflight_request.check_agents_dupes().unwrap();
 
         preflight_request
             .signing_agents
             .push((alice.clone(), vec![]));
-        assert_eq!(preflight_request.check_agents_dupes().unwrap(), (),);
+        preflight_request.check_agents_dupes().unwrap();
 
         preflight_request.signing_agents.push((bob.clone(), vec![]));
-        assert_eq!(preflight_request.check_agents_dupes().unwrap(), (),);
+        preflight_request.check_agents_dupes().unwrap();
 
         // Another alice is a dupe, even if roles are different.
         preflight_request
@@ -893,7 +893,7 @@ pub mod test {
         let bob = AgentPubKey::arbitrary(&mut u).unwrap();
 
         // When everything is empty the indexes line up by default.
-        assert_eq!(session_data.check_responses_indexes().unwrap(), ());
+        session_data.check_responses_indexes().unwrap();
 
         // When the signing agents and responses are out of sync it must error.
         session_data
@@ -933,6 +933,6 @@ pub mod test {
         *bob_state.agent_index_mut() = 1;
         (*session_data.responses_mut()).pop();
         (*session_data.responses_mut()).push((bob_state, bob_signature));
-        assert_eq!(session_data.check_responses_indexes().unwrap(), (),);
+        session_data.check_responses_indexes().unwrap()
     }
 }

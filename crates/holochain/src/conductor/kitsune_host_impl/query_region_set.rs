@@ -103,7 +103,7 @@ mod tests {
             let mut create = ::fixt::fixt!(Create);
             create.timestamp = Timestamp::now();
             let action = NewEntryAction::Create(create);
-            DhtOpHashed::from_content_sync(DhtOp::StoreEntry(sig, action, entry))
+            DhtOpHashed::from_content_sync(ChainOp::StoreEntry(sig, action, entry))
         };
         let num = 100;
 

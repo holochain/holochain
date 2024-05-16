@@ -13,7 +13,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 holochain = { path = "../holochain", default-features = false, features = [
-  "sweetest",
+  "sweettest",
   "hdk",
 ] }
 kitsune_p2p = { path = "../kitsune_p2p/kitsune_p2p" }

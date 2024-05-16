@@ -589,12 +589,10 @@ async fn create_token(
         .await
         .unwrap();
 
-    let token = match issued {
+    match issued {
         AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
         _ => panic!("Unexpected response"),
-    };
-
-    token
+    }
 }
 
 async fn create_multi_use_token(
@@ -611,12 +609,11 @@ async fn create_multi_use_token(
         ))
         .await
         .unwrap();
-    let token = match token_response {
+
+    match token_response {
         AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
         _ => panic!("unexpected response"),
-    };
-
-    token
+    }
 }
 
 async fn revoke_token(conductor: &SweetConductor, token: AppAuthenticationToken) {

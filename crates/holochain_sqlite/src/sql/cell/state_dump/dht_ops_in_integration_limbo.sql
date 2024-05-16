@@ -6,8 +6,8 @@ SELECT
   DhtOp.hash as dht_hash,
   DhtOp.rowid as rowid
 FROM
-  Action
-  JOIN DhtOp ON DhtOp.action_hash = Action.hash
+  DhtOp
+  JOIN Action ON DhtOp.action_hash = Action.hash
   LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE
   when_integrated IS NULL

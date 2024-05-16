@@ -33,7 +33,6 @@ use holochain_p2p::HolochainP2pSender;
 use holochain_p2p::NetworkCompatParams;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
-use holochain_state::prelude::from_blob;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::prelude::SourceChainResult;
 use holochain_state::prelude::StateQueryResult;
@@ -553,17 +552,26 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     timeout: Duration,
 ) -> ConsistencyResult {
     fn display_op(op: &DhtOp) -> String {
-        format!(
-            "{} {:>3}  {} ({})",
-            op.action().author(),
-            op.action().action_seq(),
-            // op.to_light().action_hash().clone(),
-            op.get_type(),
-            op.action().action_type(),
-        )
+        match op {
+            DhtOp::ChainOp(op) => format!(
+                "{} {:>3} {} {} {} ({})",
+                op.action().author(),
+                op.action().action_seq(),
+                op.to_hash(),
+                op.action().to_hash(),
+                op.get_type(),
+                op.action().action_type(),
+            ),
+            DhtOp::WarrantOp(op) => {
+                format!("{} WARRANT ({})", op.author, op.get_type(),)
+            }
+        }
     }
 
-    let header = format!("{:54} {:>3}  {}", "author", "seq", "op_type (action_type)",);
+    let header = format!(
+        "{:53} {:>3} {:53} {:53} {}",
+        "author", "seq", "op_hash", "action_hash", "op_type (action_type)",
+    );
     let start = tokio::time::Instant::now();
 
     let num_published = published.len();
@@ -744,9 +752,9 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
         txn.prepare(
             "
             SELECT
-            DhtOp.type, Action.blob as action_blob, Entry.blob as entry_blob
+            DhtOp.type, Action.author as author, Action.blob as action_blob, Entry.blob as entry_blob
             FROM DhtOp
-            JOIN
+            LEFT JOIN
             Action ON DhtOp.action_hash = Action.hash
             LEFT JOIN
             Entry ON Action.entry_hash = Entry.hash
@@ -757,14 +765,7 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
         )
         .unwrap()
         .query_and_then(named_params! {}, |row| {
-            let op_type: DhtOpType = row.get("type")?;
-            let action: SignedAction = from_blob(row.get("action_blob")?)?;
-            let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-            let entry: Option<Entry> = match entry {
-                Some(entry) => Some(from_blob::<Entry>(entry)?),
-                None => None,
-            };
-            Ok(DhtOp::from_type(op_type, action, entry)?)
+            Ok(holochain_state::query::map_sql_dht_op(true, "type", row).unwrap())
         })
         .unwrap()
         .collect::<StateQueryResult<_>>()

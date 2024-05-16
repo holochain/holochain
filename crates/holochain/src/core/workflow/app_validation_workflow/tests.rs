@@ -15,13 +15,14 @@ use hdk::hdi::test_utils::set_zome_types;
 use hdk::prelude::*;
 use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, EntryHash};
 use holochain_conductor_api::conductor::paths::DataRootPath;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations::insert_op;
 use holochain_state::prelude::{from_blob, StateQueryResult};
 use holochain_state::test_utils::test_db_dir;
 use holochain_state::validation_db::ValidationStage;
-use holochain_types::dht_op::{DhtOp, DhtOpHashed};
+use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::{TestWasm, TestWasmPair, TestZomes};
@@ -98,14 +99,14 @@ async fn main_workflow() {
         visibility: Default::default(),
     });
     let create_action = Action::Create(create);
-    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
+    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
 
     // create op that depends on previous create
     let mut delete = fixt!(Delete);
     delete.author = create_action.author().clone();
     delete.deletes_address = create_action.clone().to_hash();
-    let dht_delete_op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
+    let dht_delete_op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
 
@@ -226,7 +227,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         weight: Default::default(),
     };
     let create_action = Action::Create(create);
-    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
+    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
     let create_action_hash = create_action.to_hash();
 
@@ -241,7 +242,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         weight: Default::default(),
     };
     let delete_action = Action::Delete(delete);
-    let dht_delete_op = DhtOp::RegisterAgentActivity(fixt!(Signature), delete_action.clone());
+    let dht_delete_op = ChainOp::RegisterAgentActivity(fixt!(Signature), delete_action.clone());
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
 
@@ -428,7 +429,7 @@ async fn validate_ops_in_sequence_must_get_action() {
         visibility: EntryVisibility::Public,
     });
     let create_op = Action::Create(create);
-    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
+    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_op.clone());
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
 
     // create op that depends on previous create
@@ -436,7 +437,7 @@ async fn validate_ops_in_sequence_must_get_action() {
     delete.author = create_op.author().clone();
     delete.deletes_address = create_op.clone().to_hash();
     delete.deletes_entry_address = create_op.entry_hash().unwrap().clone();
-    let dht_delete_op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
+    let dht_delete_op = ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete);
     let dht_delete_op_hash = DhtOpHash::with_data_sync(&dht_delete_op);
     let dht_delete_op_hashed = DhtOpHashed::from_content_sync(dht_delete_op);
 
@@ -500,6 +501,52 @@ async fn validate_ops_in_sequence_must_get_action() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn multi_create_link_validation() {
+    holochain_trace::test_run();
+
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    pub struct Post(String);
+    holochain_serial!(Post);
+    app_entry!(Post);
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AppValidation]).await;
+
+    let mut conductors = SweetConductorBatch::from_config(2, ConductorConfig::default()).await;
+    let apps = conductors.setup_app("posts_test", &[dna]).await.unwrap();
+    conductors.exchange_peer_info().await;
+
+    let ((alice,), (bobbo,)) = apps.into_tuples();
+
+    let alice_zome = alice.zome(TestWasm::AppValidation.coordinator_zome_name());
+    let bob_zome = bobbo.zome(TestWasm::AppValidation.coordinator_zome_name());
+
+    let post = Post("test_the_validation".to_string());
+
+    // Alice creates posts to trigger link validations
+    let _: Record = conductors[0]
+        .call(&alice_zome, "create_post", post.clone())
+        .await;
+    let _: Record = conductors[0]
+        .call(&alice_zome, "create_post", post.clone())
+        .await;
+    let record: Record = conductors[0]
+        .call(&alice_zome, "create_post", post.clone())
+        .await;
+
+    await_consistency(Duration::from_secs(60), [&alice, &bobbo])
+        .await
+        .expect("Timed out waiting for consistency");
+
+    let links: Vec<Link> = conductors[1].call(&bob_zome, "get_all_posts", ()).await;
+
+    assert_eq!(links.len(), 3);
+    assert_eq!(
+        links[2].target.clone().into_action_hash().unwrap(),
+        record.signed_action.hashed.hash
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn handle_error_in_op_validation() {
     holochain_trace::test_run();
 
@@ -539,7 +586,7 @@ async fn handle_error_in_op_validation() {
         visibility: Default::default(),
     });
     let create_action = Action::Create(create);
-    let dht_create_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
+    let dht_create_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_create_op_hash = DhtOpHash::with_data_sync(&dht_create_op);
     let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
 
@@ -552,7 +599,7 @@ async fn handle_error_in_op_validation() {
     });
     let entry = fixt!(Entry);
     let dht_store_entry_op =
-        DhtOp::StoreEntry(fixt!(Signature), NewEntryAction::Create(create), entry);
+        ChainOp::StoreEntry(fixt!(Signature), NewEntryAction::Create(create), entry);
     let dht_store_entry_op_hash = DhtOpHash::with_data_sync(&dht_store_entry_op);
     let dht_store_entry_op_hashed = DhtOpHashed::from_content_sync(dht_store_entry_op);
 
@@ -706,14 +753,12 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
             let visibility = EntryVisibility::from(&input);
             assert_eq!(visibility, EntryVisibility::Private);
             let entry = input.try_into().unwrap();
-            dbg!();
             h.create(CreateInput::new(
                 location.clone(),
                 visibility,
                 entry,
                 ChainTopOrdering::default(),
             ))?;
-            dbg!();
             h.create(CreateInput::new(
                 EntryDefLocation::CapClaim,
                 visibility,
@@ -911,7 +956,7 @@ fn expected_invalid_entry(
             named_params! {
                 ":invalid_action_hash": invalid_action_hash,
                 ":invalid_entry_hash": invalid_entry_hash,
-                ":store_entry": DhtOpType::StoreEntry,
+                ":store_entry": ChainOpType::StoreEntry,
                 ":rejected": ValidationStatus::Rejected,
             },
             |row| row.get(0),
@@ -933,7 +978,7 @@ fn expected_invalid_link(txn: &Transaction, invalid_link_hash: &ActionHash) -> b
             &sql,
             named_params! {
                 ":invalid_link_hash": invalid_link_hash,
-                ":create_link": DhtOpType::RegisterAddLink,
+                ":create_link": ChainOpType::RegisterAddLink,
                 ":rejected": ValidationStatus::Rejected,
             },
             |row| row.get(0),
@@ -955,7 +1000,7 @@ fn expected_invalid_remove_link(txn: &Transaction, invalid_remove_hash: &ActionH
             &sql,
             named_params! {
                 ":invalid_remove_hash": invalid_remove_hash,
-                ":delete_link": DhtOpType::RegisterRemoveLink,
+                ":delete_link": ChainOpType::RegisterRemoveLink,
                 ":rejected": ValidationStatus::Rejected,
             },
             |row| row.get(0),
@@ -980,7 +1025,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
         "
         SELECT DhtOp.type, Action.hash, Action.blob
         FROM DhtOp
-        JOIN Action ON DhtOp.action_hash = Action.hash
+        LEFT JOIN Action ON DhtOp.action_hash = Action.hash
         WHERE
         when_integrated IS NULL
     ",
@@ -989,8 +1034,18 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     .query_and_then([], |row| {
         let op_type: DhtOpType = row.get("type")?;
         let hash: ActionHash = row.get("hash")?;
-        let action: SignedAction = from_blob(row.get("blob")?)?;
-        Ok(DhtOpLite::from_type(op_type, hash, &action.0)?)
+        match op_type {
+            DhtOpType::Chain(op_type) => {
+                let action: SignedAction = from_blob(row.get("blob")?)?;
+                Ok(ChainOpLite::from_type(op_type, hash, &action)?.into())
+            }
+            DhtOpType::Warrant(_) => {
+                let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
+                let author: AgentPubKey = from_blob(row.get("author")?)?;
+                let ((warrant, timestamp), signature) = warrant.into();
+                Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
+            }
+        }
     })
     .unwrap()
     .collect::<StateQueryResult<Vec<DhtOpLite>>>()

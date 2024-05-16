@@ -44,7 +44,19 @@ impl ValidationDependencies {
 
     /// Get the state of a given dependency. This should always return a value because we should know about the dependency
     /// by examining the ops that are being validated. However, the dependency may not be found on the DHT yet.
-    pub fn get(&mut self, hash: &ActionHash) -> Option<&mut ValidationDependencyState> {
+    pub fn get(&self, hash: &ActionHash) -> Option<&ValidationDependencyState> {
+        match self.states.get(hash) {
+            Some(dep) => Some(dep),
+            None => {
+                tracing::warn!(hash = ?hash, "Have not attempted to fetch requested dependency, this is a bug");
+                None
+            }
+        }
+    }
+
+    /// Get the state of a given dependency. This should always return a value because we should know about the dependency
+    /// by examining the ops that are being validated. However, the dependency may not be found on the DHT yet.
+    pub fn get_mut(&mut self, hash: &ActionHash) -> Option<&mut ValidationDependencyState> {
         match self.states.get_mut(hash) {
             Some(dep) => Some(dep),
             None => {

@@ -29,7 +29,7 @@ async fn entry_scratch_same_as_sql() {
         ChainTopOrdering::default(),
     )
     .unwrap();
-    insert_valid_integrated_op(&mut txn, &td.store_entry_op).unwrap();
+    insert_valid_integrated_op(&mut txn, &td.store_entry_op.downcast()).unwrap();
     let r1 = query
         .run(Txn::from(&txn))
         .unwrap()
@@ -63,7 +63,7 @@ async fn record_scratch_same_as_sql() {
         ChainTopOrdering::default(),
     )
     .unwrap();
-    insert_valid_integrated_op(&mut txn, &td.store_record_op).unwrap();
+    insert_valid_integrated_op(&mut txn, &td.store_record_op.downcast()).unwrap();
     let r1 = query
         .run(Txn::from(&txn))
         .unwrap()
