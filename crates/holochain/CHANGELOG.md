@@ -7,8 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Fix an issue which caused a `WebsocketClosed` error to be logged when signals are sent after a client has closed their
-  connection. #3824
+## 0.3.1-rc.0
+
+- Fix an issue which caused a `WebsocketClosed` error to be logged when signals are sent after a client has closed their connection. \#3824
 - **BREAKING** - Serialization: Update of serialization packages `holochain-serialization` and `holochain-wasmer-*` leads to general message format change for enums. Previously an enum value like
 
 <!-- end list -->
