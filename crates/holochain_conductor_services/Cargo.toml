@@ -18,8 +18,8 @@ futures = "0.3"
 mockall = "0.11"
 thiserror = "1.0"
 
-holochain_keystore = { version = "^0.3.0-beta-dev.37", path = "../holochain_keystore" }
-holochain_types = { version = "^0.3.0-beta-dev.43", path = "../holochain_types" }
+holochain_keystore = { version = "^0.3.0", path = "../holochain_keystore" }
+holochain_types = { version = "^0.3.0", path = "../holochain_types" }
 
 [lints]
 workspace = true

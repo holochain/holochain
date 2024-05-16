@@ -12,11 +12,11 @@ crate-type = ["cdylib", "rlib"]
 cfg-if = "1.0"
 clap = { version = "4.2.2", features = [ "derive", "wrap_help" ], optional = true }
 flate2 = { version = "1.0.25", optional = true }
-hdi = { path = "../hdi", version = "^0.4.0-beta-dev.36", optional = true }
-hdk = { path = "../hdk", version = "^0.3.0-beta-dev.41", optional = true }
-holochain = { path = "../holochain", version = "^0.3.0-beta-dev.48", optional = true }
-holochain_types = { path = "../holochain_types", version = "^0.3.0-beta-dev.43", optional = true }
-holochain_keystore = { path = "../holochain_keystore", version = "^0.3.0-beta-dev.37", optional = true }
+hdi = { path = "../hdi", version = "^0.4.0", optional = true }
+hdk = { path = "../hdk", version = "^0.3.0", optional = true }
+holochain = { path = "../holochain", version = "^0.3.0", optional = true }
+holochain_types = { path = "../holochain_types", version = "^0.3.0", optional = true }
+holochain_keystore = { path = "../holochain_keystore", version = "^0.3.0", optional = true }
 rand = { version = "0.8.5", optional = true }
 rand-utf8 = { version = "0.0.1", optional = true }
 serde = { version = "1", optional = true }
