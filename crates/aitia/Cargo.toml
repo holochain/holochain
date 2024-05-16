@@ -1,6 +1,6 @@
 [package]
 name = "aitia"
-version = "0.2.0-beta-dev.9"
+version = "0.2.0"
 description = "Library for making sense of events in terms of causal graphs"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
