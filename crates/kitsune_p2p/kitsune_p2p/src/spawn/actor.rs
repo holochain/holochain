@@ -227,10 +227,11 @@ pub(super) async fn create_meta_net(
         });
 
         tracing::trace!("tx2");
-        let (h, e) = MetaNet::new_tx2(host.clone(), config.clone(), tls_config, metrics).await?;
+        let (h, e, p) = MetaNet::new_tx2(host.clone(), config.clone(), tls_config, metrics).await?;
         ep_hnd = Some(h);
         ep_evt = Some(e);
         bootstrap_net = Some(BootstrapNet::Tx2);
+        maybe_peer_url = p;
     }
 
     #[cfg(feature = "tx5")]

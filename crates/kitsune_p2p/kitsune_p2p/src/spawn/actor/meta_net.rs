@@ -657,7 +657,7 @@ impl MetaNet {
         config: KitsuneP2pConfig,
         tls_config: kitsune_p2p_types::tls::TlsConfig,
         metrics: Tx2ApiMetrics,
-    ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
+    ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv, Option<String>)> {
         use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 
         let tuning_params = config.tuning_params.clone();
@@ -851,7 +851,12 @@ impl MetaNet {
             }
         });
 
-        Ok((MetaNet::Tx2(ep_hnd, return_host), evt_recv))
+        let url = match ep_hnd.local_addr() {
+            Ok(url) => Some(url.to_string()),
+            _ => None,
+        };
+
+        Ok((MetaNet::Tx2(ep_hnd, return_host), evt_recv, url))
     }
 
     /// Construct abstraction with tx5 backend.
