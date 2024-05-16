@@ -79,7 +79,7 @@ impl BootstrapTask {
         internal_sender: GhostSender<SpaceInternal>,
         host_sender: Sender<KitsuneP2pEvent>,
         space: Arc<KitsuneSpace>,
-        bootstrap_query: Box<impl BootstrapService + Send + Sync + 'static>,
+        bootstrap_query: Box<impl BootstrapService + Sync + 'static>,
         bootstrap_check_delay_backoff_multiplier: u32,
     ) -> Arc<RwLock<Self>> {
         let task_this = this.clone();

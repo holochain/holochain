@@ -227,7 +227,7 @@ impl CurrentRound {
     /// Update status based on an existing round
     pub fn update(&mut self, round_state: &RoundState) {
         self.last_touch = Instant::now();
-        self.region_diffs = round_state.region_diffs.clone();
+        self.region_diffs.clone_from(&round_state.region_diffs);
     }
 
     /// Convert to a CompletedRound

@@ -14,6 +14,88 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240515.004441
+
+## [hc\_service\_check-0.1.0-dev.2](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.2)
+
+## [hcterm-0.4.0-dev.3](crates/hcterm/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_cli-0.4.0-dev.3](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain-0.4.0-dev.3](crates/holochain/CHANGELOG.md#0.4.0-dev.3)
+
+- App validation workflow: Fix bug where ops were stuck in app validation when multiple ops were requiring the same action or entry hash. Such ops were erroneously filtered out from validation for being marked as ops awaiting hashes and not unmarked as awaiting once the hashes had arrived.
+
+## [holochain\_cli\_bundle-0.4.0-dev.3](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.3](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.3](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_cascade-0.4.0-dev.3](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_conductor\_api-0.4.0-dev.3](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_conductor\_services-0.3.0-dev.3](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.3)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.3](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.3](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_websocket-0.4.0-dev.3](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.3)
+
+## [hdk-0.4.0-dev.3](crates/hdk/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_state-0.4.0-dev.3](crates/holochain_state/CHANGELOG.md#0.4.0-dev.3)
+
+## [hdi-0.5.0-dev.3](crates/hdi/CHANGELOG.md#0.5.0-dev.3)
+
+## [holochain\_p2p-0.4.0-dev.3](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.3)
+
+## [hc\_sleuth-0.4.0-dev.3](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.3)
+
+## [hdk\_derive-0.4.0-dev.3](crates/hdk_derive/CHANGELOG.md#0.4.0-dev.3)
+
+## [aitia-0.3.0-dev.2](crates/aitia/CHANGELOG.md#0.3.0-dev.2)
+
+## [holochain\_state\_types-0.4.0-dev.3](crates/holochain_state_types/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_types-0.4.0-dev.3](crates/holochain_types/CHANGELOG.md#0.4.0-dev.3)
+
+## [kitsune\_p2p-0.4.0-dev.3](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_keystore-0.4.0-dev.3](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_sqlite-0.4.0-dev.3](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.3)
+
+## [kitsune\_p2p\_bootstrap\_client-0.4.0-dev.3](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.4.0-dev.3)
+
+## [kitsune\_p2p\_fetch-0.4.0-dev.3](crates/kitsune_p2p_fetch/CHANGELOG.md#0.4.0-dev.3)
+
+## [kitsune\_p2p\_proxy-0.4.0-dev.3](crates/kitsune_p2p_proxy/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_zome\_types-0.4.0-dev.3](crates/holochain_zome_types/CHANGELOG.md#0.4.0-dev.3)
+
+## [kitsune\_p2p\_bootstrap-0.3.0-dev.3](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.3.0-dev.3)
+
+## [kitsune\_p2p\_transport\_quic-0.4.0-dev.3](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_integrity\_types-0.4.0-dev.3](crates/holochain_integrity_types/CHANGELOG.md#0.4.0-dev.3)
+
+## [kitsune\_p2p\_block-0.4.0-dev.3](crates/kitsune_p2p_block/CHANGELOG.md#0.4.0-dev.3)
+
+## [kitsune\_p2p\_types-0.4.0-dev.3](crates/kitsune_p2p_types/CHANGELOG.md#0.4.0-dev.3)
+
+## [holo\_hash-0.4.0-dev.3](crates/holo_hash/CHANGELOG.md#0.4.0-dev.3)
+
+## [kitsune\_p2p\_bin\_data-0.4.0-dev.3](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.4.0-dev.3)
+
+## [kitsune\_p2p\_dht-0.4.0-dev.3](crates/kitsune_p2p_dht/CHANGELOG.md#0.4.0-dev.3)
+
+## [kitsune\_p2p\_dht\_arc-0.4.0-dev.3](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_trace-0.4.0-dev.2](crates/holochain_trace/CHANGELOG.md#0.4.0-dev.2)
+
 # 20240508.003809
 
 ## [hc\_service\_check-0.1.0-dev.1](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.1)

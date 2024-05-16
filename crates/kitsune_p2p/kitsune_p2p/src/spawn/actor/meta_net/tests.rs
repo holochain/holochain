@@ -400,7 +400,7 @@ async fn start_signal_srv() -> (std::net::SocketAddr, tx5_signal_srv::SrvHnd) {
     assert!(err_list.is_empty());
     assert_eq!(1, addr_list.len());
 
-    (addr_list.first().unwrap().clone(), sig_hnd)
+    (*addr_list.first().unwrap(), sig_hnd)
 }
 
 struct Setup2Nodes {

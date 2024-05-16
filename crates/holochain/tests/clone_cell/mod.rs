@@ -43,7 +43,7 @@ async fn create_clone_cell() {
     assert_eq!(
         1,
         cell_infos
-            .into_iter()
+            .iter()
             .filter(|c| matches!(c, CellInfo::Cloned(_)))
             .count()
     );
@@ -139,7 +139,7 @@ async fn disable_enable_and_delete_clone_cell() {
     assert_eq!(
         1,
         cell_infos
-            .into_iter()
+            .iter()
             .filter(|c| matches!(c, CellInfo::Cloned(_)))
             .count()
     );
@@ -253,7 +253,7 @@ async fn prevents_cross_app_clone_operations() {
     assert_eq!(
         1,
         cell_infos
-            .into_iter()
+            .iter()
             .filter(|c| matches!(c, CellInfo::Cloned(_)))
             .count()
     );
@@ -313,7 +313,7 @@ async fn create_clone_cell_from_a_clone() {
     assert_eq!(
         2,
         cell_infos
-            .into_iter()
+            .iter()
             .filter(|c| matches!(c, CellInfo::Cloned(_)))
             .count()
     );
@@ -362,7 +362,7 @@ async fn create_clone_of_another_cell_in_same_app() {
     assert_eq!(
         1,
         cell_infos
-            .into_iter()
+            .iter()
             .filter(|c| matches!(c, CellInfo::Cloned(_)))
             .count()
     );
