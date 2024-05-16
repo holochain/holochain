@@ -737,13 +737,13 @@ mod tests {
         ep_evt_send
             .send(MetaNetEvt::Request {
                 remote_url: "".to_string(),
-                con: con,
+                con,
                 data: wire::Wire::Call(wire::Call {
                     space: test_space(1),
                     to_agent: test_agent(2),
                     data: wire::WireData(vec![]),
                 }),
-                respond: Box::new(|_| async move { () }.boxed().into()),
+                respond: Box::new(|_| async move {}.boxed()),
             })
             .await
             .unwrap();
@@ -949,7 +949,7 @@ mod tests {
                     to_agent: test_agent(1),
                     data: BroadcastData::User(test_agent(2).to_vec()),
                 }),
-                respond: Box::new(|_| async move { () }.boxed().into()),
+                respond: Box::new(|_| async move {}.boxed()),
             })
             .await
             .unwrap();
@@ -983,7 +983,7 @@ mod tests {
         ep_evt_send
             .send(MetaNetEvt::Notify {
                 remote_url: "".to_string(),
-                con: con,
+                con,
                 data: wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
                     space: test_space(1),
                     basis: Arc::new(KitsuneBasis::new(vec![0; 36])),
@@ -1642,7 +1642,6 @@ mod tests {
                 .incoming_gossip_calls
                 .read()
                 .first()
-                .clone()
                 .unwrap()
                 .3
                 .to_vec()
@@ -2177,10 +2176,8 @@ mod tests {
                 respond: Box::new(|r| {
                     async move {
                         send_res.send(r).unwrap();
-                        ()
                     }
                     .boxed()
-                    .into()
                 }),
             })
             .await

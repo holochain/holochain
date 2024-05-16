@@ -248,8 +248,7 @@ async fn app_validation_workflow_inner(
         };
         let op_type = chain_op.get_type();
         let action = chain_op.action();
-        let author = action.author().clone();
-        let dependency = op_type.sys_validation_dependency(&action);
+        let deps = op_type.sys_validation_dependencies(&action);
         let dht_op_lite = chain_op.to_lite();
 
         // If this is agent activity, track it for the cache.
@@ -257,7 +256,7 @@ async fn app_validation_workflow_inner(
             (
                 action.author().clone(),
                 action.action_seq(),
-                dependency.is_none(),
+                deps.is_empty(),
             )
         });
 
@@ -325,7 +324,7 @@ async fn app_validation_workflow_inner(
                                 op: dht_op_hash.clone()
                             });
 
-                            if dependency.is_none() {
+                            if deps.is_empty() {
                                 aitia::trace!(&hc_sleuth::Event::Integrated {
                                     by: sleuth_id.clone(),
                                     op: dht_op_hash.clone()
@@ -347,8 +346,10 @@ async fn app_validation_workflow_inner(
                         Outcome::Rejected(_) => {
                             insert_op(txn, &warrant_op.unwrap())?;
                             rejected_ops.fetch_add(1, Ordering::SeqCst);
+
                             tracing::info!("Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}");
-                            if dependency.is_none() {
+
+                            if deps.is_empty() {
                                 put_integrated(txn, &dht_op_hash, ValidationStatus::Rejected)
                             } else {
                                 put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Rejected)

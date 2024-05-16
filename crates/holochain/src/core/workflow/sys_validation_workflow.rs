@@ -278,17 +278,18 @@ async fn sys_validation_workflow_inner(
         }
     }
 
-    let (summary, mut invalid_ops) = workspace
+    let (summary, invalid_ops) = workspace
         .dht_db
         .write_async(move |txn| {
             let mut summary = OutcomeSummary::default();
             let mut invalid_ops = vec![];
+
             for (hashed_op, outcome) in validation_outcomes {
                 let (op, op_hash) = hashed_op.into_inner();
 
                 // This is an optimization to skip app validation and integration for ops that are
                 // rejected and don't have dependencies.
-                let dependency = op.sys_validation_dependency();
+                let deps = op.sys_validation_dependencies();
 
                 match outcome {
                     Outcome::Accepted => {
@@ -308,7 +309,7 @@ async fn sys_validation_workflow_inner(
                         invalid_ops.push((op_hash.clone(), op.clone()));
 
                         summary.rejected += 1;
-                        if dependency.is_none() {
+                        if deps.is_empty() {
                             put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                         } else {
                             put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
