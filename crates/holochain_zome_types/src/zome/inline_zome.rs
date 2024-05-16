@@ -17,10 +17,10 @@ mod error;
 
 pub type BoxApi = Box<dyn HostFnApiT>;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A type marker for an integrity [`InlineZome`].
 pub struct IntegrityZomeMarker;
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A type marker for a coordinator [`InlineZome`].
 pub struct CoordinatorZomeMarker;
 
@@ -28,6 +28,7 @@ pub type InlineIntegrityZome = InlineZome<IntegrityZomeMarker>;
 pub type InlineCoordinatorZome = InlineZome<CoordinatorZomeMarker>;
 
 /// An "inline" zome definition in pure Rust, as opposed to a zome defined in Wasm.
+#[derive(Clone)]
 pub struct InlineZome<T = IntegrityZomeMarker> {
     /// Inline zome type marker.
     _t: PhantomData<T>,
@@ -74,7 +75,7 @@ impl<T> InlineZome<T> {
         let z = move |api: BoxApi, input: ExternIO| -> InlineZomeResult<ExternIO> {
             Ok(ExternIO::encode(f(api, input.decode()?)?)?)
         };
-        if self.functions.insert(name.into(), Box::new(z)).is_some() {
+        if self.functions.insert(name.into(), Arc::new(z)).is_some() {
             tracing::warn!("Replacing existing InlineZome callback '{}'", name);
         };
         self
@@ -177,7 +178,7 @@ pub trait InlineZomeT: std::fmt::Debug {
 
 /// An inline zome function takes a Host API and an input, and produces an output.
 pub type InlineZomeFn =
-    Box<dyn Fn(BoxApi, ExternIO) -> InlineZomeResult<ExternIO> + 'static + Send + Sync>;
+    Arc<dyn Fn(BoxApi, ExternIO) -> InlineZomeResult<ExternIO> + 'static + Send + Sync>;
 
 impl<T: std::fmt::Debug> InlineZomeT for InlineZome<T> {
     fn functions(&self) -> Vec<FunctionName> {

@@ -1,3 +1,4 @@
+use crate::sweettest::await_consistency;
 use crate::sweettest::SweetConductorBatch;
 use crate::sweettest::SweetDnaFile;
 use crate::sweettest::SweetInlineZomes;
@@ -61,29 +62,50 @@ async fn sys_validation_produces_warrants() {
             Ok(hash)
         },
     );
-    let zome_with_validation = zome_sans_validation
-        .clone()
-        .function("validate", move |api, op: Op| Ok(todo!()));
+    let zome_avec_validation =
+        zome_sans_validation
+            .clone()
+            .integrity_function("validate", move |_api, op: Op| {
+                dbg!(op.action_type(), op.action_seq());
+                if op.action_seq() > 3 {
+                    Ok(ValidateCallbackResult::Invalid("nope".to_string()))
+                } else {
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            });
 
-    let network_seed = "seed";
+    let network_seed = "seed".to_string();
 
-    let (dna_sans, _, _) = SweetDnaFile::from_inline_zomes(network_seed, zome_sans_validation).await;
-    let (dna_with, _, _) = SweetDnaFile::from_inline_zomes(network_seed, zome_with_validation).await;
+    let (dna_sans, _, _) =
+        SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_sans_validation).await;
+    let (dna_avec, _, _) =
+        SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_avec_validation).await;
 
-    let entry = Entry::app(AppString("entry1".into()).try_into().unwrap()).unwrap();
+    // let entry = Entry::app(AppString("entry1".into()).try_into().unwrap()).unwrap();
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
-    let apps = conductors
-        .setup_app(&"test_app", [&dna_file])
+    let (alice,) = conductors[0]
+        .setup_app(&"test_app", [&dna_sans])
         .await
-        .unwrap();
-    let ((alice,), (bob,)) = apps.into_tuples();
-    let alice_cell_id = alice.cell_id().clone();
-    let bob_cell_id = bob.cell_id().clone();
+        .unwrap()
+        .into_tuple();
+    let (bob,) = conductors[1]
+        .setup_app(&"test_app", [&dna_avec])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let _: ActionHash = conductors[0]
+        .call(
+            &alice.zome(SweetInlineZomes::COORDINATOR),
+            "create_string",
+            AppString("entry1".into()),
+        )
+        .await;
 
     conductors.exchange_peer_info().await;
 
-    run_test(alice_cell_id, bob_cell_id, conductors, dna_file).await;
+    await_consistency(10, &[alice, bob]).await.unwrap();
 }
 
 async fn run_test(

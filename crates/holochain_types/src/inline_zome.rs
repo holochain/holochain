@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use holochain_zome_types::prelude::*;
 use serde::de::DeserializeOwned;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 /// A set of inline integrity and coordinator zomes.
 pub struct InlineZomeSet {
     /// The set of inline zomes that will be installed as the integrity zomes.

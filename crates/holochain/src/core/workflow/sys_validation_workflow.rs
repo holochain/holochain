@@ -75,6 +75,8 @@
 //! - Once all ops have an outcome, the workflow is complete and will wait to be triggered again by new incoming ops.
 //!
 
+use crate::conductor::Conductor;
+use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::sys_validate::*;
@@ -117,15 +119,7 @@ mod unit_tests;
 mod validate_op_tests;
 
 /// The sys validation worfklow. It is described in the module level documentation.
-#[instrument(skip(
-    workspace,
-    current_validation_dependencies,
-    trigger_app_validation,
-    trigger_self,
-    network,
-    config,
-    keystore,
-))]
+#[instrument(skip_all)]
 pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
@@ -134,6 +128,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     network: Network,
     config: Arc<ConductorConfig>,
     keystore: MetaLairClient,
+    representative_agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
     // Run the actual sys validation using data we have locally
     let outcome_summary = sys_validation_workflow_inner(
@@ -141,6 +136,8 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
         current_validation_dependencies.clone(),
         config,
         keystore,
+        representative_agent,
+        network.dna_hash().clone(),
     )
     .await?;
 
@@ -224,6 +221,8 @@ async fn sys_validation_workflow_inner(
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     config: Arc<ConductorConfig>,
     keystore: MetaLairClient,
+    representative_agent: AgentPubKey,
+    dna_hash: DnaHash,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
@@ -325,8 +324,9 @@ async fn sys_validation_workflow_inner(
 
     for (_, op) in invalid_ops {
         if let Some(chain_op) = op.as_chain_op() {
-            let warrant_op = crate::core::workflow::sys_validation_workflow::make_warrant_op(
+            let warrant_op = crate::core::workflow::sys_validation_workflow::make_warrant_op_inner(
                 &keystore,
+                representative_agent.clone(),
                 &chain_op,
                 ValidationType::Sys,
             )
@@ -1315,7 +1315,30 @@ pub fn put_integrated(
 }
 
 pub async fn make_warrant_op(
-    keystore: &holochain_keystore::MetaLairClient,
+    conductor: &Conductor,
+    dna_hash: &DnaHash,
+    op: &ChainOp,
+    validation_type: ValidationType,
+) -> WorkflowResult<DhtOpHashed> {
+    let keystore = conductor.keystore();
+    let warrant_author = get_representative_agent(conductor, dna_hash).expect("TODO: handle");
+    make_warrant_op_inner(keystore, warrant_author, op, validation_type).await
+}
+
+/// Gets an arbitrary agent with a cell running the given DNA, needed for processes
+/// which require an agent signature but happens at the DNA level, so doesn't specify
+/// any particular agent.
+pub fn get_representative_agent(conductor: &Conductor, dna_hash: &DnaHash) -> Option<AgentPubKey> {
+    conductor
+        .running_cell_ids()
+        .into_iter()
+        .find(|id| id.dna_hash() == dna_hash)
+        .map(|id| id.agent_pubkey().clone())
+}
+
+pub async fn make_warrant_op_inner(
+    keystore: &MetaLairClient,
+    warrant_author: AgentPubKey,
     op: &ChainOp,
     validation_type: ValidationType,
 ) -> WorkflowResult<DhtOpHashed> {
@@ -1325,7 +1348,7 @@ pub async fn make_warrant_op(
         action: (action.to_hash().clone(), op.signature().clone()),
         validation_type,
     });
-    let warrant_op = WarrantOp::author(keystore, action.author().clone(), warrant)
+    let warrant_op = WarrantOp::author(keystore, warrant_author, warrant)
         .await
         .map_err(|e| super::WorkflowError::Other(e.into()))?;
     let op: DhtOp = warrant_op.into();

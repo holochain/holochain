@@ -386,6 +386,7 @@ impl TestCase {
             actual_network,
             config,
             self.keystore.clone(),
+            self.agent.clone(),
         )
         .await
         .unwrap()

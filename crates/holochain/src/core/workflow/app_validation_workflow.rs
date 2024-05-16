@@ -306,7 +306,8 @@ async fn app_validation_workflow_inner(
                     Outcome::AwaitingDeps(_) => None,
                     Outcome::Rejected(_) => Some(
                         crate::core::workflow::sys_validation_workflow::make_warrant_op(
-                            &workspace.keystore,
+                            &conductor,
+                            &dna_hash,
                             &chain_op,
                             ValidationType::App,
                         )

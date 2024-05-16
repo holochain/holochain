@@ -1,9 +1,11 @@
 //! The workflow and queue consumer for sys validation
 
 use super::*;
-use crate::core::workflow::sys_validation_workflow::sys_validation_workflow;
 use crate::core::workflow::sys_validation_workflow::validation_deps::ValidationDependencies;
 use crate::core::workflow::sys_validation_workflow::SysValidationWorkspace;
+use crate::core::workflow::sys_validation_workflow::{
+    get_representative_agent, sys_validation_workflow,
+};
 use holochain_keystore::MetaLairClient;
 use parking_lot::Mutex;
 use tracing::*;
@@ -32,15 +34,23 @@ pub fn spawn_sys_validation_consumer(
         conductor.task_manager(),
         (tx.clone(), rx),
         move || {
-            sys_validation_workflow(
-                workspace.clone(),
-                current_validation_dependencies.clone(),
-                trigger_app_validation.clone(),
-                trigger_self.clone(),
-                network.clone(),
-                config.clone(),
-                keystore.clone(),
-            )
+            if let Some(representative_agent) =
+                get_representative_agent(&conductor, &network.dna_hash())
+            {
+                Either::Left(sys_validation_workflow(
+                    workspace.clone(),
+                    current_validation_dependencies.clone(),
+                    trigger_app_validation.clone(),
+                    trigger_self.clone(),
+                    network.clone(),
+                    config.clone(),
+                    keystore.clone(),
+                    representative_agent,
+                ))
+            } else {
+                tracing::warn!("No agent found for DNA, skipping sys validation");
+                Either::Right(async move { Ok(WorkComplete::Complete) })
+            }
         },
     );
 
