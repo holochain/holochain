@@ -2,6 +2,7 @@
 
 use std::str::FromStr;
 
+use holochain_keystore::MetaLairClient;
 use holochain_zome_types::prelude::*;
 
 /// A Warrant DhtOp
@@ -42,6 +43,27 @@ impl WarrantOp {
     /// Convert the WarrantOp into a SignedWarrant
     pub fn into_signed_warrant(self) -> SignedWarrant {
         Signed::new((self.warrant, self.timestamp), self.signature)
+    }
+
+    /// Convenience for authoring a warrant
+    pub async fn author(
+        keystore: &MetaLairClient,
+        author: AgentPubKey,
+        warrant: Warrant,
+    ) -> Result<Self, String> {
+        let timestamp = Timestamp::now();
+        let data = holochain_serialized_bytes::encode(&(&warrant, timestamp))
+            .map_err(|e| e.to_string())?;
+        let signature = keystore
+            .sign(author.clone(), data.into())
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(Self {
+            warrant,
+            author,
+            signature,
+            timestamp,
+        })
     }
 }
 

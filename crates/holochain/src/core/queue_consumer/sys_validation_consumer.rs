@@ -4,17 +4,19 @@ use super::*;
 use crate::core::workflow::sys_validation_workflow::sys_validation_workflow;
 use crate::core::workflow::sys_validation_workflow::validation_deps::ValidationDependencies;
 use crate::core::workflow::sys_validation_workflow::SysValidationWorkspace;
+use holochain_keystore::MetaLairClient;
 use parking_lot::Mutex;
 use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow
-#[instrument(skip(workspace, space, conductor, trigger_app_validation, network,))]
+#[instrument(skip(workspace, space, conductor, trigger_app_validation, network, keystore))]
 pub fn spawn_sys_validation_consumer(
     workspace: SysValidationWorkspace,
     space: Space,
     conductor: ConductorHandle,
     trigger_app_validation: TriggerSender,
     network: HolochainP2pDna,
+    keystore: MetaLairClient,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
     let trigger_self = tx.clone();
@@ -37,6 +39,7 @@ pub fn spawn_sys_validation_consumer(
                 trigger_self.clone(),
                 network.clone(),
                 config.clone(),
+                keystore.clone(),
             )
         },
     );

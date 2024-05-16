@@ -248,6 +248,7 @@ async fn app_validation_workflow_inner(
         };
         let op_type = chain_op.get_type();
         let action = chain_op.action();
+        let author = action.author().clone();
         let dependency = op_type.sys_validation_dependency(&action);
         let dht_op_lite = chain_op.to_lite();
 
@@ -301,6 +302,19 @@ async fn app_validation_workflow_inner(
                 let awaiting_ops = awaiting_ops.clone();
                 let rejected_ops = rejected_ops.clone();
 
+                let warrant_op = match &outcome {
+                    Outcome::Accepted => None,
+                    Outcome::AwaitingDeps(_) => None,
+                    Outcome::Rejected(_) => Some(
+                        crate::core::workflow::sys_validation_workflow::make_warrant_op(
+                            &workspace.keystore,
+                            &chain_op,
+                            ValidationType::App,
+                        )
+                        .await?,
+                    ),
+                };
+
                 let write_result = workspace
                     .dht_db
                     .write_async(move|txn| match outcome {
@@ -331,10 +345,9 @@ async fn app_validation_workflow_inner(
                             )
                         }
                         Outcome::Rejected(_) => {
+                            insert_op(txn, &warrant_op.unwrap())?;
                             rejected_ops.fetch_add(1, Ordering::SeqCst);
-                            tracing::info!(
-                            "Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}"
-                        );
+                            tracing::info!("Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}");
                             if dependency.is_none() {
                                 put_integrated(txn, &dht_op_hash, ValidationStatus::Rejected)
                             } else {

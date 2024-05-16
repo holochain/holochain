@@ -86,6 +86,7 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_conductor_api::conductor::ConductorConfig;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::GenericNetwork;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
@@ -122,7 +123,8 @@ mod validate_op_tests;
     trigger_app_validation,
     trigger_self,
     network,
-    config
+    config,
+    keystore,
 ))]
 pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     workspace: Arc<SysValidationWorkspace>,
@@ -131,12 +133,14 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     trigger_self: TriggerSender,
     network: Network,
     config: Arc<ConductorConfig>,
+    keystore: MetaLairClient,
 ) -> WorkflowResult<WorkComplete> {
     // Run the actual sys validation using data we have locally
     let outcome_summary = sys_validation_workflow_inner(
         workspace.clone(),
         current_validation_dependencies.clone(),
         config,
+        keystore,
     )
     .await?;
 
@@ -219,6 +223,7 @@ async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     config: Arc<ConductorConfig>,
+    keystore: MetaLairClient,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
@@ -256,29 +261,35 @@ async fn sys_validation_workflow_inner(
 
     let mut validation_outcomes = Vec::with_capacity(sorted_ops.len());
     for hashed_op in sorted_ops {
-        let (op, op_hash) = hashed_op.into_inner();
-
-        // This is an optimization to skip app validation and integration for ops that are
-        // rejected and don't have dependencies.
-        let dependency = op.sys_validation_dependency();
-
         // Note that this is async only because of the signature checks done during countersigning.
         // In most cases this will be a fast synchronous call.
-        let r = validate_op(&op, &dna_def, current_validation_dependencies.clone()).await;
+        let r = validate_op(
+            &hashed_op,
+            &dna_def,
+            current_validation_dependencies.clone(),
+        )
+        .await;
 
         match r {
-            Ok(outcome) => validation_outcomes.push((op_hash, outcome, dependency)),
+            Ok(outcome) => validation_outcomes.push((hashed_op, outcome)),
             Err(e) => {
                 tracing::error!(error = ?e, "Error validating op");
             }
         }
     }
 
-    let summary: OutcomeSummary = workspace
+    let (summary, mut invalid_ops) = workspace
         .dht_db
         .write_async(move |txn| {
             let mut summary = OutcomeSummary::default();
-            for (op_hash, outcome, dependency) in validation_outcomes {
+            let mut invalid_ops = vec![];
+            for (hashed_op, outcome) in validation_outcomes {
+                let (op, op_hash) = hashed_op.into_inner();
+
+                // This is an optimization to skip app validation and integration for ops that are
+                // rejected and don't have dependencies.
+                let dependency = op.sys_validation_dependency();
+
                 match outcome {
                     Outcome::Accepted => {
                         summary.accepted += 1;
@@ -294,6 +305,8 @@ async fn sys_validation_workflow_inner(
                         put_validation_limbo(txn, &op_hash, status)?;
                     }
                     Outcome::Rejected(_) => {
+                        invalid_ops.push((op_hash.clone(), op.clone()));
+
                         summary.rejected += 1;
                         if dependency.is_none() {
                             put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
@@ -303,7 +316,31 @@ async fn sys_validation_workflow_inner(
                     }
                 }
             }
-            WorkflowResult::Ok(summary)
+            WorkflowResult::Ok((summary, invalid_ops))
+        })
+        .await?;
+
+    let mut warrants = vec![];
+
+    for (_, op) in invalid_ops {
+        if let Some(chain_op) = op.as_chain_op() {
+            let warrant_op = crate::core::workflow::sys_validation_workflow::make_warrant_op(
+                &keystore,
+                &chain_op,
+                ValidationType::Sys,
+            )
+            .await?;
+            warrants.push(warrant_op);
+        }
+    }
+
+    workspace
+        .dht_db
+        .write_async(move |txn| {
+            for warrant_op in warrants {
+                insert_op(txn, &warrant_op)?;
+            }
+            StateMutationResult::Ok(())
         })
         .await?;
 
@@ -1274,6 +1311,25 @@ pub fn put_integrated(
     set_validation_stage(txn, hash, ValidationStage::Pending)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
+}
+
+pub async fn make_warrant_op(
+    keystore: &holochain_keystore::MetaLairClient,
+    op: &ChainOp,
+    validation_type: ValidationType,
+) -> WorkflowResult<DhtOpHashed> {
+    let action = op.action();
+    let warrant = Warrant::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+        action_author: action.author().clone(),
+        action: (action.to_hash().clone(), op.signature().clone()),
+        validation_type,
+    });
+    let warrant_op = WarrantOp::author(keystore, action.author().clone(), warrant)
+        .await
+        .map_err(|e| super::WorkflowError::Other(e.into()))?;
+    let op: DhtOp = warrant_op.into();
+    let op = op.into_hashed();
+    Ok(op)
 }
 
 #[derive(Debug, Clone)]
