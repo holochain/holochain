@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cascade"
-version = "0.3.0-beta-dev.47"
+version = "0.3.0"
 description = "Logic for cascading updates to Holochain state and network interaction"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"

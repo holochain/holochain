@@ -1,6 +1,6 @@
 [package]
 name = "holochain_nonce"
-version = "0.3.0-beta-dev.27"
+version = "0.3.0"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2021"
 description = "This crate is for generating nonces."
