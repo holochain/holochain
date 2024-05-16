@@ -157,15 +157,15 @@ struct HostFnBuilder {
 }
 
 impl HostFnBuilder {
-    fn with_host_function<I: 'static, O: 'static>(
+    fn with_host_function<I, O>(
         &self,
         ns: &mut Exports,
         host_function_name: &str,
         host_function: fn(Arc<RealRibosome>, Arc<CallContext>, I) -> Result<O, RuntimeError>,
     ) -> &Self
     where
-        I: serde::de::DeserializeOwned + std::fmt::Debug,
-        O: serde::Serialize + std::fmt::Debug,
+        I: serde::de::DeserializeOwned + std::fmt::Debug + 'static,
+        O: serde::Serialize + std::fmt::Debug + 'static,
     {
         let ribosome_arc = Arc::clone(&self.ribosome_arc);
         let context_key = self.context_key;

@@ -709,11 +709,8 @@ pub mod test {
             .await
             .unwrap();
 
-        assert_eq!(
-            check_countersigning_preflight_response_signature(&preflight_response)
-                .await
-                .unwrap(),
-            (),
-        );
+        check_countersigning_preflight_response_signature(&preflight_response)
+            .await
+            .unwrap();
     }
 }

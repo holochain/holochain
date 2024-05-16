@@ -706,9 +706,9 @@ impl HdkT for HostHdk {
 /// At any time the global HDK can be set to a different hdk.
 /// Generally this is only useful during rust unit testing.
 /// When executing wasm without the `mock` feature, the host will be assumed.
-pub fn set_hdk<H: 'static>(hdk: H)
+pub fn set_hdk<H>(hdk: H)
 where
-    H: HdkT,
+    H: HdkT + 'static,
 {
     let hdk = Rc::new(hdk);
     let hdk2 = hdk.clone();

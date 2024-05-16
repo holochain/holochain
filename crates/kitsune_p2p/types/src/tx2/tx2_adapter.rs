@@ -216,6 +216,7 @@ pub mod test_utils {
                     }
                 });
                 let once: InChan = Box::new(m);
+                #[allow(clippy::async_yields_async)]
                 let once = futures::stream::once(async move { async move { Ok(once) }.boxed() });
                 // then return Poll::Pending forever
                 let s = once.chain(futures::stream::pending());
@@ -234,6 +235,7 @@ pub mod test_utils {
             let gen_con_recv = move || {
                 // return one result
                 let once = (gen_con(), gen_in_chan_recv());
+                #[allow(clippy::async_yields_async)]
                 let once = futures::stream::once(async move { async move { Ok(once) }.boxed() });
                 // then return Poll::Pending forever
                 let s = once.chain(futures::stream::pending());
