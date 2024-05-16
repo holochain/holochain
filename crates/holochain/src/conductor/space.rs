@@ -271,9 +271,9 @@ impl Spaces {
 
     /// Update the internal state with a pure function mapping old state to new
     #[tracing::instrument(skip_all)]
-    pub async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
+    pub async fn update_state<F>(&self, f: F) -> ConductorResult<ConductorState>
     where
-        F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
+        F: Send + FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
     {
         let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
         Ok(state)

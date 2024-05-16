@@ -101,7 +101,7 @@ pub(crate) fn incoming_countersigning(
 /// pushes the complete ops to validation then messages the signers.
 pub(crate) async fn countersigning_workflow(
     space: Space,
-    network: impl HolochainP2pDnaT + Send + Sync,
+    network: impl HolochainP2pDnaT,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // Get any complete sessions.

@@ -21,7 +21,7 @@ fn pass_report(report: &RunReport, redundancy_target: f64) {
 /// Currently this does not assert a very strong guarantee. Over time we want
 /// to reduce the margins closer to zero.
 fn pass_redundancy(stats: &Stats, redundancy_target: f64) {
-    let rf = redundancy_target as f64;
+    let rf = redundancy_target;
 
     let margin_min = 0.40;
     let margin_median_lo = 0.40;

@@ -225,7 +225,7 @@ async fn test_block_invalid_receipt() {
     let alice_block_target = BlockTargetId::Cell(alice_cell.cell_id().to_owned());
     let bob_block_target = BlockTargetId::Cell(bob_cell.cell_id().to_owned());
 
-    for now in vec![Timestamp::now(), Timestamp::MIN, Timestamp::MAX] {
+    for now in [Timestamp::now(), Timestamp::MIN, Timestamp::MAX] {
         assert!(!alice_conductor
             .spaces
             .is_blocked(alice_block_target.clone(), now)
