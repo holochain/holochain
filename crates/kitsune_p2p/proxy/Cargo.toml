@@ -15,9 +15,9 @@ edition = "2021"
 base64 = "0.22"
 derive_more = "0.99"
 futures = "0.3"
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.28", path = "../types" }
-kitsune_p2p_transport_quic = { version = "^0.3.0-beta-dev.28", path = "../transport_quic" }
-holochain_trace = { version = "^0.3.0-beta-dev.11", path = "../../holochain_trace" }
+kitsune_p2p_types = { version = "^0.3.0", path = "../types" }
+kitsune_p2p_transport_quic = { version = "^0.3.0", path = "../transport_quic" }
+holochain_trace = { version = "^0.3.0", path = "../../holochain_trace" }
 serde = { version = "1", features = [ "derive" ] }
 serde_bytes = "0.11"
 structopt = "0.3"

@@ -12,8 +12,8 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.10", path = "../timestamp" }
-kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.21", path = "../bin_data" }
+kitsune_p2p_timestamp = { version = "^0.3.0", path = "../timestamp" }
+kitsune_p2p_bin_data = { version = "^0.3.0", path = "../bin_data" }
 serde = { version = "1.0", features = ["derive"] }
 
 [lints]
