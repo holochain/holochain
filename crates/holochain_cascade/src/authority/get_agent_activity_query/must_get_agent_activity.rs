@@ -88,7 +88,7 @@ fn find_bounds(
             }
         }
         let result = statement
-                .query_row(named_params! {":hash": hash, ":author": author, ":activity": DhtOpType::RegisterAgentActivity}, |row| {
+                .query_row(named_params! {":hash": hash, ":author": author, ":activity": ChainOpType::RegisterAgentActivity}, |row| {
                     row.get(0)
                 })
                 .optional()?;
@@ -112,13 +112,14 @@ fn get_activity(
         .query_and_then(
             named_params! {
                  ":author": author,
-                 ":op_type": DhtOpType::RegisterAgentActivity,
+                 ":op_type": ChainOpType::RegisterAgentActivity,
                  ":lower_seq": range.start(),
                  ":upper_seq": range.end(),
 
             },
             |row| {
-                let SignedAction(action, signature) = from_blob(row.get("blob")?)?;
+                let action: SignedAction = from_blob(row.get("blob")?)?;
+                let (action, signature) = action.into();
                 let hash: ActionHash = row.get("hash")?;
                 let hashed = ActionHashed::with_pre_hashed(action, hash);
                 let action = SignedActionHashed::with_presigned(hashed, signature);

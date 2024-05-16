@@ -141,7 +141,7 @@ fn test_db<Kind: DbKindT>(kind: Kind) -> TestDb<Kind> {
         .unwrap();
     TestDb {
         db: DbWrite::test(tmpdir.path(), kind).expect("Couldn't create test database"),
-        tmpdir,
+        dir: tmpdir.into(),
     }
 }
 
@@ -176,7 +176,7 @@ pub struct TestDb<Kind: DbKindT> {
     /// sqlite database
     db: DbWrite<Kind>,
     /// temp directory for this environment
-    tmpdir: TempDir,
+    dir: TestDir,
 }
 
 impl<Kind: DbKindT> TestDb<Kind> {
@@ -186,14 +186,14 @@ impl<Kind: DbKindT> TestDb<Kind> {
     }
 
     /// Accessor
-    pub fn into_tempdir(self) -> TempDir {
-        self.tmpdir
+    pub fn persist(&mut self) {
+        self.dir.persist()
     }
 
     /// Dump db to a location.
     pub fn dump(&self, out: &Path) -> std::io::Result<()> {
         std::fs::create_dir(out).ok();
-        for entry in std::fs::read_dir(self.tmpdir.path())? {
+        for entry in std::fs::read_dir(&self.dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.is_file() {

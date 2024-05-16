@@ -74,7 +74,7 @@ fn create_corrupt_db<Kind: DbKindT>(kind: Kind, u: &mut arbitrary::Unstructured)
     holochain_sqlite::schema::SCHEMA_CELL
         .initialize(&mut conn, Some(kind.kind()))
         .unwrap();
-    let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+    let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
         Signature::arbitrary(u).unwrap(),
         Action::arbitrary(u).unwrap(),
     ));

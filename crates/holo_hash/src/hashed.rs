@@ -76,6 +76,21 @@ where
     pub fn into_inner(self) -> (C, HoloHashOf<C>) {
         (self.content, self.hash)
     }
+
+    /// Convert to a different content type via From
+    #[cfg(feature = "test_utils")]
+    pub fn downcast<D>(&self) -> HoloHashed<D>
+    where
+        C: Clone,
+        C::HashType: crate::hash_type::HashTypeSync,
+        D: HashableContent<HashType = C::HashType> + From<C>,
+    {
+        let old_hash = &self.hash;
+        let content: D = self.content.clone().into();
+        let hashed = HoloHashed::from_content_sync_exact(content);
+        assert_eq!(&hashed.hash, old_hash);
+        hashed
+    }
 }
 
 impl<C> Clone for HoloHashed<C>

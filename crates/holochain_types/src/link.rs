@@ -7,9 +7,9 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
 use regex::Regex;
 
+use crate::dht_op::ChainOpType;
 use crate::dht_op::DhtOpError;
 use crate::dht_op::DhtOpResult;
-use crate::dht_op::DhtOpType;
 use crate::dht_op::RenderedOp;
 use crate::dht_op::RenderedOps;
 
@@ -151,7 +151,7 @@ impl WireCreateLink {
             action,
             signature,
             validation_status,
-            DhtOpType::RegisterAddLink,
+            ChainOpType::RegisterAddLink,
         )
     }
 }
@@ -189,7 +189,7 @@ impl WireDeleteLink {
             action,
             signature,
             validation_status,
-            DhtOpType::RegisterRemoveLink,
+            ChainOpType::RegisterRemoveLink,
         )
     }
 }

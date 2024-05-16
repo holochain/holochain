@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use crate::prelude::*;
+use crate::warrant::Warrant;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
@@ -425,31 +426,31 @@ mod tests {
         h0.entry_type = entry_type_1.clone();
         h0.action_seq = 0;
         h0.entry_hash = entry_hash_0.clone();
-        let hh0 = ActionHashed::from_content_sync(h0.into());
+        let hh0 = ActionHashed::from_content_sync(h0);
 
         let mut h1 = fixt!(Update);
         h1.entry_type = entry_type_2.clone();
         h1.action_seq = 1;
         h1.prev_action = hh0.as_hash().clone();
-        let hh1 = ActionHashed::from_content_sync(h1.into());
+        let hh1 = ActionHashed::from_content_sync(h1);
 
         let mut h2 = fixt!(CreateLink);
         h2.action_seq = 2;
         h2.prev_action = hh1.as_hash().clone();
-        let hh2 = ActionHashed::from_content_sync(h2.into());
+        let hh2 = ActionHashed::from_content_sync(h2);
 
         let mut h3 = fixt!(Create);
         h3.entry_type = entry_type_2.clone();
         h3.action_seq = 3;
         h3.prev_action = hh2.as_hash().clone();
-        let hh3 = ActionHashed::from_content_sync(h3.into());
+        let hh3 = ActionHashed::from_content_sync(h3);
 
         // Cheeky forker!
         let mut h3a = fixt!(Create);
         h3a.entry_type = entry_type_1.clone();
         h3a.action_seq = 3;
         h3a.prev_action = hh2.as_hash().clone();
-        let hh3a = ActionHashed::from_content_sync(h3a.into());
+        let hh3a = ActionHashed::from_content_sync(h3a);
 
         let mut h4 = fixt!(Update);
         h4.entry_type = entry_type_1.clone();
@@ -457,12 +458,12 @@ mod tests {
         h4.entry_hash = entry_hash_0;
         h4.action_seq = 4;
         h4.prev_action = hh3.as_hash().clone();
-        let hh4 = ActionHashed::from_content_sync(h4.into());
+        let hh4 = ActionHashed::from_content_sync(h4);
 
         let mut h5 = fixt!(CreateLink);
         h5.action_seq = 5;
         h5.prev_action = hh4.as_hash().clone();
-        let hh5 = ActionHashed::from_content_sync(h5.into());
+        let hh5 = ActionHashed::from_content_sync(h5);
 
         [hh0, hh1, hh2, hh3, hh3a, hh4, hh5]
     }

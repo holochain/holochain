@@ -655,7 +655,7 @@ fixturator!(
 
 fixturator!(
     ActionHashed;
-    constructor fn from_content_sync(Action);
+    constructor fn from_content_sync_exact(Action);
 );
 
 fixturator!(
