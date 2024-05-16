@@ -14,7 +14,7 @@
 
       rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = "1.75.0";
+        version = "1.77.2";
       };
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
       moldOpensslDeps = craneLib.vendorCargoDeps {

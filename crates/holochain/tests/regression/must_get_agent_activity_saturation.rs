@@ -50,5 +50,5 @@ async fn must_get_agent_activity_saturation() {
             hash,
         )
         .await;
-    assert!(matches!(record, Some(_)));
+    assert!(record.is_some());
 }

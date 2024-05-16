@@ -133,7 +133,6 @@ fn connection_ids_from_dump(dump: &Value) -> Vec<String> {
     dump.as_object()
         .unwrap()
         .keys()
-        .into_iter()
         .filter_map(|k| {
             match base64::engine::general_purpose::URL_SAFE_NO_PAD
                 .decode(k)

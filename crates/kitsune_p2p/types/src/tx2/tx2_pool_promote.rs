@@ -873,14 +873,11 @@ mod tests {
         w_send
             .send(metric_task(async move {
                 while let Some(evt) = tgt.next().await {
-                    match evt {
-                        EpEvent::IncomingData(EpIncomingData { con, mut data, .. }) => {
-                            assert_eq!(b"hello", data.as_ref());
-                            data.clear();
-                            data.extend_from_slice(b"world");
-                            con.write(0.into(), data, t).await.unwrap();
-                        }
-                        _ => (),
+                    if let EpEvent::IncomingData(EpIncomingData { con, mut data, .. }) = evt {
+                        assert_eq!(b"hello", data.as_ref());
+                        data.clear();
+                        data.extend_from_slice(b"world");
+                        con.write(0.into(), data, t).await.unwrap();
                     }
                 }
                 KitsuneResult::Ok(())
@@ -902,13 +899,10 @@ mod tests {
                 w_send
                     .send(metric_task(async move {
                         while let Some(evt) = ep.next().await {
-                            match evt {
-                                EpEvent::IncomingData(EpIncomingData { data, .. }) => {
-                                    assert_eq!(b"world", data.as_ref());
-                                    let _ = s_done.send(());
-                                    break;
-                                }
-                                _ => (),
+                            if let EpEvent::IncomingData(EpIncomingData { data, .. }) = evt {
+                                assert_eq!(b"world", data.as_ref());
+                                let _ = s_done.send(());
+                                break;
                             }
                         }
                         KitsuneResult::Ok(())

@@ -219,28 +219,25 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
         let start = record.storage_start_loc;
         let end = record.storage_end_loc;
 
-        match (start, end) {
-            (Some(start), Some(end)) => {
-                if start < end {
-                    if tgt >= start && tgt <= end {
-                        deb = "one-span-inside";
-                        dist = 0;
-                    } else if tgt < start {
-                        deb = "one-span-before";
-                        dist = std::cmp::min(start - tgt, (u32::MAX - end) + tgt + 1);
-                    } else {
-                        deb = "one-span-after";
-                        dist = std::cmp::min(tgt - end, (u32::MAX - tgt) + start + 1);
-                    }
-                } else if tgt <= end || tgt >= start {
-                    deb = "two-span-inside";
+        if let (Some(start), Some(end)) = (start, end) {
+            if start < end {
+                if tgt >= start && tgt <= end {
+                    deb = "one-span-inside";
                     dist = 0;
+                } else if tgt < start {
+                    deb = "one-span-before";
+                    dist = std::cmp::min(start - tgt, (u32::MAX - end) + tgt + 1);
                 } else {
-                    deb = "two-span-outside";
-                    dist = std::cmp::min(tgt - end, start - tgt);
+                    deb = "one-span-after";
+                    dist = std::cmp::min(tgt - end, (u32::MAX - tgt) + start + 1);
                 }
+            } else if tgt <= end || tgt >= start {
+                deb = "two-span-inside";
+                dist = 0;
+            } else {
+                deb = "two-span-outside";
+                dist = std::cmp::min(tgt - end, start - tgt);
             }
-            _ => (),
         }
 
         assert!(dist >= prev);

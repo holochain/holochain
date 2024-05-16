@@ -598,21 +598,20 @@ fn op_match_sanity() {
         FlatOp::RegisterUpdate(_) => (),
         FlatOp::RegisterDelete(_) => (),
     }
-    match op.flattened::<_, ()>().unwrap() {
-        FlatOp::StoreRecord(OpRecord::CreateEntry {
-            action: _,
-            app_entry: EntryTypes::A(_),
-        }) => (),
-        _ => (),
+    if let FlatOp::StoreRecord(OpRecord::CreateEntry {
+        action: _,
+        app_entry: EntryTypes::A(_),
+    }) = op.flattened::<_, ()>().unwrap()
+    {
+        ()
     }
-    match op.flattened::<(), _>().unwrap() {
-        FlatOp::StoreRecord(OpRecord::CreateLink {
-            link_type: LinkTypes::A,
-            ..
-        }) => (),
-        _ => (),
+    if let FlatOp::StoreRecord(OpRecord::CreateLink {
+        link_type: LinkTypes::A,
+        ..
+    }) = op.flattened::<(), _>().unwrap()
+    {
+        ()
     }
-    match op.flattened::<(), ()>().unwrap() {
-        _ => (),
-    }
+    op.flattened::<(), ()>().unwrap();
+    ()
 }
