@@ -16,12 +16,12 @@ criterion_main!(benches);
 struct TestMessage(pub String);
 
 fn simple_bench(bench: &mut Criterion) {
-    let _g = holochain_trace::test_run();
+    holochain_trace::test_run();
 
     let runtime = rt();
 
     let (listener_addresses, jh) = runtime.block_on(setup());
-    let listener_address = listener_addresses.first().unwrap().clone();
+    let listener_address = *listener_addresses.first().unwrap();
     let (mut send, mut recv, cjh) = runtime.block_on(setup_client(listener_address));
 
     let mut group = bench.benchmark_group("simple_bench");

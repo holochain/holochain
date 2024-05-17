@@ -48,7 +48,7 @@ async fn authored_test() {
     let entry_hash = record.unwrap().action().entry_hash().cloned().unwrap();
 
     // publish these commits
-    let triggers = handle.get_cell_triggers(&alice.cell_id()).await.unwrap();
+    let triggers = handle.get_cell_triggers(alice.cell_id()).await.unwrap();
     triggers.integrate_dht_ops.trigger(&"authored_test");
 
     // Alice commits the entry
@@ -142,7 +142,7 @@ async fn authored_test() {
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(&bob.cell_id()).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob.cell_id()).await.unwrap();
     triggers.publish_dht_ops.trigger(&"");
 
     bob

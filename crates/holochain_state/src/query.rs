@@ -323,7 +323,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
                 let action =
                     from_blob::<SignedAction>(row.get(row.as_ref().column_index("blob")?)?);
                 Ok(action.and_then(|action| {
-                    let SignedAction(action, signature) = action;
+                    let (action, signature) = action.into();
                     let hash: ActionHash = row.get(row.as_ref().column_index("hash")?)?;
                     let action = ActionHashed::with_pre_hashed(action, hash);
                     let shh = SignedActionHashed::with_presigned(action, signature);
@@ -401,7 +401,7 @@ impl<'stmt> Txn<'stmt, '_> {
                 let action =
                     from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?);
                 Ok(action.and_then(|action| {
-                    let SignedAction(action, signature) = action;
+                    let (action, signature) = action.into();
                     let hash: ActionHash = row.get(row.as_ref().column_index("hash")?)?;
                     let action = ActionHashed::with_pre_hashed(action, hash);
                     let shh = SignedActionHashed::with_presigned(action, signature);
@@ -438,7 +438,7 @@ impl<'stmt> Txn<'stmt, '_> {
                 let action =
                     from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?);
                 Ok(action.and_then(|action| {
-                    let SignedAction(action, signature) = action;
+                    let (action, signature) = action.into();
                     let hash: ActionHash = row.get(row.as_ref().column_index("hash")?)?;
                     let action = ActionHashed::with_pre_hashed(action, hash);
                     let shh = SignedActionHashed::with_presigned(action, signature);
@@ -478,7 +478,7 @@ impl<'stmt> Txn<'stmt, '_> {
                 let action =
                     from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?);
                 Ok(action.and_then(|action| {
-                    let SignedAction(action, signature) = action;
+                    let (action, signature) = action.into();
                     let hash: ActionHash = row.get(row.as_ref().column_index("hash")?)?;
                     let action = ActionHashed::with_pre_hashed(action, hash);
                     let shh = SignedActionHashed::with_presigned(action, signature);
@@ -523,7 +523,7 @@ impl<'stmt> Txn<'stmt, '_> {
                 let action =
                     from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?);
                 Ok(action.and_then(|action| {
-                    let SignedAction(action, signature) = action;
+                    let (action, signature) = action.into();
                     let hash: ActionHash = row.get(row.as_ref().column_index("hash")?)?;
                     let action = ActionHashed::with_pre_hashed(action, hash);
                     let shh = SignedActionHashed::with_presigned(action, signature);
@@ -845,7 +845,7 @@ pub fn row_blob_and_hash_to_action(
 ) -> impl Fn(&Row) -> StateQueryResult<SignedActionHashed> {
     move |row| {
         let action = from_blob::<SignedAction>(row.get(blob_index)?)?;
-        let SignedAction(action, signature) = action;
+        let (action, signature) = action.into();
         let hash: ActionHash = row.get(row.as_ref().column_index(hash_index)?)?;
         let action = ActionHashed::with_pre_hashed(action, hash);
         let shh = SignedActionHashed::with_presigned(action, signature);
@@ -858,7 +858,7 @@ pub fn row_blob_to_action(
 ) -> impl Fn(&Row) -> StateQueryResult<SignedActionHashed> {
     move |row| {
         let action = from_blob::<SignedAction>(row.get(blob_index)?)?;
-        let SignedAction(action, signature) = action;
+        let (action, signature) = action.into();
         let action = ActionHashed::from_content_sync(action);
         let shh = SignedActionHashed::with_presigned(action, signature);
         Ok(shh)
@@ -932,7 +932,7 @@ pub fn get_public_entry_from_db(
 
 /// Get a [`DhtOp`] from the database
 /// filtering out private entries and
-/// [`DhtOp::StoreEntry`] where the entry
+/// [`ChainOp::StoreEntry`] where the entry
 /// is private.
 /// The ops are suitable for publishing / gossiping.
 pub fn get_public_op_from_db(
@@ -946,8 +946,8 @@ pub fn get_public_op_from_db(
         },
         |row| {
             let hash: DhtOpHash = row.get("hash")?;
-            let op_hashed =
-                map_sql_dht_op_common(row)?.map(|op| DhtOpHashed::with_pre_hashed(op, hash));
+            let op_hashed = map_sql_dht_op_common(false, false, "type", row)?
+                .map(|op| DhtOpHashed::with_pre_hashed(op, hash));
             StateQueryResult::Ok(op_hashed)
         },
     );
@@ -960,31 +960,54 @@ pub fn get_public_op_from_db(
     }
 }
 
-pub fn map_sql_dht_op_common(row: &Row) -> StateQueryResult<Option<DhtOp>> {
-    let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-    let op_type: DhtOpType = row.get("type")?;
-    if action
-        .0
-        .entry_type()
-        .map_or(false, |et| *et.visibility() == EntryVisibility::Private)
-        && op_type == DhtOpType::StoreEntry
-    {
-        return Ok(None);
-    }
+pub fn map_sql_dht_op(
+    include_private_entries: bool,
+    type_fieldname: &str,
+    row: &Row,
+) -> StateQueryResult<DhtOp> {
+    Ok(map_sql_dht_op_common(true, include_private_entries, type_fieldname, row)?.unwrap())
+}
 
-    // Check that the entry isn't private before gossiping it.
-    let mut entry: Option<Entry> = None;
-    if action
-        .0
-        .entry_type()
-        .filter(|et| *et.visibility() == EntryVisibility::Public)
-        .is_some()
-    {
-        let e: Option<Vec<u8>> = row.get("entry_blob")?;
-        entry = match e {
-            Some(entry) => Some(from_blob::<Entry>(entry)?),
-            None => None,
-        };
+pub fn map_sql_dht_op_common(
+    return_private_entry_ops: bool,
+    include_private_entries: bool,
+    type_fieldname: &str,
+    row: &Row,
+) -> StateQueryResult<Option<DhtOp>> {
+    let op_type: DhtOpType = row.get(type_fieldname)?;
+    match op_type {
+        DhtOpType::Chain(op_type) => {
+            let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
+            if action.entry_type().map_or(false, |et| {
+                !return_private_entry_ops && *et.visibility() == EntryVisibility::Private
+            }) && op_type == ChainOpType::StoreEntry
+            {
+                return Ok(None);
+            }
+
+            // Check that the entry isn't private before gossiping it.
+            let mut entry: Option<Entry> = None;
+            if action
+                .entry_type()
+                .filter(|et| include_private_entries || *et.visibility() == EntryVisibility::Public)
+                .is_some()
+            {
+                let e: Option<Vec<u8>> = row.get("entry_blob")?;
+                entry = match e {
+                    Some(entry) => Some(from_blob::<Entry>(entry)?),
+                    None => None,
+                };
+            }
+
+            Ok(Some(ChainOp::from_type(op_type, action, entry)?.into()))
+        }
+        DhtOpType::Warrant(_) => {
+            let warrant = from_blob::<SignedWarrant>(row.get("action_blob")?)?;
+            let author: AgentPubKey = row.get("author")?;
+            let ((warrant, timestamp), signature) = warrant.into();
+            Ok(Some(
+                WarrantOp::new(warrant, author, signature, timestamp).into(),
+            ))
+        }
     }
-    Ok(Some(DhtOp::from_type(op_type, action, entry)?))
 }

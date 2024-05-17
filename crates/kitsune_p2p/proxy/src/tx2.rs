@@ -1014,8 +1014,10 @@ mod tests {
         let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
         let f = tx2_pool_promote(f, Default::default());
 
-        let mut conf = super::ProxyConfig::default();
-        conf.allow_proxy_fwd = true;
+        let conf = ProxyConfig {
+            allow_proxy_fwd: true,
+            ..Default::default()
+        };
         let f = tx2_proxy(f, conf).unwrap();
 
         let mut ep = f.bind("none:".try_into().unwrap(), t).await.unwrap();

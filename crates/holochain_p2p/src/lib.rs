@@ -311,7 +311,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .await
     }
 
-    /// Get [`DhtOp::StoreRecord`] or [`DhtOp::StoreEntry`] from the DHT.
+    /// Get [`ChainOp::StoreRecord`] or [`ChainOp::StoreEntry`] from the DHT.
     async fn get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,

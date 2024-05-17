@@ -2135,9 +2135,9 @@ mod state_impls {
 
         /// Update the internal state with a pure function mapping old state to new
         #[tracing::instrument(skip_all)]
-        pub(crate) async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
+        pub(crate) async fn update_state<F>(&self, f: F) -> ConductorResult<ConductorState>
         where
-            F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
+            F: Send + FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
         {
             self.spaces.update_state(f).await
         }
@@ -3220,19 +3220,7 @@ fn query_dht_ops_from_statement(
 
     let r: Vec<DhtOp> = stmt
         .query_and_then([], |row| {
-            let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-            let op_type: DhtOpType = row.get("dht_type")?;
-            let entry = match action.0.entry_type().map(|et| et.visibility()) {
-                Some(EntryVisibility::Public) => {
-                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                    match entry {
-                        Some(entry) => Some(from_blob::<Entry>(entry)?),
-                        None => None,
-                    }
-                }
-                _ => None,
-            };
-            Ok(DhtOp::from_type(op_type, action, entry)?)
+            holochain_state::query::map_sql_dht_op(false, "dht_type", row)
         })?
         .collect::<StateQueryResult<Vec<_>>>()?;
     Ok(r)

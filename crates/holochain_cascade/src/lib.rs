@@ -416,7 +416,7 @@ impl CascadeImpl {
                 ..
             } = op;
             let op =
-                DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(signature, content));
+                DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(signature, content));
             insert_op(txn, &op)?;
             // We set the integrated to for the cache so it can match the
             // same query as the vault. This can also be used for garbage collection.

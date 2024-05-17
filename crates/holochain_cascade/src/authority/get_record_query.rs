@@ -17,7 +17,7 @@ impl GetRecordOpsQuery {
 }
 
 pub struct Item {
-    op_type: DhtOpType,
+    op_type: ChainOpType,
     action: SignedAction,
 }
 
@@ -53,9 +53,9 @@ impl Query for GetRecordOpsQuery {
 
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":store_record": DhtOpType::StoreRecord,
-            ":delete": DhtOpType::RegisterDeletedBy,
-            ":update": DhtOpType::RegisterUpdatedRecord,
+            ":store_record": ChainOpType::StoreRecord,
+            ":delete": ChainOpType::RegisterDeletedBy,
+            ":update": ChainOpType::RegisterUpdatedRecord,
             ":action_hash": self.0,
         };
         params.to_vec()
@@ -78,18 +78,18 @@ impl Query for GetRecordOpsQuery {
 
     fn fold(&self, mut state: Self::State, dht_op: Self::Item) -> StateQueryResult<Self::State> {
         match &dht_op.data.op_type {
-            DhtOpType::StoreRecord => {
+            ChainOpType::StoreRecord => {
                 if state.action.is_none() {
                     state.action = Some(dht_op.map(|d| d.action));
                 }
             }
-            DhtOpType::RegisterDeletedBy => {
+            ChainOpType::RegisterDeletedBy => {
                 let status = dht_op.validation_status();
                 state
                     .deletes
                     .push(Judged::raw(dht_op.data.action.try_into()?, status));
             }
-            DhtOpType::RegisterUpdatedRecord => {
+            ChainOpType::RegisterUpdatedRecord => {
                 let status = dht_op.validation_status();
                 let action = dht_op.data.action;
                 state.updates.push(Judged::raw(
@@ -109,7 +109,6 @@ impl Query for GetRecordOpsQuery {
         let entry_hash = state.action.as_ref().and_then(|wire_op| {
             wire_op
                 .data
-                .0
                 .entry_data()
                 .map(|(hash, et)| (hash, et.visibility()))
         });

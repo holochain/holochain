@@ -19,7 +19,7 @@ const BOB: &'static str = "BOB";
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 struct Event {
     action: ActionLocation,
-    op_type: DhtOpType,
+    op_type: ChainOpType,
     called_zome: &'static str,
     with_zome_index: Option<ZomeIndex>,
     with_entry_def_index: Option<EntryDefIndex>,
@@ -29,7 +29,7 @@ impl Default for Event {
     fn default() -> Self {
         Self {
             action: Default::default(),
-            op_type: DhtOpType::RegisterAgentActivity,
+            op_type: ChainOpType::RegisterAgentActivity,
             called_zome: Default::default(),
             with_zome_index: Default::default(),
             with_entry_def_index: Default::default(),
@@ -96,14 +96,14 @@ impl Expected {
     }
 
     fn activity_and_record_all_zomes(&mut self, mut event: Event) {
-        event.op_type = DhtOpType::RegisterAgentActivity;
+        event.op_type = ChainOpType::RegisterAgentActivity;
         self.all_zomes(event.clone());
-        event.op_type = DhtOpType::StoreRecord;
+        event.op_type = ChainOpType::StoreRecord;
         self.all_zomes(event.clone());
     }
 
     fn activity_all_zomes(&mut self, mut event: Event) {
-        event.op_type = DhtOpType::RegisterAgentActivity;
+        event.op_type = ChainOpType::RegisterAgentActivity;
         self.all_zomes(event.clone());
     }
 
@@ -115,17 +115,17 @@ impl Expected {
     }
 
     fn activity_and_record_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
-        event.op_type = DhtOpType::RegisterAgentActivity;
+        event.op_type = ChainOpType::RegisterAgentActivity;
 
         self.zomes(event.clone(), zomes);
 
-        event.op_type = DhtOpType::StoreRecord;
+        event.op_type = ChainOpType::StoreRecord;
 
         self.zomes(event.clone(), zomes);
     }
 
     fn record_for_zomes(&mut self, mut event: Event, zomes: &[&'static str]) {
-        event.op_type = DhtOpType::StoreRecord;
+        event.op_type = ChainOpType::StoreRecord;
 
         self.zomes(event.clone(), zomes);
     }
@@ -149,7 +149,7 @@ impl Expected {
         };
         self.activity_and_record_for_zomes(event.clone(), zomes);
 
-        event.op_type = DhtOpType::StoreEntry;
+        event.op_type = ChainOpType::StoreEntry;
         self.zomes(event.clone(), zomes);
     }
 
@@ -204,7 +204,7 @@ async fn app_validation_ops() {
                 let event = match op {
                     Op::StoreRecord(StoreRecord { record }) => Event {
                         action: ActionLocation::new(record.action().clone(), &agents),
-                        op_type: DhtOpType::StoreRecord,
+                        op_type: ChainOpType::StoreRecord,
                         called_zome: zome,
                         with_zome_index: None,
                         with_entry_def_index: None,
@@ -221,7 +221,7 @@ async fn app_validation_ops() {
                             };
                         Event {
                             action: ActionLocation::new(action.hashed.content.clone(), &agents),
-                            op_type: DhtOpType::StoreEntry,
+                            op_type: ChainOpType::StoreEntry,
                             called_zome: zome,
                             with_zome_index,
                             with_entry_def_index,
@@ -239,7 +239,7 @@ async fn app_validation_ops() {
                         };
                         Event {
                             action: ActionLocation::new(update.hashed.content.clone(), &agents),
-                            op_type: DhtOpType::RegisterUpdatedContent,
+                            op_type: ChainOpType::RegisterUpdatedContent,
                             called_zome: zome,
                             with_zome_index,
                             with_entry_def_index,
@@ -257,7 +257,7 @@ async fn app_validation_ops() {
                             };
                         Event {
                             action: ActionLocation::new(delete.hashed.content.clone(), &agents),
-                            op_type: DhtOpType::RegisterDeletedBy,
+                            op_type: ChainOpType::RegisterDeletedBy,
                             called_zome: zome,
                             with_zome_index,
                             with_entry_def_index,
@@ -265,21 +265,21 @@ async fn app_validation_ops() {
                     }
                     Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Event {
                         action: ActionLocation::new(action.action().clone(), &agents),
-                        op_type: DhtOpType::RegisterAgentActivity,
+                        op_type: ChainOpType::RegisterAgentActivity,
                         called_zome: zome,
                         with_zome_index: None,
                         with_entry_def_index: None,
                     },
                     Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => Event {
                         action: ActionLocation::new(create_link.hashed.content.clone(), &agents),
-                        op_type: DhtOpType::RegisterAddLink,
+                        op_type: ChainOpType::RegisterAddLink,
                         called_zome: zome,
                         with_zome_index: None,
                         with_entry_def_index: None,
                     },
                     Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => Event {
                         action: ActionLocation::new(delete_link.hashed.content.clone(), &agents),
-                        op_type: DhtOpType::RegisterRemoveLink,
+                        op_type: ChainOpType::RegisterRemoveLink,
                         called_zome: zome,
                         with_zome_index: None,
                         with_entry_def_index: None,
@@ -400,7 +400,7 @@ async fn app_validation_ops() {
     expected.activity_all_zomes(event.clone());
     expected.record_for_zomes(event.clone(), &[ZOME_A_0, ZOME_B_0]);
 
-    event.op_type = DhtOpType::StoreEntry;
+    event.op_type = ChainOpType::StoreEntry;
     event.called_zome = ZOME_A_0;
     event.with_zome_index = Some(ZomeIndex(0));
     event.with_entry_def_index = Some(0.into());
