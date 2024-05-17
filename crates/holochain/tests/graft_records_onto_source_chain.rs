@@ -93,7 +93,7 @@ async fn grafting() {
         weight: Default::default(),
     };
     let sah = SignedActionHashed::with_presigned(
-        ActionHashed::from_content_sync(action.clone().into()),
+        ActionHashed::from_content_sync(action.clone()),
         fixt!(Signature),
     );
     let record = Record::new(sah, Some(entry.clone()));

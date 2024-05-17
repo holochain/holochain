@@ -558,7 +558,7 @@ mod tests {
         );
 
         assert_eq!(
-            DhtArc::from_bounds(cent * 99, cent * 0).to_ascii(10),
+            DhtArc::from_bounds(cent * 99, 0).to_ascii(10),
             "-        @".to_string()
         );
     }

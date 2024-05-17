@@ -298,7 +298,8 @@ async fn create_op_with_status(
     create_action.author = author.clone();
     let action = Action::Create(create_action);
 
-    let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(fixt!(Signature), action));
+    let op =
+        DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(fixt!(Signature), action));
 
     let test_op_hash = op.as_hash().clone();
     vault

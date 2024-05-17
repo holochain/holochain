@@ -24,6 +24,7 @@ use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::db::DbKindT;
 use holochain_sqlite::db::DbWrite;
 use holochain_state::mutations::StateMutationResult;
+use holochain_types::dht_op::ChainOp;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::WireOps;
@@ -52,10 +53,10 @@ async fn validate_op_with_no_dependency() {
         timestamp: Timestamp::now().into(),
         hash: test_case.dna_hash(),
     };
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action));
 
     let op_hash = test_case
-        .save_op_to_db(test_case.dht_db_handle(), op)
+        .save_op_to_db(test_case.dht_db_handle(), op.into())
         .await
         .unwrap();
 
@@ -86,7 +87,7 @@ async fn validate_op_with_dependency_held_in_cache() {
         .sign_action(Action::Create(prev_create_action.clone()))
         .await;
     let previous_op =
-        DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action));
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action)).into();
     test_case
         .save_op_to_db(test_case.cache_db_handle(), previous_op)
         .await
@@ -103,7 +104,7 @@ async fn validate_op_with_dependency_held_in_cache() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
 
     let op_hash = test_case
         .save_op_to_db(test_case.dht_db_handle(), op)
@@ -148,7 +149,7 @@ async fn validate_op_with_dependency_not_held() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
 
     let op_hash = test_case
         .save_op_to_db(test_case.dht_db_handle(), op)
@@ -200,7 +201,7 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
 
     test_case
         .save_op_to_db(test_case.dht_db_handle(), op)
@@ -237,10 +238,11 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
             validation_package_action.clone(),
         ))
         .await;
-    let previous_op = DhtOp::RegisterAgentActivity(
+    let previous_op = ChainOp::RegisterAgentActivity(
         fixt!(Signature),
         Action::AgentValidationPkg(validation_package_action),
-    );
+    )
+    .into();
     test_case
         .save_op_to_db(test_case.cache_db_handle(), previous_op)
         .await
@@ -257,7 +259,7 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
     test_case
         .save_op_to_db(test_case.dht_db_handle(), op)
         .await

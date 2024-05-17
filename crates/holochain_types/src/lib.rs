@@ -36,6 +36,7 @@ pub mod signal;
 #[warn(missing_docs)]
 pub mod sql;
 pub mod validation_receipt;
+pub mod warrant;
 pub mod web_app;
 pub mod zome_types;
 

@@ -74,7 +74,17 @@ where
 
     /// Get the state of a given dependency. This should always return a value because we should know about the dependency
     /// by examining the ops that are being validated. However, the dependency may not be found on the DHT yet.
-    pub fn get(
+    pub fn get(&self, hash: &HoloHash<T::HashType>) -> Option<&ValidationDependencyState<T>> {
+        match self.states.get(hash) {
+            Some(dep) => Some(dep),
+            None => {
+                tracing::warn!(hash = ?hash, "Have not attempted to fetch requested dependency, this is a bug");
+                None
+            }
+        }
+    }
+
+    pub fn get_mut(
         &mut self,
         hash: &HoloHash<T::HashType>,
     ) -> Option<&mut ValidationDependencyState<T>> {
