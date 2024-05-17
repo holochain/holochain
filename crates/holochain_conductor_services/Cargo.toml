@@ -28,7 +28,7 @@ holochain_deepkey_dna = "0.0.6-dev.5"
 holochain_keystore = { version = "^0.4.0-dev.3", path = "../holochain_keystore" }
 holochain_types = { version = "^0.4.0-dev.3", path = "../holochain_types" }
 holochain_util = { version = "^0.4.0-dev.1", path = "../holochain_util", features = [
-    "time",
+  "time",
 ] }
 
 arbitrary = { version = "1.0", optional = true }
