@@ -252,6 +252,12 @@ mod tests {
       transport_pool:
         - type: webrtc
           signal_url: wss://signal.holotest.net
+          webrtc_config: {
+            "iceServers": [
+              { "urls": "stun:stun.l.google.com:19302" },
+              { "urls": "stun:stun2.l.google.com:19302" }
+            ]
+          }
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
         default_rpc_single_timeout_ms: 42
@@ -272,6 +278,12 @@ mod tests {
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
         network_config.transport_pool.push(TransportConfig::WebRTC {
             signal_url: "wss://signal.holotest.net".into(),
+            webrtc_config: Some(serde_json::json!({
+              "iceServers": [
+                { "urls": "stun:stun.l.google.com:19302" },
+                { "urls": "stun:stun2.l.google.com:19302" }
+              ]
+            })),
         });
         let mut tuning_params =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();

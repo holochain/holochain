@@ -866,6 +866,7 @@ impl MetaNet {
         host: HostApiLegacy,
         kitsune_internal_sender: ghost_actor::GhostSender<crate::spawn::Internal>,
         signal_url: String,
+        webrtc_config: String,
         preflight_user_data: PreflightUserData,
     ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv, Option<String>)> {
         use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
@@ -885,6 +886,7 @@ impl MetaNet {
             //       we cannot distinguish, so in order for run-local-services
             //       to work, we need to allow plain text on ALL connections
             signal_allow_plain_text: true,
+            initial_webrtc_config: webrtc_config,
             connection_count_max: tuning_params.tx5_connection_count_max,
             send_buffer_bytes_max: tuning_params.tx5_send_buffer_bytes_max,
             recv_buffer_bytes_max: tuning_params.tx5_recv_buffer_bytes_max,

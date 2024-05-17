@@ -452,6 +452,7 @@ impl Setup2Nodes {
             },
             i_s.clone(),
             format!("ws://{sig_addr}"),
+            "{}".to_string(),
             user_data_a,
         )
         .await
@@ -471,6 +472,7 @@ impl Setup2Nodes {
             },
             i_s.clone(),
             format!("ws://{sig_addr}"),
+            "{}".to_string(),
             user_data_b,
         )
         .await

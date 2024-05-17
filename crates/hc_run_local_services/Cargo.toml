@@ -25,7 +25,7 @@ futures = "0.3"
 holochain_trace = { version = "^0.4.0-dev.2", path = "../holochain_trace" }
 if-addrs = "0.12"
 kitsune_p2p_bootstrap = { version = "^0.3.0-dev.3", path = "../kitsune_p2p/bootstrap" }
-sbd-server = "=0.0.2-alpha"
+sbd-server = "=0.0.3-alpha"
 tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1"
 

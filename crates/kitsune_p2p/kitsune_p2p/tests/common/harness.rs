@@ -55,6 +55,7 @@ impl KitsuneTestHarness {
             .transport_pool
             .push(kitsune_p2p_types::config::TransportConfig::WebRTC {
                 signal_url: format!("ws://{signal_url}"),
+                webrtc_config: None,
             });
         self
     }

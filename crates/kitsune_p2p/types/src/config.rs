@@ -507,6 +507,9 @@ pub enum TransportConfig {
     WebRTC {
         /// The url of the signal server to connect to for addressability.
         signal_url: String,
+
+        /// Webrtc peer connection config.
+        webrtc_config: Option<serde_json::Value>,
     },
 }
 

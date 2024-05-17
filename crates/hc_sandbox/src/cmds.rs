@@ -80,6 +80,9 @@ pub enum NetworkType {
     WebRTC {
         /// URL to a holochain tx5 WebRTC signal server.
         signal_url: String,
+
+        /// Optional override webrtc peer connection config to use.
+        webrtc_config: Option<String>,
     },
 }
 
@@ -240,8 +243,16 @@ impl From<Network> for KitsuneP2pConfig {
                 }];
             }
             */
-            NetworkType::WebRTC { signal_url } => {
-                let transport = TransportConfig::WebRTC { signal_url };
+            NetworkType::WebRTC {
+                signal_url,
+                webrtc_config,
+            } => {
+                let webrtc_config = webrtc_config
+                    .map(|c| serde_json::from_str(&c).expect("Failed to parse webrtc_config json"));
+                let transport = TransportConfig::WebRTC {
+                    signal_url,
+                    webrtc_config,
+                };
                 kit.transport_pool = vec![transport];
             }
         }

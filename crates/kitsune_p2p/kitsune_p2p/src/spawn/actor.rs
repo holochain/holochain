@@ -23,6 +23,15 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Default webrtc config if set to `None`.
+/// TODO - set this to holochain stun servers once they exist!
+const DEFAULT_WEBRTC_CONFIG: &str = r#"{
+  "iceServers": [
+    { "urls": "stun:stun.l.google.com:19302" },
+    { "urls": "stun:stun2.l.google.com:19302" }
+  ]
+}"#;
+
 /// The bootstrap service is much more thoroughly documented in the default service implementation.
 /// See <https://github.com/holochain/bootstrap>
 mod discover;
@@ -237,8 +246,17 @@ pub(super) async fn create_meta_net(
     #[cfg(feature = "tx5")]
     if ep_hnd.is_none() && config.is_tx5() {
         tracing::trace!("tx5");
-        let signal_url = match config.transport_pool.first().unwrap() {
-            TransportConfig::WebRTC { signal_url } => signal_url.clone(),
+        let (signal_url, webrtc_config) = match config.transport_pool.first().unwrap() {
+            TransportConfig::WebRTC {
+                signal_url,
+                webrtc_config,
+            } => {
+                let webrtc_config = webrtc_config
+                    .as_ref()
+                    .map(|c| serde_json::to_string(&c).expect("Can Serialize JSON"))
+                    .unwrap_or_else(|| DEFAULT_WEBRTC_CONFIG.to_string());
+                (signal_url.clone(), webrtc_config)
+            }
             _ => unreachable!(),
         };
         let (h, e, p) = MetaNet::new_tx5(
@@ -246,6 +264,7 @@ pub(super) async fn create_meta_net(
             host.clone(),
             internal_sender.clone(),
             signal_url,
+            webrtc_config,
             preflight_user_data,
         )
         .await?;
@@ -1048,6 +1067,7 @@ mod tests {
         let mut config = KitsuneP2pConfig::default();
         config.transport_pool = vec![TransportConfig::WebRTC {
             signal_url: format!("ws://{:?}", signal_addr),
+            webrtc_config: None,
         }];
         config.bootstrap_service = None;
         config.network_type = NetworkType::QuicMdns;
@@ -1067,6 +1087,7 @@ mod tests {
         let mut config = KitsuneP2pConfig::default();
         config.transport_pool = vec![TransportConfig::WebRTC {
             signal_url: format!("ws://{:?}", signal_addr),
+            webrtc_config: None,
         }];
         config.bootstrap_service = Some(url2!("ws://not-a-bootstrap.test"));
         config.network_type = NetworkType::QuicBootstrap;
