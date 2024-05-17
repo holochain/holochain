@@ -81,9 +81,7 @@ async fn sys_validation_produces_warrants() {
     let (dna_avec, _, _) =
         SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_avec_validation).await;
 
-    // let entry = Entry::app(AppString("entry1".into()).try_into().unwrap()).unwrap();
-
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let mut conductors = SweetConductorBatch::from_standard_config(3).await;
     let (alice,) = conductors[0]
         .setup_app(&"test_app", [&dna_sans])
         .await
@@ -94,6 +92,15 @@ async fn sys_validation_produces_warrants() {
         .await
         .unwrap()
         .into_tuple();
+    let (carol,) = conductors[2]
+        .setup_app(&"test_app", [&dna_avec])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    conductors.exchange_peer_info().await;
+
+    await_consistency(10, [&alice, &bob, &carol]).await.unwrap();
 
     let _: ActionHash = conductors[0]
         .call(
@@ -103,9 +110,8 @@ async fn sys_validation_produces_warrants() {
         )
         .await;
 
-    conductors.exchange_peer_info().await;
-
-    await_consistency(10, &[alice, bob]).await.unwrap();
+    await_consistency(10, [&bob, &carol]).await.unwrap();
+    todo!("check that the warrant is held by carol");
 }
 
 async fn run_test(

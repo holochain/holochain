@@ -13,6 +13,7 @@ use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::dht_op::ChainOpHashed;
+use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpLite;
 use holochain_types::dht_op::OpOrder;
@@ -27,6 +28,7 @@ use holochain_zome_types::block::BlockTargetReason;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::prelude::*;
 use std::str::FromStr;
+use std::sync::Arc;
 
 pub use error::*;
 
@@ -110,21 +112,27 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
     let timestamp = op.timestamp();
     let signature = op.signature().clone();
     let op_order = OpOrder::new(op_type, op.timestamp());
-
-    if let (Some(op), Some(op_lite)) = (op.as_chain_op(), op_lite.as_chain_op()) {
-        let action = op.action();
-        if let Some(entry) = op.entry().into_option() {
-            let entry_hash = action
-                .entry_hash()
-                .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
-            insert_entry(txn, entry_hash, entry)?;
-        }
-        let action_hashed = ActionHashed::with_pre_hashed(action, op_lite.action_hash().to_owned());
-        let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
-        insert_action(txn, &action_hashed)?;
-    }
-
     let deps = op.sys_validation_dependencies();
+
+    match op {
+        DhtOp::ChainOp(op) => {
+            let action = op.action();
+            if let Some(entry) = op.entry().into_option() {
+                let entry_hash = action
+                    .entry_hash()
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+                insert_entry(txn, entry_hash, entry)?;
+            }
+            let action_hashed = ActionHashed::from_content_sync(action);
+            let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
+            insert_action(txn, &action_hashed)?;
+        }
+        DhtOp::WarrantOp(warrant_op) => {
+            let author = warrant_op.author.clone();
+            let warrant = warrant_op.clone().into_signed_warrant();
+            insert_warrant(txn, warrant, author)?;
+        }
+    }
     insert_op_lite(txn, &op_lite, hash, &op_order, &timestamp)?;
     set_dependency(txn, hash, deps)?;
     Ok(())
@@ -497,6 +505,25 @@ pub fn set_receipts_complete(
             "receipts_complete": holochain_sqlite::rusqlite::types::Null,
         })?;
     }
+    Ok(())
+}
+
+/// Insert a [`Warrant`] into the Action table.
+pub fn insert_warrant(
+    txn: &mut Transaction,
+    warrant: SignedWarrant,
+    author: AgentPubKey,
+) -> StateMutationResult<()> {
+    let warrant_type = warrant.0.get_type();
+    let hash = warrant.0.to_hash();
+
+    sql_insert!(txn, Action, {
+        "hash": hash,
+        "type": warrant_type,
+        "author": author,
+        "base_hash": warrant.0.dht_basis(),
+        "blob": to_blob(&warrant)?,
+    })?;
     Ok(())
 }
 
