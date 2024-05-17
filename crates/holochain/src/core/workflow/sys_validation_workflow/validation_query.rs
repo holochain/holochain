@@ -1,13 +1,11 @@
-use holo_hash::DhtOpHash;
 use holochain_sqlite::db::DbKindDht;
 use holochain_state::prelude::*;
 
-pub use crate::core::validation::DhtOpOrder;
 use crate::core::workflow::WorkflowResult;
 
 /// Get all ops that need to sys or app validated in order.
 /// - Sys validated or awaiting app dependencies.
-/// - Ordered by type then timestamp (See [`DhtOpOrder`])
+/// - Ordered by type then timestamp (See [`OpOrder`])
 #[tracing::instrument(skip_all)]
 pub async fn get_ops_to_app_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
     get_ops_to_validate(db, false).await
@@ -15,7 +13,7 @@ pub async fn get_ops_to_app_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<V
 
 /// Get all ops that need to sys or app validated in order.
 /// - Pending or awaiting sys dependencies.
-/// - Ordered by type then timestamp (See [`DhtOpOrder`])
+/// - Ordered by type then timestamp (See [`OpOrder`])
 #[tracing::instrument(skip_all)]
 pub async fn get_ops_to_sys_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
     get_ops_to_validate(db, true).await
@@ -32,7 +30,7 @@ async fn get_ops_to_validate(
         DhtOp.type as dht_type,
         DhtOp.hash as dht_hash
         FROM DhtOp
-        JOIN
+        LEFT JOIN
         Action ON DhtOp.action_hash = Action.hash
         LEFT JOIN
         Entry ON Action.entry_hash = Entry.hash
@@ -78,18 +76,11 @@ async fn get_ops_to_validate(
     db.read_async(move |txn| {
         let mut stmt = txn.prepare(&sql)?;
         let r = stmt.query_and_then([], |row| {
-            let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-            let op_type: DhtOpType = row.get("dht_type")?;
-            let hash: DhtOpHash = row.get("dht_hash")?;
-            let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-            let entry = match entry {
-                Some(entry) => Some(from_blob::<Entry>(entry)?),
-                None => None,
-            };
-            WorkflowResult::Ok(DhtOpHashed::with_pre_hashed(
-                DhtOp::from_type(op_type, action, entry)?,
-                hash,
-            ))
+            let op = WorkflowResult::Ok(holochain_state::query::map_sql_dht_op(
+                true, "dht_type", row,
+            )?)?;
+            let hash = row.get("dht_hash")?;
+            Ok(DhtOpHashed::with_pre_hashed(op, hash))
         })?;
         let r = r.collect();
         WorkflowResult::Ok(r)
@@ -126,7 +117,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn sys_validation_query() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db = test_dht_db();
         let expected = create_test_data(&db.to_db().into()).await;
         let ops = get_ops_to_sys_validate(&db.to_db().into()).await.unwrap();
@@ -142,7 +133,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn app_validation_query() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db = test_dht_db();
         let expected = create_test_data(&db.to_db().into()).await;
         let ops = get_ops_to_app_validate(&db.to_db().into()).await.unwrap();
@@ -159,7 +150,7 @@ mod tests {
     /// Make sure both workflows can't pull in the same ops.
     #[tokio::test(flavor = "multi_thread")]
     async fn workflows_are_exclusive() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db = test_dht_db();
         create_test_data(&db.to_db().into()).await;
         let app_validation_ops = get_ops_to_app_validate(&db.to_db().into()).await.unwrap();
@@ -274,7 +265,7 @@ mod tests {
     }
 
     async fn create_and_insert_op(db: &DbWrite<DbKindDht>, facts: Facts) -> DhtOpHashed {
-        let state = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+        let state = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));
@@ -326,8 +317,8 @@ mod tests {
     async fn assert_sorted_by_op_order(ops: &Vec<DhtOpHashed>) {
         let mut ops_sorted = ops.clone();
         ops_sorted.sort_by_key(|d| {
-            let op_type = d.as_content().get_type();
-            let timestamp = d.as_content().action().timestamp();
+            let op_type = d.get_type();
+            let timestamp = d.timestamp();
             OpOrder::new(op_type, timestamp)
         });
         assert_eq!(ops, &ops_sorted);

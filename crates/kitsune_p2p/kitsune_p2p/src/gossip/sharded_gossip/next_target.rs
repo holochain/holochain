@@ -16,7 +16,7 @@ impl ShardedGossipLocal {
     /// Find a remote endpoint from agents within arc set.
     pub(super) async fn find_remote_agent_within_arcset(
         &self,
-        arc_set: Arc<DhtArcSet>,
+        arc_set: ArqSet,
         agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Option<Node>> {
         let mut remote_nodes: HashMap<NodeCert, Node> = HashMap::new();
@@ -48,7 +48,7 @@ impl ShardedGossipLocal {
                         .expect("Your system clock is set before UNIX epoch")
             })
             .filter(|a| remote_agents_within_arc_set.contains(&a.agent))
-            .filter(|a| !a.storage_arc.is_empty())
+            .filter(|a| !a.storage_arc().is_empty())
         {
             // Get an address if there is one.
             let info = info
@@ -154,6 +154,7 @@ fn next_remote_node(
 #[cfg(test)]
 mod tests {
     use ::fixt::prelude::*;
+    use kitsune_p2p_types::dht::arq::ArqSize;
     use rand::distributions::Alphanumeric;
     use test_case::test_case;
 
@@ -185,7 +186,7 @@ mod tests {
         futures::executor::block_on(AgentInfoSigned::sign(
             space,
             agent,
-            42,
+            ArqSize::from_half_len(42),
             vec![random_url(rng).into()],
             42,
             69,
@@ -215,7 +216,7 @@ mod tests {
         (0..n)
             .map(|_| {
                 let info = random_agent_info(&mut rng);
-                let url = info.url_list.get(0).unwrap().clone();
+                let url = info.url_list.first().unwrap().clone();
                 let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
                 Node {
                     agent_info_list: vec![info],

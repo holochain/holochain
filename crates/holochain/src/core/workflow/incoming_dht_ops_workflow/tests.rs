@@ -7,7 +7,7 @@ use holochain_keystore::AgentPubKeyExt;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_to_limbo() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let space = TestSpace::new(fixt!(DnaHash));
     let env = space.space.dht_db.clone();
@@ -24,7 +24,7 @@ async fn incoming_ops_to_limbo() {
         let action = Action::CreateLink(action);
         let signature = author.sign(&keystore, &action).await.unwrap();
 
-        let op = DhtOp::RegisterAgentActivity(signature, action);
+        let op = ChainOp::RegisterAgentActivity(signature, action);
         let hash = DhtOpHash::with_data_sync(&op);
         hash_list.push(hash);
         op_list.push(op);
@@ -36,7 +36,7 @@ async fn incoming_ops_to_limbo() {
         let space = space.space.clone();
         all.push(tokio::task::spawn(async move {
             let start = std::time::Instant::now();
-            incoming_dht_ops_workflow(space, sys_validation_trigger, vec![op], false)
+            incoming_dht_ops_workflow(space, sys_validation_trigger, vec![op.into()], false)
                 .await
                 .unwrap();
             println!("IN OP in {} s", start.elapsed().as_secs_f64());
@@ -52,7 +52,7 @@ async fn incoming_ops_to_limbo() {
 // reprocessing.
 #[tokio::test(flavor = "multi_thread")]
 async fn can_retry_failed_op() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let space = TestSpace::new(fixt!(DnaHash));
     let env = space.space.dht_db.clone();
@@ -67,7 +67,7 @@ async fn can_retry_failed_op() {
     // Create a dummy signature that will fail validation
     let signature = Signature([0; SIGNATURE_BYTES]);
 
-    let op = DhtOp::RegisterAgentActivity(signature, action.clone());
+    let op = ChainOp::RegisterAgentActivity(signature, action.clone()).into();
     let hash = DhtOpHash::with_data_sync(&op);
 
     // Try running the workflow and...
@@ -85,7 +85,7 @@ async fn can_retry_failed_op() {
 
     // Now fix the signature
     let signature = author.sign(&keystore, &action).await.unwrap();
-    let op = DhtOp::RegisterAgentActivity(signature, action);
+    let op = ChainOp::RegisterAgentActivity(signature, action).into();
     let hash = DhtOpHash::with_data_sync(&op);
 
     // Run the workflow again to simulate a re-send of the op...
@@ -104,7 +104,7 @@ async fn can_retry_failed_op() {
 // Verifies that an op which has been republished will allow a new validation receipt to be requested.
 #[tokio::test(flavor = "multi_thread")]
 async fn republish_to_request_validation_receipt() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let space = TestSpace::new(fixt!(DnaHash));
     let env = space.space.dht_db.clone();
@@ -117,7 +117,7 @@ async fn republish_to_request_validation_receipt() {
     action.author = author.clone();
     let action = Action::CreateLink(action);
     let signature = author.sign(&keystore, &action).await.unwrap();
-    let op = DhtOp::RegisterAgentActivity(signature, action);
+    let op: DhtOp = ChainOp::RegisterAgentActivity(signature, action).into();
     let hash = DhtOpHash::with_data_sync(&op);
 
     incoming_dht_ops_workflow(

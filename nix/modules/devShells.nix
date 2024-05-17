@@ -129,7 +129,6 @@
             )
             ;
 
-
             packages = with pkgs; [
               cargo-nextest
               graph-easy
@@ -194,7 +193,6 @@
               ];
 
               packages = [
-                (pkgs.callPackage self.inputs.crate2nix.outPath { })
                 pkgs.llvmPackages.bintools
               ];
             };

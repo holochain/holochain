@@ -54,7 +54,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn zome_call_verify_block() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,

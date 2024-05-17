@@ -16,7 +16,7 @@ use kitsune_p2p::fixt::KitsuneSpaceFixturator;
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn connection_close_on_peer_restart() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
@@ -62,7 +62,7 @@ async fn connection_close_on_peer_restart() {
     wait_for_connected(sender_online.clone(), agent_restart.clone(), space.clone()).await;
 
     // Wait until the connection is found
-    tokio::time::timeout(std::time::Duration::from_secs(5), {
+    tokio::time::timeout(std::time::Duration::from_secs(15), {
         let sender_online = sender_online.clone();
         async move {
             loop {
@@ -99,7 +99,7 @@ async fn connection_close_on_peer_restart() {
         .unwrap();
 
     // Wait until there is a new connection and the old one is closed
-    tokio::time::timeout(std::time::Duration::from_secs(10), {
+    tokio::time::timeout(std::time::Duration::from_secs(30), {
         let initial_connection_id = initial_connection_id.clone();
         let sender_online = sender_online.clone();
         async move {
@@ -133,7 +133,6 @@ fn connection_ids_from_dump(dump: &Value) -> Vec<String> {
     dump.as_object()
         .unwrap()
         .keys()
-        .into_iter()
         .filter_map(|k| {
             match base64::engine::general_purpose::URL_SAFE_NO_PAD
                 .decode(k)

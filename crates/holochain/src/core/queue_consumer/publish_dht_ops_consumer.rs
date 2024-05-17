@@ -11,7 +11,7 @@ pub fn spawn_publish_dht_ops_consumer(
     cell_id: CellId,
     env: DbWrite<DbKindAuthored>,
     conductor: ConductorHandle,
-    network: impl HolochainP2pDnaT + Send + Sync + Clone + 'static,
+    network: impl HolochainP2pDnaT + Clone + 'static,
 ) -> TriggerSender {
     // Create a trigger with an exponential back off starting at 1 minute
     // and maxing out at 5 minutes.

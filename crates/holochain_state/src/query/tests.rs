@@ -5,9 +5,9 @@ use holo_hash::*;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::rusqlite::TransactionBehavior;
 use holochain_sqlite::{rusqlite::Connection, schema::SCHEMA_CELL};
+use holochain_types::action::NewEntryAction;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::OpOrder;
-use holochain_types::{action::NewEntryAction, dht_op::DhtOp};
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::prelude::*;
 
@@ -30,7 +30,7 @@ mod sys_meta;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_links() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
@@ -49,21 +49,21 @@ async fn get_links() {
     let td = LinkTestData::new();
 
     // - Add link to db.
-    insert_valid_integrated_op(&mut txn, &td.base_op).unwrap();
-    insert_valid_integrated_op(&mut txn, &td.target_op).unwrap();
-    insert_valid_integrated_op(&mut txn, &td.create_link_op).unwrap();
+    insert_valid_integrated_op(&mut txn, &td.base_op.downcast()).unwrap();
+    insert_valid_integrated_op(&mut txn, &td.target_op.downcast()).unwrap();
+    insert_valid_integrated_op(&mut txn, &td.create_link_op.downcast()).unwrap();
 
     // - Check we can get the link query back.
     let r = get_link_query(&mut [&mut txn], None, td.tag_query.clone());
     assert_eq!(r[0], td.link);
 
     // - Add the same link to the cache.
-    insert_valid_integrated_op(&mut cache_txn, &td.base_op).unwrap();
-    insert_valid_integrated_op(&mut cache_txn, &td.target_op).unwrap();
-    insert_valid_integrated_op(&mut cache_txn, &td.create_link_op).unwrap();
+    insert_valid_integrated_op(&mut cache_txn, &td.base_op.downcast()).unwrap();
+    insert_valid_integrated_op(&mut cache_txn, &td.target_op.downcast()).unwrap();
+    insert_valid_integrated_op(&mut cache_txn, &td.create_link_op.downcast()).unwrap();
 
     // - Check duplicates don't cause issues.
-    insert_valid_integrated_op(&mut cache_txn, &td.create_link_op).unwrap();
+    insert_valid_integrated_op(&mut cache_txn, &td.create_link_op.downcast()).unwrap();
 
     // - Add to the scratch
     insert_op_scratch(
@@ -98,7 +98,7 @@ async fn get_links() {
     assert_eq!(r.len(), 1);
 
     // - Insert a delete op.
-    insert_valid_integrated_op(&mut txn, &td.delete_link_op).unwrap();
+    insert_valid_integrated_op(&mut txn, &td.delete_link_op.downcast()).unwrap();
 
     let r = get_link_query(
         &mut [&mut cache_txn, &mut txn],
@@ -111,7 +111,7 @@ async fn get_links() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_entry() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
@@ -130,16 +130,16 @@ async fn get_entry() {
     let td = EntryTestData::new();
 
     // - Create an entry on main db.
-    insert_valid_integrated_op(&mut txn, &td.store_entry_op).unwrap();
+    insert_valid_integrated_op(&mut txn, &td.store_entry_op.downcast()).unwrap();
 
     // - Check we get that action back.
     let r = get_entry_query(&mut [&mut txn], None, td.query.clone()).unwrap();
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
 
     // - Create the same entry in the cache.
-    insert_valid_integrated_op(&mut cache_txn, &td.store_entry_op).unwrap();
+    insert_valid_integrated_op(&mut cache_txn, &td.store_entry_op.downcast()).unwrap();
     // - Check duplicates is ok.
-    insert_valid_integrated_op(&mut cache_txn, &td.store_entry_op).unwrap();
+    insert_valid_integrated_op(&mut cache_txn, &td.store_entry_op.downcast()).unwrap();
 
     // - Add to the scratch
     insert_op_scratch(
@@ -161,7 +161,7 @@ async fn get_entry() {
     assert_eq!(*r.action(), *td.action.action());
 
     // - Delete the entry in the cache.
-    insert_valid_integrated_op(&mut cache_txn, &td.delete_entry_action_op).unwrap();
+    insert_valid_integrated_op(&mut cache_txn, &td.delete_entry_action_op.downcast()).unwrap();
 
     // - Get the entry from both stores and union the queries.
     let r = get_entry_query(
@@ -177,7 +177,7 @@ async fn get_entry() {
 /// Test that `insert_op` also inserts an action and potentially an entry
 #[tokio::test(flavor = "multi_thread")]
 async fn insert_op_equivalence() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut conn1 = Connection::open_in_memory().unwrap();
     let mut conn2 = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn1, None).unwrap();
@@ -189,7 +189,7 @@ async fn insert_op_equivalence() {
     create_action.entry_hash = create_entry_hash.clone();
 
     let sig = fixt!(Signature);
-    let op = DhtOp::StoreEntry(
+    let op = ChainOp::StoreEntry(
         sig.clone(),
         NewEntryAction::Create(create_action.clone()),
         create_entry.clone(),

@@ -7,6 +7,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::fixt::ActionFixturator;
+use kitsune_p2p::dht::Arq;
 struct StubNetwork;
 
 impl ghost_actor::GhostHandler<HolochainP2p> for StubNetwork {}
@@ -19,7 +20,7 @@ impl HolochainP2pHandler for StubNetwork {
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arc: Option<crate::dht_arc::DhtArc>,
+        initial_arq: Option<Arq>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
@@ -254,7 +255,7 @@ mod tests {
         holo_hash::AgentPubKey,
         holo_hash::AgentPubKey,
     ) {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         (
             newhash!(DnaHash, 's'),
             fixt!(AgentPubKey, Predictable, 0),
@@ -309,7 +310,7 @@ mod tests {
 
         let zome_name: ZomeName = "".into();
         let fn_name: FunctionName = "".into();
-        let nonce = Nonce256Bits::try_from([0; 32]).unwrap();
+        let nonce = Nonce256Bits::from([0; 32]);
         let cap_secret = None;
         let payload = ExternIO::encode(b"yippo").unwrap();
         let expires_at = (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap();
@@ -507,7 +508,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_workflow() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let (dna, a1, a2, _a3) = test_setup();
 
@@ -529,13 +530,19 @@ mod tests {
         .unwrap();
 
         let test_1 = WireOps::Record(WireRecordOps {
-            action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
+            action: Some(Judged::valid(SignedAction::new(
+                fixt!(Action),
+                fixt!(Signature),
+            ))),
             deletes: vec![],
             updates: vec![],
             entry: None,
         });
         let test_2 = WireOps::Record(WireRecordOps {
-            action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
+            action: Some(Judged::valid(SignedAction::new(
+                fixt!(Action),
+                fixt!(Signature),
+            ))),
             deletes: vec![],
             updates: vec![],
             entry: None,

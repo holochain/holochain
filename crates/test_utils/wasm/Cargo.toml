@@ -1,7 +1,7 @@
 [package]
 name = "holochain_wasm_test_utils"
-version = "0.3.0-beta-dev.42"
-authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
+version = "0.4.0-dev.3"
+authors = ["thedavidmeister", "thedavidmeister@gmail.com"]
 edition = "2021"
 description = "Utilities for Wasm testing for Holochain"
 license = "Apache-2.0"
@@ -9,7 +9,7 @@ documentation = "https://docs.rs/holochain_wasm_test_utils"
 
 [lib]
 name = "holochain_wasm_test_utils"
-crate-type = [ "cdylib", "rlib" ]
+crate-type = ["cdylib", "rlib"]
 path = "./src/lib.rs"
 
 [features]
@@ -20,11 +20,11 @@ only_check = []
 
 # reminder - do not use workspace deps
 [dependencies]
-holochain_types = { path = "../../holochain_types", version = "^0.3.0-beta-dev.40"}
+holochain_types = { path = "../../holochain_types", version = "^0.4.0-dev.3"}
 strum = "0.18.0"
 strum_macros = "0.18.0"
-holochain_util = { version = "^0.3.0-beta-dev.6", path = "../../holochain_util" }
+holochain_util = { version = "^0.4.0-dev.1", path = "../../holochain_util" }
 
 [build-dependencies]
-toml = "0.5"
+toml = "0.8"
 walkdir = "2.3.1"

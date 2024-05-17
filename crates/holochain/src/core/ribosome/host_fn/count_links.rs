@@ -62,7 +62,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn count_links() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -103,7 +103,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn count_links_filtered_by_author() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -172,7 +172,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn count_links_filtered_by_timestamp() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,

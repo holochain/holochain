@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use arbitrary::Arbitrary;
-use ed25519_dalek::{Keypair, Signer};
+use ed25519_dalek::{Signer, SigningKey};
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::FullStateDump;
@@ -90,7 +90,7 @@ pub async fn grant_zome_call_capability(
     zome_name: ZomeName,
     fn_name: FunctionName,
     signing_key: AgentPubKey,
-) -> CapSecret {
+) -> std::io::Result<CapSecret> {
     let mut fns = BTreeSet::new();
     fns.insert((zome_name, fn_name));
     let functions = GrantedFunctions::Listed(fns);
@@ -113,15 +113,15 @@ pub async fn grant_zome_call_capability(
         },
     }));
     let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await;
+    let response = check_timeout(response, 3000).await?;
     assert_matches!(response, AdminResponse::ZomeCallCapabilityGranted);
-    cap_secret
+    Ok(cap_secret)
 }
 
 pub async fn call_zome_fn<S>(
     app_tx: &WebsocketSender,
     cell_id: CellId,
-    signing_keypair: &Keypair,
+    signing_keypair: &SigningKey,
     cap_secret: CapSecret,
     zome_name: ZomeName,
     fn_name: FunctionName,
@@ -130,7 +130,7 @@ pub async fn call_zome_fn<S>(
     S: Serialize + std::fmt::Debug,
 {
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
-    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
     let zome_call_unsigned = ZomeCallUnsigned {
         cap_secret: Some(cap_secret),
         cell_id: cell_id.clone(),
@@ -155,7 +155,7 @@ pub async fn call_zome_fn<S>(
     };
     let request = AppRequest::CallZome(Box::new(call));
     let response = app_tx.request(request);
-    let call_response = check_timeout(response, 6000).await;
+    let call_response = check_timeout(response, 6000).await.unwrap();
     trace!(?call_response);
     assert_matches!(call_response, AppResponse::ZomeCalled(_));
 }
@@ -164,9 +164,10 @@ pub async fn attach_app_interface(client: &mut WebsocketSender, port: Option<u16
     let request = AdminRequest::AttachAppInterface {
         port,
         allowed_origins: AllowedOrigins::Any,
+        installed_app_id: None,
     };
     let response = client.request(request);
-    let response = check_timeout(response, 3000).await;
+    let response = check_timeout(response, 3000).await.unwrap();
     match response {
         AdminResponse::AppInterfaceAttached { port } => port,
         _ => panic!("Attach app interface failed: {:?}", response),
@@ -196,12 +197,16 @@ pub async fn retry_admin_interface(
     }
 }
 
-pub async fn generate_agent_pubkey(client: &mut WebsocketSender, timeout: u64) -> AgentPubKey {
+pub async fn generate_agent_pub_key(
+    client: &mut WebsocketSender,
+    timeout: u64,
+) -> std::io::Result<AgentPubKey> {
     let request = AdminRequest::GenerateAgentPubKey;
-    let response = client.request(request);
-    let response = check_timeout_named("GenerateAgentPubkey", response, timeout).await;
+    let response = client
+        .request_timeout(request, Duration::from_millis(timeout))
+        .await?;
 
-    unwrap_to::unwrap_to!(response => AdminResponse::AgentPubKeyGenerated).clone()
+    Ok(unwrap_to::unwrap_to!(response => AdminResponse::AgentPubKeyGenerated).clone())
 }
 
 pub async fn register_and_install_dna(
@@ -212,7 +217,7 @@ pub async fn register_and_install_dna(
     properties: Option<YamlProperties>,
     role_name: RoleName,
     timeout: u64,
-) -> DnaHash {
+) -> std::io::Result<DnaHash> {
     register_and_install_dna_named(
         client,
         orig_dna_hash,
@@ -235,7 +240,7 @@ pub async fn register_and_install_dna_named(
     role_name: RoleName,
     name: String,
     timeout: u64,
-) -> DnaHash {
+) -> std::io::Result<DnaHash> {
     let mods = DnaModifiersOpt {
         properties,
         ..Default::default()
@@ -283,9 +288,9 @@ pub async fn register_and_install_dna_named(
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
-    let response = check_timeout_named("InstallApp", response, timeout).await;
+    let response = check_timeout_named("InstallApp", response, timeout).await?;
     assert_matches!(response, AdminResponse::AppInstalled(_));
-    dna_hash
+    Ok(dna_hash)
 }
 
 pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16> {
@@ -360,7 +365,7 @@ pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
 pub async fn check_timeout<T>(
     response: impl Future<Output = std::io::Result<T>>,
     timeout_ms: u64,
-) -> T {
+) -> std::io::Result<T> {
     check_timeout_named("<unnamed>", response, timeout_ms).await
 }
 
@@ -369,17 +374,13 @@ async fn check_timeout_named<T>(
     name: &'static str,
     response: impl Future<Output = std::io::Result<T>>,
     timeout_millis: u64,
-) -> T {
-    // FIXME(stefan): remove this multiplier once it's faster on self-hosted CI
-    let timeout_millis = timeout_millis * 4;
-    match tokio::time::timeout(std::time::Duration::from_millis(timeout_millis), response).await {
-        Ok(response) => response.unwrap(),
-        Err(e) => {
-            panic!(
-                "{}: Timed out on request after {}: {}",
-                name, timeout_millis, e
-            );
-        }
+) -> std::io::Result<T> {
+    match tokio::time::timeout(Duration::from_millis(timeout_millis), response).await {
+        Ok(response) => response,
+        Err(_) => Err(std::io::Error::other(format!(
+            "{}: Timed out on request after {}",
+            name, timeout_millis
+        ))),
     }
 }
 
@@ -387,16 +388,19 @@ pub async fn dump_full_state(
     client: &mut WebsocketSender,
     cell_id: CellId,
     dht_ops_cursor: Option<u64>,
-) -> FullStateDump {
+) -> std::io::Result<FullStateDump> {
     let request = AdminRequest::DumpFullState {
         cell_id: Box::new(cell_id),
         dht_ops_cursor,
     };
     let response = client.request(request);
-    let response = check_timeout(response, 3000).await;
+    let response = check_timeout(response, 3000).await?;
 
     match response {
-        AdminResponse::FullStateDumped(state) => state,
-        _ => panic!("DumpFullState failed: {:?}", response),
+        AdminResponse::FullStateDumped(state) => Ok(state),
+        _ => Err(std::io::Error::other(format!(
+            "DumpFullState failed: {:?}",
+            response
+        ))),
     }
 }

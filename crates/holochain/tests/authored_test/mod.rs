@@ -15,7 +15,7 @@ use holochain_zome_types::prelude::*;
 /// - Bob commits the entry and it is now in their authored store
 #[tokio::test(flavor = "multi_thread")]
 async fn authored_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // Check if the correct number of ops are integrated
     // every 100 ms for a maximum of 10 seconds but early exit
     // if they are there.
@@ -48,7 +48,7 @@ async fn authored_test() {
     let entry_hash = record.unwrap().action().entry_hash().cloned().unwrap();
 
     // publish these commits
-    let triggers = handle.get_cell_triggers(&alice.cell_id()).await.unwrap();
+    let triggers = handle.get_cell_triggers(alice.cell_id()).await.unwrap();
     triggers.integrate_dht_ops.trigger(&"authored_test");
 
     // Alice commits the entry
@@ -142,7 +142,7 @@ async fn authored_test() {
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(&bob.cell_id()).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob.cell_id()).await.unwrap();
     triggers.publish_dht_ops.trigger(&"");
 
     bob

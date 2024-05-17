@@ -79,7 +79,7 @@ impl BootstrapTask {
         internal_sender: GhostSender<SpaceInternal>,
         host_sender: Sender<KitsuneP2pEvent>,
         space: Arc<KitsuneSpace>,
-        bootstrap_query: Box<impl BootstrapService + Send + Sync + 'static>,
+        bootstrap_query: Box<impl BootstrapService + Sync + 'static>,
         bootstrap_check_delay_backoff_multiplier: u32,
     ) -> Arc<RwLock<Self>> {
         let task_this = this.clone();
@@ -171,7 +171,6 @@ impl BootstrapTask {
 mod tests {
     use crate::event::PutAgentInfoSignedEvt;
     use crate::spawn::actor::space::bootstrap_task::{BootstrapService, BootstrapTask};
-    use crate::spawn::actor::space::DhtArc;
     use crate::spawn::actor::space::{
         KAgent, KBasis, KSpace, MaybeDelegate, OpHashList, Payload, SpaceInternal,
         SpaceInternalHandler, SpaceInternalHandlerResult, VecMXM, WireConHnd,
@@ -193,6 +192,7 @@ mod tests {
     use kitsune_p2p_fetch::FetchContext;
     use kitsune_p2p_types::agent_info::AgentInfoSigned;
     use kitsune_p2p_types::bootstrap::RandomQuery;
+    use kitsune_p2p_types::dht::Arq;
     use kitsune_p2p_types::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p_types::KOpHash;
     use parking_lot::RwLock;
@@ -598,7 +598,7 @@ mod tests {
         fn handle_update_agent_arc(
             &mut self,
             _agent: KAgent,
-            _arc: DhtArc,
+            _arq: Arq,
         ) -> SpaceInternalHandlerResult<()> {
             unreachable!()
         }

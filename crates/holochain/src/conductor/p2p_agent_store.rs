@@ -248,15 +248,15 @@ pub async fn query_peer_density(
     topology: Topology,
     strat: PeerStrat,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
-    dht_arc: DhtArc,
+    _dht_arc: DhtArc,
 ) -> ConductorResult<PeerView> {
     let now = now();
-    let arcs = env.p2p_list_agents().await?;
-    let arcs: Vec<_> = arcs
+    let infos = env.p2p_list_agents().await?;
+    let arqs: Vec<_> = infos
         .into_iter()
         .filter_map(|v| {
             if v.space == kitsune_space && !is_expired(now, &v) {
-                Some(v.storage_arc)
+                Some(v.storage_arq)
             } else {
                 None
             }
@@ -264,7 +264,7 @@ pub async fn query_peer_density(
         .collect();
 
     // contains is already checked in the iterator
-    Ok(strat.view(topology, dht_arc, arcs.as_slice()))
+    Ok(strat.view(topology, arqs.as_slice()))
 }
 
 fn now() -> u64 {
@@ -358,7 +358,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let test_db = test_p2p_agents_db();
         let db = test_db.to_db();
@@ -374,7 +374,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_to_db() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let t_db = test_p2p_agents_db();
         let db = t_db.to_db();
 

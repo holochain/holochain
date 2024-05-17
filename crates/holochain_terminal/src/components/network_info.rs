@@ -19,25 +19,25 @@ static NETWORK_INFO_PARAMS: Lazy<Arc<RwLock<Option<NetworkInfoParams>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
 static SELECTED: Lazy<RwLock<usize>> = Lazy::new(|| RwLock::new(0));
 
-pub fn render_network_info_widget<B: Backend>(
+pub fn render_network_info_widget(
     args: &Args,
     app_client: Option<Arc<Mutex<AppClient>>>,
     events: Vec<ScreenEvent>,
-    frame: &mut Frame<B>,
+    frame: &mut Frame,
     rect: Rect,
 ) {
-    let app_client = match app_client {
-        Some(b) => b,
-        None => {
-            show_message("No admin URL configured, to use this screen please re-run the terminal with `--admin-url <my-url> --app-id <my-app-id>`", frame, rect);
-            return;
-        }
-    };
-
     let app_id = match &args.app_id {
         Some(b) => b.clone(),
         None => {
             show_message("No app ID configured, to use this screen please re-run the terminal with `--admin-url <my-url> --app-id <my-app-id>`", frame, rect);
+            return;
+        }
+    };
+
+    let app_client = match app_client {
+        Some(b) => b,
+        None => {
+            show_message("No admin URL configured, to use this screen please re-run the terminal with `--admin-url <my-url> --app-id <my-app-id>`", frame, rect);
             return;
         }
     };

@@ -96,6 +96,9 @@ pub trait HdkT: HdiT {
     fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()>;
     fn enable_clone_cell(&self, input: EnableCloneCellInput) -> ExternResult<ClonedCell>;
     fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()>;
+    // Migrate DNA
+    fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
+    fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
 }
 
 #[cfg(feature = "mock")]
@@ -177,6 +180,8 @@ mockall::mock! {
         fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()>;
         fn enable_clone_cell(&self, input: EnableCloneCellInput) -> ExternResult<ClonedCell>;
         fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()>;
+        fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
+        fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
     }
 
     impl HdiT for HdkT {
@@ -455,6 +460,15 @@ impl HdkT for ErrHdk {
     fn delete_clone_cell(&self, _input: DeleteCloneCellInput) -> ExternResult<()> {
         Self::err()
     }
+
+    // Migrate DNA
+    fn close_chain(&self, _input: CloseChainInput) -> ExternResult<ActionHash> {
+        Self::err()
+    }
+
+    fn open_chain(&self, _input: OpenChainInput) -> ExternResult<ActionHash> {
+        Self::err()
+    }
 }
 
 /// The HDK implemented as externs provided by the host.
@@ -701,14 +715,22 @@ impl HdkT for HostHdk {
     fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()> {
         host_call::<DeleteCloneCellInput, ()>(__hc__delete_clone_cell_1, input)
     }
+
+    fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash> {
+        host_call::<CloseChainInput, ActionHash>(__hc__close_chain_1, input)
+    }
+
+    fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash> {
+        host_call::<OpenChainInput, ActionHash>(__hc__open_chain_1, input)
+    }
 }
 
 /// At any time the global HDK can be set to a different hdk.
 /// Generally this is only useful during rust unit testing.
 /// When executing wasm without the `mock` feature, the host will be assumed.
-pub fn set_hdk<H: 'static>(hdk: H)
+pub fn set_hdk<H>(hdk: H)
 where
-    H: HdkT,
+    H: HdkT + 'static,
 {
     let hdk = Rc::new(hdk);
     let hdk2 = hdk.clone();

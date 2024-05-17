@@ -9,6 +9,7 @@ use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
     dependencies::lair_keystore_api,
     dht::{
+        arq::ArqSet,
         region::{Region, RegionCoords},
         region_set::RegionSetLtcs,
         spacetime::Topology,
@@ -135,7 +136,7 @@ write_test_struct! {
         fn query_region_set(
             &Self,
             _space: Arc<KitsuneSpace>,
-            _dht_arc_set: Arc<DhtArcSet>,
+            _arq_set: ArqSet,
         ) -> KitsuneHostResult<RegionSetLtcs>, HostRet<RegionSetLtcs> {
             Box::pin(async move {
                 Ok(RegionSetLtcs::empty())
@@ -399,7 +400,7 @@ async fn start_signal_srv() -> (std::net::SocketAddr, tx5_signal_srv::SrvHnd) {
     assert!(err_list.is_empty());
     assert_eq!(1, addr_list.len());
 
-    (addr_list.first().unwrap().clone(), sig_hnd)
+    (*addr_list.first().unwrap(), sig_hnd)
 }
 
 struct Setup2Nodes {

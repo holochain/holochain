@@ -186,7 +186,7 @@ mod tests {
                     let mut link_add = link_add_fixt.next().unwrap();
                     link_add.author = query_author.clone();
                     // Create DhtOp
-                    let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
+                    let op = ChainOp::RegisterAddLink(sig.clone(), link_add.clone());
                     // Get the hash from the op
                     let op_hashed = DhtOpHashed::from_content_sync(op.clone());
                     mutations::insert_op(txn, &op_hashed)?;
@@ -284,7 +284,7 @@ mod tests {
     #[ignore = "(david.b) tests should be re-written using mock network"]
     fn test_sent_to_r_nodes(num_agents: u32, num_hash: u32) {
         tokio_helper::block_forever_on(async {
-            holochain_trace::test_run().ok();
+            holochain_trace::test_run();
 
             // Create test db
             let test_db = test_authored_db();
@@ -350,7 +350,7 @@ mod tests {
     fn test_private_entries(num_agents: u32) {
         tokio_helper::block_forever_on(
             async {
-                holochain_trace::test_run().ok();
+                holochain_trace::test_run();
 
                 // Create test db
                 let test_db = test_authored_db();
@@ -455,7 +455,7 @@ mod tests {
                     let mut map = HashMap::new();
                     // Op is expected to not contain the Entry even though the above contains the entry
                     let (entry_create_action, sig) = entry_create_action.into_inner();
-                    let expected_op = DhtOp::RegisterAgentActivity(
+                    let expected_op = ChainOp::RegisterAgentActivity(
                         sig.clone(),
                         entry_create_action.clone().into_content(),
                     );
@@ -465,7 +465,7 @@ mod tests {
                         (expected_op, register_agent_activity_count.clone()),
                     );
 
-                    let expected_op = DhtOp::StoreRecord(
+                    let expected_op = ChainOp::StoreRecord(
                         sig,
                         entry_create_action.into_content().try_into().unwrap(),
                         RecordEntry::NA,
@@ -479,7 +479,7 @@ mod tests {
                     let (entry_update_action, sig) = entry_update_action.into_inner();
                     let entry_update_action: Update =
                         entry_update_action.into_content().try_into().unwrap();
-                    let expected_op = DhtOp::StoreRecord(
+                    let expected_op = ChainOp::StoreRecord(
                         sig.clone(),
                         entry_update_action.clone().into(),
                         RecordEntry::NA,
@@ -488,7 +488,7 @@ mod tests {
 
                     map.insert(op_hash, (expected_op, store_record_count.clone()));
 
-                    let expected_op = DhtOp::RegisterUpdatedContent(
+                    let expected_op = ChainOp::RegisterUpdatedContent(
                         sig.clone(),
                         entry_update_action.clone(),
                         RecordEntry::NA,
@@ -496,7 +496,7 @@ mod tests {
                     let op_hash = expected_op.to_hash();
 
                     map.insert(op_hash, (expected_op, register_replaced_by_count.clone()));
-                    let expected_op = DhtOp::RegisterUpdatedRecord(
+                    let expected_op = ChainOp::RegisterUpdatedRecord(
                         sig.clone(),
                         entry_update_action.clone(),
                         RecordEntry::NA,
@@ -507,7 +507,7 @@ mod tests {
                         op_hash,
                         (expected_op, register_updated_record_count.clone()),
                     );
-                    let expected_op = DhtOp::RegisterAgentActivity(sig, entry_update_action.into());
+                    let expected_op = ChainOp::RegisterAgentActivity(sig, entry_update_action.into());
                     let op_hash = expected_op.to_hash();
                     map.insert(
                         op_hash,
@@ -546,11 +546,11 @@ mod tests {
                                         let op_hash = DhtOpHash::with_data_sync(&op);
                                         match expected.get(&op_hash) {
                                             Some((expected_op, count)) => {
-                                                assert_eq!(&op, expected_op);
+                                                assert_eq!(op, DhtOp::from(expected_op.clone()));
                                                 count.fetch_add(1, Ordering::SeqCst);
                                             }
                                             None => {
-                                                if let DhtOp::StoreEntry(_, h, _) = op {
+                                                if let ChainOp::StoreEntry(_, h, _) = op.as_chain_op().expect("warrants not handled here") {
                                                     if *h.visibility() == EntryVisibility::Private {
                                                         panic!(
                                                             "A private op has been published: {:?}",

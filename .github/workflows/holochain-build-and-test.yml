@@ -9,19 +9,30 @@ on:
         type: string
         default: "."
       fail_fast:
-        description: "whether all tests will be stopped on first failure occurence or run to completion"
+        description: "whether all tests will be stopped on first failure occurrence or run to completion"
         required: false
         type: boolean
         default: false
     secrets:
       GITHUB_ACCESS_TOKEN:
-        description: "A GitHub access toekn which can be used for cloning the project"
+        description: "A GitHub access token which can be used for cloning the project"
         required: true
       CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL:
         description: "The Cachix token for `holochain-ci-internal` to be used for caching Holochain CI runs"
         required: true
 
 jobs:
+  static:
+    runs-on: [ self-hosted, multi-arch ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Check TOML formatting
+        run: ./scripts/format-toml.sh --check
+
   test:
     strategy:
       fail-fast: ${{ inputs.fail_fast }}
@@ -36,20 +47,23 @@ jobs:
           # ensure that any Nix changes on this branch don't cause problems for maintenance versions
           - pkgs:
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/0_1"
-          - pkgs:
-              - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/0_2"
           - pkgs:
               - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/weekly"
         platform:
-          # TODO temporarily disabled due to unexplained issues running builds on this platform.
-          # - system: x86_64-darwin
           - system: aarch64-darwin
           - system: x86_64-linux
 
         include:
+          # x86_64-darwin currently fails the holonix tests, it should pass the unit tests
+          - cmd:
+              pkgs:
+                - build-holochain-tests-unit-all
+              extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
+            platform:
+              system: x86_64-darwin
+
           # we only run repo consistency checks on x86_64-linux
           - cmd:
               pkgs:
@@ -100,10 +114,10 @@ jobs:
           nix build -L --show-trace \
             ${{ matrix.cmd.extra_arg }} \
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
-          
+
           # Don't exit if this fails so we can clean up the profile
           for i in result*; do
             cachix push holochain-ci-internal $i || true
           done
-          
+
           rm result*

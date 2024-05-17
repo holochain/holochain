@@ -73,9 +73,9 @@ resolver = "2"
 
 [workspace.lints.clippy]
 nursery = "allow"
-cargo  = "allow"
+cargo = "allow"
 pedantic = "allow"
-restriction  = "allow"
+restriction = "allow"
 style = "deny"
 complexity = "deny"
 perf = "deny"
@@ -83,11 +83,11 @@ correctness = "deny"
 dbg_macro = "deny"
 
 [profile.fast-test]
-inherits = "dev"
+inherits = "test"
 debug = 1
 
 [profile.fast-test.package."*"]
-opt-level = 3
+opt-level = 2
 debug = 1
 debug-assertions = false
 overflow-checks = false

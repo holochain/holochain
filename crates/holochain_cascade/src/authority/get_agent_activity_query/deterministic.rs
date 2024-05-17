@@ -76,7 +76,7 @@ impl Query for DeterministicGetAgentActivityQuery {
             ":author": self.agent,
             ":hash_low": self.filter.range.0,
             ":hash_high": self.filter.range.1,
-            ":op_type": DhtOpType::RegisterAgentActivity,
+            ":op_type": ChainOpType::RegisterAgentActivity,
         })
         .to_vec()
     }
@@ -102,7 +102,7 @@ impl Query for DeterministicGetAgentActivityQuery {
                 },
             signature,
         } = shh;
-        let sh = SignedAction(action, signature);
+        let sh = SignedAction::new(action, signature);
         // By tracking the prev_action of the last action we added to the chain,
         // we can filter out branches. If we performed branch detection in this
         // query, it would not be deterministic.
@@ -143,7 +143,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn agent_activity_query() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let test_db = test_dht_db();
         let db = test_db.to_db();
         let entry_type_1 = fixt!(EntryType);
@@ -168,8 +168,8 @@ mod tests {
                     action.into()
                 };
                 chain.push(ActionHash::with_data_sync(&action));
-                let op = DhtOp::RegisterAgentActivity(fixt!(Signature), action);
-                let op = DhtOpHashed::from_content_sync(op);
+                let op = ChainOp::RegisterAgentActivity(fixt!(Signature), action);
+                let op = ChainOpHashed::from_content_sync(op);
                 fill_db(&db, op).await;
             }
             chains.push(chain);

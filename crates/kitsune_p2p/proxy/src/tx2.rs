@@ -1014,8 +1014,10 @@ mod tests {
         let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
         let f = tx2_pool_promote(f, Default::default());
 
-        let mut conf = super::ProxyConfig::default();
-        conf.allow_proxy_fwd = true;
+        let conf = ProxyConfig {
+            allow_proxy_fwd: true,
+            ..Default::default()
+        };
         let f = tx2_proxy(f, conf).unwrap();
 
         let mut ep = f.bind("none:".try_into().unwrap(), t).await.unwrap();
@@ -1076,7 +1078,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_route_err() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let t = KitsuneTimeout::from_millis(5000);
         let mut all_tasks = Vec::new();
 
@@ -1109,7 +1111,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_proxy() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let t = KitsuneTimeout::from_millis(5000);
 

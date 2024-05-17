@@ -61,7 +61,7 @@ pub fn get_pending_validation_receipts(
             SELECT Action.author, DhtOp.hash, DhtOp.validation_status,
             DhtOp.when_integrated
             From DhtOp
-            JOIN Action ON DhtOp.action_hash = Action.hash
+            LEFT JOIN Action ON DhtOp.action_hash = Action.hash
             WHERE
             DhtOp.require_receipt = 1
             AND
@@ -119,13 +119,13 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validation_receipts_db_populate_and_list() -> StateMutationResult<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let test_db = crate::test_utils::test_authored_db();
         let env = test_db.to_db();
         let keystore = test_keystore();
 
-        let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+        let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));
@@ -184,7 +184,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn no_pending_receipts() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let env = crate::test_utils::test_dht_db().to_db();
 
@@ -210,7 +210,7 @@ mod tests {
         modifier: fn(txn: &mut Transaction, op_hash: HoloHashOf<DhtOp>) -> StateMutationResult<()>,
     ) -> StateMutationResult<DhtOpHash> {
         // The actual op does not matter, just some of the status fields
-        let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+        let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));
@@ -234,7 +234,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn filter_for_pending_validation_receipts() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let test_db = crate::test_utils::test_dht_db();
         let env = test_db.to_db();

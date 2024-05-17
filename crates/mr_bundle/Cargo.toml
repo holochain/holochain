@@ -1,6 +1,6 @@
 [package]
 name = "mr_bundle"
-version = "0.3.0-beta-dev.8"
+version = "0.4.0-dev.1"
 authors = ["Michael Dougherty <maackle.d@gmail.com>"]
 edition = "2021"
 description = "Implements the un-/packing of bundles that either embed or reference a set of resources"
@@ -10,17 +10,14 @@ documentation = "https://docs.rs/mr_bundle"
 
 # reminder - do not use workspace deps
 [dependencies]
-bytes = "1.0"
 derive_more = "0.99"
-either = "1.5"
 flate2 = "1.0"
-holochain_util = { path = "../holochain_util", version = "^0.3.0-beta-dev.6"}
+holochain_util = { version = "^0.4.0-dev.1", path = "../holochain_util" }
 futures = "0.3"
-reqwest = "0.11"
-rmp-serde = "=0.15.5"
+reqwest = "0.12"
+rmp-serde = "=1.1.2"
 serde = { version = "1.0", features = ["serde_derive", "derive"] }
 serde_bytes = "0.11"
-serde_derive = "1.0"
 thiserror = "1.0"
 
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
@@ -44,9 +41,4 @@ workspace = true
 
 packing = ["serde_yaml", "holochain_util/tokio"]
 
-fuzzing = [
-    "arbitrary",
-    "proptest",
-    "proptest-derive",
-    "test-strategy",
-]
+fuzzing = ["arbitrary", "proptest", "proptest-derive", "test-strategy"]

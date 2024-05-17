@@ -16,9 +16,11 @@ use kitsune_p2p_fetch::{FetchPool, FetchPoolReader, FetchSource, OpHashSized, Tr
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
+use kitsune_p2p_types::dht::arq::ArqSet;
 use kitsune_p2p_types::dht::region::{Region, RegionData};
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
-use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
+use kitsune_p2p_types::dht::ArqBounds;
+use kitsune_p2p_types::dht_arc::DhtArcSet;
 use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
@@ -648,16 +650,16 @@ impl ShardedGossipState {
 
     pub fn push_incoming<I: Clone + IntoIterator<Item = Incoming>>(&mut self, incoming: I) {
         if let Some(history) = &mut self.history {
-            history.incoming.extend(incoming.clone().into_iter());
+            history.incoming.extend(incoming.clone());
         }
-        self.queues.incoming.extend(incoming.into_iter());
+        self.queues.incoming.extend(incoming);
     }
 
     pub fn push_outgoing<I: Clone + IntoIterator<Item = Outgoing>>(&mut self, outgoing: I) {
         if let Some(history) = &mut self.history {
-            history.outgoing.extend(outgoing.clone().into_iter());
+            history.outgoing.extend(outgoing.clone());
         }
-        self.queues.outgoing.extend(outgoing.into_iter());
+        self.queues.outgoing.extend(outgoing);
     }
 
     pub fn pop(&mut self) -> (Option<Incoming>, Option<Outgoing>) {
@@ -675,7 +677,7 @@ pub struct RoundState {
     /// The remote agents hosted by the remote node, used for metrics tracking
     pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
     /// The common ground with our gossip partner for the purposes of this round
-    common_arc_set: Arc<DhtArcSet>,
+    common_arq_set: Arc<ArqSet>,
     /// We've received the last op bloom filter from our partner
     /// (the one with `finished` == true)
     received_all_incoming_op_blooms: bool,
@@ -713,13 +715,13 @@ impl RoundState {
     /// Constructor
     pub fn new(
         remote_agent_list: Vec<AgentInfoSigned>,
-        common_arc_set: Arc<DhtArcSet>,
+        common_arq_set: Arc<ArqSet>,
         region_set_sent: Option<Arc<RegionSetLtcs<RegionData>>>,
         round_timeout: Duration,
     ) -> Self {
         RoundState {
             remote_agent_list,
-            common_arc_set,
+            common_arq_set,
             received_all_incoming_op_blooms: false,
             has_pending_historical_op_data: false,
             regions_are_queued: false,
@@ -732,6 +734,11 @@ impl RoundState {
             region_set_sent,
             region_diffs: Default::default(),
         }
+    }
+
+    /// Get the common arcs as continuous arcs
+    pub fn common_arc_set(&self) -> Arc<DhtArcSet> {
+        Arc::new(self.common_arq_set.to_dht_arc_set_std())
     }
 }
 
@@ -780,13 +787,13 @@ impl ShardedGossipLocal {
     fn new_state(
         &self,
         remote_agent_list: Vec<AgentInfoSigned>,
-        common_arc_set: Arc<DhtArcSet>,
+        common_arq_set: Arc<ArqSet>,
         region_set_sent: Option<RegionSetLtcs>,
         round_timeout: Duration,
     ) -> KitsuneResult<RoundState> {
         Ok(RoundState::new(
             remote_agent_list,
-            common_arc_set,
+            common_arq_set,
             region_set_sent.map(Arc::new),
             round_timeout,
         ))
@@ -1222,7 +1229,7 @@ kitsune_p2p_types::write_codec_enum! {
         Initiate(0x10) {
             /// The list of arc intervals (equivalent to a [`DhtArcSet`])
             /// for all local agents
-            intervals.0: Vec<DhtArcRange>,
+            intervals.0: Vec<ArqBounds>,
             /// A random number to resolve concurrent initiates.
             id.1: u32,
             /// List of active local agents represented by this node.
@@ -1233,7 +1240,7 @@ kitsune_p2p_types::write_codec_enum! {
         Accept(0x20) {
             /// The list of arc intervals (equivalent to a [`DhtArcSet`])
             /// for all local agents
-            intervals.0: Vec<DhtArcRange>,
+            intervals.0: Vec<ArqBounds>,
             /// List of active local agents represented by this node.
             agent_list.1: Vec<AgentInfoSigned>,
         },

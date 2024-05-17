@@ -4,7 +4,6 @@ use hdk::prelude::*;
 use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
-use holochain::conductor::api::RealAppInterfaceApi;
 use holochain::conductor::api::ZomeCall;
 use holochain::sweettest::*;
 use holochain_nonce::fresh_nonce;
@@ -23,7 +22,7 @@ pub struct ChannelName(String);
 
 #[tokio::test(flavor = "multi_thread")]
 async fn ser_entry_hash_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let eh = fixt!(EntryHash);
     let extern_io: ExternIO = ExternIO::encode(eh).unwrap();
     tracing::debug!(?extern_io);
@@ -36,7 +35,7 @@ async fn ser_entry_hash_test() {
 #[tokio::test(flavor = "multi_thread")]
 /// we can call a fn on a remote
 async fn ser_regression_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     // ////////////
     // START DNA
     // ////////////
@@ -93,10 +92,13 @@ async fn ser_regression_test() {
     .await
     .unwrap();
 
-    let app_api = RealAppInterfaceApi::new(conductors[0].clone());
+    let app_api = AppInterfaceApi::new(conductors[0].clone());
     let request = Box::new(invocation.clone());
     let request = AppRequest::CallZome(request).try_into().unwrap();
-    let response = app_api.handle_app_request(request).await;
+    let response = app_api
+        .handle_request("".to_string(), Ok(request))
+        .await
+        .unwrap();
 
     let _channel_hash: EntryHash = match response {
         AppResponse::ZomeCalled(r) => r.decode().unwrap(),
@@ -140,7 +142,10 @@ async fn ser_regression_test() {
 
     let request = Box::new(invocation.clone());
     let request = AppRequest::CallZome(request).try_into().unwrap();
-    let response = app_api.handle_app_request(request).await;
+    let response = app_api
+        .handle_request("".to_string(), Ok(request))
+        .await
+        .unwrap();
 
     let _msg_hash: EntryHash = match response {
         AppResponse::ZomeCalled(r) => r.decode().unwrap(),

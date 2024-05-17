@@ -250,7 +250,7 @@ fn test_grow_by_multiple_chunks() {
 ///
 /// (not a very good test, probably)
 fn test_degenerate_asymmetrical_coverage() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let topo = Topology::unit_zero();
     let other = ArqBounds::from_interval(&topo, 4, DhtArcRange::from_bounds(0x0u32, 0x80))
         .unwrap()
@@ -273,7 +273,7 @@ fn test_degenerate_asymmetrical_coverage() {
     let extrapolated = view.extrapolated_coverage(&arq);
     assert_eq!(extrapolated, 5.0);
     let old = arq.clone();
-    let mut new = arq.clone();
+    let mut new = arq;
     let resized = view.update_arq(&mut new);
     assert_eq!(old, new);
     assert!(!resized);

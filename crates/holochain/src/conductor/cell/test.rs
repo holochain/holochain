@@ -1,6 +1,6 @@
 use crate::conductor::space::TestSpaces;
 use crate::conductor::Conductor;
-use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::ribosome::real_ribosome::{ModuleCacheLock, RealRibosome};
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::test_utils::{fake_valid_dna_file, test_network};
 use holo_hash::HasHash;
@@ -8,8 +8,8 @@ use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_state::prelude::*;
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::action;
-use parking_lot::RwLock;
 use std::sync::Arc;
+use tokio::sync::broadcast;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
@@ -41,9 +41,11 @@ async fn test_cell_handle_publish() {
         .await
         .unwrap();
     handle.register_dna(dna_file.clone()).await.unwrap();
-    let wasmer_module_cache = Arc::new(RwLock::new(ModuleCache::new(Some(db_dir))));
+    let wasmer_module_cache = Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(db_dir))));
 
-    let ribosome = RealRibosome::new(dna_file, wasmer_module_cache).unwrap();
+    let ribosome = RealRibosome::new(dna_file, wasmer_module_cache)
+        .await
+        .unwrap();
 
     super::Cell::genesis(
         cell_id.clone(),
@@ -63,6 +65,7 @@ async fn test_cell_handle_publish() {
         handle.clone(),
         spaces.test_spaces[&dna].space.clone(),
         holochain_p2p_cell,
+        broadcast::channel(10).0,
     )
     .await
     .unwrap();
@@ -74,12 +77,12 @@ async fn test_cell_handle_publish() {
     });
     let hh = ActionHashed::from_content_sync(action.clone());
     let shh = SignedActionHashed::sign(&keystore, hh).await.unwrap();
-    let op = DhtOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
+    let op = ChainOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
     spaces
         .spaces
-        .handle_publish(&dna, true, false, vec![op.clone()])
+        .handle_publish(&dna, true, false, vec![op.clone().into()])
         .await
         .unwrap();
 

@@ -121,7 +121,7 @@ pub mod test {
     /// activity.
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_agent_activity_self() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::MustGet).await;
@@ -138,7 +138,7 @@ pub mod test {
     /// previous action bounded activity.
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_agent_activity_self_prev() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::MustGet).await;
@@ -153,7 +153,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_agent_activity() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,

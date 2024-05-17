@@ -8,10 +8,8 @@ use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::AnyDhtHashPrimitive;
 use holo_hash::EntryHash;
-use holo_hash::HasHash;
 use holochain_nonce::Nonce256Bits;
 use holochain_p2p::actor;
-use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
@@ -23,6 +21,7 @@ use holochain_types::test_utils::chain::entry_hash;
 use holochain_types::test_utils::chain::TestChainItem;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
+use kitsune_p2p::dht::Arq;
 use std::collections::HashSet;
 use std::sync::Arc;
 use QueryFilter;
@@ -249,7 +248,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         &self,
         _agent: AgentPubKey,
         _maybe_agent_info: Option<AgentInfoSigned>,
-        _initial_arc: Option<DhtArc>,
+        _initial_arq: Option<Arq>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -279,12 +278,12 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 }
 
 /// Insert ops directly into the database and mark integrated as valid
-pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
+pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashed) {
     env.write_async(move |txn| -> DatabaseResult<()> {
-        let hash = op.as_hash();
-        insert_op(txn, &op).unwrap();
-        set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
-        set_when_integrated(txn, hash, Timestamp::now()).unwrap();
+        let hash = op.to_hash();
+        insert_op(txn, &op.downcast()).unwrap();
+        set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
+        set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
         Ok(())
     })
     .await
@@ -292,12 +291,12 @@ pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed)
 }
 
 /// Insert ops directly into the database and mark integrated as rejected
-pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
+pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashed) {
     env.write_async(move |txn| -> DatabaseResult<()> {
-        let hash = op.as_hash();
-        insert_op(txn, &op).unwrap();
-        set_validation_status(txn, hash, ValidationStatus::Rejected).unwrap();
-        set_when_integrated(txn, hash, Timestamp::now()).unwrap();
+        let hash = op.to_hash();
+        insert_op(txn, &op.downcast()).unwrap();
+        set_validation_status(txn, &hash, ValidationStatus::Rejected).unwrap();
+        set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
         Ok(())
     })
     .await
@@ -305,11 +304,11 @@ pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: Dht
 }
 
 /// Insert ops directly into the database and mark valid and pending integration
-pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
+pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashed) {
     env.write_async(move |txn| -> DatabaseResult<()> {
-        let hash = op.as_hash();
-        insert_op(txn, &op).unwrap();
-        set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
+        let hash = op.to_hash();
+        insert_op(txn, &op.downcast()).unwrap();
+        set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
         Ok(())
     })
     .await
@@ -317,9 +316,9 @@ pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtO
 }
 
 /// Insert ops into the authored database
-pub async fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
+pub async fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: ChainOpHashed) {
     env.write_async(move |txn| -> DatabaseResult<()> {
-        insert_op(txn, &op).unwrap();
+        insert_op(txn, &op.downcast()).unwrap();
         Ok(())
     })
     .await
@@ -384,7 +383,7 @@ pub fn commit_chain<Kind: DbKindT>(
     db.test_write(move |txn| {
         for data in &data {
             for op in data {
-                let op_light = DhtOpLite::RegisterAgentActivity(
+                let op_lite = ChainOpLite::RegisterAgentActivity(
                     op.action.action_address().clone(),
                     op.action
                         .hashed
@@ -395,15 +394,15 @@ pub fn commit_chain<Kind: DbKindT>(
                 );
 
                 let timestamp = Timestamp::now();
+                let op_type = op_lite.get_type();
                 let (_, hash) =
-                    UniqueForm::op_hash(op_light.get_type(), op.action.hashed.content.clone())
-                        .unwrap();
+                    DhtOpUniqueForm::op_hash(op_type, op.action.hashed.content.clone()).unwrap();
                 insert_action(txn, &op.action).unwrap();
                 insert_op_lite(
                     txn,
-                    &op_light,
+                    &op_lite.into(),
                     &hash,
-                    &OpOrder::new(op_light.get_type(), timestamp),
+                    &OpOrder::new(op_type, timestamp),
                     &timestamp,
                 )
                 .unwrap();

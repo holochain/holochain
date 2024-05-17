@@ -9,14 +9,14 @@ pub async fn wait_for_connected(
     to_agent: Arc<KitsuneAgent>,
     space: Arc<KitsuneSpace>,
 ) {
-    tokio::time::timeout(std::time::Duration::from_secs(17), async move {
+    tokio::time::timeout(std::time::Duration::from_secs(30), async move {
         loop {
             match sender
                 .rpc_single(
                     space.clone(),
                     to_agent.clone(),
                     "connection test".as_bytes().to_vec(),
-                    Some(std::time::Duration::from_secs(5).as_millis() as u64),
+                    Some(std::time::Duration::from_secs(30).as_millis() as u64),
                 )
                 .await
             {

@@ -472,7 +472,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "flaky"]
     async fn test_quic_tx2() {
-        kitsune_p2p_types::dependencies::holochain_trace::test_run().ok();
+        kitsune_p2p_types::dependencies::holochain_trace::test_run();
 
         let t = KitsuneTimeout::from_millis(5000);
 

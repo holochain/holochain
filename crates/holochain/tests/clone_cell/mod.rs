@@ -5,7 +5,7 @@ use holochain_wasm_test_utils::TestWasm;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
@@ -43,7 +43,7 @@ async fn create_clone_cell() {
     assert_eq!(
         1,
         cell_infos
-            .into_iter()
+            .iter()
             .filter(|c| matches!(c, CellInfo::Cloned(_)))
             .count()
     );
@@ -51,7 +51,7 @@ async fn create_clone_cell() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn disable_enable_and_delete_clone_cell() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
@@ -139,7 +139,7 @@ async fn disable_enable_and_delete_clone_cell() {
     assert_eq!(
         1,
         cell_infos
-            .into_iter()
+            .iter()
             .filter(|c| matches!(c, CellInfo::Cloned(_)))
             .count()
     );
@@ -147,7 +147,7 @@ async fn disable_enable_and_delete_clone_cell() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn prevents_cross_app_clone_operations() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
@@ -253,7 +253,7 @@ async fn prevents_cross_app_clone_operations() {
     assert_eq!(
         1,
         cell_infos
-            .into_iter()
+            .iter()
             .filter(|c| matches!(c, CellInfo::Cloned(_)))
             .count()
     );
@@ -261,7 +261,7 @@ async fn prevents_cross_app_clone_operations() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_from_a_clone() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
@@ -313,7 +313,7 @@ async fn create_clone_cell_from_a_clone() {
     assert_eq!(
         2,
         cell_infos
-            .into_iter()
+            .iter()
             .filter(|c| matches!(c, CellInfo::Cloned(_)))
             .count()
     );
@@ -321,7 +321,7 @@ async fn create_clone_cell_from_a_clone() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_of_another_cell_in_same_app() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
@@ -362,7 +362,7 @@ async fn create_clone_of_another_cell_in_same_app() {
     assert_eq!(
         1,
         cell_infos
-            .into_iter()
+            .iter()
             .filter(|c| matches!(c, CellInfo::Cloned(_)))
             .count()
     );

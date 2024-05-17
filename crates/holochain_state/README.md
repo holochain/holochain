@@ -19,17 +19,17 @@ with the `holochain_sqlite` crate.
 The main abstraction for creating data read queries is the `Query` trait.
 This can be implemented to make constructing complex queries easier.
 
-The `source_chain` module provides the `SourceChain` type,
+The [`source_chain`] module provides the `SourceChain` type,
 which is the abstraction for working with chains of actions.
 
-The `host_fn_workspace` module provides abstractions for reading data during workflows.
+The [`host_fn_workspace`] module provides abstractions for reading data during workflows.
 
 ### Writes
-The `mutations` module is the complete set of functions
+The [`mutations`] module is the complete set of functions
 for writing data to sqlite in holochain.
 
 ### In-memory
-The `scratch` module provides the `Scratch` type for
+The [`scratch`] module provides the `Scratch` type for
 reading and writing data in memory that is not visible anywhere else.
 
 The SourceChain type uses the Scratch for in-memory operations which

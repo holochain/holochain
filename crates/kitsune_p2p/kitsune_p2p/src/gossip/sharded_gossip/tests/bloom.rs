@@ -16,7 +16,7 @@ async fn bloom_windows() {
 
     let r = make_node(1, expected_time.clone())
         .await
-        .generate_op_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
+        .generate_op_blooms_for_time_window(&ArqSet::full_std(), search_window.clone())
         .await
         .unwrap();
 
@@ -33,7 +33,7 @@ async fn bloom_windows() {
 
     let r = make_empty_node()
         .await
-        .generate_op_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
+        .generate_op_blooms_for_time_window(&ArqSet::full_std(), search_window.clone())
         .await
         .unwrap();
 
@@ -53,7 +53,7 @@ async fn bloom_windows() {
         expected_time.clone(),
     )
     .await
-    .generate_op_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
+    .generate_op_blooms_for_time_window(&ArqSet::full_std(), search_window.clone())
     .await
     .unwrap();
 
@@ -73,14 +73,14 @@ async fn bloom_windows() {
         expected_time.clone(),
     )
     .await
-    .generate_op_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
+    .generate_op_blooms_for_time_window(&ArqSet::full_std(), search_window.clone())
     .await
     .unwrap();
 
     match r {
         Batch::Complete(v) => {
             assert_eq!(v.len(), 2);
-            let r = v.get(0).unwrap();
+            let r = v.first().unwrap();
             let TimedBloomFilter { bloom, time } = r;
             assert!(bloom.is_some());
             assert_eq!(
@@ -115,7 +115,7 @@ async fn bloom_windows() {
         expected_time.clone(),
     )
     .await
-    .generate_op_blooms_for_time_window(&Arc::new(DhtArcSet::Full), search_window.clone())
+    .generate_op_blooms_for_time_window(&ArqSet::full_std(), search_window.clone())
     .await
     .unwrap();
 
@@ -168,14 +168,14 @@ async fn bloom_windows() {
         expected_time.clone(),
     )
     .await
-    .generate_op_blooms_for_time_window(&Arc::new(DhtArcSet::Full), last_cursor..search_window.end)
+    .generate_op_blooms_for_time_window(&ArqSet::full_std(), last_cursor..search_window.end)
     .await
     .unwrap();
 
     match r {
         Batch::Complete(v) => {
             assert_eq!(v.len(), 1);
-            let r = v.get(0).unwrap();
+            let r = v.first().unwrap();
             let TimedBloomFilter { bloom, time } = r;
             assert!(bloom.is_some());
             assert_eq!(*time, last_cursor..search_window.end);
