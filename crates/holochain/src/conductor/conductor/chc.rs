@@ -5,7 +5,6 @@ use super::*;
 impl Conductor {
     /// Get access to the CHC used by the conductor
     #[allow(unused_variables)]
-    #[cfg(feature = "test_utils")]
     pub fn get_chc(&self, cell_id: &CellId) -> Option<ChcImpl> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "chc")] {

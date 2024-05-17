@@ -51,6 +51,7 @@ pub struct DnaDef {
     pub coordinator_zomes: CoordinatorZomes,
 }
 
+#[cfg(feature = "full-dna-def")]
 #[derive(Serialize, Debug, PartialEq, Eq)]
 /// A reference to for creating the hash for [`DnaDef`].
 struct DnaDefHash<'a> {
