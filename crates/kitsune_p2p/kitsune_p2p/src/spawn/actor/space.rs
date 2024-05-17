@@ -428,7 +428,7 @@ impl SpaceInternalHandler for Space {
         let ro_inner = self.ro_inner.clone();
         let timeout = ro_inner.config.tuning_params.implicit_timeout();
         let fut =
-            discover::get_cached_remotes_near_basis(ro_inner.clone(), basis.get_loc(), timeout);
+            discover::search_remotes_covering_basis(ro_inner.clone(), basis.get_loc(), timeout);
 
         Ok(async move {
             futures::future::join_all(local_notify_events).await;
