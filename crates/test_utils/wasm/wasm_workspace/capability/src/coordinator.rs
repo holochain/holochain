@@ -125,7 +125,7 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
     fns.insert((this_zome.clone(), "needs_cap_claim".into()));
     let functions = GrantedFunctions::Listed(fns);
     create_cap_grant(CapGrantEntry {
-        access: (secret, agent.clone()).into(),
+        access: (Some(secret), agent.clone()).into(),
         functions,
         tag: tag.clone(),
     })?;
