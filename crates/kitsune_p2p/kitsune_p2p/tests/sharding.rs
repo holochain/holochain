@@ -65,7 +65,7 @@ async fn publish_to_basis_from_inside() {
             let loc = agent.get_loc().as_();
             // Search from the start of our agent, up to halfway through it. Agents that are in the
             // upper part of their range are less likely to overlap with the previous agent.
-            if (loc) > base_len * i && (loc as f64) < base_len as f64 * (i as f64 + 0.5) {
+            if loc > base_len * i && (loc as f64) < base_len as f64 * (i as f64 + 0.5) {
                 found_loc = true;
                 break;
             }
