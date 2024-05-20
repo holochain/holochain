@@ -1,7 +1,16 @@
 # holochain Makefile
 
-TEST_HOLOCHAIN = holochain
+# We have a balance to strike here between having too many CI jobs
+# and bundling them up too far so the jobs run out of disk space.
+# Try to bundle in groups that use similar dependencies.
 
+# Holochain itself and any crates that pull holochain in as a library dep.
+# This list should be kept small, since it builds a lot.
+TEST_HOLOCHAIN = \
+	holochain \
+	hc_demo_cli
+
+# Kitsune crates.
 TEST_KITSUNE = \
 	kitsune_p2p/bootstrap \
 	kitsune_p2p/bootstrap_client \
@@ -15,6 +24,7 @@ TEST_KITSUNE = \
 	kitsune_p2p/transport_quic \
 	kitsune_p2p/types
 
+# Crate dependencies other than kitsune which feed into holochain.
 TEST_DEPS = \
 	hdk \
 	hdk_derive \
@@ -40,31 +50,29 @@ TEST_DEPS = \
 	holochain_conductor_services \
 	holochain_terminal
 
-TEST_HC = \
+# An additional test bucket for testing utility crates and crates
+# that are siblings to holochain but don't depend on the library directly.
+TEST_MISC = \
 	hc \
-	hc_bundle \
 	hc_sandbox \
+	hc_bundle \
 	hc_sleuth \
 	hc_run_local_services \
-	hc_demo_cli \
-	hc_service_check
-
-TEST_MISC = \
+	hc_service_check \
 	aitia \
 	fixt \
 	fixt/test \
 	mock_hdi \
-	holochain \
 	test_utils/wasm \
 	test_utils/wasm_common \
 	holochain_diagnostics \
 	diagnostic_tests
 
-.PHONY: all test-all $(TEST_HOLOCHAIN) $(TEST_KITSUNE) $(TEST_DEPS) $(TEST_HC) $(TEST_MISC)
+.PHONY: all test-all $(TEST_HOLOCHAIN) $(TEST_KITSUNE) $(TEST_DEPS) $(TEST_MISC)
 
 all: test-all
 
-test-all: test-holochain test-kitsune test-deps test-hc test-misc
+test-all: test-holochain test-kitsune test-deps test-misc
 
 test-holochain: $(TEST_HOLOCHAIN)
 
@@ -72,11 +80,9 @@ test-kitsune: $(TEST_KITSUNE)
 
 test-deps: $(TEST_DEPS)
 
-test-hc: $(TEST_HC)
-
 test-misc: $(TEST_MISC)
 
-$(TEST_HOLOCHAIN) $(TEST_KITSUNE) $(TEST_DEPS) $(TEST_HC) $(TEST_MISC):
+$(TEST_HOLOCHAIN) $(TEST_KITSUNE) $(TEST_DEPS) $(TEST_MISC):
 	cargo install cargo-nextest
 	cd crates/$@ && \
 		RUSTFLAGS="-Dwarnings" cargo build -j4 \

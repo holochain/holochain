@@ -18,7 +18,6 @@ jobs:
           'test-holochain',
           'test-kitsune',
           'test-deps',
-          'test-hc',
           'test-misc'
         ]
         os: [
