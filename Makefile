@@ -27,7 +27,6 @@ TEST_KITSUNE = \
 # Crate dependencies other than kitsune which feed into holochain.
 TEST_DEPS = \
 	hdk \
-	hdk_derive \
 	holo_hash \
 	hdi \
 	mr_bundle \
@@ -67,7 +66,7 @@ TEST_MISC = \
 	holochain_diagnostics \
 	diagnostic_tests
 
-.PHONY: all test-all $(TEST_HOLOCHAIN) $(TEST_KITSUNE) $(TEST_DEPS) $(TEST_MISC) hc_sandbox
+.PHONY: all test-all $(TEST_HOLOCHAIN) $(TEST_KITSUNE) $(TEST_DEPS) $(TEST_MISC) hc_sandbox hdk_derive
 
 all: test-all
 
@@ -77,7 +76,7 @@ test-holochain: $(TEST_HOLOCHAIN)
 
 test-kitsune: $(TEST_KITSUNE)
 
-test-deps: $(TEST_DEPS)
+test-deps: $(TEST_DEPS) hdk_derive
 
 test-misc: $(TEST_MISC)
 
@@ -93,11 +92,25 @@ $(TEST_HOLOCHAIN) $(TEST_KITSUNE) $(TEST_DEPS) $(TEST_MISC):
 		--cargo-profile fast-test \
 		--all-features
 
+# hdk_derive is a special case because of
+# https://github.com/nextest-rs/nextest/issues/267
+# essentially nextest doesn't work, we have to use plain-old cargo test
+hdk_derive:
+	cd crates/$@ && \
+		RUSTFLAGS="-Dwarnings" cargo build -j4 \
+		--all-features --all-targets \
+		--profile fast-test
+	cd crates/$@ && \
+		RUSTFLAGS="-Dwarnings" RUST_BACKTRACE=1 cargo test -j4 \
+		--all-features \
+		--profile fast-test
+
 # hc_sandbox is a special case because it requires binaries on the path
+# NOTE - this one must be its own top-level github action job
+#        since it uses so much disk space
 # TODO - while the cargo install-s below technically work, it'd be much
 #        more appropriate for the test to use binaries out of the target
 #        directory by default
-
 hc_sandbox:
 	cargo install cargo-nextest
 	cargo install --force --path crates/holochain
