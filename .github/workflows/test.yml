@@ -1,0 +1,126 @@
+name: test
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+jobs:
+  test:
+    name: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        test-name: [
+          'aitia',
+          'fixt',
+          'fixt/test',
+          'hdk',
+          'hdk_derive',
+          'holo_hash',
+          'hdi',
+          'mock_hdi',
+          'mr_bundle',
+          'holochain_integrity_types',
+          'holochain_zome_types',
+          'holochain_types',
+          'holochain',
+          'holochain_cascade',
+          'holochain_conductor_api',
+          'holochain_p2p',
+          'holochain_keystore',
+          'holochain_state',
+          'holochain_state_types',
+          'holochain_sqlite',
+          'holochain_trace',
+          'holochain_websocket',
+          'holochain_util',
+          'holochain_metrics',
+          'holochain_nonce',
+          'holochain_secure_primitive',
+          'holochain_conductor_services',
+          'hc',
+          'hc_bundle',
+          'hc_sandbox',
+          'hc_sleuth',
+          'hc_run_local_services',
+          'hc_demo_cli',
+          'hc_service_check',
+          'holochain_terminal',
+          'kitsune_p2p/bootstrap',
+          'kitsune_p2p/bootstrap_client',
+          'kitsune_p2p/dht',
+          'kitsune_p2p/dht_arc',
+          'kitsune_p2p/fetch',
+          'kitsune_p2p/kitsune_p2p',
+          'kitsune_p2p/mdns',
+          'kitsune_p2p/proxy',
+          'kitsune_p2p/timestamp',
+          'kitsune_p2p/transport_quic',
+          'kitsune_p2p/types',
+          'test_utils/wasm',
+          'test_utils/wasm_common',
+          'holochain_diagnostics',
+          'diagnostic_tests'
+        ]
+        os: [
+          ubuntu-latest,
+          macos-latest,
+          macos-13,
+          windows-latest,
+        ]
+        toolchain: [
+          '1.77.2',
+        ]
+    steps:
+      - name: free disk space
+        if: matrix.os == 'ubuntu-latest'
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: go toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: '=1.20.0'
+
+      - name: rust toolchain
+        run: |
+          rustup toolchain install ${{ matrix.toolchain }} --profile minimal --no-self-update
+          rustup default ${{ matrix.toolchain }}
+
+      - name: rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo prune
+        run: |
+          cargo install cargo-prune
+          cargo prune
+
+      - name: install vcpkg packages
+        if: matrix.os == 'windows-latest'
+        uses: johnwason/vcpkg-action@v6
+        id: vcpkg
+        with:
+          pkgs: libsodium openssl
+          triplet: x64-windows-release
+          token: ${{ github.token }}
+          github-binarycache: true
+
+      - name: test windows
+        if: matrix.os == 'windows-latest'
+        run: |-
+          $env:OPENSSL_NO_VENDOR="1"
+          $env:OPENSSL_DIR="$(pwd)\vcpkg\packages\openssl_x64-windows-release"
+          $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
+          make ${{ matrix.test-name }}
+
+      - name: test
+        if: matrix.os != 'windows-latest'
+        run: make ${{ matrix.test-name }}

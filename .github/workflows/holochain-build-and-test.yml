@@ -40,7 +40,7 @@ jobs:
         cmd:
           # ensure functionality on multiple platforms
           - pkgs:
-              - build-holochain-tests-unit-all
+            #  - build-holochain-tests-unit-all
               - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
 
@@ -57,17 +57,17 @@ jobs:
 
         include:
           # x86_64-darwin currently fails the holonix tests, it should pass the unit tests
-          - cmd:
-              pkgs:
-                - build-holochain-tests-unit-all
-              extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
-            platform:
-              system: x86_64-darwin
+          #- cmd:
+          #    pkgs:
+          #      - build-holochain-tests-unit-all
+          #    extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
+          #  platform:
+          #    system: x86_64-darwin
 
           # we only run repo consistency checks on x86_64-linux
           - cmd:
               pkgs:
-                - build-holochain-tests-static-all
+                #- build-holochain-tests-static-all
                 - build-release-automation-tests-unit
               extra_arg: "--override-input versions './versions/weekly' --override-input holochain ${{ inputs.repo_path }}"
             platform:
