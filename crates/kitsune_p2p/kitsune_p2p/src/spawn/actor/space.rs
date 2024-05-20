@@ -428,7 +428,6 @@ impl SpaceInternalHandler for Space {
                 info.agent.get_loc().as_u32() % mod_cnt == mod_idx
                     && Some(info.agent()) != broadcast_source
             }) {
-                tracing::info!("Delegate publish to {:?}", info.agent());
                 let ro_inner = ro_inner.clone();
                 let space = space.clone();
                 let data = data.clone();
@@ -1060,7 +1059,6 @@ impl KitsuneP2pHandler for Space {
 
                 // attempt to open connections to the discovered remote nodes
                 for info in cover_nodes {
-                    tracing::info!("Publish directly to {:?}", info.agent());
                     let ro_inner = ro_inner.clone();
                     all.push(async move {
                         use discover::PeerDiscoverResult;
