@@ -18,7 +18,8 @@ jobs:
           'test-holochain',
           'test-kitsune',
           'test-deps',
-          'test-misc'
+          'test-misc',
+          'hc_sandbox'
         ]
         os: [
           ubuntu-latest,
@@ -78,3 +79,7 @@ jobs:
       - name: test
         if: matrix.os != 'windows-latest'
         run: make ${{ matrix.test-name }}
+
+  tests-pass:
+    name: 'All Unit Tests Pass'
+    needs: test

@@ -311,3 +311,11 @@ pub fn hdk_entry_helper(attrs: TokenStream, code: TokenStream) -> TokenStream {
 pub fn dna_properties(attrs: TokenStream, code: TokenStream) -> TokenStream {
     dna_properties::build(attrs, code)
 }
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn stub() {
+        // nextest on macos can't seem to pass without at least one test here
+    }
+}
