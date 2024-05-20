@@ -82,4 +82,8 @@ jobs:
 
   tests-pass:
     name: 'All Unit Tests Pass'
+    runs-on: 'ubuntu-lastest'
     needs: test
+    steps:
+      - name: check status
+        run: echo "All Unit Tests Pass"
