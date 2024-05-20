@@ -44,6 +44,8 @@ mod fact;
 mod graph;
 pub(crate) mod traversal;
 
+struct Bob;
+
 #[macro_use]
 #[cfg(feature = "tracing")]
 pub mod logging;
