@@ -416,6 +416,9 @@ fn should_agent_hold_op_at_basis(
         .find(|info| info.agent == agent)
         .unwrap();
 
-    // TODO Why is this different to doing `to_dht_arc_range_std()` and then checking contains?
+    // let range = agent_info.storage_arq.to_dht_arc_range_std();
+    // range.contains(&basis.get_loc())
+
+    // TODO Why is this different to doing the commented lines above?
     agent_info.storage_arc().contains(&basis.get_loc())
 }
