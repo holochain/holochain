@@ -203,9 +203,9 @@ async fn publish_to_basis_from_inside() {
     );
 }
 
-/// Very similar to the test above except the publisher is does not have the basis in its arc.
+/// Very similar to the test above except the publisher does not have the basis in its arc.
 /// This is a valid scenario because any hash might be produced by creating data and the publish
-/// should still go to the correct agents. It also says with the publisher, so we need to account
+/// should still go to the correct agents. It also stays with the publisher, so we need to account
 /// for that when checking the op stores at the end of the test.
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
