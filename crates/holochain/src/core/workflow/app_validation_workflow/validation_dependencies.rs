@@ -27,7 +27,7 @@ impl Default for ValidationDependencies {
 }
 
 impl ValidationDependencies {
-    const FETCH_TIMEOUT: Duration = Duration::from_secs(60);
+    const FETCH_TIMEOUT: Duration = Duration::from_secs(30);
 
     pub fn new() -> Self {
         Self {

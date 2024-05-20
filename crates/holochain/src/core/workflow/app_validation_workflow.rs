@@ -198,8 +198,11 @@ pub async fn app_validation_workflow(
         if outcome_summary.validated < outcome_summary.ops_to_validate
             && !validations_dependencies.fetch_missing_hashes_timed_out()
         {
-            // Trigger app validation workflow again in 20-2000 milliseconds.
-            let interval = max(101 - validations_dependencies.missing_hashes.len(), 1) * 20;
+            // Trigger app validation workflow again in 100-1000 milliseconds.
+            let interval = max(
+                1000 - validations_dependencies.missing_hashes.len() * 100,
+                100,
+            );
             WorkComplete::Incomplete(Some(Duration::from_millis(interval as u64)))
         } else {
             WorkComplete::Complete
