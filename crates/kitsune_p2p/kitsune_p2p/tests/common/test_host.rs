@@ -127,6 +127,8 @@ impl KitsuneHost for TestHost {
         arq_set: kitsune_p2p_types::dht::ArqSet,
     ) -> kitsune_p2p::KitsuneHostResult<kitsune_p2p_types::dht::prelude::RegionSetLtcs> {
         async move {
+            tracing::info!("*** query region set");
+
             let topology = self.get_topology(space.clone()).await?;
 
             let times = TelescopingTimes::historical(&topology);
@@ -140,7 +142,10 @@ impl KitsuneHost for TestHost {
                         .op_store
                         .read()
                         .iter()
-                        .filter(|op| op.is_in_bounds(&bounds))
+                        .filter(|op| {
+                            tracing::info!("Checking op for in bounds {:?}", op);
+                            op.is_in_bounds(&bounds)
+                        })
                         .fold(
                             RegionData {
                                 hash: RegionHash::from_vec(vec![0; 32]).unwrap(),
@@ -185,6 +190,8 @@ impl KitsuneHost for TestHost {
         region: kitsune_p2p_types::dht::prelude::RegionCoords,
     ) -> kitsune_p2p::KitsuneHostResult<Vec<kitsune_p2p_fetch::OpHashSized>> {
         async move {
+            tracing::info!("*** query op hashes by region");
+
             let topology = self.get_topology(space).await?;
             let bounds = region.to_bounds(&topology);
 
@@ -193,6 +200,7 @@ impl KitsuneHost for TestHost {
                 .read()
                 .iter()
                 .filter_map(|op| {
+                    tracing::info!("Checking op for in bounds {:?}", op);
                     if op.is_in_bounds(&bounds) {
                         Some(op.clone().into())
                     } else {
@@ -246,6 +254,8 @@ impl KitsuneHost for TestHost {
         op_hash_list: Vec<kitsune_p2p_types::KOpHash>,
         _context: Option<kitsune_p2p_fetch::FetchContext>,
     ) -> kitsune_p2p::KitsuneHostResult<Vec<bool>> {
+        tracing::info!("*** check op data");
+
         let res = op_hash_list
             .iter()
             .map(|op_hash| {

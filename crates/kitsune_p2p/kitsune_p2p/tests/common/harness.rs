@@ -147,6 +147,10 @@ impl KitsuneTestHarness {
     pub fn duplicate_ops_received_count(&self) -> u32 {
         self.legacy_host_api.duplicate_ops_received_count()
     }
+
+    pub fn config(&self) -> KitsuneP2pConfig {
+        self.config.clone()
+    }
 }
 
 pub async fn start_bootstrap() -> (SocketAddr, AbortHandle) {

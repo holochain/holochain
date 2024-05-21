@@ -1069,6 +1069,7 @@ impl ShardedGossipLocal {
                     if state.is_finished() {
                         self.remove_state(&peer_cert, false)?;
                     }
+                    tracing::info!("OpBatchReceived, next {:?}", r);
                     r
                 }
                 None => Vec::with_capacity(0),
