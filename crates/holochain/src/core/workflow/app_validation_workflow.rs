@@ -130,7 +130,6 @@ use holochain_state::prelude::*;
 
 use parking_lot::Mutex;
 use rusqlite::Transaction;
-use std::cmp::max;
 use std::collections::HashSet;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -199,11 +198,10 @@ pub async fn app_validation_workflow(
             && !validations_dependencies.fetch_missing_hashes_timed_out()
         {
             // Trigger app validation workflow again in 100-1000 milliseconds.
-            let interval = max(
-                1000 - validations_dependencies.missing_hashes.len() * 100,
-                100,
-            );
-            WorkComplete::Incomplete(Some(Duration::from_millis(interval as u64)))
+            let interval = 900u64
+                .saturating_sub(validations_dependencies.missing_hashes.len() as u64 * 100)
+                + 100;
+            WorkComplete::Incomplete(Some(Duration::from_millis(interval)))
         } else {
             WorkComplete::Complete
         },
