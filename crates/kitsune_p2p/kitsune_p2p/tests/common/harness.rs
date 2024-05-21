@@ -6,6 +6,7 @@ use kitsune_p2p::{
     actor::KitsuneP2p, event::KitsuneP2pEventReceiver, spawn_kitsune_p2p, HostApi,
     KitsuneP2pResult, PreflightUserData,
 };
+use kitsune_p2p_bootstrap::BootstrapShutdown;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     config::{tuning_params_struct, KitsuneP2pConfig},
@@ -14,7 +15,6 @@ use kitsune_p2p_types::{
 };
 use parking_lot::RwLock;
 use tokio::task::AbortHandle;
-use kitsune_p2p_bootstrap::BootstrapShutdown;
 
 pub struct KitsuneTestHarness {
     name: String,
