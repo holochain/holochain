@@ -309,7 +309,7 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
 async fn two_nodes_broadcast_agent_info() {
     holochain_trace::test_run();
 
-    let (bootstrap_addr, bootstrap_handle) = start_bootstrap().await;
+    let (bootstrap_addr, mut bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
 
     let mut harness_a = KitsuneTestHarness::try_new("host_a")
@@ -407,7 +407,7 @@ async fn two_nodes_broadcast_agent_info() {
 async fn two_nodes_gossip_agent_info() {
     holochain_trace::test_run();
 
-    let (bootstrap_addr, bootstrap_handle) = start_bootstrap().await;
+    let (bootstrap_addr, mut bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
 
     let mut harness_a = KitsuneTestHarness::try_new("host_a")
@@ -890,7 +890,7 @@ async fn publish_only_fetches_ops_once() {
 async fn delegate_publish() {
     holochain_trace::test_run();
 
-    let (bootstrap_addr, bootstrap_handle) = start_bootstrap().await;
+    let (bootstrap_addr, mut bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
 
     let mut harness_a = KitsuneTestHarness::try_new("host_a")
