@@ -13,10 +13,7 @@ WHERE
     FROM
       DhtOp AS DhtOpDep
     WHERE
-      (
-        DhtOpDep.basis_hash = DhtOp.dependency
-        OR DhtOpDep.basis_hash = DhtOp.dependency2
-      )
+      DhtOpDep.basis_hash = DhtOp.dependency
       AND DhtOpDep.when_integrated IS NOT NULL
       AND DhtOpDep.type = :store_entry
     LIMIT
