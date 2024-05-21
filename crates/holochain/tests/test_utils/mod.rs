@@ -99,14 +99,14 @@ pub async fn grant_zome_call_capability(
     assignees.insert(signing_key.clone());
 
     let mut buf = arbitrary::Unstructured::new(&[]);
-    let cap_secret = CapSecret::arbitrary(&mut buf).unwrap();
+    let secret = CapSecret::arbitrary(&mut buf).unwrap();
 
     let request = AdminRequest::GrantZomeCallCapability(Box::new(GrantZomeCallCapabilityPayload {
         cell_id: cell_id.clone(),
         cap_grant: ZomeCallCapGrant {
             tag: "".into(),
             access: CapAccess::Assigned {
-                secret: cap_secret,
+                secret: Some(secret),
                 assignees,
             },
             functions,
@@ -115,7 +115,7 @@ pub async fn grant_zome_call_capability(
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await?;
     assert_matches!(response, AdminResponse::ZomeCallCapabilityGranted);
-    Ok(cap_secret)
+    Ok(secret)
 }
 
 pub async fn call_zome_fn<S>(

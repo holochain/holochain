@@ -1683,7 +1683,7 @@ mod tests {
         let mut assignees = BTreeSet::new();
         assignees.insert(bob.clone());
         let updated_secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
-        let updated_access = CapAccess::from((updated_secret.unwrap(), assignees));
+        let updated_access = CapAccess::from((updated_secret, assignees));
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
         // commit grant update to alice's source chain
