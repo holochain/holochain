@@ -24,7 +24,7 @@ path = "src/bin/hc-dna.rs"
 
 # reminder - do not use workspace deps
 [dependencies]
-holochain_wasmer_host = "=0.0.93"
+holochain_wasmer_host = "=0.0.94"
 wasmer = "=4.2.8"
 futures = "0.3"
 anyhow = "1.0"

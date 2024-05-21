@@ -40,7 +40,7 @@ holochain_serialized_bytes = "=0.0.54"
 holochain_state = { version = "^0.3.1-rc.0", path = "../holochain_state" }
 holochain_types = { version = "^0.3.1-rc.0", path = "../holochain_types" }
 holochain_util = { version = "^0.3.1-rc.0", path = "../holochain_util" }
-holochain_wasmer_host = "=0.0.93"
+holochain_wasmer_host = "=0.0.94"
 holochain_websocket = { version = "^0.3.1-rc.0", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.3.1-rc.0", path = "../holochain_zome_types", features = [
   "full",
