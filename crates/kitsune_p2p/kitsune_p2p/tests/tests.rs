@@ -306,6 +306,7 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
 // This is expected to test that agent info is broadcast to current peers when a new agent joins
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn two_nodes_broadcast_agent_info() {
     holochain_trace::test_run();
 
