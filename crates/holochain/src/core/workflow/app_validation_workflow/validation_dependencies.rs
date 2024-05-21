@@ -103,7 +103,7 @@ mod tests {
     use super::*;
     use fixt::fixt;
     use holo_hash::fixt::{AnyDhtHashFixturator, DhtOpHashFixturator};
-    use holochain_types::dht_op::DhtOp;
+    use holochain_types::dht_op::ChainOp;
     use holochain_zome_types::fixt::{ActionFixturator, SignatureFixturator};
 
     #[test]
@@ -152,7 +152,7 @@ mod tests {
         // op 1 is missing hashes
         // op 1 is the only hash to validate
         // filtered dht_ops should be empty
-        let dht_op_1 = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+        let dht_op_1 = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));
@@ -176,7 +176,7 @@ mod tests {
         // op 2 is new to validate
         // op 1 still to validate
         // filtered dht_ops should only contain op 2
-        let dht_op_2 = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+        let dht_op_2 = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));
@@ -189,7 +189,7 @@ mod tests {
         // op 3 is validated
         // filtered dht_ops should only contain op 3
         validation_dependencies.remove_missing_hash(&missing_hash_1);
-        let dht_op_3 = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+        let dht_op_3 = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));
@@ -201,11 +201,11 @@ mod tests {
         // op 4 and 5 to be validated
         // filtered dht_ops should contain op 4 and 5
         validation_dependencies.remove_missing_hash(&missing_hash_2);
-        let dht_op_4 = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+        let dht_op_4 = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));
-        let dht_op_5 = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
+        let dht_op_5 = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));

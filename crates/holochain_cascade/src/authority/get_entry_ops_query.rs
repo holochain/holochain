@@ -16,7 +16,7 @@ impl GetEntryOpsQuery {
 }
 
 pub struct Item {
-    op_type: DhtOpType,
+    op_type: ChainOpType,
     action: SignedAction,
 }
 
@@ -48,9 +48,9 @@ impl Query for GetEntryOpsQuery {
 
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
-            ":store_entry": DhtOpType::StoreEntry,
-            ":delete": DhtOpType::RegisterDeletedEntryAction,
-            ":update": DhtOpType::RegisterUpdatedContent,
+            ":store_entry": ChainOpType::StoreEntry,
+            ":delete": ChainOpType::RegisterDeletedEntryAction,
+            ":update": ChainOpType::RegisterUpdatedContent,
             ":entry_hash": self.0,
         };
         params.to_vec()
@@ -73,11 +73,10 @@ impl Query for GetEntryOpsQuery {
 
     fn fold(&self, mut state: Self::State, dht_op: Self::Item) -> StateQueryResult<Self::State> {
         match &dht_op.data.op_type {
-            DhtOpType::StoreEntry => {
+            ChainOpType::StoreEntry => {
                 if dht_op
                     .data
                     .action
-                    .0
                     .entry_type()
                     .filter(|et| *et.visibility() == EntryVisibility::Public)
                     .is_some()
@@ -87,7 +86,6 @@ impl Query for GetEntryOpsQuery {
                         state.entry_data = dht_op
                             .data
                             .action
-                            .0
                             .entry_data()
                             .map(|(h, t)| (h.clone(), t.clone()));
                     }
@@ -97,14 +95,14 @@ impl Query for GetEntryOpsQuery {
                         .push(Judged::raw(dht_op.data.action.try_into()?, status));
                 }
             }
-            DhtOpType::RegisterDeletedEntryAction => {
+            ChainOpType::RegisterDeletedEntryAction => {
                 let status = dht_op.validation_status();
                 state
                     .ops
                     .deletes
                     .push(Judged::raw(dht_op.data.action.try_into()?, status));
             }
-            DhtOpType::RegisterUpdatedContent => {
+            ChainOpType::RegisterUpdatedContent => {
                 let status = dht_op.validation_status();
                 let action = dht_op.data.action;
                 state.ops.updates.push(Judged::raw(

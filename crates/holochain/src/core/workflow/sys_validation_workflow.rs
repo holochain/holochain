@@ -10,33 +10,33 @@
 //!
 //! The workflow operates on [`DhtOp`]s which are roughly equivalent to [`Record`]s but catered to the needs of a specific type of Authority.
 //! Checks that you can rely on sys validation having performed are:
-//! - For a [`DhtOp::StoreRecord`]
+//! - For a [`ChainOp::StoreRecord`]
 //!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op can progress.
 //!    - The [`Action`] must be either a [`Action::Create`] or an [`Action::Update`].
 //!    - Run the [store entry checks](#store-entry-checks).
-//! - For a [`DhtOp::StoreEntry`]
+//! - For a [`ChainOp::StoreEntry`]
 //!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op is accepted.
 //!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //!    - Run the [store entry checks](#store-entry-checks).
-//! - For a [`DhtOp::RegisterAgentActivity`]
+//! - For a [`ChainOp::RegisterAgentActivity`]
 //!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //!    - If the [`Action`] is a [`Action::Dna`], then verify the contained DNA hash matches the DNA hash that sys validation is being run for.
 //!    - Check that the previous action is never a [`Action::CloseChain`], since this is always required to be the last action in a chain.
 //!    - Run the [store record checks](#store-record-checks).
-//! - For a [`DhtOp::RegisterUpdatedContent`]
+//! - For a [`ChainOp::RegisterUpdatedContent`]
 //!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
 //!    - If there is an [`Entry`], then the [store entry checks](#store-entry-checks) are run.
-//! - For a [`DhtOp::RegisterUpdatedRecord`]
+//! - For a [`ChainOp::RegisterUpdatedRecord`]
 //!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
 //!    - If there is an [`Entry`], then the [store entry checks](#store-entry-checks) are run.
-//! - For a [`DhtOp::RegisterDeletedBy`]
+//! - For a [`ChainOp::RegisterDeletedBy`]
 //!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`Action::Create`] or [`Action::Update`].
-//! - For a [`DhtOp::RegisterDeletedEntryAction`]
+//! - For a [`ChainOp::RegisterDeletedEntryAction`]
 //!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`Action::Create`] or [`Action::Update`].
-//! - For a [`DhtOp::RegisterAddLink`]
+//! - For a [`ChainOp::RegisterAddLink`]
 //!   - The size of the [`CreateLink::tag`] must be less than or equal to the maximum size that is accepted for this link tag. This is specified in the constant [`MAX_TAG_SIZE`].
-//! - For a [`DhtOp::RegisterRemoveLink`]
+//! - For a [`ChainOp::RegisterRemoveLink`]
 //!   - The [`DeleteLink::link_add_address`] reference to the [`Action`] of the link being deleted must point to an [`Action`] that can be found locally. That action being deleted must also
 //!     be a [`Action::CreateLink`].
 //!
@@ -257,12 +257,10 @@ async fn sys_validation_workflow_inner(
     let mut validation_outcomes = Vec::with_capacity(sorted_ops.len());
     for hashed_op in sorted_ops {
         let (op, op_hash) = hashed_op.into_inner();
-        let op_type = op.get_type();
-        let action = op.action();
 
         // This is an optimization to skip app validation and integration for ops that are
         // rejected and don't have dependencies.
-        let dependency = op_type.sys_validation_dependency(&action);
+        let dependency = op.sys_validation_dependency();
 
         // Note that this is async only because of the signature checks done during countersigning.
         // In most cases this will be a fast synchronous call.
@@ -400,14 +398,41 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
         .filter_map(|op| {
             // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
             match &op.content {
-                DhtOp::StoreRecord(_, action, entry) => {
-                    let mut actions = match entry {
-                        RecordEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
-                            // Discard errors here because we'll check later whether the input is valid. If it's not then it
-                            // won't matter that we've skipped fetching deps for it
-                            if let Ok(entry_rate_weight) = action_to_entry_rate_weight(action) {
+                DhtOp::ChainOp(op) => match &**op {
+                    ChainOp::StoreRecord(_, action, entry) => {
+                        let mut actions = match entry {
+                            RecordEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
+                                // Discard errors here because we'll check later whether the input is valid. If it's not then it
+                                // won't matter that we've skipped fetching deps for it
+                                if let Ok(entry_rate_weight) = action_to_entry_rate_weight(action) {
+                                    make_action_set_for_session_data(
+                                        entry_rate_weight,
+                                        entry,
+                                        session_data,
+                                    )
+                                    .unwrap_or_else(|_| vec![])
+                                    .into_iter()
+                                    .map(|action| action.into_hash())
+                                    .collect::<Vec<_>>()
+                                } else {
+                                    vec![]
+                                }
+                            }
+                            _ => vec![],
+                        };
+
+                        if let Action::Update(update) = action {
+                            actions.push(update.original_action_address.clone());
+                        }
+                        Some(actions)
+                    }
+                    ChainOp::StoreEntry(_, action, entry) => {
+                        let mut actions = match entry {
+                            Entry::CounterSign(session_data, _) => {
+                                // Discard errors here because we'll check later whether the input is valid. If it's not then it
+                                // won't matter that we've skipped fetching deps for it
                                 make_action_set_for_session_data(
-                                    entry_rate_weight,
+                                    new_entry_action_to_entry_rate_weight(action),
                                     entry,
                                     session_data,
                                 )
@@ -415,56 +440,47 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                                 .into_iter()
                                 .map(|action| action.into_hash())
                                 .collect::<Vec<_>>()
-                            } else {
-                                vec![]
                             }
-                        }
-                        _ => vec![],
-                    };
+                            _ => vec![],
+                        };
 
-                    if let Action::Update(update) = action {
-                        actions.push(update.original_action_address.clone());
-                    }
-                    Some(actions)
-                }
-                DhtOp::StoreEntry(_, action, entry) => {
-                    let mut actions = match entry {
-                        Entry::CounterSign(session_data, _) => {
-                            // Discard errors here because we'll check later whether the input is valid. If it's not then it
-                            // won't matter that we've skipped fetching deps for it
-                            make_action_set_for_session_data(
-                                new_entry_action_to_entry_rate_weight(action),
-                                entry,
-                                session_data,
-                            )
-                            .unwrap_or_else(|_| vec![])
-                            .into_iter()
-                            .map(|action| action.into_hash())
-                            .collect::<Vec<_>>()
+                        if let NewEntryAction::Update(update) = action {
+                            actions.push(update.original_action_address.clone());
                         }
-                        _ => vec![],
-                    };
-
-                    if let NewEntryAction::Update(update) = action {
-                        actions.push(update.original_action_address.clone());
+                        Some(actions)
                     }
-                    Some(actions)
-                }
-                DhtOp::RegisterAgentActivity(_, action) => action
-                    .prev_action()
-                    .map(|action| vec![action.as_hash().clone()]),
-                DhtOp::RegisterUpdatedContent(_, action, _) => {
-                    Some(vec![action.original_action_address.clone()])
-                }
-                DhtOp::RegisterUpdatedRecord(_, action, _) => {
-                    Some(vec![action.original_action_address.clone()])
-                }
-                DhtOp::RegisterDeletedBy(_, action) => Some(vec![action.deletes_address.clone()]),
-                DhtOp::RegisterDeletedEntryAction(_, action) => {
-                    Some(vec![action.deletes_address.clone()])
-                }
-                DhtOp::RegisterRemoveLink(_, action) => Some(vec![action.link_add_address.clone()]),
-                _ => None,
+                    ChainOp::RegisterAgentActivity(_, action) => action
+                        .prev_action()
+                        .map(|action| vec![action.as_hash().clone()]),
+                    ChainOp::RegisterUpdatedContent(_, action, _) => {
+                        Some(vec![action.original_action_address.clone()])
+                    }
+                    ChainOp::RegisterUpdatedRecord(_, action, _) => {
+                        Some(vec![action.original_action_address.clone()])
+                    }
+                    ChainOp::RegisterDeletedBy(_, action) => {
+                        Some(vec![action.deletes_address.clone()])
+                    }
+                    ChainOp::RegisterDeletedEntryAction(_, action) => {
+                        Some(vec![action.deletes_address.clone()])
+                    }
+                    ChainOp::RegisterRemoveLink(_, action) => {
+                        Some(vec![action.link_add_address.clone()])
+                    }
+                    _ => None,
+                },
+                DhtOp::WarrantOp(op) => match &op.warrant {
+                    Warrant::ChainIntegrity(warrant) => match warrant {
+                        ChainIntegrityWarrant::InvalidChainOp {
+                            action: (action_hash, _),
+                            ..
+                        } => Some(vec![action_hash.clone()]),
+                        ChainIntegrityWarrant::ChainFork {
+                            action_pair: ((a1, _), (a2, _)),
+                            ..
+                        } => Some(vec![a1.clone(), a2.clone()]),
+                    },
+                },
             }
         })
         .flatten()
@@ -492,7 +508,11 @@ pub(crate) async fn validate_op(
     dna_def: &DnaDefHashed,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> WorkflowResult<Outcome> {
-    match validate_op_inner(op, dna_def, validation_dependencies).await {
+    let result = match op {
+        DhtOp::ChainOp(op) => validate_chain_op(op, dna_def, validation_dependencies).await,
+        DhtOp::WarrantOp(op) => validate_warrant_op(op, dna_def, validation_dependencies).await,
+    };
+    match result {
         Ok(_) => Ok(Outcome::Accepted),
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
@@ -533,7 +553,7 @@ pub(crate) async fn validate_op(
 fn handle_failed(error: &ValidationOutcome) -> Outcome {
     use Outcome::*;
     match error {
-        ValidationOutcome::Counterfeit(_, _) => {
+        ValidationOutcome::CounterfeitAction(_, _) => {
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
         ValidationOutcome::DepMissingFromDht(dep) => MissingDhtDep(dep.clone()),
@@ -567,14 +587,14 @@ fn make_action_set_for_session_data(
         .collect())
 }
 
-async fn validate_op_inner(
-    op: &DhtOp,
+async fn validate_chain_op(
+    op: &ChainOp,
     dna_def: &DnaDefHashed,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
     match op {
-        DhtOp::StoreRecord(_, action, entry) => {
+        ChainOp::StoreRecord(_, action, entry) => {
             check_prev_action(action)?;
             if let Some(entry) = entry.as_option() {
                 // Retrieve for all other actions on countersigned entry.
@@ -585,7 +605,7 @@ async fn validate_op_inner(
                         session_data,
                     )? {
                         // Just require that we are holding all the other actions
-                        let mut validation_dependencies = validation_dependencies.lock();
+                        let validation_dependencies = validation_dependencies.lock();
                         validation_dependencies
                             .get(&action_hash)
                             .and_then(|s| s.as_action())
@@ -606,7 +626,7 @@ async fn validate_op_inner(
             }
             Ok(())
         }
-        DhtOp::StoreEntry(_, action, entry) => {
+        ChainOp::StoreEntry(_, action, entry) => {
             // Check and hold for all other actions on countersigned entry.
             if let Entry::CounterSign(session_data, _) = entry {
                 for action_hash in make_action_set_for_session_data(
@@ -615,7 +635,7 @@ async fn validate_op_inner(
                     session_data,
                 )? {
                     // Just require that we are holding all the other actions
-                    let mut validation_dependencies = validation_dependencies.lock();
+                    let validation_dependencies = validation_dependencies.lock();
                     validation_dependencies
                         .get(&action_hash)
                         .and_then(|s| s.as_action())
@@ -628,11 +648,11 @@ async fn validate_op_inner(
             check_prev_action(&action.clone().into())?;
             store_entry(action.into(), entry, validation_dependencies.clone()).await
         }
-        DhtOp::RegisterAgentActivity(_, action) => {
+        ChainOp::RegisterAgentActivity(_, action) => {
             register_agent_activity(action, validation_dependencies.clone(), dna_def)?;
             store_record(action, validation_dependencies)
         }
-        DhtOp::RegisterUpdatedContent(_, action, entry) => {
+        ChainOp::RegisterUpdatedContent(_, action, entry) => {
             register_updated_content(action, validation_dependencies.clone())?;
             if let Some(entry) = entry.as_option() {
                 store_entry(
@@ -645,7 +665,7 @@ async fn validate_op_inner(
 
             Ok(())
         }
-        DhtOp::RegisterUpdatedRecord(_, action, entry) => {
+        ChainOp::RegisterUpdatedRecord(_, action, entry) => {
             register_updated_record(action, validation_dependencies.clone())?;
             if let Some(entry) = entry.as_option() {
                 store_entry(
@@ -658,14 +678,110 @@ async fn validate_op_inner(
 
             Ok(())
         }
-        DhtOp::RegisterDeletedBy(_, action) => register_deleted_by(action, validation_dependencies),
-        DhtOp::RegisterDeletedEntryAction(_, action) => {
+        ChainOp::RegisterDeletedBy(_, action) => {
+            register_deleted_by(action, validation_dependencies)
+        }
+        ChainOp::RegisterDeletedEntryAction(_, action) => {
             register_deleted_entry_action(action, validation_dependencies)
         }
-        DhtOp::RegisterAddLink(_, action) => register_add_link(action),
-        DhtOp::RegisterRemoveLink(_, action) => {
+        ChainOp::RegisterAddLink(_, action) => register_add_link(action),
+        ChainOp::RegisterRemoveLink(_, action) => {
             register_delete_link(action, validation_dependencies)
         }
+    }
+}
+
+async fn validate_warrant_op(
+    op: &WarrantOp,
+    _dna_def: &DnaDefHashed,
+    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+) -> SysValidationResult<()> {
+    match &op.warrant {
+        Warrant::ChainIntegrity(warrant) => match warrant {
+            ChainIntegrityWarrant::InvalidChainOp {
+                action: (action_hash, action_sig),
+                action_author,
+                ..
+            } => {
+                let action = {
+                    let deps = validation_dependencies.lock();
+                    let action = deps
+                        .get(action_hash)
+                        .and_then(|s| s.as_action())
+                        .ok_or_else(|| {
+                            ValidationOutcome::DepMissingFromDht(action_hash.clone().into())
+                        })?;
+
+                    if action.author() != action_author {
+                        return Err(ValidationOutcome::InvalidWarrantOp(
+                            op.clone(),
+                            "action author mismatch".into(),
+                        )
+                        .into());
+                    }
+                    action.clone()
+                };
+                verify_action_signature(action_sig, &action).await?;
+
+                Ok(())
+            }
+            ChainIntegrityWarrant::ChainFork {
+                action_pair: ((a1, a1_sig), (a2, a2_sig)),
+                chain_author,
+                ..
+            } => {
+                let (action1, action2) = {
+                    let deps = validation_dependencies.lock();
+                    let action1 = deps
+                        .get(a1)
+                        .and_then(|s| s.as_action())
+                        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a1.clone().into()))?;
+                    let action2 = deps
+                        .get(a2)
+                        .and_then(|s| s.as_action())
+                        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a2.clone().into()))?;
+
+                    // chain_author basis must match the author of the action
+                    if action1.author() != chain_author {
+                        return Err(ValidationOutcome::InvalidWarrantOp(
+                            op.clone(),
+                            "chain author mismatch".into(),
+                        )
+                        .into());
+                    }
+
+                    // Both actions must be by same author
+                    if action1.author() != action2.author() {
+                        return Err(ValidationOutcome::InvalidWarrantOp(
+                            op.clone(),
+                            "action pair author mismatch".into(),
+                        )
+                        .into());
+                    }
+
+                    // A fork is evidenced by two actions with a common predecessor.
+                    // NOTE: we could also check sequence numbers, but then we'd have to traverse
+                    // both forks backwards until reaching a common ancestor to protect against an
+                    // attack where someone authors a warrant using two actions from two different DNAs.
+                    // Using seq numbers makes it easier to detect and prove a fork, but using prev_action
+                    // prevents the attack.
+                    if action1.prev_action() != action2.prev_action() {
+                        return Err(ValidationOutcome::InvalidWarrantOp(
+                            op.clone(),
+                            "action pair seq mismatch".into(),
+                        )
+                        .into());
+                    }
+
+                    (action1.clone(), action2.clone())
+                };
+
+                verify_action_signature(a1_sig, &action1).await?;
+                verify_action_signature(a2_sig, &action2).await?;
+
+                Ok(())
+            }
+        },
     }
 }
 
@@ -703,7 +819,7 @@ async fn sys_validate_record_inner(
     let signature = record.signature();
     let action = record.action();
     let maybe_entry = record.entry().as_option();
-    counterfeit_check(signature, action).await?;
+    counterfeit_check_action(signature, action).await?;
 
     async fn validate(
         action: &Action,
@@ -761,11 +877,21 @@ async fn sys_validate_record_inner(
     }
 }
 
-/// Check if the op has valid signature and author.
+/// Check if the chain op has valid signature and author.
 /// Ops that fail this check should be dropped.
-pub async fn counterfeit_check(signature: &Signature, action: &Action) -> SysValidationResult<()> {
+pub async fn counterfeit_check_action(
+    signature: &Signature,
+    action: &Action,
+) -> SysValidationResult<()> {
     verify_action_signature(signature, action).await?;
     author_key_is_valid(action.author()).await?;
+    Ok(())
+}
+
+/// Check if the warrant op has valid signature and author.
+pub async fn counterfeit_check_warrant(warrant_op: &WarrantOp) -> SysValidationResult<()> {
+    verify_warrant_signature(warrant_op).await?;
+    author_key_is_valid(&warrant_op.author).await?;
     Ok(())
 }
 
@@ -781,7 +907,7 @@ fn register_agent_activity(
     check_prev_action(action)?;
     check_valid_if_dna(action, dna_def)?;
     if let Some(prev_action_hash) = prev_action_hash {
-        let mut validation_dependencies = validation_dependencies.lock();
+        let validation_dependencies = validation_dependencies.lock();
         let prev_action = validation_dependencies
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
@@ -809,7 +935,7 @@ fn store_record(
     // Checks
     check_prev_action(action)?;
     if let Some(prev_action_hash) = prev_action_hash {
-        let mut validation_dependencies = validation_dependencies.lock();
+        let validation_dependencies = validation_dependencies.lock();
         let prev_action = validation_dependencies
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
@@ -840,7 +966,7 @@ async fn store_entry(
     // Additional checks if this is an Update
     if let NewEntryActionRef::Update(entry_update) = action {
         let original_action_address = &entry_update.original_action_address;
-        let mut validation_dependencies = validation_dependencies.lock();
+        let validation_dependencies = validation_dependencies.lock();
         let original_action = validation_dependencies
             .get(original_action_address)
             .and_then(|s| s.as_action())
@@ -865,7 +991,7 @@ fn register_updated_content(
     // Get data ready to validate
     let original_action_address = &entry_update.original_action_address;
 
-    let mut validation_dependencies = validation_dependencies.lock();
+    let validation_dependencies = validation_dependencies.lock();
     let original_action = validation_dependencies
         .get(original_action_address)
         .and_then(|s| s.as_action())
@@ -883,7 +1009,7 @@ fn register_updated_record(
     // Get data ready to validate
     let original_action_address = &record_update.original_action_address;
 
-    let mut validation_dependencies = validation_dependencies.lock();
+    let validation_dependencies = validation_dependencies.lock();
     let original_action = validation_dependencies
         .get(original_action_address)
         .and_then(|s| s.as_action())
@@ -901,7 +1027,7 @@ fn register_deleted_by(
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
-    let mut validation_dependencies = validation_dependencies.lock();
+    let validation_dependencies = validation_dependencies.lock();
     let action = validation_dependencies
         .get(removed_action_address)
         .and_then(|s| s.as_action())
@@ -919,7 +1045,7 @@ fn register_deleted_entry_action(
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
-    let mut validation_dependencies = validation_dependencies.lock();
+    let validation_dependencies = validation_dependencies.lock();
     let action = validation_dependencies
         .get(removed_action_address)
         .and_then(|s| s.as_action())
@@ -942,7 +1068,7 @@ fn register_delete_link(
     let link_add_address = &link_remove.link_add_address;
 
     // Just require that this link exists, don't need to check anything else about it here
-    let mut validation_dependencies = validation_dependencies.lock();
+    let validation_dependencies = validation_dependencies.lock();
     let add_link_action = validation_dependencies
         .get(link_add_address)
         .and_then(|s| s.as_action())
@@ -1030,7 +1156,7 @@ impl SysValidationWorkspace {
                 DatabaseResult::Ok(stmt.query_row(
                     named_params! {
                         ":author": author,
-                        ":activity": DhtOpType::RegisterAgentActivity,
+                        ":activity": ChainOpType::RegisterAgentActivity,
                     },
                     |row| row.get(0),
                 )?)

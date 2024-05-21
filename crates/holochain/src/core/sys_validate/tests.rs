@@ -241,7 +241,7 @@ async fn test_record_with_cascade() {
     let keystore = holochain_keystore::test_keystore();
     for _ in 0..100 {
         let op =
-            holochain_types::facts::valid_dht_op(keystore.clone(), fake_agent_pubkey_1(), false)
+            holochain_types::facts::valid_chain_op(keystore.clone(), fake_agent_pubkey_1(), false)
                 .build(&mut g);
         let action = op.action().clone();
         assert_valid_action(&keystore, action).await;
@@ -328,7 +328,7 @@ async fn check_valid_if_dna_test() {
     let keystore = test_keystore();
     let db = tmp.to_db();
     // Test data
-    let _activity_return = vec![ActionHash::arbitrary(&mut g).unwrap()];
+    let _activity_return = [ActionHash::arbitrary(&mut g).unwrap()];
 
     let mut dna_def = DnaDef::arbitrary(&mut g).unwrap();
     dna_def.modifiers.origin_time = Timestamp::MIN;

@@ -359,7 +359,7 @@ fixturator!(
             CapAccessVariant::Unrestricted => CapAccess::from(()),
             CapAccessVariant::Transferable => CapAccess::from(CapSecretFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()),
             CapAccessVariant::Assigned => CapAccess::from((
-                Some(CapSecretFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()),
+                None,
                 BTreeSet::new()
             ))
         }
@@ -655,7 +655,7 @@ fixturator!(
 
 fixturator!(
     ActionHashed;
-    constructor fn from_content_sync(Action);
+    constructor fn from_content_sync_exact(Action);
 );
 
 fixturator!(

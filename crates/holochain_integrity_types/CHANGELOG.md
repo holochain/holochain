@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- `CapAccess::Assigned` (used in `ZomeCallCapGrant`) now has an optional secret. If no secret is provided as part of an Assigned grant, the `cap_secret` provided in zome calls will be unchecked.
+
+## 0.4.0-dev.3
+
 ## 0.4.0-dev.2
 
 ## 0.4.0-dev.1

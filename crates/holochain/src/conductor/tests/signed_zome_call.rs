@@ -31,7 +31,7 @@ async fn signed_zome_call() {
 
     // compute a cap access secret
     let mut buf = arbitrary::Unstructured::new(&[]);
-    let cap_access_secret = CapSecret::arbitrary(&mut buf).unwrap();
+    let secret = Some(CapSecret::arbitrary(&mut buf).unwrap());
 
     // set up functions to grant access to
     let mut functions = BTreeSet::new();
@@ -45,10 +45,7 @@ async fn signed_zome_call() {
     let cap_grant = ZomeCallCapGrant {
         tag: "signing_key".into(),
         functions: granted_functions,
-        access: CapAccess::Assigned {
-            secret: cap_access_secret,
-            assignees,
-        },
+        access: CapAccess::Assigned { secret, assignees },
     };
 
     // request authorization of signing key for agent's own cell should succeed
@@ -103,7 +100,7 @@ async fn signed_zome_call() {
         .valid_cap_grant(
             granted_function.clone(),
             cap_access_public_key.clone(),
-            Some(cap_access_secret.clone()),
+            secret.clone(),
         )
         .await
         .unwrap();
@@ -111,7 +108,7 @@ async fn signed_zome_call() {
     assert!(actual_cap_grant.unwrap().is_valid(
         &granted_function,
         &cap_access_public_key,
-        Some(&cap_access_secret)
+        secret.as_ref()
     ));
 
     // a zome call without the cap secret that enables lookup of the authorized
@@ -150,7 +147,7 @@ async fn signed_zome_call() {
                     cell_id: cell_id.clone(),
                     zome_name: zome.coordinator_zome_name(),
                     fn_name: "get_entry".into(),
-                    cap_secret: Some(cap_access_secret),
+                    cap_secret: secret,
                     payload: ExternIO::encode(()).unwrap(),
                     nonce,
                     expires_at,
@@ -188,7 +185,7 @@ async fn signed_zome_call_wildcard() {
 
     // compute a cap access secret
     let mut buf = arbitrary::Unstructured::new(&[]);
-    let cap_access_secret = CapSecret::arbitrary(&mut buf).unwrap();
+    let secret = Some(CapSecret::arbitrary(&mut buf).unwrap());
 
     // set up functions to grant access to
     let granted_functions = GrantedFunctions::All;
@@ -200,10 +197,7 @@ async fn signed_zome_call_wildcard() {
     let cap_grant = ZomeCallCapGrant {
         tag: "signing_key".into(),
         functions: granted_functions,
-        access: CapAccess::Assigned {
-            secret: cap_access_secret,
-            assignees,
-        },
+        access: CapAccess::Assigned { secret, assignees },
     };
 
     // request authorization of signing key for agent's own cell should succeed
@@ -238,7 +232,7 @@ async fn signed_zome_call_wildcard() {
         .valid_cap_grant(
             called_function.clone(),
             cap_access_public_key.clone(),
-            Some(cap_access_secret.clone()),
+            secret.clone(),
         )
         .await
         .unwrap();
@@ -246,7 +240,7 @@ async fn signed_zome_call_wildcard() {
     assert!(actual_cap_grant.unwrap().is_valid(
         &called_function,
         &cap_access_public_key,
-        Some(&cap_access_secret)
+        secret.as_ref()
     ));
 
     // a zome call with the cap secret of the authorized signing key should succeed
@@ -260,7 +254,7 @@ async fn signed_zome_call_wildcard() {
                     cell_id: cell_id.clone(),
                     zome_name: zome.coordinator_zome_name(),
                     fn_name: "get_entry".into(),
-                    cap_secret: Some(cap_access_secret),
+                    cap_secret: secret,
                     payload: ExternIO::encode(()).unwrap(),
                     nonce,
                     expires_at,

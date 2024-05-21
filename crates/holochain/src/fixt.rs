@@ -508,7 +508,7 @@ fixturator!(
     curve Empty ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Empty).next().unwrap(),
         zome: ZomeFixturator::new(Empty).next().unwrap(),
-        cap_secret: Some(CapSecretFixturator::new(Empty).next().unwrap()),
+        cap_secret: None,
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
