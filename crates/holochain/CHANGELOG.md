@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Update Holochain Wasmer to v0.0.94 to get a fix for a deallocation bug that was causing crashes when calling zome functions
+  on Rust 1.78. #3900
+
 ## 0.3.1-rc.0
 
 - Fix an issue which caused a `WebsocketClosed` error to be logged when signals are sent after a client has closed their connection. \#3824
