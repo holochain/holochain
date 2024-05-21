@@ -47,6 +47,8 @@ impl ShardedGossipLocal {
             url,
         }) = remote_agent
         {
+            tracing::info!("initiating gossip with remote agents: {:?}", agent_info_list);
+
             let id = rand::thread_rng().gen();
 
             let gossip = ShardedGossipWire::initiate(
@@ -67,6 +69,7 @@ impl ShardedGossipLocal {
                 inner.initiate_tgt = Some(tgt);
                 Ok(())
             })?;
+            // TODO always a new connection even if we have an open one?
             Some((cert, HowToConnect::Url(url.to_string()), gossip))
         } else {
             None

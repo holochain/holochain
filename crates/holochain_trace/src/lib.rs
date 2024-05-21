@@ -165,7 +165,7 @@ pub fn test_run() {
     static INIT_ONCE: std::sync::Once = std::sync::Once::new();
 
     INIT_ONCE.call_once(|| {
-        init_fmt(Output::Log).unwrap();
+        init_fmt(Output::Json).unwrap();
     });
 }
 

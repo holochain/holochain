@@ -330,6 +330,7 @@ impl Arq<Loc> {
     pub fn to_bounds_std(&self) -> ArqBounds {
         self.to_bounds(SpaceDimension::standard())
     }
+
     /// Convert to the [`ArqBounds`] representation, which forgets about the
     /// [`Loc`] associated with this arq.
     pub fn to_bounds(&self, dim: impl SpaceDim) -> ArqBounds {

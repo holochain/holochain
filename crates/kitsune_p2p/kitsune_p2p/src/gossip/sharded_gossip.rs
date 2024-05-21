@@ -945,6 +945,12 @@ impl ShardedGossipLocal {
                 missing_hashes,
                 finished,
             }) => {
+                tracing::info!(
+                    "Received OpBloom with missing hashes: {:?} and finished: {:?}",
+                    missing_hashes,
+                    finished
+                );
+
                 let state = if finished {
                     self.incoming_op_blooms_finished(&peer_cert)?
                 } else {
@@ -975,6 +981,8 @@ impl ShardedGossipLocal {
                 }
             }
             ShardedGossipWire::OpRegions(OpRegions { region_set }) => {
+                tracing::info!("Incoming op regions {:?}", region_set);
+
                 if let Some(state) = self.incoming_op_blooms_finished(&peer_cert)? {
                     self.queue_incoming_regions(&peer_cert, state, region_set)
                         .await?
@@ -983,6 +991,12 @@ impl ShardedGossipLocal {
                 }
             }
             ShardedGossipWire::MissingOpHashes(MissingOpHashes { ops, finished }) => {
+                tracing::info!(
+                    "Incoming missing op hashes {:?} and finished {}",
+                    ops,
+                    finished
+                );
+
                 let mut gossip = Vec::with_capacity(0);
                 let finished = MissingOpsStatus::try_from(finished)?;
 
