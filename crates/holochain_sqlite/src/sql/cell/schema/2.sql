@@ -127,9 +127,11 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     num_validation_attempts     INTEGER     NULL,
     last_validation_attempt     INTEGER     NULL,
 
-    -- The FIRST integration dependency if there is one.
+    -- The FIRST sys validation dependency if there is one.
     dependency          BLOB           NULL,
-    -- The SECOND integration dependency if there is one.
+    -- The SECOND sys validation dependency if there is one,
+    -- which is only ever used for Warrants.
+    -- Actions only have one sys validation dependency.
     -- The database can only handle up to two dependencies.
     dependency2         BLOB           NULL,
 
