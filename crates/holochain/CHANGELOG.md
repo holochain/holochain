@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Rename feature `sweetest` in Holochain crate to `sweettest` to match the crate name.
 - Remove deprecated functions `consistency_10s` and `consistency_60s`. Use `await_consistency` instead.
-- Remove deprecated type `SweetEasyLine`. Use `SweetInlineZomes` instead.
+- Remove deprecated type `SweetEasyInline`. Use `SweetInlineZomes` instead.
 - Remove deprecated methods `SweetInlineZomes::callback` and `SweetInlineZomes::integrity_callback`. Use `SweetInlineZomes::function` and `SweetInlineZomes::integrity_function` instead.
 
 ## 0.4.0-dev.3
