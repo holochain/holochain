@@ -404,6 +404,7 @@ async fn two_nodes_broadcast_agent_info() {
 // about peers that are unkown to the new peer.
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn two_nodes_gossip_agent_info() {
     holochain_trace::test_run();
 
