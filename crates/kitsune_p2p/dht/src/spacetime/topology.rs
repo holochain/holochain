@@ -313,7 +313,7 @@ pub struct GossipParams {
     /// a time buffer of 2 will allow +/- 10 min discrepancies with gossip partners.
     pub max_time_offset: TimeQuantum,
 
-    /// What is the difference in power will you accept for other agents' Arqs?
+    /// What is the difference in power that you will accept in other agents' Arqs?
     /// e.g. if the power I use in my arq is 14, and this offset is 2,
     /// I won't talk to anyone whose arq is expressed with a power lower
     /// than 12 or greater than 16
