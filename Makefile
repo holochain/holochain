@@ -34,9 +34,12 @@ TEST_DEPS = \
 	holochain_sqlite \
 	holochain_conductor_services \
 	holochain_terminal \
+	holochain_websocket \
 	test_utils/wasm \
+	hc \
+	hc_bundle \
 	hc_run_local_services \
-	hc
+	hc_sleuth
 
 # Small support crates with small dependency requirements
 TEST_MISC = \
@@ -47,8 +50,6 @@ TEST_MISC = \
 	holo_hash \
 	hdi \
 	mr_bundle \
-	hc_bundle \
-	hc_sleuth \
 	hc_service_check \
 	aitia \
 	fixt \
@@ -59,8 +60,7 @@ TEST_MISC = \
 	holochain_metrics \
 	holochain_util \
 	holochain_nonce \
-	holochain_secure_primitive \
-	holochain_websocket
+	holochain_secure_primitive
 
 # The set of tests that require holochain binaries on the path in order to run
 TEST_BIN = \

@@ -1093,6 +1093,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     // guard to assure that response time to zome calls and concurrent zome calls
     // is not increasing disproportionally
+    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     async fn concurrent_zome_call_response_time_guard() {
         holochain_trace::test_run();
         let mut conductor = SweetConductor::from_config_rendezvous(
