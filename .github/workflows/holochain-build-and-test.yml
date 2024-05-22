@@ -104,20 +104,22 @@ jobs:
           set -xe
 
           git status
-          
-          whoami
 
-          # if a nix store path was passed, ensure it exists locally. This will fetch from cachix if necessary.
+          # If a nix store path was passed, ensure it exists locally. This will fetch the path from cachix.
           if [[ ${{ inputs.repo_path }} == "/nix/"* ]]; then
-            echo "Realising nix store path from ${{ inputs.repo_path }}"
             nix-store --realise ${{inputs.repo_path }}
-            ls -al ${{ inputs.repo_path }}
+            
+            # Temporary workaround for https://github.com/NixOS/nix/issues/10202
+            git config --global --add safe.directory ${{ inputs.repo_path }}
           fi
 
           # first build all derivations. this could be enough for test derivations.
           nix build -L --show-trace \
             ${{ matrix.cmd.extra_arg }} \
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
+
+          # Temporary workaround for https://github.com/NixOS/nix/issues/10202
+          git config --global --unset safe.directory ${{ inputs.repo_path }}
 
           # Don't exit if this fails so we can clean up the profile
           for i in result*; do
