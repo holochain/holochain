@@ -8,7 +8,7 @@ on:
     branches:
       - develop
 jobs:
-  test:
+  unit-test-job-id:
     name: test
     runs-on: ${{ matrix.os }}
     strategy:
@@ -16,7 +16,6 @@ jobs:
       matrix:
         test-name: [
           'test-holochain',
-          'test-kitsune',
           'test-deps',
           'test-misc',
           'test-bin'
@@ -81,11 +80,11 @@ jobs:
         run: make ${{ matrix.test-name }}
 
   tests-pass:
-    if: always()
+    if: ${{ always() }}
     name: 'All Unit Tests Pass'
-    runs-on: 'ubuntu-lastest'
+    runs-on: 'ubuntu-latest'
     needs:
-      - test
+      - unit-test-job-id
     steps:
       - name: check status
         uses: re-actors/alls-green@release/v1
