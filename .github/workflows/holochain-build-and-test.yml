@@ -107,10 +107,11 @@ jobs:
           
           whoami
 
-          # if a nix store path was passed, ensure it exists locally
+          # if a nix store path was passed, ensure it exists locally. This will fetch from cachix if necessary.
           if [[ ${{ inputs.repo_path }} == "/nix/"* ]]; then
-            ls -al ${{ inputs.repo_path }}
+            echo "Realising nix store path from ${{ inputs.repo_path }}"
             nix-store --realise ${{inputs.repo_path }}
+            ls -al ${{ inputs.repo_path }}
           fi
 
           # first build all derivations. this could be enough for test derivations.
