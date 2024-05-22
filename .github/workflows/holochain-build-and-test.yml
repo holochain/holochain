@@ -104,9 +104,12 @@ jobs:
           set -xe
 
           git status
+          
+          whoami
 
           # if a nix store path was passed, ensure it exists locally
           if [[ ${{ inputs.repo_path }} == "/nix/"* ]]; then
+            ls -al ${{ inputs.repo_path }}
             nix-store --realise ${{inputs.repo_path }}
           fi
 
