@@ -99,15 +99,15 @@ install-bin:
 # like benchmarks at least remain build-able. Then runs nextest tests
 $(TEST_HOLOCHAIN) $(TEST_KITSUNE) $(TEST_DEPS) $(TEST_MISC) $(TEST_BIN):
 	cargo install cargo-nextest
-	cd crates/$@ && \
-		RUSTFLAGS="-Dwarnings" \
+	RUSTFLAGS="-Dwarnings" \
 		cargo build -j4 \
+		--manifest-path crates/$@/Cargo.toml \
 		--locked \
 		--all-features --all-targets \
 		--profile fast-test
-	cd crates/$@ && \
-		RUSTFLAGS="-Dwarnings" RUST_BACKTRACE=1 \
+	RUSTFLAGS="-Dwarnings" RUST_BACKTRACE=1 \
 		cargo nextest run \
+		--manifest-path crates/$@/Cargo.toml \
 		--locked \
 		--build-jobs 4 \
 		--cargo-profile fast-test \
