@@ -22,6 +22,8 @@ jobs:
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_2_rc"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3_rc"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly"
+          # Cache a specific version of Holochain for Holo to use in CI - will need to be updated when they move to new versions
+          - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly --override-input holochain github:holochain/holochain/holochain-0.4.0-dev.2"
         platform:
           - x86_64-darwin
           - aarch64-darwin
