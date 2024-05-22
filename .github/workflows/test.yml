@@ -19,7 +19,7 @@ jobs:
           'test-kitsune',
           'test-deps',
           'test-misc',
-          'hc_sandbox'
+          'test-bin'
         ]
         os: [
           ubuntu-latest,
@@ -81,9 +81,13 @@ jobs:
         run: make ${{ matrix.test-name }}
 
   tests-pass:
+    if: always()
     name: 'All Unit Tests Pass'
     runs-on: 'ubuntu-lastest'
-    needs: test
+    needs:
+      - test
     steps:
       - name: check status
-        run: echo "All Unit Tests Pass"
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

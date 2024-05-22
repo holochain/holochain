@@ -40,7 +40,6 @@ jobs:
         cmd:
           # ensure functionality on multiple platforms
           - pkgs:
-            #  - build-holochain-tests-unit-all
               - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
 
@@ -56,18 +55,10 @@ jobs:
           - system: x86_64-linux
 
         include:
-          # x86_64-darwin currently fails the holonix tests, it should pass the unit tests
-          #- cmd:
-          #    pkgs:
-          #      - build-holochain-tests-unit-all
-          #    extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
-          #  platform:
-          #    system: x86_64-darwin
-
           # we only run repo consistency checks on x86_64-linux
           - cmd:
               pkgs:
-                #- build-holochain-tests-static-all
+                - build-holochain-tests-static-all
                 - build-release-automation-tests-unit
               extra_arg: "--override-input versions './versions/weekly' --override-input holochain ${{ inputs.repo_path }}"
             platform:
@@ -108,7 +99,7 @@ jobs:
           # If a nix store path was passed, ensure it exists locally. This will fetch the path from cachix.
           if [[ ${{ inputs.repo_path }} == "/nix/"* ]]; then
             nix-store --realise ${{inputs.repo_path }}
-            
+
             # Temporary workaround for https://github.com/NixOS/nix/issues/10202
             git config --global --add safe.directory ${{ inputs.repo_path }}
           fi

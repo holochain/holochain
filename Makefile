@@ -66,11 +66,15 @@ TEST_MISC = \
 	holochain_diagnostics \
 	diagnostic_tests
 
-.PHONY: all test-all $(TEST_HOLOCHAIN) $(TEST_KITSUNE) $(TEST_DEPS) $(TEST_MISC) hc_sandbox hdk_derive
+# The set of tests that require holochain binaries on the path in order to run
+TEST_BIN = \
+	hc_sandbox
+
+.PHONY: all test-all $(TEST_HOLOCHAIN) $(TEST_KITSUNE) $(TEST_DEPS) $(TEST_MISC) $(TEST_BIN) test-holochain test-kitsune test-deps test-misc test-bin install-bin hdk_derive
 
 all: test-all
 
-test-all: test-holochain test-kitsune test-deps test-misc hc_sandbox
+test-all: test-holochain test-kitsune test-deps test-misc test-bin
 
 test-holochain: $(TEST_HOLOCHAIN)
 
@@ -80,7 +84,17 @@ test-deps: $(TEST_DEPS) hdk_derive
 
 test-misc: $(TEST_MISC)
 
-$(TEST_HOLOCHAIN) $(TEST_KITSUNE) $(TEST_DEPS) $(TEST_MISC):
+test-bin: install-bin $(TEST_BIN)
+
+# TODO - while the cargo install-s below technically work, it'd be much
+#        more appropriate for the test to use binaries out of the target
+#        directory by default
+install-bin:
+	cargo install --force --path crates/holochain
+	cargo install --force --path crates/hc
+	cargo install --force --path crates/hc_sandbox
+
+$(TEST_HOLOCHAIN) $(TEST_KITSUNE) $(TEST_DEPS) $(TEST_MISC) $(TEST_BIN):
 	cargo install cargo-nextest
 	cd crates/$@ && \
 		RUSTFLAGS="-Dwarnings" cargo build -j4 \
@@ -104,20 +118,3 @@ hdk_derive:
 		RUSTFLAGS="-Dwarnings" RUST_BACKTRACE=1 cargo test -j4 \
 		--all-features \
 		--profile fast-test
-
-# hc_sandbox is a special case because it requires binaries on the path
-# NOTE - this one must be its own top-level github action job
-#        since it uses so much disk space
-# TODO - while the cargo install-s below technically work, it'd be much
-#        more appropriate for the test to use binaries out of the target
-#        directory by default
-hc_sandbox:
-	cargo install cargo-nextest
-	cargo install --force --path crates/holochain
-	cargo install --force --path crates/hc
-	cargo install --force --path crates/hc_sandbox
-	cd crates/hc_sandbox && \
-		RUSTFLAGS="-Dwarnings" RUST_BACKTRACE=1 cargo nextest run \
-		--build-jobs 4 \
-		--cargo-profile fast-test \
-		--all-features
