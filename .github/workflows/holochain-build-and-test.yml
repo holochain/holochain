@@ -119,7 +119,9 @@ jobs:
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
 
           # Temporary workaround for https://github.com/NixOS/nix/issues/10202
-          git config --global --unset safe.directory ${{ inputs.repo_path }}
+          if [[ ${{ inputs.repo_path }} == "/nix/"* ]]; then
+            git config --global --unset safe.directory ${{ inputs.repo_path }}
+          fi
 
           # Don't exit if this fails so we can clean up the profile
           for i in result*; do
