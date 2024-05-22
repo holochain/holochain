@@ -12,6 +12,7 @@ jobs:
   cache-update:
     strategy:
       fail-fast: false
+      max-parallel: 5
       matrix:
         target:
           - "github:holochain/holochain#packages.{0}.build-holonix-tests-integration"
@@ -22,12 +23,14 @@ jobs:
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_2_rc"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3_rc"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly"
-          # Cache a specific version of Holochain for Holo to use in CI - will need to be updated when they move to new versions
-          - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly --override-input holochain github:holochain/holochain/holochain-0.4.0-dev.2"
         platform:
           - x86_64-darwin
           - aarch64-darwin
           - x86_64-linux
+        # Cache a specific version of Holonix+Holochain for Holo to use in CI - will need to be updated when they move to new versions
+        include:
+          - target: "github:holochain/holochain/holochain-0.4.0-dev.2#devShells.{0}.holonix"
+            extra_args: "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly --override-input holochain github:holochain/holochain/holochain-0.4.0-dev.2"
 
     runs-on: [self-hosted, multi-arch]
     steps:
