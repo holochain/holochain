@@ -47,9 +47,10 @@ pub enum NetworkCmd {
 }
 
 impl NetworkCmd {
-    pub fn into_inner(self) -> Network {
-        match self {
-            NetworkCmd::Network(n) => n,
+    pub fn as_inner(this: &Option<Self>) -> Option<&Network> {
+        match this {
+            None => None,
+            Some(NetworkCmd::Network(n)) => Some(n),
         }
     }
 }
@@ -81,8 +82,8 @@ pub enum NetworkType {
         /// URL to a holochain tx5 WebRTC signal server.
         signal_url: String,
 
-        /// Optional override webrtc peer connection config to use.
-        webrtc_config: Option<String>,
+        /// Optional path to override webrtc peer connection config file.
+        webrtc_config: Option<std::path::PathBuf>,
     },
 }
 
@@ -192,12 +193,16 @@ Run `hc sandbox generate --help` for more options."
     }
 }
 
-impl From<Network> for KitsuneP2pConfig {
-    fn from(n: Network) -> Self {
+impl Network {
+    pub async fn to_kitsune(this: &Option<&Self>) -> Option<KitsuneP2pConfig> {
         let Network {
             transport,
             bootstrap,
-        } = n;
+        } = match this {
+            None => return None,
+            Some(n) => (*n).clone(),
+        };
+
         let mut kit = KitsuneP2pConfig::default();
         kit.bootstrap_service = bootstrap;
 
@@ -247,8 +252,17 @@ impl From<Network> for KitsuneP2pConfig {
                 signal_url,
                 webrtc_config,
             } => {
-                let webrtc_config = webrtc_config
-                    .map(|c| serde_json::from_str(&c).expect("Failed to parse webrtc_config json"));
+                let webrtc_config = match webrtc_config {
+                    Some(path) => {
+                        let content = tokio::fs::read_to_string(path)
+                            .await
+                            .expect("failed to read webrtc_config file");
+                        let parsed = serde_json::from_str(&content)
+                            .expect("failed to parse webrtc_config file content");
+                        Some(parsed)
+                    }
+                    None => None,
+                };
                 let transport = TransportConfig::WebRTC {
                     signal_url,
                     webrtc_config,
@@ -256,7 +270,7 @@ impl From<Network> for KitsuneP2pConfig {
                 kit.transport_pool = vec![transport];
             }
         }
-        kit
+        Some(kit)
     }
 }
 
