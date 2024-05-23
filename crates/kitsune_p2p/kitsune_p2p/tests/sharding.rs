@@ -518,7 +518,8 @@ async fn gossip_to_basis_from_inside() {
     // location. Due to the logic above, the receiver should have the sender's location in its arc.
     assert_eq!(agents[sender_idx].2.get_loc(), basis.get_loc());
 
-    let test_op = TestHostOp::new(space.clone());
+    let test_op = TestHostOp::new(space.clone()).with_forced_location(basis.get_loc());
+    assert_eq!(test_op.location(), basis.get_loc());
 
     agents[sender_idx]
         .0

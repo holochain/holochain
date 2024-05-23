@@ -268,11 +268,20 @@ impl TestLegacyHost {
                                         for interval in intervals {
                                             match interval {
                                                 DhtArcRange::Bounded(lower, upper) => {
-                                                    if lower < op.location()
-                                                        && op.location() < upper
-                                                    {
-                                                        in_any = true;
-                                                        break;
+                                                    if lower <= upper {
+                                                        if lower < op.location()
+                                                            && op.location() < upper
+                                                        {
+                                                            in_any = true;
+                                                            break;
+                                                        }
+                                                    } else {
+                                                        if lower < op.location()
+                                                            || op.location() < upper
+                                                        {
+                                                            in_any = true;
+                                                            break;
+                                                        }
                                                     }
                                                 }
                                                 _ => unreachable!(
