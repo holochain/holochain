@@ -67,7 +67,27 @@ TEST_BIN = \
 	hc_sandbox
 
 # mark everything as phony because it doesn't represent a file-system output
-.PHONY: all test-all $(TEST_HOLOCHAIN) $(TEST_DEPS) $(TEST_MISC) $(TEST_BIN) test-holochain test-deps test-misc test-bin install-bin hdk_derive
+.PHONY: all test-all $(TEST_HOLOCHAIN) $(TEST_DEPS) $(TEST_MISC) $(TEST_BIN) test-holochain test-deps test-misc test-bin install-bin hdk_derive test-workspace
+
+test-workspace:
+	cargo install cargo-nextest
+	RUSTFLAGS="-Dwarnings" \
+		cargo build -j4 \
+		--workspace \
+		--exclude holochain_cli_sandbox \
+		--exclude hdk_derive \
+		--locked \
+		--all-features --all-targets \
+		--profile fast-test
+	RUSTFLAGS="-Dwarnings" RUST_BACKTRACE=1 \
+		cargo nextest run \
+		--workspace \
+		--exclude holochain_cli_sandbox \
+		--exclude hdk_derive \
+		--locked \
+		--build-jobs 4 \
+		--cargo-profile fast-test \
+		--all-features
 
 # default to running everything (first rule)
 default: test-all

@@ -19,7 +19,7 @@ jobs:
           #'test-deps',
           #'test-misc',
           #'test-bin'
-          'test-all'
+          'test-workspace'
         ]
         os: [
           ubuntu-latest,
