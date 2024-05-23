@@ -7,6 +7,10 @@ on:
   pull_request:
     branches:
       - develop
+env:
+  INCREMENTAL: 0
+  RUSTFLAGS: '-Dwarnings'
+  RUST_BACKTRACE: 1
 jobs:
   unit-test-job-id:
     name: test
@@ -37,6 +41,9 @@ jobs:
 
       - name: rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: 'true'
+          cache-all-crates: 'true'
 
       - name: cargo prune
         run: |
