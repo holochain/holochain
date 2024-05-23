@@ -268,4 +268,36 @@ mod tests {
             DhtArcSet::Full,
         );
     }
+
+    #[test]
+    fn single_overlap() {
+        let first = DhtArcSet::from(vec![(0, 100)]);
+        let second = DhtArcSet::from(vec![(50, 150)]);
+
+        assert!(first.overlap(&second));
+    }
+
+    #[test]
+    fn single_no_overlap() {
+        let first = DhtArcSet::from(vec![(0, 100)]);
+        let second = DhtArcSet::from(vec![(101, 150)]);
+
+        assert!(!first.overlap(&second));
+    }
+
+    #[test]
+    fn overlap_multi() {
+        let first = DhtArcSet::from(vec![(0, 100), (200, 300)]);
+        let second = DhtArcSet::from(vec![(250, 350)]);
+
+        assert!(first.overlap(&second));
+    }
+
+    #[test]
+    fn overlap_multi_out_of_order() {
+        let first = DhtArcSet::from(vec![(200, 300), (0, 100)]);
+        let second = DhtArcSet::from(vec![(500, 550), (250, 350)]);
+
+        assert!(first.overlap(&second));
+    }
 }
