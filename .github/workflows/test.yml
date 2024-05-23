@@ -14,13 +14,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-name: [
-          #'test-holochain',
-          #'test-deps',
-          #'test-misc',
-          #'test-bin'
-          'test-workspace'
-        ]
         os: [
           ubuntu-latest,
           macos-latest,
@@ -60,17 +53,29 @@ jobs:
           token: ${{ github.token }}
           github-binarycache: true
 
+      - name: build windows
+        if: matrix.os == 'windows-latest'
+        run: |-
+          $env:OPENSSL_NO_VENDOR="1"
+          $env:OPENSSL_DIR="$(pwd)\vcpkg\packages\openssl_x64-windows-release"
+          $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
+          make build-workspace
+
+      - name: build
+        if: matrix.os != 'windows-latest'
+        run: make build-workspace
+
       - name: test windows
         if: matrix.os == 'windows-latest'
         run: |-
           $env:OPENSSL_NO_VENDOR="1"
           $env:OPENSSL_DIR="$(pwd)\vcpkg\packages\openssl_x64-windows-release"
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
-          make ${{ matrix.test-name }}
+          make test-workspace
 
       - name: test
         if: matrix.os != 'windows-latest'
-        run: make ${{ matrix.test-name }}
+        run: make test-workspace
 
   tests-pass:
     if: ${{ always() }}
