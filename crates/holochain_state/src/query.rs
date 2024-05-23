@@ -160,6 +160,9 @@ pub trait Store {
     /// Get an [`SignedActionHashed`] from this store.
     fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>>;
 
+    /// Get a [`Warrant`] from this store.
+    fn get_warrants_for_basis(&self, hash: &AnyLinkableHash) -> StateQueryResult<Vec<Warrant>>;
+
     /// Get an [`Record`] from this store.
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>>;
 
@@ -336,6 +339,36 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         } else {
             Ok(Some(shh??))
         }
+    }
+
+    fn get_warrants_for_basis(&self, hash: &AnyLinkableHash) -> StateQueryResult<Vec<Warrant>> {
+        let warrants = self
+            .txn
+            .prepare_cached(
+                "
+            SELECT
+            Action.blob
+            FROM Action
+            WHERE base_hash = :hash
+            AND type >= 1000
+            ",
+            )?
+            .query_map(
+                named_params! {
+                    ":hash": hash,
+                },
+                |row| {
+                    Ok(
+                        from_blob::<SignedWarrant>(row.get(row.as_ref().column_index("blob")?)?)
+                            .map(|signed_warrant| {
+                                let (warrant, _) = signed_warrant.into_data().into();
+                                warrant
+                            }),
+                    )
+                },
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(warrants.into_iter().collect::<Result<Vec<_>, _>>()?)
     }
 
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
@@ -606,6 +639,15 @@ impl<'stmt> Store for Txns<'stmt, '_> {
         Ok(None)
     }
 
+    fn get_warrants_for_basis(&self, hash: &AnyLinkableHash) -> StateQueryResult<Vec<Warrant>> {
+        let mut warrants = vec![];
+        for txn in &self.txns {
+            let r = txn.get_warrants_for_basis(hash)?;
+            warrants.extend(r.into_iter());
+        }
+        Ok(warrants)
+    }
+
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
         for txn in &self.txns {
             let r = txn.get_record(hash)?;
@@ -702,6 +744,11 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
         } else {
             Ok(r)
         }
+    }
+
+    fn get_warrants_for_basis(&self, hash: &AnyLinkableHash) -> StateQueryResult<Vec<Warrant>> {
+        // The scratch will never
+        self.txns.get_warrants_for_basis(hash)
     }
 
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {

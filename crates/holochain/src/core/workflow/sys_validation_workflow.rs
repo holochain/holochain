@@ -76,7 +76,6 @@
 //!
 
 use crate::conductor::Conductor;
-use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::sys_validate::*;
@@ -222,7 +221,7 @@ async fn sys_validation_workflow_inner(
     config: Arc<ConductorConfig>,
     keystore: MetaLairClient,
     representative_agent: AgentPubKey,
-    dna_hash: DnaHash,
+    _dna_hash: DnaHash,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
@@ -336,7 +335,7 @@ async fn sys_validation_workflow_inner(
     }
 
     workspace
-        .dht_db
+        .authored_db
         .write_async(move |txn| {
             for warrant_op in warrants {
                 insert_op(txn, &warrant_op)?;
@@ -1130,7 +1129,8 @@ fn update_check(entry_update: &Update, original_action: &Action) -> SysValidatio
 
 pub struct SysValidationWorkspace {
     scratch: Option<SyncScratch>,
-    authored_db: DbRead<DbKindAuthored>,
+    // Authored DB is writeable because warrants may be written.
+    authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
     dht_query_cache: Option<DhtDbQueryCache>,
     cache: DbWrite<DbKindCache>,
@@ -1140,7 +1140,7 @@ pub struct SysValidationWorkspace {
 
 impl SysValidationWorkspace {
     pub fn new(
-        authored_db: DbRead<DbKindAuthored>,
+        authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
         dht_query_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
@@ -1261,7 +1261,7 @@ impl SysValidationWorkspace {
             .with_cache(self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade
-                .with_authored(self.authored_db.clone())
+                .with_authored(self.authored_db.clone().into())
                 .with_scratch(scratch.clone()),
             None => cascade,
         }
@@ -1343,8 +1343,11 @@ pub async fn make_warrant_op_inner(
     validation_type: ValidationType,
 ) -> WorkflowResult<DhtOpHashed> {
     let action = op.action();
+    let action_author = action.author().clone();
+    tracing::warn!("Authoring warrant for invalid op authored by {action_author}");
+
     let warrant = Warrant::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
-        action_author: action.author().clone(),
+        action_author,
         action: (action.to_hash().clone(), op.signature().clone()),
         validation_type,
     });

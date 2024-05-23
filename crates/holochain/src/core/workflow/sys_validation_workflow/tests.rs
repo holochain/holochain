@@ -40,16 +40,21 @@ async fn sys_validation_workflow_test() {
     run_test(alice_cell_id, bob_cell_id, conductors, dna_file).await;
 }
 
+/// Three agent test.
+/// Alice is bypassing validation.
+/// Bob and Carol are running a DNA with validation that will reject any new action authored.
+/// Alice and Bob join the network, and Alice commits an invalid action.
+/// Bob blocks Alice and authors a Warrant.
+/// Carol joins the network, and receives Bob's warrant via gossip.
 #[tokio::test(flavor = "multi_thread")]
 async fn sys_validation_produces_warrants() {
     holochain_trace::test_run();
 
-    let string_entry_def = EntryDef::default_from_id("string");
-
     #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
     struct AppString(String);
 
-    let zome_sans_validation = SweetInlineZomes::new(vec![string_entry_def], 0).function(
+    let string_entry_def = EntryDef::default_from_id("string");
+    let zome_common = SweetInlineZomes::new(vec![string_entry_def], 0).function(
         "create_string",
         move |api, s: AppString| {
             let entry = Entry::app(s.try_into().unwrap()).unwrap();
@@ -62,24 +67,52 @@ async fn sys_validation_produces_warrants() {
             Ok(hash)
         },
     );
-    let zome_avec_validation =
-        zome_sans_validation
+
+    let zome_sans_validation =
+        zome_common
             .clone()
             .integrity_function("validate", move |_api, op: Op| {
-                dbg!(op.action_type(), op.action_seq());
+                println!(
+                    "sans-{}  {}    {} {}",
+                    0,
+                    op.action_seq(),
+                    op.author(),
+                    op.action_type()
+                );
+                Ok(ValidateCallbackResult::Valid)
+            });
+
+    let zome_avec_validation = |i| {
+        zome_common
+            .clone()
+            .integrity_function("validate", move |_api, op: Op| {
+                println!(
+                    "AVEC-{}    {}  {} {}",
+                    i,
+                    op.action_seq(),
+                    op.author(),
+                    op.action_type()
+                );
                 if op.action_seq() > 3 {
                     Ok(ValidateCallbackResult::Invalid("nope".to_string()))
                 } else {
                     Ok(ValidateCallbackResult::Valid)
                 }
-            });
+            })
+    };
 
     let network_seed = "seed".to_string();
 
     let (dna_sans, _, _) =
         SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_sans_validation).await;
-    let (dna_avec, _, _) =
-        SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_avec_validation).await;
+    let (dna_avec_1, _, _) =
+        SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_avec_validation(1)).await;
+    let (dna_avec_2, _, _) =
+        SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_avec_validation(2)).await;
+
+    let dna_hash = dna_sans.dna_hash();
+    assert_eq!(dna_sans.dna_hash(), dna_avec_1.dna_hash());
+    assert_eq!(dna_avec_1.dna_hash(), dna_avec_2.dna_hash());
 
     let mut conductors = SweetConductorBatch::from_standard_config(3).await;
     let (alice,) = conductors[0]
@@ -88,19 +121,26 @@ async fn sys_validation_produces_warrants() {
         .unwrap()
         .into_tuple();
     let (bob,) = conductors[1]
-        .setup_app(&"test_app", [&dna_avec])
+        .setup_app(&"test_app", [&dna_avec_1])
         .await
         .unwrap()
         .into_tuple();
     let (carol,) = conductors[2]
-        .setup_app(&"test_app", [&dna_avec])
+        .setup_app(&"test_app", [&dna_avec_2])
         .await
         .unwrap()
         .into_tuple();
 
+    println!("AGENTS");
+    println!("0 alice {}", alice.agent_pubkey());
+    println!("1 bob   {}", bob.agent_pubkey());
+    println!("2 carol {}", carol.agent_pubkey());
+
     conductors.exchange_peer_info().await;
 
     await_consistency(10, [&alice, &bob, &carol]).await.unwrap();
+
+    conductors[2].shutdown().await;
 
     let _: ActionHash = conductors[0]
         .call(
@@ -110,8 +150,74 @@ async fn sys_validation_produces_warrants() {
         )
         .await;
 
+    await_consistency(10, [&alice, &bob]).await.unwrap();
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    conductors[0].shutdown().await;
+
+    // Ensure that bob authored a warrant
+    let alice_pubkey = alice.agent_pubkey().clone();
+    conductors[1].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
+        let seqs: Vec<Option<u32>> = txn
+            .prepare_cached("SELECT seq FROM Action")
+            .unwrap()
+            .query_map([], |row| {
+                let seq: Option<u32> = row.get(0).unwrap();
+                dbg!(&seq);
+                Ok(seq)
+            })
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        dbg!(seqs);
+
+        let store = Txn::from(&txn);
+
+        let warrants = store.get_warrants_for_basis(&alice_pubkey.into()).unwrap();
+        assert_eq!(warrants.len(), 1);
+    });
+
+    // TODO: ensure that bob blocked alice
+
+    conductors[2].startup().await;
     await_consistency(10, [&bob, &carol]).await.unwrap();
-    todo!("check that the warrant is held by carol");
+
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
+    // // Ensure that carol authored a warrant
+    // let alice_pubkey = alice.agent_pubkey().clone();
+    // conductors[2].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
+    //     let seqs: Vec<Option<u32>> = txn
+    //         .prepare_cached("SELECT seq FROM Action")
+    //         .unwrap()
+    //         .query_map([], |row| {
+    //             let seq: Option<u32> = row.get(0).unwrap();
+    //             dbg!(&seq);
+    //             Ok(seq)
+    //         })
+    //         .unwrap()
+    //         .collect::<Result<Vec<_>, _>>()
+    //         .unwrap();
+    //     dbg!(seqs);
+
+    //     let store = Txn::from(&txn);
+
+    //     let warrants = store.get_warrants_for_basis(&alice_pubkey.into()).unwrap();
+    //     assert_eq!(warrants.len(), 1);
+    // });
+
+
+    // Ensure that carol gets gossiped the warrant for alice from bob
+    let alice_pubkey = alice.agent_pubkey().clone();
+    conductors[2]
+        .spaces
+        .dht_db(dna_hash)
+        .unwrap()
+        .test_read(move |txn| {
+            let store = Txn::from(&txn);
+            let warrants = store.get_warrants_for_basis(&alice_pubkey.into()).unwrap();
+            assert_eq!(warrants.len(), 1);
+        });
 }
 
 async fn run_test(
@@ -386,7 +492,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
         "
         SELECT DhtOp.type, Action.hash, Action.blob, Action.author
         FROM DhtOp
-        LEFT JOIN Action ON DhtOp.action_hash = Action.hash
+        JOIN Action ON DhtOp.action_hash = Action.hash
         WHERE
         when_integrated IS NULL
     ",

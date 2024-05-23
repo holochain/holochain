@@ -301,18 +301,26 @@ async fn app_validation_workflow_inner(
                 let awaiting_ops = awaiting_ops.clone();
                 let rejected_ops = rejected_ops.clone();
 
-                let warrant_op = match &outcome {
-                    Outcome::Accepted => None,
-                    Outcome::AwaitingDeps(_) => None,
-                    Outcome::Rejected(_) => Some(
-                        crate::core::workflow::sys_validation_workflow::make_warrant_op(
-                            &conductor,
-                            &dna_hash,
-                            &chain_op,
-                            ValidationType::App,
-                        )
-                        .await?,
-                    ),
+                match &outcome {
+                    Outcome::Rejected(_) => {
+                        let warrant_op =
+                            crate::core::workflow::sys_validation_workflow::make_warrant_op(
+                                &conductor,
+                                &dna_hash,
+                                &chain_op,
+                                ValidationType::App,
+                            )
+                            .await?;
+                        
+                        workspace
+                            .authored_db
+                            .write_async(move |txn| {
+                                warn!("Inserting warrant op");
+                                insert_op(txn, &warrant_op)
+                            })
+                            .await?;
+                    }
+                    _ => (),
                 };
 
                 let write_result = workspace
@@ -345,7 +353,6 @@ async fn app_validation_workflow_inner(
                             )
                         }
                         Outcome::Rejected(_) => {
-                            insert_op(txn, &warrant_op.unwrap())?;
                             rejected_ops.fetch_add(1, Ordering::SeqCst);
 
                             tracing::info!("Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}");
@@ -894,7 +901,8 @@ impl Default for OutcomeSummary {
 }
 
 pub struct AppValidationWorkspace {
-    authored_db: DbRead<DbKindAuthored>,
+    // Writeable because of warrants
+    authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
     dht_db_cache: DhtDbQueryCache,
     cache: DbWrite<DbKindCache>,
@@ -904,7 +912,8 @@ pub struct AppValidationWorkspace {
 
 impl AppValidationWorkspace {
     pub fn new(
-        authored_db: DbRead<DbKindAuthored>,
+        // Writeable because of warrants
+        authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
         dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
@@ -923,7 +932,7 @@ impl AppValidationWorkspace {
 
     pub async fn validation_workspace(&self) -> AppValidationResult<HostFnWorkspaceRead> {
         Ok(HostFnWorkspace::new(
-            self.authored_db.clone(),
+            self.authored_db.clone().into(),
             self.dht_db.clone().into(),
             self.dht_db_cache.clone(),
             self.cache.clone(),
@@ -936,7 +945,7 @@ impl AppValidationWorkspace {
 
     pub fn full_cascade<Network: HolochainP2pDnaT>(&self, network: Network) -> CascadeImpl {
         CascadeImpl::empty()
-            .with_authored(self.authored_db.clone())
+            .with_authored(self.authored_db.clone().into())
             .with_dht(self.dht_db.clone().into())
             .with_network(Arc::new(network), self.cache.clone())
     }

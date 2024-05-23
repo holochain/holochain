@@ -566,7 +566,7 @@ impl Spaces {
             SELECT DhtOp.hash, DhtOp.type AS dht_type,
             Action.blob AS action_blob, Entry.blob AS entry_blob
             FROM DHtOp
-            LEFT JOIN Action ON DhtOp.action_hash = Action.hash
+            JOIN Action ON DhtOp.action_hash = Action.hash
             LEFT JOIN Entry ON Action.entry_hash = Entry.hash
             WHERE
             DhtOp.hash = ?
