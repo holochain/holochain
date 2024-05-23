@@ -246,21 +246,26 @@ impl From<Vec<(u32, u32)>> for DhtArcSet {
     }
 }
 
-#[test]
-fn fullness() {
-    assert_eq!(DhtArcSet::from(vec![(0, u32::MAX),]), DhtArcSet::Full,);
-    assert_eq!(DhtArcSet::from(vec![(0, u32::MAX - 1),]), DhtArcSet::Full,);
-    assert_ne!(DhtArcSet::from(vec![(0, u32::MAX - 2),]), DhtArcSet::Full,);
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    assert_eq!(DhtArcSet::from(vec![(11, 10),]), DhtArcSet::Full,);
+    #[test]
+    fn fullness() {
+        assert_eq!(DhtArcSet::from(vec![(0, u32::MAX),]), DhtArcSet::Full,);
+        assert_eq!(DhtArcSet::from(vec![(0, u32::MAX - 1),]), DhtArcSet::Full,);
+        assert_ne!(DhtArcSet::from(vec![(0, u32::MAX - 2),]), DhtArcSet::Full,);
 
-    assert_eq!(
-        DhtArcSet::from(vec![(u32::MAX - 1, u32::MAX - 2),]),
-        DhtArcSet::Full,
-    );
+        assert_eq!(DhtArcSet::from(vec![(11, 10),]), DhtArcSet::Full,);
 
-    assert_eq!(
-        DhtArcSet::from(vec![(u32::MAX, u32::MAX - 1),]),
-        DhtArcSet::Full,
-    );
+        assert_eq!(
+            DhtArcSet::from(vec![(u32::MAX - 1, u32::MAX - 2),]),
+            DhtArcSet::Full,
+        );
+
+        assert_eq!(
+            DhtArcSet::from(vec![(u32::MAX, u32::MAX - 1),]),
+            DhtArcSet::Full,
+        );
+    }
 }

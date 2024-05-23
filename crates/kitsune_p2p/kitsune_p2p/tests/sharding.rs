@@ -479,14 +479,14 @@ async fn gossip_to_basis_from_inside() {
         let len =
             DhtLocation::new(base_len * (i + 1)) - agent.get_loc() + DhtLocation::new(base_len);
 
-        // let arc = Arq::from_start_and_half_len_approximate(
-        //     dim,
-        //     &ArqStrat::standard(LocalStorageConfig::default(), 2.0),
-        //     agent.get_loc(),
-        //     len.as_() / 2 + 1,
-        // );
-        let strat = harness.config().tuning_params.to_arq_strat();
-        let arc = Arq::new_full_max(dim, &strat, agent.get_loc());
+        let arc = Arq::from_start_and_half_len_approximate(
+            dim,
+            &ArqStrat::standard(LocalStorageConfig::default(), 2.0),
+            agent.get_loc(),
+            len.as_() / 2 + 1,
+        );
+        // let strat = harness.config().tuning_params.to_arq_strat();
+        // let arc = Arq::new_full_max(dim, &strat, agent.get_loc());
 
         sender
             .join(space.clone(), agent.clone(), None, Some(arc))

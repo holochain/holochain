@@ -719,6 +719,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                             space,
                             since_ms,
                             until_ms,
+                            // TODO leaving quantized space here?
                             arq_set.to_dht_arc_set_std().into(),
                         )
                         .await?

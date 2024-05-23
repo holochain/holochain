@@ -581,7 +581,7 @@ pub fn power_and_count_from_length(dim: impl SpaceDim, len: u64, max_chunks: u32
     let dim = dim.get();
     assert!(len <= U32_LEN);
     let mut power = 0;
-    let mut count = (len / dim.quantum as u64) as f64;
+    let mut count = (len as f64 / dim.quantum as f64).ceil();
     let max = max_chunks as f64;
 
     while count.round() > max {
