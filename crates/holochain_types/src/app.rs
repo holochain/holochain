@@ -996,6 +996,8 @@ pub enum DisabledAppReason {
     NeverStarted,
     /// The disabling was done manually by the user (via admin interface)
     User,
+    /// Disabling app in order to delete its agent key and render all chains read-only.
+    DeleteAgentKey,
     /// The disabling was due to an UNRECOVERABLE error
     Error(String),
 }

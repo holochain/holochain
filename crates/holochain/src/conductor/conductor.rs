@@ -1463,12 +1463,14 @@ mod app_impls {
             };
 
             let (agent_key, derivation_details): (AgentPubKey, Option<DerivationDetailsInput>) =
-                if let Some(agent_key) = agent_key {
-                    if dpki.is_some() {
-                        // TODO: allow adding additional apps to an existing DPKI KeyRegistration.
-                        tracing::warn!("Using app with a pre-existing agent key: DPKI will not be used to manage keys for this app.");
-                    }
-                    (agent_key, None)
+            // pre-installed dpki for this app
+            if let Some(agent_key) = agent_key {
+                if dpki.is_some() {
+                    // TODO: allow adding additional apps to an existing DPKI KeyRegistration.
+                    tracing::warn!("Using app with a pre-existing agent key: DPKI will not be used to manage keys for this app.");
+                }
+                (agent_key, None)
+                // no pre-installed dpki for this app
                 } else if let Some((dpki, state)) = &mut dpki {
                     let derivation_details = state.next_derivation_details(None).await?;
 
@@ -1870,6 +1872,17 @@ mod cell_impls {
         pub fn running_cell_ids(&self) -> HashSet<CellId> {
             self.running_cells
                 .share_ref(|cells| cells.keys().cloned().collect())
+        }
+
+        /// Delete an agent's key pair of a cell. This leads to the cell's source
+        /// chain being closed.
+        pub async fn delete_agent_key_for_app(
+            self: Arc<Self>,
+            app_id: &InstalledAppId,
+        ) -> ConductorResult<()> {
+            self.disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)
+                .await?;
+            Ok(())
         }
     }
 }

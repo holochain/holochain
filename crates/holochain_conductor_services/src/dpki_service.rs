@@ -22,7 +22,7 @@ pub struct DpkiService {
     /// Mirrored from the State.
     /// Note, this is a little weird for DPKI implementations which are not backed by a Holochain DNA.
     /// In that case, the impl still needs an AgentPubKey to sign new key registrations with, and it still
-    /// needs a unique identifier to advertise network compatibility, which is coved by the DnaHash.
+    /// needs a unique identifier to advertise network compatibility, which is covered by the DnaHash.
     /// So such an implementation should just use 32 unique bytes and create a DnaHash from that, to be
     /// used in this CellId.
     pub cell_id: CellId,
@@ -33,7 +33,7 @@ pub struct DpkiService {
     state: tokio::sync::Mutex<Box<dyn DpkiState>>,
 }
 
-// /// Interface for the DPKI service
+/// Interface for the DPKI service
 impl DpkiService {
     pub fn new(
         cell_id: CellId,

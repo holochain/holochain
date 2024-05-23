@@ -23,6 +23,7 @@ use holochain_zome_types::op::Op;
 use maplit::hashset;
 use matches::assert_matches;
 
+mod agent_key_deletion;
 mod test_dpki;
 
 #[tokio::test(flavor = "multi_thread")]
