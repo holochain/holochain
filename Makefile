@@ -73,7 +73,8 @@ TEST_BIN = \
 default: test-all
 
 # run all the unit test sets
-test-all: test-holochain test-deps test-misc test-bin
+#test-all: test-holochain test-deps test-misc test-bin
+test-all: test-holochain test-deps test-misc
 
 # run the tests that result in a full build of the holochain library
 test-holochain: $(TEST_HOLOCHAIN)

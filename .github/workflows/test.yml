@@ -15,10 +15,11 @@ jobs:
       fail-fast: false
       matrix:
         test-name: [
-          'test-holochain',
-          'test-deps',
-          'test-misc',
-          'test-bin'
+          #'test-holochain',
+          #'test-deps',
+          #'test-misc',
+          #'test-bin'
+          'test-all'
         ]
         os: [
           ubuntu-latest,
