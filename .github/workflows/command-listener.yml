@@ -55,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           
-          HOLONIX_VERSION=$(echo $ACTION | cut -b 14- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          HOLONIX_VERSION=$(echo $ACTION | cut -b 16- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
           gh pr comment $PR_NUMBER --repo holochain/holochain --body "Got it, will try to update inputs for Holonix version \`$HOLONIX_VERSION\` - [Workflow](https://github.com/holochain/holochain/actions/runs/$RUN_ID)"
           
           echo "holonix_version=${HOLONIX_VERSION}" >> "$GITHUB_OUTPUT"

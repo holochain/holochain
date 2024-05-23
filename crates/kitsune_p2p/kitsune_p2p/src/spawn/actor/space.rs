@@ -1605,14 +1605,16 @@ impl Space {
         // TODO: We are simply setting the initial arc to full.
         // In the future we may want to do something more intelligent.
         //
-        // In the case an initial_arc is passend into the join request,
+        // In the case an initial_arc is passed into the join request,
         // handle_join will initialize this agent_arcs map to that value.
-        let strat = self.config.tuning_params.to_arq_strat();
         self.agent_arqs.get(agent).cloned().unwrap_or_else(|| {
             let dim = SpaceDimension::standard();
             match self.config.tuning_params.arc_clamping() {
                 Some(ArqClamping::Empty) => Arq::new_empty(dim, agent.get_loc()),
-                Some(ArqClamping::Full) | None => Arq::new_full_max(dim, &strat, agent.get_loc()),
+                Some(ArqClamping::Full) | None => {
+                    let strat = self.config.tuning_params.to_arq_strat();
+                    Arq::new_full_max(dim, &strat, agent.get_loc())
+                }
             }
         })
     }
