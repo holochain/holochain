@@ -376,8 +376,9 @@ async fn no_gossip_to_basis_from_outside() {
 
     // If the location was copied correctly then the basis location should be the same as the sender
     // location. Due to the logic above, the receiver should have the sender's location in its arc.
-    let basis = basis_from_agent(&agents[sender_idx].3);
-    assert_eq!(agents[sender_idx].3.get_loc(), basis.get_loc());
+    let target_idx = 3;
+    let basis = basis_from_agent(&agents[target_idx].3);
+    assert_eq!(agents[target_idx].3.get_loc(), basis.get_loc());
 
     let test_op = TestHostOp::new(space.clone()).with_forced_location(basis.get_loc());
     assert_eq!(test_op.location(), basis.get_loc());
