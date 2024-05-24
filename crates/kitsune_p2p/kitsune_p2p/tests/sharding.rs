@@ -1,9 +1,8 @@
-use std::collections::HashSet;
-use std::net::SocketAddr;
 use crate::common::{
     start_bootstrap, start_signal_srv, wait_for_connected, KitsuneTestHarness, TestHostOp,
 };
 use fixt::fixt;
+use ghost_actor::GhostSender;
 use kitsune_p2p::actor::{BroadcastData, KitsuneP2p, KitsuneP2pSender};
 use kitsune_p2p::dht::arq::LocalStorageConfig;
 use kitsune_p2p::dht::prelude::SpaceDimension;
@@ -15,8 +14,9 @@ use kitsune_p2p_types::config::tuning_params_struct;
 use kitsune_p2p_types::dht::{Arq, ArqStrat};
 use kitsune_p2p_types::{KAgent, KitsuneTimeout};
 use num_traits::AsPrimitive;
+use std::collections::HashSet;
+use std::net::SocketAddr;
 use std::sync::Arc;
-use ghost_actor::GhostSender;
 
 mod common;
 
@@ -54,24 +54,23 @@ async fn publish_to_basis_from_inside() {
         bootstrap_addr,
         space.clone(),
         tuner,
-        Box::new(
-            move |agents| {
-                let basis = basis_from_agent(&agents[sender_idx].3);
+        Box::new(move |agents| {
+            let basis = basis_from_agent(&agents[sender_idx].3);
 
-                for i in 0..5 {
-                    let should_this_agent_hold_the_op =
-                        agents[i].2.to_dht_arc_std().contains(&basis.get_loc());
+            for i in 0..5 {
+                let should_this_agent_hold_the_op =
+                    agents[i].2.to_dht_arc_std().contains(&basis.get_loc());
 
-                    // Another agent ended up with the op location in their arc, don't want this!
-                    if should_this_agent_hold_the_op && (i != sender_idx && i != should_recv_idx) {
-                        return false;
-                    }
+                // Another agent ended up with the op location in their arc, don't want this!
+                if should_this_agent_hold_the_op && (i != sender_idx && i != should_recv_idx) {
+                    return false;
                 }
-
-                true
             }
-        )
-    ).await;
+
+            true
+        }),
+    )
+    .await;
 
     // If the location was copied correctly then the basis location should be the same as the sender
     // location. Due to the logic above, the receiver should have the sender's location in its arc.
@@ -152,24 +151,25 @@ async fn publish_to_basis_from_outside() {
         bootstrap_addr,
         space.clone(),
         tuner,
-        Box::new(
-            move |agents| {
-                let basis = basis_from_agent(&agents[should_recv_idx_1].3);
+        Box::new(move |agents| {
+            let basis = basis_from_agent(&agents[should_recv_idx_1].3);
 
-                for i in 0..5 {
-                    let should_this_agent_hold_the_op =
-                        agents[i].2.to_dht_arc_std().contains(&basis.get_loc());
+            for i in 0..5 {
+                let should_this_agent_hold_the_op =
+                    agents[i].2.to_dht_arc_std().contains(&basis.get_loc());
 
-                    // Another agent ended up with the op location in their arc, don't want this!
-                    if should_this_agent_hold_the_op && (i != sender_idx && i != should_recv_idx_1 && i != should_recv_idx_2) {
-                        return false;
-                    }
+                // Another agent ended up with the op location in their arc, don't want this!
+                if should_this_agent_hold_the_op
+                    && (i != sender_idx && i != should_recv_idx_1 && i != should_recv_idx_2)
+                {
+                    return false;
                 }
-
-                true
             }
-        )
-    ).await;
+
+            true
+        }),
+    )
+    .await;
 
     // If the location was copied correctly then the basis location should be the same as the sender
     // location. Due to the logic above, the receiver should have the sender's location in its arc.
@@ -231,7 +231,11 @@ async fn publish_to_basis_from_outside() {
 
     assert_eq!(1, agents[should_recv_idx_2].0.op_store().read().len());
 
-    check_op_receivers(&agents, basis, &[sender_idx, should_recv_idx_1, should_recv_idx_2]);
+    check_op_receivers(
+        &agents,
+        basis,
+        &[sender_idx, should_recv_idx_1, should_recv_idx_2],
+    );
 }
 
 /// Test scenario steps:
@@ -274,24 +278,23 @@ async fn gossip_to_basis_from_inside() {
         bootstrap_addr,
         space.clone(),
         tuner,
-        Box::new(
-            move |agents| {
-                let basis = basis_from_agent(&agents[sender_idx].3);
+        Box::new(move |agents| {
+            let basis = basis_from_agent(&agents[sender_idx].3);
 
-                for i in 0..5 {
-                    let should_this_agent_hold_the_op =
-                        agents[i].2.to_dht_arc_std().contains(&basis.get_loc());
+            for i in 0..5 {
+                let should_this_agent_hold_the_op =
+                    agents[i].2.to_dht_arc_std().contains(&basis.get_loc());
 
-                    // Another agent ended up with the op location in their arc, don't want this!
-                    if should_this_agent_hold_the_op && (i != sender_idx && i != should_recv_idx) {
-                        return false;
-                    }
+                // Another agent ended up with the op location in their arc, don't want this!
+                if should_this_agent_hold_the_op && (i != sender_idx && i != should_recv_idx) {
+                    return false;
                 }
-
-                true
             }
-        )
-    ).await;
+
+            true
+        }),
+    )
+    .await;
 
     // If the location was copied correctly then the basis location should be the same as the sender
     // location. Due to the logic above, the receiver should have the sender's location in its arc.
@@ -364,13 +367,12 @@ async fn no_gossip_to_basis_from_outside() {
         bootstrap_addr,
         space.clone(),
         tuner,
-        Box::new(
-            |_agents| {
-                // Any agent setup will do
-                true
-            }
-        )
-    ).await;
+        Box::new(|_agents| {
+            // Any agent setup will do
+            true
+        }),
+    )
+    .await;
 
     // If the location was copied correctly then the basis location should be the same as the sender
     // location. Due to the logic above, the receiver should have the sender's location in its arc.
@@ -410,8 +412,12 @@ async fn setup_overlapping_agents(
     signal_url: SocketAddr,
     bootstrap_addr: SocketAddr,
     space: Arc<KitsuneSpace>,
-    kitsune_tuner: fn(tuning_params_struct::KitsuneP2pTuningParams) -> tuning_params_struct::KitsuneP2pTuningParams,
-    verify_agent_setup: Box<dyn Fn(&Vec<(KitsuneTestHarness, GhostSender<KitsuneP2p>, Arq, KAgent)>) -> bool>,
+    kitsune_tuner: fn(
+        tuning_params_struct::KitsuneP2pTuningParams,
+    ) -> tuning_params_struct::KitsuneP2pTuningParams,
+    verify_agent_setup: Box<
+        dyn Fn(&Vec<(KitsuneTestHarness, GhostSender<KitsuneP2p>, Arq, KAgent)>) -> bool,
+    >,
 ) -> Vec<(KitsuneTestHarness, GhostSender<KitsuneP2p>, Arq, KAgent)> {
     // Arcs are this long by default, with an adjustment to ensure overlap.
     let base_len = u32::MAX / 5;

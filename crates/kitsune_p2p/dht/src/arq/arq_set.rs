@@ -311,18 +311,21 @@ mod tests {
 
         let start_a = 10_000;
         let len_a = 30_000;
-        let arq_a = Arq::from_start_and_half_len_approximate(dim, &strat, start_a.into(), len_a / 2);
+        let arq_a =
+            Arq::from_start_and_half_len_approximate(dim, &strat, start_a.into(), len_a / 2);
 
         let start_b = 10_000_000;
         let len_b = 20_000;
-        let arq_b = Arq::from_start_and_half_len_approximate(dim, &strat, start_b.into(), len_b / 2);
+        let arq_b =
+            Arq::from_start_and_half_len_approximate(dim, &strat, start_b.into(), len_b / 2);
 
         let arq_set = ArqSet::new(vec![arq_a.to_bounds_std(), arq_b.to_bounds_std()]);
         let arc_set = arq_set.to_dht_arc_set_std();
 
         // Before first interval
         {
-            let agent_arc_before_a = Arq::from_start_and_half_len_approximate(dim, &strat, 100.into(), 100);
+            let agent_arc_before_a =
+                Arq::from_start_and_half_len_approximate(dim, &strat, 100.into(), 100);
             let interval = DhtArcRange::from(agent_arc_before_a.to_dht_arc_std());
 
             assert!(!arc_set.overlap(&interval.into()));
@@ -330,7 +333,12 @@ mod tests {
 
         // Overlaps with start of first interval
         {
-            let agent_arc_overlap_start_a = Arq::from_start_and_half_len_approximate(dim, &strat, (start_a - 1_000).into(), 1_500);
+            let agent_arc_overlap_start_a = Arq::from_start_and_half_len_approximate(
+                dim,
+                &strat,
+                (start_a - 1_000).into(),
+                1_500,
+            );
             let interval = DhtArcRange::from(agent_arc_overlap_start_a.to_dht_arc_std());
 
             assert!(arc_set.overlap(&interval.into()));
@@ -338,7 +346,12 @@ mod tests {
 
         // Inside first interval
         {
-            let agent_arc_inside_a = Arq::from_start_and_half_len_approximate(dim, &strat, (start_a + 100).into(), len_a / 10);
+            let agent_arc_inside_a = Arq::from_start_and_half_len_approximate(
+                dim,
+                &strat,
+                (start_a + 100).into(),
+                len_a / 10,
+            );
             let interval = DhtArcRange::from(agent_arc_inside_a.to_dht_arc_std());
 
             assert!(arc_set.overlap(&interval.into()));
@@ -346,7 +359,12 @@ mod tests {
 
         // Overlaps with the end of the first interval
         {
-            let agent_arc_overlap_end_a = Arq::from_start_and_half_len_approximate(dim, &strat, (start_a + len_a - 1_000).into(), 1_500);
+            let agent_arc_overlap_end_a = Arq::from_start_and_half_len_approximate(
+                dim,
+                &strat,
+                (start_a + len_a - 1_000).into(),
+                1_500,
+            );
             let interval = DhtArcRange::from(agent_arc_overlap_end_a.to_dht_arc_range_std());
 
             assert!(arc_set.overlap(&interval.into()));
@@ -354,7 +372,8 @@ mod tests {
 
         // Between the two intervals
         {
-            let agent_arc_between = Arq::from_start_and_half_len_approximate(dim, &strat, 1_000_000.into(), 1_000);
+            let agent_arc_between =
+                Arq::from_start_and_half_len_approximate(dim, &strat, 1_000_000.into(), 1_000);
             let interval = DhtArcRange::from(agent_arc_between.to_dht_arc_std());
 
             assert!(!arc_set.overlap(&interval.into()));
@@ -362,7 +381,12 @@ mod tests {
 
         // Overlap with the start of the second interval
         {
-            let agent_arc_overlap_start_b = Arq::from_start_and_half_len_approximate(dim, &strat, (start_b - 10_000).into(), 15_000);
+            let agent_arc_overlap_start_b = Arq::from_start_and_half_len_approximate(
+                dim,
+                &strat,
+                (start_b - 10_000).into(),
+                15_000,
+            );
             let interval = DhtArcRange::from(agent_arc_overlap_start_b.to_dht_arc_std());
 
             assert!(arc_set.overlap(&interval.into()));
