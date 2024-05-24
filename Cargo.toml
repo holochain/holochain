@@ -18,7 +18,6 @@ members = [
   "crates/holochain_conductor_api",
   "crates/holochain_p2p",
   "crates/holochain_keystore",
-  "crates/holochain_sqlite",
   "crates/holochain_state",
   "crates/holochain_state_types",
   "crates/holochain_sqlite",

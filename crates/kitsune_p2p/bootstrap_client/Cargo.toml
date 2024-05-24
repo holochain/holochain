@@ -25,6 +25,7 @@ url2 = "0.0.6"
 [dev-dependencies]
 arbitrary = { version = "1.0", features = ["derive"] }
 kitsune_p2p_bootstrap_client = { path = ".", features = ["tx2", "test_utils"] }
+kitsune_p2p_types = { version = "^0.4.0-dev.3", path = "../types", features = ["test_utils"] }
 fixt = { version = "^0.4.0-dev.1", path = "../../fixt" }
 tokio = "1"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
