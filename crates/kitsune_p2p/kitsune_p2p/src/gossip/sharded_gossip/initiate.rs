@@ -49,6 +49,7 @@ impl ShardedGossipLocal {
         {
             let id = rand::thread_rng().gen();
 
+            // TODO Why send both the agents and the intervals? The agents contain their arcs
             let gossip = ShardedGossipWire::initiate(
                 intervals,
                 id,
@@ -67,6 +68,7 @@ impl ShardedGossipLocal {
                 inner.initiate_tgt = Some(tgt);
                 Ok(())
             })?;
+            // TODO always a new connection even if we have an open one?
             Some((cert, HowToConnect::Url(url.to_string()), gossip))
         } else {
             None
