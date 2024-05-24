@@ -251,11 +251,11 @@ mod tests {
       bootstrap_service: https://bootstrap-staging.holo.host
       transport_pool:
         - type: webrtc
-          signal_url: wss://signal.holotest.net
+          signal_url: wss://sbd-0.main.infra.holo.host
           webrtc_config: {
             "iceServers": [
-              { "urls": "stun:stun.l.google.com:19302" },
-              { "urls": "stun:stun2.l.google.com:19302" }
+              { "urls": "stun:stun-0.main.infra.holo.host:443" },
+              { "urls": "stun:stun-1.main.infra.holo.host:443" }
             ]
           }
       tuning_params:
@@ -277,11 +277,11 @@ mod tests {
         let mut network_config = KitsuneP2pConfig::default();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
         network_config.transport_pool.push(TransportConfig::WebRTC {
-            signal_url: "wss://signal.holotest.net".into(),
+            signal_url: "wss://sbd-0.main.infra.holo.host".into(),
             webrtc_config: Some(serde_json::json!({
               "iceServers": [
-                { "urls": "stun:stun.l.google.com:19302" },
-                { "urls": "stun:stun2.l.google.com:19302" }
+                { "urls": "stun:stun-0.main.infra.holo.host:443" },
+                { "urls": "stun:stun-1.main.infra.holo.host:443" }
               ]
             })),
         });
