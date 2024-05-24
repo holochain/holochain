@@ -154,22 +154,25 @@ async fn sys_validation_produces_warrants() {
 
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     conductors[0].shutdown().await;
+    conductors[2].startup().await;
+
+    conductors[0].persist_dbs();
+    conductors[1].persist_dbs();
+    conductors[2].persist_dbs();
 
     // Ensure that bob authored a warrant
     let alice_pubkey = alice.agent_pubkey().clone();
     conductors[1].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
-        let seqs: Vec<Option<u32>> = txn
-            .prepare_cached("SELECT seq FROM Action")
-            .unwrap()
-            .query_map([], |row| {
-                let seq: Option<u32> = row.get(0).unwrap();
-                dbg!(&seq);
-                Ok(seq)
-            })
-            .unwrap()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
-        dbg!(seqs);
+        // let seqs: Vec<Option<u32>> = txn
+        //     .prepare_cached("SELECT seq FROM Action")
+        //     .unwrap()
+        //     .query_map([], |row| {
+        //         let seq: Option<u32> = row.get(0).unwrap();
+        //         Ok(seq)
+        //     })
+        //     .unwrap()
+        //     .collect::<Result<Vec<_>, _>>()
+        //     .unwrap();
 
         let store = Txn::from(&txn);
 
@@ -179,7 +182,6 @@ async fn sys_validation_produces_warrants() {
 
     // TODO: ensure that bob blocked alice
 
-    conductors[2].startup().await;
     await_consistency(10, [&bob, &carol]).await.unwrap();
 
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
@@ -205,7 +207,6 @@ async fn sys_validation_produces_warrants() {
     //     let warrants = store.get_warrants_for_basis(&alice_pubkey.into()).unwrap();
     //     assert_eq!(warrants.len(), 1);
     // });
-
 
     // Ensure that carol gets gossiped the warrant for alice from bob
     let alice_pubkey = alice.agent_pubkey().clone();

@@ -19,7 +19,8 @@ use super::MIN_PUBLISH_INTERVAL;
 /// Get all dht ops on an agents chain that need to be published.
 /// - Don't publish private entries.
 /// - Only get ops that haven't been published within the minimum publish interval
-/// - Only get ops that have less then the RECEIPT_BUNDLE_SIZE
+/// - Only get ops that have less than the RECEIPT_BUNDLE_SIZE
+// TODO: should we not filter by author here?
 pub async fn get_ops_to_publish<AuthorDb>(
     agent: AgentPubKey,
     db: &AuthorDb,
@@ -73,6 +74,8 @@ where
                 },
                 |row| {
                     let op = map_sql_dht_op(false, "dht_type", row)?;
+                    // TODO: why do the hashes not match for ops and actions, with warrants?
+                    dbg!(op.get_type());
                     let action_size: usize = row.get("action_size")?;
                     // will be NULL if the op has no associated entry
                     let entry_size: Option<usize> = row.get("entry_size")?;

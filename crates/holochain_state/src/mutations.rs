@@ -181,6 +181,7 @@ pub fn insert_op_lite(
         }
         DhtOpLite::Warrant(op) => {
             let warrant_hash = op.warrant.to_hash();
+            dbg!(&warrant_hash);
             sql_insert!(txn, DhtOp, {
                 "hash": hash,
                 "type": op_lite.get_type(),
@@ -532,6 +533,7 @@ pub fn insert_warrant(
 ) -> StateMutationResult<()> {
     let warrant_type = warrant.0.get_type();
     let hash = warrant.0.to_hash();
+    dbg!(&hash);
 
     sql_insert!(txn, Action, {
         "hash": hash,
@@ -881,7 +883,9 @@ mod tests {
 
     #[test]
     fn can_write_and_read_warrants() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().unwrap().into_path();
+        println!("dir: {:?}", dir);
+
         let cell_id = Arc::new(fixt!(CellId));
 
         let pair = (fixt!(ActionHash), fixt!(Signature));
