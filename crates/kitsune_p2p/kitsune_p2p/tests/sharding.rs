@@ -326,6 +326,86 @@ async fn gossip_to_basis_from_inside() {
     check_op_receivers(&agents, basis, &[sender_idx, should_recv_idx]);
 }
 
+/// Similar to the test above except that we create the op for an agent outside the arc that is belongs in.
+/// By never publishing the op and having no overlap with the arc that the op does belong in, the op should
+/// never be gossipped to anyone.
+///
+/// This is important because, while publish should cross arcs, gossip should not. If we gossip with everyone
+/// on a network then we could go a long time between talking to each node and maintain a lot of connections.
+#[cfg(feature = "tx5")]
+#[tokio::test(flavor = "multi_thread")]
+async fn no_gossip_to_basis_from_outside() {
+    holochain_trace::test_run();
+
+    let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
+    let (signal_url, _signal_srv_handle) = start_signal_srv().await;
+
+    let space = Arc::new(fixt!(KitsuneSpace));
+
+    let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
+        params.gossip_arc_clamping = "none".to_string();
+        params.gossip_dynamic_arcs = false; // Don't update the arcs dynamically, use the initial value
+        params.disable_historical_gossip = true;
+        params.disable_publish = true;
+        params.gossip_loop_iteration_delay_ms = 100;
+        params.gossip_peer_on_success_next_gossip_delay_ms = 100;
+
+        // This needs to be set because the first connection can fail and that would put the remote on a 5-minute cooldown
+        // which we obviously don't want in a test.
+        params.gossip_peer_on_error_next_gossip_delay_ms = 100;
+
+        params
+    };
+
+    let sender_idx = 0;
+
+    let agents = setup_overlapping_agents(
+        signal_url,
+        bootstrap_addr,
+        space.clone(),
+        tuner,
+        Box::new(
+            |_agents| {
+                // Any agent setup will do
+                true
+            }
+        )
+    ).await;
+
+    // If the location was copied correctly then the basis location should be the same as the sender
+    // location. Due to the logic above, the receiver should have the sender's location in its arc.
+    let basis = basis_from_agent(&agents[sender_idx].3);
+    assert_eq!(agents[sender_idx].3.get_loc(), basis.get_loc());
+
+    let test_op = TestHostOp::new(space.clone()).with_forced_location(basis.get_loc());
+    assert_eq!(test_op.location(), basis.get_loc());
+
+    agents[sender_idx]
+        .0
+        .op_store()
+        .write()
+        .push(test_op.clone());
+
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+    for i in 0..5 {
+        if i == sender_idx {
+            continue;
+        }
+
+        // None of the other agents should have received the op.
+        let store_lock = agents[i].0.op_store();
+        let store = store_lock.read();
+        assert!(
+            store.is_empty(),
+            "Agent {} should not have received any data but has {} ops. Ops store: {:?}",
+            i,
+            store.len(),
+            store,
+        );
+    }
+}
+
 async fn setup_overlapping_agents(
     signal_url: SocketAddr,
     bootstrap_addr: SocketAddr,
