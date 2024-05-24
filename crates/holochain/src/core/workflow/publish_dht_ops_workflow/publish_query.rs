@@ -37,6 +37,50 @@ where
 
     let results = db
         .read_async(move |txn| {
+            // txn.prepare(
+            //     "  SELECT
+            //     Action.blob as action_blob,
+            //     Action.author as author,
+            //     Action.type as action_type,
+            //     LENGTH(Action.blob) AS action_size,
+            //     CASE
+            //       WHEN DhtOp.type IN ('StoreEntry', 'StoreRecord') THEN LENGTH(Entry.blob)
+            //       ELSE 0
+            //     END AS entry_size,
+            //     Entry.blob as entry_blob,
+            //     DhtOp.type as dht_type,
+            //     DhtOp.hash as dht_hash
+            //     FROM Action
+            //     JOIN
+            //     DhtOp ON DhtOp.action_hash = Action.hash
+            //     LEFT JOIN
+            //     Entry ON Action.entry_hash = Entry.hash
+
+            //     -- WHERE
+            //     -- (DhtOp.type != 'StoreEntry' OR Action.private_entry = 0)
+            //     -- AND
+            //     -- DhtOp.withhold_publish IS NULL
+            //     -- AND
+            //     -- (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= 1716572313)
+            //     -- AND
+            //     -- DhtOp.receipts_complete IS NULL",
+            // )?
+            // .query_and_then(
+            //     named_params! {
+            //         // ":author": agent
+            //     },
+            //     |row| {
+            //         let action_type: String = row.get("action_type")?;
+            //         let dht_type: String = row.get("dht_type")?;
+            //         let author: AgentPubKey = row.get("author")?;
+            //         WorkflowResult::Ok((action_type, dht_type, author))
+            //     },
+            // )?
+            // .for_each(|row| {
+            //     dbg!(row.unwrap());
+            // });
+            // dbg!("printed debug rows");
+
             let mut stmt = txn.prepare(
                 "
             SELECT
@@ -66,6 +110,7 @@ where
             DhtOp.receipts_complete IS NULL
             ",
             )?;
+            dbg!(&recency_threshold);
             let r = stmt.query_and_then(
                 named_params! {
                     ":author": agent,
@@ -74,8 +119,6 @@ where
                 },
                 |row| {
                     let op = map_sql_dht_op(false, "dht_type", row)?;
-                    // TODO: why do the hashes not match for ops and actions, with warrants?
-                    dbg!(op.get_type());
                     let action_size: usize = row.get("action_size")?;
                     // will be NULL if the op has no associated entry
                     let entry_size: Option<usize> = row.get("entry_size")?;

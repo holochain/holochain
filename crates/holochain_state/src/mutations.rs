@@ -113,6 +113,8 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
     let op_order = OpOrder::new(op_type, op.timestamp());
     let deps = op.sys_validation_dependencies();
 
+    let mut create_op = true;
+
     match op {
         DhtOp::ChainOp(op) => {
             let action = op.action();
@@ -129,11 +131,16 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
         DhtOp::WarrantOp(warrant_op) => {
             let author = warrant_op.author.clone();
             let warrant = warrant_op.clone().into_signed_warrant();
-            insert_warrant(txn, warrant, author)?;
+            let inserted = insert_warrant(txn, warrant, author)?;
+            if inserted == 0 {
+                create_op = false;
+            }
         }
     }
-    insert_op_lite(txn, &op_lite, hash, &op_order, &timestamp)?;
-    set_dependency(txn, hash, deps)?;
+    if create_op {
+        insert_op_lite(txn, &op_lite, hash, &op_order, &timestamp)?;
+        set_dependency(txn, hash, deps)?;
+    }
     Ok(())
 }
 
@@ -530,19 +537,17 @@ pub fn insert_warrant(
     txn: &mut Transaction,
     warrant: SignedWarrant,
     author: AgentPubKey,
-) -> StateMutationResult<()> {
+) -> StateMutationResult<usize> {
     let warrant_type = warrant.0.get_type();
     let hash = warrant.0.to_hash();
-    dbg!(&hash);
 
-    sql_insert!(txn, Action, {
+    Ok(sql_insert!(txn, Action, {
         "hash": hash,
         "type": warrant_type,
         "author": author,
         "base_hash": warrant.0.dht_basis(),
         "blob": to_blob(&warrant)?,
-    })?;
-    Ok(())
+    })?)
 }
 
 /// Insert a [`Action`] into the database.

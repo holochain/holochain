@@ -148,6 +148,7 @@ async fn main_workflow() {
             validated: 0,
             accepted: 0,
             rejected: 0,
+            warranted: 0,
             missing: 1,
             failed: empty_set,
         } if empty_set == HashSet::<DhtOpHash>::new()
@@ -190,6 +191,7 @@ async fn main_workflow() {
             validated: 1,
             accepted: 1,
             rejected: 0,
+            warranted: 0,
             missing: 0,
             failed: empty_set,
         } if empty_set == HashSet::<DhtOpHash>::new()
@@ -344,6 +346,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             validated: 2,
             accepted: 2,
             rejected: 0,
+            warranted: 0,
             missing: 0,
             failed: empty_set,
         } if empty_set == HashSet::<DhtOpHash>::new()
@@ -486,6 +489,7 @@ async fn validate_ops_in_sequence_must_get_action() {
             validated: 2,
             accepted: 2,
             rejected: 0,
+            warranted: 0,
             missing: 0,
             failed: empty_set,
         } if empty_set == HashSet::<DhtOpHash>::new()
@@ -647,6 +651,7 @@ async fn handle_error_in_op_validation() {
             validated: 1,
             accepted: 1,
             missing: 0,
+            warranted: 0,
             rejected: 0,
             failed: actual_failed,
         } if actual_failed == expected_failed

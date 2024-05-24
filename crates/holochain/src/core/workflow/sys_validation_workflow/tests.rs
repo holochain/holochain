@@ -72,13 +72,13 @@ async fn sys_validation_produces_warrants() {
         zome_common
             .clone()
             .integrity_function("validate", move |_api, op: Op| {
-                println!(
-                    "sans-{}  {}    {} {}",
-                    0,
-                    op.action_seq(),
-                    op.author(),
-                    op.action_type()
-                );
+                // println!(
+                //     "sans-{}  {}    {} {}",
+                //     0,
+                //     op.action_seq(),
+                //     op.author(),
+                //     op.action_type()
+                // );
                 Ok(ValidateCallbackResult::Valid)
             });
 
@@ -86,13 +86,13 @@ async fn sys_validation_produces_warrants() {
         zome_common
             .clone()
             .integrity_function("validate", move |_api, op: Op| {
-                println!(
-                    "AVEC-{}    {}  {} {}",
-                    i,
-                    op.action_seq(),
-                    op.author(),
-                    op.action_type()
-                );
+                // println!(
+                //     "AVEC-{}    {}  {} {}",
+                //     i,
+                //     op.action_seq(),
+                //     op.author(),
+                //     op.action_type()
+                // );
                 if op.action_seq() > 3 {
                     Ok(ValidateCallbackResult::Invalid("nope".to_string()))
                 } else {
@@ -210,15 +210,15 @@ async fn sys_validation_produces_warrants() {
 
     // Ensure that carol gets gossiped the warrant for alice from bob
     let alice_pubkey = alice.agent_pubkey().clone();
-    conductors[2]
+    let warrants = conductors[2]
         .spaces
         .dht_db(dna_hash)
         .unwrap()
         .test_read(move |txn| {
             let store = Txn::from(&txn);
-            let warrants = store.get_warrants_for_basis(&alice_pubkey.into()).unwrap();
-            assert_eq!(warrants.len(), 1);
+            store.get_warrants_for_basis(&alice_pubkey.into()).unwrap()
         });
+    assert_eq!(warrants.len(), 1);
 }
 
 async fn run_test(

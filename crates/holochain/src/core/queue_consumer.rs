@@ -145,6 +145,7 @@ pub async fn spawn_queue_consumer_tasks(
             ),
             conductor.clone(),
             tx_integration.clone(),
+            tx_publish.clone(),
             network.clone(),
             dht_query_cache.clone(),
         )

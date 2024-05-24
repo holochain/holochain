@@ -54,7 +54,7 @@ pub enum WarrantType {
     // because they occupy the same field in the Action table.
     //
     /// Signifies evidence of a breach of chain integrity
-    ChainIntegrity = 1000,
+    ChainIntegrityWarrant,
 }
 
 impl From<Warrant> for WarrantType {
@@ -66,7 +66,9 @@ impl From<Warrant> for WarrantType {
 #[cfg(any(feature = "sqlite", feature = "sqlite_encrypted"))]
 impl rusqlite::ToSql for WarrantType {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
-        Ok(rusqlite::types::ToSqlOutput::Owned((*self as i32).into()))
+        Ok(rusqlite::types::ToSqlOutput::Owned(
+            format!("{:?}", self).into(),
+        ))
     }
 }
 
@@ -124,7 +126,7 @@ impl Warrant {
     /// Get the warrant type
     pub fn get_type(&self) -> WarrantType {
         match self {
-            Warrant::ChainIntegrity(_) => WarrantType::ChainIntegrity,
+            Warrant::ChainIntegrity(_) => WarrantType::ChainIntegrityWarrant,
         }
     }
 }

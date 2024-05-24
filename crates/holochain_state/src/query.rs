@@ -350,12 +350,13 @@ impl<'stmt> Store for Txn<'stmt, '_> {
             Action.blob
             FROM Action
             WHERE base_hash = :hash
-            AND type >= 1000
+            AND type = :type
             ",
             )?
             .query_map(
                 named_params! {
                     ":hash": hash,
+                    ":type": WarrantType::ChainIntegrityWarrant,
                 },
                 |row| {
                     Ok(
