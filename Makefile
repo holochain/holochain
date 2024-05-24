@@ -48,4 +48,3 @@ test-workspace:
 		--locked \
 		--all-features \
 		--profile fast-test
-
