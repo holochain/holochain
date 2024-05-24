@@ -334,7 +334,6 @@ async fn remote_signals() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
-#[ignore = "this is a long-running test that slows down ci - execute this manually"]
 async fn emit_signals() {
     holochain_trace::test_run();
     // NOTE: This is a full integration test that
