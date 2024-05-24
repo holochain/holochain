@@ -42,7 +42,6 @@ jobs:
       - name: rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: 'true'
           cache-all-crates: 'true'
 
       - name: cargo prune
