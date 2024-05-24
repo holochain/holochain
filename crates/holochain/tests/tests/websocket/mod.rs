@@ -33,7 +33,7 @@ use std::time::Duration;
 use tempfile::TempDir;
 use tracing::*;
 
-use crate::test_utils::*;
+use crate::tests::test_utils::*;
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]

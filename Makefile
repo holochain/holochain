@@ -13,7 +13,7 @@ default: build-workspace test-workspace
 #       otherwise some rebuilding will occur due to resolver = "2"
 build-workspace:
 	RUSTFLAGS="-Dwarnings" \
-		cargo build -j4 \
+		cargo build \
 		--workspace \
 		--exclude holochain_cli_sandbox \
 		--exclude hdk_derive \
@@ -31,19 +31,18 @@ test-workspace:
 		--exclude holochain_cli_sandbox \
 		--exclude hdk_derive \
 		--locked \
-		--build-jobs 4 \
 		--cargo-profile fast-test \
 		--all-features
 	# hdk_derive cannot currently be tested via nextest
 	# https://github.com/nextest-rs/nextest/issues/267
 	RUSTFLAGS="-Dwarnings" \
-		cargo build -j4 \
+		cargo build \
 		--manifest-path crates/hdk_derive/Cargo.toml \
 		--locked \
 		--all-features --all-targets \
 		--profile fast-test
 	RUSTFLAGS="-Dwarnings" RUST_BACKTRACE=1 \
-		cargo test -j4 \
+		cargo test \
 		--manifest-path crates/hdk_derive/Cargo.toml \
 		--locked \
 		--all-features \

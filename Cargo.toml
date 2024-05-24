@@ -86,7 +86,7 @@ debug = 1
 
 [profile.fast-test.package."*"]
 opt-level = 2
-debug = 1
+debug = 0
 debug-assertions = false
 overflow-checks = false
 incremental = false
