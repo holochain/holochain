@@ -2162,10 +2162,7 @@ mod app_status_impls {
                     let p2p_agents_db = cell.p2p_agents_db().clone();
                     let cell_id = cell.id().clone();
                     let kagent = cell_id.agent_pubkey().to_kitsune();
-                    let maybe_agent_info = match p2p_agents_db.p2p_get_agent(&kagent).await {
-                        Ok(maybe_info) => maybe_info,
-                        _ => None,
-                    };
+                    let maybe_agent_info = p2p_agents_db.p2p_get_agent(&kagent).await.ok().flatten();
                     let maybe_initial_arq = maybe_agent_info.clone().map(|i| i.storage_arq);
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 

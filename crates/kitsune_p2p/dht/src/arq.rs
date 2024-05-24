@@ -22,7 +22,9 @@ use kitsune_p2p_dht_arc::{DhtArc, DhtArcRange};
 
 use crate::{op::Loc, spacetime::*};
 
-/// Convenience method for taking the power of 2 in u32
+/// Convenience method for taking the power of 2 in u32.
+///
+/// If `p` is greater than 31, this function will return 2^31.
 pub fn pow2(p: u8) -> u32 {
     debug_assert!(p < 32);
     2u32.pow((p as u32).min(31))

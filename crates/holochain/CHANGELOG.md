@@ -8,7 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Adds DPKI support. This is not fully hooked up, so the main implication for this particular implementation is that you must be using the same DPKI implementation as all other nodes on the network that you wish to talk to. If the DPKI version mismatches, you cannot establish connections, and will see so as an error in the logs. This work is in preparation for future work which will make it possible to restore your keys if you lose your device, and to revoke and replace your keys if your device is stolen or compromised.
+
+## 0.4.0-dev.4
+
 - Rename feature `sweetest` in Holochain crate to `sweettest` to match the crate name.
+- App validation workflow: Reduce interval to re-trigger when dependencies are missing from 10 seconds to 100-1000 ms, according to number of missing dependencies.
 
 ## 0.4.0-dev.3
 
