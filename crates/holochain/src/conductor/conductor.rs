@@ -1892,7 +1892,7 @@ mod cell_impls {
                 .running_services()
                 .dpki
                 .ok_or(ConductorError::DpkiError(
-                    DpkiServiceError::DpkiNotInstalled(app_id.clone()),
+                    DpkiServiceError::DpkiNotInstalled,
                 ))?;
             let dpki_state = dpki_service.state().await;
             let key_state = dpki_state

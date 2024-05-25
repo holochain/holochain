@@ -79,4 +79,29 @@ async fn delete_agent_key() {
     //     ))
     // );
     // println!("r is {r:?}");
+
+#[tokio::test(flavor = "multi_thread")]
+async fn delete_agent_key_without_dpki_installed_fails() {
+    // spawn a conductor without dpki installed
+    let conductor_config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(conductor_config).await;
+    let zomes = SweetInlineZomes::new(vec![], 0);
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let app = conductor
+        .setup_app("", [&("role".to_string(), dna_file)])
+        .await
+        .unwrap();
+    let agent_key = app.agent().clone();
+
+    // calling delete key without dpki installed should return an error
+    let result = conductor
+        .clone()
+        .delete_agent_key_for_app(agent_key, app.installed_app_id().clone())
+        .await;
+    assert_matches!(
+        result,
+        Err(ConductorError::DpkiError(
+            DpkiServiceError::DpkiNotInstalled
+        ))
+    );
 }

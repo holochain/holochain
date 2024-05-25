@@ -120,8 +120,8 @@ pub enum DpkiServiceError {
     Serialization(#[from] SerializedBytesError),
     #[error("Error talking to lair keystore: {0}")]
     Lair(anyhow::Error),
-    #[error("DPKI service not installed for app: {0}")]
-    DpkiNotInstalled(InstalledAppId),
+    #[error("DPKI service not installed")]
+    DpkiNotInstalled,
 }
 /// Alias
 pub type DpkiServiceResult<T> = Result<T, DpkiServiceError>;
