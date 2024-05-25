@@ -75,7 +75,7 @@ use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
 pub use holochain_types::share;
-use holochain_zome_types::prelude::ClonedCell;
+use holochain_zome_types::prelude::{ClonedCell, Signature, Timestamp};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
 use crate::conductor::cell::Cell;
@@ -1472,6 +1472,7 @@ mod app_impls {
                 (agent_key, None)
                 // no pre-installed dpki for this app
                 } else if let Some((dpki, state)) = &mut dpki {
+                    // register a new key derivation for this app
                     let derivation_details = state.next_derivation_details(None).await?;
 
                     let dst_tag = format!(
@@ -1553,6 +1554,7 @@ mod app_impls {
                 // Update the db
                 let stopped_app = self.add_disabled_app_to_db(app).await?;
 
+                // generate the
                 if let (Some((dpki, state)), Some(derivation)) = (dpki, derivation_details) {
                     let dpki_agent = dpki.cell_id.agent_pubkey();
 
@@ -1839,6 +1841,8 @@ mod app_impls {
 
 /// Methods related to cell access
 mod cell_impls {
+    use holochain_types::deepkey_roundtrip_backward;
+
     use super::*;
 
     impl Conductor {
@@ -1878,10 +1882,47 @@ mod cell_impls {
         /// chain being closed.
         pub async fn delete_agent_key_for_app(
             self: Arc<Self>,
-            app_id: &InstalledAppId,
+            agent_key: AgentPubKey,
+            app_id: InstalledAppId,
         ) -> ConductorResult<()> {
-            self.disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)
+            self.clone()
+                .disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)
                 .await?;
+            let dpki_service = self
+                .running_services()
+                .dpki
+                .ok_or(ConductorError::DpkiError(
+                    DpkiServiceError::DpkiNotInstalled(app_id.clone()),
+                ))?;
+            let dpki_state = dpki_service.state().await;
+            let key_state = dpki_state
+                .key_state(agent_key.clone(), Timestamp::now())
+                .await?;
+            match key_state {
+                KeyState::Valid(_) => {
+                    let key_meta = dpki_state.query_key_meta(agent_key.clone()).await?;
+                    let signature = dpki_service
+                        .cell_id
+                        .agent_pubkey()
+                        .sign_raw(
+                            &self.keystore,
+                            key_meta.key_registration_addr.get_raw_39().into(),
+                        )
+                        .await
+                        .map_err(|e| DpkiServiceError::Lair(e.into()))?;
+                    let signature = deepkey_roundtrip_backward!(Signature, &signature);
+                    let revocation = dpki_state
+                        .revoke_key(RevokeKeyInput {
+                            key_revocation: KeyRevocation {
+                                prior_key_registration: key_meta.key_registration_addr,
+                                revocation_authorization: vec![(0, signature)],
+                            },
+                        })
+                        .await?;
+                }
+                KeyState::NotFound => todo!(),
+                KeyState::Invalid(signed_hashed_action) => todo!(),
+            }
             Ok(())
         }
     }

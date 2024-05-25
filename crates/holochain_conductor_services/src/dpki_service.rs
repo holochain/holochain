@@ -87,10 +87,20 @@ pub trait DpkiState: Send + Sync {
         agent_key: Option<AgentPubKey>,
     ) -> DpkiServiceResult<DerivationDetails>;
 
+    /// Create a new key for a given app.
     async fn register_key(
         &self,
         input: CreateKeyInput,
     ) -> DpkiServiceResult<(ActionHash, KeyRegistration, KeyMeta)>;
+
+    /// Query meta data for a given key.
+    async fn query_key_meta(&self, key: AgentPubKey) -> DpkiServiceResult<KeyMeta>;
+
+    /// Revoke a registered key.
+    async fn revoke_key(
+        &self,
+        input: RevokeKeyInput,
+    ) -> DpkiServiceResult<(ActionHash, KeyRegistration)>;
 
     /// Check if the key is valid (properly created and not revoked) as-at the given Timestamp
     async fn key_state(
@@ -110,6 +120,8 @@ pub enum DpkiServiceError {
     Serialization(#[from] SerializedBytesError),
     #[error("Error talking to lair keystore: {0}")]
     Lair(anyhow::Error),
+    #[error("DPKI service not installed for app: {0}")]
+    DpkiNotInstalled(InstalledAppId),
 }
 /// Alias
 pub type DpkiServiceResult<T> = Result<T, DpkiServiceError>;

@@ -1,16 +1,12 @@
+use std::path::Path;
+
+use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_services::KeyState;
-use holochain_state::source_chain::SourceChainError;
-use holochain_types::dna::DnaWithRole;
-use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::timestamp::Timestamp;
 use matches::assert_matches;
 
-use crate::{
-    conductor::{
-        api::error::{ConductorApiError, DpkiError},
-        CellError,
-    },
-    sweettest::{SweetAgents, SweetConductor, SweetDnaFile, SweetInlineZomes, SweetZome},
+use crate::sweettest::{
+    SweetConductor, SweetConductorConfig, SweetDnaFile, SweetInlineZomes, SweetZome,
 };
 
 #[tokio::test(flavor = "multi_thread")]
@@ -63,7 +59,7 @@ async fn delete_agent_key() {
     // - prevent cell cloning
     let result = conductor
         .clone()
-        .delete_agent_key_for_app(app.installed_app_id())
+        .delete_agent_key_for_app(agent_key.clone(), app.installed_app_id().clone())
         .await;
     println!("delete result {result:?}");
 

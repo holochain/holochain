@@ -79,6 +79,12 @@ impl DpkiState for DeepkeyState {
         self.call_deepkey_zome("create_key", input).await
     }
 
+    async fn query_key_meta(&self, agent_key: AgentPubKey) -> DpkiServiceResult<KeyMeta> {
+        let payload = agent_key.get_raw_32();
+        self.call_deepkey_zome("query_key_meta_for_key", payload)
+            .await
+    }
+
     async fn revoke_key(
         &self,
         input: RevokeKeyInput,
