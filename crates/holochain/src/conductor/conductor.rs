@@ -1885,9 +1885,6 @@ mod cell_impls {
             agent_key: AgentPubKey,
             app_id: InstalledAppId,
         ) -> ConductorResult<()> {
-            self.clone()
-                .disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)
-                .await?;
             let dpki_service = self
                 .running_services()
                 .dpki
@@ -1899,7 +1896,14 @@ mod cell_impls {
                 .key_state(agent_key.clone(), Timestamp::now())
                 .await?;
             match key_state {
+                KeyState::NotFound => Err(ConductorError::DpkiError(
+                    DpkiServiceError::AgentKeyNotFound(agent_key),
+                )),
+                KeyState::Invalid(signed_hashed_action) => todo!(), //Err(ConductorError::DpkiError(DpkiServiceError)),
                 KeyState::Valid(_) => {
+                    self.clone()
+                        .disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)
+                        .await?;
                     let key_meta = dpki_state.query_key_meta(agent_key.clone()).await?;
                     let signature = dpki_service
                         .cell_id
@@ -1919,11 +1923,9 @@ mod cell_impls {
                             },
                         })
                         .await?;
+                    Ok(())
                 }
-                KeyState::NotFound => todo!(),
-                KeyState::Invalid(signed_hashed_action) => todo!(),
             }
-            Ok(())
         }
     }
 }
