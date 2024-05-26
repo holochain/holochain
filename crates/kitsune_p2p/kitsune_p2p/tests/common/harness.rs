@@ -6,6 +6,7 @@ use kitsune_p2p::{
     actor::KitsuneP2p, event::KitsuneP2pEventReceiver, spawn_kitsune_p2p, HostApi,
     KitsuneP2pResult, PreflightUserData,
 };
+use kitsune_p2p_bootstrap::BootstrapShutdown;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     config::{tuning_params_struct, KitsuneP2pConfig},
@@ -149,19 +150,45 @@ impl KitsuneTestHarness {
     }
 }
 
-pub async fn start_bootstrap() -> (SocketAddr, AbortHandle) {
+pub struct TestBootstrapHandle {
+    shutdown_cb: Option<BootstrapShutdown>,
+    abort_handle: AbortHandle,
+}
+
+impl TestBootstrapHandle {
+    fn new(shutdown_cb: BootstrapShutdown, abort_handle: AbortHandle) -> Self {
+        Self {
+            shutdown_cb: Some(shutdown_cb),
+            abort_handle,
+        }
+    }
+
+    pub fn abort(&mut self) {
+        if let Some(shutdown_cb) = self.shutdown_cb.take() {
+            shutdown_cb();
+        }
+        self.abort_handle.abort();
+    }
+}
+
+impl Drop for TestBootstrapHandle {
+    fn drop(&mut self) {
+        self.abort();
+    }
+}
+
+pub async fn start_bootstrap() -> (SocketAddr, TestBootstrapHandle) {
     let (bs_driver, bs_addr, shutdown) =
         kitsune_p2p_bootstrap::run("127.0.0.1:0".parse::<SocketAddr>().unwrap(), vec![])
             .await
             .expect("Could not start bootstrap server");
 
     let abort_handle = tokio::spawn(async move {
-        let _shutdown_cb = shutdown;
         bs_driver.await;
     })
     .abort_handle();
 
-    (bs_addr, abort_handle)
+    (bs_addr, TestBootstrapHandle::new(shutdown, abort_handle))
 }
 
 pub async fn start_signal_srv() -> (SocketAddr, tx5_signal_srv::SrvHnd) {
