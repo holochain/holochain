@@ -1052,7 +1052,7 @@ pub fn map_sql_dht_op_common(
         DhtOpType::Warrant(_) => {
             let warrant = from_blob::<SignedWarrant>(row.get("action_blob")?)?;
             let author: AgentPubKey = row.get("author")?;
-            let ((warrant, timestamp), signature) = warrant.into();
+            let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
             Ok(Some(
                 WarrantOp::new(warrant, author, signature, timestamp).into(),
             ))

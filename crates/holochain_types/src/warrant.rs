@@ -42,7 +42,7 @@ impl WarrantOp {
 
     /// Convert the WarrantOp into a SignedWarrant
     pub fn into_signed_warrant(self) -> SignedWarrant {
-        Signed::new((self.warrant, self.timestamp), self.signature)
+        Signed::new((self.warrant, self.timestamp).into(), self.signature)
     }
 
     /// Convenience for authoring a warrant

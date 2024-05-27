@@ -40,14 +40,21 @@ async fn sys_validation_workflow_test() {
     run_test(alice_cell_id, bob_cell_id, conductors, dna_file).await;
 }
 
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "should be implemented"]
+async fn sys_validation_produces_warrants() {
+    unimplemented!()
+}
+
 /// Three agent test.
 /// Alice is bypassing validation.
 /// Bob and Carol are running a DNA with validation that will reject any new action authored.
 /// Alice and Bob join the network, and Alice commits an invalid action.
 /// Bob blocks Alice and authors a Warrant.
 /// Carol joins the network, and receives Bob's warrant via gossip.
+/// (TODO: write similar test for publish.)
 #[tokio::test(flavor = "multi_thread")]
-async fn sys_validation_produces_warrants() {
+async fn app_validation_produces_warrants() {
     holochain_trace::test_run();
 
     #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
@@ -68,31 +75,16 @@ async fn sys_validation_produces_warrants() {
         },
     );
 
-    let zome_sans_validation =
-        zome_common
-            .clone()
-            .integrity_function("validate", move |_api, op: Op| {
-                // println!(
-                //     "sans-{}  {}    {} {}",
-                //     0,
-                //     op.action_seq(),
-                //     op.author(),
-                //     op.action_type()
-                // );
-                Ok(ValidateCallbackResult::Valid)
-            });
+    let zome_sans_validation = zome_common
+        .clone()
+        .integrity_function("validate", move |_api, op: Op| {
+            Ok(ValidateCallbackResult::Valid)
+        });
 
     let zome_avec_validation = |i| {
         zome_common
             .clone()
             .integrity_function("validate", move |_api, op: Op| {
-                // println!(
-                //     "AVEC-{}    {}  {} {}",
-                //     i,
-                //     op.action_seq(),
-                //     op.author(),
-                //     op.action_type()
-                // );
                 if op.action_seq() > 3 {
                     Ok(ValidateCallbackResult::Invalid("nope".to_string()))
                 } else {
@@ -151,29 +143,18 @@ async fn sys_validation_produces_warrants() {
         .await;
 
     await_consistency(10, [&alice, &bob]).await.unwrap();
+    // tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     conductors[0].shutdown().await;
     conductors[2].startup().await;
 
-    conductors[0].persist_dbs();
-    conductors[1].persist_dbs();
-    conductors[2].persist_dbs();
+    // conductors[0].persist_dbs();
+    // conductors[1].persist_dbs();
+    // conductors[2].persist_dbs();
 
-    // Ensure that bob authored a warrant
+    //- Ensure that bob authored a warrant
     let alice_pubkey = alice.agent_pubkey().clone();
     conductors[1].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
-        // let seqs: Vec<Option<u32>> = txn
-        //     .prepare_cached("SELECT seq FROM Action")
-        //     .unwrap()
-        //     .query_map([], |row| {
-        //         let seq: Option<u32> = row.get(0).unwrap();
-        //         Ok(seq)
-        //     })
-        //     .unwrap()
-        //     .collect::<Result<Vec<_>, _>>()
-        //     .unwrap();
-
         let store = Txn::from(&txn);
 
         let warrants = store.get_warrants_for_basis(&alice_pubkey.into()).unwrap();
@@ -183,32 +164,9 @@ async fn sys_validation_produces_warrants() {
     // TODO: ensure that bob blocked alice
 
     await_consistency(10, [&bob, &carol]).await.unwrap();
+    // tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-
-    // // Ensure that carol authored a warrant
-    // let alice_pubkey = alice.agent_pubkey().clone();
-    // conductors[2].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
-    //     let seqs: Vec<Option<u32>> = txn
-    //         .prepare_cached("SELECT seq FROM Action")
-    //         .unwrap()
-    //         .query_map([], |row| {
-    //             let seq: Option<u32> = row.get(0).unwrap();
-    //             dbg!(&seq);
-    //             Ok(seq)
-    //         })
-    //         .unwrap()
-    //         .collect::<Result<Vec<_>, _>>()
-    //         .unwrap();
-    //     dbg!(seqs);
-
-    //     let store = Txn::from(&txn);
-
-    //     let warrants = store.get_warrants_for_basis(&alice_pubkey.into()).unwrap();
-    //     assert_eq!(warrants.len(), 1);
-    // });
-
-    // Ensure that carol gets gossiped the warrant for alice from bob
+    //- Ensure that carol gets gossiped the warrant for alice from bob
     let alice_pubkey = alice.agent_pubkey().clone();
     let warrants = conductors[2]
         .spaces
@@ -510,7 +468,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
             DhtOpType::Warrant(_) => {
                 let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
                 let author: AgentPubKey = row.get("author")?;
-                let ((warrant, timestamp), signature) = warrant.into();
+                let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
                 Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
             }
         }

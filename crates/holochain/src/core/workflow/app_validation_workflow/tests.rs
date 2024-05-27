@@ -1047,7 +1047,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
             DhtOpType::Warrant(_) => {
                 let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
                 let author: AgentPubKey = from_blob(row.get("author")?)?;
-                let ((warrant, timestamp), signature) = warrant.into();
+                let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
                 Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
             }
         }

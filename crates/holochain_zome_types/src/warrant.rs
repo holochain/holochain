@@ -146,5 +146,20 @@ pub enum ValidationType {
     App,
 }
 
+/// A warrant with timestamp
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+    Eq,
+    PartialEq,
+    Hash,
+    derive_more::From,
+    derive_more::Into,
+)]
+pub struct TimedWarrant(pub Warrant, pub Timestamp);
+
 /// A signed warrant with timestamp
-pub type SignedWarrant = Signed<(Warrant, Timestamp)>;
+pub type SignedWarrant = Signed<TimedWarrant>;
