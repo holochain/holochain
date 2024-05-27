@@ -1899,7 +1899,9 @@ mod cell_impls {
                 KeyState::NotFound => Err(ConductorError::DpkiError(
                     DpkiServiceError::AgentKeyNotFound(agent_key),
                 )),
-                KeyState::Invalid(signed_hashed_action) => todo!(), //Err(ConductorError::DpkiError(DpkiServiceError)),
+                KeyState::Invalid(_) => Err(ConductorError::DpkiError(
+                    DpkiServiceError::InvalidAgentKey(agent_key),
+                )),
                 KeyState::Valid(_) => {
                     self.clone()
                         .disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)

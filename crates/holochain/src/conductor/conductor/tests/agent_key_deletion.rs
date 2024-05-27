@@ -41,18 +41,15 @@ async fn delete_agent_key() {
     assert_matches!(key_state, KeyState::Valid(_));
 
     // deleting a non-existing key should fail
-    let this_is_not_the_key_you_are_looking_for = AgentPubKey::from_raw_32(vec![0; 32]);
+    let non_existing_key = AgentPubKey::from_raw_32(vec![0; 32]);
     let result = conductor
         .clone()
-        .delete_agent_key_for_app(
-            this_is_not_the_key_you_are_looking_for.clone(),
-            app.installed_app_id().clone(),
-        )
+        .delete_agent_key_for_app(non_existing_key.clone(), app.installed_app_id().clone())
         .await;
     println!("delete result {result:?}");
     assert_matches!(
         result,
-        Err(ConductorError::DpkiError(DpkiServiceError::AgentKeyNotFound(agent_key))) if agent_key == this_is_not_the_key_you_are_looking_for
+        Err(ConductorError::DpkiError(DpkiServiceError::AgentKeyNotFound(key))) if key == non_existing_key
     );
 
     // calling the cell should succeed
@@ -62,6 +59,7 @@ async fn delete_agent_key() {
     // TODOs
     // - add multiple cells
     // - prevent cell cloning
+    // - handle app info
     // - write test for other possible key states
 
     let result = conductor
@@ -69,6 +67,7 @@ async fn delete_agent_key() {
         .delete_agent_key_for_app(agent_key.clone(), app.installed_app_id().clone())
         .await;
     println!("delete result {result:?}");
+    assert_matches!(result, Ok(()));
 
     let key_state = dpki
         .state()
@@ -76,7 +75,6 @@ async fn delete_agent_key() {
         .key_state(agent_key.clone(), Timestamp::now())
         .await
         .unwrap();
-    println!("state {key_state:?} initial key state {initial_key_state:?}");
     assert_matches!(key_state, KeyState::Invalid(_));
     // let r = conductor.call_fallible::<_, ()>(&zome, fn_name, ()).await;
     // assert_matches!(

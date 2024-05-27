@@ -124,6 +124,8 @@ pub enum DpkiServiceError {
     DpkiNotInstalled,
     #[error("Agent key not registered in DPKI: {0}")]
     AgentKeyNotFound(AgentPubKey),
+    #[error("Provided agent key is invalid: {0}")]
+    InvalidAgentKey(AgentPubKey),
 }
 /// Alias
 pub type DpkiServiceResult<T> = Result<T, DpkiServiceError>;
