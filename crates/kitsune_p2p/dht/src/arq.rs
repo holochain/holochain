@@ -576,6 +576,7 @@ pub fn is_full(dim: impl SpaceDim, power: u8, count: u32) -> bool {
 /// Calculate the unique pairing of power and count implied by a given length
 /// and max number of chunks. Gives the nearest value that satisfies the constraints,
 /// but may not be exact.
+#[cfg(feature = "test_utils")]
 pub fn power_and_count_from_length(dim: impl SpaceDim, len: u64, max_chunks: u32) -> ArqSize {
     let dim = dim.get();
     assert!(len <= U32_LEN);
@@ -597,6 +598,7 @@ pub fn power_and_count_from_length(dim: impl SpaceDim, len: u64, max_chunks: u32
 /// Calculate the highest power and lowest count such that the given length is
 /// represented exactly. If the length is not representable even at the quantum
 /// level (power==0), return None.
+#[cfg(feature = "test_utils")]
 pub fn power_and_count_from_length_exact(
     dim: impl SpaceDim,
     len: u64,
