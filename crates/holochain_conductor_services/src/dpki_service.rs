@@ -48,8 +48,10 @@ impl DpkiService {
             state,
         }
     }
-    pub fn should_run(&self, dna_hash: &DnaHash) -> bool {
-        self.cell_id.dna_hash() != dna_hash
+
+    /// Whether the passed in DNA hash is Deepkey DNA hash
+    pub fn is_deepkey_dna(&self, dna_hash: &DnaHash) -> bool {
+        self.cell_id.dna_hash() == dna_hash
     }
 
     /// Get the UUID of the DPKI service.

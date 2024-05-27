@@ -259,7 +259,7 @@ where
 
     if let Some(dpki) = conductor_handle.running_services().dpki.clone() {
         // Don't check DPKI validity on DPKI itself!
-        if dpki.should_run(workspace.source_chain().cell_id().dna_hash()) {
+        if !dpki.is_deepkey_dna(workspace.source_chain().cell_id().dna_hash()) {
             // Check the validity of the author as-at the first and the last record to be committed.
             // If these are valid, then the author is valid for the entire commit.
             let first = records.first();

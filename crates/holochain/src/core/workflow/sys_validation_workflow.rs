@@ -278,7 +278,7 @@ async fn sys_validation_workflow_inner(
         let dpki = workspace
             .dpki
             .clone()
-            .filter(|dpki| dpki.should_run(workspace.dna_def_hashed().as_hash()));
+            .filter(|dpki| !dpki.is_deepkey_dna(workspace.dna_def_hashed().as_hash()));
 
         // Note that this is async only because of the signature checks done during countersigning.
         // In most cases this will be a fast synchronous call.
@@ -606,7 +606,7 @@ async fn validate_chain_op(
     check_entry_visibility(op)?;
     if let Some(dpki) = dpki {
         // Don't run DPKI agent validity checks on the DPKI service itself
-        if dpki.should_run(dna_def.as_hash()) {
+        if !dpki.is_deepkey_dna(dna_def.as_hash()) {
             check_dpki_agent_validity_for_op(&dpki, op).await?;
         }
     }
