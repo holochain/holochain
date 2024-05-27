@@ -1474,7 +1474,7 @@ mod app_impls {
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
 
-            match membrane_proofs {
+            match dbg!(membrane_proofs) {
                 MemproofProvisioning::Provided(membrane_proofs) => {
                     let ops = bundle
                         .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
@@ -1535,6 +1535,11 @@ mod app_impls {
                     let ops = bundle
                         .resolve_cells(&local_dnas, agent_key.clone(), Default::default())
                         .await?;
+
+                    for (dna, _) in ops.dnas_to_register {
+                        self.clone().register_dna(dna).await?;
+                    }
+
                     let roles = ops.role_assignments;
                     let app =
                         InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;

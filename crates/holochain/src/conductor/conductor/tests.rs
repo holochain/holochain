@@ -1172,3 +1172,54 @@ async fn test_init_concurrency() {
     assert_eq!(num_calls_clone.fetch_add(0, Ordering::SeqCst), 100);
     assert_eq!(num_inits_clone.fetch_add(0, Ordering::SeqCst), 1);
 }
+
+/// Check that an app can be installed with deferred memproof provisioning and:
+/// - all status checks return correctly while still provisioned,
+/// - no zome calls can be made while awaiting provisioning,
+/// - app functions correctly after provisioning
+#[tokio::test(flavor = "multi_thread")]
+async fn test_deferred_provisioning() {
+    holochain_trace::test_run();
+    let zome = simple_create_entry_zome();
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome.into())).await;
+    let conductor = SweetConductor::from_standard_config().await;
+    let app_id = "app-id".to_string();
+    let agent_key = SweetAgents::one(conductor.keystore()).await;
+    let bundle = app_bundle_from_dnas([&dna]).await;
+
+    //- Install with deferred memproofs
+    let app = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            source: AppBundleSource::Bundle(bundle),
+            agent_key: agent_key.clone(),
+            installed_app_id: Some(app_id.clone()),
+            membrane_proofs: MemproofProvisioning::Deferred,
+            network_seed: None,
+            ignore_genesis_failure: false,
+        })
+        .await
+        .unwrap();
+    assert_eq!(app.role_assignments().len(), 1);
+
+    let cell_id = app.all_cells().next().unwrap().clone();
+
+    //- Status is AwaitingMemproofs and there is 1 cell assignment
+    let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
+    assert_eq!(app_info.cell_info.len(), 1);
+
+    let cell = conductor.get_sweet_cell(cell_id.clone()).unwrap();
+
+    //- Can't make zome calls, error returned is CellDisabled
+    //  (which isn't ideal, but gets the message across well enough)
+    let result: Result<ActionHash, _> = conductor
+        .call_fallible(&cell.zome("zome"), "create", ())
+        .await;
+    assert_matches!(
+        result,
+        Err(ConductorApiError::ConductorError(
+            ConductorError::CellDisabled(_)
+        ))
+    );
+}
