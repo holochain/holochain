@@ -556,21 +556,6 @@ pub(crate) async fn validate_op(
     }
 }
 
-/// For now errors result in an outcome but in the future
-/// we might find it useful to include the reason something
-/// was rejected etc.
-/// This is why the errors contain data but is currently unread.
-fn handle_failed(error: &ValidationOutcome) -> Outcome {
-    use Outcome::*;
-    match error {
-        ValidationOutcome::CounterfeitAction(_, _) => {
-            unreachable!("Counterfeit ops are dropped before sys validation")
-        }
-        ValidationOutcome::DepMissingFromDht(_) => MissingDhtDep,
-        reason => Rejected(reason.to_string()),
-    }
-}
-
 fn action_to_entry_rate_weight(action: &Action) -> SysValidationResult<EntryRateWeight> {
     action
         .entry_rate_data()
