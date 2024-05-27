@@ -1884,7 +1884,7 @@ mod cell_impls {
             self: Arc<Self>,
             agent_key: AgentPubKey,
             app_id: InstalledAppId,
-        ) -> ConductorResult<()> {
+        ) -> ConductorResult<(ActionHash, KeyRegistration)> {
             let dpki_service = self
                 .running_services()
                 .dpki
@@ -1892,21 +1892,25 @@ mod cell_impls {
                     DpkiServiceError::DpkiNotInstalled,
                 ))?;
             let dpki_state = dpki_service.state().await;
+            let timestamp = Timestamp::now();
             let key_state = dpki_state
-                .key_state(agent_key.clone(), Timestamp::now())
+                .key_state(agent_key.clone(), timestamp.clone())
                 .await?;
             match key_state {
                 KeyState::NotFound => Err(ConductorError::DpkiError(
-                    DpkiServiceError::AgentKeyNotFound(agent_key),
+                    DpkiServiceError::DpkiAgentMissing(agent_key),
                 )),
                 KeyState::Invalid(_) => Err(ConductorError::DpkiError(
-                    DpkiServiceError::InvalidAgentKey(agent_key),
+                    DpkiServiceError::DpkiAgentInvalid(agent_key, timestamp),
                 )),
                 KeyState::Valid(_) => {
+                    // disable app, then revoke key and enable app again
                     self.clone()
                         .disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)
                         .await?;
+                    // get action hash of key registration
                     let key_meta = dpki_state.query_key_meta(agent_key.clone()).await?;
+                    // sign revocation request
                     let signature = dpki_service
                         .cell_id
                         .agent_pubkey()
@@ -1925,7 +1929,8 @@ mod cell_impls {
                             },
                         })
                         .await?;
-                    Ok(())
+                    self.clone().enable_app(app_id).await?;
+                    Ok(revocation)
                 }
             }
         }

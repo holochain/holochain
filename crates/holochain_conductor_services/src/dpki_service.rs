@@ -124,10 +124,10 @@ pub enum DpkiServiceError {
     Lair(anyhow::Error),
     #[error("DPKI service not installed")]
     DpkiNotInstalled,
-    #[error("Agent key not registered in DPKI: {0}")]
-    AgentKeyNotFound(AgentPubKey),
-    #[error("Provided agent key is invalid: {0}")]
-    InvalidAgentKey(AgentPubKey),
+    #[error("The agent {0} could not be found in DPKI")]
+    DpkiAgentMissing(AgentPubKey),
+    #[error("The agent {0} was found to be invalid at {1} according to the DPKI service")]
+    DpkiAgentInvalid(AgentPubKey, Timestamp),
 }
 /// Alias
 pub type DpkiServiceResult<T> = Result<T, DpkiServiceError>;
