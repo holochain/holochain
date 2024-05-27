@@ -565,7 +565,7 @@ pub mod test {
             source: AppBundleSource::Bundle(app_bundle),
             agent_key: agent_key.clone(),
             installed_app_id: None,
-            membrane_proofs: HashMap::new(),
+            membrane_proofs: HashMap::new().into(),
             network_seed: None,
             #[cfg(feature = "chc")]
             ignore_genesis_failure: false,

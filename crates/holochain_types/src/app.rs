@@ -135,7 +135,7 @@ pub struct InstallAppPayload {
 
     /// Include proof-of-membrane-membership data for cells that require it,
     /// keyed by the RoleName specified in the app bundle manifest.
-    pub membrane_proofs: HashMap<RoleName, MembraneProof>,
+    pub membrane_proofs: MemproofProvisioning,
 
     /// Optional: overwrites all network seeds for all DNAs of Cells created by this app.
     /// The app can still use existing Cells, i.e. this does not require that
@@ -148,6 +148,23 @@ pub struct InstallAppPayload {
     #[cfg(feature = "chc")]
     #[serde(default)]
     pub ignore_genesis_failure: bool,
+}
+
+/// Either provides membrane proofs, or specifies that they will be provided later
+/// via the [`AppRequest::ProvideMembraneProofs`] method.
+#[derive(Debug, serde::Serialize, serde::Deserialize, derive_more::From)]
+pub enum MemproofProvisioning {
+    /// Membrane proofs are provided here and now
+    Provided(HashMap<RoleName, MembraneProof>),
+    /// Membrane proofs will be provided later
+    Deferred,
+}
+
+impl MemproofProvisioning {
+    /// No memproofs provided, and none will ever be provided.
+    pub fn empty() -> Self {
+        Self::Provided(HashMap::new())
+    }
 }
 
 /// The possible locations of an AppBundle
@@ -812,6 +829,10 @@ pub enum AppStatus {
     /// to an unrecoverable error. App must be Enabled before running again,
     /// and will not restart automaticaly on conductor reboot.
     Disabled(DisabledAppReason),
+
+    /// The app is installed by genesis has not completed due to use of
+    /// [`MembraneProofProvisioning::Deferred`]
+    AwaitingMemproofs,
 }
 
 /// The AppStatus without the reasons.
@@ -821,6 +842,7 @@ pub enum AppStatusKind {
     Running,
     Paused,
     Disabled,
+    AwaitingMemproofs,
 }
 
 impl From<AppStatus> for AppStatusKind {
@@ -829,6 +851,7 @@ impl From<AppStatus> for AppStatusKind {
             AppStatus::Running => Self::Running,
             AppStatus::Paused(_) => Self::Paused,
             AppStatus::Disabled(_) => Self::Disabled,
+            AppStatus::AwaitingMemproofs => Self::AwaitingMemproofs,
         }
     }
 }
@@ -882,6 +905,8 @@ impl AppStatus {
 
             (Disabled(_), Enable) => Some((Running, SpinUp)),
             (Disabled(_), Pause(_)) | (Disabled(_), Disable(_)) | (Disabled(_), Start) => None,
+
+            (AwaitingMemproofs, _) => None,
         }
         .map(|(new_status, delta)| {
             *self = new_status;
@@ -959,6 +984,7 @@ impl StoppedAppReason {
         match status {
             AppStatus::Paused(reason) => Some(Self::Paused(reason.clone())),
             AppStatus::Disabled(reason) => Some(Self::Disabled(reason.clone())),
+            AppStatus::AwaitingMemproofs => Some(Self::Disabled(DisabledAppReason::Partial)),
             AppStatus::Running => None,
         }
     }
@@ -988,6 +1014,8 @@ pub enum PausedAppReason {
 pub enum DisabledAppReason {
     /// The app is freshly installed, and never started
     NeverStarted,
+    /// The app is partially installed, i.e. awaiting membrane proofs
+    Partial,
     /// The disabling was done manually by the user (via admin interface)
     User,
     /// The disabling was due to an UNRECOVERABLE error

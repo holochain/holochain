@@ -1439,7 +1439,7 @@ mod app_impls {
         pub async fn install_app_bundle(
             self: Arc<Self>,
             payload: InstallAppPayload,
-        ) -> ConductorResult<StoppedApp> {
+        ) -> ConductorResult<InstalledApp> {
             #[cfg(feature = "chc")]
             let ignore_genesis_failure = payload.ignore_genesis_failure;
             #[cfg(not(feature = "chc"))]
@@ -1473,55 +1473,80 @@ mod app_impls {
             let local_dnas = self
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
-            let ops = bundle
-                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
-                .await?;
 
-            let cells_to_create = ops.cells_to_create();
+            match membrane_proofs {
+                MemproofProvisioning::Provided(membrane_proofs) => {
+                    let ops = bundle
+                        .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
+                        .await?;
+                    let cells_to_create = ops.cells_to_create();
 
-            // check if cells_to_create contains a cell identical to an existing one
-            let state = self.get_state().await?;
-            let all_cells: HashSet<_> = state
-                .installed_apps()
-                .values()
-                .flat_map(|app| app.all_cells())
-                .collect();
-            let maybe_duplicate_cell_id = cells_to_create
-                .iter()
-                .find(|(cell_id, _)| all_cells.contains(cell_id));
-            if let Some((duplicate_cell_id, _)) = maybe_duplicate_cell_id {
-                return Err(ConductorError::CellAlreadyExists(
-                    duplicate_cell_id.to_owned(),
-                ));
-            };
+                    // check if cells_to_create contains a cell identical to an existing one
+                    let state = self.get_state().await?;
+                    let all_cells: HashSet<_> = state
+                        .installed_apps()
+                        .values()
+                        .flat_map(|app| app.all_cells())
+                        .collect();
+                    let maybe_duplicate_cell_id = cells_to_create
+                        .iter()
+                        .find(|(cell_id, _)| all_cells.contains(cell_id));
+                    if let Some((duplicate_cell_id, _)) = maybe_duplicate_cell_id {
+                        return Err(ConductorError::CellAlreadyExists(
+                            duplicate_cell_id.to_owned(),
+                        ));
+                    };
 
-            for (dna, _) in ops.dnas_to_register {
-                self.clone().register_dna(dna).await?;
-            }
+                    for (dna, _) in ops.dnas_to_register {
+                        self.clone().register_dna(dna).await?;
+                    }
 
-            let cell_ids: Vec<_> = cells_to_create
-                .iter()
-                .map(|(cell_id, _)| cell_id.clone())
-                .collect();
+                    let cell_ids: Vec<_> = cells_to_create
+                        .iter()
+                        .map(|(cell_id, _)| cell_id.clone())
+                        .collect();
 
-            let genesis_result =
-                crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
+                    let genesis_result =
+                        crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create)
+                            .await;
 
-            if genesis_result.is_ok() || ignore_genesis_failure {
-                let roles = ops.role_assignments;
-                let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
+                    if genesis_result.is_ok() || ignore_genesis_failure {
+                        let roles = ops.role_assignments;
+                        let app =
+                            InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
 
-                // Update the db
-                let stopped_app = self.add_disabled_app_to_db(app).await?;
+                        // Update the db
+                        let stopped_app = self.add_disabled_app_to_db(app).await?;
 
-                // Return the result, which be may an error if no_rollback was specified
-                genesis_result.map(|()| stopped_app)
-            } else if let Err(err) = genesis_result {
-                // Rollback created cells on error
-                self.remove_cells(&cell_ids).await;
-                Err(err)
-            } else {
-                unreachable!()
+                        // Return the result, which be may an error if no_rollback was specified
+                        genesis_result.map(|()| stopped_app.into())
+                    } else if let Err(err) = genesis_result {
+                        // Rollback created cells on error
+                        self.remove_cells(&cell_ids).await;
+                        Err(err)
+                    } else {
+                        unreachable!()
+                    }
+                }
+                MemproofProvisioning::Deferred => {
+                    // XXX: passing in empty memproofs, because this function is not constructed well.
+                    //      it doesn't really need to know about the memproofs, it just needs to associate
+                    //      the proper cells with the proper memproofs.
+                    let ops = bundle
+                        .resolve_cells(&local_dnas, agent_key.clone(), Default::default())
+                        .await?;
+                    let roles = ops.role_assignments;
+                    let app =
+                        InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
+
+                    let (_, app) = self
+                        .update_state_prime(move |mut state| {
+                            let app = state.add_app_awaiting_memproofs(app)?;
+                            Ok((state, app))
+                        })
+                        .await?;
+                    Ok(app)
+                }
             }
         }
 
@@ -2107,6 +2132,11 @@ mod app_status_impls {
                                 Disabled(_) => {
                                     // Disabled status should never automatically change.
                                     AppStatusFx::NoChange
+                                }
+                                AwaitingMemproofs => {
+                                    unimplemented!(
+                                        "There are no cells to affect the status of an app in the Partial state"
+                                    )
                                 }
                             }
                         })

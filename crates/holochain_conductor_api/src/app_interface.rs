@@ -395,6 +395,7 @@ pub enum AppInfoStatus {
     Paused { reason: PausedAppReason },
     Disabled { reason: DisabledAppReason },
     Running,
+    AwaitingMemproofs,
 }
 
 impl From<AppStatus> for AppInfoStatus {
@@ -403,6 +404,7 @@ impl From<AppStatus> for AppInfoStatus {
             AppStatus::Running => AppInfoStatus::Running,
             AppStatus::Disabled(reason) => AppInfoStatus::Disabled { reason },
             AppStatus::Paused(reason) => AppInfoStatus::Paused { reason },
+            AppStatus::AwaitingMemproofs => AppInfoStatus::AwaitingMemproofs,
         }
     }
 }
@@ -413,6 +415,7 @@ impl From<AppInfoStatus> for AppStatus {
             AppInfoStatus::Running => AppStatus::Running,
             AppInfoStatus::Disabled { reason } => AppStatus::Disabled(reason),
             AppInfoStatus::Paused { reason } => AppStatus::Paused(reason),
+            AppInfoStatus::AwaitingMemproofs => AppStatus::AwaitingMemproofs,
         }
     }
 }
