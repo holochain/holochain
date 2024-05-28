@@ -2464,7 +2464,7 @@ mod deepkey_impls {
     use super::*;
 
     impl Conductor {
-        /// Revoke an agent's key pair for all cells of an app. The agent key is made invalid and
+        /// Revoke an agent's key pair for all cells of an app. The agent key becomes invalid and
         /// source chains of all cells of the app are made read-only.
         pub async fn revoke_agent_key_for_app(
             self: Arc<Self>,
