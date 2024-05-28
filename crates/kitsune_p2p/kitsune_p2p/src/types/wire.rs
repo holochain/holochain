@@ -10,7 +10,6 @@ use std::sync::Arc;
 
 /// Type used for content data of wire messages.
 #[derive(
-    Debug,
     Clone,
     PartialEq,
     Eq,
@@ -27,6 +26,12 @@ use std::sync::Arc;
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub struct WireData(#[serde(with = "serde_bytes")] pub Vec<u8>);
+
+impl std::fmt::Debug for WireData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<{} bytes>", self.0.len())
+    }
+}
 
 /// Enum containing the individual metric exchange messages used by clients
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]

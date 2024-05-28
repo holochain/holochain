@@ -997,6 +997,7 @@ impl MetaNet {
             while let Some(evt) = ep_evt.recv().await {
                 match evt {
                     tx5::EndpointEvent::ListeningAddressOpen { local_url } => {
+                        tracing::info!(%local_url, "listening open");
                         if evt_send
                             .send(MetaNetEvt::NewAddress {
                                 local_url: local_url.to_string(),
@@ -1007,10 +1008,12 @@ impl MetaNet {
                             break;
                         }
                     }
-                    tx5::EndpointEvent::ListeningAddressClosed { .. } => {
+                    tx5::EndpointEvent::ListeningAddressClosed { local_url } => {
+                        tracing::info!(%local_url, "listening closed");
                         // TODO: publish close agent_info
                     }
                     tx5::EndpointEvent::Connected { peer_url } => {
+                        tracing::debug!(%peer_url, "peer connected");
                         if evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: peer_url.to_string(),
@@ -1029,6 +1032,7 @@ impl MetaNet {
                         }
                     }
                     tx5::EndpointEvent::Disconnected { peer_url } => {
+                        tracing::debug!(%peer_url, "peer disconnected");
                         if evt_send
                             .send(MetaNetEvt::Disconnected {
                                 remote_url: peer_url.to_string(),
