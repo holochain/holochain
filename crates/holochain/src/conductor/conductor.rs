@@ -1841,7 +1841,6 @@ mod app_impls {
 
 /// Methods related to cell access
 mod cell_impls {
-    use holochain_types::deepkey_roundtrip_backward;
     use holochain_zome_types::action::builder;
 
     use super::*;
@@ -1879,95 +1878,28 @@ mod cell_impls {
                 .share_ref(|cells| cells.keys().cloned().collect())
         }
 
-        /// Delete an agent's key pair of a cell. This leads to the cell's source
-        /// chain being closed.
-        pub async fn delete_agent_key_for_app(
-            self: Arc<Self>,
-            agent_key: AgentPubKey,
-            app_id: InstalledAppId,
-        ) -> ConductorResult<(ActionHash, KeyRegistration)> {
-            let dpki_service = self
-                .running_services()
-                .dpki
-                .ok_or(ConductorError::DpkiError(
-                    DpkiServiceError::DpkiNotInstalled,
-                ))?;
-            let dpki_state = dpki_service.state().await;
-            let timestamp = Timestamp::now();
-            let key_state = dpki_state
-                .key_state(agent_key.clone(), timestamp.clone())
+        /// Close source chain of the given cell. Closing a source chain makes it read-only.
+        pub async fn close_chain(conductor: Arc<Self>, cell_id: CellId) -> ConductorApiResult<()> {
+            let action_builder = builder::CloseChain::new(cell_id.dna_hash().clone());
+            let source_chain = SourceChain::new(
+                conductor.get_or_create_authored_db(
+                    cell_id.dna_hash(),
+                    cell_id.agent_pubkey().clone(),
+                )?,
+                conductor.get_dht_db(cell_id.dna_hash())?,
+                conductor.get_dht_db_cache(cell_id.dna_hash())?,
+                conductor.keystore().clone(),
+                cell_id.agent_pubkey().clone(),
+            )
+            .await?;
+            source_chain
+                .put_weightless(action_builder, None, ChainTopOrdering::Strict)
                 .await?;
-            match key_state {
-                KeyState::NotFound => Err(ConductorError::DpkiError(
-                    DpkiServiceError::DpkiAgentMissing(agent_key),
-                )),
-                KeyState::Invalid(_) => Err(ConductorError::DpkiError(
-                    DpkiServiceError::DpkiAgentInvalid(agent_key, timestamp),
-                )),
-                KeyState::Valid(_) => {
-                    // get action hash of key registration
-                    let key_meta = dpki_state.query_key_meta(agent_key.clone()).await?;
-                    // sign revocation request
-                    let signature = dpki_service
-                        .cell_id
-                        .agent_pubkey()
-                        .sign_raw(
-                            &self.keystore,
-                            key_meta.key_registration_addr.get_raw_39().into(),
-                        )
-                        .await
-                        .map_err(|e| DpkiServiceError::Lair(e.into()))?;
-                    let signature = deepkey_roundtrip_backward!(Signature, &signature);
-
-                    // disable app, revoke key, close all cells' chains and enable app again
-                    self.clone()
-                        .disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)
-                        .await?;
-                    let revocation = dpki_state
-                        .revoke_key(RevokeKeyInput {
-                            key_revocation: KeyRevocation {
-                                prior_key_registration: key_meta.key_registration_addr,
-                                revocation_authorization: vec![(0, signature)],
-                            },
-                        })
-                        .await?;
-
-                    let state = self.get_state().await?;
-                    let app = state.get_app(&app_id)?;
-                    let close_chain_requests = app.all_cells().map(|cell_id| {
-                        let conductor = self.clone();
-                        let agent_key = agent_key.clone();
-                        async move {
-                            let action_builder =
-                                builder::CloseChain::new(cell_id.dna_hash().clone());
-                            let source_chain = SourceChain::new(
-                                conductor.get_or_create_authored_db(
-                                    cell_id.dna_hash(),
-                                    agent_key.clone(),
-                                )?,
-                                conductor.get_dht_db(cell_id.dna_hash())?,
-                                conductor.get_dht_db_cache(cell_id.dna_hash())?,
-                                conductor.keystore().clone(),
-                                agent_key.clone(),
-                            )
-                            .await?;
-                            source_chain
-                                .put_weightless(action_builder, None, ChainTopOrdering::Strict)
-                                .await?;
-                            let network = conductor
-                                .holochain_p2p
-                                .to_dna(cell_id.dna_hash().clone(), conductor.get_chc(&cell_id));
-                            source_chain.flush(&network).await?;
-                            Ok::<_, ConductorApiError>(())
-                        }
-                    });
-                    futures::future::join_all(close_chain_requests).await;
-
-                    self.clone().enable_app(app_id).await?;
-
-                    Ok(revocation)
-                }
-            }
+            let network = conductor
+                .holochain_p2p
+                .to_dna(cell_id.dna_hash().clone(), conductor.get_chc(&cell_id));
+            source_chain.flush(&network).await?;
+            Ok(())
         }
     }
 }
@@ -2509,6 +2441,83 @@ mod service_impls {
             }
 
             Ok(())
+        }
+    }
+}
+
+/// Methods related to Deepkey operations
+mod deepkey_impls {
+    use holochain_types::deepkey_roundtrip_backward;
+
+    use super::*;
+
+    impl Conductor {
+        /// Delete an agent's key pair of a cell. This leads to the cell's source
+        /// chain being closed.
+        pub async fn delete_agent_key_for_app(
+            self: Arc<Self>,
+            agent_key: AgentPubKey,
+            app_id: InstalledAppId,
+        ) -> ConductorResult<(ActionHash, KeyRegistration)> {
+            let dpki_service = self
+                .running_services()
+                .dpki
+                .ok_or(ConductorError::DpkiError(
+                    DpkiServiceError::DpkiNotInstalled,
+                ))?;
+            let dpki_state = dpki_service.state().await;
+            let timestamp = Timestamp::now();
+            let key_state = dpki_state
+                .key_state(agent_key.clone(), timestamp.clone())
+                .await?;
+            match key_state {
+                KeyState::NotFound => Err(ConductorError::DpkiError(
+                    DpkiServiceError::DpkiAgentMissing(agent_key),
+                )),
+                KeyState::Invalid(_) => Err(ConductorError::DpkiError(
+                    DpkiServiceError::DpkiAgentInvalid(agent_key, timestamp),
+                )),
+                KeyState::Valid(_) => {
+                    // get action hash of key registration
+                    let key_meta = dpki_state.query_key_meta(agent_key.clone()).await?;
+                    // sign revocation request
+                    let signature = dpki_service
+                        .cell_id
+                        .agent_pubkey()
+                        .sign_raw(
+                            &self.keystore,
+                            key_meta.key_registration_addr.get_raw_39().into(),
+                        )
+                        .await
+                        .map_err(|e| DpkiServiceError::Lair(e.into()))?;
+                    let signature = deepkey_roundtrip_backward!(Signature, &signature);
+
+                    // disable app, revoke key, close all cells' chains and enable app again
+                    self.clone()
+                        .disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)
+                        .await?;
+                    let revocation = dpki_state
+                        .revoke_key(RevokeKeyInput {
+                            key_revocation: KeyRevocation {
+                                prior_key_registration: key_meta.key_registration_addr,
+                                revocation_authorization: vec![(0, signature)],
+                            },
+                        })
+                        .await?;
+
+                    // close chain of all cells of this app
+                    let state = self.get_state().await?;
+                    let app = state.get_app(&app_id)?;
+                    let close_chain_requests = app
+                        .all_cells()
+                        .map(|cell_id| Self::close_chain(self.clone(), cell_id));
+                    futures::future::join_all(close_chain_requests).await;
+
+                    self.clone().enable_app(app_id).await?;
+
+                    Ok(revocation)
+                }
+            }
         }
     }
 }
