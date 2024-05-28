@@ -18,8 +18,7 @@ build-workspace:
 		--exclude holochain_cli_sandbox \
 		--exclude hdk_derive \
 		--locked \
-		--all-features --all-targets \
-		--profile fast-test
+		--all-features --all-targets
 
 # Execute tests on all creates.
 # TODO - make hc_sandbox able to run binaries out of target/debug
@@ -31,7 +30,6 @@ test-workspace:
 		--exclude holochain_cli_sandbox \
 		--exclude hdk_derive \
 		--locked \
-		--cargo-profile fast-test \
 		--all-features
 	# hdk_derive cannot currently be tested via nextest
 	# https://github.com/nextest-rs/nextest/issues/267
@@ -39,11 +37,9 @@ test-workspace:
 		cargo build \
 		--manifest-path crates/hdk_derive/Cargo.toml \
 		--locked \
-		--all-features --all-targets \
-		--profile fast-test
+		--all-features --all-targets
 	RUSTFLAGS="-Dwarnings" RUST_BACKTRACE=1 \
 		cargo test \
 		--manifest-path crates/hdk_derive/Cargo.toml \
 		--locked \
-		--all-features \
-		--profile fast-test
+		--all-features

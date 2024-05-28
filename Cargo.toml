@@ -80,11 +80,10 @@ perf = "deny"
 correctness = "deny"
 dbg_macro = "deny"
 
-[profile.fast-test]
-inherits = "test"
+[profile.dev]
 debug = 1
 
-[profile.fast-test.package."*"]
+[profile.dev.package."*"]
 opt-level = 2
 debug = 0
 debug-assertions = false
