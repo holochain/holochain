@@ -12,7 +12,7 @@ env:
   RUSTFLAGS: '-Dwarnings'
   RUST_BACKTRACE: 1
 jobs:
-  unit-test-job-id:
+  test-job-id:
     name: test
     runs-on: ${{ matrix.os }}
     strategy:
@@ -42,7 +42,7 @@ jobs:
       - name: rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          cache-all-crates: 'true'
+          save-if: ${{ github.ref == 'refs/heads/develop' }}
 
       - name: cargo prune
         run: |
@@ -91,7 +91,7 @@ jobs:
     name: 'All Unit Tests Pass'
     runs-on: 'ubuntu-latest'
     needs:
-      - unit-test-job-id
+      - test-job-id
     steps:
       - name: check status
         uses: re-actors/alls-green@release/v1
