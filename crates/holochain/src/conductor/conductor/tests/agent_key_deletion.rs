@@ -17,19 +17,31 @@ use crate::sweettest::{
 #[tokio::test(flavor = "multi_thread")]
 async fn delete_agent_key() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let (dna_file, _, coordinator_zomes) =
-        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd]).await;
+    let (dna_file_1, _, coordinator_zomes_1) =
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let (dna_file_2, _, coordinator_zomes_2) =
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let app = conductor
-        .setup_app("", [&("role".to_string(), dna_file.clone())])
+        .setup_app(
+            "",
+            [
+                &("role_1".to_string(), dna_file_1.clone()),
+                &("role_2".to_string(), dna_file_2.clone()),
+            ],
+        )
         .await
         .unwrap();
     let agent_key = app.agent().clone();
-    let zome = SweetZome::new(
+    let zome_1 = SweetZome::new(
         app.cells()[0].cell_id().clone(),
-        coordinator_zomes[0].name.clone(),
+        coordinator_zomes_1[0].name.clone(),
     );
-    let create_fn_name = "create";
-    let read_fn_name = "reed";
+    let zome_2 = SweetZome::new(
+        app.cells()[1].cell_id().clone(),
+        coordinator_zomes_2[0].name.clone(),
+    );
+    let create_fn_name = "create_entry";
+    let read_fn_name = "get_post";
 
     // no agent key provided, so DPKI should be installed
     // and the generated agent key be valid
@@ -57,12 +69,11 @@ async fn delete_agent_key() {
     );
 
     // writing to the cell should succeed
-    let action_hash: ActionHash = conductor.call(&zome, create_fn_name, ()).await;
+    let action_hash_1: ActionHash = conductor.call(&zome_1, create_fn_name, ()).await;
+    let action_hash_2: ActionHash = conductor.call(&zome_2, create_fn_name, ()).await;
 
     // TODOs
-    // - add multiple cells
     // - disable cell cloning
-    // - make chains read-only
 
     // deleting the key should succeed
     let result = conductor
@@ -88,12 +99,25 @@ async fn delete_agent_key() {
     assert_matches!(result, Err(ConductorError::DpkiError(DpkiServiceError::DpkiAgentInvalid(invalid_key, _))) if invalid_key == agent_key);
 
     // reading an entry should still succeed
-    let result: Option<Record> = conductor.call(&zome, read_fn_name, action_hash).await;
+    let result: Option<Record> = conductor.call(&zome_1, read_fn_name, action_hash_1).await;
+    assert!(result.is_some());
+    let result: Option<Record> = conductor.call(&zome_2, read_fn_name, action_hash_2).await;
     assert!(result.is_some());
 
-    // creating an entry should fail now
+    // creating an entry should fail now for both cells
     let result = conductor
-        .call_fallible::<_, ActionHash>(&zome, create_fn_name, ())
+        .call_fallible::<_, ActionHash>(&zome_1, create_fn_name, ())
+        .await;
+    if let Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) = result {
+        assert_matches!(
+            *workflow_error,
+            WorkflowError::SysValidationError(SysValidationError::ValidationOutcome(ValidationOutcome::DpkiAgentInvalid(invalid_key, _))) if invalid_key == agent_key
+        );
+    } else {
+        panic!("different error than expected");
+    }
+    let result = conductor
+        .call_fallible::<_, ActionHash>(&zome_2, create_fn_name, ())
         .await;
     if let Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) = result {
         assert_matches!(
@@ -104,9 +128,24 @@ async fn delete_agent_key() {
         panic!("different error than expected");
     }
 
-    // last source chain action should be CloseChain
+    // last source chain action in both cells should be CloseChain
     conductor
-        .get_or_create_authored_db(dna_file.dna_hash(), agent_key)
+        .get_or_create_authored_db(dna_file_1.dna_hash(), agent_key.clone())
+        .unwrap()
+        .test_read(|txn| {
+            txn.query_row(
+                "SELECT type FROM Action ORDER BY seq DESC LIMIT 1",
+                [],
+                |row| {
+                    let action_type = row.get::<_, String>("type").unwrap();
+                    assert_eq!(action_type, ActionType::CloseChain.to_string());
+                    Ok(())
+                },
+            )
+            .unwrap();
+        });
+    conductor
+        .get_or_create_authored_db(dna_file_2.dna_hash(), agent_key)
         .unwrap()
         .test_read(|txn| {
             txn.query_row(
