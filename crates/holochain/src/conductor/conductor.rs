@@ -1554,7 +1554,7 @@ mod app_impls {
                 // Update the db
                 let stopped_app = self.add_disabled_app_to_db(app).await?;
 
-                // generate the
+                // Register initial agent key in Deepkey
                 if let (Some((dpki, state)), Some(derivation)) = (dpki, derivation_details) {
                     let dpki_agent = dpki.cell_id.agent_pubkey();
 
