@@ -41,8 +41,6 @@ jobs:
 
       - name: rust cache
         uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/develop' }}
 
       - name: cargo prune
         run: |
@@ -54,9 +52,9 @@ jobs:
         uses: johnwason/vcpkg-action@v6
         id: vcpkg
         with:
-          pkgs: libsodium openssl
           triplet: x64-windows-release
           token: ${{ github.token }}
+          manifest-dir: '.config'
           github-binarycache: true
 
       - name: build windows
