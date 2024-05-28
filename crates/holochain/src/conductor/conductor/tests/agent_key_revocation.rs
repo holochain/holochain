@@ -1,7 +1,9 @@
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_conductor_services::{DpkiServiceError, KeyState};
+use holochain_types::app::{AppError, CreateCloneCellPayload};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::action::ActionType;
+use holochain_zome_types::dependencies::holochain_integrity_types::DnaModifiersOpt;
 use holochain_zome_types::record::Record;
 use holochain_zome_types::timestamp::Timestamp;
 use matches::assert_matches;
@@ -21,12 +23,14 @@ async fn revoke_agent_key() {
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let (dna_file_2, _, coordinator_zomes_2) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let role_1 = "role_1";
+    let role_2 = "role_2";
     let app = conductor
         .setup_app(
             "",
             [
-                &("role_1".to_string(), dna_file_1.clone()),
-                &("role_2".to_string(), dna_file_2.clone()),
+                &(role_1.to_string(), dna_file_1.clone()),
+                &(role_2.to_string(), dna_file_2.clone()),
             ],
         )
         .await
@@ -71,9 +75,6 @@ async fn revoke_agent_key() {
     // writing to the cell should succeed
     let action_hash_1: ActionHash = conductor.call(&zome_1, create_fn_name, ()).await;
     let action_hash_2: ActionHash = conductor.call(&zome_2, create_fn_name, ()).await;
-
-    // TODOs
-    // - disable cell cloning
 
     // deleting the key should succeed
     let result = conductor
@@ -145,7 +146,7 @@ async fn revoke_agent_key() {
             .unwrap();
         });
     conductor
-        .get_or_create_authored_db(dna_file_2.dna_hash(), agent_key)
+        .get_or_create_authored_db(dna_file_2.dna_hash(), agent_key.clone())
         .unwrap()
         .test_read(|txn| {
             txn.query_row(
@@ -159,6 +160,36 @@ async fn revoke_agent_key() {
             )
             .unwrap();
         });
+
+    // cloning cells should fail for both cells
+    let result = conductor
+        .raw_handle()
+        .create_clone_cell(
+            app.installed_app_id(),
+            CreateCloneCellPayload {
+                role_name: role_1.to_string(),
+                membrane_proof: None,
+                modifiers: DnaModifiersOpt::none().with_network_seed("network_seed".into()),
+                name: None,
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_matches!(result, ConductorError::AppError(AppError::CellToCloneHasInvalidAgent(invalid_key)) if invalid_key == agent_key);
+    let result = conductor
+        .raw_handle()
+        .create_clone_cell(
+            app.installed_app_id(),
+            CreateCloneCellPayload {
+                role_name: role_2.to_string(),
+                membrane_proof: None,
+                modifiers: DnaModifiersOpt::none().with_network_seed("network_seed".into()),
+                name: None,
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_matches!(result, ConductorError::AppError(AppError::CellToCloneHasInvalidAgent(invalid_key)) if invalid_key == agent_key);
 }
 
 #[tokio::test(flavor = "multi_thread")]

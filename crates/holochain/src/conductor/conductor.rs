@@ -1913,9 +1913,7 @@ mod clone_cell_impls {
     impl Conductor {
         /// Create a new cell in an existing app based on an existing DNA.
         ///
-        /// # Returns
-        ///
-        /// A struct with the created cell's clone id and cell id.
+        /// NB: Cells of an invalid agent key cannot be cloned. Such calls will fail.
         pub async fn create_clone_cell(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,
@@ -1933,6 +1931,20 @@ mod clone_cell_impls {
                     "neither network_seed nor properties nor origin_time provided for clone cell"
                         .to_string(),
                 ));
+            }
+
+            if let Some(dpki) = self.running_services().dpki {
+                let state = self.get_state().await?;
+                let app = state.get_app(installed_app_id)?;
+                let agent_key = app.agent_key().clone();
+                let key_state = dpki
+                    .state()
+                    .await
+                    .key_state(agent_key.clone(), Timestamp::now())
+                    .await?;
+                if let KeyState::Invalid(_) = key_state {
+                    return Err(AppError::CellToCloneHasInvalidAgent(agent_key).into());
+                }
             }
 
             // add cell to app
