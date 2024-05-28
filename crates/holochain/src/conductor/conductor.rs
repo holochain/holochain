@@ -1842,6 +1842,7 @@ mod app_impls {
 /// Methods related to cell access
 mod cell_impls {
     use holochain_types::deepkey_roundtrip_backward;
+    use holochain_zome_types::action::builder;
 
     use super::*;
 
@@ -1904,10 +1905,6 @@ mod cell_impls {
                     DpkiServiceError::DpkiAgentInvalid(agent_key, timestamp),
                 )),
                 KeyState::Valid(_) => {
-                    // disable app, then revoke key and enable app again
-                    self.clone()
-                        .disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)
-                        .await?;
                     // get action hash of key registration
                     let key_meta = dpki_state.query_key_meta(agent_key.clone()).await?;
                     // sign revocation request
@@ -1921,6 +1918,11 @@ mod cell_impls {
                         .await
                         .map_err(|e| DpkiServiceError::Lair(e.into()))?;
                     let signature = deepkey_roundtrip_backward!(Signature, &signature);
+
+                    // disable app, revoke key, close all cells' chains and enable app again
+                    self.clone()
+                        .disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)
+                        .await?;
                     let revocation = dpki_state
                         .revoke_key(RevokeKeyInput {
                             key_revocation: KeyRevocation {
@@ -1929,7 +1931,40 @@ mod cell_impls {
                             },
                         })
                         .await?;
+
+                    let state = self.get_state().await?;
+                    let app = state.get_app(&app_id)?;
+                    let close_chain_requests = app.all_cells().map(|cell_id| {
+                        let conductor = self.clone();
+                        let agent_key = agent_key.clone();
+                        async move {
+                            let action_builder =
+                                builder::CloseChain::new(cell_id.dna_hash().clone());
+                            let source_chain = SourceChain::new(
+                                conductor.get_or_create_authored_db(
+                                    cell_id.dna_hash(),
+                                    agent_key.clone(),
+                                )?,
+                                conductor.get_dht_db(cell_id.dna_hash())?,
+                                conductor.get_dht_db_cache(cell_id.dna_hash())?,
+                                conductor.keystore().clone(),
+                                agent_key.clone(),
+                            )
+                            .await?;
+                            source_chain
+                                .put_weightless(action_builder, None, ChainTopOrdering::Strict)
+                                .await?;
+                            let network = conductor
+                                .holochain_p2p
+                                .to_dna(cell_id.dna_hash().clone(), conductor.get_chc(&cell_id));
+                            source_chain.flush(&network).await?;
+                            Ok::<_, ConductorApiError>(())
+                        }
+                    });
+                    futures::future::join_all(close_chain_requests).await;
+
                     self.clone().enable_app(app_id).await?;
+
                     Ok(revocation)
                 }
             }

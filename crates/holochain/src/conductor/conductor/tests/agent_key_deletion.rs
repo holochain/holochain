@@ -1,16 +1,10 @@
-use hdk::prelude::{app_entry, wasm_error, WasmError, WasmErrorInner};
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_conductor_services::{DpkiServiceError, KeyState};
-use holochain_serialized_bytes::{holochain_serial, SerializedBytes};
-use holochain_zome_types::action::ChainTopOrdering;
-use holochain_zome_types::entry::{
-    AppEntryBytes, CreateInput, Entry, EntryDefLocation, EntryError, GetInput, GetOptions,
-};
-use holochain_zome_types::entry_def::{EntryDef, EntryVisibility};
-use holochain_zome_types::record::{Record, RecordEntry};
+use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::action::ActionType;
+use holochain_zome_types::record::Record;
 use holochain_zome_types::timestamp::Timestamp;
 use matches::assert_matches;
-use serde::{Deserialize, Serialize};
 
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::{conductor::ConductorError, CellError};
@@ -23,36 +17,10 @@ use crate::sweettest::{
 #[tokio::test(flavor = "multi_thread")]
 async fn delete_agent_key() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    // let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentInfo]).await;
-
-    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-    pub struct Post(String);
-    holochain_serial!(Post);
-    app_entry!(Post);
-
-    let entry_def = EntryDef::default_from_id("entry_def_id");
-    let create_fn_name = "function_create";
-    let read_fn_name = "function_read";
-    let zomes = SweetInlineZomes::new(vec![entry_def], 0)
-        .function(create_fn_name, |api, _: ()| {
-            let entry: Entry = Post("".to_string()).try_into().unwrap();
-            Ok(api.create(CreateInput::new(
-                EntryDefLocation::app(0, 0),
-                EntryVisibility::Public,
-                entry,
-                ChainTopOrdering::Relaxed,
-            ))?)
-        })
-        .function(read_fn_name, |api, action_hash: ActionHash| {
-            Ok(api.get(vec![GetInput {
-                any_dht_hash: action_hash.into(),
-                get_options: GetOptions::default(),
-            }])?)
-        });
-
-    let (dna_file, _, coordinator_zomes) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let (dna_file, _, coordinator_zomes) =
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd]).await;
     let app = conductor
-        .setup_app("", [&("role".to_string(), dna_file)])
+        .setup_app("", [&("role".to_string(), dna_file.clone())])
         .await
         .unwrap();
     let agent_key = app.agent().clone();
@@ -60,6 +28,8 @@ async fn delete_agent_key() {
         app.cells()[0].cell_id().clone(),
         coordinator_zomes[0].name.clone(),
     );
+    let create_fn_name = "create";
+    let read_fn_name = "reed";
 
     // no agent key provided, so DPKI should be installed
     // and the generated agent key be valid
@@ -91,6 +61,8 @@ async fn delete_agent_key() {
 
     // TODOs
     // - add multiple cells
+    // - disable cell cloning
+    // - make chains read-only
 
     // deleting the key should succeed
     let result = conductor
@@ -116,8 +88,8 @@ async fn delete_agent_key() {
     assert_matches!(result, Err(ConductorError::DpkiError(DpkiServiceError::DpkiAgentInvalid(invalid_key, _))) if invalid_key == agent_key);
 
     // reading an entry should still succeed
-    let result: Vec<Option<Record>> = conductor.call(&zome, read_fn_name, action_hash).await;
-    assert!(result.len() == 1 && result[0].is_some());
+    let result: Option<Record> = conductor.call(&zome, read_fn_name, action_hash).await;
+    assert!(result.is_some());
 
     // creating an entry should fail now
     let result = conductor
@@ -131,6 +103,23 @@ async fn delete_agent_key() {
     } else {
         panic!("different error than expected");
     }
+
+    // last source chain action should be CloseChain
+    conductor
+        .get_or_create_authored_db(dna_file.dna_hash(), agent_key)
+        .unwrap()
+        .test_read(|txn| {
+            txn.query_row(
+                "SELECT type FROM Action ORDER BY seq DESC LIMIT 1",
+                [],
+                |row| {
+                    let action_type = row.get::<_, String>("type").unwrap();
+                    assert_eq!(action_type, ActionType::CloseChain.to_string());
+                    Ok(())
+                },
+            )
+            .unwrap();
+        });
 }
 
 #[tokio::test(flavor = "multi_thread")]
