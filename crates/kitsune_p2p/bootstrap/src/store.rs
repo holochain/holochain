@@ -32,7 +32,7 @@ impl StoreEntry {
             kitsune_p2p_types::codec::rmp_decode(&mut bytes)?;
 
         if agent != info.agent {
-            return Err(std::io::Error::other("agent mismatch"));
+            return Err(std::io::Error::other("signed inner agent does not match unsigned outer agent"));
         }
 
         Ok(StoreEntry {
