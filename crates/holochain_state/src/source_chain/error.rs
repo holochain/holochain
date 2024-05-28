@@ -42,9 +42,6 @@ pub enum SourceChainError {
     #[error(transparent)]
     ScratchError(#[from] ScratchError),
 
-    #[error("Attempted to write to a read-only chain.")]
-    ChainReadOnly,
-
     #[error("Attempted to write anything other than the countersigning session entry while the chain was locked for a countersigning session.")]
     ChainLocked,
 
