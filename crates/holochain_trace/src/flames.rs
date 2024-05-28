@@ -33,22 +33,6 @@ impl Visit for EventFieldFlameVisitor {
     }
 }
 
-pub(crate) struct FlameTimedConsole {
-    path: PathBuf,
-}
-
-impl FlameTimedConsole {
-    pub(crate) fn new(path: PathBuf) -> Self {
-        Self { path }
-    }
-}
-
-impl Drop for FlameTimedConsole {
-    fn drop(&mut self) {
-        save_flamegraph(self.path.clone());
-    }
-}
-
 pub(crate) struct FlameTimed(InMemoryWriter);
 
 impl FlameTimed {
@@ -91,30 +75,6 @@ pub(crate) fn toml_path() -> Option<PathBuf> {
         None
     })?;
     Some(PathBuf::from(path))
-}
-
-fn save_flamegraph(path: PathBuf) -> Option<()> {
-    println!("path {:?}", path);
-    let now = chrono::Local::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    let inf = std::fs::File::open(path.join("flames.folded"))
-        .ok()
-        .or_else(|| {
-            eprintln!("failed to create flames dir");
-            None
-        })?;
-    let reader = std::io::BufReader::new(inf);
-
-    let out = std::fs::File::create(path.join(format!("tracing_flame_{}.svg", now)))
-        .ok()
-        .or_else(|| {
-            eprintln!("failed to create flames inferno");
-            None
-        })?;
-    let writer = std::io::BufWriter::new(out);
-
-    let mut opts = inferno::flamegraph::Options::default();
-    inferno::flamegraph::from_reader(&mut opts, reader, writer).unwrap();
-    Some(())
 }
 
 fn parse_time(samples: &mut usize, value: &dyn std::fmt::Debug) {
