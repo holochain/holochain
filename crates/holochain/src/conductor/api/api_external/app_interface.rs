@@ -133,6 +133,8 @@ impl AppInterfaceApi {
             AppRequest::ListWasmHostFunctions => Ok(AppResponse::ListWasmHostFunctions(
                 self.conductor_handle.list_wasm_host_functions().await?,
             )),
+            AppRequest::ProvideMemproofs(memproofs) => todo!(),
+            AppRequest::RotateAppAgentKey => todo!(),
         }
     }
 }

@@ -62,7 +62,7 @@ impl AppBundle {
         self,
         dna_store: &impl DnaStore,
         agent: AgentPubKey,
-        membrane_proofs: HashMap<RoleName, MembraneProof>,
+        membrane_proofs: MemproofMap,
     ) -> AppBundleResult<AppRoleResolution> {
         let AppManifestValidated { name: _, roles } = self.manifest().clone().validate()?;
         let bundle = Arc::new(self);

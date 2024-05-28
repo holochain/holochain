@@ -155,10 +155,13 @@ pub struct InstallAppPayload {
 #[derive(Debug, serde::Serialize, serde::Deserialize, derive_more::From)]
 pub enum MemproofProvisioning {
     /// Membrane proofs are provided here and now
-    Provided(HashMap<RoleName, MembraneProof>),
+    Provided(MemproofMap),
     /// Membrane proofs will be provided later
     Deferred,
 }
+
+/// Alias
+pub type MemproofMap = HashMap<RoleName, MembraneProof>;
 
 impl MemproofProvisioning {
     /// No memproofs provided, and none will ever be provided.

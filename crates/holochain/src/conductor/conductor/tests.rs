@@ -1233,4 +1233,11 @@ async fn test_deferred_provisioning() {
             ConductorError::CellDisabled(_)
         ))
     );
+
+    //- Now provide the memproofs
+    todo!("now provide the memproofs");
+
+    //- Status is now Running and there is 1 cell assignment
+    let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    assert_eq!(app_info.status, AppInfoStatus::Running);
 }

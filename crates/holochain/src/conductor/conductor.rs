@@ -1679,6 +1679,44 @@ mod app_impls {
             Ok(maybe_app_info)
         }
 
+        pub async fn provide_memproofs(
+            &self,
+            installed_app_id: &InstalledAppId,
+            memproofs: MemproofMap,
+        ) -> ConductorResult<()> {
+            let (state, _) = self
+                .update_state_prime({
+                    let installed_app_id = installed_app_id.clone();
+                    move |mut state| {
+                        let app = state.get_app_mut(&installed_app_id)?;
+                        app.provide_membrane_proof(memproofs)?;
+                        Ok((state, ()))
+                    }
+                })
+                .await?;
+            self.create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
+                .await?;
+            Ok(())
+        }
+
+        pub async fn rotate_app_key(
+            &self,
+            installed_app_id: &InstalledAppId,
+        ) -> ConductorResult<()> {
+            let new_agent_key = todo!();
+            let (state, _) = self
+                .update_state_prime({
+                    let installed_app_id = installed_app_id.clone();
+                    move |mut state| {
+                        let app = state.get_app_mut(&installed_app_id)?;
+                        app.rotate_agent_key(new_agent_key)?;
+                        Ok((state, ()))
+                    }
+                })
+                .await?;
+            Ok(())
+        }
+
         fn get_app_info_inner(
             &self,
             app_id: &InstalledAppId,
