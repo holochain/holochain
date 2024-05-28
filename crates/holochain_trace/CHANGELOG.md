@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Remove deprecated flame graph output `FlameTimedConsole`.
+
 ## 0.4.0-dev.2
 
 ## 0.4.0-dev.1

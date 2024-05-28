@@ -72,15 +72,3 @@ pub async fn await_consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCel
         .collect();
     consistency_dbs(&all_cell_dbs[..], timeout.into().into_duration()).await
 }
-
-/// Wait for all cells to reach consistency for 10 seconds
-#[deprecated = "Use `await_consistency()` with a timeout of `10` instead"]
-pub async fn consistency_10s<'a, I: IntoIterator<Item = &'a SweetCell>>(all_cells: I) {
-    await_consistency(10, all_cells).await.unwrap()
-}
-
-/// Wait for all cells to reach consistency for 60 seconds
-#[deprecated = "Use `await_consistency()` with a timeout of `60` instead"]
-pub async fn consistency_60s<'a, I: IntoIterator<Item = &'a SweetCell>>(all_cells: I) {
-    await_consistency(60, all_cells).await.unwrap()
-}
