@@ -1,6 +1,5 @@
-use crate::spacetime::Topology;
-
 use super::{Arq, PeerView, PeerViewQ};
+use crate::spacetime::Topology;
 
 /// A Strategy for generating PeerViews.
 /// The enum allows us to add new strategies over time.

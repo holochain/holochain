@@ -41,7 +41,9 @@ async fn test_cell_handle_publish() {
         .await
         .unwrap();
     handle.register_dna(dna_file.clone()).await.unwrap();
-    let wasmer_module_cache = Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(db_dir))));
+    let wasmer_module_cache = Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(
+        db_dir.join("wasm-cache"),
+    ))));
 
     let ribosome = RealRibosome::new(dna_file, wasmer_module_cache)
         .await
