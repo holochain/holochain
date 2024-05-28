@@ -27,6 +27,7 @@ warp = "0.3"
 
 [dev-dependencies]
 kitsune_p2p_bootstrap = { path = ".", features = ["test_utils"] }
+kitsune_p2p_types = { version = "^0.4.0-dev.4", path = "../types", features = ["test_utils"] }
 kitsune_p2p = { path = "../kitsune_p2p", features = ["sqlite"] }
 fixt = { path = "../../fixt", version = "^0.4.0-dev.1"}
 criterion = "0.5.1"
