@@ -7,6 +7,7 @@ use holochain_zome_types::dependencies::holochain_integrity_types::DnaModifiersO
 use holochain_zome_types::record::Record;
 use holochain_zome_types::timestamp::Timestamp;
 use matches::assert_matches;
+use rusqlite::Row;
 
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::{conductor::ConductorError, CellError};
@@ -130,63 +131,42 @@ async fn revoke_agent_key() {
     }
 
     // last source chain action in both cells should be CloseChain
+    let sql = "SELECT type FROM Action ORDER BY seq DESC LIMIT 1";
+    let row_fn = |row: &Row| {
+        let action_type = row.get::<_, String>("type").unwrap();
+        assert_eq!(action_type, ActionType::CloseChain.to_string());
+        Ok(())
+    };
     conductor
         .get_or_create_authored_db(dna_file_1.dna_hash(), agent_key.clone())
         .unwrap()
-        .test_read(|txn| {
-            txn.query_row(
-                "SELECT type FROM Action ORDER BY seq DESC LIMIT 1",
-                [],
-                |row| {
-                    let action_type = row.get::<_, String>("type").unwrap();
-                    assert_eq!(action_type, ActionType::CloseChain.to_string());
-                    Ok(())
-                },
-            )
-            .unwrap();
+        .test_read(move |txn| {
+            txn.query_row(sql, [], row_fn.clone()).unwrap();
         });
     conductor
         .get_or_create_authored_db(dna_file_2.dna_hash(), agent_key.clone())
         .unwrap()
-        .test_read(|txn| {
-            txn.query_row(
-                "SELECT type FROM Action ORDER BY seq DESC LIMIT 1",
-                [],
-                |row| {
-                    let action_type = row.get::<_, String>("type").unwrap();
-                    assert_eq!(action_type, ActionType::CloseChain.to_string());
-                    Ok(())
-                },
-            )
-            .unwrap();
+        .test_read(move |txn| {
+            txn.query_row(sql, [], row_fn).unwrap();
         });
 
     // cloning cells should fail for both cells
+    let mut create_clone_cell_payload = CreateCloneCellPayload {
+        role_name: role_1.to_string(),
+        membrane_proof: None,
+        modifiers: DnaModifiersOpt::none().with_network_seed("network_seed".into()),
+        name: None,
+    };
     let result = conductor
         .raw_handle()
-        .create_clone_cell(
-            app.installed_app_id(),
-            CreateCloneCellPayload {
-                role_name: role_1.to_string(),
-                membrane_proof: None,
-                modifiers: DnaModifiersOpt::none().with_network_seed("network_seed".into()),
-                name: None,
-            },
-        )
+        .create_clone_cell(app.installed_app_id(), create_clone_cell_payload.clone())
         .await
         .unwrap_err();
     assert_matches!(result, ConductorError::AppError(AppError::CellToCloneHasInvalidAgent(invalid_key)) if invalid_key == agent_key);
+    create_clone_cell_payload.role_name = role_2.to_string();
     let result = conductor
         .raw_handle()
-        .create_clone_cell(
-            app.installed_app_id(),
-            CreateCloneCellPayload {
-                role_name: role_2.to_string(),
-                membrane_proof: None,
-                modifiers: DnaModifiersOpt::none().with_network_seed("network_seed".into()),
-                name: None,
-            },
-        )
+        .create_clone_cell(app.installed_app_id(), create_clone_cell_payload)
         .await
         .unwrap_err();
     assert_matches!(result, ConductorError::AppError(AppError::CellToCloneHasInvalidAgent(invalid_key)) if invalid_key == agent_key);
