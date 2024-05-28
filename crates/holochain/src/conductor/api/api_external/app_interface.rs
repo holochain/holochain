@@ -100,6 +100,14 @@ impl AppInterfaceApi {
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }
+            AppRequest::RevokeAgentKey(payload) => {
+                let RevokeAgentKeyPayload { agent_key, app_id } = *payload;
+                self.conductor_handle
+                    .clone()
+                    .revoke_agent_key_for_app(agent_key, app_id)
+                    .await?;
+                Ok(AppResponse::AgentKeyRevoked)
+            }
             AppRequest::CreateCloneCell(payload) => {
                 let clone_cell = self
                     .conductor_handle

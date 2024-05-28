@@ -15,7 +15,7 @@ use crate::sweettest::{
 };
 
 #[tokio::test(flavor = "multi_thread")]
-async fn delete_agent_key() {
+async fn revoke_agent_key() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file_1, _, coordinator_zomes_1) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
@@ -61,7 +61,7 @@ async fn delete_agent_key() {
     let non_existing_key = AgentPubKey::from_raw_32(vec![0; 32]);
     let result = conductor
         .clone()
-        .delete_agent_key_for_app(non_existing_key.clone(), app.installed_app_id().clone())
+        .revoke_agent_key_for_app(non_existing_key.clone(), app.installed_app_id().clone())
         .await;
     assert_matches!(
         result,
@@ -78,7 +78,7 @@ async fn delete_agent_key() {
     // deleting the key should succeed
     let result = conductor
         .clone()
-        .delete_agent_key_for_app(agent_key.clone(), app.installed_app_id().clone())
+        .revoke_agent_key_for_app(agent_key.clone(), app.installed_app_id().clone())
         .await;
     assert_matches!(result, Ok((_, _)));
 
@@ -94,7 +94,7 @@ async fn delete_agent_key() {
     // deleting agent key again should return a "key invalid" error
     let result = conductor
         .clone()
-        .delete_agent_key_for_app(agent_key.clone(), app.installed_app_id().clone())
+        .revoke_agent_key_for_app(agent_key.clone(), app.installed_app_id().clone())
         .await;
     assert_matches!(result, Err(ConductorError::DpkiError(DpkiServiceError::DpkiAgentInvalid(invalid_key, _))) if invalid_key == agent_key);
 
@@ -177,7 +177,7 @@ async fn delete_agent_key_without_dpki_installed_fails() {
     // calling delete key without dpki installed should return an error
     let result = conductor
         .clone()
-        .delete_agent_key_for_app(agent_key, app.installed_app_id().clone())
+        .revoke_agent_key_for_app(agent_key, app.installed_app_id().clone())
         .await;
     assert_matches!(
         result,

@@ -33,6 +33,19 @@ pub enum AppRequest {
     /// [`AppResponse::ZomeCalled`]
     CallZome(Box<ZomeCall>),
 
+    /// Revoke an agent key for an app.
+    ///
+    /// When an agent key is revoked, it becomes invalid and can no longer be used to author
+    /// actions for that app. The source chain of all cells of the app are made read-only.
+    /// No further actions can be added to the chains by anyone. They can still be queried.
+    ///
+    /// Cloning a cell of this app will fail, as the new clone cell could not be written to.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::AgentKeyRevoked`]
+    RevokeAgentKey(Box<RevokeAgentKeyPayload>),
+
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
     ///
     /// Using the provided, already-registered DNA, create a new DNA with a unique
@@ -99,6 +112,12 @@ pub enum AppResponse {
     ///
     /// [msgpack]: https://msgpack.org/
     ZomeCalled(Box<ExternIO>),
+
+    /// The successful response to an [`AppRequest::RevokeAgentKey`].
+    ///
+    /// The agent key has been revoked and is from now on invalid for all cells of the app. No further actions
+    /// can be authored for the cells' source chains as they are read-only now.
+    AgentKeyRevoked,
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///
@@ -391,6 +410,13 @@ impl AppInfo {
             manifest,
         }
     }
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+/// The parameters to revoke an agent for an app.
+pub struct RevokeAgentKeyPayload {
+    pub agent_key: AgentPubKey,
+    pub app_id: InstalledAppId,
 }
 
 /// A flat, slightly more API-friendly representation of [`AppInfo`]

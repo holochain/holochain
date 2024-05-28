@@ -2452,9 +2452,9 @@ mod deepkey_impls {
     use super::*;
 
     impl Conductor {
-        /// Delete an agent's key pair of a cell. This leads to the cell's source
-        /// chain being closed.
-        pub async fn delete_agent_key_for_app(
+        /// Revoke an agent's key pair for all cells of an app. The agent key is made invalid and
+        /// source chains of all cells of the app are made read-only.
+        pub async fn revoke_agent_key_for_app(
             self: Arc<Self>,
             agent_key: AgentPubKey,
             app_id: InstalledAppId,
