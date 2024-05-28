@@ -984,7 +984,9 @@ impl StoppedAppReason {
         match status {
             AppStatus::Paused(reason) => Some(Self::Paused(reason.clone())),
             AppStatus::Disabled(reason) => Some(Self::Disabled(reason.clone())),
-            AppStatus::AwaitingMemproofs => Some(Self::Disabled(DisabledAppReason::Partial)),
+            AppStatus::AwaitingMemproofs => {
+                Some(Self::Disabled(DisabledAppReason::AwaitingMemproofs))
+            }
             AppStatus::Running => None,
         }
     }
@@ -1015,7 +1017,7 @@ pub enum DisabledAppReason {
     /// The app is freshly installed, and never started
     NeverStarted,
     /// The app is partially installed, i.e. awaiting membrane proofs
-    Partial,
+    AwaitingMemproofs,
     /// The disabling was done manually by the user (via admin interface)
     User,
     /// The disabling was due to an UNRECOVERABLE error

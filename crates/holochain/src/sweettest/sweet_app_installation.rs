@@ -21,7 +21,7 @@ pub async fn app_bundle_from_dnas<'a>(
                 dna: AppRoleDnaManifest {
                     location: Some(DnaLocation::Bundled(path.clone())),
                     modifiers,
-                    installed_hash: None,
+                    installed_hash: Some(installed_dna_hash.into()),
                     clone_limit: 255,
                 },
                 provisioning: Some(CellProvisioning::Create { deferred: false }),

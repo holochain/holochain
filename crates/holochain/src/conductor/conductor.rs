@@ -1474,7 +1474,7 @@ mod app_impls {
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
 
-            match dbg!(membrane_proofs) {
+            match membrane_proofs {
                 MemproofProvisioning::Provided(membrane_proofs) => {
                     let ops = bundle
                         .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
