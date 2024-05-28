@@ -83,7 +83,7 @@ pub enum AppRequest {
     /// # Returns
     ///
     /// [`AppResponse::Ok`]
-    ProvideMemproofs(HashMap<RoleName, MembraneProof>),
+    ProvideMemproofs(MemproofMap),
 
     /// Replace the agent key associated with this app with a new one.
     /// The new key will be created using the same method which is used

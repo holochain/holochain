@@ -423,13 +423,16 @@ impl From<StoppedApp> for InstalledApp {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InstalledAppCommon {
     /// The unique identifier for an installed app in this conductor
-    installed_app_id: InstalledAppId,
+    pub installed_app_id: InstalledAppId,
+
     /// The agent key used to install this app.
-    agent_key: AgentPubKey,
+    pub agent_key: AgentPubKey,
+
     /// Assignments of DNA roles to cells and their clones, as specified in the AppManifest
-    role_assignments: HashMap<RoleName, AppRoleAssignment>,
+    pub role_assignments: HashMap<RoleName, AppRoleAssignment>,
+
     /// The manifest used to install the app.
-    manifest: AppManifest,
+    pub manifest: AppManifest,
 }
 
 impl InstalledAppCommon {
@@ -1033,23 +1036,28 @@ pub struct AppRoleAssignment {
     /// The Id of the Cell which will be provisioned for this role.
     /// This also identifies the basis for cloned DNAs, and this is how the
     /// Agent is determined for clones (always the same as the provisioned cell).
-    base_cell_id: CellId,
+    pub base_cell_id: CellId,
+
     /// Records whether the base cell has actually been provisioned or not.
     /// If true, then `base_cell_id` refers to an actual existing Cell.
     /// If false, then `base_cell_id` is just recording what that cell will be
     /// called in the future.
-    is_provisioned: bool,
+    pub is_provisioned: bool,
+
     /// The number of allowed clone cells.
-    clone_limit: u32,
+    pub clone_limit: u32,
+
     /// The index of the next clone cell to be created.
-    next_clone_index: u32,
+    pub next_clone_index: u32,
+
     /// Cells which were cloned at runtime. The length cannot grow beyond
     /// `clone_limit`.
-    clones: HashMap<CloneId, CellId>,
+    pub clones: HashMap<CloneId, CellId>,
+
     /// Clone cells that have been disabled. These cells cannot be called
     /// any longer and are not returned as part of the app info either.
     /// Disabled clone cells can be deleted through the Admin API.
-    disabled_clones: HashMap<CloneId, CellId>,
+    pub disabled_clones: HashMap<CloneId, CellId>,
 }
 
 impl AppRoleAssignment {

@@ -1679,42 +1679,71 @@ mod app_impls {
             Ok(maybe_app_info)
         }
 
+        /// Run genesis for cells of an app which was installed using
+        /// [`MemproofProvisioning::Deferred`]
         pub async fn provide_memproofs(
-            &self,
+            self: Arc<Self>,
             installed_app_id: &InstalledAppId,
             memproofs: MemproofMap,
         ) -> ConductorResult<()> {
-            let (state, _) = self
-                .update_state_prime({
-                    let installed_app_id = installed_app_id.clone();
-                    move |mut state| {
-                        let app = state.get_app_mut(&installed_app_id)?;
-                        app.provide_membrane_proof(memproofs)?;
-                        Ok((state, ()))
-                    }
+            let state = self.get_state().await?;
+
+            let app = state.get_app(&installed_app_id)?;
+            let cells_to_genesis = memproofs
+                .into_iter()
+                .filter_map(|(role_name, memproof)| {
+                    app.roles().get(&role_name).and_then(|role| {
+                        if role.is_provisioned {
+                            Some((role.base_cell_id.clone(), Some(memproof)))
+                        } else {
+                            None
+                        }
+                    })
                 })
+                .collect();
+
+            crate::conductor::conductor::genesis_cells(self.clone(), cells_to_genesis).await?;
+
+            self.update_state({
+                let installed_app_id = installed_app_id.clone();
+                move |mut state| {
+                    let app = state.get_app_mut(&installed_app_id)?;
+                    app.status = AppStatus::Disabled(DisabledAppReason::NeverStarted);
+                    Ok(state)
+                }
+            })
+            .await?;
+
+            self.clone()
+                .create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
                 .await?;
-            self.create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
+            let app_ids: HashSet<_> = [installed_app_id.to_owned()].into_iter().collect();
+            let delta = self
+                .clone()
+                .reconcile_app_status_with_cell_status(Some(app_ids.clone()))
                 .await?;
+            self.process_app_status_fx(delta, Some(app_ids)).await?;
             Ok(())
         }
 
-        pub async fn rotate_app_key(
+        /// Update the agent key for an installed app
+        pub async fn rotate_app_agent_key(
             &self,
             installed_app_id: &InstalledAppId,
-        ) -> ConductorResult<()> {
-            let new_agent_key = todo!();
-            let (state, _) = self
-                .update_state_prime({
-                    let installed_app_id = installed_app_id.clone();
-                    move |mut state| {
-                        let app = state.get_app_mut(&installed_app_id)?;
-                        app.rotate_agent_key(new_agent_key)?;
-                        Ok((state, ()))
-                    }
-                })
-                .await?;
-            Ok(())
+        ) -> ConductorResult<AgentPubKey> {
+            // TODO: use key derivation for DPKI
+            let new_agent_key = self.keystore().new_sign_keypair_random().await?;
+            let ret = new_agent_key.clone();
+            self.update_state({
+                let installed_app_id = installed_app_id.clone();
+                move |mut state| {
+                    let app = state.get_app_mut(&installed_app_id)?;
+                    app.agent_key = new_agent_key;
+                    Ok(state)
+                }
+            })
+            .await?;
+            Ok(ret)
         }
 
         fn get_app_info_inner(
@@ -2150,7 +2179,7 @@ mod app_status_impls {
                                     // If not all required cells are running, pause the app
                                     let missing: Vec<_> = app
                                         .required_cells()
-                                        .filter(|id| !cell_ids.contains(id))
+                                        .filter(|id| !cell_ids.contains(dbg!(id)))
                                         .collect();
                                     if !missing.is_empty() {
                                         let reason = PausedAppReason::Error(format!(

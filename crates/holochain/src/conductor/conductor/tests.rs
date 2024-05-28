@@ -1234,10 +1234,28 @@ async fn test_deferred_provisioning() {
         ))
     );
 
+    //- Rotate app agent key a few times just for the heck of it
+    // TODO: not yet implemented
+    // let agent1 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
+    // let agent2 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
+    // let agent3 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
+    // assert_ne!(agent_key, agent1);
+    // assert_ne!(agent1, agent2);
+    // assert_ne!(agent2, agent3);
+
     //- Now provide the memproofs
-    todo!("now provide the memproofs");
+    conductor
+        .clone()
+        .provide_memproofs(&app_id, MemproofMap::new())
+        .await
+        .unwrap();
+
+    conductor.enable_app(app_id.clone()).await.unwrap();
 
     //- Status is now Running and there is 1 cell assignment
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
     assert_eq!(app_info.status, AppInfoStatus::Running);
+
+    //- And now we can make a zome call successfully
+    let _: ActionHash = conductor.call(&cell.zome("zome"), "create", ()).await;
 }

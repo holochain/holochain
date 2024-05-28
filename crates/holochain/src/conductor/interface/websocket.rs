@@ -1313,7 +1313,7 @@ pub mod test {
     /// - `RotateAppAgent`
     /// - `AgentInfo`
     #[tokio::test(flavor = "multi_thread")]
-    fn test_app_websocket_availability_for_deferred_memproof_apps() {
+    async fn test_app_websocket_availability_for_deferred_memproof_apps() {
         todo!()
     }
 
