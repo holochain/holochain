@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.4.0-dev.5
+
+- Remove deprecated method `TestDbs::persist`.
+
 ## 0.4.0-dev.4
 
 ## 0.4.0-dev.3
