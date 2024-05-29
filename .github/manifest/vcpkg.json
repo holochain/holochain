@@ -4,7 +4,7 @@
     "openssl",
     {
       "name": "libsodium",
-      "version": "1.0.19-RELEASE"
+      "version": "1.0.19"
     }
   ]
 }

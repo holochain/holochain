@@ -42,10 +42,10 @@ jobs:
       - name: rust cache
         uses: Swatinem/rust-cache@v2
 
-      - name: cargo prune
+      - name: cargo sweep stamp
         run: |
-          cargo install cargo-prune
-          cargo prune
+          cargo install cargo-sweep
+          cargo sweep --stamp
 
       - name: install vcpkg packages
         if: matrix.os == 'windows-latest'
@@ -54,7 +54,7 @@ jobs:
         with:
           triplet: x64-windows-release
           token: ${{ github.token }}
-          manifest-dir: '.config'
+          manifest-dir: ${{ github.workspace }}/.github/manifest
           github-binarycache: true
 
       - name: build windows
@@ -81,8 +81,8 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: make test-workspace
 
-      - name: cargo prune after
-        run: cargo prune
+      - name: cargo sweep file
+        run: cargo sweep --file
 
   tests-pass:
     if: ${{ always() }}
