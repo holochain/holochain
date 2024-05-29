@@ -104,7 +104,3 @@ where
     /// [`EntryHash`] of the deleted entry.
     RegisterDelete(OpDelete),
 }
-
-#[deprecated = "use the name FlatOp instead"]
-/// Alias for `FlatOp` for backward compatibility
-pub type OpType<ET, LT> = FlatOp<ET, LT>;
