@@ -217,7 +217,6 @@ impl AppBundle {
         expected_hash: Option<&DnaHashB64>,
         modifiers: DnaModifiersOpt,
     ) -> AppBundleResult<DnaFile> {
-        dbg!(&modifiers);
         let dna_file = if let Some(expected_hash) = expected_hash {
             let (dna_file, original_hash) =
                 if let Some(mut dna_file) = dna_store.get_dna(&expected_hash.clone().into()) {
@@ -227,7 +226,6 @@ impl AppBundle {
                 } else {
                     self.resolve_location(location, modifiers).await?
                 };
-            dbg!(dna_file.dna_def());
             let expected_hash: DnaHash = expected_hash.clone().into();
             if expected_hash != original_hash {
                 return Err(AppBundleError::CellResolutionFailure(

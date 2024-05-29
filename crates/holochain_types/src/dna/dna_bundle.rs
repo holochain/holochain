@@ -143,14 +143,14 @@ impl DnaBundle {
             .dna_def()
             .integrity_zomes
             .iter()
-            .find(|&(_, z)| matches!(z.as_any_zome_def(), ZomeDef::Inline { .. }))
-            .is_some()
-            || dna_file
-                .dna_def()
-                .coordinator_zomes
-                .iter()
-                .find(|&(_, z)| matches!(z.as_any_zome_def(), ZomeDef::Inline { .. }))
-                .is_some();
+            .any(|(_, z)| matches!(z.as_any_zome_def(), ZomeDef::Inline { .. }))
+            || {
+                dna_file
+                    .dna_def()
+                    .coordinator_zomes
+                    .iter()
+                    .any(|(_, z)| matches!(z.as_any_zome_def(), ZomeDef::Inline { .. }))
+            };
         if contains_inline_zome {
             panic!("Can't use inline zomes in a DnaBundle!");
         }
