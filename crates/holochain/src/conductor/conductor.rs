@@ -1720,6 +1720,8 @@ mod app_impls {
         }
 
         /// Update the agent key for an installed app
+        // TODO: fully implement after DPKI is available
+        #[allow(unused)]
         pub async fn rotate_app_agent_key(
             &self,
             installed_app_id: &InstalledAppId,
@@ -1732,11 +1734,12 @@ mod app_impls {
                 move |mut state| {
                     let app = state.get_app_mut(&installed_app_id)?;
                     app.agent_key = new_agent_key;
+                    // TODO: update all cell IDs in the roles
                     Ok(state)
                 }
             })
             .await?;
-            Ok(ret)
+            unimplemented!("this is a partial implementation for reference only")
         }
 
         fn get_app_info_inner(

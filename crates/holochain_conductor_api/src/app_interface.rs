@@ -84,19 +84,20 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::Ok`]
     ProvideMemproofs(MemproofMap),
-
-    /// Replace the agent key associated with this app with a new one.
-    /// The new key will be created using the same method which is used
-    /// when installing an app with no agent key provided.
-    ///
-    /// This method is only available if this app was installed using [`MemproofProvisioning::Deferred`],
-    /// and can only be called before [`AppRequest::ProvideMemproofs`] has been called.
-    /// Until then, it can be called as many times as needed.
-    ///
-    /// # Returns
-    ///
-    /// [`AppResponse::AppAgentKeyRotated`]
-    RotateAppAgentKey,
+    //
+    // TODO: implement after DPKI lands
+    // /// Replace the agent key associated with this app with a new one.
+    // /// The new key will be created using the same method which is used
+    // /// when installing an app with no agent key provided.
+    // ///
+    // /// This method is only available if this app was installed using [`MemproofProvisioning::Deferred`],
+    // /// and can only be called before [`AppRequest::ProvideMemproofs`] has been called.
+    // /// Until then, it can be called as many times as needed.
+    // ///
+    // /// # Returns
+    // ///
+    // /// [`AppResponse::AppAgentKeyRotated`]
+    // RotateAppAgentKey,
 }
 
 /// Represents the possible responses to an [`AppRequest`].
