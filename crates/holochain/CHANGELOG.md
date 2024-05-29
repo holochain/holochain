@@ -7,8 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Adds new app websocket `ProvideMemproofs` for use with `MemproofProvisioning::Deferred`
-- Adds new `AppStatus::AwaitingMemproofs` for use with `MemproofProvisioning::Deferred`
+<<<<<<< HEAD
+- **BREAKING**  `InstallAppPayload::membrane_proofs` now takes an enum `MemproofProvisioning` which can be one of two values: `Provided`, which takes the usual hashmap, or `Deferred`, which indicates that memproofs will be provided at a later time via the `ProvideMemproofs` app interface method.
+- Adds new `AppStatus::AwaitingMemproofs` to indicate an app which was installed with `MemproofProvisioning::Deferred`
+- Adds new app websocket method `ProvideMemproofs` for use with `MemproofProvisioning::Deferred`
 
 ## 0.4.0-dev.5
 
