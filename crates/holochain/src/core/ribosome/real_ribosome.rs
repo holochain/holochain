@@ -112,6 +112,9 @@ use once_cell::sync::Lazy;
 use opentelemetry_api::global::meter_with_version;
 use opentelemetry_api::metrics::Counter;
 use std::collections::HashMap;
+use std::env::temp_dir;
+use std::path::Path;
+use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use wasmer_middlewares::metering::get_remaining_points;
@@ -140,6 +143,10 @@ pub struct RealRibosome {
 
     /// File system and in-memory cache for wasm modules.
     pub wasmer_module_cache: Arc<ModuleCacheLock>,
+
+    // #[cfg(test)]
+    ///
+    pub deepkey_cache: Arc<ModuleCacheLock>,
 }
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
@@ -242,12 +249,19 @@ impl RealRibosome {
         dna_file: DnaFile,
         wasmer_module_cache: Arc<ModuleCacheLock>,
     ) -> RibosomeResult<Self> {
+        let deepkey_cache_path = temp_dir().join("deepkey_wasm_cache");
+        println!("deepkey_cache_path {deepkey_cache_path:?}");
+        let _ = std::fs::create_dir_all(deepkey_cache_path.clone());
         let mut ribosome = Self {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache,
+            // #[cfg(test)]
+            deepkey_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(
+                deepkey_cache_path,
+            )))),
         };
 
         // Collect the number of entry and link types
@@ -343,6 +357,8 @@ impl RealRibosome {
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
+            // #[cfg(test)]
+            deepkey_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         }
     }
 
@@ -352,7 +368,20 @@ impl RealRibosome {
         zome_name: &ZomeName,
     ) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
-        let cache_lock = self.wasmer_module_cache.clone();
+        // println!(
+        // "zome_name {zome_name:?} cfg test {:?} starts with deepkey {}",
+        // cfg!(test),
+        // zome_name.to_string().starts_with("deepkey")
+        // );
+        let cache_lock = {
+            if zome_name.to_string().starts_with("deepkey") {
+                // println!("deepkey zome and test");
+                self.deepkey_cache.clone()
+            } else {
+                // println!("not deepkey zome and test");
+                self.wasmer_module_cache.clone()
+            }
+        };
         let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.code();
         tokio::task::spawn_blocking(move || {
             let cache = timed!([1, 10, 1000], cache_lock.write());
