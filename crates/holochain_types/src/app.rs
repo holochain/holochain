@@ -830,7 +830,7 @@ pub enum AppStatus {
     /// and will not restart automaticaly on conductor reboot.
     Disabled(DisabledAppReason),
 
-    /// The app is installed by genesis has not completed due to use of
+    /// The app is installed, but genesis has not completed due to use of
     /// [`MembraneProofProvisioning::Deferred`]
     AwaitingMemproofs,
 }
