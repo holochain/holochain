@@ -3,5 +3,9 @@
   "dependencies": [
     "openssl",
     { "name": "libsodium", "version>=": "1.0.19" }
+  ],
+  "builtin-baseline": "fc6345e114c2e2c4f9714037340ccb08326b3e8c",
+  "overrides": [
+    { "name": "libsodium", "version": "1.0.19" }
   ]
 }
