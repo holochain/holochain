@@ -1307,16 +1307,6 @@ pub mod test {
         assert_eq!(vec![k1], results);
     }
 
-    /// Check that we can attach an app interface for an app with deferred memproofs
-    /// and call the following methods and no others:
-    /// - `ProvisionMemproofs`
-    /// - `RotateAppAgent`
-    /// - `AgentInfo`
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_app_websocket_availability_for_deferred_memproof_apps() {
-        todo!()
-    }
-
     async fn make_req(
         admin_api: AdminInterfaceApi,
         req: AdminRequest,
