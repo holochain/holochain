@@ -2,9 +2,6 @@
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "dependencies": [
     "openssl",
-    "libsodium"
-  ],
-  "overrides": [
-    { "name": "libsodium", "version": "1.0.19" }
+    { "name": "libsodium", "version>=": "1.0.19" }
   ]
 }
