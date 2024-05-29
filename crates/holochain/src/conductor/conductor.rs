@@ -1474,6 +1474,8 @@ mod app_impls {
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
 
+            dbg!(&local_dnas);
+
             let (ops, do_genesis) = match membrane_proofs {
                 MemproofProvisioning::Provided(membrane_proofs) => {
                     let ops = bundle
@@ -1491,7 +1493,9 @@ mod app_impls {
                     (ops, false)
                 }
             };
+            dbg!(&ops);
             let cells_to_create = ops.cells_to_create();
+            dbg!(&cells_to_create);
 
             // check if cells_to_create contains a cell identical to an existing one
             let state = self.get_state().await?;
@@ -1510,6 +1514,7 @@ mod app_impls {
             };
 
             for (dna, _) in ops.dnas_to_register {
+                dbg!(dna.dna_def());
                 self.clone().register_dna(dna).await?;
             }
 
@@ -1684,22 +1689,15 @@ mod app_impls {
         pub async fn provide_memproofs(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,
-            memproofs: MemproofMap,
+            mut memproofs: MemproofMap,
         ) -> ConductorResult<()> {
             let state = self.get_state().await?;
 
             let app = state.get_app(&installed_app_id)?;
-            let cells_to_genesis = memproofs
+            let cells_to_genesis = app
+                .roles()
                 .into_iter()
-                .filter_map(|(role_name, memproof)| {
-                    app.roles().get(&role_name).and_then(|role| {
-                        if role.is_provisioned {
-                            Some((role.base_cell_id.clone(), Some(memproof)))
-                        } else {
-                            None
-                        }
-                    })
-                })
+                .map(|(role_name, role)| (role.base_cell_id.clone(), memproofs.remove(role_name)))
                 .collect();
 
             crate::conductor::conductor::genesis_cells(self.clone(), cells_to_genesis).await?;
@@ -2179,7 +2177,7 @@ mod app_status_impls {
                                     // If not all required cells are running, pause the app
                                     let missing: Vec<_> = app
                                         .required_cells()
-                                        .filter(|id| !cell_ids.contains(dbg!(id)))
+                                        .filter(|id| !cell_ids.contains(id))
                                         .collect();
                                     if !missing.is_empty() {
                                         let reason = PausedAppReason::Error(format!(

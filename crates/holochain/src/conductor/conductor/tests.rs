@@ -1180,23 +1180,11 @@ async fn test_init_concurrency() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_deferred_provisioning() {
     holochain_trace::test_run();
-    let zome = simple_create_entry_zome();
-    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome.into())).await;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
     let conductor = SweetConductor::from_standard_config().await;
     let app_id = "app-id".to_string();
     let agent_key = SweetAgents::one(conductor.keystore()).await;
     let bundle = app_bundle_from_dnas([&dna]).await;
-    let mut manifest = bundle.manifest().clone();
-    match manifest {
-        AppManifest::V1(ref mut m) => {
-            m.roles[0].dna.installed_hash = None;
-        }
-    }
-    let bundle = bundle
-        .into_inner()
-        .update_manifest(manifest)
-        .unwrap()
-        .into();
 
     //- Install with deferred memproofs
     let app = conductor
@@ -1224,9 +1212,7 @@ async fn test_deferred_provisioning() {
 
     //- Can't make zome calls, error returned is CellDisabled
     //  (which isn't ideal, but gets the message across well enough)
-    let result: Result<ActionHash, _> = conductor
-        .call_fallible(&cell.zome("zome"), "create", ())
-        .await;
+    let result: Result<String, _> = conductor.call_fallible(&cell.zome("foo"), "foo", ()).await;
     assert_matches!(
         result,
         Err(ConductorApiError::ConductorError(
@@ -1236,6 +1222,7 @@ async fn test_deferred_provisioning() {
 
     //- Rotate app agent key a few times just for the heck of it
     // TODO: not yet implemented
+
     // let agent1 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
     // let agent2 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
     // let agent3 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
@@ -1257,5 +1244,5 @@ async fn test_deferred_provisioning() {
     assert_eq!(app_info.status, AppInfoStatus::Running);
 
     //- And now we can make a zome call successfully
-    let _: ActionHash = conductor.call(&cell.zome("zome"), "create", ()).await;
+    let _: String = conductor.call(&cell.zome("foo"), "foo", ()).await;
 }

@@ -139,6 +139,21 @@ impl DnaBundle {
     /// Build a bundle from a DnaFile. Useful for tests.
     #[cfg(feature = "test_utils")]
     pub fn from_dna_file(dna_file: DnaFile) -> DnaResult<Self> {
+        let contains_inline_zome = dna_file
+            .dna_def()
+            .integrity_zomes
+            .iter()
+            .find(|&(_, z)| matches!(z.as_any_zome_def(), ZomeDef::Inline { .. }))
+            .is_some()
+            || dna_file
+                .dna_def()
+                .coordinator_zomes
+                .iter()
+                .find(|&(_, z)| matches!(z.as_any_zome_def(), ZomeDef::Inline { .. }))
+                .is_some();
+        if contains_inline_zome {
+            panic!("Can't use inline zomes in a DnaBundle!");
+        }
         let DnaFile { dna, code, .. } = dna_file;
         let manifest = Self::manifest_from_dna_def(dna.into_content())?;
         let resources = code

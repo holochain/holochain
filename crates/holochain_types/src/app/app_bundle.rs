@@ -214,19 +214,21 @@ impl AppBundle {
         role_name: RoleName,
         dna_store: &impl DnaStore,
         location: &mr_bundle::Location,
-        installed_hash: Option<&DnaHashB64>,
+        expected_hash: Option<&DnaHashB64>,
         modifiers: DnaModifiersOpt,
     ) -> AppBundleResult<DnaFile> {
-        let dna_file = if let Some(installed_hash) = installed_hash {
+        dbg!(&modifiers);
+        let dna_file = if let Some(expected_hash) = expected_hash {
             let (dna_file, original_hash) =
-                if let Some(mut dna_file) = dna_store.get_dna(&installed_hash.clone().into()) {
+                if let Some(mut dna_file) = dna_store.get_dna(&expected_hash.clone().into()) {
                     let original_hash = dna_file.dna_hash().clone();
                     dna_file = dna_file.update_modifiers(modifiers);
                     (dna_file, original_hash)
                 } else {
                     self.resolve_location(location, modifiers).await?
                 };
-            let expected_hash: DnaHash = installed_hash.clone().into();
+            dbg!(dna_file.dna_def());
+            let expected_hash: DnaHash = expected_hash.clone().into();
             if expected_hash != original_hash {
                 return Err(AppBundleError::CellResolutionFailure(
                     role_name,
