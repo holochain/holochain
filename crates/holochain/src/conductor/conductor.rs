@@ -2199,11 +2199,7 @@ mod app_status_impls {
                                     // Disabled status should never automatically change.
                                     AppStatusFx::NoChange
                                 }
-                                AwaitingMemproofs => {
-                                    unimplemented!(
-                                        "There are no cells to affect the status of an app in the Partial state"
-                                    )
-                                }
+                                AwaitingMemproofs => AppStatusFx::NoChange,
                             }
                         })
                         .fold(AppStatusFx::default(), AppStatusFx::combine);

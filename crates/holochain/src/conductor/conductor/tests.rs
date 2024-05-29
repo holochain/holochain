@@ -1175,16 +1175,19 @@ async fn test_init_concurrency() {
 
 /// Check that an app can be installed with deferred memproof provisioning and:
 /// - all status checks return correctly while still provisioned,
-/// - no zome calls can be made while awaiting provisioning,
-/// - app functions correctly after provisioning
+/// - no zome calls can be made while awaiting memproofs,
+/// - cells cannot be cloned while awaiting memproofs,
+/// - conductor can be restarted and app still in AwaitingMemproofs state,
+/// - app functions normally after memproofs provided
 #[tokio::test(flavor = "multi_thread")]
 async fn test_deferred_provisioning() {
     holochain_trace::test_run();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let app_id = "app-id".to_string();
     let agent_key = SweetAgents::one(conductor.keystore()).await;
-    let bundle = app_bundle_from_dnas([&dna]).await;
+    let role_name = "role".to_string();
+    let bundle = app_bundle_from_dnas([&(role_name.clone(), dna)]).await;
 
     //- Install with deferred memproofs
     let app = conductor
@@ -1220,6 +1223,18 @@ async fn test_deferred_provisioning() {
         ))
     );
 
+    conductor.shutdown().await;
+    conductor.startup().await;
+
+    //- Status is still AwaitingMemproofs after a restart
+    let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
+
+    //- Status is still AwaitingMemproofs after enabling but before memproofs
+    conductor.enable_app(app_id.clone()).await.unwrap();
+    let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
+
     //- Rotate app agent key a few times just for the heck of it
     // TODO: not yet implemented
 
@@ -1245,4 +1260,34 @@ async fn test_deferred_provisioning() {
 
     //- And now we can make a zome call successfully
     let _: String = conductor.call(&cell.zome("foo"), "foo", ()).await;
+}
+
+/// Can uninstall an app with deferred memproofs before providing memproofs
+#[tokio::test(flavor = "multi_thread")]
+async fn test_deferred_provisioning_uninstall() {
+    holochain_trace::test_run();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
+    let conductor = SweetConductor::from_standard_config().await;
+    let app_id = "app-id".to_string();
+    let agent_key = SweetAgents::one(conductor.keystore()).await;
+    let role_name = "role".to_string();
+    let bundle = app_bundle_from_dnas([&(role_name.clone(), dna)]).await;
+
+    //- Install with deferred memproofs
+    conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            source: AppBundleSource::Bundle(bundle),
+            agent_key: agent_key.clone(),
+            installed_app_id: Some(app_id.clone()),
+            membrane_proofs: MemproofProvisioning::Deferred,
+            network_seed: None,
+            ignore_genesis_failure: false,
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(conductor.list_apps(None).await.unwrap().len(), 1);
+    conductor.clone().uninstall_app(&app_id).await.unwrap();
+    assert_eq!(conductor.list_apps(None).await.unwrap().len(), 0);
 }
