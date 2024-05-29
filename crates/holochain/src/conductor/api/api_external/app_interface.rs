@@ -139,16 +139,15 @@ impl AppInterfaceApi {
                     .provide_memproofs(&installed_app_id, memproofs)
                     .await?;
                 Ok(AppResponse::Ok)
-            }
-            //
-            // TODO: implement after DPKI lands
-            // AppRequest::RotateAppAgentKey => {
-            //     let new_key = self
-            //         .conductor_handle
-            //         .rotate_app_agent_key(&installed_app_id)
-            //         .await?;
-            //     Ok(AppResponse::AppAgentKeyRotated(new_key))
-            // }
+            } //
+              // TODO: implement after DPKI lands
+              // AppRequest::RotateAppAgentKey => {
+              //     let new_key = self
+              //         .conductor_handle
+              //         .rotate_app_agent_key(&installed_app_id)
+              //         .await?;
+              //     Ok(AppResponse::AppAgentKeyRotated(new_key))
+              // }
         }
     }
 }
