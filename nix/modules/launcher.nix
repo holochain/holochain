@@ -76,6 +76,12 @@
       package = craneLib.buildPackage (commonArgs // {
         cargoArtifacts = deps;
 
+        stdenv =
+          if pkgs.stdenv.isDarwin then
+            pkgs.overrideSDK pkgs.stdenv "11.0"
+          else
+            pkgs.stdenv;
+
         nativeBuildInputs = commonArgs.nativeBuildInputs ++ [
           pkgs.makeBinaryWrapper
         ];
