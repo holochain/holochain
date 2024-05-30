@@ -80,6 +80,7 @@ impl SweetLocalRendezvous {
             let _sig_hnd = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
                 bind: vec![format!("{addr}:0")],
                 limit_clients: 100,
+                disable_rate_limiting: true,
                 ..Default::default()
             }))
             .await
