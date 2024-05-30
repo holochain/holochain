@@ -554,7 +554,7 @@ impl SweetConductor {
         &mut self,
         installed_app_id: &InstalledAppId,
         payload: CreateCloneCellPayload,
-    ) -> ConductorApiResult<holochain_zome_types::clone::ClonedCell> {
+    ) -> ConductorResult<holochain_zome_types::clone::ClonedCell> {
         let clone = self
             .raw_handle()
             .create_clone_cell(installed_app_id, payload)

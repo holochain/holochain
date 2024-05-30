@@ -158,14 +158,12 @@ async fn revoke_agent_key() {
         name: None,
     };
     let result = conductor
-        .raw_handle()
         .create_clone_cell(app.installed_app_id(), create_clone_cell_payload.clone())
         .await
         .unwrap_err();
     assert_matches!(result, ConductorError::AppError(AppError::CellToCloneHasInvalidAgent(invalid_key)) if invalid_key == agent_key);
     create_clone_cell_payload.role_name = role_2.to_string();
     let result = conductor
-        .raw_handle()
         .create_clone_cell(app.installed_app_id(), create_clone_cell_payload)
         .await
         .unwrap_err();
