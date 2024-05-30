@@ -26,7 +26,8 @@ pub struct DeepkeyState {
     pub(crate) cell_id: CellId,
 }
 
-const DEEPKEY_ZOME_NAME: &str = "deepkey_csr";
+pub const DEEPKEY_INTEGRITY_NAME: &str = "deepkey";
+pub const DEEPKEY_COORDINATOR_NAME: &str = "deepkey_csr";
 
 impl DeepkeyState {
     async fn call_deepkey_zome<
@@ -40,7 +41,7 @@ impl DeepkeyState {
         let cell_id = self.cell_id.clone();
         let provenance = cell_id.agent_pubkey().clone();
         let cap_secret = None;
-        let zome_name: ZomeName = DEEPKEY_ZOME_NAME.into();
+        let zome_name: ZomeName = DEEPKEY_COORDINATOR_NAME.into();
         let fn_name: FunctionName = fn_name.into();
         let payload = ExternIO::encode(input)?;
         self.runner
@@ -77,13 +78,6 @@ impl DpkiState for DeepkeyState {
         input: CreateKeyInput,
     ) -> DpkiServiceResult<(ActionHash, KeyRegistration, KeyMeta)> {
         self.call_deepkey_zome("create_key", input).await
-    }
-
-    async fn revoke_key(
-        &self,
-        input: RevokeKeyInput,
-    ) -> DpkiServiceResult<(ActionHash, KeyRegistration)> {
-        self.call_deepkey_zome("revoke_key", input).await
     }
 
     async fn key_state(
