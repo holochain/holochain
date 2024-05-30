@@ -8,6 +8,7 @@ use super::DnaWithRole;
 /// with no modifiers, clone limit of 255, and arbitrary role names
 pub async fn app_bundle_from_dnas<'a>(
     dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)>,
+    memproofs_deferred: bool,
 ) -> AppBundle {
     let (roles, resources): (Vec<_>, Vec<_>) = dnas_with_roles
         .into_iter()
@@ -52,6 +53,7 @@ pub async fn app_bundle_from_dnas<'a>(
         .name("[generated]".into())
         .description(None)
         .roles(roles)
+        .membrane_proofs_deferred(memproofs_deferred)
         .build()
         .unwrap();
 
@@ -67,12 +69,12 @@ pub async fn get_install_app_payload_from_dnas(
     data: &[(impl DnaWithRole, Option<MembraneProof>)],
 ) -> InstallAppPayload {
     let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).collect();
-    let bundle = app_bundle_from_dnas(dnas_with_roles).await;
-    let membrane_proofs = MemproofProvisioning::Provided(
-        data.iter()
-            .map(|(dr, memproof)| (dr.role(), memproof.clone().unwrap_or_default()))
-            .collect(),
-    );
+    let bundle = app_bundle_from_dnas(dnas_with_roles, false).await;
+    let membrane_proofs = data
+        .iter()
+        .map(|(dr, memproof)| (dr.role(), memproof.clone().unwrap_or_default()))
+        .collect();
+
     InstallAppPayload {
         agent_key,
         source: AppBundleSource::Bundle(bundle),

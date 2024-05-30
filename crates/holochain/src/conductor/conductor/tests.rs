@@ -1187,18 +1187,7 @@ async fn test_deferred_provisioning() {
     let app_id = "app-id".to_string();
     let agent_key = SweetAgents::one(conductor.keystore()).await;
     let role_name = "role".to_string();
-    let bundle = app_bundle_from_dnas([&(role_name.clone(), dna)]).await;
-    let mut manifest = bundle.manifest().clone();
-    match manifest {
-        AppManifest::V1(ref mut m) => {
-            m.membrane_proofs_deferred = true;
-        }
-    }
-    let bundle = bundle
-        .into_inner()
-        .update_manifest(manifest)
-        .unwrap()
-        .into();
+    let bundle = app_bundle_from_dnas([&(role_name.clone(), dna)], true).await;
 
     //- Install with deferred memproofs
     let app = conductor
@@ -1207,7 +1196,7 @@ async fn test_deferred_provisioning() {
             source: AppBundleSource::Bundle(bundle),
             agent_key: agent_key.clone(),
             installed_app_id: Some(app_id.clone()),
-            membrane_proofs: MemproofProvisioning::Deferred,
+            membrane_proofs: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
         })
@@ -1282,7 +1271,7 @@ async fn test_deferred_provisioning_uninstall() {
     let app_id = "app-id".to_string();
     let agent_key = SweetAgents::one(conductor.keystore()).await;
     let role_name = "role".to_string();
-    let bundle = app_bundle_from_dnas([&(role_name.clone(), dna)]).await;
+    let bundle = app_bundle_from_dnas([&(role_name.clone(), dna)], true).await;
 
     //- Install with deferred memproofs
     conductor
@@ -1291,7 +1280,7 @@ async fn test_deferred_provisioning_uninstall() {
             source: AppBundleSource::Bundle(bundle),
             agent_key: agent_key.clone(),
             installed_app_id: Some(app_id.clone()),
-            membrane_proofs: MemproofProvisioning::Deferred,
+            membrane_proofs: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
         })

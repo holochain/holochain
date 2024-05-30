@@ -17,7 +17,6 @@ use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
 use holochain_conductor_api::{AdminRequest, AppInterfaceInfo};
-use holochain_types::app::MemproofProvisioning;
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::Timestamp;
@@ -515,7 +514,7 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         installed_app_id: app_id,
         agent_key,
         source: AppBundleSource::Path(path),
-        membrane_proofs: MemproofProvisioning::empty(),
+        membrane_proofs: Default::default(),
         network_seed,
         #[cfg(feature = "chc")]
         ignore_genesis_failure: false,
