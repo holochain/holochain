@@ -10,16 +10,7 @@ use std::sync::Arc;
 
 /// Type used for content data of wire messages.
 #[derive(
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    Deref,
-    AsRef,
-    From,
-    Into,
-    serde::Serialize,
-    serde::Deserialize,
+    Clone, PartialEq, Eq, Hash, Deref, AsRef, From, Into, serde::Serialize, serde::Deserialize,
 )]
 #[cfg_attr(
     feature = "fuzzing",
