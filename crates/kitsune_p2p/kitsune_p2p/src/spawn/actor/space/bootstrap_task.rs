@@ -348,7 +348,9 @@ mod tests {
         for i in 1..durations.len() {
             assert!(
                 durations[i] >= durations[i - 1] * 2 || durations[i] == durations[i - 1],
-                "Expected durations to increase to a maximum, but got {:?} and {:?}", durations[i - 1], durations[i]
+                "Expected durations to increase to a maximum, but got {:?} and {:?}",
+                durations[i - 1],
+                durations[i]
             );
         }
 
