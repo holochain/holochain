@@ -9,10 +9,10 @@
 //! ## Configure the keystore to be used.
 //! keystore:
 //!
-//!   ## use an in-process keystore with default database location.
+//!   ## Use an in-process keystore with default database location.
 //!   type: lair_server_in_proc
 //!
-//! ## Configure an admin websocket interface at a specific port.
+//! ## Configure an admin WebSocket interface at a specific port.
 //! admin_interfaces:
 //!   - driver:
 //!       type: websocket
@@ -22,22 +22,22 @@
 //! ## Configure the network.
 //! network:
 //!
-//!   ## Use the holo-provided default production bootstrap server.
+//!   ## Use the Holo-provided default production bootstrap server.
 //!   bootstrap_service: https://bootstrap.holo.host
 //!
-//!   ## [deprecated] Please just include this in your config file for now.
+//!   ## This currently has no effect on functionality but is required. Please just include as-is for now.
 //!   network_type: quic_bootstrap
 //!
-//!   ## Setup a specific network configuration..
+//!   ## Setup a specific network configuration.
 //!   transport_pool:
-//!     ## use webrtc
+//!     ## Use WebRTC, which is the only option for now.
 //!     - type: webrtc
 //!
-//!       ## Use the holo-provided default production sbd (signal) server.
+//!       ## Use the Holo-provided default production sbd (signal) server.
 //!       ## `signal_url` is REQUIRED.
 //!       signal_url: wss://sbd-0.main.infra.holo.host
 //!
-//!       ## Override the default webrtc stun configuration.
+//!       ## Override the default WebRTC STUN configuration.
 //!       ## This is OPTIONAL. If this is not specified, it will default
 //!       ## to what you can see here:
 //!       webrtc_config: {
