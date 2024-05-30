@@ -1188,6 +1188,17 @@ async fn test_deferred_provisioning() {
     let agent_key = SweetAgents::one(conductor.keystore()).await;
     let role_name = "role".to_string();
     let bundle = app_bundle_from_dnas([&(role_name.clone(), dna)]).await;
+    let mut manifest = bundle.manifest().clone();
+    match manifest {
+        AppManifest::V1(ref mut m) => {
+            m.membrane_proofs_deferred = true;
+        }
+    }
+    let bundle = bundle
+        .into_inner()
+        .update_manifest(manifest)
+        .unwrap()
+        .into();
 
     //- Install with deferred memproofs
     let app = conductor
