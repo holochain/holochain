@@ -897,7 +897,7 @@ checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
 name = "hdi"
-version = "0.5.0-dev.4"
+version = "0.5.0-dev.5"
 dependencies = [
  "getrandom",
  "hdk_derive",
@@ -913,7 +913,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.4.0-dev.4"
+version = "0.4.0-dev.5"
 dependencies = [
  "getrandom",
  "hdi",
@@ -932,7 +932,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.4.0-dev.4"
+version = "0.4.0-dev.5"
 dependencies = [
  "darling 0.14.4",
  "heck 0.5.0",
@@ -973,7 +973,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "holo_hash"
-version = "0.4.0-dev.4"
+version = "0.4.0-dev.5"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -993,7 +993,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.4.0-dev.4"
+version = "0.4.0-dev.5"
 dependencies = [
  "derive_builder",
  "holo_hash",
@@ -1061,7 +1061,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.4.0-dev.4"
+version = "0.4.0-dev.5"
 dependencies = [
  "hdk",
  "serde",
@@ -1109,7 +1109,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.4.0-dev.4"
+version = "0.4.0-dev.5"
 dependencies = [
  "derive_builder",
  "derive_more",
@@ -1246,7 +1246,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bin_data"
-version = "0.4.0-dev.4"
+version = "0.4.0-dev.5"
 dependencies = [
  "base64",
  "derive_more",
@@ -1259,7 +1259,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_block"
-version = "0.4.0-dev.4"
+version = "0.4.0-dev.5"
 dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_timestamp",
@@ -1268,7 +1268,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.4.0-dev.4"
+version = "0.4.0-dev.5"
 dependencies = [
  "derivative",
  "derive_more",
@@ -1286,7 +1286,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.4.0-dev.4"
+version = "0.4.0-dev.5"
 dependencies = [
  "derive_more",
  "gcollections",
