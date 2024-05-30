@@ -1,5 +1,57 @@
 #![deny(missing_docs)]
-//! This module is used to configure the conductor
+//! This module is used to configure the conductor.
+//!
+//! #### Example minimum conductor config:
+//!
+//! ```rust
+//! let yaml = r#"---
+//!
+//! ## Configure the keystore to be used.
+//! keystore:
+//!
+//!   ## use an in-process keystore with default database location.
+//!   type: lair_server_in_proc
+//!
+//! ## Configure an admin websocket interface at a specific port.
+//! admin_interfaces:
+//!   - driver:
+//!       type: websocket
+//!       port: 1234
+//!       allowed_origins: "*"
+//!
+//! ## Configure the network.
+//! network:
+//!
+//!   ## Use the holo-provided default production bootstrap server.
+//!   bootstrap_service: https://bootstrap.holo.host
+//!
+//!   ## [deprecated] Please just include this in your config file for now.
+//!   network_type: quic_bootstrap
+//!
+//!   ## Setup a specific network configuration..
+//!   transport_pool:
+//!     ## use webrtc
+//!     - type: webrtc
+//!
+//!       ## Use the holo-provided default production sbd (signal) server.
+//!       ## `signal_url` is REQUIRED.
+//!       signal_url: wss://sbd-0.main.infra.holo.host
+//!
+//!       ## Override the default webrtc stun configuration.
+//!       ## This is OPTIONAL. If this is not specified, it will default
+//!       ## to what you can see here:
+//!       webrtc_config: {
+//!         "iceServers": [
+//!           { "urls": "stun:stun-0.main.infra.holo.host:443" },
+//!           { "urls": "stun:stun-1.main.infra.holo.host:443" }
+//!         ]
+//!       }
+//! "#;
+//!
+//!use holochain_conductor_api::conductor::ConductorConfig;
+//!
+//!let _: ConductorConfig = serde_yaml::from_str(yaml).unwrap();
+//! ```
 
 use crate::conductor::process::ERROR_CODE;
 use holochain_types::prelude::DbSyncStrategy;
