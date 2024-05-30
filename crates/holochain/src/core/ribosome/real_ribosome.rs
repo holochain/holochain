@@ -119,9 +119,6 @@ use wasmer_middlewares::metering::get_remaining_points;
 use wasmer_middlewares::metering::set_remaining_points;
 use wasmer_middlewares::metering::MeteringPoints;
 
-#[cfg(test)]
-use holochain_conductor_services::{DEEPKEY_COORDINATOR_NAME, DEEPKEY_INTEGRITY_NAME};
-
 pub(crate) type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
 
 /// The only RealRibosome is a Wasm ribosome.
@@ -147,7 +144,7 @@ pub struct RealRibosome {
 
     #[cfg(test)]
     ///
-    pub deepkey_cache: Arc<ModuleCacheLock>,
+    pub shared_test_module_cache: Arc<ModuleCacheLock>,
 }
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
@@ -250,9 +247,8 @@ impl RealRibosome {
         dna_file: DnaFile,
         wasmer_module_cache: Arc<ModuleCacheLock>,
     ) -> RibosomeResult<Self> {
-        let deepkey_cache_path = temp_dir().join("deepkey_wasm_cache");
-        println!("deepkey_cache_path {deepkey_cache_path:?}");
-        let _ = std::fs::create_dir_all(deepkey_cache_path.clone());
+        let shared_test_module_cache = temp_dir().join("deepkey_wasm_cache");
+        let _ = std::fs::create_dir_all(shared_test_module_cache.clone());
         let mut ribosome = Self {
             dna_file,
             zome_types: Default::default(),
@@ -260,8 +256,8 @@ impl RealRibosome {
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache,
             #[cfg(test)]
-            deepkey_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(
-                deepkey_cache_path,
+            shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(
+                shared_test_module_cache,
             )))),
         };
 
@@ -359,7 +355,7 @@ impl RealRibosome {
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
             #[cfg(test)]
-            deepkey_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
+            shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         }
     }
 
@@ -370,13 +366,7 @@ impl RealRibosome {
     ) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
         #[cfg(test)]
-        let cache_lock = if zome_name.to_string() == DEEPKEY_INTEGRITY_NAME
-            || zome_name.to_string() == DEEPKEY_COORDINATOR_NAME
-        {
-            self.deepkey_cache.clone()
-        } else {
-            self.wasmer_module_cache.clone()
-        };
+        let cache_lock = self.shared_test_module_cache.clone();
         #[cfg(not(test))]
         let cache_lock = self.wasmer_module_cache.clone();
 
