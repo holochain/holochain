@@ -13,91 +13,70 @@
       crateInfo = craneLib.crateNameFromCargoToml { cargoToml = flake.config.reconciledInputs.launcher + "/crates/hc_launch/src-tauri/Cargo.toml"; };
 
       commonArgs = {
-
         pname = "hc-launch";
-        src = flake.config.reconciledInputs.launcher;
+        src = inputs.launcher;
+        cargoExtraArgs = "--bin hc-launch";
 
         # We are asking Crane to build a binary from the workspace and that's the only way we can build it because
         # the workspace defines the dependencies, so we can't just build the member crate. But then we need to tell
         # Crate what the version is, so we look it up directly from the member's Cargo.toml.
         version = crateInfo.version;
 
-        CARGO_PROFILE = "release";
-
-        cargoExtraArgs = "--bin hc-launch";
-
-        buildInputs = (with pkgs; [
-          openssl
-
-          # this is required for glib-networking
-          glib
-        ])
-        ++ (lib.optionals pkgs.stdenv.isLinux
-          (with pkgs; [
-            webkitgtk.dev
-            gdk-pixbuf
-            gtk3
-          ]))
-        ++ lib.optionals pkgs.stdenv.isDarwin
-          (with self'.legacyPackages.apple_sdk'.frameworks; [
-            AppKit
-            CoreFoundation
-            CoreServices
-            Security
-            IOKit
-            WebKit
+        buildInputs = [
+          pkgs.perl
+        ]
+        ++ (pkgs.lib.optionals pkgs.stdenv.isLinux
+          [
+            pkgs.glib
+            pkgs.go
+            pkgs.webkitgtk.dev
           ])
+        ++ pkgs.lib.optionals pkgs.stdenv.isDarwin
+          [
+            apple_sdk.frameworks.AppKit
+            apple_sdk.frameworks.WebKit
+
+            (if pkgs.system == "x86_64-darwin" then
+              pkgs.darwin.apple_sdk_11_0.stdenv.mkDerivation
+                {
+                  name = "go";
+                  nativeBuildInputs = with pkgs; [
+                    makeBinaryWrapper
+                    go
+                  ];
+                  dontBuild = true;
+                  dontUnpack = true;
+                  installPhase = ''
+                    makeWrapper ${pkgs.go}/bin/go $out/bin/go
+                  '';
+                }
+            else pkgs.go)
+          ]
         ;
 
-        nativeBuildInputs = (with pkgs; [
-          perl
-          pkg-config
-
-          # currently needed to build tx5
-          self'.packages.goWrapper
-        ])
-        ++ (lib.optionals pkgs.stdenv.isLinux
-          (with pkgs; [
-            wrapGAppsHook
-          ]))
-        ++ (lib.optionals pkgs.stdenv.isDarwin [
-          pkgs.xcbuild
-          pkgs.libiconv
-        ])
-        ;
+        nativeBuildInputs = (
+          if pkgs.stdenv.isLinux then [ pkgs.pkg-config ]
+          else [ ]
+        );
 
         doCheck = false;
       };
 
       # derivation building all dependencies
-      deps = craneLib.buildDepsOnly (commonArgs // { });
+      deps = craneLib.buildDepsOnly
+        (commonArgs // { });
 
       # derivation with the main crates
-      package = craneLib.buildPackage (commonArgs // {
-        cargoArtifacts = deps;
+      hc-launch = craneLib.buildPackage
+        (commonArgs // {
+          cargoArtifacts = deps;
 
-        stdenv =
-          if pkgs.stdenv.isDarwin then
-            pkgs.overrideSDK pkgs.stdenv "11.0"
-          else
-            pkgs.stdenv;
-
-        nativeBuildInputs = commonArgs.nativeBuildInputs ++ [
-          pkgs.makeBinaryWrapper
-        ];
-
-        preFixup = ''
-          gappsWrapperArgs+=(
-            --set WEBKIT_DISABLE_COMPOSITING_MODE 1
-          )
-
-          # without this the DevTools will just display an unparsed HTML file (see https://github.com/tauri-apps/tauri/issues/5711#issuecomment-1336409601)
-          gappsWrapperArgs+=(
-            --prefix XDG_DATA_DIRS : "${pkgs.shared-mime-info}/share"
-          )
-        '';
-      });
-
+          stdenv =
+            if pkgs.stdenv.isDarwin then
+              pkgs.overrideSDK pkgs.stdenv "11.0"
+            else
+              pkgs.stdenv;
+        });
     in
     {
       packages = {
