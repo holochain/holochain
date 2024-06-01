@@ -8,9 +8,14 @@
         version = "1.77.2";
       };
 
-      craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
+      craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
 
       crateInfo = craneLib.crateNameFromCargoToml { cargoToml = flake.config.reconciledInputs.launcher + "/crates/hc_launch/src-tauri/Cargo.toml"; };
+
+      apple_sdk =
+        if system == "x86_64-darwin"
+        then pkgs.darwin.apple_sdk_10_12
+        else pkgs.darwin.apple_sdk_11_0;
 
       commonArgs = {
         pname = "hc-launch";
