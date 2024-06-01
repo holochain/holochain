@@ -289,7 +289,7 @@ mod slow_tests {
         let op = Op::StoreRecord(StoreRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(
-                    ActionHashed::from_content_sync(action.into()),
+                    ActionHashed::from_content_sync(action),
                     Signature::arbitrary(&mut u).unwrap(),
                 ),
                 Some(entry),

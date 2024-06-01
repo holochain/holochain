@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_dht_arc"
-version = "0.4.0-dev.2"
+version = "0.4.0-dev.5"
 description = "Kitsune P2p Dht Arc Utils"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -26,7 +26,7 @@ rusqlite = { version = "0.29", optional = true }
 
 [dev-dependencies]
 maplit = "1"
-holochain_trace = { version = "^0.4.0-dev.1", path = "../../holochain_trace" }
+holochain_trace = { version = "^0.4.0-dev.3", path = "../../holochain_trace" }
 pretty_assertions = "1.4.0"
 rand = "0.8.5"
 statrs = "0.16.0"

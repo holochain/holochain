@@ -306,7 +306,7 @@ mod startup_shutdown_impls {
                 post_commit,
                 services: RwShare::new(None),
                 wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
-                    maybe_data_root_path,
+                    maybe_data_root_path.map(|p| p.join("wasm-cache")),
                 ))),
                 app_auth_token_store: RwShare::default(),
                 app_broadcast: AppBroadcast::default(),
@@ -1993,10 +1993,7 @@ mod app_status_impls {
                     let p2p_agents_db = cell.p2p_agents_db().clone();
                     let cell_id = cell.id().clone();
                     let kagent = cell_id.agent_pubkey().to_kitsune();
-                    let maybe_agent_info = match p2p_agents_db.p2p_get_agent(&kagent).await {
-                        Ok(maybe_info) => maybe_info,
-                        _ => None,
-                    };
+                    let maybe_agent_info = p2p_agents_db.p2p_get_agent(&kagent).await.ok().flatten();
                     let maybe_initial_arq = maybe_agent_info.clone().map(|i| i.storage_arq);
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
@@ -2135,9 +2132,9 @@ mod state_impls {
 
         /// Update the internal state with a pure function mapping old state to new
         #[tracing::instrument(skip_all)]
-        pub(crate) async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
+        pub(crate) async fn update_state<F>(&self, f: F) -> ConductorResult<ConductorState>
         where
-            F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
+            F: Send + FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
         {
             self.spaces.update_state(f).await
         }
@@ -3220,19 +3217,7 @@ fn query_dht_ops_from_statement(
 
     let r: Vec<DhtOp> = stmt
         .query_and_then([], |row| {
-            let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-            let op_type: DhtOpType = row.get("dht_type")?;
-            let entry = match action.0.entry_type().map(|et| et.visibility()) {
-                Some(EntryVisibility::Public) => {
-                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                    match entry {
-                        Some(entry) => Some(from_blob::<Entry>(entry)?),
-                        None => None,
-                    }
-                }
-                _ => None,
-            };
-            Ok(DhtOp::from_type(op_type, action, entry)?)
+            holochain_state::query::map_sql_dht_op(false, "dht_type", row)
         })?
         .collect::<StateQueryResult<Vec<_>>>()?;
     Ok(r)

@@ -146,12 +146,12 @@ pub mod test {
         let action = record.action().clone();
         let record_entry: RecordEntry = record.entry().clone();
         let entry = record_entry.clone().into_option().unwrap();
-        let entry_state = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
+        let entry_state = DhtOpHashed::from_content_sync(ChainOp::StoreEntry(
             signature.clone(),
             NewEntryAction::try_from(action.clone()).unwrap(),
             entry.clone(),
         ));
-        let record_state = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+        let record_state = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
             signature,
             action.clone(),
             record_entry,

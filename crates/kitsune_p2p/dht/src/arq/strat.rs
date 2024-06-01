@@ -1,8 +1,5 @@
-use kitsune_p2p_dht_arc::DEFAULT_MIN_PEERS;
-
-use crate::spacetime::Topology;
-
 use super::{Arq, PeerView, PeerViewQ};
+use crate::spacetime::Topology;
 
 /// A Strategy for generating PeerViews.
 /// The enum allows us to add new strategies over time.
@@ -99,15 +96,19 @@ pub struct ArqStrat {
 #[cfg(feature = "test_utils")]
 impl Default for ArqStrat {
     fn default() -> Self {
-        Self::standard(LocalStorageConfig::default())
+        Self::standard(
+            LocalStorageConfig::default(),
+            kitsune_p2p_dht_arc::DEFAULT_MIN_PEERS as f64,
+        )
     }
 }
 
 impl ArqStrat {
     /// Standard arq strat
-    pub fn standard(local_storage: LocalStorageConfig) -> Self {
+    pub fn standard(local_storage: LocalStorageConfig, min_coverage: f64) -> Self {
         Self {
-            min_coverage: DEFAULT_MIN_PEERS as f64,
+            // TODO This is referred to as min_coverage, min_peers and redundancy_target. Pick one name and make this consistent.
+            min_coverage,
             // this buffer implies min-max chunk count of 8-16
             buffer: 0.143,
             power_std_dev_threshold: 1.0,

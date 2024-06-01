@@ -24,7 +24,7 @@ pub struct SpaceQuantum(u32);
 impl SpaceQuantum {
     /// The inclusive locations at either end of this quantum
     pub fn to_loc_bounds(&self, topo: &Topology) -> (Loc, Loc) {
-        let (a, b): (u32, u32) = bounds(topo.space.into(), 0, self.0.into(), 1);
+        let (a, b): (u32, u32) = space_bounds(topo.space.into(), 0, self.0.into(), 1);
         (Loc::from(a), Loc::from(b))
     }
 }
@@ -59,7 +59,7 @@ impl TimeQuantum {
 
     /// The inclusive timestamps at either end of this quantum
     pub fn to_timestamp_bounds(&self, topo: &Topology) -> (Timestamp, Timestamp) {
-        let (a, b): (i64, i64) = bounds64(topo.time.into(), 0, self.0.into(), 1);
+        let (a, b): (i64, i64) = time_bounds64(topo.time.into(), 0, self.0.into(), 1);
         (
             Timestamp::from_micros(a + topo.time_origin.as_micros()),
             Timestamp::from_micros(b + topo.time_origin.as_micros()),
@@ -78,14 +78,17 @@ pub trait Quantum:
     /// The dimension type which this quantum corresponds to (time or space)
     type Dim: Into<Dimension> + Copy;
 
-    /// The u32 representation
+    /// The quantized value
     fn inner(&self) -> u32;
 
     /// If this coord is beyond the max value for its dimension, wrap it around
-    /// the max value
+    /// the max value. See [Quantum::max_value].
     fn normalized(self, dim: impl Into<Self::Dim>) -> Self;
 
-    /// The maximum quantum for this dimension
+    /// The maximum quantum for this dimension.
+    ///
+    /// For a quantum value of 1, this will be u32::MAX. For any larger quantum value, the maximum
+    /// quantized value is less than the maximum u32 value.
     fn max_value(dim: impl Into<Self::Dim>) -> Self {
         Self::from((2u64.pow(dim.into().into().bit_depth as u32) - 1) as u32)
     }
@@ -97,12 +100,12 @@ pub trait Quantum:
 
     /// Exposes wrapping addition for the u32
     fn wrapping_add(self, other: u32) -> Self {
-        Self::from((self.inner()).wrapping_add(other))
+        Self::from(self.inner().wrapping_add(other))
     }
 
     /// Exposes wrapping subtraction for the u32
     fn wrapping_sub(self, other: u32) -> Self {
-        Self::from((self.inner()).wrapping_sub(other))
+        Self::from(self.inner().wrapping_sub(other))
     }
 }
 

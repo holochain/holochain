@@ -29,7 +29,7 @@
 //! is executed. Entry and link CRUD actions, which the ops are derived from, have been
 //! written with a particular integrity zome's entry and link types. Thus for
 //! op validation, the validation function of the same integrity zome must be
-//! used. Ops that do not relate to a specific entry or link like [`DhtOp::RegisterAgentActivity`]
+//! used. Ops that do not relate to a specific entry or link like [`ChainOp::RegisterAgentActivity`]
 //! or non-app entries like [`EntryType::CapGrant`] are validated with all
 //! validation functions of the DNA's integrity zomes.
 //!
@@ -189,17 +189,19 @@ pub async fn app_validation_workflow(
         trigger_integration.trigger(&"app_validation_workflow");
     }
 
+    let validations_dependencies = validation_dependencies.lock();
     Ok(
         // If not all ops have been validated
         // and fetching missing hashes has not timed out,
         // trigger app validation workflow again.
         if outcome_summary.validated < outcome_summary.ops_to_validate
-            && !validation_dependencies
-                .lock()
-                .fetch_missing_hashes_timed_out()
+            && !validations_dependencies.fetch_missing_hashes_timed_out()
         {
-            // Trigger app validation workflow again in 10 seconds.
-            WorkComplete::Incomplete(Some(Duration::from_secs(10)))
+            // Trigger app validation workflow again in 100-1000 milliseconds.
+            let interval = 900u64
+                .saturating_sub(validations_dependencies.missing_hashes.len() as u64 * 100)
+                + 100;
+            WorkComplete::Incomplete(Some(Duration::from_millis(interval)))
         } else {
             WorkComplete::Complete
         },
@@ -242,13 +244,17 @@ async fn app_validation_workflow_inner(
     // Validate ops sequentially
     for sorted_dht_op in sorted_dht_ops.into_iter() {
         let (dht_op, dht_op_hash) = sorted_dht_op.into_inner();
-        let op_type = dht_op.get_type();
-        let action = dht_op.action();
-        let dependency = dht_op.sys_validation_dependency();
-        let dht_op_lite = dht_op.to_lite();
+        let chain_op = match dht_op {
+            DhtOp::ChainOp(chain_op) => chain_op,
+            _ => continue,
+        };
+        let op_type = chain_op.get_type();
+        let action = chain_op.action();
+        let dependency = op_type.sys_validation_dependency(&action);
+        let dht_op_lite = chain_op.to_lite();
 
         // If this is agent activity, track it for the cache.
-        let activity = matches!(op_type, DhtOpType::RegisterAgentActivity).then(|| {
+        let activity = matches!(op_type, ChainOpType::RegisterAgentActivity).then(|| {
             (
                 action.author().clone(),
                 action.action_seq(),
@@ -257,7 +263,7 @@ async fn app_validation_workflow_inner(
         });
 
         // Validate this op
-        let validation_outcome = match dhtop_to_op(dht_op.clone(), cascade.clone()).await {
+        let validation_outcome = match chain_op_to_op(*chain_op.clone(), cascade.clone()).await {
             Ok(op) => {
                 validate_op_outer(
                     dna_hash.clone(),
@@ -340,12 +346,12 @@ async fn app_validation_workflow_inner(
                     })
                     .await;
                 if let Err(err) = write_result {
-                    tracing::error!(?dht_op, ?err, "Error updating dht op in database.");
+                    tracing::error!(?chain_op, ?err, "Error updating dht op in database.");
                 }
             }
             Err(err) => {
                 tracing::error!(
-                    ?dht_op,
+                    ?chain_op,
                     ?err,
                     "App validation error when validating dht op."
                 );
@@ -361,11 +367,11 @@ async fn app_validation_workflow_inner(
         // TODO: This will no longer be true when [#1212](https://github.com/holochain/holochain/pull/1212) lands.
         if has_no_dependency {
             dht_query_cache
-                .set_activity_to_integrated(&author, seq)
+                .set_activity_to_integrated(&author, Some(seq))
                 .await?;
         } else {
             dht_query_cache
-                .set_activity_ready_to_integrate(&author, seq)
+                .set_activity_ready_to_integrate(&author, Some(seq))
                 .await?;
         }
     }
@@ -393,13 +399,13 @@ async fn app_validation_workflow_inner(
 // This fn is only used in the zome call workflow's inline validation.
 pub async fn record_to_op(
     record: Record,
-    op_type: DhtOpType,
+    op_type: ChainOpType,
     cascade: Arc<impl Cascade>,
 ) -> AppValidationOutcome<(Op, DhtOpHash, Option<Entry>)> {
-    use DhtOpType::*;
+    use ChainOpType::*;
 
     // Hide private data where appropriate
-    let (record, mut hidden_entry) = if matches!(op_type, DhtOpType::StoreEntry) {
+    let (record, mut hidden_entry) = if matches!(op_type, ChainOpType::StoreEntry) {
         // We don't want to hide private data for a StoreEntry, because when doing
         // inline validation as an author, we want to validate and integrate our own entry!
         // Publishing and gossip rules state that a private StoreEntry will never be transmitted
@@ -419,18 +425,18 @@ pub async fn record_to_op(
     if matches!(op_type, RegisterAgentActivity) {
         hidden_entry = entry.take().or(hidden_entry);
     }
-    let dht_op = DhtOp::from_type(op_type, action, entry)?;
-    let dht_op_hash = dht_op.clone().to_hash();
+    let chain_op = ChainOp::from_type(op_type, action, entry)?;
+    let chain_op_hash = chain_op.clone().to_hash();
     Ok((
-        dhtop_to_op(dht_op, cascade).await?,
-        dht_op_hash,
+        chain_op_to_op(chain_op, cascade).await?,
+        chain_op_hash,
         hidden_entry,
     ))
 }
 
-async fn dhtop_to_op(dht_op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
-    let op = match dht_op {
-        DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
+async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
+    let op = match chain_op {
+        ChainOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(
                     ActionHashed::from_content_sync(action),
@@ -439,11 +445,11 @@ async fn dhtop_to_op(dht_op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidation
                 entry.into_option(),
             ),
         }),
-        DhtOp::StoreEntry(signature, action, entry) => Op::StoreEntry(StoreEntry {
+        ChainOp::StoreEntry(signature, action, entry) => Op::StoreEntry(StoreEntry {
             action: SignedHashed::new_unchecked(action.into(), signature),
             entry,
         }),
-        DhtOp::RegisterAgentActivity(signature, action) => {
+        ChainOp::RegisterAgentActivity(signature, action) => {
             Op::RegisterAgentActivity(RegisterAgentActivity {
                 action: SignedActionHashed::with_presigned(
                     ActionHashed::from_content_sync(action),
@@ -452,8 +458,8 @@ async fn dhtop_to_op(dht_op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidation
                 cached_entry: None,
             })
         }
-        DhtOp::RegisterUpdatedContent(signature, update, entry)
-        | DhtOp::RegisterUpdatedRecord(signature, update, entry) => {
+        ChainOp::RegisterUpdatedContent(signature, update, entry)
+        | ChainOp::RegisterUpdatedRecord(signature, update, entry) => {
             let new_entry = match update.entry_type.visibility() {
                 EntryVisibility::Public => match entry.into_option() {
                     Some(entry) => Some(entry),
@@ -472,18 +478,18 @@ async fn dhtop_to_op(dht_op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidation
                 new_entry,
             })
         }
-        DhtOp::RegisterDeletedBy(signature, delete)
-        | DhtOp::RegisterDeletedEntryAction(signature, delete) => {
+        ChainOp::RegisterDeletedBy(signature, delete)
+        | ChainOp::RegisterDeletedEntryAction(signature, delete) => {
             Op::RegisterDelete(RegisterDelete {
                 delete: SignedHashed::new_unchecked(delete, signature),
             })
         }
-        DhtOp::RegisterAddLink(signature, create_link) => {
+        ChainOp::RegisterAddLink(signature, create_link) => {
             Op::RegisterCreateLink(RegisterCreateLink {
                 create_link: SignedHashed::new_unchecked(create_link, signature),
             })
         }
-        DhtOp::RegisterRemoveLink(signature, delete_link) => {
+        ChainOp::RegisterRemoveLink(signature, delete_link) => {
             let create_link = cascade
                 .retrieve_action(delete_link.link_add_address.clone(), Default::default())
                 .await?

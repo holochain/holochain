@@ -1,15 +1,54 @@
 use std::{collections::HashMap, sync::Arc};
 
 use kitsune_p2p_types::{
-    agent_info::AgentInfoSigned,
-    bin_types::{KitsuneAgent, KitsuneSpace},
+    bin_types::{KitsuneAgent, KitsuneSignature, KitsuneSpace},
     bootstrap::RandomQuery,
-    codec::rmp_encode,
 };
 use parking_lot::RwLock;
 use rand::seq::IteratorRandom;
 
-type AgentMap = HashMap<Arc<KitsuneAgent>, AgentInfoSigned>;
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq, Clone))]
+pub(crate) struct StoreEntry {
+    pub encoded: Vec<u8>,
+    pub signature: Arc<KitsuneSignature>,
+    pub space: Arc<KitsuneSpace>,
+    pub agent: Arc<KitsuneAgent>,
+    pub signed_at_ms: u64,
+    pub expires_at_ms: u64,
+}
+
+impl StoreEntry {
+    pub fn parse(encoded: Vec<u8>) -> Result<Self, std::io::Error> {
+        let mut bytes: &[u8] = &encoded;
+        let kitsune_p2p_types::agent_info::agent_info_helper::AgentInfoSignedEncode {
+            agent,
+            signature,
+            agent_info,
+        } = kitsune_p2p_types::codec::rmp_decode(&mut bytes)?;
+
+        let mut bytes: &[u8] = &agent_info;
+        let info: kitsune_p2p_types::agent_info::agent_info_helper::AgentInfoEncode =
+            kitsune_p2p_types::codec::rmp_decode(&mut bytes)?;
+
+        if agent != info.agent {
+            return Err(std::io::Error::other(
+                "signed inner agent does not match unsigned outer agent",
+            ));
+        }
+
+        Ok(StoreEntry {
+            encoded,
+            signature,
+            space: info.space,
+            agent,
+            signed_at_ms: info.signed_at_ms,
+            expires_at_ms: info.signed_at_ms + info.expires_after_ms,
+        })
+    }
+}
+
+type AgentMap = HashMap<Arc<KitsuneAgent>, StoreEntry>;
 type SpaceMap = HashMap<Arc<KitsuneSpace>, AgentMap>;
 
 #[derive(Clone, Debug)]
@@ -36,17 +75,17 @@ impl Store {
         });
     }
 
-    pub fn put(&self, info: AgentInfoSigned) {
+    pub fn put(&self, entry: StoreEntry) {
         let mut lock = self.0.write();
-        let space_map = lock.entry(info.space.clone()).or_default();
-        match space_map.entry(info.agent.clone()) {
+        let space_map = lock.entry(entry.space.clone()).or_default();
+        match space_map.entry(entry.agent.clone()) {
             std::collections::hash_map::Entry::Occupied(mut e) => {
-                if info.signed_at_ms > e.get().signed_at_ms {
-                    e.insert(info);
+                if entry.signed_at_ms > e.get().signed_at_ms {
+                    e.insert(entry);
                 }
             }
             std::collections::hash_map::Entry::Vacant(e) => {
-                e.insert(info);
+                e.insert(entry);
             }
         }
     }
@@ -69,11 +108,7 @@ impl Store {
                         if i.expires_at_ms <= now {
                             return None;
                         }
-                        let mut buf = Vec::new();
-                        match rmp_encode(&mut buf, i) {
-                            Ok(_) => Some(buf),
-                            Err(_) => None,
-                        }
+                        Some(i.encoded.to_vec())
                     })
                     .choose_multiple(&mut rng, limit)
             })
@@ -85,7 +120,7 @@ impl Store {
     }
 
     #[cfg(test)]
-    pub fn all(&self) -> HashMap<Arc<KitsuneSpace>, HashMap<Arc<KitsuneAgent>, AgentInfoSigned>> {
+    pub fn all(&self) -> HashMap<Arc<KitsuneSpace>, HashMap<Arc<KitsuneAgent>, StoreEntry>> {
         self.0.read().clone()
     }
 }

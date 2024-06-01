@@ -62,7 +62,7 @@ async fn connection_close_on_peer_restart() {
     wait_for_connected(sender_online.clone(), agent_restart.clone(), space.clone()).await;
 
     // Wait until the connection is found
-    tokio::time::timeout(std::time::Duration::from_secs(5), {
+    tokio::time::timeout(std::time::Duration::from_secs(15), {
         let sender_online = sender_online.clone();
         async move {
             loop {
@@ -99,7 +99,7 @@ async fn connection_close_on_peer_restart() {
         .unwrap();
 
     // Wait until there is a new connection and the old one is closed
-    tokio::time::timeout(std::time::Duration::from_secs(10), {
+    tokio::time::timeout(std::time::Duration::from_secs(30), {
         let initial_connection_id = initial_connection_id.clone();
         let sender_online = sender_online.clone();
         async move {
@@ -130,18 +130,11 @@ async fn connection_close_on_peer_restart() {
 }
 
 fn connection_ids_from_dump(dump: &Value) -> Vec<String> {
-    dump.as_object()
-        .unwrap()
-        .keys()
+    let stats: tx5::stats::Stats =
+        serde_json::from_str(&serde_json::to_string(dump).unwrap()).unwrap();
+    stats
+        .connection_list
         .into_iter()
-        .filter_map(|k| {
-            match base64::engine::general_purpose::URL_SAFE_NO_PAD
-                .decode(k)
-                .ok()
-            {
-                Some(v) if v.len() == 32 => Some(k.clone()),
-                _ => None,
-            }
-        })
+        .map(|c| base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&c.pub_key))
         .collect()
 }

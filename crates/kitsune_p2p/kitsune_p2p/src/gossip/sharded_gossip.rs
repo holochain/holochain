@@ -326,14 +326,13 @@ impl ShardedGossip {
 
         if let Some(msg) = outgoing.as_ref() {
             tracing::debug!(
-                "OUTGOING GOSSIP [{}]  => {:17} ({:10}) : {:?} -> {:?} [{}]",
+                "OUTGOING GOSSIP [{}]  => {:17} ({:10}) : this -> {:?} [{}]",
                 gossip_type_char,
                 msg.2
                     .variant_type()
                     .to_string()
                     .replace("ShardedGossipWire::", ""),
                 msg.2.encode_vec().expect("can't encode msg").len(),
-                self.ep_hnd.local_id(),
                 &msg.0,
                 self.gossip
                     .inner
@@ -356,12 +355,11 @@ impl ShardedGossip {
             {
                 Ok(r) => {
                     tracing::debug!(
-                        "INCOMING GOSSIP [{}] <=  {:17} ({:10}) : {:?} -> {:?} [{}]",
+                        "INCOMING GOSSIP [{}] <=  {:17} ({:10}) : {:?} -> this [{}]",
                         gossip_type_char,
                         variant_type,
                         len,
                         con.peer_id(),
-                        self.ep_hnd.local_id(),
                         self.gossip
                             .inner
                             .share_mut(|s, _| Ok(s.round_map.current_rounds().len()))
@@ -650,16 +648,16 @@ impl ShardedGossipState {
 
     pub fn push_incoming<I: Clone + IntoIterator<Item = Incoming>>(&mut self, incoming: I) {
         if let Some(history) = &mut self.history {
-            history.incoming.extend(incoming.clone().into_iter());
+            history.incoming.extend(incoming.clone());
         }
-        self.queues.incoming.extend(incoming.into_iter());
+        self.queues.incoming.extend(incoming);
     }
 
     pub fn push_outgoing<I: Clone + IntoIterator<Item = Outgoing>>(&mut self, outgoing: I) {
         if let Some(history) = &mut self.history {
-            history.outgoing.extend(outgoing.clone().into_iter());
+            history.outgoing.extend(outgoing.clone());
         }
-        self.queues.outgoing.extend(outgoing.into_iter());
+        self.queues.outgoing.extend(outgoing);
     }
 
     pub fn pop(&mut self) -> (Option<Incoming>, Option<Outgoing>) {

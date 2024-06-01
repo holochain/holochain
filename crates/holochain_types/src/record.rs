@@ -46,7 +46,7 @@ impl WireRecordOps {
         let mut ops = Vec::with_capacity(1 + deletes.len() + updates.len());
         if let Some(action) = action {
             let status = action.validation_status();
-            let SignedAction(action, signature) = action.data;
+            let (action, signature) = action.data.into();
             // TODO: If they only need the metadata because they already have
             // the content we could just send the entry hash instead of the
             // SignedAction.
@@ -55,7 +55,7 @@ impl WireRecordOps {
                 action,
                 signature,
                 status,
-                DhtOpType::StoreRecord,
+                ChainOpType::StoreRecord,
             )?);
             if let Some(entry_hash) = entry_hash {
                 for op in deletes {
@@ -68,19 +68,18 @@ impl WireRecordOps {
                         action,
                         signature,
                         status,
-                        DhtOpType::RegisterDeletedBy,
+                        ChainOpType::RegisterDeletedBy,
                     )?);
                 }
                 for op in updates {
                     let status = op.validation_status();
-                    let SignedAction(action, signature) =
-                        op.data.into_signed_action(entry_hash.clone());
+                    let (action, signature) = op.data.into_signed_action(entry_hash.clone()).into();
 
                     ops.push(RenderedOp::new(
                         action,
                         signature,
                         status,
-                        DhtOpType::RegisterUpdatedRecord,
+                        ChainOpType::RegisterUpdatedRecord,
                     )?);
                 }
             }
@@ -460,12 +459,10 @@ mod tests {
     async fn test_signed_action_roundtrip() {
         let signature = SignatureFixturator::new(Unpredictable).next().unwrap();
         let action = ActionFixturator::new(Unpredictable).next().unwrap();
-        let signed_action = SignedAction(action, signature);
+        let signed_action = SignedAction::new(action, signature);
         let hashed: HoloHashed<SignedAction> = HoloHashed::from_content_sync(signed_action);
-        let HoloHashed {
-            content: SignedAction(action, signature),
-            hash,
-        } = hashed.clone();
+        let HoloHashed { content, hash } = hashed.clone();
+        let (action, signature) = content.into();
         let shh = SignedActionHashed {
             hashed: ActionHashed::with_pre_hashed(action, hash),
             signature,
@@ -474,7 +471,7 @@ mod tests {
         assert_eq!(shh.action_address(), hashed.as_hash());
 
         let round = HoloHashed {
-            content: SignedAction(shh.action().clone(), shh.signature().clone()),
+            content: SignedAction::new(shh.action().clone(), shh.signature().clone()),
             hash: shh.action_address().clone(),
         };
 

@@ -7,6 +7,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.0-dev.5
+
+- Moved the WASM cache from the data directory to a subdirectory of the data directory named `wasm-cache`. Old content won’t be removed and WASMs will have to be recompiled into the new cache. \#3920
+- Remove deprecated functions `consistency_10s` and `consistency_60s`. Use `await_consistency` instead.
+- Remove deprecated type `SweetEasyInline`. Use `SweetInlineZomes` instead.
+- Remove deprecated methods `SweetInlineZomes::callback` and `SweetInlineZomes::integrity_callback`. Use `SweetInlineZomes::function` and `SweetInlineZomes::integrity_function` instead.
+
+## 0.4.0-dev.4
+
+- Rename feature `sweetest` in Holochain crate to `sweettest` to match the crate name.
+- App validation workflow: Reduce interval to re-trigger when dependencies are missing from 10 seconds to 100-1000 ms, according to number of missing dependencies.
+
+## 0.4.0-dev.3
+
 - App validation workflow: Fix bug where ops were stuck in app validation when multiple ops were requiring the same action or entry hash. Such ops were erroneously filtered out from validation for being marked as ops awaiting hashes and not unmarked as awaiting once the hashes had arrived.
 
 ## 0.4.0-dev.2
