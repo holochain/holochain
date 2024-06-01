@@ -132,6 +132,8 @@ mod graft_records_onto_source_chain;
 
 mod app_auth_token_store;
 
+mod agent_key_operations;
+
 pub(crate) mod app_broadcast;
 
 #[cfg(test)]
@@ -1455,6 +1457,7 @@ mod app_impls {
         ) -> ConductorResult<StoppedApp> {
             let dpki = self.running_services().dpki.clone();
 
+            // if dpki is installed, load dpki state
             let mut dpki = if let Some(d) = dpki.as_ref() {
                 let lock = d.state().await;
                 Some((d.clone(), lock))
@@ -1463,15 +1466,15 @@ mod app_impls {
             };
 
             let (agent_key, derivation_details): (AgentPubKey, Option<DerivationDetailsInput>) =
-            // pre-installed dpki for this app
-            if let Some(agent_key) = agent_key {
-                if dpki.is_some() {
-                    // TODO: allow adding additional apps to an existing DPKI KeyRegistration.
-                    tracing::warn!("Using app with a pre-existing agent key: DPKI will not be used to manage keys for this app.");
-                }
-                (agent_key, None)
-                // no pre-installed dpki for this app
+                if let Some(agent_key) = agent_key {
+                    if dpki.is_some() {
+                        // dpki installed, agent key given
+                        tracing::warn!("App is being installed with an existing agent key: DPKI will not be used to manage keys for this app.");
+                    }
+                    (agent_key, None)
                 } else if let Some((dpki, state)) = &mut dpki {
+                    // dpki installed, no agent key given
+
                     // register a new key derivation for this app
                     let derivation_details = state.next_derivation_details(None).await?;
 
@@ -1509,6 +1512,7 @@ mod app_impls {
 
                     (AgentPubKey::from_raw_32(seed), Some(derivation))
                 } else {
+                    // dpki not installed, no agent key given
                     (self.keystore.new_sign_keypair_random().await?, None)
                 };
 
@@ -2453,83 +2457,6 @@ mod service_impls {
             }
 
             Ok(())
-        }
-    }
-}
-
-/// Methods related to Deepkey operations
-mod deepkey_impls {
-    use holochain_types::deepkey_roundtrip_backward;
-
-    use super::*;
-
-    impl Conductor {
-        /// Revoke an agent's key pair for all cells of an app. The agent key becomes invalid and
-        /// source chains of all cells of the app are made read-only.
-        pub async fn revoke_agent_key_for_app(
-            self: Arc<Self>,
-            agent_key: AgentPubKey,
-            app_id: InstalledAppId,
-        ) -> ConductorResult<(ActionHash, KeyRegistration)> {
-            let dpki_service = self
-                .running_services()
-                .dpki
-                .ok_or(ConductorError::DpkiError(
-                    DpkiServiceError::DpkiNotInstalled,
-                ))?;
-            let dpki_state = dpki_service.state().await;
-            let timestamp = Timestamp::now();
-            let key_state = dpki_state
-                .key_state(agent_key.clone(), timestamp.clone())
-                .await?;
-            match key_state {
-                KeyState::NotFound => Err(ConductorError::DpkiError(
-                    DpkiServiceError::DpkiAgentMissing(agent_key),
-                )),
-                KeyState::Invalid(_) => Err(ConductorError::DpkiError(
-                    DpkiServiceError::DpkiAgentInvalid(agent_key, timestamp),
-                )),
-                KeyState::Valid(_) => {
-                    // get action hash of key registration
-                    let key_meta = dpki_state.query_key_meta(agent_key.clone()).await?;
-                    // sign revocation request
-                    let signature = dpki_service
-                        .cell_id
-                        .agent_pubkey()
-                        .sign_raw(
-                            &self.keystore,
-                            key_meta.key_registration_addr.get_raw_39().into(),
-                        )
-                        .await
-                        .map_err(|e| DpkiServiceError::Lair(e.into()))?;
-                    let signature = deepkey_roundtrip_backward!(Signature, &signature);
-
-                    // disable app, revoke key, close all cells' chains and enable app again
-                    self.clone()
-                        .disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)
-                        .await?;
-                    let revocation = dpki_state
-                        .revoke_key(RevokeKeyInput {
-                            key_revocation: KeyRevocation {
-                                prior_key_registration: key_meta.key_registration_addr,
-                                revocation_authorization: vec![(0, signature)],
-                            },
-                        })
-                        .await?;
-
-                    // close chain of all cells of this app
-                    let state = self.get_state().await?;
-                    let app = state.get_app(&app_id)?;
-                    let close_chain_requests = app
-                        .all_cells()
-                        .map(|cell_id| Self::close_chain(self.clone(), cell_id));
-                    futures::future::join_all(close_chain_requests).await;
-
-                    self.clone().enable_app(app_id).await?;
-
-                    Ok(revocation)
-                }
-            }
         }
     }
 }
