@@ -100,7 +100,6 @@ async fn revoke_agent_key_with_dpki_installed() {
     let row_fn = {
         let agent_key = agent_key.clone();
         move |row: &Row| {
-            println!("{row:?}");
             let author = row.get::<_, AgentPubKey>("author").unwrap();
             let action_type = row.get::<_, String>("type").unwrap();
             let deletes_entry_hash = row.get::<_, EntryHash>("deletes_entry_hash").unwrap();
@@ -113,11 +112,14 @@ async fn revoke_agent_key_with_dpki_installed() {
     conductor
         .get_or_create_authored_db(dna_file_1.dna_hash(), agent_key.clone())
         .unwrap()
-        .test_read(move |txn| txn.query_row(sql, [], row_fn.clone()).unwrap());
-    // conductor
-    //     .get_or_create_authored_db(dna_file_2.dna_hash(), agent_key.clone())
-    //     .unwrap()
-    //     .test_read(move |txn| txn.query_row(sql, [], row_fn).unwrap());
+        .test_read({
+            let row_fn = row_fn.clone();
+            move |txn| txn.query_row(sql, [], row_fn).unwrap()
+        });
+    conductor
+        .get_or_create_authored_db(dna_file_2.dna_hash(), agent_key.clone())
+        .unwrap()
+        .test_read(move |txn| txn.query_row(sql, [], row_fn).unwrap());
 
     // // Deleting same agent key again should return a "key invalid" error.
     // let result = conductor

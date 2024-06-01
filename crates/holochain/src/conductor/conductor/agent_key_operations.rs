@@ -21,14 +21,14 @@ impl Conductor {
 
         // Revoke key in DPKI first, if installed, and then in cells' source chains.
         // Call separate function so that in case a part of key revocation fails, the app is still enabled again.
-        let result =
+        let revocation_result =
             Conductor::revoke_agent_key_for_app_inner(self.clone(), agent_key, app_id.clone())
                 .await;
 
         // Enable app again.
         self.clone().enable_app(app_id).await?;
 
-        result
+        revocation_result
     }
 
     async fn revoke_agent_key_for_app_inner(
@@ -89,42 +89,62 @@ impl Conductor {
         let state = conductor.get_state().await?;
         let app = state.get_app(&app_id)?;
         let delete_agent_key_of_all_cells = app.all_cells().map(|cell_id| {
-                println!("cell id {cell_id:?}");
-                let conductor = conductor.clone();
-                let agent_key = agent_key.clone();
-                async move {
-                    let authored_db = conductor
-                        .get_or_create_authored_db(cell_id.dna_hash(), agent_key.clone())
-                        .unwrap();
-                    let create_agent_key_address = authored_db
-                        .read_async({
-                            let agent_key = agent_key.clone();
-                            move |txn| {
-                                let agent_key_entry_hash: EntryHash = agent_key.clone().into();
-                                let create_agent_key_address = txn.query_row(
-                                    "SELECT hash FROM Action WHERE author = :agent_key AND type = :create AND entry_hash = :agent_key_entry_hash",
-                                    named_params! {":agent_key": agent_key, ":create": ActionType::Create.to_string(), ":agent_key_entry_hash": agent_key_entry_hash},
-                                    |row| {
-                                        row.get::<_, ActionHash>("hash")
-                                    },
-                                )?;
-                                Ok::<_, DatabaseError>(create_agent_key_address)
-                            }
-                        })
-                        .await?;
-                    println!("create agent key address is {create_agent_key_address:?}");
-                    let source_chain = SourceChain::new(authored_db, conductor.get_dht_db(cell_id.dna_hash())?, conductor.get_dht_db_cache(cell_id.dna_hash())?, conductor.keystore().clone(), agent_key.clone()).await?;
-                    let result = source_chain.put_weightless(builder::Delete::new(create_agent_key_address, agent_key.clone().into()), None, ChainTopOrdering::Strict).await?;
-                    let network = conductor
-                        .holochain_p2p
-                        .to_dna(cell_id.dna_hash().clone(), conductor.get_chc(&cell_id));
-                    source_chain.flush(&network).await?;
-                    println!("result of put {result:?}");
-                    Ok::<_, ConductorApiError>(())
-                }
-            });
-        let result = futures::future::join_all(delete_agent_key_of_all_cells).await;
-        println!("all delte futures result {result:?}");
+            let conductor = conductor.clone();
+            let agent_key = agent_key.clone();
+            async move {
+                // Instantiate source chain
+                let authored_db = conductor
+                    .get_or_create_authored_db(cell_id.dna_hash(), agent_key.clone())
+                    .unwrap();
+                let source_chain = SourceChain::new(
+                    authored_db,
+                    conductor.get_dht_db(cell_id.dna_hash())?,
+                    conductor.get_dht_db_cache(cell_id.dna_hash())?,
+                    conductor.keystore().clone(),
+                    agent_key.clone(),
+                )
+                .await?;
+
+                // Query source chain for agent pub key 'Create' action.
+                let mut entry_hashes = HashSet::new();
+                entry_hashes.insert(agent_key.clone().into());
+                let queried = source_chain
+                    .query(ChainQueryFilter {
+                        sequence_range: ChainQueryFilterRange::Unbounded,
+                        entry_type: None,
+                        entry_hashes: Some(entry_hashes),
+                        action_type: Some(vec![ActionType::Create]),
+                        include_entries: false,
+                        order_descending: false,
+                    })
+                    .await?;
+                // There must only be 1 record of the agent pub key 'Create' action.
+                assert!(queried.len() == 1);
+                let create_agent_key_address = queried[0].action_address().clone();
+
+                // Insert `Delete` action of agent pub key into source chain.
+                let _ = source_chain
+                    .put_weightless(
+                        builder::Delete::new(create_agent_key_address, agent_key.clone().into()),
+                        None,
+                        ChainTopOrdering::Strict,
+                    )
+                    .await?;
+                let network = conductor
+                    .holochain_p2p
+                    .to_dna(cell_id.dna_hash().clone(), conductor.get_chc(&cell_id));
+                source_chain.flush(&network).await?;
+
+                // Trigger publish for 'Delete" actions.
+                let cell_triggers = conductor.get_cell_triggers(&cell_id).await?;
+                cell_triggers
+                    .publish_dht_ops
+                    .trigger(&"agent_key_revocation");
+
+                Ok::<_, ConductorApiError>(())
+            }
+        });
+        let _ = futures::future::join_all(delete_agent_key_of_all_cells).await;
 
         Ok(())
     }
