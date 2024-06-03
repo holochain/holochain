@@ -20,6 +20,7 @@ use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::params;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_sqlite::sql::sql_cell::SELECT_VALID_AGENT_PUB_KEY;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
 use holochain_state_types::SourceChainDumpRecord;
@@ -415,6 +416,55 @@ impl SourceChain {
             }
             result => result,
         }
+    }
+
+    pub async fn delete_valid_agent_pub_key(&self) -> SourceChainResult<()> {
+        let agent_key_entry_hash: EntryHash = self.agent_pubkey().clone().into();
+        let valid_create_agent_key_action = self
+            .author_db()
+            .read_async({
+                let agent_key = self.agent_pubkey().clone();
+                let cell_id = self.cell_id().as_ref().clone();
+                move |txn| {
+                    txn.query_row(
+                        SELECT_VALID_AGENT_PUB_KEY,
+                        named_params! {
+                            ":author": agent_key.clone(),
+                            ":type": ActionType::Create.to_string(),
+                            ":entry_type": EntryType::AgentPubKey.to_string(),
+                            ":entry_hash": agent_key_entry_hash
+                        },
+                        |row| {
+                            let create_agent_signed_action = from_blob::<SignedAction>(row.get(0)?)
+                                .map_err(|_| rusqlite::Error::BlobSizeError)?;
+                            let create_agent_action = create_agent_signed_action.action().clone();
+                            Ok(create_agent_action)
+                        },
+                    )
+                    .map_err(|err| match err {
+                        rusqlite::Error::BlobSizeError | rusqlite::Error::QueryReturnedNoRows => {
+                            SourceChainError::InvalidAgentKey(agent_key, cell_id)
+                        }
+                        _ => {
+                            tracing::error!(?err, "Error looking up valid agent pub key");
+                            SourceChainError::other(err)
+                        }
+                    })
+                }
+            })
+            .await?;
+
+        self.put_weightless(
+            builder::Delete::new(
+                valid_create_agent_key_action.to_hash(),
+                self.agent_pubkey().clone().into(),
+            ),
+            None,
+            ChainTopOrdering::Strict,
+        )
+        .await?;
+
+        Ok(())
     }
 }
 
@@ -1569,6 +1619,47 @@ mod tests {
         .await?;
 
         Ok(())
+    }
+
+    // Test that a valid agent pub key can be deleted and that repeated deletes fail.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn delete_valid_agent_pub_key() {
+        let authored_db = test_authored_db().to_db();
+        let dht_db = test_dht_db().to_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.clone().into());
+        let keystore = test_keystore();
+        let agent_key = keystore.new_sign_keypair_random().await.unwrap();
+        let mut mock_network = MockHolochainP2pDnaT::new();
+        mock_network
+            .expect_authority_for_hash()
+            .returning(|_| Ok(false));
+        mock_network.expect_chc().return_const(None);
+
+        source_chain::genesis(
+            authored_db.clone(),
+            dht_db.clone(),
+            &dht_db_cache,
+            keystore.clone(),
+            fake_dna_hash(1),
+            agent_key.clone(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        // Delete valid agent pub key should succeed.
+        let chain = SourceChain::new(authored_db, dht_db, dht_db_cache, keystore, agent_key)
+            .await
+            .unwrap();
+        let result = chain.delete_valid_agent_pub_key().await;
+        assert!(result.is_ok());
+        chain.flush(&mock_network).await.unwrap();
+
+        // Valid agent pub key has been deleted. Repeating the operation should fail now as no valid
+        // pub key can be found.
+        let result = chain.delete_valid_agent_pub_key().await.unwrap_err();
+        assert_matches!(result, SourceChainError::InvalidAgentKey(invalid_key, cell_id) if invalid_key == *chain.author && cell_id == *chain.cell_id());
     }
 
     #[tokio::test(flavor = "multi_thread")]

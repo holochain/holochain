@@ -16,6 +16,9 @@ pub mod sql_cell {
     pub const UPDATE_INTEGRATE_DEP_CREATE_LINK: &str =
         include_str!("sql/cell/update_dep_create_link.sql");
 
+    pub const SELECT_VALID_AGENT_PUB_KEY: &str =
+        include_str!("sql/cell/select_valid_agent_pub_key.sql");
+
     pub const FETCH_OP_HASHES_P1: &str =
         include_str!("sql/cell/fetch_hashes/fetch_op_hashes_p1.sql");
     pub const FETCH_OP_HASHES_P2: &str =
