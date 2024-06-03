@@ -14,6 +14,66 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240603.115351
+
+## [hcterm-0.3.1-rc.1](crates/hcterm/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_cli-0.3.1-rc.1](crates/holochain_cli/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain-0.3.1-rc.1](crates/holochain/CHANGELOG.md#0.3.1-rc.1)
+
+- Update Holochain Wasmer to v0.0.94 to get a fix for a deallocation bug that was causing crashes when calling zome functions on Rust 1.78. \#3900
+
+## [holochain\_cli\_bundle-0.3.1-rc.1](crates/holochain_cli_bundle/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_cli\_run\_local\_services-0.3.1-rc.1](crates/holochain_cli_run_local_services/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_cli\_sandbox-0.3.1-rc.1](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_cascade-0.3.1-rc.1](crates/holochain_cascade/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_conductor\_api-0.3.1-rc.1](crates/holochain_conductor_api/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_conductor\_services-0.2.1-rc.1](crates/holochain_conductor_services/CHANGELOG.md#0.2.1-rc.1)
+
+## [holochain\_test\_wasm\_common-0.3.1-rc.1](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_wasm\_test\_utils-0.3.1-rc.1](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_websocket-0.3.1-rc.1](crates/holochain_websocket/CHANGELOG.md#0.3.1-rc.1)
+
+## [hdk-0.3.1-rc.1](crates/hdk/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_state-0.3.1-rc.1](crates/holochain_state/CHANGELOG.md#0.3.1-rc.1)
+
+## [hdi-0.4.1-rc.1](crates/hdi/CHANGELOG.md#0.4.1-rc.1)
+
+## [holochain\_p2p-0.3.1-rc.1](crates/holochain_p2p/CHANGELOG.md#0.3.1-rc.1)
+
+## [hc\_sleuth-0.2.1-rc.1](crates/hc_sleuth/CHANGELOG.md#0.2.1-rc.1)
+
+## [hdk\_derive-0.3.1-rc.1](crates/hdk_derive/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_state\_types-0.3.1-rc.1](crates/holochain_state_types/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_types-0.3.1-rc.1](crates/holochain_types/CHANGELOG.md#0.3.1-rc.1)
+
+## [kitsune\_p2p-0.3.1-rc.1](crates/kitsune_p2p/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_keystore-0.3.1-rc.1](crates/holochain_keystore/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_sqlite-0.3.1-rc.1](crates/holochain_sqlite/CHANGELOG.md#0.3.1-rc.1)
+
+## [kitsune\_p2p\_bootstrap\_client-0.3.1-rc.1](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.3.1-rc.1)
+
+## [holochain\_zome\_types-0.3.1-rc.1](crates/holochain_zome_types/CHANGELOG.md#0.3.1-rc.1)
+
+## [kitsune\_p2p\_bootstrap-0.2.1-rc.1](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.2.1-rc.1)
+
+## [holochain\_integrity\_types-0.3.1-rc.1](crates/holochain_integrity_types/CHANGELOG.md#0.3.1-rc.1)
+
+## [holo\_hash-0.3.1-rc.1](crates/holo_hash/CHANGELOG.md#0.3.1-rc.1)
+
 # 20240516.213154
 
 ## [hcterm-0.3.1-rc.0](crates/hcterm/CHANGELOG.md#0.3.1-rc.0)

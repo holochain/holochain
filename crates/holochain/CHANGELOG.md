@@ -7,8 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Update Holochain Wasmer to v0.0.94 to get a fix for a deallocation bug that was causing crashes when calling zome functions
-  on Rust 1.78. #3900
+## 0.3.1-rc.1
+
+- Update Holochain Wasmer to v0.0.94 to get a fix for a deallocation bug that was causing crashes when calling zome functions on Rust 1.78. \#3900
 
 ## 0.3.1-rc.0
 

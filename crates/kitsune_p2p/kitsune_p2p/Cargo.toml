@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p"
-version = "0.3.1-rc.0"
+version = "0.3.1-rc.1"
 description = "p2p / dht communication framework"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -26,7 +26,7 @@ kitsune_p2p_mdns = { version = "^0.3.1-rc.0", path = "../mdns" }
 kitsune_p2p_proxy = { version = "^0.3.1-rc.0", path = "../proxy" }
 kitsune_p2p_timestamp = { version = "^0.3.1-rc.0", path = "../timestamp", features = ["now"] }
 kitsune_p2p_block = { version = "^0.3.1-rc.0", path = "../block" }
-kitsune_p2p_bootstrap_client = { version = "^0.3.1-rc.0", path = "../bootstrap_client" }
+kitsune_p2p_bootstrap_client = { version = "^0.3.1-rc.1", path = "../bootstrap_client" }
 kitsune_p2p_bin_data = { version = "^0.3.1-rc.0", path = "../bin_data" }
 kitsune_p2p_transport_quic = { version = "^0.3.1-rc.0", path = "../transport_quic", optional = true }
 kitsune_p2p_types = { version = "^0.3.1-rc.0", path = "../types", default-features = false }
