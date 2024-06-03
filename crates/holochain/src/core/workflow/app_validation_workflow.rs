@@ -165,6 +165,7 @@ mod types;
     dht_query_cache,
     validation_dependencies,
 ))]
+#[allow(clippy::too_many_arguments)]
 pub async fn app_validation_workflow(
     dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
@@ -309,29 +310,26 @@ async fn app_validation_workflow_inner(
                 let awaiting_ops = awaiting_ops.clone();
                 let rejected_ops = rejected_ops.clone();
 
-                match &outcome {
-                    Outcome::Rejected(_) => {
-                        let warrant_op =
-                            crate::core::workflow::sys_validation_workflow::make_warrant_op(
-                                &conductor,
-                                &dna_hash,
-                                &chain_op,
-                                ValidationType::App,
-                            )
-                            .await?;
+                if let Outcome::Rejected(_) = &outcome {
+                    let warrant_op =
+                        crate::core::workflow::sys_validation_workflow::make_warrant_op(
+                            &conductor,
+                            &dna_hash,
+                            &chain_op,
+                            ValidationType::App,
+                        )
+                        .await?;
 
-                        workspace
-                            .authored_db
-                            .write_async(move |txn| {
-                                warn!("Inserting warrant op");
-                                insert_op(txn, &warrant_op)
-                            })
-                            .await?;
+                    workspace
+                        .authored_db
+                        .write_async(move |txn| {
+                            warn!("Inserting warrant op");
+                            insert_op(txn, &warrant_op)
+                        })
+                        .await?;
 
-                        warranted_ops.fetch_add(1, Ordering::SeqCst);
-                    }
-                    _ => (),
-                };
+                    warranted_ops.fetch_add(1, Ordering::SeqCst);
+                }
 
                 let write_result = workspace
                     .dht_db

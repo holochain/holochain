@@ -119,6 +119,7 @@ mod validate_op_tests;
 
 /// The sys validation worfklow. It is described in the module level documentation.
 #[instrument(skip_all)]
+#[allow(clippy::too_many_arguments)]
 pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
@@ -324,7 +325,7 @@ async fn sys_validation_workflow_inner(
             let warrant_op = crate::core::workflow::sys_validation_workflow::make_warrant_op_inner(
                 &keystore,
                 representative_agent.clone(),
-                &chain_op,
+                chain_op,
                 ValidationType::Sys,
             )
             .await?;

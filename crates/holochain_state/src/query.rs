@@ -369,7 +369,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
                 },
             )?
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(warrants.into_iter().collect::<Result<Vec<_>, _>>()?)
+        warrants.into_iter().collect::<Result<Vec<_>, _>>()
     }
 
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {

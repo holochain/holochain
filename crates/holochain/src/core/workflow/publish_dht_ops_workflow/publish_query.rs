@@ -35,10 +35,9 @@ where
         .map(|t| t.as_secs())
         .unwrap_or(0);
 
-    let results = db
-        .read_async(move |txn| {
-            let mut stmt = txn.prepare(
-                "
+    db.read_async(move |txn| {
+        let mut stmt = txn.prepare(
+            "
             SELECT
             Action.blob as action_blob,
             Action.author as author,
@@ -66,32 +65,30 @@ where
             AND
             DhtOp.receipts_complete IS NULL
             ",
-            )?;
-            let r = stmt.query_and_then(
-                named_params! {
-                    ":author": agent,
-                    ":recency_threshold": recency_threshold,
-                    ":store_entry": ChainOpType::StoreEntry,
-                },
-                |row| {
-                    // let dht_type: DhtOpType = row.get("dht_type")?;
-                    // dbg!(&dht_type);
-                    let op = map_sql_dht_op(false, "dht_type", row)?;
-                    let action_size: usize = row.get("action_size")?;
-                    // will be NULL if the op has no associated entry
-                    let entry_size: Option<usize> = row.get("entry_size")?;
-                    let op_size = (action_size + entry_size.unwrap_or(0)).into();
-                    let hash: DhtOpHash = row.get("dht_hash")?;
-                    let op_hash_sized = OpHashSized::new(hash.to_kitsune(), Some(op_size));
-                    let basis = op.dht_basis();
-                    WorkflowResult::Ok((basis, op_hash_sized, op))
-                },
-            )?;
-            WorkflowResult::Ok(r.collect())
-        })
-        .await?;
-
-    results
+        )?;
+        let r = stmt.query_and_then(
+            named_params! {
+                ":author": agent,
+                ":recency_threshold": recency_threshold,
+                ":store_entry": ChainOpType::StoreEntry,
+            },
+            |row| {
+                // let dht_type: DhtOpType = row.get("dht_type")?;
+                // dbg!(&dht_type);
+                let op = map_sql_dht_op(false, "dht_type", row)?;
+                let action_size: usize = row.get("action_size")?;
+                // will be NULL if the op has no associated entry
+                let entry_size: Option<usize> = row.get("entry_size")?;
+                let op_size = (action_size + entry_size.unwrap_or(0)).into();
+                let hash: DhtOpHash = row.get("dht_hash")?;
+                let op_hash_sized = OpHashSized::new(hash.to_kitsune(), Some(op_size));
+                let basis = op.dht_basis();
+                WorkflowResult::Ok((basis, op_hash_sized, op))
+            },
+        )?;
+        WorkflowResult::Ok(r.collect::<Result<Vec<_>, _>>())
+    })
+    .await?
 }
 
 /// Get the number of ops that might need to publish again in the future.
