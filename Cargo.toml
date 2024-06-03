@@ -104,13 +104,13 @@ lto = true
 # influxive-otel = { path = "../influxive/crates/influxive-otel" }
 # contrafact = { git = "https://github.com/maackle/contrafact-rs.git", branch = "lambda" }
 # tx5 = { path = "../tx5/crates/tx5" }
+# tx5-core = { path = "../tx5/crates/tx5-core" }
+# tx5-go-pion = { path = "../tx5/crates/tx5-go-pion" }
 # tx5-go-pion-sys = { path = "../tx5/crates/tx5-go-pion-sys" }
 # tx5-go-pion-turn = { path = "../tx5/crates/tx5-go-pion-turn" }
 # tx5-signal = { path = "../tx5/crates/tx5-signal" }
-# tx5-signal-srv = { path = "../tx5/crates/tx5-signal-srv" }
 # tx5 = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # tx5-signal = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
-# tx5-signal-srv = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
