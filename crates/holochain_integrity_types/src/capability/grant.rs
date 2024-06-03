@@ -87,13 +87,13 @@ impl CapGrant {
     /// if a grant is valid in a standalone way.
     pub fn is_valid(
         &self,
-        check_function: &GrantedFunction,
-        check_agent: &AgentPubKey,
-        check_secret: Option<&CapSecret>,
+        given_function: &GrantedFunction,
+        given_agent: &AgentPubKey,
+        given_secret: Option<&CapSecret>,
     ) -> bool {
         match self {
             // Grant is always valid if the author matches the check agent.
-            CapGrant::ChainAuthor(author) => author == check_agent,
+            CapGrant::ChainAuthor(author) => author == given_agent,
             // Otherwise we need to do more work…
             CapGrant::RemoteAgent(ZomeCallCapGrant {
                 access, functions, ..
@@ -101,13 +101,13 @@ impl CapGrant {
                 // The checked function needs to be in the grant…
                 let granted = match functions {
                     GrantedFunctions::All => true,
-                    GrantedFunctions::Listed(fns) => fns.contains(check_function),
+                    GrantedFunctions::Listed(fns) => fns.contains(given_function),
                 };
                 granted
                 // The agent needs to be valid…
                 && match access {
                     // The grant is assigned so the agent needs to match…
-                    CapAccess::Assigned { assignees, .. } => assignees.contains(check_agent),
+                    CapAccess::Assigned { assignees, .. } => assignees.contains(given_agent),
                     // The grant has no assignees so is always valid…
                     _ => true,
                 }
@@ -116,8 +116,8 @@ impl CapGrant {
                     // Unless the extern is unrestricted.
                     CapAccess::Unrestricted => true,
                     // note the PartialEq implementation is constant time for secrets
-                    CapAccess::Transferable { secret, .. } => check_secret.map(|given| secret == given).unwrap_or(false),
-                    CapAccess::Assigned { secret, .. } => check_secret.map(|given| secret == given).unwrap_or(false),
+                    CapAccess::Transferable { secret, .. } => given_secret.map(|given| secret == given).unwrap_or(false),
+                    CapAccess::Assigned { secret, .. } => given_secret.map(|given| secret == given).unwrap_or(false),
                 }
             }
         }
