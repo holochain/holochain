@@ -205,6 +205,7 @@ pub enum GrantedFunctions {
     Listed(BTreeSet<GrantedFunction>),
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -225,19 +226,11 @@ mod tests {
             functions: GrantedFunctions::All,
         }
         .into();
+
         let g2: CapGrant = ZomeCallCapGrant {
             tag: tag.clone(),
             access: CapAccess::Assigned {
-                secret: None,
-                assignees: assignees.clone(),
-            },
-            functions: GrantedFunctions::All,
-        }
-        .into();
-        let g3: CapGrant = ZomeCallCapGrant {
-            tag: tag.clone(),
-            access: CapAccess::Assigned {
-                secret: Some(secret.clone()),
+                secret: secret.clone(),
                 assignees: assignees.clone(),
             },
             functions: GrantedFunctions::All,
@@ -280,37 +273,13 @@ mod tests {
             Some(&secret),
         ));
 
-        assert!(g2.is_valid(
+        assert!(!g2.is_valid(
             &(ZomeName("zome".into()), FunctionName("fn".into())),
             &agent1,
             None,
         ));
 
-        assert!(g2.is_valid(
-            &(ZomeName("zome".into()), FunctionName("fn".into())),
-            &agent1,
-            Some(&secret_wrong),
-        ));
-
-        assert!(g3.is_valid(
-            &(ZomeName("zome".into()), FunctionName("fn".into())),
-            &agent1,
-            Some(&secret),
-        ));
-
-        assert!(!g3.is_valid(
-            &(ZomeName("zome".into()), FunctionName("fn".into())),
-            &agent2,
-            Some(&secret),
-        ));
-
-        assert!(!g3.is_valid(
-            &(ZomeName("zome".into()), FunctionName("fn".into())),
-            &agent1,
-            None,
-        ));
-
-        assert!(!g3.is_valid(
+        assert!(!g2.is_valid(
             &(ZomeName("zome".into()), FunctionName("fn".into())),
             &agent1,
             Some(&secret_wrong),
