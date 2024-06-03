@@ -204,3 +204,116 @@ pub enum GrantedFunctions {
     /// grant to specified zomes and functions
     Listed(BTreeSet<GrantedFunction>),
 }
+
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cap_grant_is_valid() {
+        let agent1 = AgentPubKey::from_raw_36(vec![1; 36]);
+        let agent2 = AgentPubKey::from_raw_36(vec![2; 36]);
+        let assignees: BTreeSet<_> = [agent1.clone()].into_iter().collect();
+        let secret: CapSecret = [1; 64].into();
+        let secret_wrong: CapSecret = [2; 64].into();
+        let tag = "tag".to_string();
+
+        let g1: CapGrant = ZomeCallCapGrant {
+            tag: tag.clone(),
+            access: CapAccess::Transferable {
+                secret: secret.clone(),
+            },
+            functions: GrantedFunctions::All,
+        }
+        .into();
+        let g2: CapGrant = ZomeCallCapGrant {
+            tag: tag.clone(),
+            access: CapAccess::Assigned {
+                secret: None,
+                assignees: assignees.clone(),
+            },
+            functions: GrantedFunctions::All,
+        }
+        .into();
+        let g3: CapGrant = ZomeCallCapGrant {
+            tag: tag.clone(),
+            access: CapAccess::Assigned {
+                secret: Some(secret.clone()),
+                assignees: assignees.clone(),
+            },
+            functions: GrantedFunctions::All,
+        }
+        .into();
+
+        assert!(g1.is_valid(
+            &(ZomeName("zome".into()), FunctionName("fn".into())),
+            &agent1,
+            Some(&secret),
+        ));
+
+        assert!(g1.is_valid(
+            &(ZomeName("zome".into()), FunctionName("fn".into())),
+            &agent2,
+            Some(&secret),
+        ));
+
+        assert!(!g1.is_valid(
+            &(ZomeName("zome".into()), FunctionName("fn".into())),
+            &agent1,
+            Some(&secret_wrong),
+        ));
+
+        assert!(!g1.is_valid(
+            &(ZomeName("zome".into()), FunctionName("fn".into())),
+            &agent1,
+            None,
+        ));
+
+        assert!(g2.is_valid(
+            &(ZomeName("zome".into()), FunctionName("fn".into())),
+            &agent1,
+            Some(&secret),
+        ));
+
+        assert!(!g2.is_valid(
+            &(ZomeName("zome".into()), FunctionName("fn".into())),
+            &agent2,
+            Some(&secret),
+        ));
+
+        assert!(g2.is_valid(
+            &(ZomeName("zome".into()), FunctionName("fn".into())),
+            &agent1,
+            None,
+        ));
+
+        assert!(g2.is_valid(
+            &(ZomeName("zome".into()), FunctionName("fn".into())),
+            &agent1,
+            Some(&secret_wrong),
+        ));
+
+        assert!(g3.is_valid(
+            &(ZomeName("zome".into()), FunctionName("fn".into())),
+            &agent1,
+            Some(&secret),
+        ));
+
+        assert!(!g3.is_valid(
+            &(ZomeName("zome".into()), FunctionName("fn".into())),
+            &agent2,
+            Some(&secret),
+        ));
+
+        assert!(!g3.is_valid(
+            &(ZomeName("zome".into()), FunctionName("fn".into())),
+            &agent1,
+            None,
+        ));
+
+        assert!(!g3.is_valid(
+            &(ZomeName("zome".into()), FunctionName("fn".into())),
+            &agent1,
+            Some(&secret_wrong),
+        ));
+    }
+}
