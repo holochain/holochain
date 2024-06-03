@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- App manifest now includes a new `membrane_proofs_deferred: bool` field, which allows the membrane proofs for the app's cells to provided at a time after installation, allowing the app's UI to guide the process of creating membrane proofs.
+- App manifest now includes a new `membrane_proofs_deferred: bool` field, which allows the membrane proofs for the app's cells to be provided at a time after installation, allowing the app's UI to guide the process of creating membrane proofs.
 - Adds new `AppStatus::AwaitingMemproofs` to indicate an app which was installed with `MemproofProvisioning::Deferred`
 - Adds new app websocket method `ProvideMemproofs` for use with `MemproofProvisioning::Deferred`
 
