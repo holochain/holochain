@@ -1,7 +1,6 @@
-use crate::store::Store;
+use crate::store::{Store, StoreEntry};
 
 use super::*;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use warp::Filter;
 
 pub(crate) fn put(
@@ -19,8 +18,7 @@ async fn put_info(peer: Bytes, store: Store) -> Result<impl warp::Reply, warp::R
     #[derive(Debug)]
     struct BadDecode(#[allow(dead_code)] String);
     impl warp::reject::Reject for BadDecode {}
-    let peer: AgentInfoSigned =
-        rmp_decode(&mut AsRef::<[u8]>::as_ref(&peer)).map_err(|e| BadDecode(format!("{e:?}")))?;
+    let peer = StoreEntry::parse(peer.to_vec()).map_err(|e| BadDecode(format!("{e:?}")))?;
     if !valid(&peer) {
         #[derive(Debug)]
         struct Invalid;
@@ -34,7 +32,7 @@ async fn put_info(peer: Bytes, store: Store) -> Result<impl warp::Reply, warp::R
     Ok(buf)
 }
 
-fn valid(peer: &AgentInfoSigned) -> bool {
+fn valid(peer: &StoreEntry) -> bool {
     // TODO: actually verify signature... just checking size for now
     if peer.signature.len() != 64 {
         return false;
@@ -61,7 +59,7 @@ mod tests {
         let store = Store::new(vec![]);
         let filter = put(store.clone());
 
-        let info = AgentInfoSigned::sign(
+        let info = kitsune_p2p_types::agent_info::AgentInfoSigned::sign(
             Arc::new(fixt!(KitsuneSpace, Unpredictable)),
             Arc::new(fixt!(KitsuneAgent, Unpredictable)),
             ArqSize::from_half_len(u32::MAX / 4),
@@ -74,6 +72,10 @@ mod tests {
         .unwrap();
         let mut buf = Vec::new();
         rmp_encode(&mut buf, info.clone()).unwrap();
+
+        let mut enc = Vec::new();
+        kitsune_p2p_types::codec::rmp_encode(&mut enc, &info).unwrap();
+        let info_as_entry = StoreEntry::parse(enc).unwrap();
 
         let res = warp::test::request()
             .method("POST")
@@ -90,7 +92,7 @@ mod tests {
                 .unwrap()
                 .get(info.agent.as_ref())
                 .unwrap(),
-            info
+            info_as_entry,
         );
     }
 }
