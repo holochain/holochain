@@ -1466,6 +1466,9 @@ mod app_impls {
             };
 
             let manifest = bundle.manifest().clone();
+            let defer_memproofs = match &manifest {
+                AppManifest::V1(m) => m.membrane_proofs_deferred,
+            };
 
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
@@ -1474,22 +1477,17 @@ mod app_impls {
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
 
-            let (ops, do_genesis) = match membrane_proofs {
-                MemproofProvisioning::Provided(membrane_proofs) => {
-                    let ops = bundle
-                        .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
-                        .await?;
-                    (ops, true)
-                }
-                MemproofProvisioning::Deferred => {
-                    // XXX: passing in empty memproofs, because this function is not constructed well.
-                    //      it doesn't really need to know about the memproofs, it just needs to associate
-                    //      the proper cells with the proper memproofs.
-                    let ops = bundle
-                        .resolve_cells(&local_dnas, agent_key.clone(), Default::default())
-                        .await?;
-                    (ops, false)
-                }
+            let ops = if defer_memproofs {
+                // XXX: passing in empty memproofs, because this function is not constructed well.
+                //      it doesn't really need to know about the memproofs, it just needs to associate
+                //      the proper cells with the proper memproofs.
+                bundle
+                    .resolve_cells(&local_dnas, agent_key.clone(), Default::default())
+                    .await?
+            } else {
+                bundle
+                    .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
+                    .await?
             };
             let cells_to_create = ops.cells_to_create();
 
@@ -1513,7 +1511,18 @@ mod app_impls {
                 self.clone().register_dna(dna).await?;
             }
 
-            if do_genesis {
+            if defer_memproofs {
+                let roles = ops.role_assignments;
+                let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
+
+                let (_, app) = self
+                    .update_state_prime(move |mut state| {
+                        let app = state.add_app_awaiting_memproofs(app)?;
+                        Ok((state, app))
+                    })
+                    .await?;
+                Ok(app)
+            } else {
                 let cell_ids: Vec<_> = cells_to_create
                     .iter()
                     .map(|(cell_id, _)| cell_id.clone())
@@ -1539,17 +1548,6 @@ mod app_impls {
                 } else {
                     unreachable!()
                 }
-            } else {
-                let roles = ops.role_assignments;
-                let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
-
-                let (_, app) = self
-                    .update_state_prime(move |mut state| {
-                        let app = state.add_app_awaiting_memproofs(app)?;
-                        Ok((state, app))
-                    })
-                    .await?;
-                Ok(app)
             }
         }
 

@@ -135,7 +135,7 @@ pub struct InstallAppPayload {
 
     /// Include proof-of-membrane-membership data for cells that require it,
     /// keyed by the RoleName specified in the app bundle manifest.
-    pub membrane_proofs: MemproofProvisioning,
+    pub membrane_proofs: MemproofMap,
 
     /// Optional: overwrites all network seeds for all DNAs of Cells created by this app.
     /// The app can still use existing Cells, i.e. this does not require that
@@ -150,25 +150,8 @@ pub struct InstallAppPayload {
     pub ignore_genesis_failure: bool,
 }
 
-/// Either provides membrane proofs, or specifies that they will be provided later
-/// via the [`AppRequest::ProvideMembraneProofs`] method.
-#[derive(Debug, serde::Serialize, serde::Deserialize, derive_more::From)]
-pub enum MemproofProvisioning {
-    /// Membrane proofs are provided here and now
-    Provided(MemproofMap),
-    /// Membrane proofs will be provided later
-    Deferred,
-}
-
 /// Alias
 pub type MemproofMap = HashMap<RoleName, MembraneProof>;
-
-impl MemproofProvisioning {
-    /// No memproofs provided, and none will ever be provided.
-    pub fn empty() -> Self {
-        Self::Provided(HashMap::new())
-    }
-}
 
 /// The possible locations of an AppBundle
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
