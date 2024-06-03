@@ -77,11 +77,11 @@ async fn app_validation_produces_warrants() {
 
     let zome_sans_validation = zome_common
         .clone()
-        .integrity_function("validate", move |_api, op: Op| {
+        .integrity_function("validate", move |_api, _op: Op| {
             Ok(ValidateCallbackResult::Valid)
         });
 
-    let zome_avec_validation = |i| {
+    let zome_avec_validation = |_| {
         zome_common
             .clone()
             .integrity_function("validate", move |_api, op: Op| {

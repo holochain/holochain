@@ -136,7 +136,6 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
         config,
         keystore,
         representative_agent,
-        network.dna_hash().clone(),
     )
     .await?;
 
@@ -221,7 +220,6 @@ async fn sys_validation_workflow_inner(
     config: Arc<ConductorConfig>,
     keystore: MetaLairClient,
     representative_agent: AgentPubKey,
-    _dna_hash: DnaHash,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
