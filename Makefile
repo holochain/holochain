@@ -1,7 +1,7 @@
 # holochain Makefile
 
 # mark everything as phony because it doesn't represent a file-system output
-.PHONY: default test-workspace
+.PHONY: default build-workspace test-workspace
 
 # default to running everything (first rule)
 default: build-workspace test-workspace
