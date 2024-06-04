@@ -42,6 +42,7 @@ pub struct AppManifestV1 {
     /// specify membrane proofs at installation time. The membrane proofs
     /// will instead be provided later by [`AppRequest::ProvideMemproofs`]
     #[serde(default)]
+    #[builder(default)]
     pub membrane_proofs_deferred: bool,
 }
 
