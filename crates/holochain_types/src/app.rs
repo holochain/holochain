@@ -889,6 +889,10 @@ impl AppStatus {
             (Disabled(_), Enable) => Some((Running, SpinUp)),
             (Disabled(_), Pause(_)) | (Disabled(_), Disable(_)) | (Disabled(_), Start) => None,
 
+            (AwaitingMemproofs, Enable | Start) => Some((
+                AwaitingMemproofs,
+                Error("Cannot enable an app which is AwaitingMemproofs".to_string()),
+            )),
             (AwaitingMemproofs, _) => None,
         }
         .map(|(new_status, delta)| {
@@ -918,6 +922,8 @@ pub enum AppStatusFx {
     SpinUp,
     /// The transition may cause some Cells to be removed and some to be (fallibly) added.
     Both,
+    /// The transition was invalid and should produce an error.
+    Error(String),
 }
 
 impl Default for AppStatusFx {
@@ -936,6 +942,8 @@ impl AppStatusFx {
             (SpinUp, SpinUp) => SpinUp,
             (Both, _) | (_, Both) => Both,
             (SpinDown, SpinUp) | (SpinUp, SpinDown) => Both,
+            (Error(err1), Error(err2)) => Error(format!("{err1}. {err2}")),
+            (Error(err), _) | (_, Error(err)) => Error(err),
         }
     }
 }

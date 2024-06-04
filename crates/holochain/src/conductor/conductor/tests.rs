@@ -1231,7 +1231,8 @@ async fn test_deferred_provisioning() {
     assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
 
     //- Status is still AwaitingMemproofs after enabling but before memproofs
-    conductor.enable_app(app_id.clone()).await.unwrap();
+    let r = conductor.enable_app(app_id.clone()).await;
+    assert_matches!(r, Err(ConductorError::AppStatusError(_)));
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
     assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
 

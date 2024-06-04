@@ -2982,6 +2982,7 @@ impl Conductor {
                     }
                     (delta, errors)
                 }
+                Error(err) => return Err(ConductorError::AppStatusError(err)),
             };
         }
 
