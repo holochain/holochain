@@ -26,6 +26,10 @@
       ],
       "description": "A description for the app"
     },
+    "membrane_proofs_deferred": {
+      "type": "boolean",
+      "description": "If true, membrane proofs are not provided at installation time, but later via app interface."
+    },
     "roles": {
       "type": "array",
       "items": {

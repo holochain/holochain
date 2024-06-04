@@ -6,7 +6,6 @@ use hc_sandbox::CmdRunner;
 use holochain_cli_sandbox as hc_sandbox;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
-use holochain_types::app::MemproofProvisioning;
 use holochain_types::prelude::AppBundleSource;
 use holochain_types::prelude::InstallAppPayload;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
@@ -54,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
             installed_app_id: Some(app_id),
             agent_key,
             source: AppBundleSource::Bundle(bundle),
-            membrane_proofs: MemproofProvisioning::empty(),
+            membrane_proofs: Default::default(),
             network_seed: None,
             #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
