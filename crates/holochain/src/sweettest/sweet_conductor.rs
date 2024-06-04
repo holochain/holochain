@@ -555,24 +555,6 @@ impl SweetConductor {
     ///
     /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn try_shutdown(&mut self) -> std::io::Result<()> {
-        for dna in &self.dnas {
-            let contains_inline_zome = dna
-                .dna_def()
-                .integrity_zomes
-                .iter()
-                .any(|(_, z)| matches!(z.as_any_zome_def(), ZomeDef::Inline { .. }))
-                || {
-                    dna.dna_def()
-                        .coordinator_zomes
-                        .iter()
-                        .any(|(_, z)| matches!(z.as_any_zome_def(), ZomeDef::Inline { .. }))
-                };
-            if contains_inline_zome {
-                // The bundle will not pick up the inline zomes if used here.
-                panic!("Can't restart a SweetConductor which uses a DNA with InlineZomes, since those will be lost upon restart.");
-            }
-        }
-
         if let Some(handle) = self.handle.take() {
             aitia::trace!(&hc_sleuth::Event::SweetConductorShutdown {
                 node: handle.config.sleuth_id()
