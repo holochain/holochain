@@ -72,9 +72,9 @@ pub async fn authored_ops_to_dht_db_without_check(
         })
         .await?;
     for op in activity {
-        let dependency = op.sys_validation_dependency();
+        let deps = op.sys_validation_dependencies();
 
-        if dependency.is_none() {
+        if deps.is_empty() {
             let _ = dht_db_cache
                 .set_activity_to_integrated(
                     &op.author(),
@@ -105,7 +105,7 @@ fn insert_locally_validated_op(
     let op = filter_private_entry(op)?;
     let hash = op.as_hash();
 
-    let dependency = op.sys_validation_dependency();
+    let deps = op.sys_validation_dependencies();
     let op_type = op.as_chain_op().map(|op| op.get_type());
 
     // Insert the op.
@@ -115,7 +115,7 @@ fn insert_locally_validated_op(
 
     // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
     // Set the stage to awaiting integration.
-    if dependency.is_none() {
+    if deps.is_empty() {
         // This set the validation stage to pending which is correct when
         // it's integrated.
         set_validation_stage(txn, hash, ValidationStage::Pending)?;
