@@ -2,7 +2,7 @@ use holochain_types::deepkey_roundtrip_backward;
 
 use super::*;
 
-pub type RevokeAgentKeyForAppResult = Vec<(CellId, ConductorApiResult<()>)>;
+pub type RevokeAgentKeyForAppResult = HashMap<CellId, ConductorApiResult<()>>;
 
 impl Conductor {
     /// Revoke an agent's key pair for all cells of an app.
@@ -56,7 +56,7 @@ impl Conductor {
         conductor: Arc<Conductor>,
         agent_key: AgentPubKey,
         app_id: InstalledAppId,
-    ) -> ConductorResult<Vec<(CellId, ConductorApiResult<()>)>> {
+    ) -> ConductorResult<RevokeAgentKeyForAppResult> {
         // If DPKI service is installed, revoke agent key there first
         if let Some(dpki_service) = conductor.running_services().dpki {
             let dpki_state = dpki_service.state().await;
@@ -70,11 +70,9 @@ impl Conductor {
                         DpkiServiceError::DpkiAgentMissing(agent_key.clone()),
                     ))
                 }
-                KeyState::Invalid(_) => {
-                    return Err(ConductorError::DpkiError(
-                        DpkiServiceError::DpkiAgentInvalid(agent_key.clone(), timestamp),
-                    ))
-                }
+                // If the key already is invalid, do nothing. Operation should be idempotent to allow for
+                // retries if agent key of some source chain could not be deleted successfully.
+                KeyState::Invalid(_) => (),
                 KeyState::Valid(_) => {
                     // Get action hash of key registration
                     let key_meta = dpki_state.query_key_meta(agent_key.clone()).await?;
@@ -140,12 +138,14 @@ impl Conductor {
         });
         let delete_agent_key_results =
             futures::future::join_all(delete_agent_key_of_all_cells).await;
-        // Build result consisting of cell id and deletion result
-        let cell_results = delete_agent_key_results
+        // Build result map with cell id as key and deletion result as value
+        let mut cell_results = HashMap::new();
+        delete_agent_key_results
             .into_iter()
             .enumerate()
-            .map(|(index, result)| (all_cells[index].clone(), result))
-            .collect();
+            .for_each(|(index, result)| {
+                cell_results.insert(all_cells[index].clone(), result);
+            });
 
         Ok(cell_results)
     }

@@ -19,7 +19,7 @@ pub enum SourceChainError {
     #[error("The source chain is empty, but is expected to have been initialized")]
     ChainEmpty,
 
-    #[error("Agent key {0} invalid in cell {1:?}")]
+    #[error("Agent key {0} invalid in cell {1}")]
     InvalidAgentKey(AgentPubKey, CellId),
 
     #[error(
