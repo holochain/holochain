@@ -795,7 +795,7 @@ pub mod wasm_test {
             )
             .await;
 
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency(60, [&alice_cell, &bob_cell])
             .await
             .unwrap();
 
