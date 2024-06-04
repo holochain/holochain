@@ -258,14 +258,13 @@ mod tests {
             }
         })
         .await
-        .expect(
-            format!(
+        .unwrap_or_else(|_| {
+            panic!(
                 "Timeout while waiting for fetch pool to contain {} items, has {}",
                 n,
                 fetch_pool.len()
             )
-            .as_str(),
-        )
+        })
     }
 
     async fn wait_for_fetch_n(

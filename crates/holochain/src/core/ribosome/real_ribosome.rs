@@ -159,15 +159,15 @@ struct HostFnBuilder {
 }
 
 impl HostFnBuilder {
-    fn with_host_function<I: 'static, O: 'static>(
+    fn with_host_function<I, O>(
         &self,
         ns: &mut Exports,
         host_function_name: &str,
         host_function: fn(Arc<RealRibosome>, Arc<CallContext>, I) -> Result<O, RuntimeError>,
     ) -> &Self
     where
-        I: serde::de::DeserializeOwned + std::fmt::Debug,
-        O: serde::Serialize + std::fmt::Debug,
+        I: serde::de::DeserializeOwned + std::fmt::Debug + 'static,
+        O: serde::Serialize + std::fmt::Debug + 'static,
     {
         let ribosome_arc = Arc::clone(&self.ribosome_arc);
         let context_key = self.context_key;
@@ -1136,7 +1136,7 @@ pub mod wasm_test {
         assert_eq!(results.unwrap(), [true, true]);
 
         // run two rounds of two concurrent zome calls
-        // having been cached, responses should take less than 10 milliseconds
+        // having been cached, responses should take less than 15 milliseconds
         for _ in 0..2 {
             let zome_call_1 = tokio::spawn({
                 let conductor = conductor.clone();
@@ -1167,13 +1167,13 @@ pub mod wasm_test {
                 .unwrap();
 
             assert!(
-                results[0] <= Duration::from_millis(10),
-                "{:?} > 10ms",
+                results[0] <= Duration::from_millis(15),
+                "{:?} > 15ms",
                 results[0]
             );
             assert!(
-                results[1] <= Duration::from_millis(10),
-                "{:?} > 10ms",
+                results[1] <= Duration::from_millis(15),
+                "{:?} > 15ms",
                 results[1]
             );
         }

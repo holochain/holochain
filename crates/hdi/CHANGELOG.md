@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.5.0-dev.5
+
+- Remove deprecated type `OpType`. Use `FlatOp` instead.
+- Remove deprecated method `Op::to_type`. Use `Op::flattened` instead.
+
+## 0.5.0-dev.4
+
+## 0.5.0-dev.3
+
 ## 0.5.0-dev.2
 
 ## 0.5.0-dev.1

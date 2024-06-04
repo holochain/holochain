@@ -328,7 +328,7 @@ async fn check_valid_if_dna_test() {
     let keystore = test_keystore();
     let db = tmp.to_db();
     // Test data
-    let _activity_return = vec![ActionHash::arbitrary(&mut g).unwrap()];
+    let _activity_return = [ActionHash::arbitrary(&mut g).unwrap()];
 
     let mut dna_def = DnaDef::arbitrary(&mut g).unwrap();
     dna_def.modifiers.origin_time = Timestamp::MIN;

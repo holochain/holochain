@@ -308,8 +308,13 @@ impl DhtArcRange<DhtLocation> {
         matches!(self, Self::Bounded(_, _))
     }
 
-    /// Get the min distance to a location.
-    /// Zero if Full, u32::MAX if Empty.
+    /// Get the min distance to a location to this range.
+    ///
+    /// If the range is empty, returns u32::MAX.
+    /// If the range is full, returns 0.
+    ///
+    /// If the range is Bounded and the target is within the range, returns 0.
+    /// Otherwise, returns the minimum distance to the start or end of the range.
     pub fn dist(&self, tgt: u32) -> u32 {
         match self {
             DhtArcRange::Empty => u32::MAX,
@@ -558,7 +563,7 @@ mod tests {
         );
 
         assert_eq!(
-            DhtArc::from_bounds(cent * 99, cent * 0).to_ascii(10),
+            DhtArc::from_bounds(cent * 99, 0).to_ascii(10),
             "-        @".to_string()
         );
     }

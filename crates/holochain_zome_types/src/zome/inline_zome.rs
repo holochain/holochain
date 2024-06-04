@@ -80,17 +80,6 @@ impl<T> InlineZome<T> {
         self
     }
 
-    /// Alias for `function`
-    #[deprecated = "Alias for `function`"]
-    pub fn callback<F, I, O>(self, name: &str, f: F) -> Self
-    where
-        F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
-        I: DeserializeOwned + std::fmt::Debug,
-        O: Serialize + std::fmt::Debug,
-    {
-        self.function(name, f)
-    }
-
     /// Make a call to an inline zome callback.
     /// If the callback doesn't exist, return None.
     pub fn maybe_call(
@@ -264,13 +253,14 @@ impl std::hash::Hash for DynInlineZome {
 mod tests {
     use super::*;
     use crate::prelude::GetOptions;
+    use ::fixt::fixt;
     use holo_hash::AnyDhtHash;
 
     #[test]
     #[allow(unused_variables, unreachable_code)]
     fn can_create_inline_dna() {
         let zome = InlineIntegrityZome::new("", vec![], 0).function("zome_fn_1", |api, a: ()| {
-            let hash: AnyDhtHash = todo!();
+            let hash: AnyDhtHash = fixt!(ActionHash).into();
             Ok(api
                 .get(vec![GetInput::new(hash, GetOptions::default())])
                 .expect("TODO after crate re-org"))
