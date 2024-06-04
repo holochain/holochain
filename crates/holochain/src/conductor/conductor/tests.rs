@@ -1176,7 +1176,7 @@ async fn test_init_concurrency() {
 /// Check that an app can be installed with deferred memproof provisioning and:
 /// - all status checks return correctly while still provisioned,
 /// - no zome calls can be made while awaiting memproofs,
-/// - cells cannot be cloned while awaiting memproofs,
+/// - cells can be cloned while awaiting memproofs (even though this is unusual),
 /// - conductor can be restarted and app still in AwaitingMemproofs state,
 /// - app functions normally after memproofs provided
 #[tokio::test(flavor = "multi_thread")]
@@ -1235,6 +1235,20 @@ async fn test_deferred_provisioning() {
     assert_matches!(r, Err(ConductorError::AppStatusError(_)));
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
     assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
+
+    //- Can create a clone cell, even though this is unusual
+    conductor
+        .create_clone_cell(
+            &app_id,
+            CreateCloneCellPayload {
+                role_name,
+                modifiers: DnaModifiersOpt::none().with_network_seed("seeeeed".into()),
+                membrane_proof: None,
+                name: None,
+            },
+        )
+        .await
+        .unwrap();
 
     //- Rotate app agent key a few times just for the heck of it
     // TODO: not yet implemented
