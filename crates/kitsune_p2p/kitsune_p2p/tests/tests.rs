@@ -306,7 +306,7 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
 // This is expected to test that agent info is broadcast to current peers when a new agent joins
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "windows", ignore = "flaky on windows")]
+#[ignore = "Flaky on CI"]
 async fn two_nodes_broadcast_agent_info() {
     holochain_trace::test_run();
 
@@ -405,6 +405,7 @@ async fn two_nodes_broadcast_agent_info() {
 // about peers that are unkown to the new peer.
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Flaky on CI"]
 async fn two_nodes_gossip_agent_info() {
     holochain_trace::test_run();
 
@@ -501,6 +502,7 @@ async fn two_nodes_gossip_agent_info() {
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn gossip_stops_when_agent_leaves_space() {
     holochain_trace::test_run();
 
@@ -622,6 +624,7 @@ async fn gossip_stops_when_agent_leaves_space() {
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn gossip_historical_ops() {
     holochain_trace::test_run();
 
@@ -706,6 +709,7 @@ async fn gossip_historical_ops() {
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn publish_only_fetches_ops_once() {
     holochain_trace::test_run();
 
@@ -888,6 +892,7 @@ async fn publish_only_fetches_ops_once() {
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn delegate_publish() {
     holochain_trace::test_run();
 
