@@ -73,8 +73,6 @@ where
                 ":store_entry": ChainOpType::StoreEntry,
             },
             |row| {
-                // let dht_type: DhtOpType = row.get("dht_type")?;
-                // dbg!(&dht_type);
                 let op = map_sql_dht_op(false, "dht_type", row)?;
                 let action_size: usize = row.get("action_size")?;
                 // will be NULL if the op has no associated entry
