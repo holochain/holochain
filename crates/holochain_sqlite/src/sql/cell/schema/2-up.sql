@@ -1,9 +1,9 @@
+-- no-sql-format --
 
 DROP INDEX Action_type_idx;
 DROP INDEX Action_author;
 DROP INDEX Action_seq_idx;
 
--- no-sql-format --
 CREATE TABLE Action_2up (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             TEXT           NOT NULL,
@@ -55,7 +55,6 @@ CREATE TABLE Action_2up (
     -- FOREIGN KEY(create_link_hash) REFERENCES Action(hash)
 );
 
-
 INSERT INTO Action_2up SELECT * FROM Action;
 
 DROP TABLE Action;
@@ -65,3 +64,16 @@ ALTER TABLE Action_2up RENAME TO Action;
 CREATE INDEX Action_type_idx ON Action ( type );
 CREATE INDEX Action_author ON Action ( author );
 CREATE INDEX Action_seq_idx ON Action ( seq );
+
+
+
+------------------------------------------------------------------------
+
+ALTER TABLE DhtOp 
+    ADD COLUMN  dependency2  BLOB  NULL;
+
+DROP INDEX DhtOp_type_dep_idx;
+DROP INDEX DhtOp_validation_stage_idx;
+
+CREATE INDEX DhtOp_type_dep_idx ON DhtOp ( type, dependency, dependency2 );
+CREATE INDEX DhtOp_validation_stage_idx ON DhtOp ( validation_stage, type, dependency, dependency2 );
