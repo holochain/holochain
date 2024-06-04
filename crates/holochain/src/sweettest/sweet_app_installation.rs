@@ -15,22 +15,6 @@ pub async fn app_bundle_from_dnas<'a>(
         .map(|dr| {
             let dna = dr.dna();
 
-            let contains_inline_zome = dna
-                .dna_def()
-                .integrity_zomes
-                .iter()
-                .any(|(_, z)| matches!(z.as_any_zome_def(), ZomeDef::Inline { .. }))
-                || {
-                    dna.dna_def()
-                        .coordinator_zomes
-                        .iter()
-                        .any(|(_, z)| matches!(z.as_any_zome_def(), ZomeDef::Inline { .. }))
-                };
-            if contains_inline_zome {
-                // The bundle will not pick up the inline zomes if used here.
-                panic!("Can't use inline zomes to construct an AppBundle here.");
-            }
-
             let path = PathBuf::from(format!("{}", dna.dna_hash()));
             let modifiers = DnaModifiersOpt::none();
             let installed_dna_hash = DnaHash::with_data_sync(dna.dna_def());
