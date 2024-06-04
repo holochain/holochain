@@ -24,7 +24,7 @@ pub struct SweetLocalRendezvous {
     #[cfg(feature = "tx5")]
     sig_addr: String,
     #[cfg(feature = "tx5")]
-    _sig_hnd: tx5_signal_srv::SrvHnd,
+    _sig_hnd: sbd_server::SbdServer,
 }
 
 impl Drop for SweetLocalRendezvous {
@@ -77,23 +77,16 @@ impl SweetLocalRendezvous {
             let (turn_addr, turn_srv) = tx5_go_pion_turn::test_turn_server().await.unwrap();
             tracing::info!("RUNNING TURN: {turn_addr:?}");
 
-            let mut sig_conf = tx5_signal_srv::Config::default();
-            sig_conf.port = 0;
-            sig_conf.ice_servers = serde_json::json!({
-                "iceServers": [
-                    serde_json::from_str::<serde_json::Value>(&turn_addr).unwrap(),
-                ],
-            });
-            sig_conf.demo = false;
-            tracing::info!(
-                "RUNNING ICE SERVERS: {}",
-                serde_json::to_string_pretty(&sig_conf.ice_servers).unwrap()
-            );
+            let _sig_hnd = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
+                bind: vec![format!("{addr}:0")],
+                limit_clients: 100,
+                disable_rate_limiting: true,
+                ..Default::default()
+            }))
+            .await
+            .unwrap();
 
-            let (_sig_hnd, sig_addr_list, _sig_err_list) =
-                tx5_signal_srv::exec_tx5_signal_srv(sig_conf).await.unwrap();
-            let sig_port = sig_addr_list.first().unwrap().port();
-            let sig_addr: std::net::SocketAddr = (addr, sig_port).into();
+            let sig_addr = *_sig_hnd.bind_addrs().first().unwrap();
             let sig_addr = format!("ws://{sig_addr}");
             tracing::info!("RUNNING SIG: {sig_addr:?}");
 

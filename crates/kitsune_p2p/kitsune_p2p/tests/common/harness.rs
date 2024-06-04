@@ -56,6 +56,7 @@ impl KitsuneTestHarness {
             .transport_pool
             .push(kitsune_p2p_types::config::TransportConfig::WebRTC {
                 signal_url: format!("ws://{signal_url}"),
+                webrtc_config: None,
             });
         self
     }
@@ -191,13 +192,14 @@ pub async fn start_bootstrap() -> (SocketAddr, TestBootstrapHandle) {
     (bs_addr, TestBootstrapHandle::new(shutdown, abort_handle))
 }
 
-pub async fn start_signal_srv() -> (SocketAddr, tx5_signal_srv::SrvHnd) {
-    let mut config = tx5_signal_srv::Config::default();
-    config.interfaces = "127.0.0.1".to_string();
-    config.port = 0;
-    config.demo = false;
-    let (sig_hnd, addr_list, _err_list) =
-        tx5_signal_srv::exec_tx5_signal_srv(config).await.unwrap();
+pub async fn start_signal_srv() -> (SocketAddr, sbd_server::SbdServer) {
+    let server = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
+        bind: vec!["127.0.0.1:0".to_string(), "[::1]:0".to_string()],
+        limit_clients: 100,
+        ..Default::default()
+    }))
+    .await
+    .unwrap();
 
-    (*addr_list.first().unwrap(), sig_hnd)
+    (*server.bind_addrs().first().unwrap(), server)
 }

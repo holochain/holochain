@@ -91,13 +91,14 @@ async fn bootstrap(url: String) -> Result<()> {
 
 async fn signal(url: String) -> Result<()> {
     println!("signal check of {url}");
-    let (cli, _rcv) = tx5_signal::Cli::builder()
-        .with_url(url2::Url2::parse(url).into())
-        .build()
-        .await
-        .unwrap();
-    let ice = cli.ice_servers();
-    println!("got signal connect result: {ice:#?}");
+    let config = tx5_signal::SignalConfig {
+        listener: false,
+        allow_plain_text: true,
+        ..Default::default()
+    };
+    let (conn, _rcv) = tx5_signal::SignalConnection::connect(&url, Arc::new(config)).await?;
+    let peer_url = format!("{url}/{:?}", conn.pub_key());
+    println!("got signal connect result: {peer_url}");
     Ok(())
 }
 

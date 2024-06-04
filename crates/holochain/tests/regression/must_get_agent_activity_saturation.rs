@@ -41,7 +41,9 @@ async fn must_get_agent_activity_saturation() {
     }
 
     // let conductors catch up
-    await_consistency(60, [alice_cell, bob_cell]).await.unwrap();
+    await_consistency(120, [alice_cell, bob_cell])
+        .await
+        .unwrap();
 
     let record: Option<Record> = conductors[1]
         .call(

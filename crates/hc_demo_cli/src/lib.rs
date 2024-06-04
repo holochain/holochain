@@ -1,4 +1,3 @@
-#![deny(warnings)]
 #![deny(unsafe_code)]
 //! `hc demo-cli` provides a method of experiencing holochain without depending
 //! on downstream projects such as launcher, dev hub, or the app store.

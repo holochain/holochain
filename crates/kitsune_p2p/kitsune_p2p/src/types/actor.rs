@@ -3,7 +3,6 @@
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
-use url2::Url2;
 
 use crate::gossip::sharded_gossip::KitsuneDiagnostics;
 
@@ -101,9 +100,6 @@ type OptArq = Option<crate::dht::Arq>;
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pSender allows async remote-control of the KitsuneP2p actor.
     pub chan KitsuneP2p<super::KitsuneP2pError> {
-        /// Get the calculated transport bindings.
-        fn list_transport_bindings() -> Vec<Url2>;
-
         /// Announce a space/agent pair on this network.
         fn join(space: KSpace, agent: KAgent, maybe_agent_info: Option<kitsune_p2p_types::agent_info::AgentInfoSigned>, initial_arq: OptArq) -> ();
 

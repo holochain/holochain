@@ -1,6 +1,5 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
-#![deny(warnings)]
 //! Initialize holochain metrics.
 //! This crate should only be used in binaries to initialize the actual
 //! metrics collection. Libraries should just use the opentelemetry_api

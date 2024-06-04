@@ -775,7 +775,7 @@ async fn network_stats() {
         .await;
 
     #[cfg(feature = "tx5")]
-    const EXPECT: &str = "go-pion";
+    const EXPECT: &str = "backendGoPion";
 
     let req = AdminRequest::DumpNetworkStats;
     let res: AdminResponse = client.request(req).await.unwrap();

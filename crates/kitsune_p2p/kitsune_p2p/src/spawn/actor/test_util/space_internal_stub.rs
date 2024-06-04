@@ -36,6 +36,10 @@ impl SpaceInternalStub {
 impl GhostControlHandler for SpaceInternalStub {}
 impl GhostHandler<SpaceInternal> for SpaceInternalStub {}
 impl SpaceInternalHandler for SpaceInternalStub {
+    fn handle_new_address(&mut self, _: String) -> SpaceInternalHandlerResult<()> {
+        unreachable!()
+    }
+
     fn handle_list_online_agents_for_basis_hash(
         &mut self,
         _space: KSpace,

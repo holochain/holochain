@@ -199,10 +199,18 @@ write_test_struct! {
         }
     }
     InternalHandler {
+        fn handle_new_address(
+            &mut Self,
+            _local_url: String,
+        ) -> InternalHandlerResult<()>, InternalHandlerResult<()> {
+            Ok(futures::future::FutureExt::boxed(async move {
+                Ok(())
+            }).into())
+        }
         fn handle_register_space_event_handler(
             &mut Self,
             _recv: futures::channel::mpsc::Receiver<KitsuneP2pEvent>,
-        ) -> InternalHandlerResult<()>, InternalHandlerResult<()>{
+        ) -> InternalHandlerResult<()>, InternalHandlerResult<()> {
             Ok(futures::future::FutureExt::boxed(async move {
                 Ok(())
             }).into())
@@ -390,22 +398,21 @@ impl Test {
     }
 }
 
-async fn start_signal_srv() -> (std::net::SocketAddr, tx5_signal_srv::SrvHnd) {
-    let mut config = tx5_signal_srv::Config::default();
-    config.interfaces = "127.0.0.1".to_string();
-    config.port = 0;
-    config.demo = false;
-    let (sig_hnd, addr_list, err_list) = tx5_signal_srv::exec_tx5_signal_srv(config).await.unwrap();
+async fn start_signal_srv() -> (std::net::SocketAddr, sbd_server::SbdServer) {
+    let server = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
+        bind: vec!["127.0.0.1:0".to_string(), "[::1]:0".to_string()],
+        limit_clients: 100,
+        ..Default::default()
+    }))
+    .await
+    .unwrap();
 
-    assert!(err_list.is_empty());
-    assert_eq!(1, addr_list.len());
-
-    (*addr_list.first().unwrap(), sig_hnd)
+    (*server.bind_addrs().first().unwrap(), server)
 }
 
 struct Setup2Nodes {
     tuning_params: KitsuneP2pTuningParams,
-    _sig_hnd: tx5_signal_srv::SrvHnd,
+    _sig_hnd: sbd_server::SbdServer,
     pub addr1: String,
     pub send1: MetaNet,
     pub addr2: String,
@@ -429,12 +436,15 @@ impl Setup2Nodes {
     ) -> Self {
         let mut tuning_params = config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning_params.tx2_implicit_timeout_ms = 500;
+        tuning_params.tx5_timeout_s = 4;
         let tuning_params = Arc::new(tuning_params);
 
         let (sig_addr, _sig_hnd) = start_signal_srv().await;
         let (test, i_s, evt_sender) = test.spawn().await;
 
-        let (send1, recv1) = MetaNet::new_tx5(
+        tracing::warn!("-- test -- init node 1");
+
+        let (send1, recv1, addr1) = MetaNet::new_tx5(
             tuning_params.clone(),
             HostApiLegacy {
                 api: Arc::new(test.clone()),
@@ -442,14 +452,19 @@ impl Setup2Nodes {
             },
             i_s.clone(),
             format!("ws://{sig_addr}"),
+            "{}".to_string(),
             user_data_a,
         )
         .await
         .unwrap();
-        test.spawn_receiver(recv1);
-        let addr1 = send1.local_addr().unwrap();
 
-        let (send2, recv2) = MetaNet::new_tx5(
+        let addr1 = addr1.unwrap();
+
+        test.spawn_receiver(recv1);
+
+        tracing::warn!("-- test -- init node 2");
+
+        let (send2, recv2, addr2) = MetaNet::new_tx5(
             tuning_params.clone(),
             HostApiLegacy {
                 api: Arc::new(test.clone()),
@@ -457,12 +472,15 @@ impl Setup2Nodes {
             },
             i_s.clone(),
             format!("ws://{sig_addr}"),
+            "{}".to_string(),
             user_data_b,
         )
         .await
         .unwrap();
+
+        let addr2 = addr2.unwrap();
+
         test.spawn_receiver(recv2);
-        let addr2 = send2.local_addr().unwrap();
 
         Self {
             tuning_params,
@@ -625,6 +643,8 @@ async fn basic_notify() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn basic_broadcast() {
+    holochain_trace::test_run();
+
     let recv_done = Arc::new(atomic::AtomicUsize::new(0));
 
     let mut test = Test::default();
@@ -789,6 +809,7 @@ async fn preflight_user_data_mismatch() {
     let ud1 = PreflightUserData {
         bytes: vec![1, 2, 3],
         comparator: Box::new(|_, r| {
+            println!("want 1, 2, 3, got {r:?}");
             (r == &[1, 2, 3])
                 .then_some(())
                 .ok_or("preflight mismatch".into())
@@ -797,6 +818,7 @@ async fn preflight_user_data_mismatch() {
     let ud2 = PreflightUserData {
         bytes: vec![9, 8, 7, 6, 5],
         comparator: Box::new(|_, r| {
+            println!("want 9, 8, 7, 6, 5, got {r:?}");
             (r == &[9, 8, 7, 6, 5])
                 .then_some(())
                 .ok_or("preflight mismatch".into())
@@ -805,12 +827,14 @@ async fn preflight_user_data_mismatch() {
 
     let nodes = Setup2Nodes::new_with_user_data(test, ud1, ud2).await;
 
+    println!("get con");
     let con = nodes
         .send1
         .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
         .await
         .unwrap();
 
+    println!("notify");
     // This should error out because preflight failed due to user data mismatch
     if con
         .notify(
@@ -820,6 +844,7 @@ async fn preflight_user_data_mismatch() {
         .await
         .is_ok()
     {
+        println!("WARN! notify was OKAY");
         // ...but if it *doesn't* error, the request should at least timeout because
         // preflight user data doesn't match
         //

@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use futures::lock::Mutex;
+use hc_seed_bundle::{dependencies::sodoken, PwHashLimits};
 use kitsune_p2p_types::dependencies::lair_keystore_api::{self, LairClient, LairResult};
+use lair_keystore_api::dependencies::hc_seed_bundle;
 use tokio::runtime::Handle;
-use tx5::deps::{hc_seed_bundle::PwHashLimits, sodoken};
 
 /// Construct a new TestKeystore with the new lair api.
 pub async fn spawn_test_keystore() -> LairResult<Arc<Mutex<LairClient>>> {
