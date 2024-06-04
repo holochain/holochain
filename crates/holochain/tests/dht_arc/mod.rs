@@ -30,6 +30,7 @@ async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> V
     out
 }
 
+// TODO This really looks like it shouldn't be disabled!
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Not using alpha strategy anymore, todo: change to new strategy"]
 // This test shows that we can handle maintaining our [`MINIMUM_REDUNDANCY`]

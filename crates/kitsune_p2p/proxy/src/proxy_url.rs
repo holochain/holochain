@@ -44,6 +44,12 @@ impl ProxyUrl {
             };
         }
         let full = url2::try_url2!("{}", full).map_err(|_| err!("parse"))?;
+        if full.scheme() == "wss" || full.scheme() == "ws" {
+            return Ok(Self {
+                full: full.clone(),
+                base: full,
+            });
+        }
         let base_scheme = match full.path_segments() {
             None => return Err(err!("read scheme")),
             Some(mut s) => match s.next() {
@@ -137,11 +143,9 @@ impl ProxyUrl {
         if scheme == "wss" || scheme == "ws" {
             // override for tx5
             if let Some(mut i) = self.full.path_segments() {
-                if let Some(_u) = i.next() {
-                    if let Some(u) = i.next() {
-                        let digest = base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(u).unwrap();
-                        return CertDigest::from_slice(&digest);
-                    }
+                if let Some(u) = i.next() {
+                    let digest = base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(u).unwrap();
+                    return CertDigest::from_slice(&digest);
                 }
             }
         }

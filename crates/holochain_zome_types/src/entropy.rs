@@ -31,30 +31,3 @@ pub fn unstructured_noise() -> arbitrary::Unstructured<'static> {
 pub fn random_generator() -> Generator<'static> {
     Generator::from(unstructured_noise())
 }
-
-// The following seemed like a convenient way to avoid having to
-// create an Unstructured data, but it's actually harmful since
-// it causes identical data to be created if used in conjunction
-// with unstructured_noise. Don't use shortcuts.
-//
-// use std::sync::Mutex;
-// use arbitrary::{Arbitrary, Unstructured};
-//
-// static ENTROPY: Lazy<Mutex<Unstructured<'static>>> =
-//     Lazy::new(|| Mutex::new(Unstructured::new(&NOISE)));
-
-// /// Additional methods for arbitrary data types
-// pub trait ArbitraryExt: Arbitrary<'static> {
-//     /// Generate arbitrary data from built-in noise
-//     #[deprecated]
-//     fn fixture() -> Self {
-//         let mut u = ENTROPY.lock().unwrap();
-//         if let Ok(a) = Self::arbitrary(&mut u) {
-//             a
-//         } else {
-//             *u = unstructured_noise();
-//             Self::arbitrary(&mut u).unwrap()
-//         }
-//     }
-// }
-// impl<T> ArbitraryExt for T where T: Arbitrary<'static> {}

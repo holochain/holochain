@@ -7,8 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- Fix an issue with delegated publish where delegates were publishing to nodes near the target basis, rather than nodes
-  covering the basis.
+## 0.4.0-dev.5
+
+## 0.4.0-dev.4
+
+- Fix an issue with delegated publish where delegates were publishing to nodes near the target basis, rather than nodes covering the basis.
 
 ## 0.4.0-dev.3
 

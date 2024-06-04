@@ -46,7 +46,9 @@ mod tests {
             )
             .await
             .unwrap();
-            store.put(info);
+            let mut enc = Vec::new();
+            kitsune_p2p_types::codec::rmp_encode(&mut enc, &info).unwrap();
+            store.put(crate::store::StoreEntry::parse(enc).unwrap());
         }
 
         let res = warp::test::request()
