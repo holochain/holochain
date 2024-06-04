@@ -564,7 +564,9 @@ impl Spaces {
     ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
         let mut sql = "
             SELECT DhtOp.hash, DhtOp.type AS dht_type,
-            Action.blob AS action_blob, Entry.blob AS entry_blob
+            Action.blob AS action_blob, 
+            Action.author as author,
+            Entry.blob AS entry_blob
             FROM DHtOp
             JOIN Action ON DhtOp.action_hash = Action.hash
             LEFT JOIN Entry ON Action.entry_hash = Entry.hash

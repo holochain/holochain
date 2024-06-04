@@ -26,6 +26,7 @@ async fn get_ops_to_validate(
     let mut sql = "
         SELECT
         Action.blob as action_blob,
+        Action.author as author,
         Entry.blob as entry_blob,
         DhtOp.type as dht_type,
         DhtOp.hash as dht_hash

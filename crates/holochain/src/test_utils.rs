@@ -752,7 +752,10 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
         txn.prepare(
             "
             SELECT
-            DhtOp.type, Action.author as author, Action.blob as action_blob, Entry.blob as entry_blob
+            DhtOp.type, 
+            Action.author as author, 
+            Action.blob as action_blob, 
+            Entry.blob as entry_blob
             FROM DhtOp
             JOIN
             Action ON DhtOp.action_hash = Action.hash
