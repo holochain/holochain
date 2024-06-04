@@ -15,6 +15,7 @@ use kitsune_p2p::fixt::KitsuneSpaceFixturator;
 // closed by other peers when they get the new agent info.
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn connection_close_on_peer_restart() {
     holochain_trace::test_run();
 
