@@ -258,6 +258,12 @@ async fn sys_validation_workflow_inner(
 
     let mut validation_outcomes = Vec::with_capacity(sorted_ops.len());
     for hashed_op in sorted_ops {
+        let (op, op_hash) = hashed_op.into_inner();
+
+        // This is an optimization to skip app validation and integration for ops that are
+        // rejected and don't have dependencies.
+        let deps = op.sys_validation_dependencies();
+
         // Note that this is async only because of the signature checks done during countersigning.
         // In most cases this will be a fast synchronous call.
         let r = validate_op(
