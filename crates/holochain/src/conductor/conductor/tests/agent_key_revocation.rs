@@ -19,6 +19,7 @@ use crate::sweettest::{
 
 #[tokio::test(flavor = "multi_thread")]
 async fn revoke_agent_key_with_dpki_installed() {
+    holochain_trace::test_run();
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file_1, _, coordinator_zomes_1) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
@@ -37,14 +38,10 @@ async fn revoke_agent_key_with_dpki_installed() {
         .await
         .unwrap();
     let agent_key = app.agent().clone();
-    let zome_1 = SweetZome::new(
-        app.cells()[0].cell_id().clone(),
-        coordinator_zomes_1[0].name.clone(),
-    );
-    let zome_2 = SweetZome::new(
-        app.cells()[1].cell_id().clone(),
-        coordinator_zomes_2[0].name.clone(),
-    );
+    let cell_id_1 = app.cells()[0].cell_id().clone();
+    let cell_id_2 = app.cells()[1].cell_id().clone();
+    let zome_1 = SweetZome::new(cell_id_1.clone(), coordinator_zomes_1[0].name.clone());
+    let zome_2 = SweetZome::new(cell_id_2.clone(), coordinator_zomes_2[0].name.clone());
     let create_fn_name = "create_entry";
     let read_fn_name = "get_post";
 
@@ -77,11 +74,13 @@ async fn revoke_agent_key_with_dpki_installed() {
     let action_hash_2: ActionHash = conductor.call(&zome_2, create_fn_name, ()).await;
 
     // Deleting the key should succeed
-    let result = conductor
+    let revocation_result_per_cell = conductor
         .clone()
         .revoke_agent_key_for_app(agent_key.clone(), app.installed_app_id().clone())
-        .await;
-    assert_matches!(result, Ok(()));
+        .await
+        .unwrap();
+    assert_matches!(&revocation_result_per_cell[0], (cell_id, Ok(())) if *cell_id == cell_id_1);
+    assert_matches!(&revocation_result_per_cell[1], (cell_id, Ok(())) if *cell_id == cell_id_2);
 
     // Key should be in invalid in DPKI
     let key_state = dpki

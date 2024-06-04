@@ -1,7 +1,8 @@
 use holochain_types::deepkey_roundtrip_backward;
-use holochain_zome_types::action::builder;
 
 use super::*;
+
+pub type RevokeAgentKeyForAppResult = Vec<(CellId, ConductorApiResult<()>)>;
 
 impl Conductor {
     /// Revoke an agent's key pair for all cells of an app.
@@ -13,82 +14,104 @@ impl Conductor {
         self: Arc<Self>,
         agent_key: AgentPubKey,
         app_id: InstalledAppId,
-    ) -> ConductorResult<()> {
-        // Disable app while revoking key.
+    ) -> ConductorResult<RevokeAgentKeyForAppResult> {
+        // Disable app while revoking key
         self.clone()
             .disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)
             .await?;
 
         // Revoke key in DPKI first, if installed, and then in cells' source chains.
         // Call separate function so that in case a part of key revocation fails, the app is still enabled again.
-        let revocation_result =
+        let revocation_per_cell_results =
             Conductor::revoke_agent_key_for_app_inner(self.clone(), agent_key, app_id.clone())
                 .await;
 
         // Enable app again.
-        self.clone().enable_app(app_id).await?;
+        self.clone().enable_app(app_id.clone()).await?;
 
-        revocation_result
+        let deletion_per_cell_results = revocation_per_cell_results?;
+
+        // Publish 'Delete' actions of cells where successful.
+        // Triggering workflow is only possible when cells are enabled.
+        let publish_workflow_triggers = deletion_per_cell_results
+            .iter()
+            .filter(|(_, result)| result.is_ok())
+            .map({
+                |(cell_id, _)| {
+                    let conductor = self.clone();
+                    async move {
+                        let cell_triggers = conductor.get_cell_triggers(&cell_id).await?;
+                        cell_triggers.publish_dht_ops.trigger(&"delete agent key");
+                        ConductorApiResult::Ok(())
+                    }
+                }
+            });
+        let _trigger_publish_results = futures::future::join_all(publish_workflow_triggers).await;
+
+        // Return cell ids with their agent key deletion result
+        Ok(deletion_per_cell_results)
     }
 
     async fn revoke_agent_key_for_app_inner(
         conductor: Arc<Conductor>,
         agent_key: AgentPubKey,
         app_id: InstalledAppId,
-    ) -> ConductorResult<()> {
-        // If DPKI service is installed, revoke agent key there first.
-        let dpki_service = conductor
-            .running_services()
-            .dpki
-            .ok_or(ConductorError::DpkiError(
-                DpkiServiceError::DpkiNotInstalled,
-            ))?;
-        let dpki_state = dpki_service.state().await;
-        let timestamp = Timestamp::now();
-        let key_state = dpki_state
-            .key_state(agent_key.clone(), timestamp.clone())
-            .await?;
-        match key_state {
-            KeyState::NotFound => {
-                return Err(ConductorError::DpkiError(
-                    DpkiServiceError::DpkiAgentMissing(agent_key.clone()),
-                ))
-            }
-            KeyState::Invalid(_) => {
-                return Err(ConductorError::DpkiError(
-                    DpkiServiceError::DpkiAgentInvalid(agent_key.clone(), timestamp),
-                ))
-            }
-            KeyState::Valid(_) => {
-                // get action hash of key registration
-                let key_meta = dpki_state.query_key_meta(agent_key.clone()).await?;
-                // sign revocation request
-                let signature = dpki_service
-                    .cell_id
-                    .agent_pubkey()
-                    .sign_raw(
-                        &conductor.keystore,
-                        key_meta.key_registration_addr.get_raw_39().into(),
-                    )
-                    .await
-                    .map_err(|e| DpkiServiceError::Lair(e.into()))?;
-                let signature = deepkey_roundtrip_backward!(Signature, &signature);
-                // Revoke key in DPKI
-                let _revocation = dpki_state
-                    .revoke_key(RevokeKeyInput {
-                        key_revocation: KeyRevocation {
-                            prior_key_registration: key_meta.key_registration_addr,
-                            revocation_authorization: vec![(0, signature)],
-                        },
-                    })
-                    .await?;
-            }
-        };
+    ) -> ConductorResult<Vec<(CellId, ConductorApiResult<()>)>> {
+        // If DPKI service is installed, revoke agent key there first
+        if let Some(dpki_service) = conductor.running_services().dpki {
+            let dpki_state = dpki_service.state().await;
+            let timestamp = Timestamp::now();
+            let key_state = dpki_state
+                .key_state(agent_key.clone(), timestamp.clone())
+                .await?;
+            match key_state {
+                KeyState::NotFound => {
+                    return Err(ConductorError::DpkiError(
+                        DpkiServiceError::DpkiAgentMissing(agent_key.clone()),
+                    ))
+                }
+                KeyState::Invalid(_) => {
+                    return Err(ConductorError::DpkiError(
+                        DpkiServiceError::DpkiAgentInvalid(agent_key.clone(), timestamp),
+                    ))
+                }
+                KeyState::Valid(_) => {
+                    // Get action hash of key registration
+                    let key_meta = dpki_state.query_key_meta(agent_key.clone()).await?;
+                    // Sign revocation request
+                    let signature = dpki_service
+                        .cell_id
+                        .agent_pubkey()
+                        .sign_raw(
+                            &conductor.keystore,
+                            key_meta.key_registration_addr.get_raw_39().into(),
+                        )
+                        .await
+                        .map_err(|e| DpkiServiceError::Lair(e.into()))?;
+                    let signature = deepkey_roundtrip_backward!(Signature, &signature);
+                    // Revoke key in DPKI
+                    let _revocation = dpki_state
+                        .revoke_key(RevokeKeyInput {
+                            key_revocation: KeyRevocation {
+                                prior_key_registration: key_meta.key_registration_addr,
+                                revocation_authorization: vec![(0, signature)],
+                            },
+                        })
+                        .await?;
+                }
+            };
+        }
 
-        // Write 'Delete' action to source chains of all cells of the app.
+        // Write 'Delete' action to source chains of all cells of the app
         let state = conductor.get_state().await?;
         let app = state.get_app(&app_id)?;
-        let delete_agent_key_of_all_cells = app.all_cells().map(|cell_id| {
+        if *app.agent_key() != agent_key {
+            return Err(ConductorError::AppError(AppError::AgentKeyMissing(
+                agent_key, app_id,
+            )));
+        }
+        let all_cells: Vec<CellId> = app.all_cells().collect();
+        let delete_agent_key_of_all_cells = all_cells.clone().into_iter().map(|cell_id| {
             let conductor = conductor.clone();
             let agent_key = agent_key.clone();
             async move {
@@ -105,47 +128,25 @@ impl Conductor {
                 )
                 .await?;
 
-                // Query source chain for agent pub key 'Create' action.
-                let mut entry_hashes = HashSet::new();
-                entry_hashes.insert(agent_key.clone().into());
-                let queried = source_chain
-                    .query(ChainQueryFilter {
-                        sequence_range: ChainQueryFilterRange::Unbounded,
-                        entry_type: None,
-                        entry_hashes: Some(entry_hashes),
-                        action_type: Some(vec![ActionType::Create]),
-                        include_entries: false,
-                        order_descending: false,
-                    })
-                    .await?;
-                // There must only be 1 record of the agent pub key 'Create' action.
-                assert!(queried.len() == 1);
-                let create_agent_key_address = queried[0].action_address().clone();
-
-                // Insert `Delete` action of agent pub key into source chain.
-                let _ = source_chain
-                    .put_weightless(
-                        builder::Delete::new(create_agent_key_address, agent_key.clone().into()),
-                        None,
-                        ChainTopOrdering::Strict,
-                    )
-                    .await?;
+                // Insert `Delete` action of agent pub key into source chain
+                source_chain.delete_valid_agent_pub_key().await?;
                 let network = conductor
                     .holochain_p2p
                     .to_dna(cell_id.dna_hash().clone(), conductor.get_chc(&cell_id));
                 source_chain.flush(&network).await?;
 
-                // Trigger publish for 'Delete" actions.
-                let cell_triggers = conductor.get_cell_triggers(&cell_id).await?;
-                cell_triggers
-                    .publish_dht_ops
-                    .trigger(&"agent_key_revocation");
-
                 Ok::<_, ConductorApiError>(())
             }
         });
-        let _ = futures::future::join_all(delete_agent_key_of_all_cells).await;
+        let delete_agent_key_results =
+            futures::future::join_all(delete_agent_key_of_all_cells).await;
+        // Build result consisting of cell id and deletion result
+        let cell_results = delete_agent_key_results
+            .into_iter()
+            .enumerate()
+            .map(|(index, result)| (all_cells[index].clone(), result))
+            .collect();
 
-        Ok(())
+        Ok(cell_results)
     }
 }
