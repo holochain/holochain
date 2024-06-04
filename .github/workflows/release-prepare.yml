@@ -209,9 +209,9 @@ jobs:
           export LATEST_HOLOCHAIN_RELEASE_TAG=$(git tag --sort=-taggerdate --merged "${RELEASE_BRANCH}" | grep holochain- | head -n1)
           export LATEST_HOLOCHAIN_RELEASE_VERSION=${LATEST_HOLOCHAIN_RELEASE_TAG/holochain-/}
 
-          # clean the repo before adding it to the store
+          # clean the repo before adding it to the store. Adding the directory to the store will cause the content to be pushed to cachix.
           git clean -ffdx
-          export STORE_PATH=$(nix store add-path --name holochain_repo .)
+          export STORE_PATH=$(nix store add --name holochain_repo .)
 
           echo "latest_holochain_release_tag=${LATEST_HOLOCHAIN_RELEASE_TAG}" >> $GITHUB_OUTPUT
           echo "latest_holochain_release_version=${LATEST_HOLOCHAIN_RELEASE_VERSION}" >> $GITHUB_OUTPUT

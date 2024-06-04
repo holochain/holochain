@@ -157,10 +157,6 @@ impl kitsune_p2p_dht::prelude::OpRegion for DhtOp {
     }
 }
 
-#[deprecated = "DhtOpLight is renamed to DhtOpLite"]
-/// Old alias for DhtOpLite
-pub type DhtOpLight = DhtOpLite;
-
 /// A type for storing in databases that doesn't need the actual
 /// data. Everything is a hash of the type except the signatures.
 #[allow(missing_docs)]

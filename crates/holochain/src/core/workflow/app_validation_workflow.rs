@@ -197,17 +197,19 @@ pub async fn app_validation_workflow(
         trigger_publish.trigger(&"app_validation_workflow");
     }
 
+    let validations_dependencies = validation_dependencies.lock();
     Ok(
         // If not all ops have been validated
         // and fetching missing hashes has not timed out,
         // trigger app validation workflow again.
         if outcome_summary.validated < outcome_summary.ops_to_validate
-            && !validation_dependencies
-                .lock()
-                .fetch_missing_hashes_timed_out()
+            && !validations_dependencies.fetch_missing_hashes_timed_out()
         {
-            // Trigger app validation workflow again in 10 seconds.
-            WorkComplete::Incomplete(Some(Duration::from_secs(10)))
+            // Trigger app validation workflow again in 100-1000 milliseconds.
+            let interval = 900u64
+                .saturating_sub(validations_dependencies.missing_hashes.len() as u64 * 100)
+                + 100;
+            WorkComplete::Incomplete(Some(Duration::from_millis(interval)))
         } else {
             WorkComplete::Complete
         },

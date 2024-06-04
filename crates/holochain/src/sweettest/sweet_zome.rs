@@ -22,10 +22,6 @@ impl SweetZome {
     }
 }
 
-#[deprecated = "alias for SweetInlineZomes"]
-/// Alias for SweetInlineZomes
-pub type SweetEasyInline = SweetInlineZomes;
-
 #[derive(Default, Clone)]
 /// A helper for creating an [`InlineZomeSet`] consisting of a single
 /// integrity zome and a single coordinator zome.
@@ -67,28 +63,6 @@ impl SweetInlineZomes {
         O: Serialize + std::fmt::Debug,
     {
         Self(self.0.function(Self::COORDINATOR, name, f))
-    }
-
-    /// Alias for `integrity_function`
-    #[deprecated = "Alias for `integrity_function`"]
-    pub fn integrity_callback<F, I, O>(self, name: &str, f: F) -> Self
-    where
-        F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
-        I: DeserializeOwned + std::fmt::Debug,
-        O: Serialize + std::fmt::Debug,
-    {
-        self.integrity_function(name, f)
-    }
-
-    /// Alias for `function`
-    #[deprecated = "Alias for `function`"]
-    pub fn callback<F, I, O>(self, name: &str, f: F) -> Self
-    where
-        F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
-        I: DeserializeOwned + std::fmt::Debug,
-        O: Serialize + std::fmt::Debug,
-    {
-        self.function(name, f)
     }
 }
 
