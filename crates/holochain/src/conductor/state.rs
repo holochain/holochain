@@ -164,7 +164,7 @@ impl ConductorState {
             .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))
     }
 
-    /// Add an app in the Deactivated state. Returns an error if an app is already
+    /// Add an app in the Disabled state. Returns an error if an app is already
     /// present at the given ID.
     pub fn add_app(&mut self, app: InstalledAppCommon) -> ConductorResult<StoppedApp> {
         if self.installed_apps.contains_key(app.id()) {
@@ -173,6 +173,20 @@ impl ConductorState {
         let stopped_app = StoppedApp::new_fresh(app);
         self.installed_apps.insert(stopped_app.clone().into());
         Ok(stopped_app)
+    }
+
+    /// Add an app in the AwaitingMemproofs state. Returns an error if an app is already
+    /// present at the given ID.
+    pub fn add_app_awaiting_memproofs(
+        &mut self,
+        app: InstalledAppCommon,
+    ) -> ConductorResult<InstalledApp> {
+        if self.installed_apps.contains_key(app.id()) {
+            return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
+        }
+        let app = InstalledApp::new(app, AppStatus::AwaitingMemproofs);
+        self.installed_apps.insert(app.clone());
+        Ok(app)
     }
 
     /// Update the status of an installed app in-place.
