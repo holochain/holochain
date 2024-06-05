@@ -64,5 +64,6 @@ async fn test_p2p_metric_store_sanity() {
     .unwrap();
 
     // clean up temp dir
-    tmp_dir.close().unwrap();
+    // (just make a best effort. this often fails on windows)
+    let _ = tmp_dir.close();
 }
