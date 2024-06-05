@@ -68,7 +68,6 @@ impl ShardedGossipLocal {
                 inner.initiate_tgt = Some(tgt);
                 Ok(())
             })?;
-            // TODO always a new connection even if we have an open one?
             Some((cert, HowToConnect::Url(url.to_string()), gossip))
         } else {
             None
