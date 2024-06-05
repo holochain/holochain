@@ -100,21 +100,22 @@ impl Query for GetAgentActivityQuery {
 
             match ty {
                 DhtOpType::Chain(_) => {
-                    from_blob::<SignedAction>(row.get("action_blob")?).and_then(|action| {
+                    from_blob::<SignedAction>(row.get("action_blob")?).map(|action| {
                         let action = ActionHashed::with_pre_hashed(action.into_data(), hash);
                         let item = if integrated.is_some() {
                             Item::Integrated(action)
                         } else {
                             Item::Pending(action)
                         };
-                        Ok(Judged::raw(item, validation_status))
+                        Judged::raw(item, validation_status)
                     })
                 }
-                DhtOpType::Warrant(_) => from_blob::<SignedWarrant>(row.get("action_blob")?)
-                    .and_then(|warrant| {
+                DhtOpType::Warrant(_) => {
+                    from_blob::<SignedWarrant>(row.get("action_blob")?).map(|warrant| {
                         let item = Item::Warrant(warrant.into_data().0);
-                        Ok(Judged::raw(item, None))
-                    }),
+                        Judged::raw(item, None)
+                    })
+                }
             }
         })
     }
