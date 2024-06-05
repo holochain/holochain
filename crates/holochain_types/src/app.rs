@@ -356,12 +356,6 @@ pub struct StoppedApp {
 
 impl StoppedApp {
     /// Constructor
-    #[deprecated = "should only be constructable through conversions from other types"]
-    pub fn new(app: InstalledAppCommon, reason: StoppedAppReason) -> Self {
-        Self { app, reason }
-    }
-
-    /// Constructor
     pub fn new_fresh(app: InstalledAppCommon) -> Self {
         Self {
             app,

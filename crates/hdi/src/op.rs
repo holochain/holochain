@@ -27,19 +27,6 @@ pub trait OpHelper {
         LT: LinkTypesHelper,
         WasmError: From<<ET as EntryTypesHelper>::Error>,
         WasmError: From<<LT as LinkTypesHelper>::Error>;
-
-    /// Alias for `flattened`, for backward compatibility
-    #[deprecated = "`to_type` has been renamed to `flattened`, please use that name instead"]
-    fn to_type<ET, LT>(&self) -> Result<FlatOp<ET, LT>, WasmError>
-    where
-        ET: EntryTypesHelper + UnitEnum,
-        <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
-        LT: LinkTypesHelper,
-        WasmError: From<<ET as EntryTypesHelper>::Error>,
-        WasmError: From<<LT as LinkTypesHelper>::Error>,
-    {
-        self.flattened()
-    }
 }
 
 /// All possible variants that an [`RegisterAgentActivity`]

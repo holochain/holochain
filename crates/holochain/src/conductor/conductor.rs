@@ -301,7 +301,7 @@ mod startup_shutdown_impls {
                 post_commit,
                 running_services: RwShare::new(ConductorServices::default()),
                 wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
-                    maybe_data_root_path,
+                    maybe_data_root_path.map(|p| p.join("wasm-cache")),
                 ))),
                 app_auth_token_store: RwShare::default(),
                 app_broadcast: AppBroadcast::default(),

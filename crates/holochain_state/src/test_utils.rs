@@ -349,12 +349,6 @@ impl TestDbs {
         self.p2p_metrics.clone()
     }
 
-    /// Consume the TempDir so that it will not be cleaned up after the test is over.
-    #[deprecated = "persist() should only be used during debugging"]
-    pub fn persist(&mut self) {
-        self.dir.persist();
-    }
-
     /// Get the root path for these environments
     pub fn path(&self) -> &Path {
         &self.dir
