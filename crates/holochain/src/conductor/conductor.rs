@@ -1452,7 +1452,7 @@ mod app_impls {
             agent_key: Option<AgentPubKey>,
             ops: AppRoleResolution,
             ignore_genesis_failure: bool,
-        ) -> ConductorResult<StoppedApp> {
+        ) -> ConductorResult<InstalledApp> {
             let dpki = self.running_services().dpki.clone();
 
             let mut dpki = if let Some(d) = dpki.as_ref() {
@@ -1531,13 +1531,23 @@ mod app_impls {
                 self.clone().register_dna(dna).await?;
             }
 
+            let cell_ids: Vec<_> = cells_to_create
+                .iter()
+                .map(|(cell_id, _)| cell_id.clone())
+                .collect();
+
             let defer_memproofs = match &manifest {
                 AppManifest::V1(m) => m.membrane_proofs_deferred,
             };
 
             let app_result = if defer_memproofs {
                 let roles = ops.role_assignments;
-                let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
+                let app = InstalledAppCommon::new(
+                    installed_app_id.clone(),
+                    agent_key.clone(),
+                    roles,
+                    manifest,
+                )?;
 
                 let (_, app) = self
                     .update_state_prime(move |mut state| {
@@ -1547,11 +1557,6 @@ mod app_impls {
                     .await?;
                 Ok(app)
             } else {
-                let cell_ids: Vec<_> = cells_to_create
-                    .iter()
-                    .map(|(cell_id, _)| cell_id.clone())
-                    .collect();
-
                 let genesis_result =
                     crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
 
@@ -1567,8 +1572,8 @@ mod app_impls {
                     // Update the db
                     let stopped_app = self.add_disabled_app_to_db(app).await?;
 
-                    // Return the result, which be may an error if no_rollback was specified
-                    genesis_result.map(|()| stopped_app)
+                    // Return the result, which be may be an error if no_rollback was specified
+                    genesis_result.map(|()| stopped_app.into())
                 } else if let Err(err) = genesis_result {
                     // Rollback created cells on error
                     self.remove_cells(&cell_ids).await;
@@ -1652,9 +1657,6 @@ mod app_impls {
                 }
             };
             let manifest = bundle.manifest().clone();
-            let defer_memproofs = match &manifest {
-                AppManifest::V1(m) => m.membrane_proofs_deferred,
-            };
 
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
@@ -1858,7 +1860,12 @@ mod app_impls {
             let cells_to_genesis = app
                 .roles()
                 .iter()
-                .map(|(role_name, role)| (role.base_cell_id.clone(), memproofs.remove(role_name)))
+                .map(|(role_name, role)| {
+                    (
+                        CellId::new(role.base_dna_hash.clone(), app.agent_key.clone()),
+                        memproofs.remove(role_name),
+                    )
+                })
                 .collect();
 
             crate::conductor::conductor::genesis_cells(self.clone(), cells_to_genesis).await?;

@@ -362,6 +362,7 @@ impl Arq<Loc> {
     }
 
     /// Computes the Arq which most closely matches the given [`DhtArc`]
+    #[cfg(feature = "test_utils")]
     pub fn from_dht_arc_approximate(
         dim: impl SpaceDim,
         strat: &ArqStrat,
@@ -378,6 +379,7 @@ impl Arq<Loc> {
     }
 
     /// Computes the Arq which most closely matches the given params
+    #[cfg(feature = "test_utils")]
     pub fn from_start_and_half_len_approximate(
         dim: impl SpaceDim,
         strat: &ArqStrat,
@@ -626,6 +628,7 @@ pub fn power_and_count_from_length_exact(
 }
 
 /// Given a center and a length, give Arq which matches most closely given the provided strategy
+#[cfg(feature = "test_utils")]
 pub fn approximate_arq(dim: impl SpaceDim, strat: &ArqStrat, start: Loc, len: u64) -> Arq {
     let dim = dim.get();
     if len == 0 {

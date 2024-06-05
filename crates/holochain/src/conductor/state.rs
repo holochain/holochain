@@ -216,11 +216,11 @@ impl ConductorState {
         &mut self,
         app: InstalledAppCommon,
     ) -> ConductorResult<InstalledApp> {
-        if self.installed_apps.contains_key(app.id()) {
+        if self.installed_apps_and_services.contains_key(app.id()) {
             return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
         }
         let app = InstalledApp::new(app, AppStatus::AwaitingMemproofs);
-        self.installed_apps.insert(app.clone());
+        self.installed_apps_and_services.insert(app.clone());
         Ok(app)
     }
 
