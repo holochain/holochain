@@ -14,5 +14,10 @@ getrandom = { version = "0.2.7", default-features = false, features = ["std"] }
 kitsune_p2p_timestamp = { version = "^0.4.0-dev.1", path = "../kitsune_p2p/timestamp" }
 holochain_secure_primitive = { version = "^0.4.0-dev.1", path = "../holochain_secure_primitive", default-features = false }
 
+[dev-dependencies]
+kitsune_p2p_timestamp = { version = "^0.4.0-dev.1", path = "../kitsune_p2p/timestamp", features = [
+  "now",
+] }
+
 [lints]
 workspace = true

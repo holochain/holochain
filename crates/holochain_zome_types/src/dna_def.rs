@@ -99,7 +99,9 @@ impl DnaDef {
             .find(|(name, _)| name == zome_name)
             .cloned()
             .map(|(name, def)| IntegrityZome::new(name, def))
-            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+            .ok_or_else(|| {
+                ZomeError::ZomeNotFound(format!("Intengrity zome '{}' not found", &zome_name,))
+            })
     }
 
     /// Check if a zome is an integrity zome.
@@ -116,7 +118,9 @@ impl DnaDef {
             .find(|(name, _)| name == zome_name)
             .cloned()
             .map(|(name, def)| CoordinatorZome::new(name, def))
-            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+            .ok_or_else(|| {
+                ZomeError::ZomeNotFound(format!("Coordinator zome '{}' not found", &zome_name,))
+            })
     }
 
     /// Find a any zome from a [`ZomeName`].
@@ -150,7 +154,9 @@ impl DnaDef {
         self.all_zomes()
             .find(|(name, _)| *name == zome_name)
             .map(|(_, def)| def)
-            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+            .ok_or_else(|| {
+                ZomeError::ZomeNotFound(format!("Wasm zome '{}' not found", &zome_name,))
+            })
             .and_then(|def| {
                 if let ZomeDef::Wasm(wasm_zome) = def {
                     Ok(wasm_zome)
@@ -165,7 +171,9 @@ impl DnaDef {
         self.all_zomes()
             .find(|(name, _)| *name == zome_name)
             .map(|(_, def)| def)
-            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+            .ok_or_else(|| {
+                ZomeError::ZomeNotFound(format!("Wasm zome '{}' not found", &zome_name,))
+            })
             .and_then(|def| match def {
                 ZomeDef::Wasm(wasm_zome) => Ok(wasm_zome.wasm_hash.clone()),
                 _ => Err(ZomeError::NonWasmZome(zome_name.clone())),

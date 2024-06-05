@@ -179,9 +179,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle-query"
-version = "1.0.3"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a64c907d4e79225ac72e2a354c9ce84d50ebb4586dee56c82b3ee73004f537f5"
+checksum = "ad186efb764318d35165f1758e7dcef3b10628e26d41a44bc5550652e6804391"
 dependencies = [
  "windows-sys 0.52.0",
 ]
@@ -1414,9 +1414,9 @@ dependencies = [
 
 [[package]]
 name = "cxx"
-version = "1.0.122"
+version = "1.0.123"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb497fad022245b29c2a0351df572e2d67c1046bcef2260ebc022aec81efea82"
+checksum = "8194f089b6da4751d6c1da1ef37c17255df51f9346cdb160f8b096562ae4a85c"
 dependencies = [
  "cc",
  "cxxbridge-flags",
@@ -1426,9 +1426,9 @@ dependencies = [
 
 [[package]]
 name = "cxx-build"
-version = "1.0.122"
+version = "1.0.123"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9327c7f9fbd6329a200a5d4aa6f674c60ab256525ff0084b52a889d4e4c60cee"
+checksum = "1e8df9a089caae66634d754672d5f909395f30f38af6ff19366980d8a8b57501"
 dependencies = [
  "cc",
  "codespan-reporting",
@@ -1441,15 +1441,15 @@ dependencies = [
 
 [[package]]
 name = "cxxbridge-flags"
-version = "1.0.122"
+version = "1.0.123"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "688c799a4a846f1c0acb9f36bb9c6272d9b3d9457f3633c7753c6057270df13c"
+checksum = "25290be4751803672a70b98c68b51c1e7d0a640ab5a4377f240f9d2e70054cd1"
 
 [[package]]
 name = "cxxbridge-macro"
-version = "1.0.122"
+version = "1.0.123"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "928bc249a7e3cd554fd2e8e08a426e9670c50bbfc9a621653cfa9accc9641783"
+checksum = "b8cb317cb13604b4752416783bb25070381c36e844743e4146b7f8e55de7d140"
 dependencies = [
  "proc-macro2 1.0.85",
  "quote 1.0.36",
@@ -2510,7 +2510,7 @@ dependencies = [
 
 [[package]]
 name = "hc_service_check"
-version = "0.1.0-dev.4"
+version = "0.1.0-dev.5"
 dependencies = [
  "clap 4.5.4",
  "kitsune_p2p_bootstrap_client",
@@ -2522,7 +2522,7 @@ dependencies = [
 
 [[package]]
 name = "hc_sleuth"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2546,7 +2546,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2731,7 +2731,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2844,7 +2844,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2874,7 +2874,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "anyhow",
  "clap 4.5.4",
@@ -2888,7 +2888,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2914,7 +2914,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_run_local_services"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "clap 4.5.4",
  "futures",
@@ -2928,7 +2928,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -2959,7 +2959,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "derive_more",
  "holo_hash",
@@ -2985,7 +2985,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_services"
-version = "0.3.0-dev.5"
+version = "0.3.0-dev.6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3036,7 +3036,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "assert_cmd",
  "base64 0.22.1",
@@ -3066,7 +3066,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_metrics"
-version = "0.4.0-dev.1"
+version = "0.4.0-dev.2"
 dependencies = [
  "influxive",
  "opentelemetry_api",
@@ -3092,7 +3092,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "aitia",
  "async-trait",
@@ -3160,7 +3160,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3205,7 +3205,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "aitia",
  "anyhow",
@@ -3285,7 +3285,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3359,7 +3359,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -3418,7 +3418,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "async-trait",
  "criterion",
@@ -4116,7 +4116,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -4197,7 +4197,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap"
-version = "0.3.0-dev.5"
+version = "0.3.0-dev.6"
 dependencies = [
  "clap 4.5.4",
  "criterion",
@@ -4219,7 +4219,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap_client"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "arbitrary",
  "ed25519-dalek",
@@ -4288,7 +4288,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_fetch"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "arbitrary",
  "backon",
@@ -4325,7 +4325,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_proxy"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "base64 0.22.1",
  "criterion",
@@ -4359,7 +4359,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "blake2b_simd",
  "futures",
@@ -4373,7 +4373,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "arbitrary",
  "base64 0.22.1",
@@ -4561,7 +4561,7 @@ dependencies = [
  "tar",
  "ureq",
  "vcpkg",
- "zip 2.1.2",
+ "zip 2.1.3",
 ]
 
 [[package]]
@@ -5242,9 +5242,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "openssl-src"
-version = "300.3.0+3.3.0"
+version = "300.3.1+3.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eba8804a1c5765b18c4b3f907e6897ebabeedebc9830e1a0046c4a4cf44663e1"
+checksum = "7259953d42a81bf137fbbd73bd30a8e1914d6dce43c2b90ed575783a22608b91"
 dependencies = [
  "cc",
 ]
@@ -6775,7 +6775,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.25.0",
  "tokio-tungstenite",
- "webpki-roots 0.26.1",
+ "webpki-roots 0.26.2",
 ]
 
 [[package]]
@@ -7459,7 +7459,7 @@ version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d8cec3501a5194c432b2b7976db6b7d10ec95c253208b45f83f7136aa985e29"
 dependencies = [
- "strum_macros 0.26.3",
+ "strum_macros 0.26.4",
 ]
 
 [[package]]
@@ -7489,9 +7489,9 @@ dependencies = [
 
 [[package]]
 name = "strum_macros"
-version = "0.26.3"
+version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7993a8e3a9e88a00351486baae9522c91b123a088f76469e5bd5cc17198ea87"
+checksum = "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2 1.0.85",
@@ -7635,9 +7635,9 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tar"
-version = "0.4.40"
+version = "0.4.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b16afcea1f22891c49a00c751c7b63b2233284064f11a200fc624137c51e2ddb"
+checksum = "cb797dad5fb5b76fcf519e702f4a589483b5ef06567f160c392832c1f5e44909"
 dependencies = [
  "filetime",
  "libc",
@@ -8447,9 +8447,9 @@ dependencies = [
 
 [[package]]
 name = "unicode-width"
-version = "0.1.12"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68f5e5f3158ecfd4b8ff6fe086db7c8467a2dfdac97fe420f2b7c4aa97af66d6"
+checksum = "0336d538f7abc86d282a4189614dfaa90810dfc2c6f6427eaf88e16311dd225d"
 
 [[package]]
 name = "unicode-xid"
@@ -9001,9 +9001,9 @@ checksum = "5f20c57d8d7db6d3b86154206ae5d8fba62dd39573114de97c2cb0578251f8e1"
 
 [[package]]
 name = "webpki-roots"
-version = "0.26.1"
+version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3de34ae270483955a94f4b21bdaaeb83d508bb84a01435f393818edb0012009"
+checksum = "3c452ad30530b54a4d8e71952716a212b08efd0f3562baa66c29a618b07da7c3"
 dependencies = [
  "rustls-pki-types",
 ]
@@ -9496,9 +9496,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "2.1.2"
+version = "2.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "098d5d7737fb0b70814faa73c17df84f047d38dd31d13bbf2ec3fb354b5abf45"
+checksum = "775a2b471036342aa69bc5a602bc889cb0a06cda00477d0c69566757d5553d39"
 dependencies = [
  "arbitrary",
  "crc32fast",
