@@ -107,7 +107,7 @@ impl DnaDef {
                     self.integrity_zomes,
                     self.coordinator_zomes,
                 );
-                ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,))
+                ZomeError::ZomeNotFound(format!("Integrity zome '{}' not found", &zome_name,))
             })
     }
 
@@ -132,7 +132,7 @@ impl DnaDef {
                     self.integrity_zomes,
                     self.coordinator_zomes,
                 );
-                ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,))
+                ZomeError::ZomeNotFound(format!("Coordinator Zome '{}' not found", &zome_name,))
             })
     }
 
@@ -180,7 +180,7 @@ impl DnaDef {
                     self.integrity_zomes,
                     self.coordinator_zomes,
                 );
-                ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,))
+                ZomeError::ZomeNotFound(format!("Wasm zome '{}' not found", &zome_name,))
             })
             .and_then(|def| {
                 if let ZomeDef::Wasm(wasm_zome) = def {
@@ -202,7 +202,7 @@ impl DnaDef {
                     self.integrity_zomes,
                     self.coordinator_zomes,
                 );
-                ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,))
+                ZomeError::ZomeNotFound(format!("Hash for wasm zome '{}' not found", &zome_name,))
             })
             .and_then(|def| match def {
                 ZomeDef::Wasm(wasm_zome) => Ok(wasm_zome.wasm_hash.clone()),

@@ -6,11 +6,15 @@ use crate::conductor::conductor::app_manifest_from_dnas;
 
 /// Get a "standard" AppBundle from a single DNA, with Create provisioning,
 /// with no modifiers, clone limit of 255, and arbitrary role names
-pub async fn app_bundle_from_dnas(dnas_with_roles: &[impl DnaWithRole]) -> AppBundle {
+pub async fn app_bundle_from_dnas(
+    dnas_with_roles: &[impl DnaWithRole],
+    memproofs_deferred: bool,
+) -> AppBundle {
     let (roles, resources): (Vec<_>, Vec<_>) = dnas_with_roles
         .iter()
         .map(|dr| {
             let dna = dr.dna();
+
             let path = PathBuf::from(format!("{}", dna.dna_hash()));
             let modifiers = DnaModifiersOpt::none();
             let manifest = AppRoleManifest {
@@ -37,6 +41,7 @@ pub async fn app_bundle_from_dnas(dnas_with_roles: &[impl DnaWithRole]) -> AppBu
         .name("[generated]".into())
         .description(None)
         .roles(roles)
+        .membrane_proofs_deferred(memproofs_deferred)
         .build()
         .unwrap()
         .into();
@@ -59,11 +64,12 @@ pub async fn get_install_app_payload_from_dnas(
     data: &[(impl DnaWithRole, Option<MembraneProof>)],
 ) -> InstallAppPayload {
     let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
-    let bundle = app_bundle_from_dnas(&dnas_with_roles).await;
+    let bundle = app_bundle_from_dnas(&dnas_with_roles, false).await;
     let membrane_proofs = data
         .iter()
         .map(|(dr, memproof)| (dr.role(), memproof.clone().unwrap_or_default()))
         .collect();
+
     InstallAppPayload {
         agent_key,
         source: AppBundleSource::Bundle(bundle),

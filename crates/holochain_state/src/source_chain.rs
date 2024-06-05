@@ -925,7 +925,7 @@ fn build_ops_from_actions(
     actions: Vec<SignedActionHashed>,
 ) -> SourceChainResult<(
     Vec<SignedActionHashed>,
-    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, SysValDep)>,
+    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, SysValDeps)>,
 )> {
     // Actions end up back in here.
     let mut actions_output = Vec::with_capacity(actions.len());
@@ -954,10 +954,10 @@ fn build_ops_from_actions(
             let op_order = OpOrder::new(op_type, action.timestamp());
             let timestamp = action.timestamp();
             // Put the action back by value.
-            let dependency = op_type.sys_validation_dependency(&action);
+            let deps = op_type.sys_validation_dependencies(&action);
             h = Some(action);
             // Collect the DhtOpLite, DhtOpHash and OpOrder.
-            ops.push((op, op_hash, op_order, timestamp, dependency));
+            ops.push((op, op_hash, op_order, timestamp, deps));
         }
 
         // Put the SignedActionHashed back together.

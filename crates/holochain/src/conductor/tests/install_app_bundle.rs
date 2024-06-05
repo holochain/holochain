@@ -54,7 +54,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
-            membrane_proofs: HashMap::new(),
+            membrane_proofs: HashMap::new().into(),
             #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         }
@@ -177,7 +177,7 @@ async fn reject_duplicate_app_for_same_agent() {
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
-            membrane_proofs: HashMap::new(),
+            membrane_proofs: HashMap::new().into(),
             #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
@@ -197,7 +197,7 @@ async fn reject_duplicate_app_for_same_agent() {
             source: AppBundleSource::Bundle(bundle),
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
-            membrane_proofs: HashMap::new(),
+            membrane_proofs: HashMap::new().into(),
             #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
             network_seed: None,
@@ -221,7 +221,7 @@ async fn reject_duplicate_app_for_same_agent() {
             source: AppBundleSource::Bundle(bundle),
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
-            membrane_proofs: HashMap::new(),
+            membrane_proofs: HashMap::new().into(),
             #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
             network_seed: None,
@@ -242,7 +242,7 @@ async fn reject_duplicate_app_for_same_agent() {
             source: AppBundleSource::Bundle(bundle),
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
-            membrane_proofs: HashMap::new(),
+            membrane_proofs: HashMap::new().into(),
             #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
             network_seed: Some("network".into()),
@@ -293,7 +293,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
             network_seed: Some("final seed".into()),
-            membrane_proofs: HashMap::new(),
+            membrane_proofs: HashMap::new().into(),
             #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
@@ -337,7 +337,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_2".into()),
             network_seed: None,
-            membrane_proofs: HashMap::new(),
+            membrane_proofs: HashMap::new().into(),
             #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
@@ -401,7 +401,7 @@ async fn network_seed_regression() {
             source: AppBundleSource::Bundle(bundle1),
             installed_app_id: Some("no-seed".into()),
             network_seed: None,
-            membrane_proofs: HashMap::new(),
+            membrane_proofs: HashMap::new().into(),
             #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
@@ -415,7 +415,7 @@ async fn network_seed_regression() {
             source: AppBundleSource::Bundle(bundle2),
             installed_app_id: Some("yes-seed".into()),
             network_seed: Some("seed".into()),
-            membrane_proofs: HashMap::new(),
+            membrane_proofs: HashMap::new().into(),
             #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
@@ -665,7 +665,7 @@ impl TestCase {
                 source,
                 installed_app_id: Some(case_str.clone()),
                 network_seed,
-                membrane_proofs: HashMap::new(),
+                membrane_proofs: HashMap::new().into(),
                 #[cfg(feature = "chc")]
                 ignore_genesis_failure: false,
             })

@@ -32,7 +32,7 @@ use std::time::Duration;
 use tempfile::TempDir;
 use tracing::*;
 
-use crate::test_utils::*;
+use crate::tests::test_utils::*;
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
@@ -730,7 +730,7 @@ async fn network_stats() {
         .await;
 
     #[cfg(feature = "tx5")]
-    const EXPECT: &str = "go-pion";
+    const EXPECT: &str = "backendGoPion";
 
     let req = AdminRequest::DumpNetworkStats;
     let res: AdminResponse = client.request(req).await.unwrap();

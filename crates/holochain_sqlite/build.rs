@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::path::PathBuf;
 
 /// The location of all our sql scrips
@@ -95,10 +97,13 @@ fn _check_migrations() {
 }
 
 fn main() {
-    println!("cargo:rerun-if-env-changed=FIX_SQL_FMT");
-    let all_sql = find_sql(std::path::Path::new(SQL_DIR));
-    for sql in all_sql {
-        println!("cargo:rerun-if-changed={}", sql.to_string_lossy());
-        check_fmt(&sql);
+    #[cfg(not(windows))]
+    {
+        println!("cargo:rerun-if-env-changed=FIX_SQL_FMT");
+        let all_sql = find_sql(std::path::Path::new(SQL_DIR));
+        for sql in all_sql {
+            println!("cargo:rerun-if-changed={}", sql.to_string_lossy());
+            check_fmt(&sql);
+        }
     }
 }

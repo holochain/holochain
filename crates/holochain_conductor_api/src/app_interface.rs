@@ -76,6 +76,28 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::ListWasmHostFunctions`]
     ListWasmHostFunctions,
+
+    /// Provide the membrane proofs for this app, if this app was installed
+    /// using [`MemproofProvisioning::Deferred`].
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::Ok`]
+    ProvideMemproofs(MemproofMap),
+    //
+    // TODO: implement after DPKI lands
+    // /// Replace the agent key associated with this app with a new one.
+    // /// The new key will be created using the same method which is used
+    // /// when installing an app with no agent key provided.
+    // ///
+    // /// This method is only available if this app was installed using [`MemproofProvisioning::Deferred`],
+    // /// and can only be called before [`AppRequest::ProvideMemproofs`] has been called.
+    // /// Until then, it can be called as many times as needed.
+    // ///
+    // /// # Returns
+    // ///
+    // /// [`AppResponse::AppAgentKeyRotated`]
+    // RotateAppAgentKey,
 }
 
 /// Represents the possible responses to an [`AppRequest`].
@@ -121,6 +143,12 @@ pub enum AppResponse {
 
     /// All the wasm host functions supported by this conductor.
     ListWasmHostFunctions(Vec<String>),
+
+    /// The app agent key as been rotated, and the new key is returned.
+    AppAgentKeyRotated(AgentPubKey),
+
+    /// Operation successful, no payload.
+    Ok,
 }
 
 /// The data provided over an app interface in order to make a zome call
@@ -400,6 +428,7 @@ pub enum AppInfoStatus {
     Paused { reason: PausedAppReason },
     Disabled { reason: DisabledAppReason },
     Running,
+    AwaitingMemproofs,
 }
 
 impl From<AppStatus> for AppInfoStatus {
@@ -408,6 +437,7 @@ impl From<AppStatus> for AppInfoStatus {
             AppStatus::Running => AppInfoStatus::Running,
             AppStatus::Disabled(reason) => AppInfoStatus::Disabled { reason },
             AppStatus::Paused(reason) => AppInfoStatus::Paused { reason },
+            AppStatus::AwaitingMemproofs => AppInfoStatus::AwaitingMemproofs,
         }
     }
 }
@@ -418,6 +448,7 @@ impl From<AppInfoStatus> for AppStatus {
             AppInfoStatus::Running => AppStatus::Running,
             AppInfoStatus::Disabled { reason } => AppStatus::Disabled(reason),
             AppInfoStatus::Paused { reason } => AppStatus::Paused(reason),
+            AppInfoStatus::AwaitingMemproofs => AppStatus::AwaitingMemproofs,
         }
     }
 }

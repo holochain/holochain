@@ -58,7 +58,7 @@ impl SweetConductorConfig {
         #[cfg(feature = "tx5")]
         {
             for t in network.transport_pool.iter_mut() {
-                if let kitsune_p2p_types::config::TransportConfig::WebRTC { signal_url } = t {
+                if let kitsune_p2p_types::config::TransportConfig::WebRTC { signal_url, .. } = t {
                     if signal_url == "rendezvous:" {
                         *signal_url = rendezvous.sig_addr().to_string();
                     }
@@ -123,6 +123,7 @@ impl SweetConductorConfig {
             config.network.transport_pool =
                 vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
                     signal_url: "rendezvous:".into(),
+                    webrtc_config: None,
                 }];
         }
 
