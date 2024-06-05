@@ -150,6 +150,7 @@ mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg_attr(target_os = "windows", ignore = "unc path mismatch - use dunce")]
     async fn test_roundtrip() {
         let tmpdir = tempfile::Builder::new()
             .prefix("hc-bundle-test")
