@@ -8,6 +8,7 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub struct GetAgentActivityQuery {
     agent: AgentPubKey,
+    agent_basis: AnyLinkableHash,
     filter: ChainQueryFilter,
     options: GetActivityOptions,
 }
@@ -15,6 +16,7 @@ pub struct GetAgentActivityQuery {
 impl GetAgentActivityQuery {
     pub fn new(agent: AgentPubKey, filter: ChainQueryFilter, options: GetActivityOptions) -> Self {
         Self {
+            agent_basis: agent.clone().into(),
             agent,
             filter,
             options,
@@ -27,6 +29,7 @@ pub struct State {
     valid: Vec<ActionHashed>,
     rejected: Vec<ActionHashed>,
     pending: Vec<ActionHashed>,
+    warrants: Vec<Warrant>,
     status: Option<ChainStatus>,
 }
 
@@ -34,6 +37,7 @@ pub struct State {
 pub enum Item {
     Integrated(ActionHashed),
     Pending(ActionHashed),
+    Warrant(Warrant),
 }
 
 impl Query for GetAgentActivityQuery {
@@ -43,22 +47,39 @@ impl Query for GetAgentActivityQuery {
 
     fn query(&self) -> String {
         "
-            SELECT Action.hash, DhtOp.validation_status, Action.blob AS action_blob,
-            DhtOp.when_integrated
+            SELECT 
+            Action.hash, 
+            DhtOp.validation_status, 
+            Action.blob AS action_blob,
+            DhtOp.when_integrated,
+            DhtOp.type AS dht_type,
             FROM Action
             JOIN DhtOp ON DhtOp.action_hash = Action.hash
-            WHERE Action.author = :author
-            AND DhtOp.type = :op_type
+            WHERE 
+            (
+                -- is an action
+                Action.author = :author
+                AND dht_type = :chain_op_type
+            )
+            OR
+            (
+                -- is an integrated warrant
+                DhtOp.basis_hash = :author_basis
+                AND dht_type = :warrant_op_type
+                AND DhtOp.when_integrated IS NOT NULL
+            )
             ORDER BY Action.seq ASC
         "
         .to_string()
     }
 
     fn params(&self) -> Vec<holochain_state::query::Params> {
-        (named_params! {
+        named_params! {
             ":author": self.agent,
-            ":op_type": ChainOpType::RegisterAgentActivity,
-        })
+            ":author_basis": self.agent_basis,
+            ":chain_op_type": ChainOpType::RegisterAgentActivity,
+            ":warrant_op_type": WarrantOpType::ChainIntegrityWarrant,
+        }
         .to_vec()
     }
 
@@ -74,16 +95,27 @@ impl Query for GetAgentActivityQuery {
         Arc::new(move |row| {
             let validation_status: Option<ValidationStatus> = row.get("validation_status")?;
             let hash: ActionHash = row.get("hash")?;
-            from_blob::<SignedAction>(row.get("action_blob")?).and_then(|action| {
-                let integrated: Option<Timestamp> = row.get("when_integrated")?;
-                let action = ActionHashed::with_pre_hashed(action.into_data(), hash);
-                let item = if integrated.is_some() {
-                    Item::Integrated(action)
-                } else {
-                    Item::Pending(action)
-                };
-                Ok(Judged::raw(item, validation_status))
-            })
+            let ty: DhtOpType = row.get("dht_type")?;
+            let integrated: Option<Timestamp> = row.get("when_integrated")?;
+
+            match ty {
+                DhtOpType::Chain(_) => {
+                    from_blob::<SignedAction>(row.get("action_blob")?).and_then(|action| {
+                        let action = ActionHashed::with_pre_hashed(action.into_data(), hash);
+                        let item = if integrated.is_some() {
+                            Item::Integrated(action)
+                        } else {
+                            Item::Pending(action)
+                        };
+                        Ok(Judged::raw(item, validation_status))
+                    })
+                }
+                DhtOpType::Warrant(_) => from_blob::<SignedWarrant>(row.get("action_blob")?)
+                    .and_then(|warrant| {
+                        let item = Item::Warrant(warrant.into_data().0);
+                        Ok(Judged::raw(item, None))
+                    }),
+            }
         })
     }
 
@@ -121,6 +153,7 @@ impl Query for GetAgentActivityQuery {
                 state.rejected.push(action);
             }
             (_, Item::Pending(data)) => state.pending.push(data),
+            (_, Item::Warrant(warrant)) => state.warrants.push(warrant),
             _ => (),
         }
         Ok(state)
@@ -158,10 +191,17 @@ impl Query for GetAgentActivityQuery {
             ChainItems::NotRequested
         };
 
+        let warrants = if self.options.include_warrants {
+            state.warrants
+        } else {
+            vec![]
+        };
+
         Ok(AgentActivityResponse {
             agent: self.agent.clone(),
             valid_activity,
             rejected_activity,
+            warrants,
             status,
             highest_observed,
         })

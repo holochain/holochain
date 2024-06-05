@@ -20,6 +20,8 @@ pub struct AgentActivityResponse<T = SignedActionHashed> {
     /// The highest chain action that has
     /// been observed by this authority.
     pub highest_observed: Option<HighestObserved>,
+    /// Any warrants at the basis of this agent.
+    pub warrants: Vec<Warrant>,
 }
 
 holochain_serial!(AgentActivityResponse<ActionHash>);
@@ -38,10 +40,11 @@ impl<A> AgentActivityResponse<A> {
             rejected_activity: convert_activity(&other.rejected_activity),
             status: ChainStatus::Empty,
             highest_observed: other.highest_observed,
+            warrants: other.warrants,
         }
     }
 
-    /// Convert an status only response to a different type.
+    /// Convert a status only response to a different type.
     pub fn status_only<B>(other: AgentActivityResponse<B>) -> Self {
         AgentActivityResponse {
             agent: other.agent,
@@ -49,10 +52,11 @@ impl<A> AgentActivityResponse<A> {
             rejected_activity: ChainItems::NotRequested,
             status: ChainStatus::Empty,
             highest_observed: other.highest_observed,
+            warrants: other.warrants,
         }
     }
 
-    /// Convert an hashes only response to a different type.
+    /// Convert a hashes only response to a different type.
     pub fn hashes_only<B>(other: AgentActivityResponse<B>) -> Self {
         let convert_activity = |items: ChainItems<B>| match items {
             ChainItems::Full(_) => ChainItems::Full(Vec::with_capacity(0)),
@@ -65,6 +69,7 @@ impl<A> AgentActivityResponse<A> {
             rejected_activity: convert_activity(other.rejected_activity),
             status: other.status,
             highest_observed: other.highest_observed,
+            warrants: other.warrants,
         }
     }
 }

@@ -221,6 +221,7 @@ async fn get_agent_activity() {
         agent: td.agent.clone(),
         valid_activity: td.valid_hashes.clone(),
         rejected_activity: ChainItems::NotRequested,
+        warrants: vec![],
         status: ChainStatus::Valid(td.chain_head.clone()),
         highest_observed: Some(td.highest_observed.clone()),
     };
