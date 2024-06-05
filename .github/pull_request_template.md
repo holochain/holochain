@@ -4,4 +4,4 @@
 
 ### TODO:
 - [ ] CHANGELOGs updated with appropriate info
-- [ ] Rustdoc updated or added to
+- [ ] All code changes are reflected in docs, including module-level docs
