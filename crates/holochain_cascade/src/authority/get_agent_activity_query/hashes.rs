@@ -52,20 +52,20 @@ impl Query for GetAgentActivityQuery {
             DhtOp.validation_status, 
             Action.blob AS action_blob,
             DhtOp.when_integrated,
-            DhtOp.type AS dht_type,
+            DhtOp.type AS dht_type
             FROM Action
             JOIN DhtOp ON DhtOp.action_hash = Action.hash
-            WHERE 
+            WHERE
             (
                 -- is an action
                 Action.author = :author
-                AND dht_type = :chain_op_type
+                AND DhtOp.type = :chain_op_type
             )
             OR
             (
                 -- is an integrated warrant
                 DhtOp.basis_hash = :author_basis
-                AND dht_type = :warrant_op_type
+                AND DhtOp.type = :warrant_op_type
                 AND DhtOp.when_integrated IS NOT NULL
             )
             ORDER BY Action.seq ASC
