@@ -13,14 +13,15 @@ env:
 jobs:
   static-job-id:
     name: static
-    runs-on: maos-latest # currently faster than ubuntu-latest
+    runs-on: macos-latest # currently faster than ubuntu-latest
     steps:
-      - uses: common/pre@v1
+      - uses: ./.github/actions/common-pre
 
       - name: static
         run: make static-all
 
       - uses: common/post@v1
+      - uses: ./.github/actions/common-post
 
   test-job-id:
     name: test
@@ -35,7 +36,7 @@ jobs:
           windows-latest,
         ]
     steps:
-      - uses: common/pre@v1
+      - uses: ./.github/actions/common-pre
 
       - name: build windows
         if: matrix.os == 'windows-latest'
@@ -61,7 +62,7 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: make test-workspace
 
-      - uses: common/post@v1
+      - uses: ./.github/actions/common-post
 
   ci-pass:
     if: ${{ always() }}
