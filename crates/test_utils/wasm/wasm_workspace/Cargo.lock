@@ -913,7 +913,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "getrandom",
  "hdi",
@@ -1018,7 +1018,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_nonce"
-version = "0.4.0-dev.2"
+version = "0.4.0-dev.3"
 dependencies = [
  "getrandom",
  "holochain_secure_primitive",
@@ -1061,7 +1061,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "hdk",
  "serde",
@@ -1109,7 +1109,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.6"
 dependencies = [
  "derive_builder",
  "derive_more",
