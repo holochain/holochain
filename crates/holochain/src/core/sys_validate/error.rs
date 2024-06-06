@@ -120,6 +120,8 @@ pub enum ValidationOutcome {
     DpkiAgentMissing(AgentPubKey),
     #[error("The agent {0:?} was found to be invalid at {1:?} according to the DPKI service")]
     DpkiAgentInvalid(AgentPubKey, Timestamp),
+    #[error("Agent key {0} invalid")]
+    InvalidAgentKey(AgentPubKey),
     #[error("The entry def index for {0:?} was out of range")]
     EntryDefId(AppEntryDef),
     #[error("The entry has a different hash to the action's entry hash")]

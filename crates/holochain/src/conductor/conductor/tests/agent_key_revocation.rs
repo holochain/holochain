@@ -211,7 +211,7 @@ async fn revoke_agent_key_without_dpki_installed() {
     let non_existing_key = AgentPubKey::from_raw_32(vec![0; 32]);
     let result = conductor
         .clone()
-        .revoke_agent_key_for_app(agent_key, app.installed_app_id().clone())
+        .revoke_agent_key_for_app(non_existing_key.clone(), app.installed_app_id().clone())
         .await;
     assert_matches!(
         result,
@@ -277,8 +277,50 @@ async fn revoke_agent_key_without_dpki_installed() {
     let result: Option<Record> = conductor.call(&zome_2, read_fn_name, action_hash_2).await;
     assert!(result.is_some());
 
-        Err(ConductorError::DpkiError(
-            DpkiServiceError::DpkiNotInstalled
-        ))
-    );
+    // Creating an entry should fail now for both cells
+    let result = conductor
+        .call_fallible::<_, ActionHash>(&zome_1, create_fn_name, ())
+        .await;
+    if let Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) = result {
+        assert_matches!(
+            *workflow_error,
+            WorkflowError::SourceChainError(
+                SourceChainError::InvalidCommit(message)
+            ) if message == ValidationOutcome::InvalidAgentKey(agent_key.clone()).to_string()
+        );
+    } else {
+        panic!("different error than expected {result:?}");
+    }
+    let result = conductor
+        .call_fallible::<_, ActionHash>(&zome_2, create_fn_name, ())
+        .await;
+    if let Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) = result {
+        assert_matches!(
+            *workflow_error,
+            WorkflowError::SourceChainError(
+                SourceChainError::InvalidCommit(message)
+            ) if message == ValidationOutcome::InvalidAgentKey(agent_key.clone()).to_string()
+        );
+    } else {
+        panic!("different error than expected {result:?}");
+    }
+
+    // Cloning cells should fail for both cells
+    // let mut create_clone_cell_payload = CreateCloneCellPayload {
+    //     role_name: role_1.to_string(),
+    //     membrane_proof: None,
+    //     modifiers: DnaModifiersOpt::none().with_network_seed("network_seed".into()),
+    //     name: None,
+    // };
+    // let result = conductor
+    //     .create_clone_cell(app.installed_app_id(), create_clone_cell_payload.clone())
+    //     .await
+    //     .unwrap_err();
+    // assert_matches!(result, ConductorError::AppError(AppError::CellToCloneHasInvalidAgent(invalid_key)) if invalid_key == agent_key);
+    // create_clone_cell_payload.role_name = role_2.to_string();
+    // let result = conductor
+    //     .create_clone_cell(app.installed_app_id(), create_clone_cell_payload)
+    //     .await
+    //     .unwrap_err();
+    // assert_matches!(result, ConductorError::AppError(AppError::CellToCloneHasInvalidAgent(invalid_key)) if invalid_key == agent_key);
 }

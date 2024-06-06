@@ -192,6 +192,85 @@ async fn validate_valid_agent_validation_package_op() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn validate_delete_agent_key_op() {
+    holochain_trace::test_run();
+
+    let mut test_case = TestCase::new().await;
+
+    // Create agent pub key action
+    let create_agent_pub_key = Create {
+        author: test_case.agent.clone(),
+        action_seq: 2,
+        entry_type: EntryType::AgentPubKey,
+        entry_hash: test_case.agent.clone().into(),
+        prev_action: fixt!(ActionHash),
+        weight: Default::default(),
+        timestamp: Timestamp::now().into(),
+    };
+    let create_agent_pub_key_action = test_case
+        .sign_action(Action::Create(create_agent_pub_key))
+        .await;
+
+    // Op to validate
+    let mut action = fixt!(Delete);
+    action.author = test_case.agent.clone();
+    action.prev_action = create_agent_pub_key_action.as_hash().clone();
+    action.action_seq = create_agent_pub_key_action.action().action_seq() + 1;
+    action.deletes_entry_address = test_case.agent.clone().into();
+    action.timestamp = Timestamp::now();
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Delete(action)).into();
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![create_agent_pub_key_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert!(
+        matches!(outcome, Outcome::Accepted),
+        "Expected Accepted but actual outcome was {outcome:?}",
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn reject_action_after_deleted_agent_key() {
+    holochain_trace::test_run();
+
+    let mut test_case = TestCase::new().await;
+
+    // Delete agent pub key action
+    let mut delete_agent_pub_key = fixt!(Delete);
+    delete_agent_pub_key.author = test_case.agent.clone();
+    delete_agent_pub_key.deletes_entry_address = test_case.agent.clone().into();
+    delete_agent_pub_key.timestamp = Timestamp::now();
+    let delete_agent_pub_key_action = test_case
+        .sign_action(Action::Delete(delete_agent_pub_key))
+        .await;
+
+    // Op to validate
+    let mut create = fixt!(Create);
+    create.author = test_case.agent.clone();
+    create.action_seq = delete_agent_pub_key_action.action().action_seq() + 1;
+    create.prev_action = delete_agent_pub_key_action.as_hash().clone();
+    create.timestamp = Timestamp::now();
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create)).into();
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![delete_agent_pub_key_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert_eq!(
+        outcome,
+        Outcome::Rejected(ValidationOutcome::InvalidAgentKey(test_case.agent.clone()).to_string()),
+        "Expected Rejected but actual outcome was {outcome:?}",
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_create_op() {
     holochain_trace::test_run();
 

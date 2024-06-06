@@ -589,12 +589,15 @@ async fn validate_chain_op(
     dpki: Option<DpkiImpl>,
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
+    // Check agent validity in Deepkey first
     if let Some(dpki) = dpki {
         // Don't run DPKI agent validity checks on the DPKI service itself
         if !dpki.is_deepkey_dna(dna_def.as_hash()) {
             check_dpki_agent_validity_for_op(&dpki, op).await?;
         }
     }
+    // Check agent validity in source chain
+    check_agent_validity(&op.action(), validation_dependencies.clone()).await?;
     match op {
         ChainOp::StoreRecord(_, action, entry) => {
             check_prev_action(action)?;
@@ -691,6 +694,34 @@ async fn validate_chain_op(
             register_delete_link(action, validation_dependencies)
         }
     }
+}
+
+/// Verify agent key validity.
+///
+/// If the previous action is a `Delete` of the current agent pub key,
+/// the agent key is invalid.
+async fn check_agent_validity(
+    action: &Action,
+    validation_dependencies: SysValDeps,
+) -> SysValidationResult<()> {
+    if let Some(prev_action_hash) = action.prev_action() {
+        let deps = validation_dependencies.same_dht.lock();
+        let prev_action = deps
+            .get(prev_action_hash)
+            .and_then(|state| state.as_action())
+            .ok_or_else(|| {
+                println!("ending up here");
+                ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into())
+            })?;
+        if let Action::Delete(delete) = prev_action {
+            if delete.deletes_entry_address == action.author().clone().into() {
+                return Err(SysValidationError::ValidationOutcome(
+                    ValidationOutcome::InvalidAgentKey(action.author().clone()),
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 // TODO: should this check DPKI for agent validity?
@@ -836,6 +867,8 @@ async fn sys_validate_record_inner(
             vec![action.clone()].into_iter(),
         )
         .await;
+
+        check_agent_validity(action, validation_dependencies.clone()).await?;
 
         store_record(action, validation_dependencies.clone())?;
         if let Some(maybe_entry) = maybe_entry {
