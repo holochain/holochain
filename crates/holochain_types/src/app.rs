@@ -145,6 +145,7 @@ pub struct InstallAppPayload {
     /// Optional: If app installation fails due to genesis failure, normally the app will be
     /// immediately uninstalled. When this flag is set, the app is left installed with empty cells intact.
     /// This can be useful for using `graft_records_onto_source_chain`, or for diagnostics.
+    #[cfg(feature = "chc")]
     #[serde(default)]
     pub ignore_genesis_failure: bool,
 }

@@ -130,6 +130,8 @@ pub async fn spawn_queue_consumer_tasks(
         .get_dna_def(&dna_hash)
         .expect("Dna must be in store");
 
+    todo!("need to trigger sys validation from app validation workflow when authoring warrant");
+
     // App validation
     // One per space.
     let tx_app = queue_consumer_map.spawn_once_app_validation(dna_hash.clone(), || {
