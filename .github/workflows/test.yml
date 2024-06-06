@@ -11,6 +11,17 @@ env:
   RUSTFLAGS: '-Dwarnings'
   RUST_BACKTRACE: 1
 jobs:
+  static-job-id:
+    name: static
+    runs-on: maos-latest # currently faster than ubuntu-latest
+    steps:
+      - uses: common/pre@v1
+
+      - name: static
+        run: make static-all
+
+      - uses: common/post@v1
+
   test-job-id:
     name: test
     runs-on: ${{ matrix.os }}
@@ -24,37 +35,7 @@ jobs:
           windows-latest,
         ]
     steps:
-      - name: free disk space
-        if: matrix.os == 'ubuntu-latest'
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-
-      - name: checkout
-        uses: actions/checkout@v4
-
-      - name: go toolchain
-        uses: actions/setup-go@v5
-        with:
-          go-version: '=1.20.0'
-
-      - name: rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: cargo sweep stamp
-        run: |
-          cargo install cargo-sweep
-          cargo sweep --stamp
-
-      - name: install vcpkg packages
-        if: matrix.os == 'windows-latest'
-        uses: johnwason/vcpkg-action@v6
-        id: vcpkg
-        with:
-          triplet: x64-windows-release
-          token: ${{ github.token }}
-          manifest-dir: ${{ github.workspace }}/.github/manifest
-          github-binarycache: true
+      - uses: common/pre@v1
 
       - name: build windows
         if: matrix.os == 'windows-latest'
@@ -80,14 +61,14 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: make test-workspace
 
-      - name: cargo sweep file
-        run: cargo sweep --file
+      - uses: common/post@v1
 
-  tests-pass:
+  ci-pass:
     if: ${{ always() }}
-    name: 'All Unit Tests Pass'
+    name: 'CI Pass'
     runs-on: 'ubuntu-latest'
     needs:
+      - static-job-id
       - test-job-id
     steps:
       - name: check status

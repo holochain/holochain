@@ -1,0 +1,5 @@
+runs:
+  using: 'composite'
+  steps:
+    - name: cargo sweep file
+      run: cargo sweep --file
