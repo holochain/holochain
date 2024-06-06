@@ -20,7 +20,6 @@ jobs:
       - name: static
         run: make static-all
 
-      - uses: common/post@v1
       - uses: ./.github/actions/common-post
 
   test-job-id:
