@@ -15,12 +15,22 @@ jobs:
     name: static
     runs-on: macos-latest # currently faster than ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: checkout
+        uses: actions/checkout@v4
 
       - uses: ./.github/actions/common-pre
 
-      - name: static
-        run: make static-all
+      - name: static-fmt
+        run: make static-fmt
+
+      - name: static-toml
+        run: make static-toml
+
+      - name: static-clippy
+        run: make static-clippy
+
+      - name: static-doc
+        run: make static-doc
 
       - uses: ./.github/actions/common-post
 
@@ -37,7 +47,8 @@ jobs:
           windows-latest,
         ]
     steps:
-      - uses: actions/checkout@v4
+      - name: checkout
+        uses: actions/checkout@v4
 
       - uses: ./.github/actions/common-pre
 

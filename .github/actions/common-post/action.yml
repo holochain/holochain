@@ -1,5 +1,7 @@
+name: 'Common Test Teardown Actions'
 runs:
   using: 'composite'
   steps:
     - name: cargo sweep file
+      shell: bash
       run: cargo sweep --file

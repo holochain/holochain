@@ -1,3 +1,4 @@
+name: 'Common Test Setup Actions'
 runs:
   using: 'composite'
   steps:
