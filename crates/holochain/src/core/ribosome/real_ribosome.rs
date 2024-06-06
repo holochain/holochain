@@ -143,7 +143,7 @@ pub struct RealRibosome {
     pub wasmer_module_cache: Arc<ModuleCacheLock>,
 
     #[cfg(test)]
-    ///
+    /// Wasm cache for Deepkey wasm in a temporary directory to be shared across all tests.
     pub shared_test_module_cache: Arc<ModuleCacheLock>,
 }
 
@@ -248,7 +248,11 @@ impl RealRibosome {
         wasmer_module_cache: Arc<ModuleCacheLock>,
     ) -> RibosomeResult<Self> {
         let shared_test_module_cache = temp_dir().join("deepkey_wasm_cache");
-        let _ = std::fs::create_dir_all(shared_test_module_cache.clone());
+        #[cfg(test)]
+        {
+            // Create this temporary directory only in tests.
+            let _ = std::fs::create_dir_all(shared_test_module_cache.clone());
+        }
         let mut ribosome = Self {
             dna_file,
             zome_types: Default::default(),
