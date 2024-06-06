@@ -7,9 +7,6 @@ runs:
       with:
         tool-cache: false
 
-    - name: checkout
-      uses: actions/checkout@v4
-
     - name: go toolchain
       uses: actions/setup-go@v5
       with:
