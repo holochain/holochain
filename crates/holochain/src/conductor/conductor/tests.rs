@@ -377,7 +377,7 @@ async fn test_signing_error_during_genesis() {
     let db_dir = test_db_dir();
     let config = ConductorConfig {
         data_root_path: Some(db_dir.path().to_path_buf().into()),
-        dpki: Some(DpkiConfig::disabled()),
+        dpki: DpkiConfig::disabled(),
         ..Default::default()
     };
     let mut conductor = SweetConductor::new(

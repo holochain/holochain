@@ -108,7 +108,7 @@ pub struct ConductorConfig {
     /// `device_seed_lair_tag` is currently unused but may be required in the future.
     // TODO: once device seed generation is fully hooked up, make this config required.
     #[serde(default)]
-    pub dpki: Option<DpkiConfig>,
+    pub dpki: DpkiConfig,
 
     /// Setup admin interfaces to control this conductor through a websocket connection.
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
@@ -272,7 +272,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: Default::default(),
-                dpki: None,
+                dpki: Default::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
@@ -362,10 +362,7 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                dpki: Some(DpkiConfig::new(
-                    Some("path/to/dna.dna".into()),
-                    "device-seed".into()
-                )),
+                dpki: DpkiConfig::new(Some("path/to/dna.dna".into()), "device-seed".into()),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket {
@@ -399,7 +396,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: Default::default(),
-                dpki: None,
+                dpki: Default::default(),
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },

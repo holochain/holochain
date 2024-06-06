@@ -9,7 +9,7 @@ async fn initialize_dpki() {
     holochain_trace::test_run();
 
     let mut config = SweetConductorConfig::standard();
-    config.dpki = Some(DpkiConfig::new(None, "TODO".to_string()));
+    config.dpki = DpkiConfig::new(None, "TODO".to_string());
     let mut conductor = SweetConductor::from_config(config).await;
 
     assert!(conductor.running_services().dpki.is_some());
@@ -33,9 +33,8 @@ async fn validate_with_dpki() {
     holochain_trace::test_run();
 
     let rendezvous = SweetLocalRendezvous::new().await;
-    let mut config = SweetConductorConfig::rendezvous(true);
+    let config = SweetConductorConfig::rendezvous(true);
 
-    config.dpki = Some(DpkiConfig::new(None, "TODO".to_string()));
     let mut conductors = SweetConductorBatch::new(vec![
         SweetConductor::from_config_rendezvous(config.clone(), rendezvous.clone()).await,
         SweetConductor::from_config_rendezvous(config.clone(), rendezvous.clone()).await,

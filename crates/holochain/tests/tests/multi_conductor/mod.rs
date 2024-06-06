@@ -63,7 +63,7 @@ async fn test_publish() -> anyhow::Result<()> {
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
     config.network = network;
-    config.dpki = Some(DpkiConfig::disabled());
+    config.dpki = DpkiConfig::disabled();
     config.tuning_params = Some(ConductorTuningParams {
         sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),
         ..Default::default()

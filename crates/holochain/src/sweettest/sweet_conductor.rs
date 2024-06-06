@@ -9,7 +9,6 @@ use crate::conductor::{
 };
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
-use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, CellInfo, ProvisionedCell,
 };
@@ -527,11 +526,7 @@ impl SweetConductor {
 
     /// Install DPKI a bit more concisely
     pub async fn install_dpki(&self) {
-        let dpki_config = self
-            .config
-            .dpki
-            .clone()
-            .unwrap_or(DpkiConfig::new(None, "DPKI_DEVICE_SEED".to_string()));
+        let dpki_config = self.config.dpki.clone();
         let (dna, _) = crate::conductor::conductor::get_dpki_dna(&dpki_config)
             .await
             .unwrap()

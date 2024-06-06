@@ -88,7 +88,7 @@ impl SweetConductorConfig {
     /// such as tests which disable networking, tests which use pregenerated agent keys,
     /// or any situation where it's known that DPKI is irrelevant.
     pub fn no_dpki(mut self) -> Self {
-        self.dpki = Some(holochain_conductor_api::conductor::DpkiConfig::disabled());
+        self.dpki = holochain_conductor_api::conductor::DpkiConfig::disabled();
         self
     }
 
@@ -97,7 +97,7 @@ impl SweetConductorConfig {
     #[cfg(feature = "test_utils")]
     pub fn no_dpki_mustfix(mut self) -> Self {
         tracing::warn!("Disabling DPKI for a test which should pass with DPKI enabled. TODO: fix");
-        self.dpki = Some(holochain_conductor_api::conductor::DpkiConfig::disabled());
+        self.dpki = holochain_conductor_api::conductor::DpkiConfig::disabled();
         self
     }
 

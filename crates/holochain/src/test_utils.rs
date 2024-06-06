@@ -450,7 +450,7 @@ pub async fn setup_app_inner(
                 allowed_origins: AllowedOrigins::Any,
             },
         }]),
-        dpki: Some(DpkiConfig::disabled()),
+        dpki: DpkiConfig::disabled(),
         network: network.unwrap_or_default(),
         ..Default::default()
     };
