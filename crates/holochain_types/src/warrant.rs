@@ -5,6 +5,8 @@ use std::str::FromStr;
 use holochain_keystore::MetaLairClient;
 use holochain_zome_types::prelude::*;
 
+use crate::dht_op::DhtOpUniqueForm;
+
 /// A Warrant DhtOp
 #[derive(
     Clone,
@@ -65,6 +67,11 @@ impl WarrantOp {
             timestamp,
         })
     }
+
+    /// Get the hashable content
+    pub fn as_unique_form(&self) -> DhtOpUniqueForm {
+        DhtOpUniqueForm::Warrant(&self.warrant, &self.author, self.timestamp)
+    }
 }
 
 /// Different types of warrants
@@ -83,6 +90,22 @@ impl WarrantOp {
 pub enum WarrantOpType {
     /// A chain integrity warrant
     ChainIntegrityWarrant,
+}
+
+impl HashableContent for WarrantOp {
+    type HashType = hash_type::DhtOp;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::DhtOp
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        HashableContentBytes::Content(
+            (&self.as_unique_form())
+                .try_into()
+                .expect("Could not serialize HashableContent"),
+        )
+    }
 }
 
 impl holochain_sqlite::rusqlite::ToSql for WarrantOpType {
