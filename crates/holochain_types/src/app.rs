@@ -135,7 +135,7 @@ pub struct InstallAppPayload {
 
     /// Include proof-of-membrane-membership data for cells that require it,
     /// keyed by the RoleName specified in the app bundle manifest.
-    pub membrane_proofs: HashMap<RoleName, MembraneProof>,
+    pub membrane_proofs: MemproofMap,
 
     /// Optional: overwrites all network seeds for all DNAs of Cells created by this app.
     /// The app can still use existing Cells, i.e. this does not require that
@@ -149,6 +149,9 @@ pub struct InstallAppPayload {
     #[serde(default)]
     pub ignore_genesis_failure: bool,
 }
+
+/// Alias
+pub type MemproofMap = HashMap<RoleName, MembraneProof>;
 
 /// The possible locations of an AppBundle
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -397,13 +400,16 @@ impl From<StoppedApp> for InstalledApp {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InstalledAppCommon {
     /// The unique identifier for an installed app in this conductor
-    installed_app_id: InstalledAppId,
+    pub installed_app_id: InstalledAppId,
+
     /// The agent key used to install this app.
-    agent_key: AgentPubKey,
+    pub agent_key: AgentPubKey,
+
     /// Assignments of DNA roles to cells and their clones, as specified in the AppManifest
-    role_assignments: HashMap<RoleName, AppRoleAssignment>,
+    pub role_assignments: HashMap<RoleName, AppRoleAssignment>,
+
     /// The manifest used to install the app.
-    manifest: AppManifest,
+    pub manifest: AppManifest,
 }
 
 impl InstalledAppCommon {
@@ -806,6 +812,10 @@ pub enum AppStatus {
     /// to an unrecoverable error. App must be Enabled before running again,
     /// and will not restart automaticaly on conductor reboot.
     Disabled(DisabledAppReason),
+
+    /// The app is installed, but genesis has not completed due to use of
+    /// [`MembraneProofProvisioning::Deferred`]
+    AwaitingMemproofs,
 }
 
 /// The AppStatus without the reasons.
@@ -815,6 +825,7 @@ pub enum AppStatusKind {
     Running,
     Paused,
     Disabled,
+    AwaitingMemproofs,
 }
 
 impl From<AppStatus> for AppStatusKind {
@@ -823,6 +834,7 @@ impl From<AppStatus> for AppStatusKind {
             AppStatus::Running => Self::Running,
             AppStatus::Paused(_) => Self::Paused,
             AppStatus::Disabled(_) => Self::Disabled,
+            AppStatus::AwaitingMemproofs => Self::AwaitingMemproofs,
         }
     }
 }
@@ -876,6 +888,12 @@ impl AppStatus {
 
             (Disabled(_), Enable) => Some((Running, SpinUp)),
             (Disabled(_), Pause(_)) | (Disabled(_), Disable(_)) | (Disabled(_), Start) => None,
+
+            (AwaitingMemproofs, Enable | Start) => Some((
+                AwaitingMemproofs,
+                Error("Cannot enable an app which is AwaitingMemproofs".to_string()),
+            )),
+            (AwaitingMemproofs, _) => None,
         }
         .map(|(new_status, delta)| {
             *self = new_status;
@@ -904,6 +922,8 @@ pub enum AppStatusFx {
     SpinUp,
     /// The transition may cause some Cells to be removed and some to be (fallibly) added.
     Both,
+    /// The transition was invalid and should produce an error.
+    Error(String),
 }
 
 impl Default for AppStatusFx {
@@ -922,6 +942,8 @@ impl AppStatusFx {
             (SpinUp, SpinUp) => SpinUp,
             (Both, _) | (_, Both) => Both,
             (SpinDown, SpinUp) | (SpinUp, SpinDown) => Both,
+            (Error(err1), Error(err2)) => Error(format!("{err1}. {err2}")),
+            (Error(err), _) | (_, Error(err)) => Error(err),
         }
     }
 }
@@ -953,6 +975,9 @@ impl StoppedAppReason {
         match status {
             AppStatus::Paused(reason) => Some(Self::Paused(reason.clone())),
             AppStatus::Disabled(reason) => Some(Self::Disabled(reason.clone())),
+            AppStatus::AwaitingMemproofs => {
+                Some(Self::Disabled(DisabledAppReason::AwaitingMemproofs))
+            }
             AppStatus::Running => None,
         }
     }
@@ -982,6 +1007,8 @@ pub enum PausedAppReason {
 pub enum DisabledAppReason {
     /// The app is freshly installed, and never started
     NeverStarted,
+    /// The app is partially installed, i.e. awaiting membrane proofs
+    AwaitingMemproofs,
     /// The disabling was done manually by the user (via admin interface)
     User,
     /// The disabling was due to an UNRECOVERABLE error
@@ -994,23 +1021,28 @@ pub struct AppRoleAssignment {
     /// The Id of the Cell which will be provisioned for this role.
     /// This also identifies the basis for cloned DNAs, and this is how the
     /// Agent is determined for clones (always the same as the provisioned cell).
-    base_cell_id: CellId,
+    pub base_cell_id: CellId,
+
     /// Records whether the base cell has actually been provisioned or not.
     /// If true, then `base_cell_id` refers to an actual existing Cell.
     /// If false, then `base_cell_id` is just recording what that cell will be
     /// called in the future.
-    is_provisioned: bool,
+    pub is_provisioned: bool,
+
     /// The number of allowed clone cells.
-    clone_limit: u32,
+    pub clone_limit: u32,
+
     /// The index of the next clone cell to be created.
-    next_clone_index: u32,
+    pub next_clone_index: u32,
+
     /// Cells which were cloned at runtime. The length cannot grow beyond
     /// `clone_limit`.
-    clones: HashMap<CloneId, CellId>,
+    pub clones: HashMap<CloneId, CellId>,
+
     /// Clone cells that have been disabled. These cells cannot be called
     /// any longer and are not returned as part of the app info either.
     /// Disabled clone cells can be deleted through the Admin API.
-    disabled_clones: HashMap<CloneId, CellId>,
+    pub disabled_clones: HashMap<CloneId, CellId>,
 }
 
 impl AppRoleAssignment {

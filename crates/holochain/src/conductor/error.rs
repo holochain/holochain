@@ -92,6 +92,9 @@ pub enum ConductorError {
     #[error("Tried to perform an operation on an app that was not running: {0}")]
     AppNotRunning(InstalledAppId),
 
+    #[error("App status could not be changed: {0}")]
+    AppStatusError(String),
+
     #[error(transparent)]
     HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
 

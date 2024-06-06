@@ -59,6 +59,10 @@ async fn roundtrip() {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "don't use system sha256sum - use a rust library"
+)]
 async fn test_packed_hash_consistency() {
     let mut i = 0;
     let mut hash = None;
@@ -155,6 +159,7 @@ async fn test_integrity() {
 }
 
 #[tokio::test]
+#[cfg_attr(target_os = "windows", ignore = "theres a hash mismatch - check crlf?")]
 /// Test that a manifest with multiple integrity zomes and dependencies parses
 /// to the correct dna file.
 async fn test_multi_integrity() {

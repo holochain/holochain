@@ -18,7 +18,6 @@ members = [
   "crates/holochain_conductor_api",
   "crates/holochain_p2p",
   "crates/holochain_keystore",
-  "crates/holochain_sqlite",
   "crates/holochain_state",
   "crates/holochain_state_types",
   "crates/holochain_sqlite",
@@ -81,13 +80,12 @@ perf = "deny"
 correctness = "deny"
 dbg_macro = "deny"
 
-[profile.fast-test]
-inherits = "test"
+[profile.dev]
 debug = 1
 
-[profile.fast-test.package."*"]
+[profile.dev.package."*"]
 opt-level = 2
-debug = 1
+debug = 0
 debug-assertions = false
 overflow-checks = false
 incremental = false

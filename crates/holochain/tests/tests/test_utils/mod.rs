@@ -282,7 +282,7 @@ pub async fn register_and_install_dna_named(
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(name),
         network_seed: None,
-        membrane_proofs: std::collections::HashMap::new(),
+        membrane_proofs: std::collections::HashMap::new().into(),
         #[cfg(feature = "chc")]
         ignore_genesis_failure: false,
     };
