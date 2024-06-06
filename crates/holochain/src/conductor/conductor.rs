@@ -1419,7 +1419,7 @@ mod app_impls {
             data: &[(impl DnaWithRole, Option<MembraneProof>)],
         ) -> ConductorResult<AgentPubKey> {
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
-            let manifest = app_manifest_from_dnas(&dnas_with_roles, 255);
+            let manifest = app_manifest_from_dnas(&dnas_with_roles, 255, false);
 
             let (dnas_to_register, role_assignments): (Vec<_>, Vec<_>) = data
                 .iter()
@@ -3577,6 +3577,7 @@ pub(crate) async fn get_dpki_dna(config: &DpkiConfig) -> DnaResult<DnaBundle> {
 pub fn app_manifest_from_dnas(
     dnas_with_roles: &[impl DnaWithRole],
     clone_limit: u32,
+    memproofs_deferred: bool,
 ) -> AppManifest {
     let roles: Vec<_> = dnas_with_roles
         .iter()
@@ -3601,6 +3602,7 @@ pub fn app_manifest_from_dnas(
         .name("[generated]".into())
         .description(None)
         .roles(roles)
+        .membrane_proofs_deferred(memproofs_deferred)
         .build()
         .unwrap()
         .into()

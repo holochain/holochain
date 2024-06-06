@@ -48,7 +48,7 @@ pub async fn app_bundle_from_dnas(
 
     debug_assert_eq!(
         manifest,
-        app_manifest_from_dnas(dnas_with_roles, 255),
+        app_manifest_from_dnas(dnas_with_roles, 255, memproofs_deferred),
         "app_bundle_from_dnas and app_manifest_from_dnas should produce the same manifest"
     );
 
