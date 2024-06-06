@@ -567,7 +567,6 @@ pub mod test {
             installed_app_id: None,
             membrane_proofs: HashMap::new().into(),
             network_seed: None,
-            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         }));
         let response: AdminResponse = admin_tx.request(request).await.unwrap();

@@ -1440,10 +1440,7 @@ mod app_impls {
             self: Arc<Self>,
             payload: InstallAppPayload,
         ) -> ConductorResult<InstalledApp> {
-            #[cfg(feature = "chc")]
             let ignore_genesis_failure = payload.ignore_genesis_failure;
-            #[cfg(not(feature = "chc"))]
-            let ignore_genesis_failure = false;
 
             let InstallAppPayload {
                 source,
