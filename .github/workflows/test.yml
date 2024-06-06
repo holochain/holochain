@@ -1,4 +1,5 @@
 name: test
+
 on:
   push:
     branches:
@@ -6,10 +7,16 @@ on:
   pull_request:
     branches:
       - develop
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   CARGO_INCREMENTAL: 0
   RUSTFLAGS: '-Dwarnings'
   RUST_BACKTRACE: 1
+
 jobs:
   static-job-id:
     name: static
