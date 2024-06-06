@@ -16,6 +16,7 @@ runs:
       uses: Swatinem/rust-cache@v2
 
     - name: cargo sweep stamp
+      shell: bash
       run: |
         cargo install cargo-sweep
         cargo sweep --stamp
