@@ -103,7 +103,7 @@ matches = { version = "0.1.8", optional = true }
 holochain_test_wasm_common = { version = "^0.4.0-dev.5", path = "../test_utils/wasm_common", optional = true }
 kitsune_p2p_bootstrap = { version = "^0.3.0-dev.6", path = "../kitsune_p2p/bootstrap", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
-sbd-server = { version = "=0.0.3-alpha", optional = true }
+sbd-server = { version = "=0.0.4-alpha", optional = true }
 tx5-go-pion-turn = { version = "=0.0.11-alpha", optional = true }
 
 # chc deps
