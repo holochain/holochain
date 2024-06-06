@@ -418,10 +418,9 @@ impl SourceChain {
         }
     }
 
-    pub async fn delete_valid_agent_pub_key(&self) -> SourceChainResult<()> {
+    pub async fn valid_create_agent_key_action(&self) -> SourceChainResult<Action> {
         let agent_key_entry_hash: EntryHash = self.agent_pubkey().clone().into();
-        let valid_create_agent_key_action = self
-            .author_db()
+        self.author_db()
             .read_async({
                 let agent_key = self.agent_pubkey().clone();
                 let cell_id = self.cell_id().as_ref().clone();
@@ -452,7 +451,12 @@ impl SourceChain {
                     })
                 }
             })
-            .await?;
+            .await
+    }
+
+    pub async fn delete_valid_agent_pub_key(&self) -> SourceChainResult<()> {
+        let agent_key_entry_hash: EntryHash = self.agent_pubkey().clone().into();
+        let valid_create_agent_key_action = self.valid_create_agent_key_action().await?;
 
         self.put_weightless(
             builder::Delete::new(

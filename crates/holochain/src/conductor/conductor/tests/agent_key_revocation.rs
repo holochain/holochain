@@ -228,7 +228,6 @@ async fn revoke_agent_key_without_dpki_installed() {
         .revoke_agent_key_for_app(agent_key.clone(), app.installed_app_id().clone())
         .await
         .unwrap();
-    println!("revocation result per cell {revocation_result_per_cell:?}");
     assert_matches!(revocation_result_per_cell.get(&cell_id_1).unwrap(), Ok(()));
     assert_matches!(revocation_result_per_cell.get(&cell_id_2).unwrap(), Ok(()));
 
@@ -306,21 +305,21 @@ async fn revoke_agent_key_without_dpki_installed() {
     }
 
     // Cloning cells should fail for both cells
-    // let mut create_clone_cell_payload = CreateCloneCellPayload {
-    //     role_name: role_1.to_string(),
-    //     membrane_proof: None,
-    //     modifiers: DnaModifiersOpt::none().with_network_seed("network_seed".into()),
-    //     name: None,
-    // };
-    // let result = conductor
-    //     .create_clone_cell(app.installed_app_id(), create_clone_cell_payload.clone())
-    //     .await
-    //     .unwrap_err();
-    // assert_matches!(result, ConductorError::AppError(AppError::CellToCloneHasInvalidAgent(invalid_key)) if invalid_key == agent_key);
-    // create_clone_cell_payload.role_name = role_2.to_string();
-    // let result = conductor
-    //     .create_clone_cell(app.installed_app_id(), create_clone_cell_payload)
-    //     .await
-    //     .unwrap_err();
-    // assert_matches!(result, ConductorError::AppError(AppError::CellToCloneHasInvalidAgent(invalid_key)) if invalid_key == agent_key);
+    let mut create_clone_cell_payload = CreateCloneCellPayload {
+        role_name: role_1.to_string(),
+        membrane_proof: None,
+        modifiers: DnaModifiersOpt::none().with_network_seed("network_seed".into()),
+        name: None,
+    };
+    let result = conductor
+        .create_clone_cell(app.installed_app_id(), create_clone_cell_payload.clone())
+        .await
+        .unwrap_err();
+    assert_matches!(result, ConductorError::SourceChainError(SourceChainError::InvalidAgentKey(invalid_key, cell_id)) if invalid_key == agent_key && cell_id == cell_id_1);
+    create_clone_cell_payload.role_name = role_2.to_string();
+    let result = conductor
+        .create_clone_cell(app.installed_app_id(), create_clone_cell_payload)
+        .await
+        .unwrap_err();
+    assert_matches!(result, ConductorError::SourceChainError(SourceChainError::InvalidAgentKey(invalid_key, cell_id)) if invalid_key == agent_key && cell_id == cell_id_2);
 }

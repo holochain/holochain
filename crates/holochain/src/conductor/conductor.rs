@@ -2013,7 +2013,7 @@ mod clone_cell_impls {
     impl Conductor {
         /// Create a new cell in an existing app based on an existing DNA.
         ///
-        /// NB: Cells of an invalid agent key cannot be cloned. Such calls will fail.
+        /// Cells of an invalid agent key cannot be cloned.
         pub async fn create_clone_cell(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,
@@ -2033,9 +2033,10 @@ mod clone_cell_impls {
                 ));
             }
 
+            let state = self.get_state().await?;
+            let app = state.get_app(installed_app_id)?;
+            // Check Deepkey first if agent key is valid
             if let Some(dpki) = self.running_services().dpki {
-                let state = self.get_state().await?;
-                let app = state.get_app(installed_app_id)?;
                 let agent_key = app.agent_key().clone();
                 let key_state = dpki
                     .state()
@@ -2046,6 +2047,20 @@ mod clone_cell_impls {
                     return Err(AppError::CellToCloneHasInvalidAgent(agent_key).into());
                 }
             }
+
+            // Check source chain if agent key is valid
+            let app_role = app.role(&role_name)?;
+            let source_chain = SourceChain::new(
+                self.get_or_create_authored_db(app_role.dna_hash(), app.agent_key().clone())?,
+                self.get_or_create_dht_db(app_role.dna_hash())?,
+                self.get_or_create_space(app_role.dna_hash())?
+                    .dht_query_cache,
+                self.keystore.clone(),
+                app.agent_key().clone(),
+            )
+            .await?;
+            let _valid_create_agent_key_action =
+                source_chain.valid_create_agent_key_action().await?;
 
             // add cell to app
             let clone_cell = self
