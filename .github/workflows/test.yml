@@ -25,7 +25,8 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - uses: ./.github/actions/common-pre
+      - name: 'Common Test Setup Actions'
+        uses: ./.github/actions/common-pre
 
       - name: static-fmt
         run: make static-fmt
@@ -39,7 +40,8 @@ jobs:
       - name: static-doc
         run: make static-doc
 
-      - uses: ./.github/actions/common-post
+      - name: 'Common Test Teardown Actions'
+        uses: ./.github/actions/common-post
 
   test-job-id:
     name: test
@@ -57,7 +59,8 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - uses: ./.github/actions/common-pre
+      - name: 'Common Test Setup Actions'
+        uses: ./.github/actions/common-pre
 
       - name: build windows
         if: matrix.os == 'windows-latest'
@@ -83,7 +86,8 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: make test-workspace
 
-      - uses: ./.github/actions/common-post
+      - name: 'Common Test Teardown Actions'
+        uses: ./.github/actions/common-post
 
   ci-pass:
     if: ${{ always() }}
