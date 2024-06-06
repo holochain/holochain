@@ -1087,8 +1087,6 @@ async fn app_validation_produces_warrants() {
         1
     );
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-
     conductors[2].persist_dbs();
 
     let activity: AgentActivity = conductors[2]

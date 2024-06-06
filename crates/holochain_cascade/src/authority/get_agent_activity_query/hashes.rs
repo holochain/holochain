@@ -66,7 +66,7 @@ impl Query for GetAgentActivityQuery {
                 -- is an integrated warrant
                 DhtOp.basis_hash = :author_basis
                 AND DhtOp.type = :warrant_op_type
-                -- AND DhtOp.when_integrated IS NOT NULL
+                AND DhtOp.when_integrated IS NOT NULL
             )
             ORDER BY Action.seq ASC
         "

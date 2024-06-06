@@ -108,7 +108,7 @@ impl From<AgentActivityResponse<Record>> for holochain_zome_types::query::AgentA
             rejected_activity,
             status: a.status,
             highest_observed: a.highest_observed,
-            warrants: Vec::with_capacity(0),
+            warrants: a.warrants,
         }
     }
 }
