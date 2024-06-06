@@ -1087,6 +1087,10 @@ async fn app_validation_produces_warrants() {
         1
     );
 
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    conductors[2].persist_dbs();
+
     let activity: AgentActivity = conductors[2]
         .call(
             &carol.zome(SweetInlineZomes::COORDINATOR),
@@ -1204,9 +1208,9 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     .unwrap()
     .query_and_then([], |row| {
         let op_type: DhtOpType = row.get("type")?;
-        let hash: ActionHash = row.get("hash")?;
         match op_type {
             DhtOpType::Chain(op_type) => {
+                let hash: ActionHash = row.get("hash")?;
                 let action: SignedAction = from_blob(row.get("blob")?)?;
                 Ok(ChainOpLite::from_type(op_type, hash, &action)?.into())
             }

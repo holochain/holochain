@@ -48,7 +48,7 @@ impl Query for GetAgentActivityQuery {
     fn query(&self) -> String {
         "
             SELECT 
-            Action.hash, 
+            Action.hash,
             DhtOp.validation_status, 
             Action.blob AS action_blob,
             DhtOp.when_integrated,
@@ -94,12 +94,12 @@ impl Query for GetAgentActivityQuery {
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         Arc::new(move |row| {
             let validation_status: Option<ValidationStatus> = row.get("validation_status")?;
-            let hash: ActionHash = row.get("hash")?;
             let ty: DhtOpType = row.get("dht_type")?;
             let integrated: Option<Timestamp> = row.get("when_integrated")?;
 
             match ty {
                 DhtOpType::Chain(_) => {
+                    let hash: ActionHash = row.get("hash")?;
                     from_blob::<SignedAction>(row.get("action_blob")?).map(|action| {
                         let action = ActionHashed::with_pre_hashed(action.into_data(), hash);
                         let item = if integrated.is_some() {
@@ -111,6 +111,7 @@ impl Query for GetAgentActivityQuery {
                     })
                 }
                 DhtOpType::Warrant(_) => {
+                    let _hash: WarrantHash = row.get("hash")?;
                     from_blob::<SignedWarrant>(row.get("action_blob")?).map(|warrant| {
                         let item = Item::Warrant(warrant.into_data().0);
                         Judged::raw(item, None)
