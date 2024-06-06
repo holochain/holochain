@@ -46,6 +46,9 @@ pub fn holo_hash_encode(data: &[u8]) -> String {
 
 /// internal PARSE for holo hash REPR
 pub fn holo_hash_decode_unchecked(s: &str) -> Result<Vec<u8>, HoloHashError> {
+    if s.is_empty() {
+        return Err(HoloHashError::BadSize);
+    }
     if &s[..1] != "u" {
         return Err(HoloHashError::NoU);
     }
