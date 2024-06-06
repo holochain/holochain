@@ -6,7 +6,6 @@ use crate::conductor::paths::DataRootPath;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::KeystorePath;
-use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_p2p::NetworkCompatParams;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
@@ -184,12 +183,7 @@ impl ConductorBuilder {
         );
 
         // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
-        let dpki_config = Some(
-            config
-                .dpki
-                .clone()
-                .unwrap_or(DpkiConfig::new(None, "DPKI_DEVICE_SEED".to_string())),
-        );
+        let dpki_config = Some(config.dpki.clone());
 
         let dpki_dna_to_install = match &dpki_config {
             Some(config) => {
@@ -457,12 +451,7 @@ impl ConductorBuilder {
         );
 
         // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
-        let dpki_config = Some(
-            config
-                .dpki
-                .clone()
-                .unwrap_or(DpkiConfig::new(None, "DPKI_DEVICE_SEED".to_string())),
-        );
+        let dpki_config = Some(config.dpki.clone());
 
         let (dpki_uuid, dpki_dna_to_install) = match (&self.dpki, &dpki_config) {
             // If a DPKI impl was provided to the builder, use that

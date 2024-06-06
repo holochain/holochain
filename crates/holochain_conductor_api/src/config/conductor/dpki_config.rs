@@ -41,3 +41,9 @@ impl DpkiConfig {
         }
     }
 }
+
+impl Default for DpkiConfig {
+    fn default() -> Self {
+        DpkiConfig::new(None, "DPKI_DEVICE_SEED".to_string())
+    }
+}

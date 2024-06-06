@@ -327,14 +327,13 @@ impl ShardedGossip {
 
         if let Some(msg) = outgoing.as_ref() {
             tracing::debug!(
-                "OUTGOING GOSSIP [{}]  => {:17} ({:10}) : {:?} -> {:?} [{}]",
+                "OUTGOING GOSSIP [{}]  => {:17} ({:10}) : this -> {:?} [{}]",
                 gossip_type_char,
                 msg.2
                     .variant_type()
                     .to_string()
                     .replace("ShardedGossipWire::", ""),
                 msg.2.encode_vec().expect("can't encode msg").len(),
-                self.ep_hnd.local_id(),
                 &msg.0,
                 self.gossip
                     .inner
@@ -357,12 +356,11 @@ impl ShardedGossip {
             {
                 Ok(r) => {
                     tracing::debug!(
-                        "INCOMING GOSSIP [{}] <=  {:17} ({:10}) : {:?} -> {:?} [{}]",
+                        "INCOMING GOSSIP [{}] <=  {:17} ({:10}) : {:?} -> this [{}]",
                         gossip_type_char,
                         variant_type,
                         len,
                         con.peer_id(),
-                        self.ep_hnd.local_id(),
                         self.gossip
                             .inner
                             .share_mut(|s, _| Ok(s.round_map.current_rounds().len()))

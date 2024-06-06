@@ -122,7 +122,8 @@ async fn test_p2p_agent_store_extrapolated_coverage() {
     assert_eq!(2, res.len());
 
     // clean up temp dir
-    tmp_dir.close().unwrap();
+    // (just make a best effort. this often fails on windows)
+    let _ = tmp_dir.close();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -258,5 +259,6 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     assert!(signed.is_none());
 
     // clean up temp dir
-    tmp_dir.close().unwrap();
+    // (just make a best effort. this often fails on windows)
+    let _ = tmp_dir.close();
 }

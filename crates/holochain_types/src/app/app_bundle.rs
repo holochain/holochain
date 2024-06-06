@@ -61,7 +61,7 @@ impl AppBundle {
     pub async fn resolve_cells(
         self,
         dna_store: &impl DnaStore,
-        membrane_proofs: HashMap<RoleName, MembraneProof>,
+        membrane_proofs: MemproofMap,
     ) -> AppBundleResult<AppRoleResolution> {
         let AppManifestValidated { name: _, roles } = self.manifest().clone().validate()?;
         let bundle = Arc::new(self);
@@ -211,10 +211,10 @@ impl AppBundle {
         role_name: RoleName,
         dna_store: &impl DnaStore,
         location: &mr_bundle::Location,
-        installed_hash: Option<&DnaHashB64>,
+        expected_hash: Option<&DnaHashB64>,
         modifiers: DnaModifiersOpt,
     ) -> AppBundleResult<DnaFile> {
-        let dna_file = if let Some(expected_hash) = installed_hash {
+        let dna_file = if let Some(expected_hash) = expected_hash {
             let expected_hash = expected_hash.clone().into();
             let (dna_file, original_hash) =
                 if let Some(mut dna_file) = dna_store.get_dna(&expected_hash) {
@@ -227,7 +227,7 @@ impl AppBundle {
             if expected_hash != original_hash {
                 return Err(AppBundleError::CellResolutionFailure(
                     role_name,
-                    format!("Hash mismatch: {} {}", expected_hash, original_hash),
+                    format!("Hash mismatch: {} != {}", expected_hash, original_hash),
                 ));
             }
             dna_file

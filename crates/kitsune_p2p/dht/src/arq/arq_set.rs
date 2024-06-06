@@ -2,9 +2,9 @@
 
 use kitsune_p2p_dht_arc::DhtArcSet;
 
-use crate::{arq::ArqBounds, spacetime::*, ArqStrat};
+use crate::{arq::ArqBounds, spacetime::*};
 
-use super::{power_and_count_from_length_exact, Arq, ArqSize, ArqStart};
+use super::{Arq, ArqStart};
 
 /// A collection of ArqBounds.
 /// All bounds are guaranteed to be quantized to the same power
@@ -67,6 +67,8 @@ impl<S: ArqStart> ArqSet<S> {
     /// Singleton set
     #[cfg(feature = "test_utils")]
     pub fn full_std() -> Self {
+        use crate::ArqStrat;
+
         Self::new(vec![Arq::<S>::new_full_max(
             SpaceDimension::standard(),
             &ArqStrat::default(),
@@ -158,9 +160,10 @@ impl ArqSet {
     //   arqs, or even of the original arqset minimum power level. For instance we
     //   may need to refactor agent info to include power level so as not to lose
     //   this info.
+    #[cfg(feature = "test_utils")]
     pub fn from_dht_arc_set_exact(
         dim: impl SpaceDim,
-        strat: &ArqStrat,
+        strat: &crate::ArqStrat,
         dht_arc_set: &DhtArcSet,
     ) -> Option<Self> {
         Some(Self::new(
@@ -169,8 +172,8 @@ impl ArqSet {
                 .into_iter()
                 .map(|i| {
                     let len = i.length();
-                    let ArqSize { power, .. } =
-                        power_and_count_from_length_exact(dim, len, strat.min_chunks())?;
+                    let super::ArqSize { power, .. } =
+                        super::power_and_count_from_length_exact(dim, len, strat.min_chunks())?;
                     ArqBounds::from_interval(dim, power, i)
                 })
                 .collect::<Option<Vec<_>>>()?,
@@ -207,7 +210,7 @@ pub fn print_arqs<S: ArqStart>(dim: impl SpaceDim, arqs: &[Arq<S>], len: usize) 
 #[cfg(test)]
 mod tests {
 
-    use crate::prelude::pow2;
+    use crate::{prelude::pow2, ArqStrat};
 
     use super::*;
 

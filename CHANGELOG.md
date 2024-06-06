@@ -14,6 +14,214 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240605.200925
+
+## [hc\_service\_check-0.1.0-dev.6](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.6)
+
+## [hcterm-0.4.0-dev.7](crates/hcterm/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_cli-0.4.0-dev.7](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain-0.4.0-dev.7](crates/holochain/CHANGELOG.md#0.4.0-dev.7)
+
+- App manifest now includes a new `membrane_proofs_deferred: bool` field, which allows the membrane proofs for the app’s cells to be provided at a time after installation, allowing the app’s UI to guide the process of creating membrane proofs.
+- Adds new `AppStatus::AwaitingMemproofs` to indicate an app which was installed with `MemproofProvisioning::Deferred`
+- Adds new app websocket method `ProvideMemproofs` for use with `MemproofProvisioning::Deferred`
+
+## [holochain\_cli\_bundle-0.4.0-dev.7](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.7](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.7](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_cascade-0.4.0-dev.7](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_conductor\_api-0.4.0-dev.7](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_conductor\_services-0.3.0-dev.7](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.7)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.6](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.7](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_websocket-0.4.0-dev.7](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.7)
+
+## [hdk-0.4.0-dev.6](crates/hdk/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_state-0.4.0-dev.7](crates/holochain_state/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_p2p-0.4.0-dev.7](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.7)
+
+## [hc\_sleuth-0.4.0-dev.7](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_types-0.4.0-dev.7](crates/holochain_types/CHANGELOG.md#0.4.0-dev.7)
+
+## [kitsune\_p2p-0.4.0-dev.7](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_keystore-0.4.0-dev.7](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_sqlite-0.4.0-dev.7](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.7)
+
+## [kitsune\_p2p\_bootstrap\_client-0.4.0-dev.7](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.4.0-dev.7)
+
+## [mr\_bundle-0.4.0-dev.2](crates/mr_bundle/CHANGELOG.md#0.4.0-dev.2)
+
+## [holochain\_zome\_types-0.4.0-dev.6](crates/holochain_zome_types/CHANGELOG.md#0.4.0-dev.6)
+
+## [kitsune\_p2p\_bootstrap-0.3.0-dev.7](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.3.0-dev.7)
+
+## [holochain\_nonce-0.4.0-dev.3](crates/holochain_nonce/CHANGELOG.md#0.4.0-dev.3)
+
+# 20240605.004424
+
+## [hc\_service\_check-0.1.0-dev.5](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.5)
+
+## [hcterm-0.4.0-dev.6](crates/hcterm/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_cli-0.4.0-dev.6](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain-0.4.0-dev.6](crates/holochain/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_cli\_bundle-0.4.0-dev.6](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.6](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.6](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_cascade-0.4.0-dev.6](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_conductor\_api-0.4.0-dev.6](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.6)
+
+- *BREAKING* Updates holochain to use the new SBD server architecture for WebRTC signaling. If you were previously running your own tx5-signal-srv server for signaling, you will need to switch to [sbd-server](https://crates.io/crates/sbd-server). If you were using the holo-provided `wss://signal.holo.host`, you must switch to `wss://sbd-0.main.infra.holo.host`. See the module level documentation at [/crates/holochain_conductor_api/src/config/conductor.rs](/crates/holochain_conductor_api/src/config/conductor.rs) for a commented example holochain conductor configuration file. [\#3842](https://github.com/holochain/holochain/pull/3842)
+
+## [holochain\_conductor\_services-0.3.0-dev.6](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.6)
+
+## [holochain\_metrics-0.4.0-dev.2](crates/holochain_metrics/CHANGELOG.md#0.4.0-dev.2)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.6](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_websocket-0.4.0-dev.6](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_state-0.4.0-dev.6](crates/holochain_state/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_p2p-0.4.0-dev.6](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.6)
+
+## [hc\_sleuth-0.4.0-dev.6](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_types-0.4.0-dev.6](crates/holochain_types/CHANGELOG.md#0.4.0-dev.6)
+
+## [kitsune\_p2p-0.4.0-dev.6](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_keystore-0.4.0-dev.6](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_sqlite-0.4.0-dev.6](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.6)
+
+## [kitsune\_p2p\_bootstrap\_client-0.4.0-dev.6](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.4.0-dev.6)
+
+## [kitsune\_p2p\_fetch-0.4.0-dev.6](crates/kitsune_p2p_fetch/CHANGELOG.md#0.4.0-dev.6)
+
+## [kitsune\_p2p\_proxy-0.4.0-dev.6](crates/kitsune_p2p_proxy/CHANGELOG.md#0.4.0-dev.6)
+
+## [kitsune\_p2p\_bootstrap-0.3.0-dev.6](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.3.0-dev.6)
+
+## [kitsune\_p2p\_transport\_quic-0.4.0-dev.6](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.4.0-dev.6)
+
+## [kitsune\_p2p\_types-0.4.0-dev.6](crates/kitsune_p2p_types/CHANGELOG.md#0.4.0-dev.6)
+
+# 20240529.004721
+
+## [hc\_service\_check-0.1.0-dev.4](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.4)
+
+## [hcterm-0.4.0-dev.5](crates/hcterm/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_cli-0.4.0-dev.5](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain-0.4.0-dev.5](crates/holochain/CHANGELOG.md#0.4.0-dev.5)
+
+- Moved the WASM cache from the data directory to a subdirectory of the data directory named `wasm-cache`. Old content won’t be removed and WASMs will have to be recompiled into the new cache. \#3920
+- Remove deprecated functions `consistency_10s` and `consistency_60s`. Use `await_consistency` instead.
+- Remove deprecated type `SweetEasyInline`. Use `SweetInlineZomes` instead.
+- Remove deprecated methods `SweetInlineZomes::callback` and `SweetInlineZomes::integrity_callback`. Use `SweetInlineZomes::function` and `SweetInlineZomes::integrity_function` instead.
+
+## [holochain\_cli\_bundle-0.4.0-dev.5](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.5](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.5](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_cascade-0.4.0-dev.5](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_conductor\_api-0.4.0-dev.5](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_conductor\_services-0.3.0-dev.5](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.5)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.5](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.5](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_websocket-0.4.0-dev.5](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.5)
+
+## [hdk-0.4.0-dev.5](crates/hdk/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_state-0.4.0-dev.5](crates/holochain_state/CHANGELOG.md#0.4.0-dev.5)
+
+- Remove deprecated method `TestDbs::persist`.
+
+## [hdi-0.5.0-dev.5](crates/hdi/CHANGELOG.md#0.5.0-dev.5)
+
+- Remove deprecated type `OpType`. Use `FlatOp` instead.
+- Remove deprecated method `Op::to_type`. Use `Op::flattened` instead.
+
+## [holochain\_p2p-0.4.0-dev.5](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.5)
+
+## [hc\_sleuth-0.4.0-dev.5](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.5)
+
+## [hdk\_derive-0.4.0-dev.5](crates/hdk_derive/CHANGELOG.md#0.4.0-dev.5)
+
+## [aitia-0.3.0-dev.3](crates/aitia/CHANGELOG.md#0.3.0-dev.3)
+
+## [holochain\_state\_types-0.4.0-dev.5](crates/holochain_state_types/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_types-0.4.0-dev.5](crates/holochain_types/CHANGELOG.md#0.4.0-dev.5)
+
+- Remove deprecated type `DhtOpLight`. Use `DhtOpLite` instead.
+
+## [kitsune\_p2p-0.4.0-dev.5](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_keystore-0.4.0-dev.5](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_sqlite-0.4.0-dev.5](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.5)
+
+## [kitsune\_p2p\_bootstrap\_client-0.4.0-dev.5](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.4.0-dev.5)
+
+## [kitsune\_p2p\_fetch-0.4.0-dev.5](crates/kitsune_p2p_fetch/CHANGELOG.md#0.4.0-dev.5)
+
+## [kitsune\_p2p\_proxy-0.4.0-dev.5](crates/kitsune_p2p_proxy/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_zome\_types-0.4.0-dev.5](crates/holochain_zome_types/CHANGELOG.md#0.4.0-dev.5)
+
+## [kitsune\_p2p\_bootstrap-0.3.0-dev.5](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.3.0-dev.5)
+
+## [kitsune\_p2p\_transport\_quic-0.4.0-dev.5](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_integrity\_types-0.4.0-dev.5](crates/holochain_integrity_types/CHANGELOG.md#0.4.0-dev.5)
+
+## [kitsune\_p2p\_block-0.4.0-dev.5](crates/kitsune_p2p_block/CHANGELOG.md#0.4.0-dev.5)
+
+## [kitsune\_p2p\_types-0.4.0-dev.5](crates/kitsune_p2p_types/CHANGELOG.md#0.4.0-dev.5)
+
+## [holo\_hash-0.4.0-dev.5](crates/holo_hash/CHANGELOG.md#0.4.0-dev.5)
+
+## [kitsune\_p2p\_bin\_data-0.4.0-dev.5](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.4.0-dev.5)
+
+## [kitsune\_p2p\_dht-0.4.0-dev.5](crates/kitsune_p2p_dht/CHANGELOG.md#0.4.0-dev.5)
+
+## [kitsune\_p2p\_dht\_arc-0.4.0-dev.5](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_trace-0.4.0-dev.3](crates/holochain_trace/CHANGELOG.md#0.4.0-dev.3)
+
+- Remove deprecated flame graph output `FlameTimedConsole`.
+
 # 20240523.125153
 
 ## [hc\_service\_check-0.1.0-dev.3](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.3)
