@@ -1439,7 +1439,7 @@ mod app_impls {
         pub async fn install_app_bundle(
             self: Arc<Self>,
             payload: InstallAppPayload,
-        ) -> ConductorResult<StoppedApp> {
+        ) -> ConductorResult<InstalledApp> {
             #[cfg(feature = "chc")]
             let ignore_genesis_failure = payload.ignore_genesis_failure;
             #[cfg(not(feature = "chc"))]
@@ -1466,6 +1466,9 @@ mod app_impls {
             };
 
             let manifest = bundle.manifest().clone();
+            let defer_memproofs = match &manifest {
+                AppManifest::V1(m) => m.membrane_proofs_deferred,
+            };
 
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
@@ -1473,10 +1476,19 @@ mod app_impls {
             let local_dnas = self
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
-            let ops = bundle
-                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
-                .await?;
 
+            let ops = if defer_memproofs {
+                // XXX: passing in empty memproofs, because this function is not constructed well.
+                //      it doesn't really need to know about the memproofs, it just needs to associate
+                //      the proper cells with the proper memproofs.
+                bundle
+                    .resolve_cells(&local_dnas, agent_key.clone(), Default::default())
+                    .await?
+            } else {
+                bundle
+                    .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
+                    .await?
+            };
             let cells_to_create = ops.cells_to_create();
 
             // check if cells_to_create contains a cell identical to an existing one
@@ -1499,29 +1511,43 @@ mod app_impls {
                 self.clone().register_dna(dna).await?;
             }
 
-            let cell_ids: Vec<_> = cells_to_create
-                .iter()
-                .map(|(cell_id, _)| cell_id.clone())
-                .collect();
-
-            let genesis_result =
-                crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
-
-            if genesis_result.is_ok() || ignore_genesis_failure {
+            if defer_memproofs {
                 let roles = ops.role_assignments;
                 let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
 
-                // Update the db
-                let stopped_app = self.add_disabled_app_to_db(app).await?;
-
-                // Return the result, which be may an error if no_rollback was specified
-                genesis_result.map(|()| stopped_app)
-            } else if let Err(err) = genesis_result {
-                // Rollback created cells on error
-                self.remove_cells(&cell_ids).await;
-                Err(err)
+                let (_, app) = self
+                    .update_state_prime(move |mut state| {
+                        let app = state.add_app_awaiting_memproofs(app)?;
+                        Ok((state, app))
+                    })
+                    .await?;
+                Ok(app)
             } else {
-                unreachable!()
+                let cell_ids: Vec<_> = cells_to_create
+                    .iter()
+                    .map(|(cell_id, _)| cell_id.clone())
+                    .collect();
+
+                let genesis_result =
+                    crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
+
+                if genesis_result.is_ok() || ignore_genesis_failure {
+                    let roles = ops.role_assignments;
+                    let app =
+                        InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
+
+                    // Update the db
+                    let stopped_app = self.add_disabled_app_to_db(app).await?;
+
+                    // Return the result, which be may an error if no_rollback was specified
+                    genesis_result.map(|()| stopped_app.into())
+                } else if let Err(err) = genesis_result {
+                    // Rollback created cells on error
+                    self.remove_cells(&cell_ids).await;
+                    Err(err)
+                } else {
+                    unreachable!()
+                }
             }
         }
 
@@ -1649,6 +1675,69 @@ mod app_impls {
             let state = self.get_state().await?;
             let maybe_app_info = self.get_app_info_inner(installed_app_id, &state)?;
             Ok(maybe_app_info)
+        }
+
+        /// Run genesis for cells of an app which was installed using
+        /// [`MemproofProvisioning::Deferred`]
+        pub async fn provide_memproofs(
+            self: Arc<Self>,
+            installed_app_id: &InstalledAppId,
+            mut memproofs: MemproofMap,
+        ) -> ConductorResult<()> {
+            let state = self.get_state().await?;
+
+            let app = state.get_app(installed_app_id)?;
+            let cells_to_genesis = app
+                .roles()
+                .iter()
+                .map(|(role_name, role)| (role.base_cell_id.clone(), memproofs.remove(role_name)))
+                .collect();
+
+            crate::conductor::conductor::genesis_cells(self.clone(), cells_to_genesis).await?;
+
+            self.update_state({
+                let installed_app_id = installed_app_id.clone();
+                move |mut state| {
+                    let app = state.get_app_mut(&installed_app_id)?;
+                    app.status = AppStatus::Disabled(DisabledAppReason::NeverStarted);
+                    Ok(state)
+                }
+            })
+            .await?;
+
+            self.clone()
+                .create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
+                .await?;
+            let app_ids: HashSet<_> = [installed_app_id.to_owned()].into_iter().collect();
+            let delta = self
+                .clone()
+                .reconcile_app_status_with_cell_status(Some(app_ids.clone()))
+                .await?;
+            self.process_app_status_fx(delta, Some(app_ids)).await?;
+            Ok(())
+        }
+
+        /// Update the agent key for an installed app
+        // TODO: fully implement after DPKI is available
+        #[allow(unused)]
+        pub async fn rotate_app_agent_key(
+            &self,
+            installed_app_id: &InstalledAppId,
+        ) -> ConductorResult<AgentPubKey> {
+            // TODO: use key derivation for DPKI
+            let new_agent_key = self.keystore().new_sign_keypair_random().await?;
+            let ret = new_agent_key.clone();
+            self.update_state({
+                let installed_app_id = installed_app_id.clone();
+                move |mut state| {
+                    let app = state.get_app_mut(&installed_app_id)?;
+                    app.agent_key = new_agent_key;
+                    // TODO: update all cell IDs in the roles
+                    Ok(state)
+                }
+            })
+            .await?;
+            unimplemented!("this is a partial implementation for reference only")
         }
 
         fn get_app_info_inner(
@@ -2108,6 +2197,7 @@ mod app_status_impls {
                                     // Disabled status should never automatically change.
                                     AppStatusFx::NoChange
                                 }
+                                AwaitingMemproofs => AppStatusFx::NoChange,
                             }
                         })
                         .fold(AppStatusFx::default(), AppStatusFx::combine);
@@ -2892,6 +2982,7 @@ impl Conductor {
                     }
                     (delta, errors)
                 }
+                Error(err) => return Err(ConductorError::AppStatusError(err)),
             };
         }
 

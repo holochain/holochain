@@ -11,11 +11,11 @@ WHERE
     SELECT
       1
     FROM
-      DhtOp AS OP_DEP
+      DhtOp AS DhtOpDep
     WHERE
-      OP_DEP.action_hash = DhtOp.dependency
-      AND OP_DEP.when_integrated IS NOT NULL
-      AND OP_DEP.type = :create_link
+      DhtOpDep.action_hash = DhtOp.dependency
+      AND DhtOpDep.when_integrated IS NOT NULL
+      AND DhtOpDep.type = :create_link
     LIMIT
       1
   )

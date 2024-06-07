@@ -122,6 +122,7 @@ async fn resource_resolution() {
 
 #[cfg(feature = "packing")]
 #[tokio::test]
+#[cfg_attr(target_os = "windows", ignore = "unc path mismatch - use dunce")]
 async fn unpack_roundtrip() {
     let dir = tempfile::tempdir().unwrap();
     let dir_path = dir.path().canonicalize().unwrap();

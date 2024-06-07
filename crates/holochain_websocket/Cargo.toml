@@ -1,6 +1,6 @@
 [package]
 name = "holochain_websocket"
-version = "0.4.0-dev.5"
+version = "0.4.0-dev.7"
 description = "Holochain utilities for serving and connection with websockets"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -12,7 +12,7 @@ edition = "2021"
 [dependencies]
 futures = "0.3"
 holochain_serialized_bytes = "=0.0.54"
-holochain_types = { version = "^0.4.0-dev.5", path = "../holochain_types" }
+holochain_types = { version = "^0.4.0-dev.7", path = "../holochain_types" }
 serde = "1.0"
 serde_bytes = "0.11.14"
 tokio = { version = "1.36.0", features = ["full"] }

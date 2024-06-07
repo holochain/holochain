@@ -16,10 +16,10 @@ clap = { version = "4.2.2", features = [
 ], optional = true }
 flate2 = { version = "1.0.25", optional = true }
 hdi = { path = "../hdi", version = "^0.5.0-dev.5", optional = true }
-hdk = { path = "../hdk", version = "^0.4.0-dev.5", optional = true }
-holochain = { path = "../holochain", version = "^0.4.0-dev.5", optional = true }
-holochain_types = { path = "../holochain_types", version = "^0.4.0-dev.5", optional = true }
-holochain_keystore = { path = "../holochain_keystore", version = "^0.4.0-dev.5", optional = true }
+hdk = { path = "../hdk", version = "^0.4.0-dev.6", optional = true }
+holochain = { path = "../holochain", version = "^0.4.0-dev.7", optional = true }
+holochain_types = { path = "../holochain_types", version = "^0.4.0-dev.7", optional = true }
+holochain_keystore = { path = "../holochain_keystore", version = "^0.4.0-dev.7", optional = true }
 rand = { version = "0.8.5", optional = true }
 rand-utf8 = { version = "0.0.1", optional = true }
 serde = { version = "1", optional = true }
