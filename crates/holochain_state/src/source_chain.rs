@@ -418,6 +418,10 @@ impl SourceChain {
         }
     }
 
+    /// Checks if the current [`AgentPubKey`] of the source chain is valid and returns its [`Create`] action.
+    ///
+    /// Valid means that there's no [`Update`] or [`Delete`] action for the key on the chain.
+    /// Returns the create action if it is valid, and an [`SourceChainError::InvalidAgentKey`] otherwise.
     pub async fn valid_create_agent_key_action(&self) -> SourceChainResult<Action> {
         let agent_key_entry_hash: EntryHash = self.agent_pubkey().clone().into();
         self.author_db()
