@@ -8,13 +8,13 @@ use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
 
 use crate::{core::ribosome::guest_callback::validate::ValidateResult, sweettest::*};
 
-const ZOME_A_0: &'static str = "ZOME_A_0";
-const ZOME_A_1: &'static str = "ZOME_A_1";
-const ZOME_B_0: &'static str = "ZOME_B_0";
-const ZOME_B_1: &'static str = "ZOME_B_1";
+const ZOME_A_0: &str = "ZOME_A_0";
+const ZOME_A_1: &str = "ZOME_A_1";
+const ZOME_B_0: &str = "ZOME_B_0";
+const ZOME_B_1: &str = "ZOME_B_1";
 
-const ALICE: &'static str = "ALICE";
-const BOB: &'static str = "BOB";
+const ALICE: &str = "ALICE";
+const BOB: &str = "BOB";
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 struct Event {

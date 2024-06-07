@@ -1,3 +1,4 @@
+#![allow(clippy::field_reassign_with_default)] // just easier to read/wriet
 use super::*;
 
 use kitsune_p2p_fetch::OpHashSized;
@@ -810,7 +811,7 @@ async fn preflight_user_data_mismatch() {
         bytes: vec![1, 2, 3],
         comparator: Box::new(|_, r| {
             println!("want 1, 2, 3, got {r:?}");
-            (r == &[1, 2, 3])
+            (r == [1, 2, 3])
                 .then_some(())
                 .ok_or("preflight mismatch".into())
         }),
@@ -819,7 +820,7 @@ async fn preflight_user_data_mismatch() {
         bytes: vec![9, 8, 7, 6, 5],
         comparator: Box::new(|_, r| {
             println!("want 9, 8, 7, 6, 5, got {r:?}");
-            (r == &[9, 8, 7, 6, 5])
+            (r == [9, 8, 7, 6, 5])
                 .then_some(())
                 .ok_or("preflight mismatch".into())
         }),

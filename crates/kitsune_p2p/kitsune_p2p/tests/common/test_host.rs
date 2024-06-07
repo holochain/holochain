@@ -78,12 +78,11 @@ impl KitsuneHost for TestHost {
             .blocks
             .read()
             .iter()
-            .find(|b| {
+            .any(|b| {
                 let target_id: BlockTargetId = b.target().clone().into();
 
                 target_id == input && b.start() <= timestamp && b.end() >= timestamp
-            })
-            .is_some();
+            });
 
         async move { Ok(blocked) }.boxed().into()
     }
