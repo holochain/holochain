@@ -16,8 +16,6 @@ use futures::stream::StreamExt;
 #[cfg(feature = "tx2")]
 use kitsune_p2p_proxy::tx2::*;
 #[cfg(feature = "tx2")]
-use kitsune_p2p_transport_quic::tx2::*;
-#[cfg(feature = "tx2")]
 use kitsune_p2p_types::config::KitsuneP2pTx2Backend;
 #[cfg(feature = "tx2")]
 use kitsune_p2p_types::config::KitsuneP2pTx2ProxyConfig;
