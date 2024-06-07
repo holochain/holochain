@@ -3,6 +3,7 @@ use crate::sweettest::SweetConductorBatch;
 use crate::sweettest::SweetDnaFile;
 use crate::sweettest::SweetInlineZomes;
 use crate::test_utils::host_fn_caller::*;
+use crate::test_utils::inline_zomes::simple_crud_zome;
 use crate::test_utils::wait_for_integration;
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use hdk::prelude::LinkTag;
@@ -40,7 +41,7 @@ async fn sys_validation_workflow_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn sys_validation_produces_warrants() {
+async fn sys_validation_produces_invalid_chain_warrant() {
     holochain_trace::test_run();
     let zome = SweetInlineZomes::new(vec![], 0);
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
@@ -110,6 +111,88 @@ async fn sys_validation_produces_warrants() {
                 })
         },
         1
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sys_validation_produces_forked_chain_warrant() {
+    holochain_trace::test_run();
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let ((alice,), (bob,)) = conductors
+        .setup_app("app", [&dna])
+        .await
+        .unwrap()
+        .into_tuples();
+    let alice_pubkey = alice.agent_pubkey().clone();
+
+    let action_hash: ActionHash = conductors[0]
+        .call(&alice.zome("coordinator"), "create_unit", ())
+        .await;
+    let records: Option<Record> = conductors[0]
+        .call(&alice.zome("coordinator"), "read", action_hash)
+        .await;
+
+    //- Modify the just-created record to produce a chain fork
+    let record = records.unwrap();
+    let (action, _) = record.into_inner();
+    let mut action = action.into_inner().0.into_content();
+    let entry = Entry::App(::fixt::fixt!(AppEntryBytes));
+    *action.entry_data_mut().unwrap().0 = entry.to_hash();
+    let action = SignedActionHashed::sign(&conductors[0].keystore(), action.into_hashed())
+        .await
+        .unwrap();
+    let (action, signature) = action.into_inner();
+    let action = SignedAction::new(action.into_content(), signature);
+    let forked_op = ChainOp::from_type(ChainOpType::StoreRecord, action, Some(entry)).unwrap();
+
+    //- Check that the op is valid
+    let dna_def = dna.dna_def().clone().into_hashed();
+    let outcome = crate::core::workflow::sys_validation_workflow::validate_op(
+        &forked_op.clone().into(),
+        &dna_def,
+        Default::default(),
+    )
+    .await
+    .unwrap();
+    matches::assert_matches!(outcome, Outcome::Accepted);
+
+    //- Inject the forked op directly into bob's DHT db
+    let forked_op = DhtOpHashed::from_content_sync(forked_op);
+    let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
+    db.test_write(move |txn| {
+        insert_op(txn, &forked_op).unwrap();
+    });
+
+    //- Trigger sys validation
+    conductors[1]
+        .get_cell_triggers(bob.cell_id())
+        .await
+        .unwrap()
+        .sys_validation
+        .trigger(&"test");
+
+    //- Check that bob authored a chain fork warrant
+    crate::wait_for_1m!(
+        {
+            let basis: AnyLinkableHash = alice_pubkey.clone().into();
+            conductors[1]
+                .spaces
+                .get_all_authored_dbs(dna.dna_hash())
+                .unwrap()[0]
+                .test_read(move |txn| {
+                    let store = Txn::from(&txn);
+                    store.get_warrants_for_basis(&basis).unwrap()
+                })
+        },
+        |warrants: &Vec<Warrant>| { !warrants.is_empty() },
+        |mut warrants: Vec<Warrant>| {
+            matches::assert_matches!(
+                warrants.pop().unwrap(),
+                Warrant::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. })
+            )
+        }
     );
 }
 
