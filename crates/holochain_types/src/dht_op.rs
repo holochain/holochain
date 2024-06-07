@@ -248,6 +248,8 @@ impl FromSql for DhtOpType {
         String::column_result(value)
             .and_then(|string| {
                 ChainOpType::from_str(&string)
+                    .map(DhtOpType::from)
+                    .or_else(|_| WarrantOpType::from_str(&string).map(DhtOpType::from))
                     .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
             })
             .map(Into::into)

@@ -13,6 +13,7 @@ use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::dht_op::ChainOpHashed;
+use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpLite;
 use holochain_types::dht_op::OpOrder;
@@ -110,23 +111,36 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
     let timestamp = op.timestamp();
     let signature = op.signature().clone();
     let op_order = OpOrder::new(op_type, op.timestamp());
-
-    if let (Some(op), Some(op_lite)) = (op.as_chain_op(), op_lite.as_chain_op()) {
-        let action = op.action();
-        if let Some(entry) = op.entry().into_option() {
-            let entry_hash = action
-                .entry_hash()
-                .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
-            insert_entry(txn, entry_hash, entry)?;
-        }
-        let action_hashed = ActionHashed::with_pre_hashed(action, op_lite.action_hash().to_owned());
-        let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
-        insert_action(txn, &action_hashed)?;
-    }
-
     let deps = op.sys_validation_dependencies();
-    insert_op_lite(txn, &op_lite, hash, &op_order, &timestamp)?;
-    set_dependency(txn, hash, deps)?;
+
+    let mut create_op = true;
+
+    match op {
+        DhtOp::ChainOp(op) => {
+            let action = op.action();
+            if let Some(entry) = op.entry().into_option() {
+                let entry_hash = action
+                    .entry_hash()
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+                insert_entry(txn, entry_hash, entry)?;
+            }
+            let action_hashed = ActionHashed::from_content_sync(action);
+            let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
+            insert_action(txn, &action_hashed)?;
+        }
+        DhtOp::WarrantOp(warrant_op) => {
+            let author = warrant_op.author.clone();
+            let warrant = warrant_op.clone().into_signed_warrant();
+            let inserted = insert_warrant(txn, warrant, author)?;
+            if inserted == 0 {
+                create_op = false;
+            }
+        }
+    }
+    if create_op {
+        insert_op_lite(txn, &op_lite, hash, &op_order, &timestamp)?;
+        set_dependency(txn, hash, deps)?;
+    }
     Ok(())
 }
 
@@ -157,18 +171,35 @@ pub fn insert_op_lite(
     order: &OpOrder,
     timestamp: &Timestamp,
 ) -> StateMutationResult<()> {
-    let action_hash = op_lite.as_chain_op().map(|op| op.action_hash().clone());
     let basis = op_lite.dht_basis();
-    sql_insert!(txn, DhtOp, {
-        "hash": hash,
-        "type": op_lite.get_type(),
-        "storage_center_loc": basis.get_loc(),
-        "authored_timestamp": timestamp,
-        "basis_hash": basis,
-        "action_hash": action_hash,
-        "require_receipt": 0,
-        "op_order": order,
-    })?;
+    match op_lite {
+        DhtOpLite::Chain(op) => {
+            let action_hash = op.action_hash().clone();
+            sql_insert!(txn, DhtOp, {
+                "hash": hash,
+                "type": op_lite.get_type(),
+                "storage_center_loc": basis.get_loc(),
+                "authored_timestamp": timestamp,
+                "basis_hash": basis,
+                "action_hash": action_hash,
+                "require_receipt": 0,
+                "op_order": order,
+            })?;
+        }
+        DhtOpLite::Warrant(op) => {
+            let warrant_hash = op.warrant.to_hash();
+            sql_insert!(txn, DhtOp, {
+                "hash": hash,
+                "type": op_lite.get_type(),
+                "storage_center_loc": basis.get_loc(),
+                "authored_timestamp": timestamp,
+                "basis_hash": basis,
+                "action_hash": warrant_hash,
+                "require_receipt": 0,
+                "op_order": order,
+            })?;
+        }
+    };
     Ok(())
 }
 
@@ -500,6 +531,24 @@ pub fn set_receipts_complete(
     Ok(())
 }
 
+/// Insert a [`Warrant`] into the Action table.
+pub fn insert_warrant(
+    txn: &mut Transaction,
+    warrant: SignedWarrant,
+    author: AgentPubKey,
+) -> StateMutationResult<usize> {
+    let warrant_type = warrant.0.get_type();
+    let hash = warrant.0.to_hash();
+
+    Ok(sql_insert!(txn, Action, {
+        "hash": hash,
+        "type": warrant_type,
+        "author": author,
+        "base_hash": warrant.0.dht_basis(),
+        "blob": to_blob(&warrant)?,
+    })?)
+}
+
 /// Insert a [`Action`] into the database.
 #[tracing::instrument(skip(txn))]
 pub fn insert_action(
@@ -823,4 +872,67 @@ pub fn schedule_fn(
         })?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use ::fixt::fixt;
+    use std::sync::Arc;
+
+    use holochain_types::prelude::*;
+
+    use crate::prelude::{Store, Txn};
+
+    use super::insert_op;
+
+    #[test]
+    fn can_write_and_read_warrants() {
+        let dir = tempfile::tempdir().unwrap().into_path();
+        println!("dir: {:?}", dir);
+
+        let cell_id = Arc::new(fixt!(CellId));
+
+        let pair = (fixt!(ActionHash), fixt!(Signature));
+
+        let make_op = |warrant| {
+            let op = WarrantOp {
+                warrant,
+                author: fixt!(AgentPubKey),
+                signature: fixt!(Signature),
+                timestamp: fixt!(Timestamp),
+            };
+            let op: DhtOp = op.into();
+            let op = op.into_hashed();
+            op
+        };
+
+        let action_author = fixt!(AgentPubKey);
+
+        let warrant1 = Warrant::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+            action_author: action_author.clone(),
+            action: pair.clone(),
+            validation_type: ValidationType::App,
+        });
+
+        let warrant2 = Warrant::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+            chain_author: action_author.clone(),
+            action_pair: (pair.clone(), pair.clone()),
+        });
+
+        let op1 = make_op(warrant1.clone());
+        let op2 = make_op(warrant2.clone());
+
+        let db = DbWrite::<DbKindAuthored>::open(dir.as_ref(), DbKindAuthored(cell_id)).unwrap();
+        db.test_write(move |txn| {
+            insert_op(txn, &op1).unwrap();
+            insert_op(txn, &op2).unwrap();
+        });
+
+        db.test_read(move |txn| {
+            let warrants = Txn::from(&txn)
+                .get_warrants_for_basis(&action_author.into())
+                .unwrap();
+            assert_eq!(warrants, vec![warrant1, warrant2]);
+        });
+    }
 }
