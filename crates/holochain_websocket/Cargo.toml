@@ -11,7 +11,7 @@ edition = "2021"
 # reminder - do not use workspace deps
 [dependencies]
 futures = "0.3"
-holochain_serialized_bytes = "=0.0.54"
+holochain_serialized_bytes = "=0.0.55"
 holochain_types = { version = "^0.4.0-dev.7", path = "../holochain_types" }
 serde = "1.0"
 serde_bytes = "0.11.14"
