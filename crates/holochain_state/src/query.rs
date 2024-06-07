@@ -748,7 +748,7 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
     }
 
     fn get_warrants_for_basis(&self, hash: &AnyLinkableHash) -> StateQueryResult<Vec<Warrant>> {
-        // The scratch will never
+        // The scratch will never contain warrants, since they are not committed to chain
         self.txns.get_warrants_for_basis(hash)
     }
 
