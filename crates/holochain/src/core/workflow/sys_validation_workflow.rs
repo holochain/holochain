@@ -506,7 +506,7 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                     if let Some(action_hashes) = op_dependency_hashes {
                         dependency_hashes.extend(action_hashes);
                     }
-                    if dependency_hashes.len() == 0 {
+                    if dependency_hashes.is_empty() {
                         None
                     } else {
                         Some(dependency_hashes.into_iter().collect())

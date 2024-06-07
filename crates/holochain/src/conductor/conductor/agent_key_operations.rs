@@ -17,7 +17,7 @@ impl Conductor {
     ) -> ConductorResult<RevokeAgentKeyForAppResult> {
         // Disable app while revoking key
         self.clone()
-            .disable_app(app_id.clone(), DisabledAppReason::DeleteAgentKey)
+            .disable_app(app_id.clone(), DisabledAppReason::DeletingAgentKey)
             .await?;
 
         // Revoke key in DPKI first, if installed, and then in cells' source chains.
@@ -61,9 +61,7 @@ impl Conductor {
         if let Some(dpki_service) = conductor.running_services().dpki {
             let dpki_state = dpki_service.state().await;
             let timestamp = Timestamp::now();
-            let key_state = dpki_state
-                .key_state(agent_key.clone(), timestamp.clone())
-                .await?;
+            let key_state = dpki_state.key_state(agent_key.clone(), timestamp).await?;
             match key_state {
                 KeyState::NotFound => {
                     return Err(ConductorError::DpkiError(
