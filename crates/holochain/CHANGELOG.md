@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.0-dev.7
+
+- App manifest now includes a new `membrane_proofs_deferred: bool` field, which allows the membrane proofs for the app’s cells to be provided at a time after installation, allowing the app’s UI to guide the process of creating membrane proofs.
+- Adds new `AppStatus::AwaitingMemproofs` to indicate an app which was installed with `MemproofProvisioning::Deferred`
+- Adds new app websocket method `ProvideMemproofs` for use with `MemproofProvisioning::Deferred`
+
+## 0.4.0-dev.6
+
 ## 0.4.0-dev.5
 
 - Moved the WASM cache from the data directory to a subdirectory of the data directory named `wasm-cache`. Old content won’t be removed and WASMs will have to be recompiled into the new cache. \#3920
