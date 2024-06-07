@@ -1,6 +1,7 @@
 use holo_hash::{ActionHash, AgentPubKey, EntryHash};
 use holochain_conductor_services::{DpkiServiceError, KeyState};
-use holochain_state::source_chain::SourceChainError;
+use holochain_p2p::actor::HolochainP2pRefToDna;
+use holochain_state::source_chain::{SourceChain, SourceChainError};
 use holochain_types::app::{AppError, CreateCloneCellPayload};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::action::ActionType;
@@ -322,4 +323,67 @@ async fn revoke_agent_key_without_dpki_installed() {
         .await
         .unwrap_err();
     assert_matches!(result, ConductorError::SourceChainError(SourceChainError::InvalidAgentKey(invalid_key, cell_id)) if invalid_key == agent_key && cell_id == cell_id_2);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn retry_revoke_agent_key_to_recover_from_partial_revocation() {
+    let no_dpki_conductor_config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(no_dpki_conductor_config).await;
+    let (dna_file_1, _, coordinator_zomes_1) =
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let (dna_file_2, _, coordinator_zomes_2) =
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let role_1 = "role_1";
+    let role_2 = "role_2";
+    let app = conductor
+        .setup_app(
+            "",
+            [
+                &(role_1.to_string(), dna_file_1.clone()),
+                &(role_2.to_string(), dna_file_2.clone()),
+            ],
+        )
+        .await
+        .unwrap();
+    let agent_key = app.agent().clone();
+    let cell_id_1 = app.cells()[0].cell_id().clone();
+    let cell_id_2 = app.cells()[1].cell_id().clone();
+
+    // Delete agent key of cell 1 of the app
+    let source_chain_1 = SourceChain::new(
+        conductor
+            .get_or_create_authored_db(cell_id_1.dna_hash(), agent_key.clone())
+            .unwrap(),
+        conductor.get_dht_db(cell_id_1.dna_hash()).unwrap(),
+        conductor.get_dht_db_cache(cell_id_1.dna_hash()).unwrap(),
+        conductor.keystore().clone(),
+        agent_key.clone(),
+    )
+    .await
+    .unwrap();
+    source_chain_1.delete_valid_agent_pub_key().await.unwrap();
+    source_chain_1
+        .flush(
+            &conductor
+                .holochain_p2p()
+                .to_dna(cell_id_1.dna_hash().clone(), conductor.get_chc(&cell_id_1)),
+        )
+        .await
+        .unwrap();
+
+    // Check agent key is invalid in cell 1
+    let invalid_agent_key_error = source_chain_1
+        .valid_create_agent_key_action()
+        .await
+        .unwrap_err();
+    assert_matches!(invalid_agent_key_error, SourceChainError::InvalidAgentKey(invalid_key, cell_id) if invalid_key == agent_key && cell_id == cell_id_1);
+
+    // Calling key revocation should succeed and return an error result for cell 1
+    let revocation_result_per_cell = conductor
+        .clone()
+        .revoke_agent_key_for_app(agent_key.clone(), app.installed_app_id().clone())
+        .await
+        .unwrap();
+    assert_matches!(revocation_result_per_cell.get(&cell_id_1).unwrap(), Err(ConductorApiError::SourceChainError(SourceChainError::InvalidAgentKey(key, cell_id))) if *key == agent_key && *cell_id == cell_id_1);
+    assert_matches!(revocation_result_per_cell.get(&cell_id_2).unwrap(), Ok(()));
 }
