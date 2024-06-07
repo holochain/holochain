@@ -49,7 +49,6 @@ pub struct SweetConductor {
     handle: Option<SweetConductorHandle>,
     db_dir: TestDir,
     keystore: MetaLairClient,
-    // pub(crate) spaces: Spaces,
     config: Arc<ConductorConfig>,
     dnas: Vec<DnaFile>,
     rendezvous: Option<DynSweetRendezvous>,
