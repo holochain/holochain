@@ -39,7 +39,7 @@
 
         (
           cd "$VERSIONS_DIR"
-          nix flake update --tarball-ttl 0
+          nix flake update --refresh
         )
 
         if [[ $(git diff -- "$VERSIONS_DIR"/flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
