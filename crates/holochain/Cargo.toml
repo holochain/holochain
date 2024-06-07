@@ -36,11 +36,11 @@ holochain_conductor_api = { version = "^0.4.0-dev.7", path = "../holochain_condu
 holochain_keystore = { version = "^0.4.0-dev.7", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.4.0-dev.7", path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.4.0-dev.7", path = "../holochain_sqlite" }
-holochain_serialized_bytes = "=0.0.54"
+holochain_serialized_bytes = "=0.0.55"
 holochain_state = { version = "^0.4.0-dev.7", path = "../holochain_state" }
 holochain_types = { version = "^0.4.0-dev.7", path = "../holochain_types" }
 holochain_util = { version = "^0.4.0-dev.1", path = "../holochain_util" }
-holochain_wasmer_host = "=0.0.94"
+holochain_wasmer_host = "=0.0.95"
 holochain_websocket = { version = "^0.4.0-dev.7", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.4.0-dev.6", path = "../holochain_zome_types", features = [
   "full",
@@ -67,7 +67,7 @@ predicates = "3.1"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
 rand-utf8 = "0.0.1"
-rusqlite = { version = "0.29" }
+rusqlite = { version = "0.31" }
 serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11.12"
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
@@ -90,8 +90,8 @@ url2 = "0.0.6"
 uuid = { version = "1.8", features = ["serde", "v4"] }
 holochain_wasm_test_utils = { version = "^0.4.0-dev.7", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
-wasmer = "=4.2.8"
-wasmer-middlewares = "=4.2.8"
+wasmer = "=4.3.1"
+wasmer-middlewares = "=4.3.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
 # Dependencies for test_utils
@@ -156,7 +156,7 @@ serde_json = { version = "1.0.51" }
 toml = "0.8"
 chrono = { version = "0.4.6", features = ["serde"] }
 hostname = "0.4"
-lair_keystore = { version = "0.4.4", default-features = false, features = [
+lair_keystore = { version = "0.4.5", default-features = false, features = [
   "rusqlite-bundled-sqlcipher-vendored-openssl",
 ] }
 
