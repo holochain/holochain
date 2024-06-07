@@ -43,6 +43,7 @@ use contrafact::Fact;
 use error::SysValidationError;
 
 use futures::FutureExt;
+use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
@@ -276,7 +277,9 @@ async fn check_previous_action() {
     let mut g = random_generator();
 
     let keystore = holochain_keystore::test_keystore();
+    let previous_action = fixt!(SignedActionHashed);
     let mut action = Action::Delete(Delete::arbitrary(&mut g).unwrap());
+    *action.prev_action_mut().unwrap() = previous_action.as_hash().clone();
     *action.author_mut() = keystore.new_sign_keypair_random().await.unwrap();
 
     *action.action_seq_mut().unwrap() = 7;
@@ -292,8 +295,14 @@ async fn check_previous_action() {
         cascade
             .expect_retrieve_action()
             .times(2)
-            // Doesn't matter what we return, the action should be rejected before deps are checked.
-            .returning(|_, _| async move { Ok(None) }.boxed());
+            // Doesn't matter what we return, the action should be rejected before deps are checked,
+            // except for the previous action that is checked for agent validity.
+            .returning({
+                move |_, _| {
+                    let previous_action = previous_action.clone();
+                    async move { Ok(Some((previous_action.clone(), CascadeSource::Local))) }.boxed()
+                }
+            });
 
         let actual = sys_validate_record(
             &sign_record(&keystore, action, None).await,
