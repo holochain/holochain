@@ -1023,8 +1023,8 @@ pub enum DisabledAppReason {
     AwaitingMemproofs,
     /// The disabling was done manually by the user (via admin interface)
     User,
-    /// Disabling app in order to delete its agent key and render all chains read-only.
-    DeleteAgentKey,
+    /// Disabling app in order to revoke its agent key and render all chains read-only.
+    DeletingAgentKey,
     /// The disabling was due to an UNRECOVERABLE error
     Error(String),
 }
