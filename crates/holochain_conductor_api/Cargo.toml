@@ -17,7 +17,7 @@ holo_hash = { version = "^0.4.0-dev.5", path = "../holo_hash", features = [
   "full",
 ] }
 holochain_state_types = { version = "^0.4.0-dev.5", path = "../holochain_state_types" }
-holochain_serialized_bytes = "=0.0.54"
+holochain_serialized_bytes = "=0.0.55"
 holochain_types = { version = "^0.4.0-dev.7", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.4.0-dev.6", path = "../holochain_zome_types" }
 serde = { version = "1.0", features = ["derive"] }
