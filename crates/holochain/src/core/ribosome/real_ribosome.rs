@@ -112,7 +112,7 @@ use once_cell::sync::Lazy;
 use opentelemetry_api::global::meter_with_version;
 use opentelemetry_api::metrics::Counter;
 use std::collections::HashMap;
-use std::env::temp_dir;
+use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use wasmer_middlewares::metering::get_remaining_points;
@@ -247,11 +247,13 @@ impl RealRibosome {
         dna_file: DnaFile,
         wasmer_module_cache: Arc<ModuleCacheLock>,
     ) -> RibosomeResult<Self> {
-        let shared_test_module_cache = temp_dir().join("deepkey_wasm_cache");
+        let mut _shared_test_module_cache: Option<PathBuf> = None;
         #[cfg(test)]
         {
             // Create this temporary directory only in tests.
-            let _ = std::fs::create_dir_all(shared_test_module_cache.clone());
+            let shared_test_module_cache_dir = std::env::temp_dir().join("deepkey_wasm_cache");
+            let _ = std::fs::create_dir_all(shared_test_module_cache_dir.clone());
+            _shared_test_module_cache = Some(shared_test_module_cache_dir);
         }
         let mut ribosome = Self {
             dna_file,
@@ -260,9 +262,9 @@ impl RealRibosome {
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache,
             #[cfg(test)]
-            shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(
-                shared_test_module_cache,
-            )))),
+            shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
+                _shared_test_module_cache,
+            ))),
         };
 
         // Collect the number of entry and link types
@@ -370,6 +372,7 @@ impl RealRibosome {
     ) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
         #[cfg(test)]
+        // When running tests, use cache folder accessible to all tests.
         let cache_lock = self.shared_test_module_cache.clone();
         #[cfg(not(test))]
         let cache_lock = self.wasmer_module_cache.clone();

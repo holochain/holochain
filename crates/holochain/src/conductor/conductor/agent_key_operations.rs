@@ -40,7 +40,7 @@ impl Conductor {
                 |(cell_id, _)| {
                     let conductor = self.clone();
                     async move {
-                        let cell_triggers = conductor.get_cell_triggers(&cell_id).await?;
+                        let cell_triggers = conductor.get_cell_triggers(cell_id).await?;
                         cell_triggers.publish_dht_ops.trigger(&"delete agent key");
                         ConductorApiResult::Ok(())
                     }

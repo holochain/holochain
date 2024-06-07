@@ -455,7 +455,6 @@ impl SourceChain {
     }
 
     pub async fn delete_valid_agent_pub_key(&self) -> SourceChainResult<()> {
-        let agent_key_entry_hash: EntryHash = self.agent_pubkey().clone().into();
         let valid_create_agent_key_action = self.valid_create_agent_key_action().await?;
 
         self.put_weightless(
