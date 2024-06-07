@@ -63,9 +63,10 @@ impl Query for GetAgentActivityQuery {
             )
             OR
             (
-                -- is an integrated warrant
+                -- is an integrated, valid warrant
                 DhtOp.basis_hash = :author_basis
                 AND DhtOp.type = :warrant_op_type
+                AND DhtOp.validation_status = :valid_status
                 AND DhtOp.when_integrated IS NOT NULL
             )
             ORDER BY Action.seq ASC
@@ -79,6 +80,7 @@ impl Query for GetAgentActivityQuery {
             ":author_basis": self.agent_basis,
             ":chain_op_type": ChainOpType::RegisterAgentActivity,
             ":warrant_op_type": WarrantOpType::ChainIntegrityWarrant,
+            ":valid_status": ValidationStatus::Valid,
         }
         .to_vec()
     }
