@@ -1988,30 +1988,6 @@ mod cell_impls {
             self.running_cells
                 .share_ref(|cells| cells.keys().cloned().collect())
         }
-
-        /// Close source chain of the given cell. Closing a source chain makes it read-only.
-        pub async fn close_chain(conductor: Arc<Self>, cell_id: CellId) -> ConductorApiResult<()> {
-            let action_builder = builder::CloseChain::new(cell_id.dna_hash().clone());
-            let source_chain = SourceChain::new(
-                conductor.get_or_create_authored_db(
-                    cell_id.dna_hash(),
-                    cell_id.agent_pubkey().clone(),
-                )?,
-                conductor.get_dht_db(cell_id.dna_hash())?,
-                conductor.get_dht_db_cache(cell_id.dna_hash())?,
-                conductor.keystore().clone(),
-                cell_id.agent_pubkey().clone(),
-            )
-            .await?;
-            source_chain
-                .put_weightless(action_builder, None, ChainTopOrdering::Strict)
-                .await?;
-            let network = conductor
-                .holochain_p2p
-                .to_dna(cell_id.dna_hash().clone(), conductor.get_chc(&cell_id));
-            source_chain.flush(&network).await?;
-            Ok(())
-        }
     }
 }
 
