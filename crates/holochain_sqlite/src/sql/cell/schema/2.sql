@@ -88,8 +88,11 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     hash             BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     type             TEXT           NOT NULL,
     basis_hash       BLOB           NOT NULL,
-    action_hash      BLOB           NOT NULL,
     require_receipt  INTEGER        NOT NULL,      -- BOOLEAN
+
+    -- This is not strictly an action hash, but a foreign key to a row in the Action table.
+    -- This may be a WarrantHash if the corresponding row in Action is a warrant.
+    action_hash      BLOB           NOT NULL,
 
     storage_center_loc          INTEGER   NOT NULL,
     authored_timestamp       INTEGER   NOT NULL,

@@ -3,7 +3,7 @@ SELECT
   MAX(seq)
 FROM
   DhtOp
-  LEFT JOIN Action ON DhtOp.action_hash = Action.hash
+  JOIN Action ON DhtOp.action_hash = Action.hash
 WHERE
   DhtOp.when_integrated IS NOT NULL
   AND DhtOp.type = :register_activity

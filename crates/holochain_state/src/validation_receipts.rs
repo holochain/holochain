@@ -61,7 +61,7 @@ pub fn get_pending_validation_receipts(
             SELECT Action.author, DhtOp.hash, DhtOp.validation_status,
             DhtOp.when_integrated
             From DhtOp
-            LEFT JOIN Action ON DhtOp.action_hash = Action.hash
+            JOIN Action ON DhtOp.action_hash = Action.hash
             WHERE
             DhtOp.require_receipt = 1
             AND
