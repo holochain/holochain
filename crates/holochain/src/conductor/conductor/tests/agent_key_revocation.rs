@@ -136,6 +136,8 @@ async fn revoke_agent_key_with_dpki_installed() {
     let result: Option<Record> = conductor.call(&zome_2, read_fn_name, action_hash_2).await;
     assert!(result.is_some());
 
+    println!("what happens next");
+
     // Creating an entry should fail now for both cells
     let result = conductor
         .call_fallible::<_, ActionHash>(&zome_1, create_fn_name, ())

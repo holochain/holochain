@@ -458,6 +458,10 @@ impl SourceChain {
             .await
     }
 
+    /// Deletes the current [`AgentPubKey`] of the source chain if it is valid and returns a [`SourceChainError::InvalidAgentKey`]
+    /// otherwise.
+    ///
+    /// The agent key is valid if there are no [`Update`] or [`Delete`] actions for that key on the chain.
     pub async fn delete_valid_agent_pub_key(&self) -> SourceChainResult<()> {
         let valid_create_agent_key_action = self.valid_create_agent_key_action().await?;
 

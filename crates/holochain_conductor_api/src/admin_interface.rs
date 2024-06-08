@@ -4,7 +4,7 @@ use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
-use crate::{AppInfo, FullStateDump, StorageInfo};
+use crate::{AppInfo, FullStateDump, RevokeAgentKeyPayload, StorageInfo};
 
 /// Represents the available conductor functions to call over an admin interface.
 ///
@@ -438,11 +438,11 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::RevokeAgentKey`].
     ///
-    /// Contains a map of [`CellId`]s with results of the revocation. An empty result indicates the
-    /// key has been successfully deleted from the source chain of the cell, whereas an error means
-    /// deletion was unsuccessful. If the key could not be deleted from all cells, the call
+    /// Contains a list of errors of the cells where deletion was unsuccessful.
+    ///
+    /// If the key could not be deleted from all cells, the call
     /// [`AdminRequest::RevokeAgentKey`] can be re-attempted to delete the key from the remaining cells.
-    AgentKeyRevoked(RevokeAgentKeyForAppResult),
+    AgentKeyRevoked(Vec<(CellId, String)>),
 
     /// The successful response to an [`AdminRequest::ListDnas`].
     ///
@@ -475,6 +475,8 @@ pub enum AdminResponse {
     /// It means the app was enabled successfully. If it was possible to
     /// put the app in a running state, it will be running, otherwise it will
     /// be paused.
+    ///
+    /// Contains the app info and list of errors of cells that could not be enabled.
     AppEnabled {
         app: AppInfo,
         errors: Vec<(CellId, String)>,

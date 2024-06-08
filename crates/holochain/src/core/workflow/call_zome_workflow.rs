@@ -239,9 +239,28 @@ where
         Arc::new(network.clone()),
     ));
 
+    let scratch_records = workspace.source_chain().scratch_records()?;
+
+    if let Some(dpki) = conductor_handle.running_services().dpki.clone() {
+        // Don't check DPKI validity on DPKI itself!
+        if !dpki.is_deepkey_dna(workspace.source_chain().cell_id().dna_hash()) {
+            // Check the validity of the author as-at the first and the last record to be committed.
+            // If these are valid, then the author is valid for the entire commit.
+            let first = scratch_records.first();
+            let last = scratch_records.last();
+            if let Some(r) = first {
+                check_dpki_agent_validity_for_record(&dpki, r).await?;
+            }
+            if let Some(r) = last {
+                if first != last {
+                    check_dpki_agent_validity_for_record(&dpki, r).await?;
+                }
+            }
+        }
+    }
+
     let records = {
         // collect all the records we need to validate in wasm
-        let scratch_records = workspace.source_chain().scratch_records()?;
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
         // Loop forwards through all the new records
         for record in scratch_records {
@@ -256,24 +275,6 @@ where
 
         to_app_validate
     };
-
-    if let Some(dpki) = conductor_handle.running_services().dpki.clone() {
-        // Don't check DPKI validity on DPKI itself!
-        if !dpki.is_deepkey_dna(workspace.source_chain().cell_id().dna_hash()) {
-            // Check the validity of the author as-at the first and the last record to be committed.
-            // If these are valid, then the author is valid for the entire commit.
-            let first = records.first();
-            let last = records.last();
-            if let Some(r) = first {
-                check_dpki_agent_validity_for_record(&dpki, r).await?;
-            }
-            if let Some(r) = last {
-                if first != last {
-                    check_dpki_agent_validity_for_record(&dpki, r).await?;
-                }
-            }
-        }
-    }
 
     for mut chain_record in records {
         for op_type in action_to_op_types(chain_record.action()) {

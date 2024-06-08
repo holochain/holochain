@@ -2,6 +2,7 @@ use holochain_types::deepkey_roundtrip_backward;
 
 use super::*;
 
+/// The result type of an agent key revocation for an app.
 pub type RevokeAgentKeyForAppResult = HashMap<CellId, ConductorApiResult<()>>;
 
 impl Conductor {
@@ -52,6 +53,7 @@ impl Conductor {
         Ok(deletion_per_cell_results)
     }
 
+    /// Revoke agent key in Deepkey first, if installed, and then write a [`Delete`] of the key to the source chain.
     async fn revoke_agent_key_for_app_inner(
         conductor: Arc<Conductor>,
         agent_key: AgentPubKey,

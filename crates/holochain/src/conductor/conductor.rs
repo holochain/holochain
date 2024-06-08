@@ -51,6 +51,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
 use tracing::*;
 
+pub use agent_key_operations::RevokeAgentKeyForAppResult;
 pub use builder::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::{DpkiConfig, KeystoreConfig};
@@ -132,6 +133,16 @@ mod graft_records_onto_source_chain;
 
 mod app_auth_token_store;
 
+/// Operations to manipulate agent keys.
+///
+/// Agent keys are handled in 2 places in Holochain, on the source chain of a cell and in the
+/// Deepkey service, should it be installed. Operations to manipulate these keys include key
+/// revocation and key update.
+///
+/// When revoking a key, it becomes invalid and the source chain can no longer be written to.
+/// Clone cells can not be created any more either.
+///
+/// The source remains read-only until a new key is created.
 mod agent_key_operations;
 
 pub(crate) mod app_broadcast;
