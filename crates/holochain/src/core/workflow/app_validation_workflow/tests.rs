@@ -1087,8 +1087,6 @@ async fn app_validation_produces_warrants() {
         1
     );
 
-    conductors[2].persist_dbs();
-
     let activity: AgentActivity = conductors[2]
         .call(
             &carol.zome(SweetInlineZomes::COORDINATOR),
