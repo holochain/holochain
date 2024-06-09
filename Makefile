@@ -42,18 +42,15 @@ static-doc:
 build-workspace:
 	$(F) cargo build \
 		--workspace \
-		--exclude holochain_cli_sandbox \
-		--exclude hdk_derive \
 		--locked \
+		--exclude hdk_derive \
 		--all-features --all-targets
 
 # execute tests on all creates
-# TODO - make hc_sandbox able to run binaries out of target/debug
 test-workspace:
 	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
-		--exclude holochain_cli_sandbox \
 		--exclude hdk_derive \
 		--locked \
 		--all-features
