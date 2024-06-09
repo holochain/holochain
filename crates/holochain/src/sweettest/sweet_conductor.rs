@@ -4,8 +4,8 @@
 use super::*;
 use crate::conductor::ConductorHandle;
 use crate::conductor::{
-    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, space::Spaces,
-    CellError, Conductor, ConductorBuilder,
+    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, CellError,
+    Conductor, ConductorBuilder,
 };
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
@@ -49,7 +49,6 @@ pub struct SweetConductor {
     handle: Option<SweetConductorHandle>,
     db_dir: TestDir,
     keystore: MetaLairClient,
-    pub(crate) spaces: Spaces,
     config: Arc<ConductorConfig>,
     dnas: Vec<DnaFile>,
     rendezvous: Option<DynSweetRendezvous>,
@@ -121,21 +120,12 @@ impl SweetConductor {
         config: Arc<ConductorConfig>,
         rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
-        // XXX: this is a bit wonky.
-        // We create a Spaces instance here purely because it's easier to initialize
-        // the per-space databases this way. However, we actually use the TestEnvs
-        // to actually access those databases.
-        // As a TODO, we can remove the need for TestEnvs in sweettest or have
-        // some other better integration between the two.
-        let spaces = Spaces::new(config.clone()).unwrap();
-
         let keystore = handle.keystore().clone();
 
         Self {
             handle: Some(SweetConductorHandle(handle)),
             db_dir: env_dir,
             keystore,
-            spaces,
             config,
             dnas: Vec::new(),
             rendezvous,
