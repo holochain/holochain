@@ -213,7 +213,13 @@ include!(concat!(env!("OUT_DIR"), "/target.rs"));
 fn get_target(file: &str) -> std::path::PathBuf {
     let target = unsafe { std::ffi::OsString::from_encoded_bytes_unchecked(TARGET.to_vec()) };
     let mut target = std::path::PathBuf::from(target);
+
+    #[cfg(not(windows))]
     target.push(file);
+
+    #[cfg(windows)]
+    target.push(format!("{}.exe", file));
+
     if std::fs::metadata(&target).is_err() {
         panic!("to run integration tests for hc_sandbox, you need to build the workspace so the following file exists: {:?}", &target);
     }
