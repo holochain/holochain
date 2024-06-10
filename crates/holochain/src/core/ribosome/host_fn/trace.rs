@@ -76,9 +76,7 @@ pub mod wasm_test {
             msg: "ribosome trace works".to_string(),
         };
 
-        let output: () = trace(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
-
-        assert_eq!((), output);
+        let _: () = trace(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]

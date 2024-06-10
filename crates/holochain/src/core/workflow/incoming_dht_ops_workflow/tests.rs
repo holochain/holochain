@@ -154,8 +154,7 @@ async fn verify_is_pending_validation_receipt(env: DbWrite<DbKindDht>, hash: Dht
 
     assert!(pending_hashes
         .into_iter()
-        .find(|pending_hash| *pending_hash == hash)
-        .is_some());
+        .any(|pending_hash| pending_hash == hash));
 }
 
 async fn verify_ops_present(env: DbWrite<DbKindDht>, hash_list: Vec<DhtOpHash>, present: bool) {

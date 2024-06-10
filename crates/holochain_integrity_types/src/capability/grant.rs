@@ -220,9 +220,7 @@ mod tests {
 
         let g1: CapGrant = ZomeCallCapGrant {
             tag: tag.clone(),
-            access: CapAccess::Transferable {
-                secret: secret.clone(),
-            },
+            access: CapAccess::Transferable { secret },
             functions: GrantedFunctions::All,
         }
         .into();
@@ -230,7 +228,7 @@ mod tests {
         let g2: CapGrant = ZomeCallCapGrant {
             tag: tag.clone(),
             access: CapAccess::Assigned {
-                secret: secret.clone(),
+                secret,
                 assignees: assignees.clone(),
             },
             functions: GrantedFunctions::All,

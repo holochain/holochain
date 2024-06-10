@@ -136,6 +136,6 @@ fn connection_ids_from_dump(dump: &Value) -> Vec<String> {
     stats
         .connection_list
         .into_iter()
-        .map(|c| base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&c.pub_key))
+        .map(|c| base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(c.pub_key))
         .collect()
 }

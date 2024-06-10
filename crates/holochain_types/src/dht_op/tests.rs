@@ -81,7 +81,7 @@ impl RecordTest {
     fn update_record(&mut self) -> (Update, Record) {
         let entry_update = builder::Update::new(
             self.original_entry_hash.clone(),
-            self.action_hash.clone().into(),
+            self.action_hash.clone(),
             self.entry_type.clone(),
             self.entry_hash.clone(),
         )
@@ -101,7 +101,7 @@ impl RecordTest {
             ChainOp::StoreEntry(
                 self.sig.clone(),
                 NewEntryAction::Create(entry_create),
-                self.entry.clone().into(),
+                self.entry.clone(),
             ),
         ];
         (record, ops)
@@ -174,12 +174,13 @@ impl RecordTest {
     }
 
     fn others(&self) -> Vec<(Record, Vec<ChainOp>)> {
-        let mut records = Vec::new();
-        records.push(self.to_record(self.dna.clone().into(), None));
-        records.push(self.to_record(self.chain_open.clone().into(), None));
-        records.push(self.to_record(self.chain_close.clone().into(), None));
-        records.push(self.to_record(self.agent_validation_pkg.clone().into(), None));
-        records.push(self.to_record(self.init_zomes_complete.clone().into(), None));
+        let records = vec![
+            self.to_record(self.dna.clone().into(), None),
+            self.to_record(self.chain_open.clone().into(), None),
+            self.to_record(self.chain_close.clone().into(), None),
+            self.to_record(self.agent_validation_pkg.clone().into(), None),
+            self.to_record(self.init_zomes_complete.clone().into(), None),
+        ];
         let mut chain_records = Vec::new();
         for record in records {
             let action: Action = record.action().clone();

@@ -74,8 +74,7 @@ async fn main_workflow() {
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
-            .unwrap()
-            .into(),
+            .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
@@ -284,8 +283,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
-            .unwrap()
-            .into(),
+            .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
@@ -407,8 +405,7 @@ async fn validate_ops_in_sequence_must_get_action() {
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
-            .unwrap()
-            .into(),
+            .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
@@ -574,8 +571,7 @@ async fn handle_error_in_op_validation() {
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
-            .unwrap()
-            .into(),
+            .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
@@ -679,10 +675,7 @@ async fn app_validation_workflow_test() {
     .await;
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
-    let apps = conductors
-        .setup_app(&"test_app", [&dna_file])
-        .await
-        .unwrap();
+    let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
     let alice_cell_id = alice.cell_id().clone();
     let bob_cell_id = bob.cell_id().clone();
@@ -781,10 +774,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
     set_zome_types(&[(0, 3)], &[]);
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
-    let apps = conductors
-        .setup_app(&"test_app", [&dna_file])
-        .await
-        .unwrap();
+    let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
 
     conductors.exchange_peer_info().await;
@@ -1006,17 +996,17 @@ async fn app_validation_produces_warrants() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(3).await;
     let (alice,) = conductors[0]
-        .setup_app(&"test_app", [&dna_sans])
+        .setup_app("test_app", [&dna_sans])
         .await
         .unwrap()
         .into_tuple();
     let (bob,) = conductors[1]
-        .setup_app(&"test_app", [&dna_avec_1])
+        .setup_app("test_app", [&dna_avec_1])
         .await
         .unwrap()
         .into_tuple();
     let (carol,) = conductors[2]
-        .setup_app(&"test_app", [&dna_avec_2])
+        .setup_app("test_app", [&dna_avec_2])
         .await
         .unwrap()
         .into_tuple();
@@ -1098,7 +1088,7 @@ fn expected_invalid_entry(
 
     let count: usize = txn
         .query_row(
-            &sql,
+            sql,
             named_params! {
                 ":invalid_action_hash": invalid_action_hash,
                 ":invalid_entry_hash": invalid_entry_hash,
@@ -1121,7 +1111,7 @@ fn expected_invalid_link(txn: &Transaction, invalid_link_hash: &ActionHash) -> b
 
     let count: usize = txn
         .query_row(
-            &sql,
+            sql,
             named_params! {
                 ":invalid_link_hash": invalid_link_hash,
                 ":create_link": ChainOpType::RegisterAddLink,
@@ -1143,7 +1133,7 @@ fn expected_invalid_remove_link(txn: &Transaction, invalid_remove_hash: &ActionH
 
     let count: usize = txn
         .query_row(
-            &sql,
+            sql,
             named_params! {
                 ":invalid_remove_hash": invalid_remove_hash,
                 ":delete_link": ChainOpType::RegisterRemoveLink,
@@ -1235,10 +1225,10 @@ async fn run_test(
     // Plus another 16 for genesis + init
     // Plus 2 for Cap Grant
     let expected_count = 3 + 16 + 2;
-    let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
-    let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
 
     alice_db
         .read_async(move |txn| -> DatabaseResult<()> {
@@ -1261,7 +1251,7 @@ async fn run_test(
     // StoreEntry should be invalid.
     // RegisterAgentActivity will be valid.
     let expected_count = 3 + expected_count;
-    let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
     alice_db
@@ -1301,7 +1291,7 @@ async fn run_test(
 
     // Integration should have 6 ops in it
     let expected_count = 6 + expected_count;
-    let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
     alice_db
@@ -1349,7 +1339,7 @@ async fn run_test(
 
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
-    let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
     alice_db
@@ -1397,7 +1387,7 @@ async fn run_test(
 
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
-    let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
     alice_db
@@ -1447,7 +1437,7 @@ async fn run_test(
 
     // Integration should have 12 ops in it
     let expected_count = 12 + expected_count;
-    let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
     alice_db
@@ -1503,7 +1493,7 @@ async fn run_test_entry_def_id(
     // Integration should have 3 ops in it
     // StoreEntry and StoreRecord should be invalid.
     let expected_count = 3 + expected_count;
-    let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
     alice_db
@@ -1547,7 +1537,7 @@ async fn commit_invalid(
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"commit_invalid");
     (invalid_action_hash, entry_hash)
 }
@@ -1577,7 +1567,7 @@ async fn commit_invalid_post(
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"commit_invalid_post");
     (invalid_action_hash, entry_hash)
 }
@@ -1593,7 +1583,7 @@ async fn call_zome_directly(
     let output = call_data.call_zome_direct(invocation).await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"call_zome_directly");
     output
 }

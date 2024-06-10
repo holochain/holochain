@@ -95,9 +95,7 @@ mod tests {
 
         let mk_op = |i: u8| {
             let entry = Entry::App(AppEntryBytes(
-                UnsafeBytes::from(vec![i % 10; 10_000_000])
-                    .try_into()
-                    .unwrap(),
+                UnsafeBytes::from(vec![i % 10; 10_000_000]).into(),
             ));
             let sig = ::fixt::fixt!(Signature);
             let mut create = ::fixt::fixt!(Create);

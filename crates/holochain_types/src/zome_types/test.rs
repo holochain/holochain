@@ -2,24 +2,18 @@ use super::*;
 use test_case::test_case;
 
 fn make_set(entries: &[(u8, u8)], links: &[(u8, u8)]) -> GlobalZomeTypes {
-    let entries = entries
-        .into_iter()
-        .map(|(z, l)| (ZomeIndex(*z), *l))
-        .collect();
-    let links = links
-        .into_iter()
-        .map(|(z, l)| (ZomeIndex(*z), *l))
-        .collect();
+    let entries = entries.iter().map(|(z, l)| (ZomeIndex(*z), *l)).collect();
+    let links = links.iter().map(|(z, l)| (ZomeIndex(*z), *l)).collect();
     GlobalZomeTypes { entries, links }
 }
 
 fn make_scope(entries: &[(u8, u8)], links: &[(u8, u8)]) -> ScopedZomeTypesSet {
     let entries = entries
-        .into_iter()
+        .iter()
         .map(|(z, l)| (ZomeIndex(*z), (0..*l).map(|t| t.into()).collect()))
         .collect();
     let links = links
-        .into_iter()
+        .iter()
         .map(|(z, l)| (ZomeIndex(*z), (0..*l).map(|t| t.into()).collect()))
         .collect();
     ScopedZomeTypesSet {
@@ -45,12 +39,8 @@ fn test_from_ordered_iterator(iter: Vec<(u8, u8)>) -> GlobalZomeTypes {
 #[test]
 fn test_from_ordered_iterator_err() {
     assert!(matches!(
-        GlobalZomeTypes::from_ordered_iterator(
-            (0..300)
-                .into_iter()
-                .map(|_| (EntryDefIndex(1), LinkType(1))),
-        )
-        .unwrap_err(),
+        GlobalZomeTypes::from_ordered_iterator((0..300).map(|_| (EntryDefIndex(1), LinkType(1))),)
+            .unwrap_err(),
         ZomeTypesError::ZomeIndexOverflow
     ));
 }
