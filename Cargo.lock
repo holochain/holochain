@@ -1939,18 +1939,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "escargot"
-version = "0.5.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f474c6844cbd04e783d0f25757583db4f491770ca618bedf2fb01815fc79939"
-dependencies = [
- "log",
- "once_cell",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3008,10 +2996,8 @@ version = "0.4.0-dev.7"
 dependencies = [
  "ansi_term",
  "anyhow",
- "assert_cmd",
  "chrono",
  "clap 4.5.4",
- "escargot",
  "futures",
  "holochain_conductor_api",
  "holochain_p2p",
@@ -3030,7 +3016,6 @@ dependencies = [
  "tracing",
  "url2",
  "walkdir",
- "which",
 ]
 
 [[package]]
@@ -9030,18 +9015,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "which"
-version = "6.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8211e4f58a2b2805adfbefbc07bab82958fc91e3836339b1ab7ae32465dce0d7"
-dependencies = [
- "either",
- "home",
- "rustix 0.38.34",
- "winsafe",
-]
-
-[[package]]
 name = "wide"
 version = "0.7.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9421,12 +9394,6 @@ dependencies = [
  "cfg-if 1.0.0",
  "windows-sys 0.48.0",
 ]
-
-[[package]]
-name = "winsafe"
-version = "0.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d135d17ab770252ad95e9a872d365cf3090e3be864a34ab46f48555993efc904"
 
 [[package]]
 name = "wyz"

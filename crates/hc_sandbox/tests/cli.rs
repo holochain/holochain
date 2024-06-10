@@ -1,4 +1,3 @@
-use assert_cmd::prelude::*;
 use holochain_cli_sandbox::cli::LaunchInfo;
 use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest};
@@ -12,66 +11,12 @@ use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdout, Command};
-use which::which;
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
-
-fn get_hc_built_path() -> &'static PathBuf {
-    static HC_BUILT_PATH: OnceLock<PathBuf> = OnceLock::new();
-
-    HC_BUILT_PATH.get_or_init(|| {
-        let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        manifest_path.push("../hc/Cargo.toml");
-
-        println!("@@ Warning, Building `hc` binary!");
-
-        let out = escargot::CargoBuild::new()
-            .bin("hc")
-            .current_target()
-            .current_release()
-            .manifest_path(manifest_path)
-            // Not defined on CI
-            .target_dir(PathBuf::from(
-                option_env!("CARGO_TARGET_DIR").unwrap_or("./target"),
-            ))
-            .run()
-            .unwrap();
-
-        println!("@@ `hc` binary built");
-
-        out.path().to_path_buf()
-    })
-}
-
-fn get_holochain_built_path() -> &'static PathBuf {
-    static HOLOCHAIN_BUILT_PATH: OnceLock<PathBuf> = OnceLock::new();
-
-    HOLOCHAIN_BUILT_PATH.get_or_init(|| {
-        let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        manifest_path.push("../holochain/Cargo.toml");
-
-        println!("@@ Warning, Building `holochain` binary!");
-
-        let out = escargot::CargoBuild::new()
-            .bin("holochain")
-            .current_target()
-            .current_release()
-            .manifest_path(manifest_path)
-            .target_dir(PathBuf::from(
-                option_env!("CARGO_TARGET_DIR").unwrap_or("./target"),
-            ))
-            .run()
-            .unwrap();
-
-        println!("@@ `holochain` binary built");
-
-        out.path().to_path_buf()
-    })
-}
 
 async fn new_websocket_client_for_port<D>(port: u16) -> anyhow::Result<(WebsocketSender, WsPoll)>
 where
@@ -263,19 +208,34 @@ async fn generate_sandbox_and_call_list_dna() {
     assert!(exit_code.success());
 }
 
+include!(concat!(env!("OUT_DIR"), "/target.rs"));
+
+fn get_target(file: &str) -> std::path::PathBuf {
+    let target = unsafe { std::ffi::OsString::from_encoded_bytes_unchecked(TARGET.to_vec()) };
+    let mut target = std::path::PathBuf::from(target);
+
+    #[cfg(not(windows))]
+    target.push(file);
+
+    #[cfg(windows)]
+    target.push(format!("{}.exe", file));
+
+    if std::fs::metadata(&target).is_err() {
+        panic!("to run integration tests for hc_sandbox, you need to build the workspace so the following file exists: {:?}", &target);
+    }
+    target
+}
+
 fn get_hc_command() -> Command {
-    Command::new(which("hc").unwrap_or_else(|_| get_hc_built_path().clone()))
+    Command::new(get_target("hc"))
 }
 
 fn get_holochain_bin_path() -> PathBuf {
-    which("holochain").unwrap_or_else(|_| get_holochain_built_path().clone())
+    get_target("holochain")
 }
 
 fn get_sandbox_command() -> Command {
-    match which("hc-sandbox") {
-        Ok(p) => Command::new(p),
-        Err(_) => Command::from(std::process::Command::cargo_bin("hc-sandbox").unwrap()),
-    }
+    Command::new(get_target("hc-sandbox"))
 }
 
 async fn get_launch_info(stdout: &mut ChildStdout) -> LaunchInfo {
