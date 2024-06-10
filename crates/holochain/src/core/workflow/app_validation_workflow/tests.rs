@@ -74,8 +74,7 @@ async fn main_workflow() {
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
-            .unwrap()
-            .into(),
+            .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
@@ -284,8 +283,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
-            .unwrap()
-            .into(),
+            .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
@@ -407,8 +405,7 @@ async fn validate_ops_in_sequence_must_get_action() {
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
-            .unwrap()
-            .into(),
+            .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
@@ -574,8 +571,7 @@ async fn handle_error_in_op_validation() {
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
-            .unwrap()
-            .into(),
+            .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
@@ -1000,17 +996,17 @@ async fn app_validation_produces_warrants() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(3).await;
     let (alice,) = conductors[0]
-        .setup_app(&"test_app", [&dna_sans])
+        .setup_app("test_app", [&dna_sans])
         .await
         .unwrap()
         .into_tuple();
     let (bob,) = conductors[1]
-        .setup_app(&"test_app", [&dna_avec_1])
+        .setup_app("test_app", [&dna_avec_1])
         .await
         .unwrap()
         .into_tuple();
     let (carol,) = conductors[2]
-        .setup_app(&"test_app", [&dna_avec_2])
+        .setup_app("test_app", [&dna_avec_2])
         .await
         .unwrap()
         .into_tuple();

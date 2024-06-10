@@ -343,7 +343,7 @@ async fn check_valid_if_dna_test() {
     let action = CreateLink::arbitrary(&mut g).unwrap();
     let cache: DhtDbQueryCache = tmp_dht.to_db().into();
     let mut workspace = SysValidationWorkspace::new(
-        db.clone().into(),
+        db.clone(),
         tmp_dht.to_db(),
         cache.clone(),
         tmp_cache.to_db(),

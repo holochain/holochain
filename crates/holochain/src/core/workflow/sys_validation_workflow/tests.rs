@@ -60,7 +60,7 @@ async fn sys_validation_produces_warrants() {
             .unwrap();
     let op = ChainOp::StoreRecord(
         signed_action.signature().clone(),
-        action.into(),
+        action,
         RecordEntry::NotStored,
     )
     .into();
