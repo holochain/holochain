@@ -40,7 +40,11 @@ where
     let mut runs = vec![];
     for i in 1..=iters {
         tracing::debug!("----- Running equilibrium iteration {} -----", i);
+
+        // following this clippy advice just leads to another error
+        #[allow(clippy::redundant_closure)]
         let run = seek_convergence(peers.clone(), |peers| step(peers));
+
         let vergence = run.vergence;
         runs.push(run);
         if vergence == Divergent {
@@ -53,7 +57,7 @@ where
 /// Run iterations until there is no movement of any arc
 /// TODO: this may be unreasonable, and we may need to just ensure that arcs
 /// settle down into a reasonable level of oscillation
-pub fn seek_convergence<'a, F>(peers: Peers, step: F) -> Run
+pub fn seek_convergence<F>(peers: Peers, step: F) -> Run
 where
     F: Fn(Peers) -> (Peers, EpochStats),
 {
@@ -116,10 +120,10 @@ pub fn run_one_epoch(
             }
         }
         let p = peers.clone();
-        let mut arq = peers.get_mut(i).unwrap();
+        let arq = peers.get_mut(i).unwrap();
         let view = strat.view(topo.clone(), p.as_slice());
         let before = arq.absolute_length(topo) as f64;
-        view.update_arq(&mut arq);
+        view.update_arq(arq);
         let after = arq.absolute_length(topo) as f64;
         let delta = after - before;
         // dbg!(&before, &after, &delta);
@@ -163,7 +167,7 @@ pub fn run_one_epoch(
     let stats = EpochStats {
         net_delta_avg: net / tot / FULL_LEN_F,
         gross_delta_avg: gross / tot / FULL_LEN_F,
-        min_redundancy: min_redundancy,
+        min_redundancy,
         delta_min: delta_min / FULL_LEN_F,
         delta_max: delta_max / FULL_LEN_F,
     };

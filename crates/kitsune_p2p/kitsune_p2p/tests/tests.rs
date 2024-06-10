@@ -245,6 +245,13 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
     wait_for_connected(sender_a.clone(), agent_b.clone(), space.clone()).await;
     wait_for_connected(sender_b.clone(), agent_a.clone(), space.clone()).await;
 
+    let op_hash_list = harness_a
+        .op_store()
+        .read()
+        .iter()
+        .map(|o| o.clone().into())
+        .collect();
+
     sender_a
         .broadcast(
             space.clone(),
@@ -252,12 +259,7 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agent_a.clone(),
-                op_hash_list: harness_a
-                    .op_store()
-                    .read()
-                    .iter()
-                    .map(|o| o.clone().into())
-                    .collect(),
+                op_hash_list,
                 context: FetchContext::default(),
             },
         )

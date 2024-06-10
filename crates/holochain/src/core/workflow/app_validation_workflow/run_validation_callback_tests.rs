@@ -770,10 +770,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
 
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
     // missing hashes should be empty
-    assert_eq!(
-        validation_dependencies.lock().missing_hashes.is_empty(),
-        true
-    );
+    assert!(validation_dependencies.lock().missing_hashes.is_empty());
     // filtering out ops with missing dependencies should not filter anything
     let ops_to_validate = vec![DhtOpHashed::from_content_sync(update_dht_op.clone())];
     let filtered_ops_to_validate = validation_dependencies
@@ -825,10 +822,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
 
     // hashes missing for delete dht op should be empty again after create
     // has been fetched
-    assert_eq!(
-        validation_dependencies.lock().missing_hashes.is_empty(),
-        true
-    );
+    assert!(validation_dependencies.lock().missing_hashes.is_empty());
 
     // filtering out ops with missing dependencies should still not filter anything
     let ops_to_validate = vec![DhtOpHashed::from_content_sync(delete_dht_op)];
@@ -871,7 +865,7 @@ impl TestCase {
                 .into(),
             test_space.space.dht_db.clone().into(),
             test_space.space.dht_query_cache.clone(),
-            test_space.space.cache_db.clone().into(),
+            test_space.space.cache_db.clone(),
             fixt!(MetaLairClient),
             None,
             Arc::new(dna_file.dna_def().clone()),
