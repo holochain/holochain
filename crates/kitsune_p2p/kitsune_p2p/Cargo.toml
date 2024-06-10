@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p"
-version = "0.4.0-dev.6"
+version = "0.4.0-dev.7"
 description = "p2p / dht communication framework"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -28,9 +28,8 @@ kitsune_p2p_timestamp = { version = "^0.4.0-dev.1", path = "../timestamp", featu
   "now",
 ] }
 kitsune_p2p_block = { version = "^0.4.0-dev.5", path = "../block" }
-kitsune_p2p_bootstrap_client = { version = "^0.4.0-dev.6", path = "../bootstrap_client" }
+kitsune_p2p_bootstrap_client = { version = "^0.4.0-dev.7", path = "../bootstrap_client" }
 kitsune_p2p_bin_data = { version = "^0.4.0-dev.5", path = "../bin_data" }
-kitsune_p2p_transport_quic = { version = "^0.4.0-dev.6", path = "../transport_quic", optional = true }
 kitsune_p2p_types = { version = "^0.4.0-dev.6", path = "../types", default-features = false }
 must_future = "0.1.1"
 nanoid = "0.4"
@@ -108,7 +107,7 @@ test_utils = [
 
 mock_network = ["kitsune_p2p_types/test_utils", "mockall"]
 
-tx2 = ["kitsune_p2p_types/tx2", "kitsune_p2p_transport_quic"]
+tx2 = ["kitsune_p2p_types/tx2"]
 tx5 = ["dep:tx5", "kitsune_p2p_types/tx5"]
 
 sqlite-encrypted = [
@@ -116,7 +115,6 @@ sqlite-encrypted = [
   "kitsune_p2p_proxy/sqlite-encrypted",
   "kitsune_p2p_timestamp/sqlite-encrypted",
   "kitsune_p2p_block/sqlite-encrypted",
-  "kitsune_p2p_transport_quic/sqlite-encrypted",
   "kitsune_p2p_types/sqlite-encrypted",
 ]
 sqlite = [
@@ -124,6 +122,5 @@ sqlite = [
   "kitsune_p2p_proxy/sqlite",
   "kitsune_p2p_timestamp/sqlite",
   "kitsune_p2p_block/sqlite",
-  "kitsune_p2p_transport_quic/sqlite",
   "kitsune_p2p_types/sqlite",
 ]

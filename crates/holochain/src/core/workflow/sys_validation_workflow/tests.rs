@@ -1,5 +1,7 @@
+use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::sweettest::SweetConductorBatch;
 use crate::sweettest::SweetDnaFile;
+use crate::sweettest::SweetInlineZomes;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::wait_for_integration;
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
@@ -35,6 +37,80 @@ async fn sys_validation_workflow_test() {
     conductors.exchange_peer_info().await;
 
     run_test(alice_cell_id, bob_cell_id, conductors, dna_file).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sys_validation_produces_warrants() {
+    holochain_trace::test_run();
+    let zome = SweetInlineZomes::new(vec![], 0);
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
+
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let ((alice,), (bob,)) = conductors
+        .setup_app("app", [&dna])
+        .await
+        .unwrap()
+        .into_tuples();
+    let alice_pubkey = alice.agent_pubkey().clone();
+
+    // - Create an invalid op
+    let mut action = ::fixt::fixt!(CreateLink);
+    action.author = alice_pubkey.clone();
+    let action = Action::CreateLink(action);
+    let signed_action =
+        SignedActionHashed::sign(&conductors[0].keystore(), action.clone().into_hashed())
+            .await
+            .unwrap();
+    let op = ChainOp::StoreRecord(
+        signed_action.signature().clone(),
+        action.into(),
+        RecordEntry::NotStored,
+    )
+    .into();
+    let dna_def = dna.dna_def().clone().into_hashed();
+
+    //- Check that the op is indeed invalid
+    let outcome = crate::core::workflow::sys_validation_workflow::validate_op(
+        &op,
+        &dna_def,
+        Default::default(),
+    )
+    .await
+    .unwrap();
+    matches::assert_matches!(outcome, Outcome::Rejected(_));
+
+    //- Inject the invalid op directly into bob's DHT db
+    let op = DhtOpHashed::from_content_sync(op);
+    let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
+    db.test_write(move |txn| {
+        insert_op(txn, &op).unwrap();
+    });
+
+    //- Trigger sys validation
+    conductors[1]
+        .get_cell_triggers(bob.cell_id())
+        .await
+        .unwrap()
+        .sys_validation
+        .trigger(&"test");
+
+    //- Check that bob authored a warrant
+    crate::assert_eq_retry_1m!(
+        {
+            let basis: AnyLinkableHash = alice_pubkey.clone().into();
+            conductors[1]
+                .spaces
+                .get_all_authored_dbs(dna.dna_hash())
+                .unwrap()[0]
+                .test_read(move |txn| {
+                    let store = Txn::from(&txn);
+
+                    let warrants = store.get_warrants_for_basis(&basis).unwrap();
+                    warrants.len()
+                })
+        },
+        1
+    );
 }
 
 async fn run_test(
@@ -309,7 +385,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
         "
         SELECT DhtOp.type, Action.hash, Action.blob, Action.author
         FROM DhtOp
-        LEFT JOIN Action ON DhtOp.action_hash = Action.hash
+        JOIN Action ON DhtOp.action_hash = Action.hash
         WHERE
         when_integrated IS NULL
     ",
@@ -326,7 +402,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
             DhtOpType::Warrant(_) => {
                 let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
                 let author: AgentPubKey = row.get("author")?;
-                let ((warrant, timestamp), signature) = warrant.into();
+                let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
                 Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
             }
         }

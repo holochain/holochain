@@ -1,6 +1,6 @@
 [package]
 name = "holochain_sqlite"
-version = "0.4.0-dev.6"
+version = "0.4.0-dev.7"
 description = "Abstractions for persistence of Holochain state via SQLite"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,16 +13,16 @@ edition = "2021"
 async-trait = "0.1"
 anyhow = "1.0"
 derive_more = "0.99"
-fallible-iterator = "0.2.0"
+fallible-iterator = "0.3.0"
 futures = "0.3"
 holo_hash = { path = "../holo_hash", version = "^0.4.0-dev.5" }
-holochain_serialized_bytes = "=0.0.54"
+holochain_serialized_bytes = "=0.0.55"
 holochain_util = { version = "^0.4.0-dev.1", path = "../holochain_util", features = [
   "backtrace",
   "time",
 ], optional = true }
-holochain_zome_types = { version = "^0.4.0-dev.5", path = "../holochain_zome_types" }
-holochain_nonce = { version = "^0.4.0-dev.2", path = "../holochain_nonce" }
+holochain_zome_types = { version = "^0.4.0-dev.6", path = "../holochain_zome_types" }
+holochain_nonce = { version = "^0.4.0-dev.3", path = "../holochain_nonce" }
 kitsune_p2p_types = { version = "^0.4.0-dev.6", path = "../kitsune_p2p/types", optional = true }
 kitsune_p2p_dht_arc = { version = "^0.4.0-dev.5", path = "../kitsune_p2p/dht_arc" }
 kitsune_p2p_bin_data = { version = "^0.4.0-dev.5", path = "../kitsune_p2p/bin_data" }
@@ -33,8 +33,8 @@ once_cell = "1.4.1"
 num_cpus = "1.13.0"
 parking_lot = "0.12"
 r2d2 = "0.8"
-r2d2_sqlite = { version = "0.1", package = "r2d2_sqlite_neonphog" }
-rmp-serde = "=1.1.2"
+r2d2_sqlite = { version = "0.24.0", package = "hc_r2d2_sqlite" }
+rmp-serde = "=1.3.0"
 scheduled-thread-pool = "0.2"
 serde = "1.0"
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
@@ -52,7 +52,7 @@ tracing = "0.1.18"
 getrandom = "0.2.7"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-rusqlite = { version = "0.29", features = [
+rusqlite = { version = "0.31", features = [
   "blob",      # better integration with blob types (Read, Write, etc)
   "backup",
   "trace",
@@ -96,6 +96,7 @@ slow_tests = []
 # Use at-rest encryption of databases
 sqlite-encrypted = [
   "rusqlite/bundled-sqlcipher-vendored-openssl",
+  "r2d2_sqlite/bundled-sqlcipher-vendored-openssl",
   "holo_hash/sqlite-encrypted",
   "holochain_zome_types/sqlite-encrypted",
   "kitsune_p2p_bin_data/sqlite-encrypted",
@@ -106,10 +107,10 @@ sqlite-encrypted = [
 # Compile SQLite from source rather than depending on a library
 sqlite = [
   "rusqlite/bundled",
+  "r2d2_sqlite/bundled",
   "holo_hash/sqlite",
   "holochain_zome_types/sqlite",
   "kitsune_p2p_bin_data/sqlite",
   "kitsune_p2p_dht_arc/sqlite",
   "kitsune_p2p_types/sqlite",
-  "r2d2_sqlite/bundled",
 ]

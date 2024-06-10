@@ -125,7 +125,8 @@ pub async fn incoming_dht_ops_workflow(
     let mut filter_ops = Vec::with_capacity(num_ops);
     for op in ops {
         // It's cheaper to check if the signature is valid before proceeding to open a write transaction.
-        match should_keep(&op.content).await {
+        let keeper = should_keep(&op.content).await;
+        match keeper {
             Ok(()) => filter_ops.push(op),
             Err(e) => {
                 tracing::warn!(
