@@ -6692,9 +6692,9 @@ dependencies = [
 
 [[package]]
 name = "sbd-client"
-version = "0.0.3-alpha"
+version = "0.0.4-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e55df0af553392262e2d951a8894d5f43d50dc8d0c793c9f8fea9bd0efbb57e"
+checksum = "0085c09324634c08502f332f979b5b6c5a6d26f55333a271abfde1d5e2c8342c"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -6710,9 +6710,9 @@ dependencies = [
 
 [[package]]
 name = "sbd-e2e-crypto-client"
-version = "0.0.3-alpha"
+version = "0.0.4-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7898f19faa60cc5ef9172ea144e03d894591bec0aa2f8374cb02cafd4c2ca33"
+checksum = "3f371aef1df1d87cb916a3bb03858df6bcf56b26f837e3b16d6f5706366854dd"
 dependencies = [
  "sbd-client",
  "sodoken 0.0.901-alpha",
@@ -6721,9 +6721,9 @@ dependencies = [
 
 [[package]]
 name = "sbd-server"
-version = "0.0.3-alpha"
+version = "0.0.4-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2998d0c65754022cdc04ea0772fd41a55dee396a36c1be5bb40b8f37dd0840a"
+checksum = "fa7bb03d0e6d48afb63182446c53c103d66a3095dc0bab60e4d94e7b9efd1349"
 dependencies = [
  "anstyle",
  "base64 0.22.1",
@@ -8224,7 +8224,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.11-alpha"
+version = "0.0.12-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22ede483a3017108ff72aef3d3c0226d859a9aac81c11aa743557647be9ddd11"
 dependencies = [
  "base64 0.22.1",
  "influxive-otel-atomic-obs",
@@ -8238,7 +8240,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-connection"
-version = "0.0.11-alpha"
+version = "0.0.12-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8e6afe0d5e49c119edf0437e780d49062d4371554163773f2b232a9f147099f"
 dependencies = [
  "bit_field",
  "tokio",
@@ -8250,7 +8254,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-core"
-version = "0.0.11-alpha"
+version = "0.0.12-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee5ec5a8a1e7a18f6b3a7c0ce6d9a356e853602740647e1b931c5fdf36a16fd7"
 dependencies = [
  "app_dirs2",
  "base64 0.22.1",
@@ -8267,7 +8273,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion"
-version = "0.0.11-alpha"
+version = "0.0.12-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cbe0d39b45bd4c75ded5e75cae0f1eac04cf2259da9d8b1f71951690a320dc09"
 dependencies = [
  "futures",
  "parking_lot 0.12.3",
@@ -8279,7 +8287,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-sys"
-version = "0.0.11-alpha"
+version = "0.0.12-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19b7ae44b8e8eb8189509cbbd43738f44337440e931b779e82842b709310e956"
 dependencies = [
  "Inflector",
  "base64 0.22.1",
@@ -8296,7 +8306,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-turn"
-version = "0.0.11-alpha"
+version = "0.0.12-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c181e7ef2d58881cc2042c841a0308214224e97dea4ea56f6130c12fc16b8fe"
 dependencies = [
  "base64 0.22.1",
  "dirs",
@@ -8312,7 +8324,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal"
-version = "0.0.11-alpha"
+version = "0.0.12-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21137a90c60e602a7672473ec22b06b5a948232ad644bf80f4949dac814756fb"
 dependencies = [
  "rand 0.8.5",
  "sbd-e2e-crypto-client",
