@@ -14,6 +14,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240610.202925
+
+## [holochain-0.3.1-rc.2](crates/holochain/CHANGELOG.md#0.3.1-rc.2)
+
+- App validation workflow: Reduce interval to re-trigger when dependencies are missing from 10 seconds to 100-1000 ms, according to number of missing dependencies.
+
 # 20240603.115351
 
 ## [hcterm-0.3.1-rc.1](crates/hcterm/CHANGELOG.md#0.3.1-rc.1)
