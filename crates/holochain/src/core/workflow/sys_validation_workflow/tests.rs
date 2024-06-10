@@ -25,7 +25,7 @@ async fn sys_validation_workflow_test() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let apps = conductors
-        .setup_app(&"test_app", [&dna_file])
+        .setup_app("test_app", [&dna_file])
         .await
         .unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
@@ -61,7 +61,7 @@ async fn run_test(
         &alice_dht_db,
         expected_count,
         num_attempts,
-        delay_per_attempt.clone(),
+        delay_per_attempt,
     )
     .await;
 
@@ -105,7 +105,7 @@ async fn run_test(
         &alice_db,
         expected_count,
         num_attempts,
-        delay_per_attempt.clone(),
+        delay_per_attempt,
     )
     .await;
 
@@ -212,7 +212,7 @@ async fn bob_links_in_a_legit_way(
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
     triggers
         .publish_dht_ops
         .trigger(&"bob_links_in_a_legit_way");
@@ -233,7 +233,6 @@ async fn bob_makes_a_large_link(
 
     let bytes = (0..MAX_TAG_SIZE + 1)
         .map(|_| 0u8)
-        .into_iter()
         .collect::<Vec<_>>();
     let link_tag = LinkTag(bytes);
 
@@ -282,27 +281,10 @@ async fn bob_makes_a_large_link(
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"bob_makes_a_large_link");
     (bad_update_action, bad_update_entry_hash, link_add_address)
 }
-
-//////////////////////
-//// Test Ideas
-//////////////////////
-// These are tests that I think might break
-// validation but are too hard to write currently
-
-// 1. Delete points to an action that isn't a NewEntryType.
-// ## Comments
-// I think this will fail RegisterDeleteBy but pass as StoreRecord
-// which is wrong.
-// ## Scenario
-// 1. Commit a Delete Action that points to a valid EntryHash and
-// a ActionHash that exists but is not a NewEntryAction (use CreateLink).
-// 2. The Create link is integrated and valid.
-// ## Expected
-// The Delete action should be invalid for all authorities.
 
 fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     txn.prepare(

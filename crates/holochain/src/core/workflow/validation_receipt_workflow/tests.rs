@@ -100,8 +100,7 @@ async fn test_validation_receipt() {
                     Ok(stmt
                         .query_map([], |row| row.get::<_, Option<u32>>(0))
                         .unwrap()
-                        .map(Result::unwrap)
-                        .flatten()
+                        .filter_map(Result::unwrap)
                         .collect::<Vec<u32>>())
                 })
                 .await

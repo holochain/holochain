@@ -256,7 +256,7 @@ mod tests {
         while i < 10 {
             conductor.raw_handle().dispatch_scheduled_fns(now).await;
             now = (now + std::time::Duration::from_millis(2))?;
-            i = i + 1;
+            i += 1;
         }
         loop {
             let query_tick_init: Vec<Record> = conductor.call(&alice, "query_tick_init", ()).await;
@@ -292,7 +292,7 @@ mod tests {
         while i < 10 {
             conductor.raw_handle().dispatch_scheduled_fns(now).await;
             now = (now + std::time::Duration::from_millis(2))?;
-            i = i + 1;
+            i += 1;
         }
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;

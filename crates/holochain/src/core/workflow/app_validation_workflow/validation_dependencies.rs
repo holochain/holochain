@@ -220,9 +220,9 @@ mod tests {
         #[test]
         fn empty() {
             let validation_dependencies = ValidationDependencies::default();
-            assert_eq!(
-                validation_dependencies.fetch_missing_hashes_timed_out(),
-                false
+            assert!(
+                !validation_dependencies.fetch_missing_hashes_timed_out(),
+
             );
         }
 
@@ -240,9 +240,8 @@ mod tests {
                         - Duration::from_secs(1),
                 },
             );
-            assert_eq!(
-                validation_dependencies.fetch_missing_hashes_timed_out(),
-                true
+            assert!(
+                validation_dependencies.fetch_missing_hashes_timed_out()
             );
         }
 
@@ -259,10 +258,7 @@ mod tests {
                         + Duration::from_secs(1),
                 },
             );
-            assert_eq!(
-                validation_dependencies.fetch_missing_hashes_timed_out(),
-                false
-            );
+            assert!(!validation_dependencies.fetch_missing_hashes_timed_out());
         }
 
         #[test]
@@ -287,10 +283,7 @@ mod tests {
                         - Duration::from_secs(1),
                 },
             );
-            assert_eq!(
-                validation_dependencies.fetch_missing_hashes_timed_out(),
-                false
-            );
+            assert!(!validation_dependencies.fetch_missing_hashes_timed_out());
         }
     }
 }

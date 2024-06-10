@@ -235,7 +235,7 @@ mod tests {
                 &bob,
                 "get_count",
                 LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))
-                    .before(mid_time.clone()),
+                    .before(mid_time),
             )
             .await;
         assert_eq!(1, count);

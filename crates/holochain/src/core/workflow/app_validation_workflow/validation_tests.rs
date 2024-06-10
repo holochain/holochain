@@ -252,7 +252,7 @@ async fn app_validation_ops() {
                                     entry_index,
                                     zome_index,
                                     ..
-                                })) => (Some(entry_index.clone()), Some(zome_index.clone())),
+                                })) => (Some(*entry_index), Some(*zome_index)),
                                 _ => (None, None),
                             };
                         Event {
@@ -369,12 +369,12 @@ async fn app_validation_ops() {
 
     let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes).await;
     let app = conductors[0]
-        .setup_app_for_agent(&"test_app", alice.clone(), &[dna_file_a.clone()])
+        .setup_app_for_agent("test_app", alice.clone(), &[dna_file_a.clone()])
         .await
         .unwrap();
     let (alice,) = app.into_tuple();
     let app = conductors[1]
-        .setup_app_for_agent(&"test_app", bob.clone(), &[dna_file_b.clone()])
+        .setup_app_for_agent("test_app", bob.clone(), &[dna_file_b.clone()])
         .await
         .unwrap();
     let (bob,) = app.into_tuple();
@@ -422,7 +422,11 @@ async fn app_validation_ops() {
             writeln!(&mut s, "Got event {} that was missing from:", event).unwrap();
             let mut events: Vec<String> = expected.0.iter().map(Event::to_string).collect();
             events.sort();
-            let events: String = events.into_iter().map(|s| format!("{}\n", s)).collect();
+            let events = events.into_iter().fold(String::new(), |mut acc, s| {
+                acc.push_str(&s);
+                acc.push('\n');
+                acc
+            });
             writeln!(&mut s, "{}", events).unwrap();
 
             panic!("{}", s);
@@ -431,7 +435,11 @@ async fn app_validation_ops() {
     if !expected.0.is_empty() {
         let mut events: Vec<String> = expected.0.iter().map(Event::to_string).collect();
         events.sort();
-        let events: String = events.into_iter().map(|s| format!("{}\n", s)).collect();
+        let events = events.into_iter().fold(String::new(), |mut acc, s| {
+            acc.push_str(&s);
+            acc.push('\n');
+            acc
+        });
 
         panic!(
             "The following ops were expected to be validated but never were: \n{}",

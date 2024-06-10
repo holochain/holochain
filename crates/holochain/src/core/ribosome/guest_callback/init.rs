@@ -170,10 +170,9 @@ mod test {
             let number_of_extras = rng.gen_range(0..5);
             for _ in 0..number_of_extras {
                 let maybe_extra = results.choose(&mut rng).cloned();
-                match maybe_extra {
-                    Some(extra) => results.push(extra),
-                    _ => {}
-                };
+                if let Some(extra) = maybe_extra {
+                    results.push(extra);
+                }
             }
 
             assert_eq!(expected, results.into(),);
@@ -358,7 +357,7 @@ mod slow_tests {
                 .call_fallible(
                     &zome,
                     "create_post",
-                    Post(format!("clone message").to_string()),
+                    Post("clone message".to_string()),
                 )
                 .await;
 
