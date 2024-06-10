@@ -40,11 +40,11 @@ async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> V
 async fn test_arc_redundancy() {
     let conductor = SweetConductor::from_standard_config().await;
     let keystore = conductor.keystore();
-    fn converge(peers: &mut Vec<Arq>) {
+    fn converge(peers: &mut [Arq]) {
         let mut mature = false;
         for _ in 0..40 {
             for i in 0..peers.len() {
-                let p = peers.clone();
+                let p = peers.to_owned();
                 let arc = peers.get_mut(i).unwrap();
                 let view = PeerStrat::default().view(Topology::standard_epoch_full(), p.as_slice());
                 view.update_arq(arc);

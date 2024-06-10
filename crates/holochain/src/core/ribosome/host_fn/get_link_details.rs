@@ -112,7 +112,7 @@ pub mod slow_tests {
 
         let exists_output: bool = conductor.call(&alice, "exists", "foo".to_string()).await;
 
-        assert_eq!(true, exists_output,);
+        assert!(exists_output);
 
         let _foo_bar: holo_hash::EntryHash = conductor
             .call(&alice, "path_entry_hash", "foo.bar".to_string())
@@ -145,7 +145,7 @@ pub mod slow_tests {
 
         let mut remove_happened = false;
         for (_, removes) in children_details_output_2_vec {
-            if removes.len() > 0 {
+            if !removes.is_empty() {
                 remove_happened = true;
 
                 let link_add_address = unwrap_to

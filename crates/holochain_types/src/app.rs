@@ -1200,8 +1200,7 @@ mod tests {
         // Assert it is accessible from the app again
         assert!(app
             .clone_cells()
-            .find(|(clone_id, _)| **clone_id == clone_id_0)
-            .is_some());
+            .any(|(clone_id, _)| *clone_id == clone_id_0));
         assert_eq!(
             app.clone_cell_ids().collect::<HashSet<_>>(),
             maplit::hashset! { &clones[0], &clones[1], &clones[2] }

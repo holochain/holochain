@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 use crate::actor::BroadcastData;
 use crate::spawn::actor::{
     EvtRcv, InternalHandlerResult, KSpace, MaybeDelegate, OpHashList, VecMXM,

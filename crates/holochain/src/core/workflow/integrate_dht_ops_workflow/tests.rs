@@ -427,7 +427,7 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
     let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
         a.original_action.clone(),
-        a.original_entry.clone().into(),
+        a.original_entry.clone(),
     )
     .into();
     let op: DhtOp = ChainOp::RegisterUpdatedContent(
@@ -451,7 +451,7 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
         a.original_action.clone(),
-        a.original_entry.clone().into(),
+        a.original_entry.clone(),
     )
     .into();
     let op: DhtOp =
@@ -461,7 +461,7 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         Db::IntQueueEmpty,
         Db::Integrated(op.clone()),
         Db::MetaDelete(
-            a.original_action_hash.clone().into(),
+            a.original_action_hash.clone(),
             a.entry_delete.clone().into(),
         ),
     ];
@@ -480,7 +480,7 @@ fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaDelete(
-            a.original_action_hash.clone().into(),
+            a.original_action_hash.clone(),
             a.entry_delete.clone().into(),
         ),
     ];
@@ -491,7 +491,7 @@ fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
         a.original_action.clone(),
-        a.original_entry.clone().into(),
+        a.original_entry.clone(),
     )
     .into();
     let original_link_op = ChainOp::RegisterAddLink(a.signature.clone(), a.link_add.clone()).into();

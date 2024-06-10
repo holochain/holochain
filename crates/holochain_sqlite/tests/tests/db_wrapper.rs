@@ -53,12 +53,12 @@ async fn async_read_respects_reader_permit_limits() {
 
         for _ in 0..3 {
             // Should not be able to get another permit
-            match my_db_handle
+            let m = my_db_handle
                 .read_async(move |_| -> DatabaseResult<()> {
                     panic!("Did not expect to be called");
                 })
-                .await
-            {
+                .await;
+            match m {
                 Err(DatabaseError::Timeout(_)) => {
                     // Could not get a permit, this is the desired outcome. Sleep and try again
                     check_task_failed_count.fetch_add(1, Ordering::SeqCst);

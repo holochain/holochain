@@ -902,8 +902,7 @@ mod tests {
                 timestamp: fixt!(Timestamp),
             };
             let op: DhtOp = op.into();
-            let op = op.into_hashed();
-            op
+            op.into_hashed()
         };
 
         let action_author = fixt!(AgentPubKey);

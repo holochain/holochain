@@ -75,8 +75,8 @@ pub mod wasm_test {
         let data = XSalsa20Poly1305Data::from(vec![1, 2, 3, 4]);
 
         let encrypt_input = X25519XSalsa20Poly1305Encrypt::new(
-            alice_x25519.clone(),
-            bob_x25519.clone(),
+            alice_x25519,
+            bob_x25519,
             data.clone(),
         );
 
@@ -86,8 +86,8 @@ pub mod wasm_test {
 
         let decrypt_input =
             holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
-                bob_x25519.clone(),
-                alice_x25519.clone(),
+                bob_x25519,
+                alice_x25519,
                 encrypt_output.clone(),
             );
 
@@ -99,8 +99,8 @@ pub mod wasm_test {
 
         let bad_decrypt_input =
             holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt::new(
-                carol_x25519.clone(),
-                alice_x25519.clone(),
+                carol_x25519,
+                alice_x25519,
                 encrypt_output,
             );
         let bad_decrypt_output: Result<Option<XSalsa20Poly1305Data>, _> = conductor

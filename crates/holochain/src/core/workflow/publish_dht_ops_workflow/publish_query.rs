@@ -152,7 +152,7 @@ mod tests {
 
         let agent = fixt!(AgentPubKey);
         let db = test_authored_db();
-        let expected = test_data(&db.to_db().into(), agent.clone()).await;
+        let expected = test_data(&db.to_db(), agent.clone()).await;
         let r = get_ops_to_publish(expected.agent.clone(), &db.to_db())
             .await
             .unwrap();
