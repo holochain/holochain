@@ -1,4 +1,4 @@
-use crate::integrity::LinkTypes;
+use crate::integrity::*;
 use hdk::prelude::*;
 
 #[hdk_dependent_link_types]
@@ -293,4 +293,32 @@ fn get_links_from_network(_: ()) -> ExternResult<Vec<Link>> {
         .get_options(GetStrategy::Network)
         .build();
     hdk::prelude::get_links(get_links_input)
+}
+
+#[hdk_extern]
+fn test_entry_create() -> ExternResult<ActionHash> {
+    create_entry(&EntryTypes::Test(Test))
+}
+
+#[hdk_extern]
+fn test_entry_get(action: ActionHash) -> ExternResult<Option<Record>> {
+    get(action, Default::default())
+}
+
+#[hdk_extern]
+fn test_entry_link(input: (ActionHash, AgentPubKey)) -> ExternResult<ActionHash> {
+    hdk::prelude::create_link(
+        input.0,
+        input.1,
+        LinkTypes::SomeLinks,
+        (),
+    )
+}
+
+#[hdk_extern]
+fn test_entry_get_links(entry_action_hash: ActionHash) -> ExternResult<Vec<Link>> {
+    hdk::link::get_links(GetLinksInputBuilder::try_new(
+        entry_action_hash,
+        LinkTypes::SomeLinks,
+    )?.build())
 }
