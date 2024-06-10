@@ -12,7 +12,7 @@ path = "src/lib/mod.rs"
 
 # reminder - do not use workspace deps
 [dependencies]
-comrak = "0.10"
+comrak = "0.17"
 yaml-rust = "0.4.5"
 structopt = "0.3"
 bstr = "0.2"
