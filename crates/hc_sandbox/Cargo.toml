@@ -56,10 +56,7 @@ url2 = "0.0.6"
 walkdir = "2"
 
 [dev-dependencies]
-assert_cmd = "2.0"
 matches = "0.1"
-escargot = "0.5.7"
-which = "6.0"
 
 [lints]
 workspace = true
