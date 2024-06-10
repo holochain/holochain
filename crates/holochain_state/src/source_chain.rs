@@ -1289,7 +1289,7 @@ pub async fn dump_state(
             let published_ops_count = txn.query_row(
                 "
                 SELECT COUNT(DhtOp.hash) FROM DhtOp
-                LEFT JOIN Action ON DhtOp.action_hash = Action.hash
+                JOIN Action ON DhtOp.action_hash = Action.hash
                 WHERE
                 Action.author = :author
                 AND

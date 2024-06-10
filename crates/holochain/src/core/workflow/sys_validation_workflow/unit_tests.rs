@@ -385,6 +385,8 @@ impl TestCase {
             self.self_trigger.0.clone(),
             actual_network,
             config,
+            self.keystore.clone(),
+            self.agent.clone(),
         )
         .await
         .unwrap()

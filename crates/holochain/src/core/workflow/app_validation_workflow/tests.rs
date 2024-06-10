@@ -20,6 +20,7 @@ use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations::insert_op;
 use holochain_state::prelude::{from_blob, StateQueryResult};
+use holochain_state::query::{Store, Txn};
 use holochain_state::test_utils::test_db_dir;
 use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::DhtOpHashed;
@@ -148,6 +149,7 @@ async fn main_workflow() {
             validated: 0,
             accepted: 0,
             rejected: 0,
+            warranted: 0,
             missing: 1,
             failed: empty_set,
         } if empty_set == HashSet::<DhtOpHash>::new()
@@ -190,6 +192,7 @@ async fn main_workflow() {
             validated: 1,
             accepted: 1,
             rejected: 0,
+            warranted: 0,
             missing: 0,
             failed: empty_set,
         } if empty_set == HashSet::<DhtOpHash>::new()
@@ -344,6 +347,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             validated: 2,
             accepted: 2,
             rejected: 0,
+            warranted: 0,
             missing: 0,
             failed: empty_set,
         } if empty_set == HashSet::<DhtOpHash>::new()
@@ -486,6 +490,7 @@ async fn validate_ops_in_sequence_must_get_action() {
             validated: 2,
             accepted: 2,
             rejected: 0,
+            warranted: 0,
             missing: 0,
             failed: empty_set,
         } if empty_set == HashSet::<DhtOpHash>::new()
@@ -533,7 +538,7 @@ async fn multi_create_link_validation() {
         .call(&alice_zome, "create_post", post.clone())
         .await;
 
-    await_consistency(Duration::from_secs(60), [&alice, &bobbo])
+    await_consistency(Duration::from_secs(10), [&alice, &bobbo])
         .await
         .expect("Timed out waiting for consistency");
 
@@ -647,6 +652,7 @@ async fn handle_error_in_op_validation() {
             validated: 1,
             accepted: 1,
             missing: 0,
+            warranted: 0,
             rejected: 0,
             failed: actual_failed,
         } if actual_failed == expected_failed
@@ -938,6 +944,146 @@ async fn check_app_entry_def_test() {
     );
 }
 
+/// Three agent test.
+/// Alice is bypassing validation.
+/// Bob and Carol are running a DNA with validation that will reject any new action authored.
+/// Alice and Bob join the network, and Alice commits an invalid action.
+/// Bob blocks Alice and authors a Warrant.
+/// Carol joins the network, and receives Bob's warrant via gossip.
+/// (TODO: write similar test for publish.)
+#[tokio::test(flavor = "multi_thread")]
+async fn app_validation_produces_warrants() {
+    holochain_trace::test_run();
+
+    #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
+    struct AppString(String);
+
+    let string_entry_def = EntryDef::default_from_id("string");
+    let zome_common = SweetInlineZomes::new(vec![string_entry_def], 0).function(
+        "create_string",
+        move |api, s: AppString| {
+            let entry = Entry::app(s.try_into().unwrap()).unwrap();
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                EntryVisibility::Public,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        },
+    );
+
+    let zome_sans_validation = zome_common
+        .clone()
+        .integrity_function("validate", move |_api, _op: Op| {
+            Ok(ValidateCallbackResult::Valid)
+        });
+
+    let zome_avec_validation = |_| {
+        zome_common
+            .clone()
+            .integrity_function("validate", move |_api, op: Op| {
+                if op.action_seq() > 3 {
+                    Ok(ValidateCallbackResult::Invalid("nope".to_string()))
+                } else {
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            })
+    };
+
+    let network_seed = "seed".to_string();
+
+    let (dna_sans, _, _) =
+        SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_sans_validation).await;
+    let (dna_avec_1, _, _) =
+        SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_avec_validation(1)).await;
+    let (dna_avec_2, _, _) =
+        SweetDnaFile::from_inline_zomes(network_seed.clone(), zome_avec_validation(2)).await;
+
+    let dna_hash = dna_sans.dna_hash();
+    assert_eq!(dna_sans.dna_hash(), dna_avec_1.dna_hash());
+    assert_eq!(dna_avec_1.dna_hash(), dna_avec_2.dna_hash());
+
+    let mut conductors = SweetConductorBatch::from_standard_config(3).await;
+    let (alice,) = conductors[0]
+        .setup_app(&"test_app", [&dna_sans])
+        .await
+        .unwrap()
+        .into_tuple();
+    let (bob,) = conductors[1]
+        .setup_app(&"test_app", [&dna_avec_1])
+        .await
+        .unwrap()
+        .into_tuple();
+    let (carol,) = conductors[2]
+        .setup_app(&"test_app", [&dna_avec_2])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    println!("AGENTS");
+    println!("0 alice {}", alice.agent_pubkey());
+    println!("1 bob   {}", bob.agent_pubkey());
+    println!("2 carol {}", carol.agent_pubkey());
+
+    conductors.exchange_peer_info().await;
+
+    await_consistency(10, [&alice, &bob, &carol]).await.unwrap();
+
+    conductors[2].shutdown().await;
+
+    let _: ActionHash = conductors[0]
+        .call(
+            &alice.zome(SweetInlineZomes::COORDINATOR),
+            "create_string",
+            AppString("entry1".into()),
+        )
+        .await;
+
+    await_consistency(10, [&alice, &bob]).await.unwrap();
+    // TODO: fix await_consistency to recognize warrants
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    conductors[0].shutdown().await;
+    conductors[2].startup().await;
+
+    // conductors[0].persist_dbs();
+    // conductors[1].persist_dbs();
+    // conductors[2].persist_dbs();
+
+    //- Ensure that bob authored a warrant
+    let alice_pubkey = alice.agent_pubkey().clone();
+    conductors[1].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
+        let store = Txn::from(&txn);
+
+        let warrants = store.get_warrants_for_basis(&alice_pubkey.into()).unwrap();
+        assert_eq!(warrants.len(), 1);
+    });
+
+    // TODO: ensure that bob blocked alice
+
+    await_consistency(10, [&bob, &carol]).await.unwrap();
+
+    //- Ensure that carol gets gossiped the warrant for alice from bob
+
+    let basis: AnyLinkableHash = alice.agent_pubkey().clone().into();
+    crate::assert_eq_retry_10s!(
+        {
+            let basis = basis.clone();
+            conductors[2]
+                .spaces
+                .dht_db(dna_hash)
+                .unwrap()
+                .test_read(move |txn| {
+                    let store = Txn::from(&txn);
+                    store.get_warrants_for_basis(&basis).unwrap()
+                })
+                .len()
+        },
+        1
+    );
+}
+
 // These are the expected invalid ops
 fn expected_invalid_entry(
     txn: &Transaction,
@@ -1025,7 +1171,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
         "
         SELECT DhtOp.type, Action.hash, Action.blob
         FROM DhtOp
-        LEFT JOIN Action ON DhtOp.action_hash = Action.hash
+        JOIN Action ON DhtOp.action_hash = Action.hash
         WHERE
         when_integrated IS NULL
     ",
@@ -1042,7 +1188,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
             DhtOpType::Warrant(_) => {
                 let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
                 let author: AgentPubKey = from_blob(row.get("author")?)?;
-                let ((warrant, timestamp), signature) = warrant.into();
+                let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
                 Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
             }
         }
