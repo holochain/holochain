@@ -183,7 +183,7 @@ async fn reject_duplicate_app_for_same_agent() {
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
-            membrane_proofs: HashMap::new().into(),
+            membrane_proofs: HashMap::new(),
             #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })

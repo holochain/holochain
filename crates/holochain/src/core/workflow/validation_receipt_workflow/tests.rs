@@ -6,7 +6,6 @@ use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_state::prelude::*;
-use rusqlite::Transaction;
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky, doesn't take into account timing or retries"]

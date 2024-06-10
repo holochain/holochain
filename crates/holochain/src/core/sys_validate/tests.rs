@@ -787,6 +787,8 @@ fn valid_chain_test() {
 
         // Test without dna at root gets rejected.
         let mut dna_not_at_root = actions.clone();
+        // This is a wrong detection I think, because it's having some trouble understanding the types.
+        #[allow(clippy::clone_on_copy)]
         dna_not_at_root.push(actions[0].clone());
         let err = validate_chain(dna_not_at_root.iter(), &None).expect_err("Dna not at root");
         assert_matches!(

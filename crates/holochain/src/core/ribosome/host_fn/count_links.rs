@@ -224,7 +224,7 @@ mod tests {
                     base.clone(),
                     LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
                 )
-                .after(mid_time.clone()),
+                .after(mid_time),
             )
             .await;
         assert_eq!(1, count);

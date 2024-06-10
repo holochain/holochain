@@ -488,7 +488,6 @@ pub mod test {
     use holochain_keystore::test_keystore;
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
-    use holochain_sqlite::prelude::*;
     use holochain_state::prelude::*;
     use holochain_trace;
     use holochain_types::test_utils::fake_agent_pubkey_1;
@@ -746,7 +745,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
-    #[allow(unreachable_code, unused_variables)]
+    #[allow(unreachable_code, unused_variables, clippy::diverging_sub_expression)]
     async fn invalid_request() {
         holochain_trace::test_run();
         let (_tmpdir, conductor_handle) = setup_admin().await;
@@ -1095,8 +1094,6 @@ pub mod test {
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
             assert_matches!(info.status, AppInfoStatus::Disabled { .. });
-        } else {
-            assert!(false);
         }
 
         // Enable the app one more time

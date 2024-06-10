@@ -111,14 +111,14 @@ async fn app_ids_are_unique() {
     let app = InstalledAppCommon::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
 
     conductor
-        .add_disabled_app_to_db(app.clone().into())
+        .add_disabled_app_to_db(app.clone())
         .await
         .unwrap();
 
     assert_matches!(
-        conductor.add_disabled_app_to_db(app.clone().into()).await,
+        conductor.add_disabled_app_to_db(app.clone()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
-        if id == "id".to_string()
+        if id == *"id"
     );
 
     //- it doesn't matter whether the app is active or inactive
@@ -128,7 +128,7 @@ async fn app_ids_are_unique() {
         .unwrap();
     assert_eq!(delta, AppStatusFx::SpinUp);
     assert_matches!(
-        conductor.add_disabled_app_to_db(app.clone().into()).await,
+        conductor.add_disabled_app_to_db(app.clone()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
         if &id == "id"
     );
