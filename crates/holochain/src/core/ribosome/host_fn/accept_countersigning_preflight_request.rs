@@ -508,7 +508,7 @@ pub mod wasm_test {
                 .unwrap(),
             )
             .await;
-        assert!(matches!(countersign_fail_create_alice, Err(_)));
+        assert!(countersign_fail_create_alice.is_err());
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
     }
 

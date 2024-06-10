@@ -204,10 +204,8 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Create the network
-        let filter_events = |evt: &_| match evt {
-            holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
-            _ => false,
-        };
+        let filter_events =
+            |evt: &_| matches!(evt, holochain_p2p::event::HolochainP2pEvent::Publish { .. });
         let (tx, mut recv) = tokio::sync::mpsc::channel(10);
         let test_network =
             test_network_with_events(Some(dna.clone()), Some(author.clone()), filter_events, tx)
@@ -224,20 +222,17 @@ mod tests {
                 let mut tx_complete = Some(tx_complete);
                 while let Some(evt) = recv.recv().await {
                     use holochain_p2p::event::HolochainP2pEvent::*;
-                    match evt {
-                        Publish { respond, .. } => {
-                            respond.respond(Ok(async move { Ok(()) }.boxed().into()));
-                            if panic_on_publish {
-                                panic!("Published, when expecting not to")
-                            }
-                            recv_count += 1;
-                            if recv_count == total_expected {
-                                // notify the test that all items have been received
-                                tx_complete.take().unwrap().send(()).unwrap();
-                                break;
-                            }
+                    if let Publish { respond, .. } = evt {
+                        respond.respond(Ok(async move { Ok(()) }.boxed().into()));
+                        if panic_on_publish {
+                            panic!("Published, when expecting not to")
                         }
-                        _ => {}
+                        recv_count += 1;
+                        if recv_count == total_expected {
+                            // notify the test that all items have been received
+                            tx_complete.take().unwrap().send(()).unwrap();
+                            break;
+                        }
                     }
                 }
             }
@@ -261,14 +256,9 @@ mod tests {
         author: AgentPubKey,
     ) {
         let (trigger_sender, _) = TriggerSender::new();
-        publish_dht_ops_workflow(
-            db.clone().into(),
-            Arc::new(dna_network),
-            trigger_sender,
-            author,
-        )
-        .await
-        .unwrap();
+        publish_dht_ops_workflow(db.clone(), Arc::new(dna_network), trigger_sender, author)
+            .await
+            .unwrap();
     }
 
     /// There is a test that shows that network messages would be sent to all agents via broadcast.
@@ -294,7 +284,7 @@ mod tests {
             let (_network, dna_network, author, recv_task, rx_complete) =
                 setup(db.clone(), num_agents, num_hash, false).await;
 
-            call_workflow(db.clone().into(), dna_network, author).await;
+            call_workflow(db.clone(), dna_network, author).await;
 
             // Wait for expected # of responses, or timeout
             tokio::select! {
@@ -359,10 +349,7 @@ mod tests {
                 let db = test_db.to_db();
 
                 let dna = fixt!(DnaHash);
-                let filter_events = |evt: &_| match evt {
-                    holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
-                    _ => false,
-                };
+                let filter_events = |evt: &_| matches!(evt, holochain_p2p::event::HolochainP2pEvent::Publish { .. });
                 let (tx, mut recv) = tokio::sync::mpsc::channel(10);
                 let author = fake_agent_pubkey_1();
                 let test_network = test_network_with_events(
@@ -383,7 +370,7 @@ mod tests {
                 // Make them private
                 let visibility = EntryVisibility::Private;
                 let mut entry_type_fixt =
-                    AppEntryDefFixturator::new(visibility.clone()).map(EntryType::App);
+                    AppEntryDefFixturator::new(visibility).map(EntryType::App);
                 let ec_entry_type = entry_type_fixt.next().unwrap();
                 let eu_entry_type = entry_type_fixt.next().unwrap();
 
@@ -398,7 +385,7 @@ mod tests {
 
                 // Put data in records
                 let source_chain = SourceChain::new(
-                    db.clone().into(),
+                    db.clone(),
                     dht_db.to_db(),
                     DhtDbQueryCache::new(dht_db.clone().into()),
                     keystore.clone(),
@@ -467,7 +454,7 @@ mod tests {
 
                     let expected_op = ChainOp::StoreRecord(
                         sig,
-                        entry_create_action.into_content().try_into().unwrap(),
+                        entry_create_action.into_content(),
                         RecordEntry::NA,
                     );
                     let op_hash = expected_op.to_hash();
@@ -537,37 +524,34 @@ mod tests {
                         let mut tx_complete = Some(tx_complete);
                         while let Some(evt) = recv.recv().await {
                             use holochain_p2p::event::HolochainP2pEvent::*;
-                            match evt {
-                                Publish { respond, ops, .. } => {
-                                    tracing::debug!(?ops);
+                            if let Publish { respond, ops, .. } = evt {
+                                tracing::debug!(?ops);
 
-                                    // Check the ops are correct
-                                    for op in ops {
-                                        let op_hash = DhtOpHash::with_data_sync(&op);
-                                        match expected.get(&op_hash) {
-                                            Some((expected_op, count)) => {
-                                                assert_eq!(op, DhtOp::from(expected_op.clone()));
-                                                count.fetch_add(1, Ordering::SeqCst);
-                                            }
-                                            None => {
-                                                if let ChainOp::StoreEntry(_, h, _) = op.as_chain_op().expect("warrants not handled here") {
-                                                    if *h.visibility() == EntryVisibility::Private {
-                                                        panic!(
-                                                            "A private op has been published: {:?}",
-                                                            h
-                                                        )
-                                                    }
+                                // Check the ops are correct
+                                for op in ops {
+                                    let op_hash = DhtOpHash::with_data_sync(&op);
+                                    match expected.get(&op_hash) {
+                                        Some((expected_op, count)) => {
+                                            assert_eq!(op, DhtOp::from(expected_op.clone()));
+                                            count.fetch_add(1, Ordering::SeqCst);
+                                        }
+                                        None => {
+                                            if let ChainOp::StoreEntry(_, h, _) = op.as_chain_op().expect("warrants not handled here") {
+                                                if *h.visibility() == EntryVisibility::Private {
+                                                    panic!(
+                                                        "A private op has been published: {:?}",
+                                                        h
+                                                    )
                                                 }
                                             }
                                         }
-                                        recv_count += 1;
                                     }
-                                    respond.respond(Ok(async move { Ok(()) }.boxed().into()));
-                                    if recv_count == total_expected {
-                                        tx_complete.take().unwrap().send(()).unwrap();
-                                    }
+                                    recv_count += 1;
                                 }
-                                _ => {}
+                                respond.respond(Ok(async move { Ok(()) }.boxed().into()));
+                                if recv_count == total_expected {
+                                    tx_complete.take().unwrap().send(()).unwrap();
+                                }
                             }
                         }
                     }
@@ -584,7 +568,7 @@ mod tests {
                     }
                 }
 
-                call_workflow(db.clone().into(), dna_network, author).await;
+                call_workflow(db.clone(), dna_network, author).await;
 
                 // Wait for expected # of responses, or timeout
                 tokio::select! {
@@ -599,11 +583,11 @@ mod tests {
                 let num_agents = num_agents + 1;
                 // Check there is no ops left that didn't come through
                 assert_eq!(
-                    num_agents * 1,
+                    num_agents,
                     register_replaced_by_count.load(Ordering::SeqCst)
                 );
                 assert_eq!(
-                    num_agents * 1,
+                    num_agents,
                     register_updated_record_count.load(Ordering::SeqCst)
                 );
                 assert_eq!(num_agents * 2, store_record_count.load(Ordering::SeqCst));

@@ -161,7 +161,7 @@ pub mod wasm_test {
                     .call(
                         &alice,
                         "verify_signature_raw",
-                        VerifySignature::new_raw(k.clone(), sig.clone().into(), data.clone()),
+                        VerifySignature::new_raw(k.clone(), sig.into(), data.clone()),
                     )
                     .await;
 

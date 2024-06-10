@@ -19,7 +19,7 @@ integrity:
       path: ../zome-3.wasm
       "#;
 
-    let _manifest: DnaManifest = serde_yaml::from_str(&manifest_yaml).unwrap();
+    let _manifest: DnaManifest = serde_yaml::from_str(manifest_yaml).unwrap();
 }
 
 #[test]
@@ -47,7 +47,7 @@ coordinator:
       path: ../zome-5.wasm
         "#;
 
-    let _manifest: DnaManifest = serde_yaml::from_str(&manifest_yaml).unwrap();
+    let _manifest: DnaManifest = serde_yaml::from_str(manifest_yaml).unwrap();
 }
 
 #[test]
@@ -69,7 +69,7 @@ coordinator:
       path: ../zome-5.wasm
         "#;
 
-    serde_yaml::from_str::<DnaManifest>(&manifest_yaml)
+    serde_yaml::from_str::<DnaManifest>(manifest_yaml)
         .expect_err("This should fail because integrity zomes are required");
 }
 
@@ -92,11 +92,11 @@ integrity:
       path: ../zome-3.wasm
 not_a_real_field: ~"#;
 
-    let err = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap_err();
+    let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `not_a_real_field`"),
         "Should have rejected unknown field but actually got: {}",
-        err.to_string(),
+        err,
     );
 }
 
@@ -125,11 +125,11 @@ integrity:
       - name: zome5
         path: ../zome-5.wasm"#;
 
-    let err = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap_err();
+    let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `coordinator`"),
         "Should have rejected coordinator zomes nested under integrity but actually got: {}",
-        err.to_string(),
+        err,
     );
 }
 
@@ -158,11 +158,11 @@ coordinator:
       - name: zome3
         path: ../zome-3.wasm"#;
 
-    let err = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap_err();
+    let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `integrity`"),
         "Should have rejected integrity zomes nested under coordinators but actually got: {}",
-        err.to_string(),
+        err,
     );
 }
 
@@ -186,11 +186,11 @@ integrity:
       path: ../zome-3.wasm
 "#;
 
-    let err = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap_err();
+    let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `not_a_real_field`"),
         "Should have rejected unknown field but actually got: {}",
-        err.to_string(),
+        err,
     );
 }
 
@@ -209,11 +209,11 @@ coordinator:
       path: ../zome-5.wasm
         "#;
 
-    let err = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap_err();
+    let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `not_a_real_field`"),
         "Should have rejected unknown field but actually got: {}",
-        err.to_string(),
+        err,
     );
 }
 
@@ -237,11 +237,11 @@ integrity:
       path: ../zome-3.wasm
 "#;
 
-    let err = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap_err();
+    let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `not_a_real_field`"),
         "Should have rejected unknown field but actually got: {}",
-        err.to_string(),
+        err,
     );
 }
 
@@ -260,10 +260,10 @@ coordinator:
       not_a_real_field: ~
         "#;
 
-    let err = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap_err();
+    let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
         err.to_string().contains("unknown field `not_a_real_field`"),
         "Should have rejected unknown field but actually got: {}",
-        err.to_string(),
+        err,
     );
 }

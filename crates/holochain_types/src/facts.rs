@@ -70,59 +70,6 @@ pub fn valid_chain_op(
     ]
 }
 
-#[cfg(test)]
-mod tests {
-    use arbitrary::Arbitrary;
-
-    use super::*;
-    use holochain_zome_types::facts;
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_valid_dht_op() {
-        // TODO: Must add constraint on dht op variant wrt action variant
-
-        let mut gg = Generator::from(unstructured_noise());
-        let g = &mut gg;
-        let keystore = holochain_keystore::spawn_test_keystore().await.unwrap();
-        let agent = AgentPubKey::new_random(&keystore).await.unwrap();
-
-        let e = Entry::arbitrary(g).unwrap();
-
-        let mut a0 = facts::is_not_entry_action().build(g);
-        *a0.author_mut() = agent.clone();
-
-        let mut a1 = facts::is_new_entry_action().build(g);
-        *a1.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
-        let mut a1 = Action::from(a1);
-        *a1.author_mut() = agent.clone();
-
-        let sn = agent.sign(&keystore, &a0).await.unwrap();
-        let se = agent.sign(&keystore, &a1).await.unwrap();
-
-        let op0a = ChainOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::Present(e.clone()));
-        let op0b = ChainOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::Hidden);
-        let op0c = ChainOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::NA);
-        let op0d = ChainOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::NotStored);
-
-        let op1a = ChainOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::Present(e.clone()));
-        let op1b = ChainOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::Hidden);
-        let op1c = ChainOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::NA);
-        let op1d = ChainOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::NotStored);
-
-        let fact = valid_chain_op(keystore, agent, false);
-
-        assert!(fact.clone().check(&op0a).is_err());
-        fact.clone().check(&op0b).unwrap();
-        fact.clone().check(&op0c).unwrap();
-        fact.clone().check(&op0d).unwrap();
-
-        fact.clone().check(&op1a).unwrap();
-        assert!(fact.clone().check(&op1b).is_err());
-        assert!(fact.clone().check(&op1c).is_err());
-        fact.clone().check(&op1d).unwrap();
-    }
-}
-
 impl ChainOp {
     /// Mutable access to the Author
     pub fn author_mut(&mut self) -> &mut AgentPubKey {
@@ -255,5 +202,57 @@ impl NewEntryAction {
     /// Mutable access to the entry hash
     pub fn entry_hash_mut(&mut self) -> &mut EntryHash {
         self.entry_data_mut().unwrap().0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use arbitrary::Arbitrary;
+
+    use super::*;
+    use holochain_zome_types::facts;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_valid_dht_op() {
+        // TODO: Must add constraint on dht op variant wrt action variant
+
+        let mut gg = Generator::from(unstructured_noise());
+        let g = &mut gg;
+        let keystore = holochain_keystore::spawn_test_keystore().await.unwrap();
+        let agent = AgentPubKey::new_random(&keystore).await.unwrap();
+
+        let e = Entry::arbitrary(g).unwrap();
+
+        let mut a0 = facts::is_not_entry_action().build(g);
+        *a0.author_mut() = agent.clone();
+
+        let mut a1 = facts::is_new_entry_action().build(g);
+        *a1.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
+        *a1.author_mut() = agent.clone();
+
+        let sn = agent.sign(&keystore, &a0).await.unwrap();
+        let se = agent.sign(&keystore, &a1).await.unwrap();
+
+        let op0a = ChainOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::Present(e.clone()));
+        let op0b = ChainOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::Hidden);
+        let op0c = ChainOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::NA);
+        let op0d = ChainOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::NotStored);
+
+        let op1a = ChainOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::Present(e.clone()));
+        let op1b = ChainOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::Hidden);
+        let op1c = ChainOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::NA);
+        let op1d = ChainOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::NotStored);
+
+        let fact = valid_chain_op(keystore, agent, false);
+
+        assert!(fact.clone().check(&op0a).is_err());
+        fact.clone().check(&op0b).unwrap();
+        fact.clone().check(&op0c).unwrap();
+        fact.clone().check(&op0d).unwrap();
+
+        fact.clone().check(&op1a).unwrap();
+        assert!(fact.clone().check(&op1b).is_err());
+        assert!(fact.clone().check(&op1c).is_err());
+        fact.clone().check(&op1d).unwrap();
     }
 }

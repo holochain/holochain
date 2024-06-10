@@ -287,7 +287,7 @@ pub mod slow_tests {
         let hash_path_b: holo_hash::AnyLinkableHash =
             conductor.call(&alice, "get_path_hash", "b").await;
 
-        let forward_link_0 = forward_links.get(0).unwrap();
+        let forward_link_0 = forward_links.first().unwrap();
         assert_eq!(forward_link_0.base, hash_path_a);
         assert_eq!(forward_link_0.target, hash_path_b);
         assert_eq!(
@@ -299,7 +299,7 @@ pub mod slow_tests {
         assert_eq!(forward_link_0.zome_index, ZomeIndex(0));
         assert!(t1 <= forward_link_0.timestamp && t2 >= forward_link_0.timestamp);
 
-        let back_link_0 = back_links.get(0).unwrap();
+        let back_link_0 = back_links.first().unwrap();
         assert_eq!(back_link_0.base, hash_path_b);
         assert_eq!(back_link_0.target, hash_path_a);
         assert_eq!(back_link_0.author, alice.cell_id().agent_pubkey().clone());

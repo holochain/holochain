@@ -1289,7 +1289,7 @@ pub async fn dump_state(
             let published_ops_count = txn.query_row(
                 "
                 SELECT COUNT(DhtOp.hash) FROM DhtOp
-                LEFT JOIN Action ON DhtOp.action_hash = Action.hash
+                JOIN Action ON DhtOp.action_hash = Action.hash
                 WHERE
                 Action.author = :author
                 AND
@@ -1578,6 +1578,7 @@ mod tests {
         let db = test_db.to_db();
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         // create transferable cap grant
+        #[allow(clippy::unnecessary_literal_unwrap)] // must be this type
         let secret_access = CapAccess::from(secret.unwrap());
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
@@ -1683,6 +1684,7 @@ mod tests {
         let mut assignees = BTreeSet::new();
         assignees.insert(bob.clone());
         let updated_secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
+        #[allow(clippy::unnecessary_literal_unwrap)] // must be this type
         let updated_access = CapAccess::from((updated_secret.unwrap(), assignees));
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 

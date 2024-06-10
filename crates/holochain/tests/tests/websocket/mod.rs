@@ -191,14 +191,14 @@ async fn call_zome() {
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
 
-    let (mut app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
     let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
     authenticate_app_ws_client(app_tx.clone(), admin_port, "test".to_string()).await;
 
     // Call Zome
     tracing::info!("Calling zome");
     call_zome_fn(
-        &mut app_tx,
+        &app_tx,
         cell_id.clone(),
         &signing_keypair,
         cap_secret,

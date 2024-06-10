@@ -179,12 +179,12 @@ fn test_clamp_empty() {
     while changed {
         let view = PeerViewQ::new(topo.clone(), strat.clone(), peers.clone());
         changed = false;
-        for (i, mut arq) in peers.iter_mut().enumerate() {
+        for (i, arq) in peers.iter_mut().enumerate() {
             if do_clamp(i) {
                 // *arq = Arq::new_full(&topo, arq.start, topo.space.max_power(&strat));
                 *arq.count_mut() = 0;
             } else {
-                let stats = view.update_arq_with_stats(&mut arq);
+                let stats = view.update_arq_with_stats(arq);
                 if stats.changed {
                     changed = true;
                 }
@@ -238,7 +238,7 @@ fn test_grow_by_multiple_chunks() {
     let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
 
     let arq = Arq::new(peer_power - 1, 0u32.into(), 6.into());
-    let mut resized = arq.clone();
+    let mut resized = arq;
     view.update_arq(&mut resized);
     assert!(resized.power() > arq.power() || resized.count() > arq.count() + 1);
 }
@@ -272,7 +272,7 @@ fn test_degenerate_asymmetrical_coverage() {
 
     let extrapolated = view.extrapolated_coverage(&arq);
     assert_eq!(extrapolated, 5.0);
-    let old = arq.clone();
+    let old = arq;
     let mut new = arq;
     let resized = view.update_arq(&mut new);
     assert_eq!(old, new);
