@@ -110,10 +110,7 @@ async fn app_ids_are_unique() {
     let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
     let app = InstalledAppCommon::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
 
-    conductor
-        .add_disabled_app_to_db(app.clone())
-        .await
-        .unwrap();
+    conductor.add_disabled_app_to_db(app.clone()).await.unwrap();
 
     assert_matches!(
         conductor.add_disabled_app_to_db(app.clone()).await,
