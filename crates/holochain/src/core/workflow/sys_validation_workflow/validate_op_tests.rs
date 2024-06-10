@@ -2165,7 +2165,7 @@ async fn action_after_close_chain() {
     // Previous action
     let dna_action = CloseChain {
         author: test_case.agent.clone().into(),
-        timestamp: Timestamp::now().into(),
+        timestamp: Timestamp::now(),
         action_seq: 23,
         prev_action: fixt!(ActionHash),
         new_dna_hash: fixt!(DnaHash),
@@ -2219,8 +2219,8 @@ async fn crash_case() {
 
     // This is the previous
     let mut create_action = fixt!(AgentValidationPkg);
-    create_action.author = agent.clone().into();
-    create_action.timestamp = Timestamp::now().into();
+    create_action.author = agent.clone();
+    create_action.timestamp = Timestamp::now();
     create_action.action_seq = 10;
     let action = Action::AgentValidationPkg(create_action);
     let action_hashed = ActionHashed::from_content_sync(action);
@@ -2333,7 +2333,7 @@ impl TestCase {
             .times(previous_actions.len())
             .returning({
                 let previous_actions = previous_actions.clone();
-                move |hash, _| match previous_actions.get(&hash.try_into().unwrap()).cloned() {
+                move |hash, _| match previous_actions.get(&hash).cloned() {
                     Some(action) => async move { Ok(Some((action, CascadeSource::Local))) }.boxed(),
                     None => async move { Ok(None) }.boxed(),
                 }
@@ -2360,7 +2360,7 @@ impl TestCase {
                 .expect("No op set, invalid test case")
                 .clone()]
             .into_iter()
-            .map(|op| DhtOpHashed::from_content_sync(op)),
+            .map(DhtOpHashed::from_content_sync),
         )
         .await;
 
@@ -2378,7 +2378,7 @@ fn test_op(previous: SignedHashed<Action>) -> DhtOp {
     create_action.author = previous.action().author().clone();
     create_action.action_seq = previous.action().action_seq() + 1;
     create_action.prev_action = previous.as_hash().clone();
-    create_action.timestamp = Timestamp::now().into();
+    create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),

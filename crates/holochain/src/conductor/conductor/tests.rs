@@ -1198,6 +1198,7 @@ async fn test_deferred_provisioning() {
             installed_app_id: Some(app_id.clone()),
             membrane_proofs: Default::default(),
             network_seed: None,
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await
@@ -1297,6 +1298,7 @@ async fn test_deferred_provisioning_uninstall() {
             installed_app_id: Some(app_id.clone()),
             membrane_proofs: Default::default(),
             network_seed: None,
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await

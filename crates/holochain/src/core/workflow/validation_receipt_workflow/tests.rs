@@ -11,7 +11,7 @@ use rusqlite::Transaction;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky, doesn't take into account timing or retries"]
 async fn test_validation_receipt() {
-    let _g = holochain_trace::test_run();
+    holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
@@ -101,7 +101,7 @@ async fn test_validation_receipt() {
                         .query_map([], |row| row.get::<_, Option<u32>>(0))
                         .unwrap()
                         .map(Result::unwrap)
-                        .filter_map(|i| i)
+                        .flatten()
                         .collect::<Vec<u32>>())
                 })
                 .await
