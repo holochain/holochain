@@ -182,7 +182,6 @@ pub struct ChainHead {
 #[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The chain has been forked by these two actions
 pub struct ChainFork {
-    // TODO: make this prev_action, not seq
     /// The point where the chain has forked.
     pub fork_seq: u32,
     /// The first action at this sequence position.
