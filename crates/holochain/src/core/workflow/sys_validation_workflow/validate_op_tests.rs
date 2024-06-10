@@ -464,8 +464,7 @@ async fn validate_create_op_with_timestamp_before_prev() {
     create_action.author = previous_action.action().author().clone();
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = (Timestamp::now() - std::time::Duration::from_secs(10))
-        .unwrap();
+    create_action.timestamp = (Timestamp::now() - std::time::Duration::from_secs(10)).unwrap();
     create_action.entry_type = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),

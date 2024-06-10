@@ -89,22 +89,14 @@ async fn get_links() {
     let r = get_link_query(&[&cache_txn], Some(&scratch), td.base_query.clone());
     assert_eq!(r[0], td.link);
     assert_eq!(r.len(), 1);
-    let r = get_link_query(
-        &[&cache_txn, &txn],
-        Some(&scratch),
-        td.tag_query.clone(),
-    );
+    let r = get_link_query(&[&cache_txn, &txn], Some(&scratch), td.tag_query.clone());
     assert_eq!(r[0], td.link);
     assert_eq!(r.len(), 1);
 
     // - Insert a delete op.
     insert_valid_integrated_op(&mut txn, &td.delete_link_op.downcast()).unwrap();
 
-    let r = get_link_query(
-        &[&cache_txn, &txn],
-        Some(&scratch),
-        td.tag_query.clone(),
-    );
+    let r = get_link_query(&[&cache_txn, &txn], Some(&scratch), td.tag_query.clone());
     // - We should not have any links now.
     assert!(r.is_empty())
 }
@@ -150,11 +142,7 @@ async fn get_entry() {
     .unwrap();
 
     // - Get the entry from both stores and union the query results.
-    let r = get_entry_query(
-        &[&txn, &cache_txn],
-        Some(&scratch),
-        td.query.clone(),
-    );
+    let r = get_entry_query(&[&txn, &cache_txn], Some(&scratch), td.query.clone());
     // - Check it's the correct entry and action.
     let r = r.unwrap();
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
@@ -164,11 +152,7 @@ async fn get_entry() {
     insert_valid_integrated_op(&mut cache_txn, &td.delete_entry_action_op.downcast()).unwrap();
 
     // - Get the entry from both stores and union the queries.
-    let r = get_entry_query(
-        &[&txn, &cache_txn],
-        Some(&scratch),
-        td.query.clone(),
-    );
+    let r = get_entry_query(&[&txn, &cache_txn], Some(&scratch), td.query.clone());
     // - There should be no live actions so resolving
     // returns no record.
     assert!(r.is_none());

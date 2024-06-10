@@ -220,10 +220,7 @@ mod tests {
         #[test]
         fn empty() {
             let validation_dependencies = ValidationDependencies::default();
-            assert!(
-                !validation_dependencies.fetch_missing_hashes_timed_out(),
-
-            );
+            assert!(!validation_dependencies.fetch_missing_hashes_timed_out(),);
         }
 
         #[test]
@@ -240,9 +237,7 @@ mod tests {
                         - Duration::from_secs(1),
                 },
             );
-            assert!(
-                validation_dependencies.fetch_missing_hashes_timed_out()
-            );
+            assert!(validation_dependencies.fetch_missing_hashes_timed_out());
         }
 
         #[test]

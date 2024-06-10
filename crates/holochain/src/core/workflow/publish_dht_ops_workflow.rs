@@ -204,7 +204,8 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Create the network
-        let filter_events = |evt: &_| matches!(evt, holochain_p2p::event::HolochainP2pEvent::Publish { .. });
+        let filter_events =
+            |evt: &_| matches!(evt, holochain_p2p::event::HolochainP2pEvent::Publish { .. });
         let (tx, mut recv) = tokio::sync::mpsc::channel(10);
         let test_network =
             test_network_with_events(Some(dna.clone()), Some(author.clone()), filter_events, tx)

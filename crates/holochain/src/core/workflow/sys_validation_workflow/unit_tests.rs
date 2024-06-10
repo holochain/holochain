@@ -367,10 +367,7 @@ impl TestCase {
             std::time::Duration::from_secs(10),
         );
 
-        let actual_network = self
-            .actual_network
-            .take()
-            .unwrap_or_default();
+        let actual_network = self.actual_network.take().unwrap_or_default();
 
         // XXX: this isn't quite right, since none of these config settings inform
         // anything else about the TestCase. It's currently only needed for the node_id

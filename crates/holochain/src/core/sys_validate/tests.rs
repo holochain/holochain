@@ -114,7 +114,15 @@ async fn record_with_deps_fixup(
 
             let entry = action.entry_data_mut().map(|(entry_hash, entry_type)| {
                 let et = entry_type.clone();
-                let entry = contrafact::brute("matching entry", move |e: &Entry| matches!((&et, e), (EntryType::AgentPubKey, Entry::Agent(_)) | (EntryType::App(_), Entry::App(_)) | (EntryType::CapClaim, Entry::CapClaim(_)) | (EntryType::CapGrant, Entry::CapGrant(_))))
+                let entry = contrafact::brute("matching entry", move |e: &Entry| {
+                    matches!(
+                        (&et, e),
+                        (EntryType::AgentPubKey, Entry::Agent(_))
+                            | (EntryType::App(_), Entry::App(_))
+                            | (EntryType::CapClaim, Entry::CapClaim(_))
+                            | (EntryType::CapGrant, Entry::CapGrant(_))
+                    )
+                })
                 .build(&mut g);
 
                 *entry_hash = EntryHash::with_data_sync(&entry);
@@ -380,14 +388,9 @@ async fn check_valid_if_dna_test() {
 
     check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()).unwrap();
 
-    fake_genesis_for_agent(
-        db.clone(),
-        tmp_dht.to_db(),
-        action.author.clone(),
-        keystore,
-    )
-    .await
-    .unwrap();
+    fake_genesis_for_agent(db.clone(), tmp_dht.to_db(), action.author.clone(), keystore)
+        .await
+        .unwrap();
 
     tmp_dht
         .to_db()

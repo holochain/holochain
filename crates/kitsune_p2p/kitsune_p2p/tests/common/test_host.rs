@@ -74,15 +74,11 @@ impl KitsuneHost for TestHost {
         input: kitsune_p2p_block::BlockTargetId,
         timestamp: kitsune_p2p_types::dht::prelude::Timestamp,
     ) -> kitsune_p2p::KitsuneHostResult<bool> {
-        let blocked = self
-            .blocks
-            .read()
-            .iter()
-            .any(|b| {
-                let target_id: BlockTargetId = b.target().clone().into();
+        let blocked = self.blocks.read().iter().any(|b| {
+            let target_id: BlockTargetId = b.target().clone().into();
 
-                target_id == input && b.start() <= timestamp && b.end() >= timestamp
-            });
+            target_id == input && b.start() <= timestamp && b.end() >= timestamp
+        });
 
         async move { Ok(blocked) }.boxed().into()
     }

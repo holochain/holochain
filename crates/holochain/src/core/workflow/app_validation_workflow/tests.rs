@@ -679,10 +679,7 @@ async fn app_validation_workflow_test() {
     .await;
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
-    let apps = conductors
-        .setup_app("test_app", [&dna_file])
-        .await
-        .unwrap();
+    let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
     let alice_cell_id = alice.cell_id().clone();
     let bob_cell_id = bob.cell_id().clone();
@@ -781,10 +778,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
     set_zome_types(&[(0, 3)], &[]);
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
-    let apps = conductors
-        .setup_app("test_app", [&dna_file])
-        .await
-        .unwrap();
+    let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
 
     conductors.exchange_peer_info().await;

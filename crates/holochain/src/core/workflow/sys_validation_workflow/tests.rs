@@ -26,10 +26,7 @@ async fn sys_validation_workflow_test() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
-    let apps = conductors
-        .setup_app("test_app", [&dna_file])
-        .await
-        .unwrap();
+    let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
     let alice_cell_id = alice.cell_id().clone();
     let bob_cell_id = bob.cell_id().clone();
@@ -177,13 +174,7 @@ async fn run_test(
     let expected_count = 14 + expected_count;
 
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(
-        &alice_db,
-        expected_count,
-        num_attempts,
-        delay_per_attempt,
-    )
-    .await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
     let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
     let num_valid_ops = move |txn: Transaction| -> DatabaseResult<usize> {
@@ -307,9 +298,7 @@ async fn bob_makes_a_large_link(
     let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
     let bad_update_entry_hash = Entry::try_from(bad_update.clone()).unwrap().to_hash();
 
-    let bytes = (0..MAX_TAG_SIZE + 1)
-        .map(|_| 0u8)
-        .collect::<Vec<_>>();
+    let bytes = (0..MAX_TAG_SIZE + 1).map(|_| 0u8).collect::<Vec<_>>();
     let link_tag = LinkTag(bytes);
 
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;

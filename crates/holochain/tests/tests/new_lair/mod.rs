@@ -45,7 +45,7 @@ async fn test_new_lair_conductor_integration() {
 
     // set up conductor config to use the started keystore
     let conductor_config = ConductorConfig {
-        admin_interfaces:Some(vec![AdminInterfaceConfig {
+        admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket {
                 port: ADMIN_PORT,
                 allowed_origins: AllowedOrigins::Any,
@@ -53,8 +53,8 @@ async fn test_new_lair_conductor_integration() {
         }]),
         data_root_path: Some(tmp.path().to_owned().into()),
         keystore: KeystoreConfig::LairServer {
-        connection_url: keystore_config.connection_url.clone().into(),
-    },
+            connection_url: keystore_config.connection_url.clone().into(),
+        },
         ..ConductorConfig::default()
     };
 

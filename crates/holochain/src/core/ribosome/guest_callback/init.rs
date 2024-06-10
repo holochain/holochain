@@ -354,11 +354,7 @@ mod slow_tests {
         let mut had_successful_zome_call = false;
         for _ in 0..30 {
             let create_post_result: ConductorApiResult<ActionHash> = conductor
-                .call_fallible(
-                    &zome,
-                    "create_post",
-                    Post("clone message".to_string()),
-                )
+                .call_fallible(&zome, "create_post", Post("clone message".to_string()))
                 .await;
 
             match create_post_result {
