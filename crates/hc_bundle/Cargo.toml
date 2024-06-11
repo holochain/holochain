@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_bundle"
-version = "0.3.1-rc.1"
+version = "0.3.1"
 description = "DNA and hApp bundling functionality for the `hc` Holochain CLI utility"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -31,10 +31,10 @@ anyhow = "1.0"
 clap = { version = "4.0", features = ["derive"] }
 holochain_util = { path = "../holochain_util", features = [
     "backtrace",
-], version = "^0.3.1-rc.0"}
+], version = "^0.3.1"}
 holochain_serialized_bytes = "=0.0.54"
-holochain_types = { version = "^0.3.1-rc.1", path = "../holochain_types" }
-mr_bundle = { version = "^0.3.1-rc.0", path = "../mr_bundle" }
+holochain_types = { version = "^0.3.1", path = "../holochain_types" }
+mr_bundle = { version = "^0.3.1", path = "../mr_bundle" }
 serde_yaml = "0.9"
 thiserror = "1.0.22"
 tracing = "0.1"
