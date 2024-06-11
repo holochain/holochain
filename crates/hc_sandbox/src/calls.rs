@@ -390,12 +390,12 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         AdminRequestCli::DumpNetworkMetrics(args) => {
             let metrics = dump_network_metrics(cmd, args).await?;
             // Print without other text so it can be piped
-            print!("{}", metrics);
+            println!("{}", metrics);
         }
         AdminRequestCli::DumpNetworkStats => {
             let stats = dump_network_stats(cmd).await?;
             // Print without other text so it can be piped
-            print!("{}", stats);
+            println!("{}", stats);
         }
         AdminRequestCli::AddAgents => todo!("Adding agent info via CLI is coming soon"),
         AdminRequestCli::ListAgents(args) => {
