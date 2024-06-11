@@ -13,6 +13,7 @@ pub enum EntryTypes {
 pub enum LinkTypes {
     SomeLinks,
     SomeOtherLinks,
+    TestEntry,
 }
 
 pub fn validate_create_link(
@@ -48,7 +49,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             tag,
             action,
         } => match link_type {
-            LinkTypes::SomeLinks => validate_create_link(action, base_address, target_address, tag),
+            LinkTypes::TestEntry => validate_create_link(action, base_address, target_address, tag),
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::StoreRecord(store_record) => match store_record {
@@ -59,7 +60,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 link_type,
                 action,
             } => match link_type {
-                LinkTypes::SomeLinks => {
+                LinkTypes::TestEntry => {
                     validate_create_link(action, base_address, target_address, tag)
                 }
                 _ => Ok(ValidateCallbackResult::Valid),

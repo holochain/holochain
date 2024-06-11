@@ -79,7 +79,7 @@ async fn zome_with_no_link_types_does_not_prevent_delete_links() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn zero_arc_does_not_prevent_delete_links() {
+async fn zero_arc_can_link_to_uncached_base() {
     use hdk::prelude::*;
 
     holochain_trace::test_run();
@@ -113,9 +113,8 @@ async fn zero_arc_does_not_prevent_delete_links() {
     let ((alice,), (bob,)) = apps.into_tuples();
 
     let alice_pk = alice.cell_id().agent_pubkey().clone();
-    let bob_pk = bob.cell_id().agent_pubkey().clone();
 
-    println!("@!@!@ alice_pk: {alice_pk:?}, bob_pk: {bob_pk:?}");
+    println!("@!@!@ alice_pk: {alice_pk:?}");
 
     let action_hash: ActionHash = conductors[0]
         .call(
@@ -133,7 +132,8 @@ async fn zero_arc_does_not_prevent_delete_links() {
         // to having bob wait to get the entry
         //
         // BUT! If bob is the one that gets the entry, then it caches it,
-        // and the create_link succeeds. And we are trying to reproduce the create_link failing due to `Awaiting deps` error
+        // and the create_link succeeds. And we are trying to reproduce the
+        // create_link failing due to `Awaiting deps` error
         let r: Option<Record> = conductors[0]
             .call(
                 &alice.zome(TestWasm::Link.coordinator_zome_name()),
@@ -149,13 +149,15 @@ async fn zero_arc_does_not_prevent_delete_links() {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 
-    let _link: ActionHash = conductors[1]
+    let link_hash: ActionHash = conductors[1]
         .call(
             &bob.zome(TestWasm::Link.coordinator_zome_name()),
             "test_entry_link",
             (action_hash.clone(), alice_pk.clone()),
         )
         .await;
+
+    println!("@!@!@ link_hash: {link_hash:?}");
 }
 
 pub mod must_get_agent_activity_saturation;
