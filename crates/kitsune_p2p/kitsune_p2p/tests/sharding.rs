@@ -500,8 +500,7 @@ async fn setup_overlapping_agents(
 
     // Each agent should be connected to the previous agent because that's how the arcs were set up
     // above.
-    // Uhhh clippy? this DOES have a .rev()
-    for i in (0..=4).rev() {
+    for i in (1..=4).rev() {
         // A circular `next` so that the last agent is connected to the first agent
         let prev = (i - 1) % 5;
 
