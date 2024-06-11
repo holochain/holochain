@@ -63,7 +63,7 @@ use std::time::Duration;
 fn matching_record(g: &mut Unstructured, f: impl Fn(&Record) -> bool) -> Record {
     // get anything but a Dna
     let mut dep = Record::arbitrary(g).unwrap();
-    while !f(&dep) {
+    while !f(&dep) || matches!(dep.action(), Action::Update(_)) {
         dep = Record::arbitrary(g).unwrap();
     }
     dep
@@ -107,7 +107,7 @@ async fn record_with_deps_fixup(
         *action.author_mut() = fake_agent_pubkey_1();
     }
 
-    let (entry, deps) = match &mut action {
+    let (entry, mut deps) = match &mut action {
         Action::Dna(_) => (None, vec![]),
         action => {
             let mut deps = vec![];
@@ -208,6 +208,10 @@ async fn record_with_deps_fixup(
             (entry, deps)
         }
     };
+
+    for d in deps.iter_mut() {
+        *d.as_action_mut().author_mut() = fake_agent_pubkey_1();
+    }
 
     assert_eq!(*action.author(), fake_agent_pubkey_1());
 

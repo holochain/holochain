@@ -63,7 +63,7 @@
     };
 
     cargo-rdme = {
-      url = "github:orium/cargo-rdme/v1.1.0";
+      url = "github:orium/cargo-rdme/v1.4.4";
       flake = false;
     };
   };
