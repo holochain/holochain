@@ -493,19 +493,15 @@ async fn setup_overlapping_agents(
     for i in 0..5 {
         agents[i]
             .1
-            .join(
-                space.clone(),
-                agents[i].3.clone(),
-                None,
-                Some(agents[i].2.clone()),
-            )
+            .join(space.clone(), agents[i].3.clone(), None, Some(agents[i].2))
             .await
             .unwrap();
     }
 
     // Each agent should be connected to the previous agent because that's how the arcs were set up
     // above.
-    for i in 4..=0 {
+    // Uhhh clippy? this DOES have a .rev()
+    for i in (4..=0).rev() {
         // A circular `next` so that the last agent is connected to the first agent
         let prev = (i - 1) % 5;
 
@@ -576,5 +572,5 @@ fn should_agent_hold_op_at_basis(
     // range.contains(&basis.get_loc())
 
     // TODO Why is this different to doing the commented lines above?
-    agent_info.storage_arc().contains(&basis.get_loc())
+    agent_info.storage_arc().contains(basis.get_loc())
 }

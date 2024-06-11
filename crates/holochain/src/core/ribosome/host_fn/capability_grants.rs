@@ -81,7 +81,7 @@ pub mod wasm_test {
             .call(
                 &alice,
                 "try_cap_claim",
-                CapFor(original_secret, bob_pubkey.clone().try_into().unwrap()),
+                CapFor(original_secret, bob_pubkey.clone()),
             )
             .await;
 
@@ -133,7 +133,7 @@ pub mod wasm_test {
             .call(
                 &alice,
                 "try_cap_claim",
-                CapFor(original_secret, bob_pubkey.clone().try_into().unwrap()),
+                CapFor(original_secret, bob_pubkey.clone()),
             )
             .await;
 
@@ -143,7 +143,7 @@ pub mod wasm_test {
             .call(
                 &alice,
                 "try_cap_claim",
-                CapFor(new_secret, bob_pubkey.clone().try_into().unwrap()),
+                CapFor(new_secret, bob_pubkey.clone()),
             )
             .await;
         assert_eq!(output, ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()),);
@@ -158,7 +158,7 @@ pub mod wasm_test {
             .call(
                 &alice,
                 "try_cap_claim",
-                CapFor(original_secret, bob_pubkey.clone().try_into().unwrap()),
+                CapFor(original_secret, bob_pubkey.clone()),
             )
             .await;
 
@@ -168,7 +168,7 @@ pub mod wasm_test {
             .call(
                 &alice,
                 "try_cap_claim",
-                CapFor(new_secret, bob_pubkey.clone().try_into().unwrap()),
+                CapFor(new_secret, bob_pubkey.clone()),
             )
             .await;
 

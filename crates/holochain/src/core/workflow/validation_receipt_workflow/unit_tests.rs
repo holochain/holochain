@@ -129,7 +129,7 @@ async fn block_invalid_op_author() {
             let blocks = blocks.clone();
             move |block| -> BoxFuture<DatabaseResult<()>> {
                 blocks.write().push(block);
-                async move { Ok(()) }.boxed().into()
+                async move { Ok(()) }.boxed()
             }
         },
     )
@@ -138,14 +138,16 @@ async fn block_invalid_op_author() {
 
     assert_eq!(WorkComplete::Complete, work_complete);
 
-    let read_blocks = blocks.read();
-    assert_eq!(1, read_blocks.len());
-    match read_blocks.first().unwrap().target() {
-        BlockTarget::Cell(cell_id, reason) => {
-            assert_eq!(CellBlockReason::InvalidOp(op_hash.clone()), *reason);
-            assert_eq!(author, *cell_id.agent_pubkey());
+    {
+        let read_blocks = blocks.read();
+        assert_eq!(1, read_blocks.len());
+        match read_blocks.first().unwrap().target() {
+            BlockTarget::Cell(cell_id, reason) => {
+                assert_eq!(CellBlockReason::InvalidOp(op_hash.clone()), *reason);
+                assert_eq!(author, *cell_id.agent_pubkey());
+            }
+            _ => unreachable!("Only expect a cell block"),
         }
-        _ => unreachable!("Only expect a cell block"),
     }
 
     // The op was rejected and the sender blocked but the `require_receipt` flag should still be cleared

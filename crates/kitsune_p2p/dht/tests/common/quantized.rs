@@ -150,6 +150,8 @@ pub fn run_one_epoch(
 
         if detail {
             let d = delta as i64 / 2i64.pow(before_pow as u32);
+            // clippy... sometimes ifs are just easier to visually parse
+            #[allow(clippy::comparison_chain)]
             let delta_str = if d == 0 {
                 "    ".into()
             } else if d > 0 {

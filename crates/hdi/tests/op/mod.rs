@@ -602,16 +602,11 @@ fn op_match_sanity() {
         action: _,
         app_entry: EntryTypes::A(_),
     }) = op.flattened::<_, ()>().unwrap()
-    {
-        ()
-    }
+    {}
     if let FlatOp::StoreRecord(OpRecord::CreateLink {
         link_type: LinkTypes::A,
         ..
     }) = op.flattened::<(), _>().unwrap()
-    {
-        ()
-    }
+    {}
     op.flattened::<(), ()>().unwrap();
-    ()
 }
