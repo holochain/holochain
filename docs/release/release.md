@@ -220,7 +220,7 @@ EOF
 
 ```console
 nix run .#release-automation -- --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
-default_semver_increment_mode: !pre_patch beta-rc
+default_semver_increment_mode: !pre_patch rc
 semver_increment_mode: !patch
 EOF
 )
