@@ -1,9 +1,9 @@
 use holo_hash::ActionHash;
+use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::{SweetAgents, SweetConductor, SweetConductorBatch, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
-use holochain::conductor::config::ConductorConfig;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use std::sync::Arc;
 
 // Intended to keep https://github.com/holochain/holochain/issues/2868 fixed.
@@ -127,12 +127,16 @@ async fn zero_arc_does_not_prevent_delete_links() {
 
     println!("@!@!@ action_hash: {action_hash:?}");
 
-    //tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-
     loop {
-        let r: Option<Record> = conductors[1]
+        // Wait until we can get the action from alice
+        // Since alice is the only node that holds DHT ops this is equivalent
+        // to having bob wait to get the entry
+        //
+        // BUT! If bob is the one that gets the entry, then it caches it,
+        // and the create_link succeeds. And we are trying to reproduce the create_link failing due to `Awaiting deps` error
+        let r: Option<Record> = conductors[0]
             .call(
-                &bob.zome(TestWasm::Link.coordinator_zome_name()),
+                &alice.zome(TestWasm::Link.coordinator_zome_name()),
                 "test_entry_get",
                 &action_hash,
             )
@@ -145,41 +149,11 @@ async fn zero_arc_does_not_prevent_delete_links() {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 
-    let link: ActionHash = conductors[1]
+    let _link: ActionHash = conductors[1]
         .call(
             &bob.zome(TestWasm::Link.coordinator_zome_name()),
             "test_entry_link",
             (action_hash.clone(), alice_pk.clone()),
-        )
-        .await;
-
-    println!("@!@!@ link: {link:?}");
-
-    //tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-
-    let mut links: Vec<Link> = conductors[1]
-        .call(
-            &bob.zome(TestWasm::Link.coordinator_zome_name()),
-            "test_entry_get_links",
-            &action_hash,
-        )
-        .await;
-
-    println!("@!@!@ links: {links:#?}");
-
-    assert_eq!(1, links.len());
-
-    let got_link = links.remove(0);
-
-    assert_eq!(bob_pk, got_link.author);
-    assert_eq!(AnyLinkableHash::from(action_hash.clone()), got_link.base);
-    assert_eq!(AnyLinkableHash::from(alice_pk.clone()), got_link.target);
-
-    let _: ActionHash = conductors[1]
-        .call(
-            &bob.zome(TestWasm::Link.coordinator_zome_name()),
-            "delete_link",
-            got_link.create_link_hash,
         )
         .await;
 }
