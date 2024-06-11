@@ -677,18 +677,13 @@ async fn dump_network_metrics(
     let resp = cmd
         .command(AdminRequest::DumpNetworkMetrics { dna_hash: args.dna })
         .await?;
-    Ok(
-        expect_match!(resp => AdminResponse::NetworkMetricsDumped, "Failed to dump network metrics"),
-    )
+    Ok(expect_match!(resp => AdminResponse::NetworkMetricsDumped, "Failed to dump network metrics"))
 }
 
 /// Calls [`AdminRequest::DumpNetworkStats`] and dumps network stats.
 async fn dump_network_stats(cmd: &mut CmdRunner) -> anyhow::Result<String> {
     let resp = cmd.command(AdminRequest::DumpNetworkStats).await?;
-    Ok(
-        expect_match!(resp => AdminResponse::NetworkStatsDumped, "Failed to dump network stats"),
-    )
-
+    Ok(expect_match!(resp => AdminResponse::NetworkStatsDumped, "Failed to dump network stats"))
 }
 
 /// Calls [`AdminRequest::AddAgentInfo`] with and adds the list of agent info.
