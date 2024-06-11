@@ -275,13 +275,11 @@ impl TestLegacyHost {
                                                             in_any = true;
                                                             break;
                                                         }
-                                                    } else {
-                                                        if lower < op.location()
-                                                            || op.location() < upper
-                                                        {
-                                                            in_any = true;
-                                                            break;
-                                                        }
+                                                    } else if lower < op.location()
+                                                        || op.location() < upper
+                                                    {
+                                                        in_any = true;
+                                                        break;
                                                     }
                                                 }
                                                 _ => unreachable!(

@@ -20,6 +20,8 @@ use std::sync::Arc;
 
 mod common;
 
+type AgentCtx = Vec<(KitsuneTestHarness, GhostSender<KitsuneP2p>, Arq, KAgent)>;
+
 /// Test scenario steps:
 ///   1. Set up 5 nodes, each with one agent.
 ///   2. Assign a DHT arc to each agent such that their start location is inside the previous agent's arc.
@@ -57,9 +59,9 @@ async fn publish_to_basis_from_inside() {
         Box::new(move |agents| {
             let basis = basis_from_agent(&agents[sender_idx].3);
 
-            for i in 0..5 {
+            for (i, agent) in agents.iter().enumerate() {
                 let should_this_agent_hold_the_op =
-                    agents[i].2.to_dht_arc_std().contains(&basis.get_loc());
+                    agent.2.to_dht_arc_std().contains(basis.get_loc());
 
                 // Another agent ended up with the op location in their arc, don't want this!
                 if should_this_agent_hold_the_op && (i != sender_idx && i != should_recv_idx) {
@@ -154,9 +156,9 @@ async fn publish_to_basis_from_outside() {
         Box::new(move |agents| {
             let basis = basis_from_agent(&agents[should_recv_idx_1].3);
 
-            for i in 0..5 {
+            for (i, agent) in agents.iter().enumerate() {
                 let should_this_agent_hold_the_op =
-                    agents[i].2.to_dht_arc_std().contains(&basis.get_loc());
+                    agent.2.to_dht_arc_std().contains(basis.get_loc());
 
                 // Another agent ended up with the op location in their arc, don't want this!
                 if should_this_agent_hold_the_op
@@ -281,9 +283,9 @@ async fn gossip_to_basis_from_inside() {
         Box::new(move |agents| {
             let basis = basis_from_agent(&agents[sender_idx].3);
 
-            for i in 0..5 {
+            for (i, agent) in agents.iter().enumerate() {
                 let should_this_agent_hold_the_op =
-                    agents[i].2.to_dht_arc_std().contains(&basis.get_loc());
+                    agent.2.to_dht_arc_std().contains(basis.get_loc());
 
                 // Another agent ended up with the op location in their arc, don't want this!
                 if should_this_agent_hold_the_op && (i != sender_idx && i != should_recv_idx) {
@@ -391,13 +393,13 @@ async fn no_gossip_to_basis_from_outside() {
 
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-    for i in 0..5 {
+    for (i, agent) in agents.iter().enumerate() {
         if i == sender_idx {
             continue;
         }
 
         // None of the other agents should have received the op.
-        let store_lock = agents[i].0.op_store();
+        let store_lock = agent.0.op_store();
         let store = store_lock.read();
         assert!(
             store.is_empty(),
@@ -417,7 +419,7 @@ async fn setup_overlapping_agents(
         tuning_params_struct::KitsuneP2pTuningParams,
     ) -> tuning_params_struct::KitsuneP2pTuningParams,
     verify_agent_setup: Box<
-        dyn Fn(&Vec<(KitsuneTestHarness, GhostSender<KitsuneP2p>, Arq, KAgent)>) -> bool,
+        dyn Fn(&AgentCtx) -> bool,
     >,
 ) -> Vec<(KitsuneTestHarness, GhostSender<KitsuneP2p>, Arq, KAgent)> {
     // Arcs are this long by default, with an adjustment to ensure overlap.
@@ -490,10 +492,10 @@ async fn setup_overlapping_agents(
         "Failed to find a setup that meets the test's requirements"
     );
 
-    for i in 0..5 {
-        agents[i]
+    for agent in &agents {
+        agent
             .1
-            .join(space.clone(), agents[i].3.clone(), None, Some(agents[i].2))
+            .join(space.clone(), agent.3.clone(), None, Some(agent.2))
             .await
             .unwrap();
     }
@@ -501,7 +503,7 @@ async fn setup_overlapping_agents(
     // Each agent should be connected to the previous agent because that's how the arcs were set up
     // above.
     // Uhhh clippy? this DOES have a .rev()
-    for i in (4..=0).rev() {
+    for i in (0..=4).rev() {
         // A circular `next` so that the last agent is connected to the first agent
         let prev = (i - 1) % 5;
 
@@ -514,7 +516,7 @@ async fn setup_overlapping_agents(
 fn basis_from_agent(agent: &KAgent) -> Arc<KitsuneBasis> {
     let agent_location = &agent.0[32..];
     let mut kitsune_basis = KitsuneBasis::new(vec![0; 36]);
-    kitsune_basis.0[32..].copy_from_slice(&agent_location);
+    kitsune_basis.0[32..].copy_from_slice(agent_location);
     Arc::new(kitsune_basis)
 }
 
@@ -525,7 +527,7 @@ fn check_op_receivers(
 ) {
     let should_recv_idx = should_recv_idx.iter().copied().collect::<HashSet<_>>();
 
-    for i in 0..5 {
+    for (i, agent) in agents.iter().enumerate() {
         if should_recv_idx.contains(&i) {
             continue;
         }
@@ -534,7 +536,7 @@ fn check_op_receivers(
         // Now we check that the agent at the current index does not have the basis that the op was
         // published to in its arc. That would make the test wrong, not Kitsune, so fail here!
         let should_this_agent_hold_the_op =
-            should_agent_hold_op_at_basis(&agents[i].0, agents[i].3.clone(), basis.clone());
+            should_agent_hold_op_at_basis(&agent.0, agent.3.clone(), basis.clone());
 
         assert!(
             !should_this_agent_hold_the_op,

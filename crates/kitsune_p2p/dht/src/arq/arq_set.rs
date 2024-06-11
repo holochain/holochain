@@ -365,7 +365,7 @@ mod tests {
                 (start_a + len_a - 1_000).into(),
                 1_500,
             );
-            let interval = DhtArcRange::from(agent_arc_overlap_end_a.to_dht_arc_range_std());
+            let interval = agent_arc_overlap_end_a.to_dht_arc_range_std();
 
             assert!(arc_set.overlap(&interval.into()));
         }
