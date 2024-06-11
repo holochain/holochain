@@ -418,9 +418,7 @@ async fn setup_overlapping_agents(
     kitsune_tuner: fn(
         tuning_params_struct::KitsuneP2pTuningParams,
     ) -> tuning_params_struct::KitsuneP2pTuningParams,
-    verify_agent_setup: Box<
-        dyn Fn(&AgentCtx) -> bool,
-    >,
+    verify_agent_setup: Box<dyn Fn(&AgentCtx) -> bool>,
 ) -> Vec<(KitsuneTestHarness, GhostSender<KitsuneP2p>, Arq, KAgent)> {
     // Arcs are this long by default, with an adjustment to ensure overlap.
     let base_len = u32::MAX / 5;
