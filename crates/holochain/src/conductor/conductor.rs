@@ -290,6 +290,16 @@ mod startup_shutdown_impls {
                 .clone()
                 .map(|path| PathBuf::from(path.deref()));
 
+            const WASM_CACHE: &str = "wasm-cache";
+
+            if let Some(path) = &maybe_data_root_path {
+                let mut path = path.clone();
+                path.push(WASM_CACHE);
+
+                // best effort to ensure the cache dir exists if configured
+                let _ = std::fs::create_dir_all(&path);
+            }
+
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),
@@ -306,7 +316,7 @@ mod startup_shutdown_impls {
                 post_commit,
                 services: RwShare::new(None),
                 wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
-                    maybe_data_root_path.map(|p| p.join("wasm-cache")),
+                    maybe_data_root_path.map(|p| p.join(WASM_CACHE)),
                 ))),
                 app_auth_token_store: RwShare::default(),
                 app_broadcast: AppBroadcast::default(),
