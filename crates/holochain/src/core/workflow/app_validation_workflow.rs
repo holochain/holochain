@@ -561,6 +561,7 @@ async fn validate_op_outer(
         &ribosome,
         conductor_handle,
         validation_dependencies,
+        false, // is_inline
     )
     .await
 }
@@ -573,6 +574,7 @@ pub async fn validate_op(
     ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    is_inline: bool,
 ) -> AppValidationOutcome<Outcome> {
     check_entry_def(op, &network.dna_hash(), conductor_handle)
         .await
@@ -595,6 +597,7 @@ pub async fn validate_op(
         workspace,
         network,
         validation_dependencies,
+        is_inline,
     )
     .await?;
 
@@ -784,9 +787,10 @@ async fn run_validation_callback(
     workspace: HostFnWorkspaceRead,
     network: GenericNetwork,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    is_inline: bool,
 ) -> AppValidationResult<Outcome> {
     let validate_result = ribosome.run_validate(
-        ValidateHostAccess::new(workspace.clone(), network.clone()),
+        ValidateHostAccess::new(workspace.clone(), network.clone(), is_inline),
         invocation.clone(),
     )?;
     match validate_result {

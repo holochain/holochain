@@ -34,6 +34,7 @@ impl ValidateInvocation {
 pub struct ValidateHostAccess {
     pub workspace: HostFnWorkspaceRead,
     pub network: GenericNetwork,
+    pub is_inline: bool,
 }
 
 impl std::fmt::Debug for ValidateHostAccess {
