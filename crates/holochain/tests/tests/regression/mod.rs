@@ -1,4 +1,5 @@
 use holo_hash::ActionHash;
+use holochain::conductor::conductor::WASM_CACHE;
 use holochain::sweettest::{SweetAgents, SweetConductor, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
 
@@ -7,6 +8,12 @@ use holochain_wasm_test_utils::TestWasm;
 async fn wasm_disk_cache() {
     holochain_trace::test_run();
     let mut conductor = SweetConductor::from_standard_config().await;
+
+    let mut cache_dir = conductor.db_path().to_owned();
+    cache_dir.push(WASM_CACHE);
+
+    let mut read = tokio::fs::read_dir(&cache_dir).await.unwrap();
+    assert!(read.next_entry().await.unwrap().is_none());
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::ValidateRejectAppTypes, TestWasm::Crd])
@@ -27,11 +34,7 @@ async fn wasm_disk_cache() {
         )
         .await;
 
-    let mut cache_dir = conductor.db_path().to_owned();
-    cache_dir.push("wasm-cache");
-
     let mut read = tokio::fs::read_dir(&cache_dir).await.unwrap();
-
     assert!(read.next_entry().await.unwrap().is_some());
 }
 

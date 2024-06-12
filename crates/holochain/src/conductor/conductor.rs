@@ -29,7 +29,9 @@
 //!
 //! # }
 //! ```
-//!
+
+/// Name of the wasm cache folder within the data root directory.
+pub const WASM_CACHE: &str = "wasm-cache";
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -289,8 +291,6 @@ mod startup_shutdown_impls {
                 .data_root_path
                 .clone()
                 .map(|path| PathBuf::from(path.deref()));
-
-            const WASM_CACHE: &str = "wasm-cache";
 
             if let Some(path) = &maybe_data_root_path {
                 let mut path = path.clone();
