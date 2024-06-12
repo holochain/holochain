@@ -20,16 +20,16 @@
     "lair": {
       "flake": false,
       "locked": {
-        "lastModified": 1709335027,
-        "narHash": "sha256-rKMhh7TLuR1lqze2YFWZCGYKZQoB4dZxjpX3sb7r7Jk=",
+        "lastModified": 1717684904,
+        "narHash": "sha256-vcXt67Tl1qwVUkx8CBevdQocqZXUEeoXjaYw86ljsYo=",
         "owner": "holochain",
         "repo": "lair",
-        "rev": "826be915efc839d1d1b8a2156b158999b8de8d5b",
+        "rev": "6a84ed490fc7074d107e38bbb4a8d707e9b8e066",
         "type": "github"
       },
       "original": {
         "owner": "holochain",
-        "ref": "lair_keystore-v0.4.4",
+        "ref": "lair_keystore-v0.4.5",
         "repo": "lair",
         "type": "github"
       }
