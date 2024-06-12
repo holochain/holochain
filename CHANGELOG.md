@@ -14,6 +14,90 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240612.004512
+
+## [hc\_service\_check-0.1.0-dev.7](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.7)
+
+## [hcterm-0.4.0-dev.8](crates/hcterm/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_cli-0.4.0-dev.8](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain-0.4.0-dev.8](crates/holochain/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_cli\_bundle-0.4.0-dev.8](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.8](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.8](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_cascade-0.4.0-dev.8](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_conductor\_api-0.4.0-dev.8](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_conductor\_services-0.3.0-dev.8](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.8)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.7](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.8](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_websocket-0.4.0-dev.8](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.8)
+
+## [hdk-0.4.0-dev.7](crates/hdk/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_state-0.4.0-dev.8](crates/holochain_state/CHANGELOG.md#0.4.0-dev.8)
+
+## [hdi-0.5.0-dev.6](crates/hdi/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_p2p-0.4.0-dev.8](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.8)
+
+## [hc\_sleuth-0.4.0-dev.8](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.8)
+
+## [hdk\_derive-0.4.0-dev.6](crates/hdk_derive/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_state\_types-0.4.0-dev.6](crates/holochain_state_types/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_types-0.4.0-dev.8](crates/holochain_types/CHANGELOG.md#0.4.0-dev.8)
+
+## [kitsune\_p2p-0.4.0-dev.8](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.8)
+
+- **BREAKING** Bumped KITSUNE\_PROTOCOL\_VERSION. This *should* have been bumped with https://github.com/holochain/holochain/pull/3842, but better late than never. [\#3984](https://github.com/holochain/holochain/pull/3984)
+
+## [holochain\_keystore-0.4.0-dev.8](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_sqlite-0.4.0-dev.8](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.8)
+
+## [kitsune\_p2p\_bootstrap\_client-0.4.0-dev.8](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.4.0-dev.8)
+
+## [kitsune\_p2p\_fetch-0.4.0-dev.7](crates/kitsune_p2p_fetch/CHANGELOG.md#0.4.0-dev.7)
+
+## [kitsune\_p2p\_proxy-0.4.0-dev.7](crates/kitsune_p2p_proxy/CHANGELOG.md#0.4.0-dev.7)
+
+## [mr\_bundle-0.4.0-dev.3](crates/mr_bundle/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_zome\_types-0.4.0-dev.7](crates/holochain_zome_types/CHANGELOG.md#0.4.0-dev.7)
+
+## [kitsune\_p2p\_bootstrap-0.3.0-dev.8](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.3.0-dev.8)
+
+## [holochain\_integrity\_types-0.4.0-dev.6](crates/holochain_integrity_types/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_nonce-0.4.0-dev.4](crates/holochain_nonce/CHANGELOG.md#0.4.0-dev.4)
+
+## [kitsune\_p2p\_block-0.4.0-dev.6](crates/kitsune_p2p_block/CHANGELOG.md#0.4.0-dev.6)
+
+## [kitsune\_p2p\_types-0.4.0-dev.7](crates/kitsune_p2p_types/CHANGELOG.md#0.4.0-dev.7)
+
+## [holo\_hash-0.4.0-dev.6](crates/holo_hash/CHANGELOG.md#0.4.0-dev.6)
+
+## [kitsune\_p2p\_bin\_data-0.4.0-dev.6](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.4.0-dev.6)
+
+## [kitsune\_p2p\_dht-0.4.0-dev.6](crates/kitsune_p2p_dht/CHANGELOG.md#0.4.0-dev.6)
+
+## [fixt-0.4.0-dev.2](crates/fixt/CHANGELOG.md#0.4.0-dev.2)
+
+## [kitsune\_p2p\_dht\_arc-0.4.0-dev.6](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.4.0-dev.6)
+
+## [kitsune\_p2p\_timestamp-0.4.0-dev.2](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.4.0-dev.2)
+
 # 20240605.200925
 
 ## [hc\_service\_check-0.1.0-dev.6](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.6)
@@ -92,7 +176,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [holochain\_conductor\_api-0.4.0-dev.6](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.6)
 
-- *BREAKING* Updates holochain to use the new SBD server architecture for WebRTC signaling. If you were previously running your own tx5-signal-srv server for signaling, you will need to switch to [sbd-server](https://crates.io/crates/sbd-server). If you were using the holo-provided `wss://signal.holo.host`, you must switch to `wss://sbd-0.main.infra.holo.host`. See the module level documentation at [/crates/holochain_conductor_api/src/config/conductor.rs](/crates/holochain_conductor_api/src/config/conductor.rs) for a commented example holochain conductor configuration file. [\#3842](https://github.com/holochain/holochain/pull/3842)
+- *BREAKING* Updates holochain to use the new SBD server architecture for WebRTC signaling. If you were previously running your own tx5-signal-srv server for signaling, you will need to switch to [sbd-server](https://crates.io/crates/sbd-server). If you were using the holo-provided `wss://signal.holo.host`, you must switch to `wss://sbd-0.main.infra.holo.host`. See the module level documentation at [/crates/holochain\_conductor\_api/src/config/conductor.rs](/crates/holochain_conductor_api/src/config/conductor.rs) for a commented example holochain conductor configuration file. [\#3842](https://github.com/holochain/holochain/pull/3842)
 
 ## [holochain\_conductor\_services-0.3.0-dev.6](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.6)
 
