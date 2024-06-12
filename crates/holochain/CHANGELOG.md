@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Warrants: When an authority rejects another agent's authored data, that authority creates a Warrant which is gossiped to the offending agent's Agent Activity Authority, who then serves that warrant along with any `get_agent_activity` request.
+- The `warrants` field of `AgentActivity` is now populated with warrants for that agent.
+
 ## 0.4.0-dev.8
 
 ## 0.4.0-dev.7

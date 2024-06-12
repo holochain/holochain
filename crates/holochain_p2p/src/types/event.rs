@@ -71,6 +71,8 @@ pub struct GetActivityOptions {
     pub include_valid_activity: bool,
     /// Include any rejected actions in the response.
     pub include_rejected_activity: bool,
+    /// Include warrants in the response.
+    pub include_warrants: bool,
     /// Include the full signed actions and hashes in the response
     /// instead of just the hashes.
     pub include_full_actions: bool,
@@ -80,6 +82,7 @@ impl Default for GetActivityOptions {
     fn default() -> Self {
         Self {
             include_valid_activity: true,
+            include_warrants: true,
             include_rejected_activity: false,
             include_full_actions: false,
         }
@@ -90,6 +93,7 @@ impl From<&actor::GetActivityOptions> for GetActivityOptions {
     fn from(a: &actor::GetActivityOptions) -> Self {
         Self {
             include_valid_activity: a.include_valid_activity,
+            include_warrants: a.include_warrants,
             include_rejected_activity: a.include_rejected_activity,
             include_full_actions: a.include_full_actions,
         }
