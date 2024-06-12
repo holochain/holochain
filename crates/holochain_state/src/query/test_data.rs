@@ -1,4 +1,4 @@
-#![allow(clippy::clippy::redundant_clone)]
+#![allow(clippy::redundant_clone)]
 use ::fixt::prelude::*;
 use holo_hash::*;
 use holochain_types::action::NewEntryAction;

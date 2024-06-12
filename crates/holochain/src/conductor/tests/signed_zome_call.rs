@@ -103,7 +103,7 @@ async fn signed_zome_call() {
         .valid_cap_grant(
             granted_function.clone(),
             cap_access_public_key.clone(),
-            Some(cap_access_secret.clone()),
+            Some(cap_access_secret),
         )
         .await
         .unwrap();
@@ -238,7 +238,7 @@ async fn signed_zome_call_wildcard() {
         .valid_cap_grant(
             called_function.clone(),
             cap_access_public_key.clone(),
-            Some(cap_access_secret.clone()),
+            Some(cap_access_secret),
         )
         .await
         .unwrap();

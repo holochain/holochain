@@ -171,7 +171,7 @@ mod tests {
         assert_eq!(
             vec![sample_app_manifest_v1
                 .roles
-                .get(0)
+                .first()
                 .unwrap()
                 .dna
                 .location

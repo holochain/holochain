@@ -1,3 +1,4 @@
+#![allow(clippy::field_reassign_with_default)]
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
 use holochain_zome_types::prelude::NOISE;

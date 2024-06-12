@@ -203,7 +203,7 @@ mod tests {
         let author = fake_agent_pubkey_1();
 
         {
-            let workspace = GenesisWorkspace::new(vault.clone().into(), dht_db.to_db()).unwrap();
+            let workspace = GenesisWorkspace::new(vault.clone(), dht_db.to_db()).unwrap();
 
             let mut api = MockCellConductorApiT::new();
             api.expect_conductor_services()

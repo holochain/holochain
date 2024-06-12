@@ -294,7 +294,8 @@ mod tests {
             async move {
                 for _ in 0..3 {
                     host_stub.next_event(Duration::from_secs(5)).await;
-                    sender.send(task.read().current_delay).await.unwrap();
+                    let send = task.read().current_delay;
+                    sender.send(send).await.unwrap();
                 }
             }
         })
@@ -335,7 +336,8 @@ mod tests {
             async move {
                 for _ in 0..3 {
                     host_stub.next_event(Duration::from_secs(5)).await;
-                    sender.send(task.read().current_delay).await.unwrap();
+                    let send = task.read().current_delay;
+                    sender.send(send).await.unwrap();
                 }
             }
         })
@@ -372,7 +374,8 @@ mod tests {
             async move {
                 for _ in 0..3 {
                     host_stub.next_event(Duration::from_secs(5)).await;
-                    sender.send(task.read().current_delay).await.unwrap();
+                    let send = task.read().current_delay;
+                    sender.send(send).await.unwrap();
                 }
             }
         })

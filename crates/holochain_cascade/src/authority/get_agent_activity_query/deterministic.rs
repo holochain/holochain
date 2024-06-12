@@ -150,6 +150,7 @@ mod tests {
         let agents = [fixt!(AgentPubKey), fixt!(AgentPubKey), fixt!(AgentPubKey)];
         let mut chains = vec![];
 
+        #[allow(clippy::needless_range_loop)]
         for a in 0..3 {
             let mut chain: Vec<ActionHash> = Vec::new();
             for seq in 0..10 {
