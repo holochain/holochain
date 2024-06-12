@@ -1456,3 +1456,85 @@ impl Default for OutcomeSummary {
         OutcomeSummary::new()
     }
 }
+
+/// Test the detect_fork function against different situations,
+/// especially the case where a fork happens after an Update Agent action,
+/// where the authorship changes
+#[tokio::test(flavor = "multi_thread")]
+async fn test_detect_fork() {
+    use ::fixt::fixt;
+    let keystore = holochain_keystore::test_keystore();
+    let author1 = keystore.new_sign_keypair_random().await.unwrap();
+    let author2 = keystore.new_sign_keypair_random().await.unwrap();
+
+    let sign_action = |a: Action| async {
+        SignedActionHashed::sign(&keystore, a.into_hashed())
+            .await
+            .unwrap()
+    };
+    let basic_action = |author: AgentPubKey, prev: Option<ActionHash>| {
+        if let Some(prev) = prev {
+            let mut a = fixt!(Create);
+            a.entry_type = EntryType::App(fixt!(AppEntryDef));
+            a.author = author;
+            a.prev_action = prev;
+            Action::Create(a)
+        } else {
+            let mut a = fixt!(Dna);
+            a.author = author;
+            Action::Dna(a)
+        }
+    };
+
+    let a0 = basic_action(author1.clone(), None);
+    let a1 = basic_action(author1.clone(), Some(a0.to_hash()));
+
+    let mut update = fixt!(Update);
+    update.author = author1.clone();
+    update.entry_type = EntryType::AgentPubKey;
+    update.entry_hash = author2.clone().into();
+    update.prev_action = a1.to_hash();
+    let a2 = Action::Update(update);
+
+    let a3 = basic_action(author2.clone(), Some(a2.to_hash()));
+    let a4 = basic_action(author2.clone(), Some(a3.to_hash()));
+
+    let mut a1_fork = a1.clone();
+    *a1_fork.entry_data_mut().unwrap().0 = fixt!(EntryHash);
+
+    let mut a3_fork = a3.clone();
+    *a3_fork.entry_data_mut().unwrap().0 = fixt!(EntryHash);
+
+    let mut a3_fork_author1 = a3.clone();
+    *a3_fork_author1.author_mut() = author1.clone();
+    *a3_fork_author1.entry_data_mut().unwrap().0 = fixt!(EntryHash);
+
+    let mut a3_fork_other_author = a3.clone();
+    *a3_fork_other_author.author_mut() = fixt!(AgentPubKey);
+    *a3_fork_other_author.entry_data_mut().unwrap().0 = fixt!(EntryHash);
+
+    let a1_hash = a1.to_hash();
+    let a3_hash = a3.to_hash();
+
+    let chain = [
+        sign_action(a0).await,
+        sign_action(a1).await,
+        sign_action(a2).await,
+        sign_action(a3).await,
+    ];
+
+    let db = test_authored_db();
+    db.test_write(move |mut txn| {
+        for a in chain {
+            insert_action(&mut txn, &a).unwrap();
+        }
+
+        assert!(detect_fork(&mut txn, &a4).unwrap().is_none());
+        assert_eq!(detect_fork(&mut txn, &a1_fork).unwrap().unwrap().0, a1_hash);
+        assert_eq!(detect_fork(&mut txn, &a3_fork).unwrap().unwrap().0, a3_hash);
+        assert!(detect_fork(&mut txn, &a3_fork_author1).unwrap().is_none());
+        assert!(detect_fork(&mut txn, &a3_fork_other_author)
+            .unwrap()
+            .is_none());
+    });
+}
