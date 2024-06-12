@@ -105,11 +105,12 @@ lto = true
 # influxive-child-svc = { path = "../influxive/crates/influxive-child-svc" }
 # influxive-otel = { path = "../influxive/crates/influxive-otel" }
 # contrafact = { git = "https://github.com/maackle/contrafact-rs.git", branch = "lambda" }
-# tx5 = { path = "../tx5/crates/tx5" }
-# tx5-go-pion-sys = { path = "../tx5/crates/tx5-go-pion-sys" }
-# tx5-go-pion-turn = { path = "../tx5/crates/tx5-go-pion-turn" }
-# tx5-signal = { path = "../tx5/crates/tx5-signal" }
-# tx5-signal-srv = { path = "../tx5/crates/tx5-signal-srv" }
+ tx5 = { path = "../tx5/crates/tx5" }
+ tx5-go-pion = { path = "../tx5/crates/tx5-go-pion" }
+ tx5-go-pion-sys = { path = "../tx5/crates/tx5-go-pion-sys" }
+ tx5-go-pion-turn = { path = "../tx5/crates/tx5-go-pion-turn" }
+ tx5-signal = { path = "../tx5/crates/tx5-signal" }
+ tx5-signal-srv = { path = "../tx5/crates/tx5-signal-srv" }
 # tx5 = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # tx5-signal = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # tx5-signal-srv = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
@@ -121,8 +122,8 @@ lto = true
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "proptest" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 #ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
-#lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
-#lair_keystore = { path = "../lair/crates/lair_keystore" }
+ lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
+ lair_keystore = { path = "../lair/crates/lair_keystore" }
 #lair_keystore_api_0_0 = { path = "../lair_0_0/crates/lair_keystore_api", package = "lair_keystore_api" }
 #lair_keystore_client_0_0 = { path = "../lair_0_0/crates/lair_keystore_client", package = "lair_keystore_client" }
 #lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "secretbox" }

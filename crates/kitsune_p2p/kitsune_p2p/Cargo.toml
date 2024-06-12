@@ -45,7 +45,7 @@ thiserror = "1.0.22"
 tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1"
 tokio-stream = "0.1"
-tx5 = { version = "=0.0.9-alpha", optional = true }
+tx5 = { version = "=0.0.9-alpha-patch.1", optional = true }
 url2 = "0.0.6"
 fixt = { path = "../../fixt", version = "^0.3.1"}
 
@@ -72,7 +72,7 @@ pretty_assertions = "1.4.0"
 test-case = "3.3"
 tokio = { version = "1.11", features = ["full", "test-util"] }
 tracing-subscriber = "0.3.16"
-tx5-signal-srv = "=0.0.9-alpha"
+tx5-signal-srv = "=0.0.9-alpha-patch.1"
 
 [lints]
 workspace = true
