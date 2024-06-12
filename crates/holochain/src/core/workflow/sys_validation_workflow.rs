@@ -1529,10 +1529,27 @@ async fn test_detect_fork() {
             insert_action(&mut txn, &a).unwrap();
         }
 
+        // Not a fork, because a4 is a perfectly valid continuation of a3
         assert!(detect_fork(&mut txn, &a4).unwrap().is_none());
+
+        // Is a fork, because:
+        // - a1 already exists
+        // - both actions point to the same previous action a0
+        // - both are under the same authorship as a0
         assert_eq!(detect_fork(&mut txn, &a1_fork).unwrap().unwrap().0, a1_hash);
+
+        // Is a fork, because:
+        // - a3 already exists
+        // - both actions point to the same previous action a2
+        // - both are under the authorship of the key which a2 updates to
         assert_eq!(detect_fork(&mut txn, &a3_fork).unwrap().unwrap().0, a3_hash);
+
+        // This is not valid in sys validation because the author is not valid,
+        // but it does not constitute a fork (it's just an invalid action)
         assert!(detect_fork(&mut txn, &a3_fork_author1).unwrap().is_none());
+
+        // This is not valid in sys validation because the author is not valid,
+        // but it does not constitute a fork (it's just an invalid action)
         assert!(detect_fork(&mut txn, &a3_fork_other_author)
             .unwrap()
             .is_none());
