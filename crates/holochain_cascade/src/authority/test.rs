@@ -253,8 +253,6 @@ async fn get_agent_activity() {
         .unwrap();
     }
 
-    db.persist();
-
     let options = actor::GetActivityOptions {
         include_valid_activity: true,
         include_rejected_activity: false,
