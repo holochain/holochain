@@ -331,7 +331,7 @@ async fn gossip_to_basis_from_inside() {
     check_op_receivers(&agents, basis, &[sender_idx, should_recv_idx]);
 }
 
-/// Similar to the test above except that we create the op for an agent outside the arc that is belongs in.
+/// Similar to the test above except that we create the op for an agent outside the arc that it belongs in.
 /// By never publishing the op and having no overlap with the arc that the op does belong in, the op should
 /// never be gossipped to anyone.
 ///
