@@ -7,11 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.4.0-dev.8
+
 ## 0.4.0-dev.7
 
 ## 0.4.0-dev.6
 
-- *BREAKING* Updates holochain to use the new SBD server architecture for WebRTC signaling. If you were previously running your own tx5-signal-srv server for signaling, you will need to switch to [sbd-server](https://crates.io/crates/sbd-server). If you were using the holo-provided `wss://signal.holo.host`, you must switch to `wss://sbd-0.main.infra.holo.host`. See the module level documentation at [/crates/holochain_conductor_api/src/config/conductor.rs](/crates/holochain_conductor_api/src/config/conductor.rs) for a commented example holochain conductor configuration file. [\#3842](https://github.com/holochain/holochain/pull/3842)
+- *BREAKING* Updates holochain to use the new SBD server architecture for WebRTC signaling. If you were previously running your own tx5-signal-srv server for signaling, you will need to switch to [sbd-server](https://crates.io/crates/sbd-server). If you were using the holo-provided `wss://signal.holo.host`, you must switch to `wss://sbd-0.main.infra.holo.host`. See the module level documentation at [/crates/holochain\_conductor\_api/src/config/conductor.rs](/crates/holochain_conductor_api/src/config/conductor.rs) for a commented example holochain conductor configuration file. [\#3842](https://github.com/holochain/holochain/pull/3842)
 
 ## 0.4.0-dev.5
 
