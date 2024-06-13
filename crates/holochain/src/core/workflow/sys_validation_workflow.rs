@@ -1485,9 +1485,11 @@ async fn test_detect_fork() {
         }
     };
 
+    // - Two actions, one following the other
     let a0 = basic_action(author1.clone(), None);
     let a1 = basic_action(author1.clone(), Some(a0.to_hash()));
 
+    // - Create an agent key update following a1
     let mut update = fixt!(Update);
     update.author = author1.clone();
     update.entry_type = EntryType::AgentPubKey;
@@ -1495,19 +1497,24 @@ async fn test_detect_fork() {
     update.prev_action = a1.to_hash();
     let a2 = Action::Update(update);
 
+    // - Two more actions following a2
     let a3 = basic_action(author2.clone(), Some(a2.to_hash()));
     let a4 = basic_action(author2.clone(), Some(a3.to_hash()));
 
+    // - Create a forked version of a1 (still pointing to a0)
     let mut a1_fork = a1.clone();
     *a1_fork.entry_data_mut().unwrap().0 = fixt!(EntryHash);
 
+    // - Create a forked version of a3 (still pointing to a2)
     let mut a3_fork = a3.clone();
     *a3_fork.entry_data_mut().unwrap().0 = fixt!(EntryHash);
 
+    // - Create another forked version of a3, with the pre-update author
     let mut a3_fork_author1 = a3.clone();
     *a3_fork_author1.author_mut() = author1.clone();
     *a3_fork_author1.entry_data_mut().unwrap().0 = fixt!(EntryHash);
 
+    // - Create another forked version of a3, with a random author
     let mut a3_fork_other_author = a3.clone();
     *a3_fork_other_author.author_mut() = fixt!(AgentPubKey);
     *a3_fork_other_author.entry_data_mut().unwrap().0 = fixt!(EntryHash);
@@ -1515,6 +1522,7 @@ async fn test_detect_fork() {
     let a1_hash = a1.to_hash();
     let a3_hash = a3.to_hash();
 
+    // - Form a chain of the "valid, unforked" actions
     let chain = [
         sign_action(a0).await,
         sign_action(a1).await,
@@ -1524,6 +1532,7 @@ async fn test_detect_fork() {
 
     let db = test_authored_db();
     db.test_write(move |mut txn| {
+        // - Commit the valid chain
         for a in chain {
             insert_action(&mut txn, &a).unwrap();
         }
