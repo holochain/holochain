@@ -1,13 +1,14 @@
 use holo_hash::ActionHash;
 use holochain::conductor::conductor::WASM_CACHE;
-use holochain::sweettest::{SweetAgents, SweetConductor, SweetDnaFile};
+use holochain::sweettest::*;
 use holochain_wasm_test_utils::TestWasm;
 
 // make sure the wasm cache at least creates files
 #[tokio::test(flavor = "multi_thread")]
 async fn wasm_disk_cache() {
     holochain_trace::test_run();
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor =
+        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
 
     let mut cache_dir = conductor.db_path().to_owned();
     cache_dir.push(WASM_CACHE);
