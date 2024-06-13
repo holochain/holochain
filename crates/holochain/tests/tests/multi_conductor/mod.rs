@@ -15,7 +15,7 @@ struct AppString(String);
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn dpki_publish() {
-    let _g = holochain_trace::test_run();
+    holochain_trace::test_run();
 
     let config = SweetConductorConfig::standard();
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
@@ -30,7 +30,7 @@ async fn dpki_publish() {
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn dpki_no_publish() {
-    let _g = holochain_trace::test_run();
+    holochain_trace::test_run();
 
     let config = SweetConductorConfig::standard().no_publish();
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;

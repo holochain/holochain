@@ -57,7 +57,7 @@ pub mod wasm_test {
             ..
         } = RibosomeTestFixture::new(TestWasm::Sign).await;
 
-        for (key, data) in vec![
+        for (key, data) in [
             (alice_pubkey.clone(), vec![100_u8, 200_u8, 50_u8]),
             (bob_pubkey.clone(), vec![100_u8, 200_u8, 50_u8]),
             (alice_pubkey, vec![1_u8, 2_u8, 3_u8]),
