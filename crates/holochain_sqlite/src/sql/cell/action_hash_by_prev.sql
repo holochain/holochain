@@ -4,6 +4,7 @@ SELECT
 FROM
   Action
 WHERE
-  prev_hash = :prev_hash
+  hash != :hash
+  AND prev_hash = :prev_hash
 LIMIT
   1

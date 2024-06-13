@@ -1396,7 +1396,12 @@ pub async fn make_fork_warrant_op_inner(
     chain_author: AgentPubKey,
     action_pair: ((ActionHash, Signature), (ActionHash, Signature)),
 ) -> WorkflowResult<DhtOpHashed> {
-    tracing::warn!("Authoring warrant for chain fork by {chain_author}");
+    debug_assert_ne!(action_pair.0 .0, action_pair.1 .0);
+    tracing::warn!(
+        "Authoring warrant for chain fork by {chain_author}. Action hashes: ({}, {})",
+        action_pair.0 .0,
+        action_pair.1 .0
+    );
 
     let warrant = Warrant::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
         chain_author,
@@ -1418,7 +1423,8 @@ pub fn detect_fork(
     statement
         .query_row(
             named_params! {
-                ":prev_hash": action.prev_action()
+                ":prev_hash": action.prev_action(),
+                ":hash": action.to_hash(),
             },
             |row| {
                 let hash: ActionHash = row.get("hash")?;
@@ -1527,7 +1533,7 @@ async fn test_detect_fork() {
         sign_action(a0).await,
         sign_action(a1).await,
         sign_action(a2).await,
-        sign_action(a3).await,
+        sign_action(a3.clone()).await,
     ];
 
     let db = test_authored_db();
@@ -1539,6 +1545,9 @@ async fn test_detect_fork() {
 
         // Not a fork, because a4 is a perfectly valid continuation of a3
         assert!(detect_fork(txn, &a4).unwrap().is_none());
+
+        // Not a fork, because a3 is already in the chain
+        assert!(detect_fork(txn, &a3).unwrap().is_none());
 
         // Is a fork, because:
         // - a1 already exists
