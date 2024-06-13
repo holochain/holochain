@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- System validation: Added a new rule that no new actions are allowed following a chain close action.
+
 ## 0.3.1
 
 ## 0.3.1-rc.2
