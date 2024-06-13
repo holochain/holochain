@@ -1531,7 +1531,7 @@ async fn test_detect_fork() {
     ];
 
     let db = test_authored_db();
-    db.test_write(move |mut txn| {
+    db.test_write(move |txn| {
         // - Commit the valid chain
         for a in chain {
             insert_action(txn, &a).unwrap();
