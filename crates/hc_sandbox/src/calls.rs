@@ -79,6 +79,8 @@ pub enum AdminRequestCli {
     DisableApp(DisableApp),
     DumpState(DumpState),
     DumpConductorState,
+    DumpNetworkMetrics(DumpNetworkMetrics),
+    DumpNetworkStats,
     /// Calls AdminRequest::AddAgentInfo.
     /// _Unimplemented_.
     AddAgents,
@@ -212,6 +214,14 @@ pub struct DumpState {
     /// The agent half of the cell ID to dump.
     #[arg(value_parser = parse_agent_key)]
     pub agent_key: AgentPubKey,
+}
+
+/// Arguments for dumping network metrics.
+#[derive(Debug, Args, Clone)]
+pub struct DumpNetworkMetrics {
+    /// The DNA hash of the app network to dump.
+    #[arg(value_parser = parse_dna_hash)]
+    pub dna: Option<DnaHash>,
 }
 
 /// Calls AdminRequest::RequestAgentInfo
@@ -376,6 +386,16 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         AdminRequestCli::DumpConductorState => {
             let state = dump_conductor_state(cmd).await?;
             msg!("DUMP CONDUCTOR STATE \n{}", state);
+        }
+        AdminRequestCli::DumpNetworkMetrics(args) => {
+            let metrics = dump_network_metrics(cmd, args).await?;
+            // Print without other text so it can be piped
+            println!("{}", metrics);
+        }
+        AdminRequestCli::DumpNetworkStats => {
+            let stats = dump_network_stats(cmd).await?;
+            // Print without other text so it can be piped
+            println!("{}", stats);
         }
         AdminRequestCli::AddAgents => todo!("Adding agent info via CLI is coming soon"),
         AdminRequestCli::ListAgents(args) => {
@@ -647,6 +667,23 @@ pub async fn dump_state(cmd: &mut CmdRunner, args: DumpState) -> anyhow::Result<
 pub async fn dump_conductor_state(cmd: &mut CmdRunner) -> anyhow::Result<String> {
     let resp = cmd.command(AdminRequest::DumpConductorState).await?;
     Ok(expect_match!(resp => AdminResponse::ConductorStateDumped, "Failed to dump state"))
+}
+
+/// Calls [`AdminRequest::DumpNetworkMetrics`] and dumps network metrics.
+async fn dump_network_metrics(
+    cmd: &mut CmdRunner,
+    args: DumpNetworkMetrics,
+) -> anyhow::Result<String> {
+    let resp = cmd
+        .command(AdminRequest::DumpNetworkMetrics { dna_hash: args.dna })
+        .await?;
+    Ok(expect_match!(resp => AdminResponse::NetworkMetricsDumped, "Failed to dump network metrics"))
+}
+
+/// Calls [`AdminRequest::DumpNetworkStats`] and dumps network stats.
+async fn dump_network_stats(cmd: &mut CmdRunner) -> anyhow::Result<String> {
+    let resp = cmd.command(AdminRequest::DumpNetworkStats).await?;
+    Ok(expect_match!(resp => AdminResponse::NetworkStatsDumped, "Failed to dump network stats"))
 }
 
 /// Calls [`AdminRequest::AddAgentInfo`] with and adds the list of agent info.
