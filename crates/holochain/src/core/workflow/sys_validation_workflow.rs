@@ -1418,8 +1418,7 @@ pub fn detect_fork(
     statement
         .query_row(
             named_params! {
-                ":prev_hash": action.prev_action(),
-                ":author": action.author()
+                ":prev_hash": action.prev_action()
             },
             |row| {
                 let hash: ActionHash = row.get("hash")?;
@@ -1545,13 +1544,20 @@ async fn test_detect_fork() {
         assert_eq!(detect_fork(&mut txn, &a3_fork).unwrap().unwrap().0, a3_hash);
 
         // This is not valid in sys validation because the author is not valid,
-        // but it does not constitute a fork (it's just an invalid action)
-        assert!(detect_fork(&mut txn, &a3_fork_author1).unwrap().is_none());
+        // but it still does technically constitute a fork (it's just an invalid action)
+        assert_eq!(
+            detect_fork(&mut txn, &a3_fork_author1).unwrap().unwrap().0,
+            a3_hash
+        );
 
         // This is not valid in sys validation because the author is not valid,
-        // but it does not constitute a fork (it's just an invalid action)
-        assert!(detect_fork(&mut txn, &a3_fork_other_author)
-            .unwrap()
-            .is_none());
+        // but it does still constitute a fork (it's just an invalid action)
+        assert_eq!(
+            detect_fork(&mut txn, &a3_fork_other_author)
+                .unwrap()
+                .unwrap()
+                .0,
+            a3_hash
+        );
     });
 }
