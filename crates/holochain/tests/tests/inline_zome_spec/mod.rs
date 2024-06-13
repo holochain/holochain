@@ -333,7 +333,7 @@ async fn simple_validation() -> anyhow::Result<()> {
     let correct = match err {
         Err(ConductorApiError::CellError(CellError::WorkflowError(ref e))) => match &**e {
             WorkflowError::SourceChainError(SourceChainError::InvalidCommit(reason)) => {
-                reason == "No empty strings allowed"
+                reason.contains("No empty strings allowed")
             }
             _ => false,
         },
