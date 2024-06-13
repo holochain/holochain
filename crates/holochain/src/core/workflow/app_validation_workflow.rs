@@ -569,6 +569,7 @@ async fn validate_op_outer(
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn validate_op(
     op: &Op,
     dht_op_hash: &DhtOpHash,
