@@ -1,3 +1,5 @@
+// clippy... this is just the test_case syntax...
+#![allow(clippy::single_range_in_vec_init)]
 use holo_hash::*;
 use std::collections::HashMap;
 use std::ops::Range;
@@ -18,7 +20,7 @@ fn hash(i: u32) -> TestHash {
 /// Build a chain of RegisterAgentActivity and then run them through the
 /// chain filter.
 fn build_chain(c: Vec<TestChainItem>, filter: TestFilter) -> Vec<TestChainItem> {
-    ChainFilterIter::new(filter, c).into_iter().collect()
+    ChainFilterIter::new(filter, c).collect()
 }
 
 /// Useful for displaying diff of test_case failure.

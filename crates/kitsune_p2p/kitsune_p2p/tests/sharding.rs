@@ -1,3 +1,4 @@
+#![allow(clippy::needless_range_loop)]
 use crate::common::{
     start_bootstrap, start_signal_srv, wait_for_connected, KitsuneTestHarness, TestHostOp,
 };
@@ -108,12 +109,12 @@ async fn publish_to_basis_from_inside() {
         let sender_location = &agents[sender_idx].3 .0[32..];
 
         let mut kitsune_basis = KitsuneBasis::new(vec![0; 36]);
-        kitsune_basis.0[32..].copy_from_slice(&sender_location);
+        kitsune_basis.0[32..].copy_from_slice(sender_location);
         let basis = Arc::new(kitsune_basis);
 
         for i in 0..5 {
             let should_this_agent_hold_the_op =
-                agents[i].2.to_dht_arc_std().contains(&basis.get_loc());
+                agents[i].2.to_dht_arc_std().contains(basis.get_loc());
 
             // Another agent ended up with the op location in their arc, don't want this!
             if should_this_agent_hold_the_op && (i != sender_idx && i != should_recv_idx) {
@@ -134,19 +135,16 @@ async fn publish_to_basis_from_inside() {
     for i in 0..5 {
         agents[i]
             .1
-            .join(
-                space.clone(),
-                agents[i].3.clone(),
-                None,
-                Some(agents[i].2.clone()),
-            )
+            .join(space.clone(), agents[i].3.clone(), None, Some(agents[i].2))
             .await
             .unwrap();
     }
 
     // Each agent should be connected to the previous agent because that's how the arcs were set up
     // above.
-    for i in 4..=0 {
+    // Uhhh clippy? this DOES have a .rev()
+    #[allow(clippy::reversed_empty_ranges)]
+    for i in (4..=0).rev() {
         // A circular `next` so that the last agent is connected to the first agent
         let prev = (i - 1) % 5;
 
@@ -316,12 +314,12 @@ async fn publish_to_basis_from_outside() {
         let should_recv_location = &agents[should_recv_idx_1].3 .0[32..];
 
         let mut kitsune_basis = KitsuneBasis::new(vec![0; 36]);
-        kitsune_basis.0[32..].copy_from_slice(&should_recv_location);
+        kitsune_basis.0[32..].copy_from_slice(should_recv_location);
         let basis = Arc::new(kitsune_basis);
 
         for i in 0..5 {
             let should_this_agent_hold_the_op =
-                agents[i].2.to_dht_arc_std().contains(&basis.get_loc());
+                agents[i].2.to_dht_arc_std().contains(basis.get_loc());
 
             // Another agent ended up with the op location in their arc, don't want this!
             if should_this_agent_hold_the_op && (i != should_recv_idx_1 && i != should_recv_idx_2) {
@@ -342,19 +340,16 @@ async fn publish_to_basis_from_outside() {
     for i in 0..5 {
         agents[i]
             .1
-            .join(
-                space.clone(),
-                agents[i].3.clone(),
-                None,
-                Some(agents[i].2.clone()),
-            )
+            .join(space.clone(), agents[i].3.clone(), None, Some(agents[i].2))
             .await
             .unwrap();
     }
 
     // Each agent should be connected to the previous agent because that's how the arcs were set up
     // above.
-    for i in 4..=0 {
+    // Uhhh clippy? this DOES have a .rev()
+    #[allow(clippy::reversed_empty_ranges)]
+    for i in (4..=0).rev() {
         // A circular `next` so that the last agent is connected to the first agent
         let prev = (i - 1) % 5;
 
@@ -468,5 +463,5 @@ fn should_agent_hold_op_at_basis(
     // range.contains(&basis.get_loc())
 
     // TODO Why is this different to doing the commented lines above?
-    agent_info.storage_arc().contains(&basis.get_loc())
+    agent_info.storage_arc().contains(basis.get_loc())
 }

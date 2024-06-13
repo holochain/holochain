@@ -226,6 +226,7 @@ async fn app_validation_workflow_inner(
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone().into();
     let sorted_dht_ops = validation_query::get_ops_to_app_validate(&db).await?;
+
     // filter out ops that have missing dependencies
     tracing::debug!("number of ops to validate {:?}", sorted_dht_ops.len());
     let sorted_dht_ops = validation_dependencies
@@ -253,13 +254,15 @@ async fn app_validation_workflow_inner(
     // Validate ops sequentially
     for sorted_dht_op in sorted_dht_ops.into_iter() {
         let (dht_op, dht_op_hash) = sorted_dht_op.into_inner();
+        let deps = dht_op.sys_validation_dependencies();
+
         let chain_op = match dht_op {
             DhtOp::ChainOp(chain_op) => chain_op,
-            _ => continue,
+            _ => unreachable!("warrant ops are never sent to app validation"),
         };
+
         let op_type = chain_op.get_type();
         let action = chain_op.action();
-        let deps = op_type.sys_validation_dependencies(&action);
         let dht_op_lite = chain_op.to_lite();
 
         // If this is agent activity, track it for the cache.

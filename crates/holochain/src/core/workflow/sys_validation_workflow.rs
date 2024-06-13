@@ -302,6 +302,7 @@ async fn sys_validation_workflow_inner(
 
             for (hashed_op, outcome) in validation_outcomes {
                 let (op, op_hash) = hashed_op.into_inner();
+                let op_type = op.get_type();
 
                 // This is an optimization to skip app validation and integration for ops that are
                 // rejected and don't have dependencies.
@@ -310,7 +311,16 @@ async fn sys_validation_workflow_inner(
                 match outcome {
                     Outcome::Accepted => {
                         summary.accepted += 1;
-                        put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?;
+                        match op_type {
+                            DhtOpType::Chain(_) => {
+                                put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?
+                            }
+                            DhtOpType::Warrant(_) => {
+                                // XXX: integrate accepted warrants immediately, because we don't
+                                //      want them to go to app validation.
+                                put_integrated(txn, &op_hash, ValidationStatus::Valid)?
+                            }
+                        };
                         aitia::trace!(&hc_sleuth::Event::SysValidated {
                             by: sleuth_id.clone(),
                             op: op_hash

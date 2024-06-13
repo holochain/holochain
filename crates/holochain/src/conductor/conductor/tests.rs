@@ -112,15 +112,12 @@ async fn app_ids_are_unique() {
     let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
     let app = InstalledAppCommon::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
 
-    conductor
-        .add_disabled_app_to_db(app.clone().into())
-        .await
-        .unwrap();
+    conductor.add_disabled_app_to_db(app.clone()).await.unwrap();
 
     assert_matches!(
-        conductor.add_disabled_app_to_db(app.clone().into()).await,
+        conductor.add_disabled_app_to_db(app.clone()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
-        if id == "id".to_string()
+        if id == *"id"
     );
 
     //- it doesn't matter whether the app is active or inactive
@@ -130,9 +127,9 @@ async fn app_ids_are_unique() {
         .unwrap();
     assert_eq!(delta, AppStatusFx::SpinUp);
     assert_matches!(
-        conductor.add_disabled_app_to_db(app.clone().into()).await,
+        conductor.add_disabled_app_to_db(app.clone()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
-        if id == "id".to_string()
+        if &id == "id"
     );
 }
 
@@ -251,7 +248,7 @@ async fn common_genesis_test_app(
 
     // Install both DNAs under the same app:
     conductor
-        .setup_app(&"app", &[dna_hardcoded, dna_custom])
+        .setup_app("app", &[dna_hardcoded, dna_custom])
         .await
 }
 
@@ -261,7 +258,7 @@ async fn test_uninstall_app() {
     let (dna, _, _) = mk_dna(simple_crud_zome()).await;
     let mut conductor = SweetConductorConfig::standard().build_conductor().await;
 
-    let app1 = conductor.setup_app(&"app1", [&dna]).await.unwrap();
+    let app1 = conductor.setup_app("app1", [&dna]).await.unwrap();
 
     let hash1: ActionHash = conductor
         .call(
@@ -271,7 +268,7 @@ async fn test_uninstall_app() {
         )
         .await;
 
-    let app2 = conductor.setup_app(&"app2", [&dna]).await.unwrap();
+    let app2 = conductor.setup_app("app2", [&dna]).await.unwrap();
 
     let hash2: ActionHash = conductor
         .call(
@@ -334,7 +331,7 @@ async fn test_uninstall_app() {
 
     // - A new app can't read any of the data from the previous two, because once the last instance
     //   of the cells was destroyed, all data was destroyed as well.
-    let app3 = conductor.setup_app(&"app2", [&dna]).await.unwrap();
+    let app3 = conductor.setup_app("app2", [&dna]).await.unwrap();
     assert!(conductor
         .call::<_, Option<Record>>(&app3.cells()[0].zome("coordinator"), "read", hash1.clone())
         .await
@@ -391,7 +388,7 @@ async fn test_signing_error_during_genesis() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign]).await;
 
     let result = conductor
-        .setup_app_for_agents(&"app", &[fixt!(AgentPubKey)], [&dna])
+        .setup_app_for_agents("app", &[fixt!(AgentPubKey)], [&dna])
         .await;
 
     // - Assert that we got an error during Genesis. However, this test is
@@ -1160,7 +1157,7 @@ async fn test_init_concurrency() {
 
     // Perform 100 concurrent zome calls
     let num_iters = Arc::new(AtomicU32::new(0));
-    let call_tasks = (0..100 as u32).map(|_i| {
+    let call_tasks = (0..100_u32).map(|_i| {
         let conductor = conductor.clone();
         let zome = cell.zome("zome");
         let num_iters = num_iters.clone();

@@ -348,7 +348,7 @@ impl DhtOp {
     fn as_unique_form(&self) -> DhtOpUniqueForm<'_> {
         match self {
             Self::ChainOp(op) => op.as_unique_form(),
-            Self::WarrantOp(op) => DhtOpUniqueForm::Warrant(&op.warrant, &op.author, op.timestamp),
+            Self::WarrantOp(op) => op.as_unique_form(),
         }
     }
 

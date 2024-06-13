@@ -29,7 +29,9 @@
 //!
 //! # }
 //! ```
-//!
+
+/// Name of the wasm cache folder within the data root directory.
+pub const WASM_CACHE: &str = "wasm-cache";
 
 pub use self::share::RwShare;
 use super::api::error::ConductorApiError;
@@ -285,6 +287,14 @@ mod startup_shutdown_impls {
             let tracing_scope = config.tracing_scope().unwrap_or_default();
             let maybe_data_root_path = config.data_root_path.clone().map(|path| (*path).clone());
 
+            if let Some(path) = &maybe_data_root_path {
+                let mut path = path.clone();
+                path.push(WASM_CACHE);
+
+                // best effort to ensure the cache dir exists if configured
+                let _ = std::fs::create_dir_all(&path);
+            }
+
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),
@@ -301,7 +311,7 @@ mod startup_shutdown_impls {
                 post_commit,
                 running_services: RwShare::new(ConductorServices::default()),
                 wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
-                    maybe_data_root_path.map(|p| p.join("wasm-cache")),
+                    maybe_data_root_path.map(|p| p.join(WASM_CACHE)),
                 ))),
                 app_auth_token_store: RwShare::default(),
                 app_broadcast: AppBroadcast::default(),

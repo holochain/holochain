@@ -330,17 +330,11 @@ async fn simple_validation() -> anyhow::Result<()> {
 
     // This is kind of ridiculous, but we can't use assert_matches! because
     // there is a Box in the mix.
-    let correct = match &err {
-        Err(ConductorApiError::CellError(e)) => match e {
-            CellError::WorkflowError(e) => match &**e {
-                WorkflowError::SourceChainError(e) => match e {
-                    SourceChainError::InvalidCommit(reason) => {
-                        reason.contains("No empty strings allowed")
-                    }
-                    _ => false,
-                },
-                _ => false,
-            },
+    let correct = match err {
+        Err(ConductorApiError::CellError(CellError::WorkflowError(ref e))) => match &**e {
+            WorkflowError::SourceChainError(SourceChainError::InvalidCommit(reason)) => {
+                reason == "No empty strings allowed"
+            }
             _ => false,
         },
         _ => false,

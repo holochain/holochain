@@ -61,13 +61,15 @@ async fn test_publish() -> anyhow::Result<()> {
 
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
-    config.network = network;
-    config.dpki = DpkiConfig::disabled();
-    config.tuning_params = Some(ConductorTuningParams {
-        sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),
-        ..Default::default()
-    });
+    let config = ConductorConfig {
+        network,
+        tuning_params: Some(ConductorTuningParams {
+            sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),
+        }),
+        dpki: DpkiConfig::disabled(),
+        ..ConductorConfig::default()
+    };
+
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =

@@ -65,7 +65,7 @@ async fn sys_validation_produces_warrants() {
             .unwrap();
     let op = ChainOp::StoreRecord(
         signed_action.signature().clone(),
-        action.into(),
+        action,
         RecordEntry::NotStored,
     )
     .into();
@@ -140,7 +140,7 @@ async fn run_test(
         &alice_dht_db,
         expected_count,
         num_attempts,
-        delay_per_attempt.clone(),
+        delay_per_attempt,
     )
     .await;
 
@@ -180,13 +180,7 @@ async fn run_test(
     let expected_count = 14 + expected_count;
 
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(
-        &alice_db,
-        expected_count,
-        num_attempts,
-        delay_per_attempt.clone(),
-    )
-    .await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
     let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
     let num_valid_ops = move |txn: Transaction| -> DatabaseResult<usize> {
@@ -291,7 +285,7 @@ async fn bob_links_in_a_legit_way(
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
     triggers
         .publish_dht_ops
         .trigger(&"bob_links_in_a_legit_way");
@@ -310,10 +304,7 @@ async fn bob_makes_a_large_link(
     let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
     let bad_update_entry_hash = Entry::try_from(bad_update.clone()).unwrap().to_hash();
 
-    let bytes = (0..MAX_TAG_SIZE + 1)
-        .map(|_| 0u8)
-        .into_iter()
-        .collect::<Vec<_>>();
+    let bytes = (0..MAX_TAG_SIZE + 1).map(|_| 0u8).collect::<Vec<_>>();
     let link_tag = LinkTag(bytes);
 
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
@@ -361,27 +352,10 @@ async fn bob_makes_a_large_link(
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"bob_makes_a_large_link");
     (bad_update_action, bad_update_entry_hash, link_add_address)
 }
-
-//////////////////////
-//// Test Ideas
-//////////////////////
-// These are tests that I think might break
-// validation but are too hard to write currently
-
-// 1. Delete points to an action that isn't a NewEntryType.
-// ## Comments
-// I think this will fail RegisterDeleteBy but pass as StoreRecord
-// which is wrong.
-// ## Scenario
-// 1. Commit a Delete Action that points to a valid EntryHash and
-// a ActionHash that exists but is not a NewEntryAction (use CreateLink).
-// 2. The Create link is integrated and valid.
-// ## Expected
-// The Delete action should be invalid for all authorities.
 
 fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     txn.prepare(
@@ -396,9 +370,9 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     .unwrap()
     .query_and_then([], |row| {
         let op_type: DhtOpType = row.get("type")?;
-        let hash: ActionHash = row.get("hash")?;
         match op_type {
             DhtOpType::Chain(op_type) => {
+                let hash: ActionHash = row.get("hash")?;
                 let action: SignedAction = from_blob(row.get("blob")?)?;
                 Ok(ChainOpLite::from_type(op_type, hash, &action)?.into())
             }

@@ -27,8 +27,7 @@ static-toml:
 
 # ensure our chosen style lints are followed
 static-clippy:
-	# TODO fix lints and switch to `$(F) cargo clippy --all-targets`
-	$(F) cargo clippy
+	$(F) cargo clippy --all-targets
 
 # ensure we can build the docs
 static-doc:

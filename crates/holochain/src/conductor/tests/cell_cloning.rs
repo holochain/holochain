@@ -89,7 +89,7 @@ async fn create_clone_cell_creates_callable_cell() {
         )
         .await
         .unwrap();
-    assert_eq!(clone_cell.enabled, true);
+    assert!(clone_cell.enabled);
     assert_eq!(clone_cell.name, clone_name);
 
     let zome = SweetZome::new(
@@ -282,12 +282,11 @@ async fn clone_cell_deletion() {
     let cell_info_for_role = app_info.cell_info.get(&role_name).unwrap();
     assert!(cell_info_for_role
         .iter()
-        .find(|cell_info| if let CellInfo::Cloned(cell) = cell_info {
+        .any(|cell_info| if let CellInfo::Cloned(cell) = cell_info {
             cell.cell_id == clone_cell.cell_id.clone()
         } else {
             false
-        })
-        .is_some());
+        }));
 
     // calling the cell after restoring succeeds
     let zome_call_response: Result<ActionHash, _> = conductor
