@@ -1,6 +1,6 @@
 use holo_hash::ActionHash;
-use holochain::conductor::config::ConductorConfig;
 use holochain::conductor::conductor::WASM_CACHE;
+use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::{SweetAgents, SweetConductor, SweetConductorBatch, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
