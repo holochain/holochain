@@ -1534,38 +1534,35 @@ async fn test_detect_fork() {
     db.test_write(move |mut txn| {
         // - Commit the valid chain
         for a in chain {
-            insert_action(&mut txn, &a).unwrap();
+            insert_action(txn, &a).unwrap();
         }
 
         // Not a fork, because a4 is a perfectly valid continuation of a3
-        assert!(detect_fork(&mut txn, &a4).unwrap().is_none());
+        assert!(detect_fork(txn, &a4).unwrap().is_none());
 
         // Is a fork, because:
         // - a1 already exists
         // - both actions point to the same previous action a0
         // - both are under the same authorship as a0
-        assert_eq!(detect_fork(&mut txn, &a1_fork).unwrap().unwrap().0, a1_hash);
+        assert_eq!(detect_fork(txn, &a1_fork).unwrap().unwrap().0, a1_hash);
 
         // Is a fork, because:
         // - a3 already exists
         // - both actions point to the same previous action a2
         // - both are under the authorship of the key which a2 updates to
-        assert_eq!(detect_fork(&mut txn, &a3_fork).unwrap().unwrap().0, a3_hash);
+        assert_eq!(detect_fork(txn, &a3_fork).unwrap().unwrap().0, a3_hash);
 
         // This is not valid in sys validation because the author is not valid,
         // but it still does technically constitute a fork (it's just an invalid action)
         assert_eq!(
-            detect_fork(&mut txn, &a3_fork_author1).unwrap().unwrap().0,
+            detect_fork(txn, &a3_fork_author1).unwrap().unwrap().0,
             a3_hash
         );
 
         // This is not valid in sys validation because the author is not valid,
         // but it does still constitute a fork (it's just an invalid action)
         assert_eq!(
-            detect_fork(&mut txn, &a3_fork_other_author)
-                .unwrap()
-                .unwrap()
-                .0,
+            detect_fork(txn, &a3_fork_other_author).unwrap().unwrap().0,
             a3_hash
         );
     });
