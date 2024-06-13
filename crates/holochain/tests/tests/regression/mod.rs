@@ -160,4 +160,114 @@ async fn zero_arc_can_link_to_uncached_base() {
     println!("@!@!@ link_hash: {link_hash:?}");
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn zero_arc_does_not_prevent_delete_links() {
+    use hdk::prelude::*;
+
+    holochain_trace::test_run();
+
+    let mut empty_arc_conductor_config = ConductorConfig::default();
+
+    let mut network_config = KitsuneP2pConfig::default();
+
+    let mut tuning_params = KitsuneP2pTuningParams::default();
+
+    tuning_params.gossip_arc_clamping = String::from("empty");
+    network_config.tuning_params = Arc::new(tuning_params);
+
+    empty_arc_conductor_config.network = network_config;
+
+    let mut conductors = SweetConductorBatch::from_configs(vec![
+        ConductorConfig::default(),
+        empty_arc_conductor_config,
+    ])
+    .await;
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![
+        TestWasm::ValidateRejectAppTypes,
+        TestWasm::Link,
+    ])
+    .await;
+
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    conductors.exchange_peer_info().await;
+
+    let ((alice,), (bob,)) = apps.into_tuples();
+
+    let alice_pk = alice.cell_id().agent_pubkey().clone();
+    let bob_pk = bob.cell_id().agent_pubkey().clone();
+
+    println!("@!@!@ alice_pk: {alice_pk:?}, bob_pk: {bob_pk:?}");
+
+    let action_hash: ActionHash = conductors[0]
+        .call(
+            &alice.zome(TestWasm::Link.coordinator_zome_name()),
+            "test_entry_create",
+            (),
+        )
+        .await;
+
+    println!("@!@!@ action_hash: {action_hash:?}");
+
+    loop {
+        let r: Option<Record> = conductors[1]
+            .call(
+                &bob.zome(TestWasm::Link.coordinator_zome_name()),
+                "test_entry_get",
+                &action_hash,
+            )
+            .await;
+
+        if r.is_some() {
+            break;
+        }
+
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+
+    let link: ActionHash = conductors[0]
+        .call(
+            &alice.zome(TestWasm::Link.coordinator_zome_name()),
+            "test_entry_link",
+            (action_hash.clone(), alice_pk.clone()),
+        )
+        .await;
+
+    println!("@!@!@ link: {link:?}");
+
+    let mut links = loop {
+        let links: Vec<Link> = conductors[1]
+            .call(
+                &bob.zome(TestWasm::Link.coordinator_zome_name()),
+                "test_entry_get_links",
+                &action_hash,
+            )
+            .await;
+
+        if links.len() > 0{
+            break links;
+        }
+
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    };
+
+    println!("@!@!@ links: {links:#?}");
+
+    assert_eq!(1, links.len());
+
+    let got_link = links.remove(0);
+
+    assert_eq!(alice_pk, got_link.author);
+    assert_eq!(AnyLinkableHash::from(action_hash.clone()), got_link.base);
+    assert_eq!(AnyLinkableHash::from(alice_pk.clone()), got_link.target);
+
+    let _: ActionHash = conductors[1]
+        .call(
+            &bob.zome(TestWasm::Link.coordinator_zome_name()),
+            "delete_link",
+            got_link.create_link_hash,
+        )
+        .await;
+}
+
 pub mod must_get_agent_activity_saturation;
