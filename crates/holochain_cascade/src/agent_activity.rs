@@ -9,7 +9,10 @@ pub(crate) fn merge_activities(
     options: &GetActivityOptions,
     results: Vec<AgentActivityResponse<ActionHash>>,
 ) -> CascadeResult<AgentActivityResponse<ActionHash>> {
-    if !options.include_rejected_activity && !options.include_valid_activity {
+    if !options.include_rejected_activity
+        && !options.include_valid_activity
+        && !options.include_warrants
+    {
         return Ok(merge_status_only(agent, results));
     }
     Ok(merge_hashes(agent, options, results))
@@ -22,6 +25,7 @@ fn merge_hashes(
 ) -> AgentActivityResponse<ActionHash> {
     let mut valid = HashSet::new();
     let mut rejected = HashSet::new();
+    let mut warrants = Vec::new();
     let mut merged_highest_observed = None;
     for result in results {
         let AgentActivityResponse {
@@ -29,11 +33,15 @@ fn merge_hashes(
             highest_observed,
             valid_activity,
             rejected_activity,
-            ..
+            warrants: these_warrants,
+            status: _,
         } = result;
+
         if the_agent != agent {
             continue;
         }
+
+        warrants.extend(these_warrants);
 
         match (merged_highest_observed.take(), highest_observed) {
             (None, None) => {}
@@ -84,6 +92,7 @@ fn merge_hashes(
         agent,
         valid_activity,
         rejected_activity,
+        warrants,
         highest_observed: merged_highest_observed,
     }
 }
@@ -234,6 +243,7 @@ fn merge_status_only(
         agent,
         valid_activity: ChainItems::NotRequested,
         rejected_activity: ChainItems::NotRequested,
+        warrants: vec![],
         highest_observed: merged_highest_observed,
     }
 }
