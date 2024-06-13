@@ -41,13 +41,20 @@ impl Conductor {
                 |(cell_id, _)| {
                     let conductor = self.clone();
                     async move {
-                        let cell_triggers = conductor.get_cell_triggers(cell_id).await?;
-                        cell_triggers.publish_dht_ops.trigger(&"delete agent key");
-                        ConductorApiResult::Ok(())
+                        match conductor.get_cell_triggers(cell_id).await {
+                            Ok(cell_triggers) => {
+                                cell_triggers.publish_dht_ops.trigger(&"agent key deleted")
+                            }
+                            Err(err) => tracing::warn!(
+                                ?err,
+                                ?cell_id,
+                                "Could not get cell triggers to publish agent key deletion"
+                            ),
+                        }
                     }
                 }
             });
-        let _trigger_publish_results = futures::future::join_all(publish_workflow_triggers).await;
+        futures::future::join_all(publish_workflow_triggers).await;
 
         // Return cell ids with their agent key deletion result
         Ok(deletion_per_cell_results)
@@ -139,13 +146,11 @@ impl Conductor {
         let delete_agent_key_results =
             futures::future::join_all(delete_agent_key_of_all_cells).await;
         // Build result map with cell id as key and deletion result as value
-        let mut cell_results = HashMap::new();
-        delete_agent_key_results
+        let cell_results: HashMap<_, _> = delete_agent_key_results
             .into_iter()
             .enumerate()
-            .for_each(|(index, result)| {
-                cell_results.insert(all_cells[index].clone(), result);
-            });
+            .map(|(index, result)| (all_cells[index].clone(), result))
+            .collect();
 
         Ok(cell_results)
     }

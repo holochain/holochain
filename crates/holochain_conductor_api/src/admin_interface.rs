@@ -476,7 +476,7 @@ pub enum AdminResponse {
     /// put the app in a running state, it will be running, otherwise it will
     /// be paused.
     ///
-    /// Contains the app info and list of errors of cells that could not be enabled.
+    /// Contains the app info and list of errors for cells that could not be enabled.
     AppEnabled {
         app: AppInfo,
         errors: Vec<(CellId, String)>,
