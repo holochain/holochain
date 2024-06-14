@@ -1952,8 +1952,6 @@ mod app_impls {
 
 /// Methods related to cell access
 mod cell_impls {
-    use holochain_zome_types::action::builder;
-
     use super::*;
 
     impl Conductor {
@@ -2046,8 +2044,7 @@ mod clone_cell_impls {
                 app.agent_key().clone(),
             )
             .await?;
-            let _valid_create_agent_key_action =
-                source_chain.valid_create_agent_key_action().await?;
+            source_chain.valid_create_agent_key_action().await?;
 
             // add cell to app
             let clone_cell = self

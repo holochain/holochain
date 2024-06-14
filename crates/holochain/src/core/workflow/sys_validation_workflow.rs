@@ -722,7 +722,7 @@ async fn validate_chain_op(
 /// Verify agent key validity.
 ///
 /// If the previous action is a `Delete` of the current agent pub key,
-/// the agent key is invalid.
+/// that agent key is invalid.
 async fn check_agent_validity(
     action: &Action,
     validation_dependencies: SysValDeps,
