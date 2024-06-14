@@ -1339,8 +1339,8 @@ pub async fn make_warrant_op(
 }
 
 /// Gets an arbitrary agent with a cell running the given DNA, needed for processes
-/// which require an agent signature but happens at the DNA level, so doesn't specify
-/// any particular agent.
+/// which require an agent signature but happen at the DNA level, i.e. not bound to any
+/// particular cell.
 pub fn get_representative_agent(conductor: &Conductor, dna_hash: &DnaHash) -> Option<AgentPubKey> {
     conductor
         .running_cell_ids()
