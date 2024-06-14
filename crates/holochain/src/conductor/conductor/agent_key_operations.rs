@@ -22,7 +22,7 @@ impl Conductor {
             .await?;
 
         // Revoke key in DPKI first, if installed, and then in cells' source chains.
-        // Call separate function so that in case key revocation fails, the app can still be enabled again.
+        // Call separate function so that in case a part of key revocation fails, the app is still enabled again.
         let revocation_per_cell_results =
             Conductor::revoke_agent_key_for_app_inner(self.clone(), agent_key, app_id.clone())
                 .await;
@@ -30,8 +30,34 @@ impl Conductor {
         // Enable app again.
         self.clone().enable_app(app_id.clone()).await?;
 
-        // Return cell ids with their agent key deletion result.
-        Ok(revocation_per_cell_results?)
+        let revocation_per_cell_results = revocation_per_cell_results?;
+
+        // Publish 'Delete' actions of cells where successful.
+        // Triggering workflow is only possible when cells are enabled.
+        let publish_workflow_triggers = revocation_per_cell_results
+            .iter()
+            .filter(|(_, result)| result.is_ok())
+            .map({
+                |(cell_id, _)| {
+                    let conductor = self.clone();
+                    async move {
+                        match conductor.get_cell_triggers(cell_id).await {
+                            Ok(cell_triggers) => {
+                                cell_triggers.publish_dht_ops.trigger(&"agent key deleted")
+                            }
+                            Err(err) => tracing::warn!(
+                                ?err,
+                                ?cell_id,
+                                "Could not get cell triggers to publish agent key deletion"
+                            ),
+                        }
+                    }
+                }
+            });
+        futures::future::join_all(publish_workflow_triggers).await;
+
+        // Return cell ids with their agent key deletion result
+        Ok(revocation_per_cell_results)
     }
 
     /// Revoke agent key in Deepkey first, if installed, and then write a [`Delete`] of the key to the source chain.
