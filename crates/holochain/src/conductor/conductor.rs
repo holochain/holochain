@@ -2029,7 +2029,9 @@ mod clone_cell_impls {
                     .key_state(agent_key.clone(), Timestamp::now())
                     .await?;
                 if let KeyState::Invalid(_) = key_state {
-                    return Err(AppError::CellToCloneHasInvalidAgent(agent_key).into());
+                    return Err(
+                        DpkiServiceError::DpkiAgentInvalid(agent_key, Timestamp::now()).into(),
+                    );
                 }
             }
 

@@ -19,9 +19,6 @@ pub enum AppError {
     #[error("Tried to delete a clone cell which was not already disabled: '{0}'")]
     CloneCellMustBeDisabledBeforeDeleting(CloneCellId),
 
-    #[error("Tried to clone a cell with an invalid agent key: '{0}'")]
-    CellToCloneHasInvalidAgent(AgentPubKey),
-
     #[error("Illegal character '{CLONE_ID_DELIMITER}' used in role name: {0}")]
     IllegalRoleName(RoleName),
 

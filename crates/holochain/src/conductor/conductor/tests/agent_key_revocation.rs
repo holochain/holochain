@@ -142,13 +142,13 @@ async fn revoke_agent_key_with_dpki_installed() {
         .create_clone_cell(app.installed_app_id(), create_clone_cell_payload.clone())
         .await
         .unwrap_err();
-    assert_matches!(result, ConductorError::AppError(AppError::CellToCloneHasInvalidAgent(invalid_key)) if invalid_key == agent_key);
+    assert_matches!(result, ConductorError::DpkiError(DpkiServiceError::DpkiAgentInvalid(invalid_key, _timestamp)) if invalid_key == agent_key);
     create_clone_cell_payload.role_name = role_2.to_string();
     let result = conductor
         .create_clone_cell(app.installed_app_id(), create_clone_cell_payload)
         .await
         .unwrap_err();
-    assert_matches!(result, ConductorError::AppError(AppError::CellToCloneHasInvalidAgent(invalid_key)) if invalid_key == agent_key);
+    assert_matches!(result, ConductorError::DpkiError(DpkiServiceError::DpkiAgentInvalid(invalid_key, _timestamp)) if invalid_key == agent_key);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -277,21 +277,6 @@ async fn retry_revoke_agent_key_to_recover_from_partial_revocation_with_dpki() {
     // Revoke agent key in Deepkey
     revoke_agent_key_in_dpki(&conductor, agent_key.clone()).await;
 
-    // Verify key is invalid
-    {
-        let dpki_service = conductor
-            .running_services()
-            .dpki
-            .expect("dpki must be installed");
-        let dpki_state = dpki_service.state().await;
-        let timestamp = Timestamp::now();
-        let key_state = dpki_state
-            .key_state(agent_key.clone(), timestamp)
-            .await
-            .unwrap();
-        assert_matches!(key_state, KeyState::Invalid(_));
-    }
-
     // Delete agent key of cell 1 of the app
     let source_chain_1 = SourceChain::new(
         conductor
@@ -350,13 +335,13 @@ async fn retry_revoke_agent_key_to_recover_from_partial_revocation_with_dpki() {
         .create_clone_cell(app.installed_app_id(), create_clone_cell_payload.clone())
         .await
         .unwrap_err();
-    assert_matches!(result, ConductorError::AppError(AppError::CellToCloneHasInvalidAgent(invalid_key)) if invalid_key == agent_key);
+    assert_matches!(result, ConductorError::DpkiError(DpkiServiceError::DpkiAgentInvalid(invalid_key, _timestamp)) if invalid_key == agent_key);
     create_clone_cell_payload.role_name = role_2.to_string();
     let result = conductor
         .create_clone_cell(app.installed_app_id(), create_clone_cell_payload)
         .await
         .unwrap_err();
-    assert_matches!(result, ConductorError::AppError(AppError::CellToCloneHasInvalidAgent(invalid_key)) if invalid_key == agent_key);
+    assert_matches!(result, ConductorError::DpkiError(DpkiServiceError::DpkiAgentInvalid(invalid_key, _timestamp)) if invalid_key == agent_key);
 
     // Calling key revocation should succeed and return an error result for cell 1
     let revocation_result_per_cell = conductor
@@ -371,13 +356,23 @@ async fn retry_revoke_agent_key_to_recover_from_partial_revocation_with_dpki() {
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_revoke_agent_key_to_recover_from_partial_revocation_without_dpki() {
     let TestCase {
-        conductor,
+        mut conductor,
+        role_1,
+        role_2,
         app,
         agent_key,
         cell_id_1,
         cell_id_2,
+        zome_1,
+        zome_2,
+        create_fn_name,
+        read_fn_name,
         ..
     } = TestCase::no_dpki().await;
+
+    // Writing to cells should succeed
+    let action_hash_1: ActionHash = conductor.call(&zome_1, &*create_fn_name, ()).await;
+    let action_hash_2: ActionHash = conductor.call(&zome_2, &*create_fn_name, ()).await;
 
     // Delete agent key of cell 1 of the app
     let source_chain_1 = SourceChain::new(
@@ -407,6 +402,43 @@ async fn retry_revoke_agent_key_to_recover_from_partial_revocation_without_dpki(
         .await
         .unwrap_err();
     assert_matches!(invalid_agent_key_error, SourceChainError::InvalidAgentKey(invalid_key, cell_id) if invalid_key == agent_key && cell_id == cell_id_1);
+
+    // Reading an entry should still succeed
+    let result: Option<Record> = conductor.call(&zome_1, &*read_fn_name, action_hash_1).await;
+    assert!(result.is_some());
+    let result: Option<Record> = conductor.call(&zome_2, &*read_fn_name, action_hash_2).await;
+    assert!(result.is_some());
+
+    // Creating an entry should fail for cell 1 as the agent key is invalid.
+    let error = conductor
+        .call_fallible::<_, ActionHash>(&zome_1, &*create_fn_name, ())
+        .await
+        .unwrap_err();
+    assert_error_due_to_invalid_agent_key_in_source_chain(error, agent_key.clone());
+    // Creating an entry should succeed for cell 2 as the agent key is still valid.
+    let _ = conductor
+        .call_fallible::<_, ActionHash>(&zome_2, &*create_fn_name, ())
+        .await
+        .unwrap();
+
+    // Cloning cells should fail for cell 1 as the agent key is invalid.
+    let mut create_clone_cell_payload = CreateCloneCellPayload {
+        role_name: role_1.to_string(),
+        membrane_proof: None,
+        modifiers: DnaModifiersOpt::none().with_network_seed("network_seed".into()),
+        name: None,
+    };
+    let result = conductor
+        .create_clone_cell(app.installed_app_id(), create_clone_cell_payload.clone())
+        .await
+        .unwrap_err();
+    assert_matches!(result, ConductorError::SourceChainError(SourceChainError::InvalidAgentKey(invalid_key, cell_id)) if invalid_key == agent_key && cell_id == cell_id_1);
+    // Cloning cells should succeed for cell 2 as the agent key is still valid.
+    create_clone_cell_payload.role_name = role_2.to_string();
+    let _ = conductor
+        .create_clone_cell(app.installed_app_id(), create_clone_cell_payload)
+        .await
+        .unwrap();
 
     // Calling key revocation should succeed and return an error result for cell 1
     let revocation_result_per_cell = conductor
