@@ -643,8 +643,8 @@ async fn validate_chain_op(
             check_dpki_agent_validity_for_op(&dpki, op).await?;
         }
     }
-    // If this is an agent activity op, check agent validity in source chain. Agent activity is validated
-    // by agent authorities.
+    // If this is an agent activity op, check agent validity in source chain. Agent activity is only
+    // validated by agent authorities.
     if let ChainOp::RegisterAgentActivity(_, _) = &op {
         check_agent_validity(&op.action(), validation_dependencies.clone()).await?;
     }
