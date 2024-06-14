@@ -11,12 +11,13 @@ use parking_lot::Mutex;
 use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow
-#[instrument(skip(workspace, space, conductor, trigger_app_validation, network, keystore))]
+#[instrument(skip_all)]
 pub fn spawn_sys_validation_consumer(
     workspace: SysValidationWorkspace,
     space: Space,
     conductor: ConductorHandle,
     trigger_app_validation: TriggerSender,
+    trigger_publish: TriggerSender,
     network: HolochainP2pDna,
     keystore: MetaLairClient,
 ) -> TriggerSender {
@@ -41,6 +42,7 @@ pub fn spawn_sys_validation_consumer(
                     workspace.clone(),
                     current_validation_dependencies.clone(),
                     trigger_app_validation.clone(),
+                    trigger_publish.clone(),
                     trigger_self.clone(),
                     network.clone(),
                     config.clone(),

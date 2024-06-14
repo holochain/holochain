@@ -125,6 +125,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     trigger_app_validation: TriggerSender,
+    trigger_publish: TriggerSender,
     trigger_self: TriggerSender,
     network: Network,
     config: Arc<ConductorConfig>,
@@ -146,6 +147,15 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
         tracing::debug!("Sys validation accepted {} ops", outcome_summary.accepted);
 
         trigger_app_validation.trigger(&"sys_validation_workflow");
+    }
+
+    if outcome_summary.warranted > 0 {
+        tracing::debug!(
+            "Sys validation created {} warrants",
+            outcome_summary.warranted
+        );
+
+        trigger_publish.trigger(&"sys_validation_workflow");
     }
 
     // Now go to the network to try to fetch missing dependencies
@@ -278,7 +288,7 @@ async fn sys_validation_workflow_inner(
 
     let mut warrants = vec![];
 
-    let (summary, invalid_ops, forked_pairs) = workspace
+    let (mut summary, invalid_ops, forked_pairs) = workspace
         .dht_db
         .write_async(move |txn| {
             let mut summary = OutcomeSummary::default();
@@ -370,6 +380,7 @@ async fn sys_validation_workflow_inner(
         .write_async(move |txn| {
             for warrant_op in warrants {
                 insert_op(txn, &warrant_op)?;
+                summary.warranted += 1;
             }
             StateMutationResult::Ok(())
         })
@@ -764,6 +775,7 @@ async fn validate_warrant_op(
     _dna_def: &DnaDefHashed,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> SysValidationResult<()> {
+    dbg!(&op);
     match &op.warrant {
         Warrant::ChainIntegrity(warrant) => match warrant {
             ChainIntegrityWarrant::InvalidChainOp {
@@ -800,14 +812,17 @@ async fn validate_warrant_op(
             } => {
                 let (action1, action2) = {
                     let deps = validation_dependencies.lock();
+                    dbg!();
                     let action1 = deps
                         .get(a1)
                         .and_then(|s| s.as_action())
                         .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a1.clone().into()))?;
+                    dbg!(&action1);
                     let action2 = deps
                         .get(a2)
                         .and_then(|s| s.as_action())
                         .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a2.clone().into()))?;
+                    dbg!(&action2);
 
                     // chain_author basis must match the author of the action
                     if action1.author() != chain_author {
@@ -1444,6 +1459,7 @@ struct OutcomeSummary {
     accepted: usize,
     missing: usize,
     rejected: usize,
+    warranted: usize,
 }
 
 impl OutcomeSummary {
@@ -1452,6 +1468,7 @@ impl OutcomeSummary {
             accepted: 0,
             missing: 0,
             rejected: 0,
+            warranted: 0,
         }
     }
 }

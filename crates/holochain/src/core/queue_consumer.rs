@@ -173,6 +173,7 @@ pub async fn spawn_queue_consumer_tasks(
             space.clone(),
             conductor.clone(),
             tx_app.clone(),
+            tx_publish.clone(),
             network.clone(),
             conductor.keystore().clone(),
         )

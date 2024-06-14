@@ -1,4 +1,5 @@
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
+use crate::sweettest::await_consistency;
 use crate::sweettest::SweetConductorBatch;
 use crate::sweettest::SweetDnaFile;
 use crate::sweettest::SweetInlineZomes;
@@ -103,7 +104,7 @@ async fn sys_validation_produces_invalid_chain_warrant() {
                 .test_read(move |txn| {
                     let store = Txn::from(&txn);
 
-                    let warrants = store.get_warrants_for_basis(&basis).unwrap();
+                    let warrants = store.get_warrants_for_basis(&basis, false).unwrap();
                     warrants.len()
                 })
         },
@@ -117,12 +118,16 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+
     let ((alice,), (bob,)) = conductors
         .setup_app("app", [&dna])
         .await
         .unwrap()
         .into_tuples();
     let alice_pubkey = alice.agent_pubkey().clone();
+
+    // For this test we want bob to get alice's chain so he can detect the fork
+    conductors.exchange_peer_info().await;
 
     let action_hash: ActionHash = conductors[0]
         .call(&alice.zome("coordinator"), "create_unit", ())
@@ -155,12 +160,16 @@ async fn sys_validation_produces_forked_chain_warrant() {
     .unwrap();
     matches::assert_matches!(outcome, Outcome::Accepted);
 
+    await_consistency(10, [&alice, &bob]).await.unwrap();
+
     //- Inject the forked op directly into bob's DHT db
     let forked_op = DhtOpHashed::from_content_sync(forked_op);
     let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
     db.test_write(move |txn| {
         insert_op(txn, &forked_op).unwrap();
     });
+
+    conductors.persist_dbs();
 
     //- Trigger sys validation
     conductors[1]
@@ -171,7 +180,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
         .trigger(&"test");
 
     //- Check that bob authored a chain fork warrant
-    crate::wait_for_1m!(
+    crate::wait_for_10s!(
         {
             let basis: AnyLinkableHash = alice_pubkey.clone().into();
             conductors[1]
@@ -180,7 +189,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
                 .unwrap()[0]
                 .test_read(move |txn| {
                     let store = Txn::from(&txn);
-                    store.get_warrants_for_basis(&basis).unwrap()
+                    store.get_warrants_for_basis(&basis, false).unwrap()
                 })
         },
         |warrants: &Vec<Warrant>| { !warrants.is_empty() },

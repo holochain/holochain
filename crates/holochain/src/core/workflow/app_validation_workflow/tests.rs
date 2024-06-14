@@ -1050,7 +1050,9 @@ async fn app_validation_produces_warrants() {
     conductors[1].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
         let store = Txn::from(&txn);
 
-        let warrants = store.get_warrants_for_basis(&alice_pubkey.into()).unwrap();
+        let warrants = store
+            .get_warrants_for_basis(&alice_pubkey.into(), false)
+            .unwrap();
         assert_eq!(warrants.len(), 1);
     });
 
@@ -1070,7 +1072,7 @@ async fn app_validation_produces_warrants() {
                 .unwrap()
                 .test_read(move |txn| {
                     let store = Txn::from(&txn);
-                    store.get_warrants_for_basis(&basis).unwrap()
+                    store.get_warrants_for_basis(&basis, true).unwrap()
                 })
                 .len()
         },
