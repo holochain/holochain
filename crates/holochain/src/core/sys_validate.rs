@@ -50,9 +50,12 @@ pub async fn verify_warrant_signature(warrant_op: &WarrantOp) -> SysValidationRe
         author,
         signature,
         warrant,
-        timestamp: _,
+        timestamp,
     } = warrant_op;
-    if author.verify_signature(signature, warrant).await? {
+    if author
+        .verify_signature(signature, &TimedWarrant(warrant.clone(), *timestamp))
+        .await?
+    {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(

@@ -44,16 +44,18 @@ async fn test_new_lair_conductor_integration() {
     println!("\n## keystore config ##\n{}", keystore_config);
 
     // set up conductor config to use the started keystore
-    let mut conductor_config = ConductorConfig::default();
-    conductor_config.admin_interfaces = Some(vec![AdminInterfaceConfig {
-        driver: InterfaceDriver::Websocket {
-            port: ADMIN_PORT,
-            allowed_origins: AllowedOrigins::Any,
+    let conductor_config = ConductorConfig {
+        admin_interfaces: Some(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket {
+                port: ADMIN_PORT,
+                allowed_origins: AllowedOrigins::Any,
+            },
+        }]),
+        data_root_path: Some(tmp.path().to_owned().into()),
+        keystore: KeystoreConfig::LairServer {
+            connection_url: keystore_config.connection_url.clone().into(),
         },
-    }]);
-    conductor_config.data_root_path = Some(tmp.path().to_owned().into());
-    conductor_config.keystore = KeystoreConfig::LairServer {
-        connection_url: keystore_config.connection_url.clone().into(),
+        ..ConductorConfig::default()
     };
 
     // write the conductor config

@@ -490,7 +490,6 @@ pub mod test {
     use holochain_keystore::test_keystore;
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
-    use holochain_sqlite::prelude::*;
     use holochain_state::prelude::*;
     use holochain_trace;
     use holochain_types::test_utils::fake_agent_pubkey_1;
@@ -505,7 +504,6 @@ pub mod test {
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
     use std::collections::{HashMap, HashSet};
-    use std::convert::TryInto;
     use tempfile::TempDir;
     use uuid::Uuid;
 
@@ -561,7 +559,7 @@ pub mod test {
             source: AppBundleSource::Bundle(app_bundle),
             agent_key: None,
             installed_app_id: None,
-            membrane_proofs: HashMap::new().into(),
+            membrane_proofs: HashMap::new(),
             network_seed: None,
             #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
@@ -722,7 +720,7 @@ pub mod test {
         let mut request: ZomeCall =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
                 cell_id.clone(),
-                wasm.into(),
+                wasm,
                 function_name,
                 ExternIO::encode(()).unwrap(),
             ))
@@ -748,7 +746,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
-    #[allow(unreachable_code, unused_variables)]
+    #[allow(unreachable_code, unused_variables, clippy::diverging_sub_expression)]
     async fn invalid_request() {
         holochain_trace::test_run();
         let (_tmpdir, conductor_handle) = setup_admin().await;
@@ -762,7 +760,6 @@ pub mod test {
         //     agent_key,
         // };
         let msg = AdminRequest::InstallApp(Box::new(payload));
-        let msg = msg.try_into().unwrap();
         let respond = |response: AdminResponse| {
             assert_matches!(
                 response,
@@ -972,7 +969,7 @@ pub mod test {
         holochain_trace::test_run();
         let agent_key = fake_agent_pubkey_1();
         let mut dnas = Vec::new();
-        for _i in 0..2 as u32 {
+        for _i in 0..2_u32 {
             let integrity_zomes = vec![TestWasm::Link.into()];
             let coordinator_zomes = vec![TestWasm::Link.into()];
             let def = DnaDef::unique_from_zomes(integrity_zomes, coordinator_zomes);
@@ -1002,7 +999,6 @@ pub mod test {
         let msg = AdminRequest::EnableApp {
             installed_app_id: app_id.clone(),
         };
-        let msg = msg.try_into().unwrap();
         let respond = |response: AdminResponse| {
             assert_matches!(response, AdminResponse::AppEnabled { .. });
         };
@@ -1060,8 +1056,6 @@ pub mod test {
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
             assert_matches!(info.status, AppInfoStatus::Running);
-        } else {
-            assert!(false);
         }
 
         // Now deactivate app
@@ -1070,7 +1064,6 @@ pub mod test {
         let msg = AdminRequest::DisableApp {
             installed_app_id: app_id.clone(),
         };
-        let msg = msg.try_into().unwrap();
         let respond = |response: AdminResponse| {
             assert_matches!(response, AdminResponse::AppDisabled);
         };
@@ -1104,8 +1097,6 @@ pub mod test {
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
             assert_matches!(info.status, AppInfoStatus::Disabled { .. });
-        } else {
-            assert!(false);
         }
 
         // Enable the app one more time
@@ -1114,7 +1105,6 @@ pub mod test {
         let msg = AdminRequest::EnableApp {
             installed_app_id: app_id.clone(),
         };
-        let msg = msg.try_into().unwrap();
         let respond = |response: AdminResponse| {
             assert_matches!(response, AdminResponse::AppEnabled { .. });
         };
@@ -1158,7 +1148,6 @@ pub mod test {
             allowed_origins: AllowedOrigins::Any,
             installed_app_id: None,
         };
-        let msg = msg.try_into().unwrap();
         let respond = |response: AdminResponse| {
             assert_matches!(response, AdminResponse::AppInterfaceAttached { .. });
         };
@@ -1193,7 +1182,6 @@ pub mod test {
         let msg = AdminRequest::DumpState {
             cell_id: Box::new(cell_id),
         };
-        let msg = msg.try_into().unwrap();
         let respond = move |response: AdminResponse| {
             assert_matches!(response, AdminResponse::StateDumped(s) if s == expected);
         };
@@ -1226,7 +1214,7 @@ pub mod test {
                     .map(|z| z.coordinator.into_inner())
                     .collect(),
             },
-            zomes.into_iter().flat_map(|t| Vec::<DnaWasm>::from(t)),
+            zomes.into_iter().flat_map(Vec::<DnaWasm>::from),
         )
         .await
     }
@@ -1318,14 +1306,13 @@ pub mod test {
         admin_api: AdminInterfaceApi,
         req: AdminRequest,
     ) -> tokio::sync::oneshot::Receiver<AdminResponse> {
-        let msg = req.try_into().unwrap();
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         let respond = move |response: AdminResponse| {
             tx.send(response).unwrap();
         };
 
-        test_handle_incoming_admin_message(msg, respond, admin_api)
+        test_handle_incoming_admin_message(req, respond, admin_api)
             .await
             .unwrap();
         rx

@@ -13,11 +13,63 @@ use crate::signature::Signed;
 )]
 #[cfg_attr(
     feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary,)
 )]
 pub enum Warrant {
     /// Signifies evidence of a breach of chain integrity
     ChainIntegrity(ChainIntegrityWarrant),
+}
+
+impl HashableContent for Warrant {
+    type HashType = holo_hash::hash_type::Warrant;
+
+    fn hash_type(&self) -> Self::HashType {
+        Self::HashType::new()
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        HashableContentBytes::Content(self.try_into().expect("Could not serialize Warrant"))
+    }
+}
+
+/// Just the type of the warrant
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+    Eq,
+    PartialEq,
+    Hash,
+    derive_more::From,
+)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary,)
+)]
+pub enum WarrantType {
+    // NOTE: the values here cannot overlap with ActionType,
+    // because they occupy the same field in the Action table.
+    //
+    /// Signifies evidence of a breach of chain integrity
+    ChainIntegrityWarrant,
+}
+
+impl From<Warrant> for WarrantType {
+    fn from(warrant: Warrant) -> Self {
+        warrant.get_type()
+    }
+}
+
+#[cfg(any(feature = "sqlite", feature = "sqlite_encrypted"))]
+impl rusqlite::ToSql for WarrantType {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        Ok(rusqlite::types::ToSqlOutput::Owned(
+            format!("{:?}", self).into(),
+        ))
+    }
 }
 
 /// A warrant which is sent to AgentActivity authorities
@@ -70,6 +122,13 @@ impl Warrant {
             },
         }
     }
+
+    /// Get the warrant type
+    pub fn get_type(&self) -> WarrantType {
+        match self {
+            Warrant::ChainIntegrity(_) => WarrantType::ChainIntegrityWarrant,
+        }
+    }
 }
 
 /// Not necessary but nice to have
@@ -87,5 +146,20 @@ pub enum ValidationType {
     App,
 }
 
+/// A warrant with timestamp
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+    Eq,
+    PartialEq,
+    Hash,
+    derive_more::From,
+    derive_more::Into,
+)]
+pub struct TimedWarrant(pub Warrant, pub Timestamp);
+
 /// A signed warrant with timestamp
-pub type SignedWarrant = Signed<(Warrant, Timestamp)>;
+pub type SignedWarrant = Signed<TimedWarrant>;

@@ -523,7 +523,7 @@ mod tests {
                 0.into(),
                 EntryVisibility::Public,
             )),
-            fake_entry_hash(1).into(),
+            fake_entry_hash(1),
         )
         .into();
         let bytes = holochain_serialized_bytes::encode(&orig).unwrap();
@@ -543,7 +543,7 @@ mod tests {
                 0.into(),
                 EntryVisibility::Public,
             )),
-            fake_entry_hash(1).into(),
+            fake_entry_hash(1),
         )
         .into();
         let bytes: SerializedBytes = orig.clone().try_into().unwrap();

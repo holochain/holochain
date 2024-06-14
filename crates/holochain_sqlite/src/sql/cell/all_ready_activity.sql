@@ -2,7 +2,7 @@ SELECT
   seq
 FROM
   DhtOp
-  LEFT JOIN Action ON DhtOp.action_hash = Action.hash
+  JOIN Action ON DhtOp.action_hash = Action.hash
 WHERE
   DhtOp.type = :register_activity
   AND DhtOp.validation_stage = 3

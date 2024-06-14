@@ -408,7 +408,7 @@ mod test {
             .await;
         assert_matches!(
             hash_install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna")
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == *"DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
         );
 
         // with a property should install and produce a different hash

@@ -2,7 +2,10 @@
 
 use std::str::FromStr;
 
+use holochain_keystore::MetaLairClient;
 use holochain_zome_types::prelude::*;
+
+use crate::dht_op::DhtOpUniqueForm;
 
 /// A Warrant DhtOp
 #[derive(
@@ -41,7 +44,33 @@ impl WarrantOp {
 
     /// Convert the WarrantOp into a SignedWarrant
     pub fn into_signed_warrant(self) -> SignedWarrant {
-        Signed::new((self.warrant, self.timestamp), self.signature)
+        Signed::new((self.warrant, self.timestamp).into(), self.signature)
+    }
+
+    /// Convenience for authoring a warrant
+    pub async fn author(
+        keystore: &MetaLairClient,
+        author: AgentPubKey,
+        warrant: Warrant,
+    ) -> Result<Self, String> {
+        let timestamp = Timestamp::now();
+        let data = holochain_serialized_bytes::encode(&(&warrant, timestamp))
+            .map_err(|e| e.to_string())?;
+        let signature = keystore
+            .sign(author.clone(), data.into())
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(Self {
+            warrant,
+            author,
+            signature,
+            timestamp,
+        })
+    }
+
+    /// Get the hashable content
+    pub fn as_unique_form(&self) -> DhtOpUniqueForm {
+        DhtOpUniqueForm::Warrant(&self.warrant, &self.author, self.timestamp)
     }
 }
 
@@ -61,6 +90,22 @@ impl WarrantOp {
 pub enum WarrantOpType {
     /// A chain integrity warrant
     ChainIntegrityWarrant,
+}
+
+impl HashableContent for WarrantOp {
+    type HashType = hash_type::DhtOp;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::DhtOp
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        HashableContentBytes::Content(
+            (&self.as_unique_form())
+                .try_into()
+                .expect("Could not serialize HashableContent"),
+        )
+    }
 }
 
 impl holochain_sqlite::rusqlite::ToSql for WarrantOpType {

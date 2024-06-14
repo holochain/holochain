@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p"
-version = "0.4.0-dev.7"
+version = "0.4.0-dev.8"
 description = "p2p / dht communication framework"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -21,17 +21,16 @@ futures = "0.3"
 ghost_actor = "=0.3.0-alpha.6"
 governor = "0.3.2"
 itertools = "0.12"
-kitsune_p2p_fetch = { version = "^0.4.0-dev.6", path = "../fetch" }
+kitsune_p2p_fetch = { version = "^0.4.0-dev.7", path = "../fetch" }
 kitsune_p2p_mdns = { version = "^0.4.0-dev.2", path = "../mdns" }
-kitsune_p2p_proxy = { version = "^0.4.0-dev.6", path = "../proxy" }
-kitsune_p2p_timestamp = { version = "^0.4.0-dev.1", path = "../timestamp", features = [
+kitsune_p2p_proxy = { version = "^0.4.0-dev.7", path = "../proxy" }
+kitsune_p2p_timestamp = { version = "^0.4.0-dev.2", path = "../timestamp", features = [
   "now",
 ] }
-kitsune_p2p_block = { version = "^0.4.0-dev.5", path = "../block" }
-kitsune_p2p_bootstrap_client = { version = "^0.4.0-dev.7", path = "../bootstrap_client" }
-kitsune_p2p_bin_data = { version = "^0.4.0-dev.5", path = "../bin_data" }
-kitsune_p2p_transport_quic = { version = "^0.4.0-dev.6", path = "../transport_quic", optional = true }
-kitsune_p2p_types = { version = "^0.4.0-dev.6", path = "../types", default-features = false }
+kitsune_p2p_block = { version = "^0.4.0-dev.6", path = "../block" }
+kitsune_p2p_bootstrap_client = { version = "^0.4.0-dev.8", path = "../bootstrap_client" }
+kitsune_p2p_bin_data = { version = "^0.4.0-dev.6", path = "../bin_data" }
+kitsune_p2p_types = { version = "^0.4.0-dev.7", path = "../types", default-features = false }
 must_future = "0.1.1"
 nanoid = "0.4"
 num-traits = "0.2"
@@ -47,9 +46,9 @@ thiserror = "1.0.22"
 tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1"
 tokio-stream = "0.1"
-tx5 = { version = "=0.0.11-alpha", optional = true }
+tx5 = { version = "=0.0.12-alpha", optional = true }
 url2 = "0.0.6"
-fixt = { path = "../../fixt", version = "^0.4.0-dev.1"}
+fixt = { path = "../../fixt", version = "^0.4.0-dev.2"}
 
 # fuzzing
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
@@ -74,7 +73,7 @@ kitsune_p2p_timestamp = { path = "../timestamp", features = [
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 maplit = "1"
 pretty_assertions = "1.4.0"
-sbd-server = "=0.0.3-alpha"
+sbd-server = "=0.0.4-alpha"
 test-case = "3.3"
 tokio = { version = "1.11", features = ["full", "test-util"] }
 tracing-subscriber = "0.3.16"
@@ -108,7 +107,7 @@ test_utils = [
 
 mock_network = ["kitsune_p2p_types/test_utils", "mockall"]
 
-tx2 = ["kitsune_p2p_types/tx2", "kitsune_p2p_transport_quic"]
+tx2 = ["kitsune_p2p_types/tx2"]
 tx5 = ["dep:tx5", "kitsune_p2p_types/tx5"]
 
 sqlite-encrypted = [
@@ -116,7 +115,6 @@ sqlite-encrypted = [
   "kitsune_p2p_proxy/sqlite-encrypted",
   "kitsune_p2p_timestamp/sqlite-encrypted",
   "kitsune_p2p_block/sqlite-encrypted",
-  "kitsune_p2p_transport_quic/sqlite-encrypted",
   "kitsune_p2p_types/sqlite-encrypted",
 ]
 sqlite = [
@@ -124,6 +122,5 @@ sqlite = [
   "kitsune_p2p_proxy/sqlite",
   "kitsune_p2p_timestamp/sqlite",
   "kitsune_p2p_block/sqlite",
-  "kitsune_p2p_transport_quic/sqlite",
   "kitsune_p2p_types/sqlite",
 ]

@@ -190,8 +190,11 @@ async fn get_links() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity() {
+    use ::fixt::fixt;
+    use holochain_state::mutations::*;
+
     holochain_trace::test_run();
-    let db = test_dht_db();
+    let mut db = test_dht_db();
 
     let td = ActivityTestData::valid_chain_scenario();
 
@@ -201,6 +204,56 @@ async fn get_agent_activity() {
     for hash_op in td.noise_ops.iter().cloned() {
         fill_db(&db.to_db(), hash_op).await;
     }
+
+    let warrant_valid = Warrant::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+        action_author: td.agent.clone(),
+        action: (fixt!(ActionHash), fixt!(Signature)),
+        validation_type: ValidationType::Sys,
+    });
+    let warrant_invalid = Warrant::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+        action_author: td.agent.clone(),
+        action: (fixt!(ActionHash), fixt!(Signature)),
+        validation_type: ValidationType::Sys,
+    });
+    {
+        let warrant_op_valid = WarrantOp::new(
+            warrant_valid.clone(),
+            fixt!(AgentPubKey),
+            fixt!(Signature),
+            Timestamp::now(),
+        )
+        .into_hashed();
+
+        let warrant_op_invalid = WarrantOp::new(
+            warrant_invalid.clone(),
+            fixt!(AgentPubKey),
+            fixt!(Signature),
+            Timestamp::now(),
+        )
+        .into_hashed();
+
+        db.write_async(move |txn| {
+            {
+                let op: DhtOpHashed = warrant_op_valid.downcast();
+                let hash = op.to_hash();
+                insert_op(txn, &op).unwrap();
+                set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
+                set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
+            }
+            {
+                let op: DhtOpHashed = warrant_op_invalid.downcast();
+                let hash = op.to_hash();
+                insert_op(txn, &op).unwrap();
+                set_validation_status(txn, &hash, ValidationStatus::Rejected).unwrap();
+                set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
+            }
+            holochain_sqlite::error::DatabaseResult::Ok(())
+        })
+        .await
+        .unwrap();
+    }
+
+    db.persist();
 
     let options = actor::GetActivityOptions {
         include_valid_activity: true,
@@ -221,10 +274,11 @@ async fn get_agent_activity() {
         agent: td.agent.clone(),
         valid_activity: td.valid_hashes.clone(),
         rejected_activity: ChainItems::NotRequested,
+        warrants: vec![warrant_valid],
         status: ChainStatus::Valid(td.chain_head.clone()),
         highest_observed: Some(td.highest_observed.clone()),
     };
-    assert_eq!(result, expected);
+    pretty_assertions::assert_eq!(result, expected);
 
     expected.valid_activity = match expected.valid_activity.clone() {
         ChainItems::Hashes(v) => ChainItems::Hashes(v.into_iter().take(20).collect()),
@@ -241,5 +295,5 @@ async fn get_agent_activity() {
     .await
     .unwrap();
 
-    assert_eq!(result, expected);
+    pretty_assertions::assert_eq!(result, expected);
 }

@@ -687,9 +687,10 @@ where
         DhtOp.storage_center_loc as loc,
         DhtOp.type as dht_type,
         Action.blob as action_blob,
+        Action.author as author,
         Entry.blob as entry_blob
         FROM DhtOp
-        LEFT JOIN
+        JOIN
         Action ON DhtOp.action_hash = Action.hash
         LEFT JOIN
         Entry ON Action.entry_hash = Entry.hash

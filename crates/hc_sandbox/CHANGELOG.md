@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Add `dump-network-metrics` and `dump-network-stats` to the sandbox admin calls.
+
+## 0.4.0-dev.8
+
 ## 0.4.0-dev.7
 
 ## 0.4.0-dev.6

@@ -66,7 +66,7 @@ mod test {
 
         let secret: CapSecret = conductor.call(&bob, "cap_secret", ()).await;
         let _action_hash: ActionHash = conductor
-            .call(&bob, "transferable_cap_grant", secret.clone())
+            .call(&bob, "transferable_cap_grant", secret)
             .await;
         let cap_for = CapFor(secret, bob_pubkey);
         let _response0: ZomeCallResponse = conductor

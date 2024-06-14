@@ -26,11 +26,12 @@ async fn get_ops_to_validate(
     let mut sql = "
         SELECT
         Action.blob as action_blob,
+        Action.author as author,
         Entry.blob as entry_blob,
         DhtOp.type as dht_type,
         DhtOp.hash as dht_hash
         FROM DhtOp
-        LEFT JOIN
+        JOIN
         Action ON DhtOp.action_hash = Action.hash
         LEFT JOIN
         Entry ON Action.entry_hash = Entry.hash
@@ -119,11 +120,11 @@ mod tests {
     async fn sys_validation_query() {
         holochain_trace::test_run();
         let db = test_dht_db();
-        let expected = create_test_data(&db.to_db().into()).await;
+        let expected = create_test_data(&db.to_db()).await;
         let ops = get_ops_to_sys_validate(&db.to_db().into()).await.unwrap();
 
         assert_sorted_by_op_order(&ops).await;
-        assert_sorted_by_validation_attempts(&db.to_db().into(), &ops).await;
+        assert_sorted_by_validation_attempts(&db.to_db(), &ops).await;
 
         // Check all the expected ops were returned
         for op in ops {
@@ -135,11 +136,11 @@ mod tests {
     async fn app_validation_query() {
         holochain_trace::test_run();
         let db = test_dht_db();
-        let expected = create_test_data(&db.to_db().into()).await;
+        let expected = create_test_data(&db.to_db()).await;
         let ops = get_ops_to_app_validate(&db.to_db().into()).await.unwrap();
 
         assert_sorted_by_op_order(&ops).await;
-        assert_sorted_by_validation_attempts(&db.to_db().into(), &ops).await;
+        assert_sorted_by_validation_attempts(&db.to_db(), &ops).await;
 
         // Check all the expected ops were returned
         for op in ops {
@@ -152,7 +153,7 @@ mod tests {
     async fn workflows_are_exclusive() {
         holochain_trace::test_run();
         let db = test_dht_db();
-        create_test_data(&db.to_db().into()).await;
+        create_test_data(&db.to_db()).await;
         let app_validation_ops = get_ops_to_app_validate(&db.to_db().into()).await.unwrap();
         let sys_validation_ops = get_ops_to_sys_validate(&db.to_db().into()).await.unwrap();
 
