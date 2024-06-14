@@ -1067,6 +1067,7 @@ impl CascadeImpl {
             rejected_activity,
             status,
             highest_observed,
+            warrants,
         } = merged_response;
         let valid_activity = match valid_activity {
             ChainItems::Hashes(hashes) => {
@@ -1121,6 +1122,7 @@ impl CascadeImpl {
             rejected_activity,
             status,
             highest_observed,
+            warrants,
         };
         Ok(r)
     }

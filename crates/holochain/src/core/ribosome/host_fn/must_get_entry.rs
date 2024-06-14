@@ -112,7 +112,7 @@ pub mod test {
     test_entry_impl!(Something);
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_must_get_entry_test<'a>() {
+    async fn ribosome_must_get_entry_test() {
         holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
@@ -169,7 +169,7 @@ pub mod test {
         // Must get entry returns the entry if it exists regardless of the
         // validation status.
         let must_get_entry: EntryHashed = conductor
-            .call(&bob, "must_get_entry", action.entry_hash().clone())
+            .call(&bob, "must_get_entry", action.entry_hash())
             .await;
         assert_eq!(Entry::from(must_get_entry), entry);
 

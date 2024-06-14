@@ -79,7 +79,7 @@ async fn test_cell_handle_publish() {
 
     let action = action::Action::Dna(action::Dna {
         author: agent.clone(),
-        timestamp: Timestamp::now().into(),
+        timestamp: Timestamp::now(),
         hash: dna.clone(),
     });
     let hh = ActionHashed::from_content_sync(action.clone());

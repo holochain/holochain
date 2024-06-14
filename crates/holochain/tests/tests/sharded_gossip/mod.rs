@@ -1,3 +1,6 @@
+#![allow(clippy::field_reassign_with_default)]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::single_match)]
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -1749,11 +1752,10 @@ async fn mock_network_sharding() {
     loop {
         let mut count = 0;
 
-        for (_i, hash) in data
+        for hash in data
             .ops
             .values()
             .map(|op| ActionHash::with_data_sync(&op.action()))
-            .enumerate()
         {
             let record: Option<Record> = conductor.call(&alice.zome("zome1"), "read", hash).await;
             if record.is_some() {

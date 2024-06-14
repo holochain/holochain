@@ -17,7 +17,7 @@ use std::convert::TryInto;
 // hCkk 5252 <Buffer 84 29 24> * ACTION
 // hCok 5380 <Buffer 84 2a 24> * WASM
 // hCsk 5508 <Buffer 84 2b 24>
-// hCwk 5636 <Buffer 84 2c 24>
+// hCwk 5636 <Buffer 84 2c 24> * WARRANT
 // hC0k 5764 <Buffer 84 2d 24> * DNA
 // hC4k 5892 <Buffer 84 2e 24>
 // hC8k 6020 <Buffer 84 2f 24> * EXTERNAL
@@ -43,6 +43,7 @@ use std::convert::TryInto;
 pub(crate) const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk [132, 32, 36]
 pub(crate) const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 36]
 pub(crate) const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk [132, 36, 36]
+pub(crate) const WARRANT_PREFIX: &[u8] = &[0x84, 0x2c, 0x24]; // uhCwk [132, 44, 36]
 pub(crate) const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k [132, 45, 36]
 pub(crate) const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk [132, 34, 36]
 pub(crate) const ACTION_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk [132, 41, 36]
@@ -172,9 +173,10 @@ primitive_hash_type!(DhtOp, DhtOpHash, DhtOpVisitor, DHTOP_PREFIX);
 primitive_hash_type!(Action, ActionHash, ActionVisitor, ACTION_PREFIX);
 primitive_hash_type!(NetId, NetIdHash, NetIdVisitor, NET_ID_PREFIX);
 primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
+primitive_hash_type!(Warrant, WarrantHash, WarrantVisitor, WARRANT_PREFIX);
 primitive_hash_type!(External, ExternalHash, ExternalVisitor, EXTERNAL_PREFIX);
 
-// DhtOps are mostly hashes
+// DhtOps are mostly hashes and maybe an Entry
 impl HashTypeSync for DhtOp {}
 // Entries are capped at 16MB, which is small enough to hash synchronously
 impl HashTypeSync for Entry {}
@@ -182,6 +184,8 @@ impl HashTypeSync for Entry {}
 impl HashTypeSync for Action {}
 // A DnaHash is a hash of the DnaDef, which excludes the wasm bytecode
 impl HashTypeSync for Dna {}
+// Warrants are composed of a small number of hashes and signatures
+impl HashTypeSync for Warrant {}
 
 // We don't know what external data might be getting hashed but typically it
 // would be small, like a reference to something in an external system such as

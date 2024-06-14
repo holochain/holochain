@@ -50,7 +50,7 @@ async fn validate_op_with_no_dependency() {
 
     let dna_action = HdkDna {
         author: fixt!(AgentPubKey),
-        timestamp: Timestamp::now().into(),
+        timestamp: Timestamp::now(),
         hash: test_case.dna_hash(),
     };
     let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action));
@@ -98,7 +98,7 @@ async fn validate_op_with_dependency_held_in_cache() {
     create_action.author = previous_action.action().author().clone();
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now().into();
+    create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
@@ -143,7 +143,7 @@ async fn validate_op_with_dependency_not_held() {
     create_action.author = previous_action.action().author().clone();
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now().into();
+    create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
@@ -195,7 +195,7 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
     create_action.author = previous_action.action().author().clone();
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now().into();
+    create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
@@ -253,7 +253,7 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
     create_action.author = previous_action.action().author().clone();
     create_action.action_seq = previous_action.action().action_seq() + 31;
     create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now().into();
+    create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
@@ -357,20 +357,16 @@ impl TestCase {
             self.test_space
                 .space
                 .get_or_create_authored_db(self.agent.clone())
-                .unwrap()
-                .into(),
-            self.test_space.space.dht_db.clone().into(),
+                .unwrap(),
+            self.test_space.space.dht_db.clone(),
             self.test_space.space.dht_query_cache.clone(),
-            self.test_space.space.cache_db.clone().into(),
+            self.test_space.space.cache_db.clone(),
             Arc::new(self.dna_def.clone()),
             None,
             std::time::Duration::from_secs(10),
         );
 
-        let actual_network = self
-            .actual_network
-            .take()
-            .unwrap_or_else(|| MockHolochainP2pDnaT::new());
+        let actual_network = self.actual_network.take().unwrap_or_default();
 
         // XXX: this isn't quite right, since none of these config settings inform
         // anything else about the TestCase. It's currently only needed for the node_id
@@ -385,6 +381,8 @@ impl TestCase {
             self.self_trigger.0.clone(),
             actual_network,
             config,
+            self.keystore.clone(),
+            self.agent.clone(),
         )
         .await
         .unwrap()

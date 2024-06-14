@@ -1,6 +1,8 @@
+use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::sweettest::SweetConductorBatch;
 use crate::sweettest::SweetConductorConfig;
 use crate::sweettest::SweetDnaFile;
+use crate::sweettest::SweetInlineZomes;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::wait_for_integration;
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
@@ -39,6 +41,81 @@ async fn sys_validation_workflow_test() {
     run_test(alice_cell_id, bob_cell_id, conductors, dna_file).await;
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn sys_validation_produces_warrants() {
+    holochain_trace::test_run();
+    let zome = SweetInlineZomes::new(vec![], 0);
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
+
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let ((alice,), (bob,)) = conductors
+        .setup_app("app", [&dna])
+        .await
+        .unwrap()
+        .into_tuples();
+    let alice_pubkey = alice.agent_pubkey().clone();
+
+    // - Create an invalid op
+    let mut action = ::fixt::fixt!(CreateLink);
+    action.author = alice_pubkey.clone();
+    let action = Action::CreateLink(action);
+    let signed_action =
+        SignedActionHashed::sign(&conductors[0].keystore(), action.clone().into_hashed())
+            .await
+            .unwrap();
+    let op = ChainOp::StoreRecord(
+        signed_action.signature().clone(),
+        action,
+        RecordEntry::NotStored,
+    )
+    .into();
+    let dna_def = dna.dna_def().clone().into_hashed();
+
+    //- Check that the op is indeed invalid
+    let outcome = crate::core::workflow::sys_validation_workflow::validate_op(
+        &op,
+        &dna_def,
+        Default::default(),
+        None,
+    )
+    .await
+    .unwrap();
+    matches::assert_matches!(outcome, Outcome::Rejected(_));
+
+    //- Inject the invalid op directly into bob's DHT db
+    let op = DhtOpHashed::from_content_sync(op);
+    let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
+    db.test_write(move |txn| {
+        insert_op(txn, &op).unwrap();
+    });
+
+    //- Trigger sys validation
+    conductors[1]
+        .get_cell_triggers(bob.cell_id())
+        .await
+        .unwrap()
+        .sys_validation
+        .trigger(&"test");
+
+    //- Check that bob authored a warrant
+    crate::assert_eq_retry_1m!(
+        {
+            let basis: AnyLinkableHash = alice_pubkey.clone().into();
+            conductors[1]
+                .spaces
+                .get_all_authored_dbs(dna.dna_hash())
+                .unwrap()[0]
+                .test_read(move |txn| {
+                    let store = Txn::from(&txn);
+
+                    let warrants = store.get_warrants_for_basis(&basis).unwrap();
+                    warrants.len()
+                })
+        },
+        1
+    );
+}
+
 async fn run_test(
     alice_cell_id: CellId,
     bob_cell_id: CellId,
@@ -63,7 +140,7 @@ async fn run_test(
         &alice_dht_db,
         expected_count,
         num_attempts,
-        delay_per_attempt.clone(),
+        delay_per_attempt,
     )
     .await;
 
@@ -103,13 +180,7 @@ async fn run_test(
     let expected_count = 14 + expected_count;
 
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(
-        &alice_db,
-        expected_count,
-        num_attempts,
-        delay_per_attempt.clone(),
-    )
-    .await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
     let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
     let num_valid_ops = move |txn: Transaction| -> DatabaseResult<usize> {
@@ -214,7 +285,7 @@ async fn bob_links_in_a_legit_way(
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
     triggers
         .publish_dht_ops
         .trigger(&"bob_links_in_a_legit_way");
@@ -233,10 +304,7 @@ async fn bob_makes_a_large_link(
     let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
     let bad_update_entry_hash = Entry::try_from(bad_update.clone()).unwrap().to_hash();
 
-    let bytes = (0..MAX_TAG_SIZE + 1)
-        .map(|_| 0u8)
-        .into_iter()
-        .collect::<Vec<_>>();
+    let bytes = (0..MAX_TAG_SIZE + 1).map(|_| 0u8).collect::<Vec<_>>();
     let link_tag = LinkTag(bytes);
 
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
@@ -284,34 +352,17 @@ async fn bob_makes_a_large_link(
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"bob_makes_a_large_link");
     (bad_update_action, bad_update_entry_hash, link_add_address)
 }
-
-//////////////////////
-//// Test Ideas
-//////////////////////
-// These are tests that I think might break
-// validation but are too hard to write currently
-
-// 1. Delete points to an action that isn't a NewEntryType.
-// ## Comments
-// I think this will fail RegisterDeleteBy but pass as StoreRecord
-// which is wrong.
-// ## Scenario
-// 1. Commit a Delete Action that points to a valid EntryHash and
-// a ActionHash that exists but is not a NewEntryAction (use CreateLink).
-// 2. The Create link is integrated and valid.
-// ## Expected
-// The Delete action should be invalid for all authorities.
 
 fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     txn.prepare(
         "
         SELECT DhtOp.type, Action.hash, Action.blob, Action.author
         FROM DhtOp
-        LEFT JOIN Action ON DhtOp.action_hash = Action.hash
+        JOIN Action ON DhtOp.action_hash = Action.hash
         WHERE
         when_integrated IS NULL
     ",
@@ -319,16 +370,16 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     .unwrap()
     .query_and_then([], |row| {
         let op_type: DhtOpType = row.get("type")?;
-        let hash: ActionHash = row.get("hash")?;
         match op_type {
             DhtOpType::Chain(op_type) => {
+                let hash: ActionHash = row.get("hash")?;
                 let action: SignedAction = from_blob(row.get("blob")?)?;
                 Ok(ChainOpLite::from_type(op_type, hash, &action)?.into())
             }
             DhtOpType::Warrant(_) => {
                 let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
                 let author: AgentPubKey = row.get("author")?;
-                let ((warrant, timestamp), signature) = warrant.into();
+                let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
                 Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
             }
         }

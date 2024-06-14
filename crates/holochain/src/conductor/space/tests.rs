@@ -55,7 +55,7 @@ async fn test_region_queries() {
     let tq_ms = tq.as_millis() as u64;
 
     // - The origin time is five time quanta ago
-    dna_def.modifiers.origin_time = five_quanta_ago.clone();
+    dna_def.modifiers.origin_time = five_quanta_ago;
     dna_def.modifiers.quantum_time = STANDARD_QUANTUM_TIME;
 
     // Cutoff duration is 2 quanta, meaning historic gossip goes up to 1 quantum ago

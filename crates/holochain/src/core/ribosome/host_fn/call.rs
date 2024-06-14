@@ -299,7 +299,7 @@ pub mod wasm_test {
         let handle = conductor.raw_handle();
 
         let zome_call_unsigned =
-            new_zome_call_unsigned(&alice.cell_id(), "call_create_entry", (), TestWasm::Create)
+            new_zome_call_unsigned(alice.cell_id(), "call_create_entry", (), TestWasm::Create)
                 .unwrap();
         let zome_call =
             ZomeCall::try_from_unsigned_zome_call(handle.keystore(), zome_call_unsigned)

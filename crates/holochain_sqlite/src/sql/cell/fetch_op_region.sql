@@ -13,7 +13,7 @@ SELECT
   ) AS total_entry_size
 FROM
   DhtOp
-  LEFT JOIN Action ON DhtOp.action_hash = Action.hash
+  JOIN Action ON DhtOp.action_hash = Action.hash
   LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE
   (

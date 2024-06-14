@@ -9,13 +9,13 @@ use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
 
 use crate::{core::ribosome::guest_callback::validate::ValidateResult, sweettest::*};
 
-const ZOME_A_0: &'static str = "ZOME_A_0";
-const ZOME_A_1: &'static str = "ZOME_A_1";
-const ZOME_B_0: &'static str = "ZOME_B_0";
-const ZOME_B_1: &'static str = "ZOME_B_1";
+const ZOME_A_0: &str = "ZOME_A_0";
+const ZOME_A_1: &str = "ZOME_A_1";
+const ZOME_B_0: &str = "ZOME_B_0";
+const ZOME_B_1: &str = "ZOME_B_1";
 
-const ALICE: &'static str = "ALICE";
-const BOB: &'static str = "BOB";
+const ALICE: &str = "ALICE";
+const BOB: &str = "BOB";
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 struct Event {
@@ -256,7 +256,7 @@ async fn app_validation_ops() {
                                     entry_index,
                                     zome_index,
                                     ..
-                                })) => (Some(entry_index.clone()), Some(zome_index.clone())),
+                                })) => (Some(*entry_index), Some(*zome_index)),
                                 _ => (None, None),
                             };
                         Event {
@@ -368,16 +368,17 @@ async fn app_validation_ops() {
 
     let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes).await;
 
+    #[allow(clippy::await_holding_lock)]
     let (alice, bob) = {
         let mut agents = agents.lock();
 
         let app = conductors[0]
-            .setup_app(&"test_app", &[dna_file_a.clone()])
+            .setup_app("test_app", &[dna_file_a.clone()])
             .await
             .unwrap();
         let (alice,) = app.into_tuple();
         let app = conductors[1]
-            .setup_app(&"test_app", &[dna_file_b.clone()])
+            .setup_app("test_app", &[dna_file_b.clone()])
             .await
             .unwrap();
         let (bob,) = app.into_tuple();
@@ -432,7 +433,11 @@ async fn app_validation_ops() {
             writeln!(&mut s, "Got event {} that was missing from:", event).unwrap();
             let mut events: Vec<String> = expected.0.iter().map(Event::to_string).collect();
             events.sort();
-            let events: String = events.into_iter().map(|s| format!("{}\n", s)).collect();
+            let events = events.into_iter().fold(String::new(), |mut acc, s| {
+                acc.push_str(&s);
+                acc.push('\n');
+                acc
+            });
             writeln!(&mut s, "{}", events).unwrap();
 
             panic!("{}", s);
@@ -441,7 +446,11 @@ async fn app_validation_ops() {
     if !expected.0.is_empty() {
         let mut events: Vec<String> = expected.0.iter().map(Event::to_string).collect();
         events.sort();
-        let events: String = events.into_iter().map(|s| format!("{}\n", s)).collect();
+        let events = events.into_iter().fold(String::new(), |mut acc, s| {
+            acc.push_str(&s);
+            acc.push('\n');
+            acc
+        });
 
         panic!(
             "The following ops were expected to be validated but never were: \n{}",

@@ -248,6 +248,8 @@ impl FromSql for DhtOpType {
         String::column_result(value)
             .and_then(|string| {
                 ChainOpType::from_str(&string)
+                    .map(DhtOpType::from)
+                    .or_else(|_| WarrantOpType::from_str(&string).map(DhtOpType::from))
                     .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
             })
             .map(Into::into)
@@ -346,7 +348,7 @@ impl DhtOp {
     fn as_unique_form(&self) -> DhtOpUniqueForm<'_> {
         match self {
             Self::ChainOp(op) => op.as_unique_form(),
-            Self::WarrantOp(op) => DhtOpUniqueForm::Warrant(&op.warrant, &op.author, op.timestamp),
+            Self::WarrantOp(op) => op.as_unique_form(),
         }
     }
 

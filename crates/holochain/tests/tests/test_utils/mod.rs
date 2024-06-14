@@ -229,6 +229,7 @@ pub async fn register_and_install_dna(
 }
 
 /// Returns the hash of the DNA installed, after modifiers have been applied
+#[allow(clippy::too_many_arguments)]
 pub async fn register_and_install_dna_named(
     client: &mut WebsocketSender,
     dna_path: PathBuf,
@@ -279,7 +280,7 @@ pub async fn register_and_install_dna_named(
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(name),
         network_seed: None,
-        membrane_proofs: std::collections::HashMap::new().into(),
+        membrane_proofs: std::collections::HashMap::new(),
         #[cfg(feature = "chc")]
         ignore_genesis_failure: false,
     };

@@ -24,6 +24,7 @@ pub trait AgentActivityExt {
             status: ChainStatus::Empty,
             // TODO: Add the actual highest observed in a follow up PR
             highest_observed: None,
+            warrants: vec![],
         }
     }
 }

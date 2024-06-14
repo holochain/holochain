@@ -1206,7 +1206,7 @@ pub mod wasm_test {
         }
 
         // make sure the context map does not retain items
-        assert_eq!(CONTEXT_MAP.lock().is_empty(), true);
+        assert!(CONTEXT_MAP.lock().is_empty());
     }
 
     #[tokio::test(flavor = "multi_thread")]
