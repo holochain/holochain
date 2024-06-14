@@ -76,8 +76,8 @@ pub enum ChainOp {
     ///     references from that action up-to-date.
     /// - Add a "created-by" reference from the entry to the hash of the action.
     ///
-    /// TODO: document how those "created-by" references are stored in
-    /// reality.
+    // TODO: document how those "created-by" references are stored in
+    // reality.
     StoreEntry(Signature, NewEntryAction, Entry),
 
     #[display(fmt = "RegisterAgentActivity")]
@@ -92,8 +92,8 @@ pub enum ChainOp {
     /// - Add an "agent-activity" reference from the public key to the hash
     ///   of the action.
     ///
-    /// TODO: document how those "agent-activity" references are stored in
-    /// reality.
+    // TODO: document how those "agent-activity" references are stored in
+    // reality.
     RegisterAgentActivity(Signature, Action),
 
     #[display(fmt = "RegisterUpdatedContent")]

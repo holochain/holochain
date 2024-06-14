@@ -249,7 +249,7 @@ async fn reject_action_after_deleted_agent_key() {
         .sign_action(Action::Delete(delete_agent_pub_key))
         .await;
 
-    // Op to validate
+    // An agent activity op to validate
     let op = test_op(&delete_agent_pub_key_action);
 
     let outcome = test_case
@@ -263,6 +263,47 @@ async fn reject_action_after_deleted_agent_key() {
         outcome,
         Outcome::Rejected(ValidationOutcome::InvalidAgentKey(test_case.agent.clone()).to_string()),
         "Expected Rejected but actual outcome was {outcome:?}",
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn non_agent_authority_validates_action_after_deleted_agent_key() {
+    holochain_trace::test_run();
+
+    let mut test_case = TestCase::new().await;
+
+    // Delete agent pub key action
+    let mut delete_agent_pub_key = fixt!(Delete);
+    delete_agent_pub_key.author = test_case.agent.clone();
+    delete_agent_pub_key.deletes_entry_address = test_case.agent.clone().into();
+    delete_agent_pub_key.action_seq = 4;
+    delete_agent_pub_key.timestamp = Timestamp::now();
+    let delete_agent_pub_key_action = test_case
+        .sign_action(Action::Delete(delete_agent_pub_key))
+        .await;
+
+    // An agent activity op to validate
+    let mut create_action = fixt!(Create);
+    let entry = Entry::App(fixt!(AppEntryBytes));
+    create_action.author = delete_agent_pub_key_action.action().author().clone();
+    create_action.action_seq = delete_agent_pub_key_action.action().action_seq() + 1;
+    create_action.prev_action = delete_agent_pub_key_action.as_hash().clone();
+    create_action.timestamp = Timestamp::now();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
+    create_action.entry_hash = entry.to_hash();
+    let action = Action::Create(create_action.clone());
+    let op = ChainOp::StoreRecord(fixt!(Signature), action, RecordEntry::Present(entry)).into();
+
+    let outcome = test_case.with_op(op).run().await.unwrap();
+
+    assert_eq!(
+        outcome,
+        Outcome::Accepted,
+        "Expected Accepted but actual outcome was {outcome:?}",
     );
 }
 
@@ -2541,6 +2582,13 @@ impl TestCase {
 
         let cascade = Arc::new(new_cascade);
 
+        {
+            println!(
+                "current val deps {:?}",
+                self.current_validation_dependencies.same_dht.lock()
+            );
+        }
+
         retrieve_previous_actions_for_ops(
             self.current_validation_dependencies.clone(),
             cascade.clone(),
@@ -2553,6 +2601,8 @@ impl TestCase {
             .map(DhtOpHashed::from_content_sync),
         )
         .await;
+
+        println!("hello");
 
         validate_op(
             self.op.as_ref().expect("No op set, invalid test case"),

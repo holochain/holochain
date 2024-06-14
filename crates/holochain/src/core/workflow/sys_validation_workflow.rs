@@ -94,7 +94,6 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use rusqlite::Transaction;
-use std::collections::HashSet;
 use std::convert::TryInto;
 use std::sync::Arc;
 use std::time::Duration;
@@ -466,46 +465,15 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
         .filter_map(|op| {
             // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
             match &op.content {
-                DhtOp::ChainOp(op) => {
-                    let op_dependency_hashes = match &**op {
-                        ChainOp::StoreRecord(_, action, entry) => {
-                            let mut actions = match entry {
-                                RecordEntry::Present(
-                                    entry @ Entry::CounterSign(session_data, _),
-                                ) => {
-                                    // Discard errors here because we'll check later whether the input is valid. If it's not then it
-                                    // won't matter that we've skipped fetching deps for it
-                                    if let Ok(entry_rate_weight) =
-                                        action_to_entry_rate_weight(action)
-                                    {
-                                        make_action_set_for_session_data(
-                                            entry_rate_weight,
-                                            entry,
-                                            session_data,
-                                        )
-                                        .unwrap_or_else(|_| vec![])
-                                        .into_iter()
-                                        .map(|action| action.into_hash())
-                                        .collect::<Vec<_>>()
-                                    } else {
-                                        vec![]
-                                    }
-                                }
-                                _ => vec![],
-                            };
-
-                            if let Action::Update(update) = action {
-                                actions.push(update.original_action_address.clone());
-                            }
-                            Some(actions)
-                        }
-                        ChainOp::StoreEntry(_, action, entry) => {
-                            let mut actions = match entry {
-                                Entry::CounterSign(session_data, _) => {
-                                    // Discard errors here because we'll check later whether the input is valid. If it's not then it
-                                    // won't matter that we've skipped fetching deps for it
+                DhtOp::ChainOp(op) => match &**op {
+                    ChainOp::StoreRecord(_, action, entry) => {
+                        let mut actions = match entry {
+                            RecordEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
+                                // Discard errors here because we'll check later whether the input is valid. If it's not then it
+                                // won't matter that we've skipped fetching deps for it
+                                if let Ok(entry_rate_weight) = action_to_entry_rate_weight(action) {
                                     make_action_set_for_session_data(
-                                        new_entry_action_to_entry_rate_weight(action),
+                                        entry_rate_weight,
                                         entry,
                                         session_data,
                                     )
@@ -513,52 +481,61 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                                     .into_iter()
                                     .map(|action| action.into_hash())
                                     .collect::<Vec<_>>()
+                                } else {
+                                    vec![]
                                 }
-                                _ => vec![],
-                            };
-
-                            if let NewEntryAction::Update(update) = action {
-                                actions.push(update.original_action_address.clone());
                             }
-                            Some(actions)
-                        }
-                        ChainOp::RegisterAgentActivity(_, action) => action
-                            .prev_action()
-                            .map(|action| vec![action.as_hash().clone()]),
-                        ChainOp::RegisterUpdatedContent(_, action, _) => {
-                            Some(vec![action.original_action_address.clone()])
-                        }
-                        ChainOp::RegisterUpdatedRecord(_, action, _) => {
-                            Some(vec![action.original_action_address.clone()])
-                        }
-                        ChainOp::RegisterDeletedBy(_, action) => {
-                            Some(vec![action.deletes_address.clone()])
-                        }
-                        ChainOp::RegisterDeletedEntryAction(_, action) => {
-                            Some(vec![action.deletes_address.clone()])
-                        }
-                        ChainOp::RegisterRemoveLink(_, action) => {
-                            Some(vec![action.link_add_address.clone()])
-                        }
-                        _ => None,
-                    };
+                            _ => vec![],
+                        };
 
-                    // Use hash set to prevent duplicate hashes.
-                    let mut dependency_hashes = HashSet::new();
-                    // If a previous action exists, it needs to be fetched to check agent validity, independent of the op type.
-                    if let Some(prev_action) = op.action().prev_action() {
-                        dependency_hashes.insert(prev_action.clone());
+                        if let Action::Update(update) = action {
+                            actions.push(update.original_action_address.clone());
+                        }
+                        Some(actions)
                     }
-                    // Combine with op specific dependency hashes.
-                    if let Some(action_hashes) = op_dependency_hashes {
-                        dependency_hashes.extend(action_hashes);
+                    ChainOp::StoreEntry(_, action, entry) => {
+                        let mut actions = match entry {
+                            Entry::CounterSign(session_data, _) => {
+                                // Discard errors here because we'll check later whether the input is valid. If it's not then it
+                                // won't matter that we've skipped fetching deps for it
+                                make_action_set_for_session_data(
+                                    new_entry_action_to_entry_rate_weight(action),
+                                    entry,
+                                    session_data,
+                                )
+                                .unwrap_or_else(|_| vec![])
+                                .into_iter()
+                                .map(|action| action.into_hash())
+                                .collect::<Vec<_>>()
+                            }
+                            _ => vec![],
+                        };
+
+                        if let NewEntryAction::Update(update) = action {
+                            actions.push(update.original_action_address.clone());
+                        }
+                        Some(actions)
                     }
-                    if dependency_hashes.is_empty() {
-                        None
-                    } else {
-                        Some(dependency_hashes.into_iter().collect())
+                    ChainOp::RegisterAgentActivity(_, action) => action
+                        .prev_action()
+                        .map(|action| vec![action.as_hash().clone()]),
+                    ChainOp::RegisterUpdatedContent(_, action, _) => {
+                        Some(vec![action.original_action_address.clone()])
                     }
-                }
+                    ChainOp::RegisterUpdatedRecord(_, action, _) => {
+                        Some(vec![action.original_action_address.clone()])
+                    }
+                    ChainOp::RegisterDeletedBy(_, action) => {
+                        Some(vec![action.deletes_address.clone()])
+                    }
+                    ChainOp::RegisterDeletedEntryAction(_, action) => {
+                        Some(vec![action.deletes_address.clone()])
+                    }
+                    ChainOp::RegisterRemoveLink(_, action) => {
+                        Some(vec![action.link_add_address.clone()])
+                    }
+                    _ => None,
+                },
                 DhtOp::WarrantOp(op) => match &op.warrant {
                     Warrant::ChainIntegrity(warrant) => match warrant {
                         ChainIntegrityWarrant::InvalidChainOp {
@@ -666,8 +643,11 @@ async fn validate_chain_op(
             check_dpki_agent_validity_for_op(&dpki, op).await?;
         }
     }
-    // Check agent validity in source chain
-    check_agent_validity(&op.action(), validation_dependencies.clone()).await?;
+    // If this is an agent activity op, check agent validity in source chain. Agent activity is validated
+    // by agent authorities.
+    if let ChainOp::RegisterAgentActivity(_, _) = &op {
+        check_agent_validity(&op.action(), validation_dependencies.clone()).await?;
+    }
     match op {
         ChainOp::StoreRecord(_, action, entry) => {
             check_prev_action(action)?;
