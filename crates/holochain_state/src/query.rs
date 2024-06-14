@@ -386,7 +386,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
 
         let warrants = if check_valid {
             self.txn
-                .prepare_cached(&sql)?
+                .prepare_cached(sql)?
                 .query_map(
                     named_params! {
                         ":hash": hash,
@@ -398,7 +398,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
                 .collect::<Result<Vec<_>, _>>()?
         } else {
             self.txn
-                .prepare_cached(&sql)?
+                .prepare_cached(sql)?
                 .query_map(
                     named_params! {
                         ":hash": hash,

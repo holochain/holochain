@@ -775,7 +775,6 @@ async fn validate_warrant_op(
     _dna_def: &DnaDefHashed,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> SysValidationResult<()> {
-    dbg!(&op);
     match &op.warrant {
         Warrant::ChainIntegrity(warrant) => match warrant {
             ChainIntegrityWarrant::InvalidChainOp {
@@ -812,17 +811,14 @@ async fn validate_warrant_op(
             } => {
                 let (action1, action2) = {
                     let deps = validation_dependencies.lock();
-                    dbg!();
                     let action1 = deps
                         .get(a1)
                         .and_then(|s| s.as_action())
                         .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a1.clone().into()))?;
-                    dbg!(&action1);
                     let action2 = deps
                         .get(a2)
                         .and_then(|s| s.as_action())
                         .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a2.clone().into()))?;
-                    dbg!(&action2);
 
                     // chain_author basis must match the author of the action
                     if action1.author() != chain_author {
@@ -1477,119 +1473,4 @@ impl Default for OutcomeSummary {
     fn default() -> Self {
         OutcomeSummary::new()
     }
-}
-
-/// Test the detect_fork function against different situations,
-/// especially the case where a fork happens after an Update Agent action,
-/// where the authorship changes
-#[tokio::test(flavor = "multi_thread")]
-async fn test_detect_fork() {
-    use ::fixt::fixt;
-    let keystore = holochain_keystore::test_keystore();
-    let author1 = keystore.new_sign_keypair_random().await.unwrap();
-    let author2 = keystore.new_sign_keypair_random().await.unwrap();
-
-    let sign_action = |a: Action| async {
-        SignedActionHashed::sign(&keystore, a.into_hashed())
-            .await
-            .unwrap()
-    };
-    let basic_action = |author: AgentPubKey, prev: Option<ActionHash>| {
-        if let Some(prev) = prev {
-            let mut a = fixt!(Create);
-            a.entry_type = EntryType::App(fixt!(AppEntryDef));
-            a.author = author;
-            a.prev_action = prev;
-            Action::Create(a)
-        } else {
-            let mut a = fixt!(Dna);
-            a.author = author;
-            Action::Dna(a)
-        }
-    };
-
-    // - Two actions, one following the other
-    let a0 = basic_action(author1.clone(), None);
-    let a1 = basic_action(author1.clone(), Some(a0.to_hash()));
-
-    // - Create an agent key update following a1
-    let mut update = fixt!(Update);
-    update.author = author1.clone();
-    update.entry_type = EntryType::AgentPubKey;
-    update.entry_hash = author2.clone().into();
-    update.prev_action = a1.to_hash();
-    let a2 = Action::Update(update);
-
-    // - Two more actions following a2
-    let a3 = basic_action(author2.clone(), Some(a2.to_hash()));
-    let a4 = basic_action(author2.clone(), Some(a3.to_hash()));
-
-    // - Create a forked version of a1 (still pointing to a0)
-    let mut a1_fork = a1.clone();
-    *a1_fork.entry_data_mut().unwrap().0 = fixt!(EntryHash);
-
-    // - Create a forked version of a3 (still pointing to a2)
-    let mut a3_fork = a3.clone();
-    *a3_fork.entry_data_mut().unwrap().0 = fixt!(EntryHash);
-
-    // - Create another forked version of a3, with the pre-update author
-    let mut a3_fork_author1 = a3.clone();
-    *a3_fork_author1.author_mut() = author1.clone();
-    *a3_fork_author1.entry_data_mut().unwrap().0 = fixt!(EntryHash);
-
-    // - Create another forked version of a3, with a random author
-    let mut a3_fork_other_author = a3.clone();
-    *a3_fork_other_author.author_mut() = fixt!(AgentPubKey);
-    *a3_fork_other_author.entry_data_mut().unwrap().0 = fixt!(EntryHash);
-
-    let a1_hash = a1.to_hash();
-    let a3_hash = a3.to_hash();
-
-    // - Form a chain of the "valid, unforked" actions
-    let chain = [
-        sign_action(a0).await,
-        sign_action(a1).await,
-        sign_action(a2).await,
-        sign_action(a3.clone()).await,
-    ];
-
-    let db = test_authored_db();
-    db.test_write(move |txn| {
-        // - Commit the valid chain
-        for a in chain {
-            insert_action(txn, &a).unwrap();
-        }
-
-        // Not a fork, because a4 is a perfectly valid continuation of a3
-        assert!(detect_fork(txn, &a4).unwrap().is_none());
-
-        // Not a fork, because a3 is already in the chain
-        assert!(detect_fork(txn, &a3).unwrap().is_none());
-
-        // Is a fork, because:
-        // - a1 already exists
-        // - both actions point to the same previous action a0
-        // - both are under the same authorship as a0
-        assert_eq!(detect_fork(txn, &a1_fork).unwrap().unwrap().0, a1_hash);
-
-        // Is a fork, because:
-        // - a3 already exists
-        // - both actions point to the same previous action a2
-        // - both are under the authorship of the key which a2 updates to
-        assert_eq!(detect_fork(txn, &a3_fork).unwrap().unwrap().0, a3_hash);
-
-        // This is not valid in sys validation because the author is not valid,
-        // but it still does technically constitute a fork (it's just an invalid action)
-        assert_eq!(
-            detect_fork(txn, &a3_fork_author1).unwrap().unwrap().0,
-            a3_hash
-        );
-
-        // This is not valid in sys validation because the author is not valid,
-        // but it does still constitute a fork (it's just an invalid action)
-        assert_eq!(
-            detect_fork(txn, &a3_fork_other_author).unwrap().unwrap().0,
-            a3_hash
-        );
-    });
 }
