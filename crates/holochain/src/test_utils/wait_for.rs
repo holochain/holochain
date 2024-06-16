@@ -19,10 +19,10 @@ macro_rules! wait_for {
 
 #[macro_export]
 macro_rules! wait_for_10s {
-    ($test:expr, $check:expr, $assert:expr) => {
+    ($test:expr, $check:expr, $assert:expr) => {{
         let wait_for = $crate::test_utils::WaitFor::ten_s();
         $crate::wait_for!(wait_for, $test, $check, $assert)
-    };
+    }};
 }
 
 #[macro_export]
