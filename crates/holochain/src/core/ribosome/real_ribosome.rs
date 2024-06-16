@@ -1109,17 +1109,19 @@ pub mod wasm_test {
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetLocalRendezvous;
+    use crate::wait_for_10s;
     use hdk::prelude::*;
     use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
+    use parking_lot::Mutex;
+    use std::collections::HashMap;
     use std::sync::Arc;
     use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
     // guard to assure that response time to zome calls and concurrent zome calls
     // is not increasing disproportionally
-    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     async fn concurrent_zome_call_response_time_guard() {
         holochain_trace::test_run();
         let mut conductor = SweetConductor::from_config_rendezvous(
@@ -1205,8 +1207,14 @@ pub mod wasm_test {
             );
         }
 
-        // make sure the context map does not retain items
-        assert!(CONTEXT_MAP.lock().is_empty());
+        // Make sure the context map does not retain items.
+        // Zome `deepkey_csr`` does a post_commit call which takes some time to complete,
+        // before it is removed from the context map.
+        wait_for_10s!(
+            CONTEXT_MAP.clone(),
+            |context_map: &Arc<Mutex<HashMap<u64, Arc<_>>>>| context_map.lock().is_empty(),
+            |_| true
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
