@@ -47,7 +47,7 @@ impl WarrantOp {
 
     /// Accessor for the warrant
     pub fn warrant(&self) -> &Warrant {
-        &self
+        self
     }
 
     /// Accessor for the warrant
@@ -57,7 +57,7 @@ impl WarrantOp {
 
     /// Get the hashable content
     pub fn as_unique_form(&self) -> DhtOpUniqueForm {
-        DhtOpUniqueForm::Warrant(&self)
+        DhtOpUniqueForm::Warrant(self)
     }
 }
 
