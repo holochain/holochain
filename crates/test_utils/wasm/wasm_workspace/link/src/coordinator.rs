@@ -329,3 +329,11 @@ fn link_validation_calls_must_get_agent_activity(input: (ActionHash, AgentPubKey
         (),
     )
 }
+
+#[hdk_extern]
+fn test_entry_get_links(entry_action_hash: ActionHash) -> ExternResult<Vec<Link>> {
+    hdk::link::get_links(GetLinksInputBuilder::try_new(
+        entry_action_hash,
+        LinkTypes::TestEntry,
+    )?.build())
+}
