@@ -452,9 +452,9 @@ pub async fn record_to_op(
         record.privatized()
     };
 
-    let (shh, entry) = record.into_inner();
+    let (sah, entry) = record.into_inner();
     let mut entry = entry.into_option();
-    let action = shh.into();
+    let action = sah.into();
     // Register agent activity doesn't store the entry so we need to
     // save it so we can reconstruct the record later.
     if matches!(op_type, RegisterAgentActivity) {

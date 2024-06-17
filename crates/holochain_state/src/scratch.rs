@@ -221,7 +221,11 @@ impl Store for Scratch {
             .cloned())
     }
 
-    fn get_warrants_for_basis(&self, _hash: &AnyLinkableHash) -> StateQueryResult<Vec<Warrant>> {
+    fn get_warrants_for_basis(
+        &self,
+        _hash: &AnyLinkableHash,
+        _check_validity: bool,
+    ) -> StateQueryResult<Vec<Warrant>> {
         unimplemented!(
             "Warrants are not committed to the chain, so the scratch will never contain one."
         )
