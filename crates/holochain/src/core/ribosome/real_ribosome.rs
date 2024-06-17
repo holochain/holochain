@@ -115,8 +115,11 @@ use opentelemetry_api::metrics::Counter;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+#[cfg(feature = "wasmer_sys")]
 use wasmer_middlewares::metering::get_remaining_points;
+#[cfg(feature = "wasmer_sys")]
 use wasmer_middlewares::metering::set_remaining_points;
+#[cfg(feature = "wasmer_sys")]
 use wasmer_middlewares::metering::MeteringPoints;
 
 pub type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
@@ -858,6 +861,7 @@ impl RibosomeT for RealRibosome {
                     }
 
                     let instance = instance_with_store.instance.clone();
+                    #[cfg(feature = "wasmer_sys")]
                     {
                         let mut store_lock = instance_with_store.store.lock();
                         let mut store_mut = store_lock.as_store_mut();
@@ -872,6 +876,7 @@ impl RibosomeT for RealRibosome {
                         .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store.clone())
                         .map(Some);
 
+                    #[cfg(feature = "wasmer_sys")]
                     {
                         let mut store_lock = instance_with_store.store.lock();
                         let mut store_mut = store_lock.as_store_mut();
