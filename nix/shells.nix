@@ -29,6 +29,8 @@ let
 
           export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
           mkdir -p $HC_WASM_CACHE_PATH
+
+          export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
         ''
         # workaround to make cargo-nextest work on darwin
         # see: https://github.com/nextest-rs/nextest/issues/267
@@ -65,7 +67,12 @@ rec {
         IOKit
         apple_sdk_11_0.frameworks.CoreFoundation
       ])
-    );
+    ) ++ [
+      pkgs.cmake
+      pkgs.clang
+      pkgs.llvmPackages.libclang.lib
+    ];
+
   };
 
   release = coreDev.overrideAttrs (attrs: {
