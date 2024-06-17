@@ -21,7 +21,7 @@
 
         CARGO_PROFILE = "";
 
-        buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher ])
+        buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher  cmake clang llvmPackages.libclang.lib ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
             AppKit
