@@ -89,6 +89,7 @@ use holochain_util::timed;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
+use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use wasmer::AsStoreMut;
 use wasmer::Exports;
 use wasmer::Function;
@@ -204,12 +205,12 @@ impl HostFnBuilder {
                                         WasmError {
                                             error: WasmErrorInner::HostShortCircuit(_),
                                             ..
-                                        } => return Err(wasm_error.into()),
-                                        _ => Err(wasm_error),
+                                        } => return Err(WasmHostError(wasm_error).into()),
+                                        _ => Err(WasmHostError(wasm_error)),
                                     },
                                     Err(runtime_error) => return Err(runtime_error),
                                 },
-                                Ok(o) => Result::<_, WasmError>::Ok(o),
+                                Ok(o) => Result::<_, WasmHostError>::Ok(o),
                             })?
                             .to_le_bytes(),
                         ))
@@ -706,7 +707,7 @@ macro_rules! do_callback {
                     Err((zome, RibosomeError::WasmRuntimeError(runtime_error))) => (
                         zome.into(),
                         <$callback_result>::try_from_wasm_error(runtime_error.downcast()?)
-                            .map_err(|e| -> RuntimeError { e.into() })?,
+                            .map_err(|e| -> RuntimeError { WasmHostError(e).into() })?,
                     ),
                     Err((_zome, other_error)) => return Err(other_error),
                     Ok(None) => {

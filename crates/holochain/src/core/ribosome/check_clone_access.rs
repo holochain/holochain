@@ -1,7 +1,7 @@
 use crate::conductor::api::CellConductorReadHandle;
 use holochain_types::app::{InstalledApp, InstalledAppId};
 use holochain_util::tokio_helper;
-use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
+use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner, WasmHostError};
 use holochain_zome_types::{call::RoleName, cell::CellId};
 use wasmer::RuntimeError;
 
