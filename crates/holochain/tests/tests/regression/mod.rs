@@ -160,35 +160,61 @@ async fn zero_arc_can_link_to_uncached_base() {
         )
         .await;
 
+    println!("@!@!@ -- must_get_valid_record --");
     println!("@!@!@ action_hash: {action_hash:?}");
 
-    loop {
-        // Wait until we can get the action from alice
-        // Since alice is the only node that holds DHT ops this is equivalent
-        // to having bob wait to get the entry
-        //
-        // BUT! If bob is the one that gets the entry, then it caches it,
-        // and the create_link succeeds. And we are trying to reproduce the
-        // create_link failing due to `Awaiting deps` error
-        let r: Option<Record> = conductors[0]
-            .call(
-                &alice.zome(TestWasm::Link.coordinator_zome_name()),
-                "test_entry_get",
-                &action_hash,
-            )
-            .await;
-
-        if r.is_some() {
-            break;
-        }
-
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-    }
-
+    // Bob is linking to Alice's action hash, but doesn't have it locally
+    // so the must_get_valid_record in validation will have to do a network get.
     let link_hash: ActionHash = conductors[1]
         .call(
             &bob.zome(TestWasm::Link.coordinator_zome_name()),
-            "test_entry_link",
+            "link_validation_calls_must_get_valid_record",
+            (action_hash.clone(), alice_pk.clone()),
+        )
+        .await;
+
+    println!("@!@!@ link_hash: {link_hash:?}");
+
+    let action_hash: ActionHash = conductors[0]
+        .call(
+            &alice.zome(TestWasm::Link.coordinator_zome_name()),
+            "test_entry_create",
+            (),
+        )
+        .await;
+
+    println!("@!@!@ -- must_get_action / must_get_entry --");
+    println!("@!@!@ action_hash: {action_hash:?}");
+
+    // Bob is linking to Alice's action hash, but doesn't have it locally
+    // so the must_get_valid_record in validation will have to do a network get.
+    let link_hash: ActionHash = conductors[1]
+        .call(
+            &bob.zome(TestWasm::Link.coordinator_zome_name()),
+            "link_validation_calls_must_get_action_then_entry",
+            (action_hash.clone(), alice_pk.clone()),
+        )
+        .await;
+
+    println!("@!@!@ link_hash: {link_hash:?}");
+
+    let action_hash: ActionHash = conductors[0]
+        .call(
+            &alice.zome(TestWasm::Link.coordinator_zome_name()),
+            "test_entry_create",
+            (),
+        )
+        .await;
+
+    println!("@!@!@ -- must_get_agent_activity --");
+    println!("@!@!@ action_hash: {action_hash:?}");
+
+    // Bob is linking to Alice's action hash, but doesn't have it locally
+    // so the must_get_valid_record in validation will have to do a network get.
+    let link_hash: ActionHash = conductors[1]
+        .call(
+            &bob.zome(TestWasm::Link.coordinator_zome_name()),
+            "link_validation_calls_must_get_agent_activity",
             (action_hash.clone(), alice_pk.clone()),
         )
         .await;
