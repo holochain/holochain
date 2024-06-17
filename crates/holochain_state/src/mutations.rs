@@ -129,9 +129,8 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
             insert_action(txn, &action_hashed)?;
         }
         DhtOp::WarrantOp(warrant_op) => {
-            let author = warrant_op.author.clone();
             let warrant = (***warrant_op).clone();
-            let inserted = insert_warrant(txn, warrant, author)?;
+            let inserted = insert_warrant(txn, warrant)?;
             if inserted == 0 {
                 create_op = false;
             }
@@ -532,13 +531,10 @@ pub fn set_receipts_complete(
 }
 
 /// Insert a [`Warrant`] into the Action table.
-pub fn insert_warrant(
-    txn: &mut Transaction,
-    warrant: SignedWarrant,
-    author: AgentPubKey,
-) -> StateMutationResult<usize> {
+pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMutationResult<usize> {
     let warrant_type = warrant.get_type();
     let hash = warrant.to_hash();
+    let author = &warrant.author;
 
     Ok(sql_insert!(txn, Action, {
         "hash": hash,
