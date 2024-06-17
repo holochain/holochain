@@ -380,7 +380,7 @@ impl RealRibosome {
         &self,
         _path: &PathBuf
     ) -> RibosomeResult<Arc<Module>> {
-        Err(RibosomeError::PreserializedModuleLoadWithInterpreterError)
+        unimplemented!("The feature flag 'wasmer_sys' must be enabled to support compiling wasm");
     }
     
     // Create a key for module cache.

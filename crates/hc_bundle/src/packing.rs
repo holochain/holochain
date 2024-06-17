@@ -119,7 +119,7 @@ async fn build_preserialized_wasm<M: Manifest>(target_path: &PathBuf, bundle: &B
 
 #[cfg(feature = "wasmer_wamr")]
 async fn build_preserialized_wasm<M: Manifest>(_target_path: &PathBuf, _bundle: &Bundle<M>) -> Result<(), HcBundleError> {
-    Err(HcBundleError::UnsupportedFeatureError("wasmer_sys".into()))
+    unimplemented!("The feature flag 'wasmer_sys' must be enabled to support compiling wasm");
 }
 
 /// Pack a directory containing a YAML manifest (DNA, hApp, Web hApp) into a bundle, returning

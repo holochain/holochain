@@ -42,9 +42,6 @@ pub enum HcBundleError {
 
     #[error(transparent)]
     ModuleCompileError(#[from] CompileError),
-
-    #[error("Requires hc_bundle to be built with the feature flag: {0}")]
-    UnsupportedFeatureError(String)
 }
 
 /// HcBundle Result type.
