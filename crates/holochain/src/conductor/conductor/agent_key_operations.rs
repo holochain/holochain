@@ -43,7 +43,12 @@ impl Conductor {
                     async move {
                         match conductor.get_cell_triggers(cell_id).await {
                             Ok(cell_triggers) => {
-                                cell_triggers.publish_dht_ops.trigger(&"agent key deleted")
+                                cell_triggers.publish_dht_ops.trigger(&"agent key deleted");
+                                // Even though integration somehow happens in multi-conductor tests,
+                                // it's not clear why it does, so it's safer to trigger it explicitly.
+                                cell_triggers
+                                    .integrate_dht_ops
+                                    .trigger(&"agent key deleted");
                             }
                             Err(err) => tracing::warn!(
                                 ?err,
