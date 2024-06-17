@@ -139,6 +139,12 @@ impl From<WarrantOp> for DhtOp {
     }
 }
 
+impl From<SignedWarrant> for DhtOp {
+    fn from(op: SignedWarrant) -> Self {
+        DhtOp::WarrantOp(Box::new(WarrantOp::from(op)))
+    }
+}
+
 impl kitsune_p2p_dht::prelude::OpRegion for DhtOp {
     fn loc(&self) -> Loc {
         self.dht_basis().get_loc()
@@ -201,6 +207,12 @@ impl From<ChainOpLite> for DhtOpLite {
 impl From<WarrantOp> for DhtOpLite {
     fn from(op: WarrantOp) -> Self {
         DhtOpLite::Warrant(Box::new(op))
+    }
+}
+
+impl From<SignedWarrant> for DhtOpLite {
+    fn from(warrant: SignedWarrant) -> Self {
+        DhtOpLite::Warrant(Box::new(warrant.into()))
     }
 }
 
@@ -377,14 +389,14 @@ impl DhtOp {
     pub fn signature(&self) -> &Signature {
         match self {
             Self::ChainOp(op) => op.signature(),
-            Self::WarrantOp(op) => &op.signature,
+            Self::WarrantOp(op) => op.signature(),
         }
     }
 
     fn to_order(&self) -> OpOrder {
         match self {
             Self::ChainOp(op) => OpOrder::new(op.get_type(), op.timestamp()),
-            Self::WarrantOp(op) => OpOrder::new(op.get_type(), op.timestamp),
+            Self::WarrantOp(op) => OpOrder::new(op.get_type(), op.timestamp()),
         }
     }
 
@@ -400,7 +412,7 @@ impl DhtOp {
     pub fn timestamp(&self) -> Timestamp {
         match self {
             Self::ChainOp(op) => op.timestamp(),
-            Self::WarrantOp(op) => op.timestamp,
+            Self::WarrantOp(op) => op.timestamp(),
         }
     }
 
@@ -416,8 +428,8 @@ impl DhtOp {
     pub fn sys_validation_dependencies(&self) -> SysValDeps {
         match self {
             Self::ChainOp(op) => op.get_type().sys_validation_dependencies(&op.action()),
-            Self::WarrantOp(op) => match &op.warrant {
-                Warrant::ChainIntegrity(w) => match w {
+            Self::WarrantOp(op) => match &op.proof {
+                WarrantProof::ChainIntegrity(w) => match w {
                     ChainIntegrityWarrant::InvalidChainOp {
                         action: action_hash,
                         ..
@@ -663,7 +675,7 @@ impl DhtOpLite {
     pub fn dht_basis(&self) -> OpBasis {
         match self {
             Self::Chain(op) => op.dht_basis().clone(),
-            Self::Warrant(op) => op.warrant.dht_basis(),
+            Self::Warrant(op) => op.dht_basis(),
         }
     }
 
@@ -694,8 +706,8 @@ impl DhtOpLite {
                 ChainOpLite::StoreEntry(_, entry_hash, _) => vec![entry_hash.clone().into()],
                 other => vec![other.action_hash().clone().into()],
             },
-            Self::Warrant(op) => match &op.warrant {
-                Warrant::ChainIntegrity(w) => match w {
+            Self::Warrant(op) => match &op.proof {
+                WarrantProof::ChainIntegrity(w) => match w {
                     ChainIntegrityWarrant::InvalidChainOp {
                         action: action_hash,
                         ..
@@ -849,7 +861,7 @@ pub enum DhtOpUniqueForm<'a> {
     RegisterAddLink(&'a action::CreateLink),
     RegisterRemoveLink(&'a action::DeleteLink),
 
-    Warrant(&'a Warrant, &'a AgentPubKey, Timestamp),
+    Warrant(&'a Warrant),
 }
 
 impl<'a> DhtOpUniqueForm<'a> {
@@ -871,7 +883,7 @@ impl<'a> DhtOpUniqueForm<'a> {
             DhtOpUniqueForm::RegisterAddLink(action) => action.base_address.clone(),
             DhtOpUniqueForm::RegisterRemoveLink(action) => action.base_address.clone(),
 
-            DhtOpUniqueForm::Warrant(warrant, _, _) => warrant.dht_basis(),
+            DhtOpUniqueForm::Warrant(warrant) => warrant.dht_basis(),
         }
     }
 

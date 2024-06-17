@@ -375,12 +375,8 @@ impl<'stmt> Store for Txn<'stmt, '_> {
 
         let row_fn = |row: &Row<'_>| {
             Ok(
-                from_blob::<SignedWarrant>(row.get(row.as_ref().column_index("blob")?)?).map(
-                    |signed_warrant| {
-                        let (warrant, _) = signed_warrant.into_data().into();
-                        warrant
-                    },
-                ),
+                from_blob::<SignedWarrant>(row.get(row.as_ref().column_index("blob")?)?)
+                    .map(|signed_warrant| signed_warrant.into_data()),
             )
         };
 
@@ -1098,11 +1094,7 @@ pub fn map_sql_dht_op_common(
         }
         DhtOpType::Warrant(_) => {
             let warrant = from_blob::<SignedWarrant>(row.get("action_blob")?)?;
-            let author: AgentPubKey = row.get("author")?;
-            let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
-            Ok(Some(
-                WarrantOp::new(warrant, author, signature, timestamp).into(),
-            ))
+            Ok(Some(warrant.into()))
         }
     }
 }

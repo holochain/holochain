@@ -130,7 +130,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
         }
         DhtOp::WarrantOp(warrant_op) => {
             let author = warrant_op.author.clone();
-            let warrant = warrant_op.clone().into_signed_warrant();
+            let warrant = (***warrant_op).clone();
             let inserted = insert_warrant(txn, warrant, author)?;
             if inserted == 0 {
                 create_op = false;
@@ -187,7 +187,7 @@ pub fn insert_op_lite(
             })?;
         }
         DhtOpLite::Warrant(op) => {
-            let warrant_hash = op.warrant.to_hash();
+            let warrant_hash = op.to_hash();
             sql_insert!(txn, DhtOp, {
                 "hash": hash,
                 "type": op_lite.get_type(),
@@ -537,14 +537,14 @@ pub fn insert_warrant(
     warrant: SignedWarrant,
     author: AgentPubKey,
 ) -> StateMutationResult<usize> {
-    let warrant_type = warrant.0.get_type();
-    let hash = warrant.0.to_hash();
+    let warrant_type = warrant.get_type();
+    let hash = warrant.to_hash();
 
     Ok(sql_insert!(txn, Action, {
         "hash": hash,
         "type": warrant_type,
         "author": author,
-        "base_hash": warrant.0.dht_basis(),
+        "base_hash": warrant.dht_basis(),
         "blob": to_blob(&warrant)?,
     })?)
 }
@@ -895,28 +895,31 @@ mod tests {
         let pair = (fixt!(ActionHash), fixt!(Signature));
 
         let make_op = |warrant| {
-            let op = WarrantOp {
-                warrant,
-                author: fixt!(AgentPubKey),
-                signature: fixt!(Signature),
-                timestamp: fixt!(Timestamp),
-            };
+            let op = SignedWarrant::new(warrant, fixt!(Signature));
             let op: DhtOp = op.into();
             op.into_hashed()
         };
 
         let action_author = fixt!(AgentPubKey);
 
-        let warrant1 = Warrant::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
-            action_author: action_author.clone(),
-            action: pair.clone(),
-            validation_type: ValidationType::App,
-        });
+        let warrant1 = Warrant::new(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                action_author: action_author.clone(),
+                action: pair.clone(),
+                validation_type: ValidationType::App,
+            }),
+            fixt!(AgentPubKey),
+            fixt!(Timestamp),
+        );
 
-        let warrant2 = Warrant::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
-            chain_author: action_author.clone(),
-            action_pair: (pair.clone(), pair.clone()),
-        });
+        let warrant2 = Warrant::new(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+                chain_author: action_author.clone(),
+                action_pair: (pair.clone(), pair.clone()),
+            }),
+            fixt!(AgentPubKey),
+            fixt!(Timestamp),
+        );
 
         let op1 = make_op(warrant1.clone());
         let op2 = make_op(warrant2.clone());

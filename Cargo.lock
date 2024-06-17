@@ -3313,6 +3313,7 @@ dependencies = [
  "holochain_wasm_test_utils",
  "holochain_zome_types",
  "kitsune_p2p",
+ "kitsune_p2p_timestamp",
  "matches",
  "nanoid",
  "one_err",

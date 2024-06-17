@@ -1088,8 +1088,8 @@ async fn app_validation_produces_warrants() {
         .await;
 
     assert_eq!(activity.warrants.len(), 1);
-    match activity.warrants.first().unwrap() {
-        Warrant::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+    match &activity.warrants.first().unwrap().proof {
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
             action_author,
             action: (hash, _),
             validation_type: _,
@@ -1204,9 +1204,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
             }
             DhtOpType::Warrant(_) => {
                 let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
-                let author: AgentPubKey = from_blob(row.get("author")?)?;
-                let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
-                Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
+                Ok(warrant.into())
             }
         }
     })

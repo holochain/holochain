@@ -548,8 +548,8 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                     }
                     _ => None,
                 },
-                DhtOp::WarrantOp(op) => match &op.warrant {
-                    Warrant::ChainIntegrity(warrant) => match warrant {
+                DhtOp::WarrantOp(op) => match &op.proof {
+                    WarrantProof::ChainIntegrity(warrant) => match warrant {
                         ChainIntegrityWarrant::InvalidChainOp {
                             action: (action_hash, _),
                             ..
@@ -775,8 +775,8 @@ async fn validate_warrant_op(
     _dna_def: &DnaDefHashed,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> SysValidationResult<()> {
-    match &op.warrant {
-        Warrant::ChainIntegrity(warrant) => match warrant {
+    match &op.proof {
+        WarrantProof::ChainIntegrity(warrant) => match warrant {
             ChainIntegrityWarrant::InvalidChainOp {
                 action: (action_hash, action_sig),
                 action_author,
@@ -792,8 +792,8 @@ async fn validate_warrant_op(
                         })?;
 
                     if action.author() != action_author {
-                        return Err(ValidationOutcome::InvalidWarrantOp(
-                            op.clone(),
+                        return Err(ValidationOutcome::InvalidWarrant(
+                            op.warrant().clone(),
                             "action author mismatch".into(),
                         )
                         .into());
@@ -822,8 +822,8 @@ async fn validate_warrant_op(
 
                     // chain_author basis must match the author of the action
                     if action1.author() != chain_author {
-                        return Err(ValidationOutcome::InvalidWarrantOp(
-                            op.clone(),
+                        return Err(ValidationOutcome::InvalidWarrant(
+                            op.warrant().clone(),
                             "chain author mismatch".into(),
                         )
                         .into());
@@ -831,8 +831,8 @@ async fn validate_warrant_op(
 
                     // Both actions must be by same author
                     if action1.author() != action2.author() {
-                        return Err(ValidationOutcome::InvalidWarrantOp(
-                            op.clone(),
+                        return Err(ValidationOutcome::InvalidWarrant(
+                            op.warrant().clone(),
                             "action pair author mismatch".into(),
                         )
                         .into());
@@ -845,8 +845,8 @@ async fn validate_warrant_op(
                     // Using seq numbers makes it easier to detect and prove a fork, but using prev_action
                     // prevents the attack.
                     if action1.prev_action() != action2.prev_action() {
-                        return Err(ValidationOutcome::InvalidWarrantOp(
-                            op.clone(),
+                        return Err(ValidationOutcome::InvalidWarrant(
+                            op.warrant().clone(),
                             "action pair seq mismatch".into(),
                         )
                         .into());
@@ -1388,12 +1388,13 @@ pub async fn make_invalid_chain_warrant_op_inner(
     let action_author = action.author().clone();
     tracing::warn!("Authoring warrant for invalid op authored by {action_author}");
 
-    let warrant = Warrant::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+    let proof = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
         action_author,
         action: (action.to_hash().clone(), op.signature().clone()),
         validation_type,
     });
-    let warrant_op = WarrantOp::author(keystore, warrant_author, warrant)
+    let warrant = Warrant::new(proof, warrant_author, Timestamp::now());
+    let warrant_op = WarrantOp::author(keystore, warrant)
         .await
         .map_err(|e| super::WorkflowError::Other(e.into()))?;
     let op: DhtOp = warrant_op.into();
@@ -1414,11 +1415,15 @@ pub async fn make_fork_warrant_op_inner(
         action_pair.1 .0
     );
 
-    let warrant = Warrant::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
-        chain_author,
-        action_pair,
-    });
-    let warrant_op = WarrantOp::author(keystore, warrant_author, warrant)
+    let warrant = Warrant::new(
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+            chain_author,
+            action_pair,
+        }),
+        warrant_author,
+        Timestamp::now(),
+    );
+    let warrant_op = WarrantOp::author(keystore, warrant)
         .await
         .map_err(|e| super::WorkflowError::Other(e.into()))?;
     let op: DhtOp = warrant_op.into();
