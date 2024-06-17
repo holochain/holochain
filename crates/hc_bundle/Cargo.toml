@@ -53,7 +53,7 @@ walkdir = "2"
 workspace = true
 
 [features]
-default = ["wasmer_wamr"]
+default = ["wasmer_sys"]
 
 sqlite-encrypted = ["holochain_types/sqlite-encrypted"]
 sqlite = ["holochain_types/sqlite"]
