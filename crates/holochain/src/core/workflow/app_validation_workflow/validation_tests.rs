@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_lock)]
+
 use std::{
     collections::{HashMap, HashSet},
     fmt::Write,
@@ -368,7 +370,6 @@ async fn app_validation_ops() {
 
     let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes).await;
 
-    #[allow(clippy::await_holding_lock)]
     let (alice, bob) = {
         let mut agents = agents.lock();
 

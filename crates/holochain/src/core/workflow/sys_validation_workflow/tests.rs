@@ -21,10 +21,7 @@ async fn sys_validation_workflow_test() {
 
     let config = SweetConductorConfig::standard().no_dpki_mustfix();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
-    let apps = conductors
-        .setup_app(&"test_app", [&dna_file])
-        .await
-        .unwrap();
+    let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
     let alice_cell_id = alice.cell_id().clone();
     let bob_cell_id = bob.cell_id().clone();
