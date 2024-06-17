@@ -328,6 +328,22 @@ impl Action {
         })
     }
 
+    /// returns the previous action except for the DNA action which doesn't have a previous
+    pub fn prev_action_mut(&mut self) -> Option<&mut ActionHash> {
+        Some(match self {
+            Self::Dna(Dna { .. }) => return None,
+            Self::AgentValidationPkg(AgentValidationPkg { prev_action, .. }) => prev_action,
+            Self::InitZomesComplete(InitZomesComplete { prev_action, .. }) => prev_action,
+            Self::CreateLink(CreateLink { prev_action, .. }) => prev_action,
+            Self::DeleteLink(DeleteLink { prev_action, .. }) => prev_action,
+            Self::Delete(Delete { prev_action, .. }) => prev_action,
+            Self::CloseChain(CloseChain { prev_action, .. }) => prev_action,
+            Self::OpenChain(OpenChain { prev_action, .. }) => prev_action,
+            Self::Create(Create { prev_action, .. }) => prev_action,
+            Self::Update(Update { prev_action, .. }) => prev_action,
+        })
+    }
+
     pub fn is_genesis(&self) -> bool {
         self.action_seq() < POST_GENESIS_SEQ_THRESHOLD
     }

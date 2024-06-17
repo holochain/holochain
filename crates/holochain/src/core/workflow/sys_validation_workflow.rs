@@ -91,6 +91,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::GenericNetwork;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
+use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
 use holochain_state::prelude::*;
 use parking_lot::Mutex;
 use rusqlite::Transaction;
@@ -124,6 +125,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     trigger_app_validation: TriggerSender,
+    trigger_publish: TriggerSender,
     trigger_self: TriggerSender,
     network: Network,
     config: Arc<ConductorConfig>,
@@ -145,6 +147,15 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
         tracing::debug!("Sys validation accepted {} ops", outcome_summary.accepted);
 
         trigger_app_validation.trigger(&"sys_validation_workflow");
+    }
+
+    if outcome_summary.warranted > 0 {
+        tracing::debug!(
+            "Sys validation created {} warrants",
+            outcome_summary.warranted
+        );
+
+        trigger_publish.trigger(&"sys_validation_workflow");
     }
 
     // Now go to the network to try to fetch missing dependencies
@@ -275,15 +286,31 @@ async fn sys_validation_workflow_inner(
         }
     }
 
-    let (summary, invalid_ops) = workspace
+    let mut warrants = vec![];
+
+    let (mut summary, invalid_ops, forked_pairs) = workspace
         .dht_db
         .write_async(move |txn| {
             let mut summary = OutcomeSummary::default();
             let mut invalid_ops = vec![];
+            let mut forked_pairs = vec![];
 
             for (hashed_op, outcome) in validation_outcomes {
                 let (op, op_hash) = hashed_op.into_inner();
                 let op_type = op.get_type();
+
+                if let DhtOp::ChainOp(chain_op) = &op {
+                    // Author a ChainFork warrant if fork is detected
+                    let action = chain_op.action();
+                    if let Some(forked_action) = detect_fork(txn, &action)? {
+                        let signature = chain_op.signature().clone();
+                        let action_hash = action.to_hash();
+                        forked_pairs.push((
+                            action.author().clone(),
+                            ((action_hash, signature), forked_action),
+                        ));
+                    }
+                }
 
                 // This is an optimization to skip app validation and integration for ops that are
                 // rejected and don't have dependencies.
@@ -324,15 +351,13 @@ async fn sys_validation_workflow_inner(
                     }
                 }
             }
-            WorkflowResult::Ok((summary, invalid_ops))
+            WorkflowResult::Ok((summary, invalid_ops, forked_pairs))
         })
         .await?;
 
-    let mut warrants = vec![];
-
     for (_, op) in invalid_ops {
         if let Some(chain_op) = op.as_chain_op() {
-            let warrant_op = crate::core::workflow::sys_validation_workflow::make_warrant_op_inner(
+            let warrant_op = crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op_inner(
                 &keystore,
                 representative_agent.clone(),
                 chain_op,
@@ -343,11 +368,19 @@ async fn sys_validation_workflow_inner(
         }
     }
 
+    for (author, pair) in forked_pairs {
+        let warrant_op =
+            make_fork_warrant_op_inner(&keystore, representative_agent.clone(), author, pair)
+                .await?;
+        warrants.push(warrant_op);
+    }
+
     workspace
         .authored_db
         .write_async(move |txn| {
             for warrant_op in warrants {
                 insert_op(txn, &warrant_op)?;
+                summary.warranted += 1;
             }
             StateMutationResult::Ok(())
         })
@@ -1331,7 +1364,7 @@ pub async fn make_warrant_op(
 ) -> WorkflowResult<DhtOpHashed> {
     let keystore = conductor.keystore();
     let warrant_author = get_representative_agent(conductor, dna_hash).expect("TODO: handle");
-    make_warrant_op_inner(keystore, warrant_author, op, validation_type).await
+    make_invalid_chain_warrant_op_inner(keystore, warrant_author, op, validation_type).await
 }
 
 /// Gets an arbitrary agent with a cell running the given DNA, needed for processes
@@ -1345,7 +1378,7 @@ pub fn get_representative_agent(conductor: &Conductor, dna_hash: &DnaHash) -> Op
         .map(|id| id.agent_pubkey().clone())
 }
 
-pub async fn make_warrant_op_inner(
+pub async fn make_invalid_chain_warrant_op_inner(
     keystore: &MetaLairClient,
     warrant_author: AgentPubKey,
     op: &ChainOp,
@@ -1368,11 +1401,61 @@ pub async fn make_warrant_op_inner(
     Ok(op)
 }
 
+pub async fn make_fork_warrant_op_inner(
+    keystore: &MetaLairClient,
+    warrant_author: AgentPubKey,
+    chain_author: AgentPubKey,
+    action_pair: ((ActionHash, Signature), (ActionHash, Signature)),
+) -> WorkflowResult<DhtOpHashed> {
+    debug_assert_ne!(action_pair.0 .0, action_pair.1 .0);
+    tracing::warn!(
+        "Authoring warrant for chain fork by {chain_author}. Action hashes: ({}, {})",
+        action_pair.0 .0,
+        action_pair.1 .0
+    );
+
+    let warrant = Warrant::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+        chain_author,
+        action_pair,
+    });
+    let warrant_op = WarrantOp::author(keystore, warrant_author, warrant)
+        .await
+        .map_err(|e| super::WorkflowError::Other(e.into()))?;
+    let op: DhtOp = warrant_op.into();
+    let op = op.into_hashed();
+    Ok(op)
+}
+
+pub fn detect_fork(
+    txn: &mut Transaction<'_>,
+    action: &Action,
+) -> StateQueryResult<Option<(ActionHash, Signature)>> {
+    let mut statement = txn.prepare(ACTION_HASH_BY_PREV)?;
+    statement
+        .query_row(
+            named_params! {
+                ":prev_hash": action.prev_action(),
+                ":hash": action.to_hash(),
+            },
+            |row| {
+                let hash: ActionHash = row.get("hash")?;
+                let action_blob: Vec<u8> = row.get("blob")?;
+                Ok((hash, action_blob))
+            },
+        )
+        .optional()?
+        .map(|(hash, action_blob)| {
+            from_blob::<SignedAction>(action_blob).map(|action| (hash, action.signature().clone()))
+        })
+        .transpose()
+}
+
 #[derive(Debug, Clone)]
 struct OutcomeSummary {
     accepted: usize,
     missing: usize,
     rejected: usize,
+    warranted: usize,
 }
 
 impl OutcomeSummary {
@@ -1381,6 +1464,7 @@ impl OutcomeSummary {
             accepted: 0,
             missing: 0,
             rejected: 0,
+            warranted: 0,
         }
     }
 }

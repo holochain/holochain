@@ -43,12 +43,12 @@ pub enum DbSyncStrategy {
     /// Allows databases that can be wiped and rebuilt to
     /// use the faster [`DbSyncLevel::Off`].
     /// This is the default.
-    #[default]
     Fast,
     /// Makes all databases use at least [`DbSyncLevel::Normal`].
     /// This is probably not needed unless you have an SSD and
     /// would prefer to lower the chances of databases needing to
     /// be rebuilt.
+    #[default]
     Resilient,
 }
 
