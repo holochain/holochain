@@ -180,7 +180,7 @@ path = "src/bin/holochain/main.rs"
 workspace = true
 
 [features]
-default = ["sqlite-encrypted", "tx2", "tx5", "metrics_influxive", "wasmer_sys"]
+default = ["sqlite-encrypted", "tx2", "tx5", "metrics_influxive", "wasmer_wamr"]
 
 tx2 = ["kitsune_p2p/tx2"]
 tx5 = ["kitsune_p2p/tx5", "tx5-go-pion-turn"]

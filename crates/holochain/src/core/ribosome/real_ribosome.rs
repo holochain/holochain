@@ -105,6 +105,7 @@ use wasmer::Type;
 use crate::core::ribosome::host_fn::close_chain::close_chain;
 use crate::core::ribosome::host_fn::count_links::count_links;
 use crate::core::ribosome::host_fn::open_chain::open_chain;
+#[cfg(feature = "wasmer_sys")]
 use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
@@ -113,6 +114,7 @@ use once_cell::sync::Lazy;
 use opentelemetry_api::global::meter_with_version;
 use opentelemetry_api::metrics::Counter;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 #[cfg(feature = "wasmer_sys")]
@@ -364,6 +366,23 @@ impl RealRibosome {
         .await?
     }
 
+    #[cfg(feature = "wasmer_sys")]
+    pub fn preserialized_module(
+        &self,
+        path: &PathBuf
+    ) -> RibosomeResult<Arc<Module>> {
+        let module = holochain_wasmer_host::module::get_ios_module_from_file(path)?;
+        Ok(Arc::new(module))
+    }
+
+    #[cfg(feature = "wasmer_wamr")]
+    pub fn preserialized_module(
+        &self,
+        _path: &PathBuf
+    ) -> RibosomeResult<Arc<Module>> {
+        Err(RibosomeError::PreserializedModuleLoadWithInterpreterError)
+    }
+    
     // Create a key for module cache.
     // Format: [WasmHash] as bytes
     // watch out for cache misses in the tests that make things slooow if you change this!
@@ -380,8 +399,7 @@ impl RealRibosome {
         match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
                 if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                    let module = holochain_wasmer_host::module::get_ios_module_from_file(path)?;
-                    Ok(Arc::new(module))
+                    self.preserialized_module(path)
                 } else {
                     self.runtime_compiled_module(zome.zome_name()).await
                 }
@@ -797,9 +815,7 @@ impl RibosomeT for RealRibosome {
                 match zome.zome_def() {
                     ZomeDef::Wasm(wasm_zome) => {
                         let module = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                            Arc::new(holochain_wasmer_host::module::get_ios_module_from_file(
-                                path,
-                            )?)
+                            self.preserialized_module(path)?
                         } else {
                             tokio_helper::block_forever_on(
                                 self.runtime_compiled_module(zome.zome_name()),
@@ -860,7 +876,8 @@ impl RibosomeT for RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
-                    let instance = instance_with_store.instance.clone();
+                    let instance: Arc<Instance> = instance_with_store.instance.clone();
+
                     #[cfg(feature = "wasmer_sys")]
                     {
                         let mut store_lock = instance_with_store.store.lock();

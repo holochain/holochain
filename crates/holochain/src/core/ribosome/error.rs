@@ -106,6 +106,10 @@ pub enum RibosomeError {
 
     #[error(transparent)]
     IO(#[from] std::io::Error),
+
+    /// An attempt to was made to load a preserialized wasm file when using a version of holochain that does not include the wasmer compiler
+    #[error("Unable to load preserialized wasm modules when holochain is built with the feature flag wasmer_wamr")]
+    PreserializedModuleLoadWithInterpreterError
 }
 
 /// Type alias

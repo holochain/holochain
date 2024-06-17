@@ -23,3 +23,7 @@ tui = "0.19"
 
 [lints]
 workspace = true
+
+[features]
+wasmer_sys = ["holochain_diagnostics/wasmer_sys"]
+wasmer_wamr = ["holochain_diagnostics/wasmer_wamr"]
