@@ -46,7 +46,7 @@ thiserror = "1.0.22"
 tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1"
 tokio-stream = "0.1"
-tx5 = { version = "=0.0.12-alpha", optional = true }
+tx5 = { version = "=0.0.13-alpha", optional = true }
 url2 = "0.0.6"
 fixt = { path = "../../fixt", version = "^0.4.0-dev.2"}
 
@@ -73,7 +73,7 @@ kitsune_p2p_timestamp = { path = "../timestamp", features = [
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 maplit = "1"
 pretty_assertions = "1.4.0"
-sbd-server = "=0.0.4-alpha"
+sbd-server = "=0.0.5-alpha"
 test-case = "3.3"
 tokio = { version = "1.11", features = ["full", "test-util"] }
 tracing-subscriber = "0.3.16"
