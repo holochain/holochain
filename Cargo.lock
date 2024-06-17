@@ -608,6 +608,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen"
+version = "0.69.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a00dc851838a2120612785d195287475a3ac45514741da670b735818822129a0"
+dependencies = [
+ "bitflags 2.5.0",
+ "cexpr",
+ "clang-sys",
+ "itertools 0.10.5",
+ "lazy_static",
+ "lazycell",
+ "log",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash",
+ "shlex",
+ "syn 2.0.66",
+ "which",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -872,6 +895,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d43a04d8753f35258c91f8ec639f792891f748a1edbd759cf1dcea3382ad83c"
 
 [[package]]
+name = "cexpr"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fac387a98bb7c37292057cffc56d62ecb629900026402633ae9160df93a8766"
+dependencies = [
+ "nom",
+]
+
+[[package]]
 name = "cfg-if"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -946,6 +978,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "clang-sys"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b023947811758c97c59bf9d1c188fd619ad4718dcaa767947df1cadb14f39f4"
+dependencies = [
+ "glob",
+ "libc",
+ "libloading",
+]
+
+[[package]]
 name = "clap"
 version = "2.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1008,6 +1051,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 dependencies = [
  "bitflags 1.3.2",
+]
+
+[[package]]
+name = "cmake"
+version = "0.1.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a31c789563b815f77f4250caee12365734369f942439b7defd71e18a48197130"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
@@ -3448,22 +3500,19 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.95"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81862ba8234412864273d21983c99af4e8b97739a5e4c354030470acdc6b431c"
+source = "git+https://github.com/mattyg/holochain-wasmer.git?branch=feat/wasmer-wamr-integration#eb3abe0ee03bf62513ee9bea264361d43132a6ee"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
  "serde_bytes",
  "test-fuzz",
  "thiserror",
- "wasmer",
 ]
 
 [[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.95"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fce20cd8eb137a355394e57612cf2cf7836dab57948d56af9f9fe080ea168d41"
+source = "git+https://github.com/mattyg/holochain-wasmer.git?branch=feat/wasmer-wamr-integration#eb3abe0ee03bf62513ee9bea264361d43132a6ee"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -3476,8 +3525,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_host"
 version = "0.0.95"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6a4f17340ec82de3f33d81f2be9b5e7bf3b60c30f04e40d3bb9aa78674a36f7"
+source = "git+https://github.com/mattyg/holochain-wasmer.git?branch=feat/wasmer-wamr-integration#eb3abe0ee03bf62513ee9bea264361d43132a6ee"
 dependencies = [
  "bimap",
  "bytes",
@@ -3487,6 +3535,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "rand 0.8.5",
  "serde",
+ "thiserror",
  "tracing",
  "wasmer",
  "wasmer-middlewares",
@@ -4511,6 +4560,12 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
+name = "lazycell"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "leb128"
@@ -5713,6 +5768,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "prettyplease"
+version = "0.2.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f12335488a2f3b0a83b14edad48dca9879ce89b2edd10e80237e4e852dd645e"
+dependencies = [
+ "proc-macro2",
+ "syn 2.0.66",
+]
+
+[[package]]
 name = "proc-macro-crate"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6512,6 +6577,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "719b953e2095829ee67db738b3bfa9fa368c94900df327b3f07fe6e794d2fe1f"
 
 [[package]]
+name = "rustc-hash"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
+
+[[package]]
 name = "rustc_version"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7112,6 +7183,12 @@ dependencies = [
  "bytes",
  "memmap2 0.6.2",
 ]
+
+[[package]]
+name = "shlex"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "shrinkwraprs"
@@ -8746,12 +8823,13 @@ dependencies = [
 
 [[package]]
 name = "wasmer"
-version = "4.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ce4a267a570e121c9375136adefa2c48810273907de9c6817bc19db4d6144bc"
+version = "4.3.2"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
 dependencies = [
+ "bindgen",
  "bytes",
  "cfg-if 1.0.0",
+ "cmake",
  "derivative",
  "indexmap 1.9.3",
  "js-sys",
@@ -8769,15 +8847,15 @@ dependencies = [
  "wasmer-derive",
  "wasmer-types",
  "wasmer-vm",
+ "wasmparser",
  "wat",
  "winapi 0.3.9",
 ]
 
 [[package]]
 name = "wasmer-compiler"
-version = "4.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9c23098e86ef1038155684fe50f0c1079a0e2a2e70f115b789df17e6ba98d20"
+version = "4.3.2"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
 dependencies = [
  "backtrace",
  "bytes",
@@ -8786,6 +8864,7 @@ dependencies = [
  "enumset",
  "lazy_static",
  "leb128",
+ "libc",
  "memmap2 0.5.10",
  "more-asserts",
  "region",
@@ -8803,9 +8882,8 @@ dependencies = [
 
 [[package]]
 name = "wasmer-compiler-cranelift"
-version = "4.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95287b79973ad5f485215733ef9f0d4bb951a6b7e655585d2bd3d4a4ba1253c9"
+version = "4.3.2"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -8844,9 +8922,8 @@ dependencies = [
 
 [[package]]
 name = "wasmer-derive"
-version = "4.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e48f36aeeecb655f15fdd358bdf6e4cec27df181468fa4226084157e8462bd5e"
+version = "4.3.2"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -8856,9 +8933,8 @@ dependencies = [
 
 [[package]]
 name = "wasmer-middlewares"
-version = "4.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "667dbe64667a478fd5726111180dd757113f3589a589f831bfe4ae1a256ae77e"
+version = "4.3.2"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
 dependencies = [
  "wasmer",
  "wasmer-types",
@@ -8867,9 +8943,8 @@ dependencies = [
 
 [[package]]
 name = "wasmer-types"
-version = "4.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83cb97b6b20084757a2a8d548dc0d4179c3fe9e2d711740423a1e6aa3f8b9091"
+version = "4.3.2"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
 dependencies = [
  "bytecheck",
  "enum-iterator",
@@ -8888,9 +8963,8 @@ dependencies = [
 
 [[package]]
 name = "wasmer-vm"
-version = "4.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc1e19d986844b17b927ec8b0c7f3da6a7a2c2cb3b0f8ca5d4cb1a1f71bfb124"
+version = "4.3.2"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
 dependencies = [
  "backtrace",
  "cc",
@@ -9008,6 +9082,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c452ad30530b54a4d8e71952716a212b08efd0f3562baa66c29a618b07da7c3"
 dependencies = [
  "rustls-pki-types",
+]
+
+[[package]]
+name = "which"
+version = "4.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87ba24419a2078cd2b0f2ede2691b6c66d8e47836da3b6db8265ebad47afbfc7"
+dependencies = [
+ "either",
+ "home",
+ "once_cell",
+ "rustix 0.38.34",
 ]
 
 [[package]]

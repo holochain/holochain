@@ -40,7 +40,7 @@ holochain_serialized_bytes = "=0.0.55"
 holochain_state = { version = "^0.4.0-dev.8", path = "../holochain_state" }
 holochain_types = { version = "^0.4.0-dev.8", path = "../holochain_types" }
 holochain_util = { version = "^0.4.0-dev.1", path = "../holochain_util" }
-holochain_wasmer_host = "=0.0.95"
+holochain_wasmer_host = { git = "https://github.com/mattyg/holochain-wasmer.git", branch = "feat/wasmer-wamr-integration", package = "holochain_wasmer_host", default-features = false, features = ["error_as_host"] }
 holochain_websocket = { version = "^0.4.0-dev.8", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.4.0-dev.7", path = "../holochain_zome_types", features = [
   "full",
@@ -90,8 +90,8 @@ url2 = "0.0.6"
 uuid = { version = "1.8", features = ["serde", "v4"] }
 holochain_wasm_test_utils = { version = "^0.4.0-dev.8", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
-wasmer = "=4.3.1"
-wasmer-middlewares = "=4.3.1"
+wasmer = { git = "https://github.com/wasmerio/wasmer.git", branch = "wamr", package = "wasmer", default-features = false }
+wasmer-middlewares = { git = "https://github.com/wasmerio/wasmer.git", branch = "wamr", package = "wasmer-middlewares", optional = true }
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
 # Dependencies for test_utils
@@ -180,7 +180,7 @@ path = "src/bin/holochain/main.rs"
 workspace = true
 
 [features]
-default = ["sqlite-encrypted", "tx2", "tx5", "metrics_influxive"]
+default = ["sqlite-encrypted", "tx2", "tx5", "metrics_influxive", "wasmer_sys"]
 
 tx2 = ["kitsune_p2p/tx2"]
 tx5 = ["kitsune_p2p/tx5", "tx5-go-pion-turn"]
@@ -267,6 +267,14 @@ sqlite = [
 
 # Extremely verbose wasm memory read/write logging
 wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
+
+# Enable wasm compiler
+# Incompatible with "wasmer_wamr"
+wasmer_sys = ["wasmer-middlewares", "wasmer/default", "holochain_wasmer_host/wasmer_sys"]
+
+# Enable wasm interpreter
+# Incompatible with "wasmer_sys"
+wasmer_wamr = ["wasmer/wamr", "holochain_wasmer_host/wasmer_wamr"]
 
 # Enable chain head coordination
 chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_types/chc"]
