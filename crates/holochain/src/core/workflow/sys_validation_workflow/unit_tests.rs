@@ -282,6 +282,7 @@ struct TestCase {
     agent: AgentPubKey,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     app_validation_trigger: (TriggerSender, TriggerReceiver),
+    publish_trigger: (TriggerSender, TriggerReceiver),
     self_trigger: (TriggerSender, TriggerReceiver),
     actual_network: Option<MockHolochainP2pDnaT>,
 }
@@ -304,6 +305,7 @@ impl TestCase {
             agent,
             current_validation_dependencies: Arc::new(Mutex::new(Default::default())),
             app_validation_trigger: TriggerSender::new(),
+            publish_trigger: TriggerSender::new(),
             self_trigger: TriggerSender::new(),
             actual_network: None,
         }
@@ -378,6 +380,7 @@ impl TestCase {
             Arc::new(workspace),
             self.current_validation_dependencies.clone(),
             self.app_validation_trigger.0.clone(),
+            self.publish_trigger.0.clone(),
             self.self_trigger.0.clone(),
             actual_network,
             config,

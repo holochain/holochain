@@ -929,7 +929,7 @@ mod tests {
 
         db.test_read(move |txn| {
             let warrants = Txn::from(&txn)
-                .get_warrants_for_basis(&action_author.into())
+                .get_warrants_for_basis(&action_author.into(), false)
                 .unwrap();
             assert_eq!(warrants, vec![warrant1, warrant2]);
         });
