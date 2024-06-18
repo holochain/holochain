@@ -1224,8 +1224,7 @@ impl HashableContent for ChainOpUniqueForm<'_> {
                 holochain_serialized_bytes::encode(self)
                     .expect("Could not serialize HashableContent"),
             )
-            .try_into()
-            .unwrap(),
+            .into(),
         )
     }
 }
