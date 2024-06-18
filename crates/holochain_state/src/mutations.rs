@@ -186,7 +186,7 @@ pub fn insert_op_lite(
             })?;
         }
         DhtOpLite::Warrant(op) => {
-            let warrant_hash = op.to_hash();
+            let warrant_hash = op.warrant().to_hash();
             sql_insert!(txn, DhtOp, {
                 "hash": hash,
                 "type": op_lite.get_type(),
