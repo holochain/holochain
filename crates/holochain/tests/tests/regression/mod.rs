@@ -187,7 +187,7 @@ async fn zero_arc_can_link_to_uncached_base() {
     println!("@!@!@ action_hash: {action_hash:?}");
 
     // Bob is linking to Alice's action hash, but doesn't have it locally
-    // so the must_get_valid_record in validation will have to do a network get.
+    // so the must_get_entry/must_get_action in validation will have to do a network get.
     let link_hash: ActionHash = conductors[1]
         .call(
             &bob.zome(TestWasm::Link.coordinator_zome_name()),
@@ -210,7 +210,7 @@ async fn zero_arc_can_link_to_uncached_base() {
     println!("@!@!@ action_hash: {action_hash:?}");
 
     // Bob is linking to Alice's action hash, but doesn't have it locally
-    // so the must_get_valid_record in validation will have to do a network get.
+    // so the must_get_agent_activity in validation will have to do a network get.
     let link_hash: ActionHash = conductors[1]
         .call(
             &bob.zome(TestWasm::Link.coordinator_zome_name()),
