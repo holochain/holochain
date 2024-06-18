@@ -908,7 +908,9 @@ async fn sys_validate_record_inner(
             let previous_action = deps
                 .get(previous_action_hash)
                 .and_then(|s| s.as_action())
-                .expect("previous action must have been fetched in preceding call");
+                .ok_or_else(|| {
+                    ValidationOutcome::DepMissingFromDht(previous_action_hash.clone().into())
+                })?;
             check_agent_validity(action.author(), &previous_action)?;
         }
 
