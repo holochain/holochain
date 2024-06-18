@@ -277,6 +277,7 @@ where
                 &ribosome,
                 &conductor_handle,
                 validation_dependencies.clone(),
+                true, // is_inline
             )
             .await;
             let outcome = outcome.or_else(Outcome::try_from);

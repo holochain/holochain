@@ -26,17 +26,35 @@ pub fn must_get_valid_record<'a>(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
-                let cascade = match call_context.host_context {
-                    HostContext::Validate(_) => {
-                        CascadeImpl::from_workspace_stores(workspace.stores(), None)
+                use crate::core::ribosome::ValidateHostAccess;
+                let (cascade, opt) = match call_context.host_context {
+                    HostContext::Validate(ValidateHostAccess { is_inline, .. }) => {
+
+                        if is_inline {
+                            (
+                                CascadeImpl::from_workspace_and_network(
+                                    &workspace,
+                                    call_context.host_context.network().clone(),
+                                ),
+                                GetOptions::network(),
+                            )
+                        } else {
+                            (
+                                CascadeImpl::from_workspace_stores(workspace.stores(), None),
+                                GetOptions::local(),
+                            )
+                        }
                     }
-                    _ => CascadeImpl::from_workspace_and_network(
-                        &workspace,
-                        call_context.host_context.network().clone(),
+                    _ => (
+                        CascadeImpl::from_workspace_and_network(
+                            &workspace,
+                            call_context.host_context.network().clone(),
+                        ),
+                        GetOptions::local(),
                     ),
                 };
                 match cascade
-                    .get_record_details(action_hash.clone(), GetOptions::local())
+                    .get_record_details(action_hash.clone(), opt)
                     .await
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
