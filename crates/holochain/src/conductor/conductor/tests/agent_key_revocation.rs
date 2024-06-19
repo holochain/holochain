@@ -505,6 +505,8 @@ mod multi_conductor {
         let bob_app = apps.next().unwrap();
         let alice = alice_app.agent().clone();
         let bob = bob_app.agent().clone();
+        let alice_cell = alice_app.into_cells().into_iter().next().unwrap();
+        let bob_cell = bob_app.into_cells().into_iter().next().unwrap();
 
         // Await Dpki consistency of Alice's and Bob's conductors.
         await_consistency(
@@ -517,46 +519,19 @@ mod multi_conductor {
         .await
         .unwrap();
 
+        // Await app cell consistency
+        await_consistency(60, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
+
         // Alice's key should be valid on Alice's conductor.
-        {
-            let dpki = conductors[0].running_services().dpki.unwrap();
-            let dpki_state = dpki.state().await;
-            let key_state = dpki_state
-                .key_state(alice.clone(), Timestamp::now())
-                .await
-                .unwrap();
-            assert_matches!(key_state, KeyState::Valid(_));
-        }
+        assert_key_valid_in_dpki(&conductors[0], alice.clone()).await;
         // Bob's key should be valid on Alice's conductor.
-        {
-            let dpki = conductors[0].running_services().dpki.unwrap();
-            let dpki_state = dpki.state().await;
-            let key_state = dpki_state
-                .key_state(bob.clone(), Timestamp::now())
-                .await
-                .unwrap();
-            assert_matches!(key_state, KeyState::Valid(_));
-        }
+        assert_key_valid_in_dpki(&conductors[0], bob.clone()).await;
         // Alice's key should be valid on Bob's conductor.
-        {
-            let dpki = conductors[1].running_services().dpki.unwrap();
-            let dpki_state = dpki.state().await;
-            let key_state = dpki_state
-                .key_state(alice.clone(), Timestamp::now())
-                .await
-                .unwrap();
-            assert_matches!(key_state, KeyState::Valid(_));
-        }
+        assert_key_valid_in_dpki(&conductors[1], alice.clone()).await;
         // Bob's key should be valid on Bob's conductor.
-        {
-            let dpki = conductors[1].running_services().dpki.unwrap();
-            let dpki_state = dpki.state().await;
-            let key_state = dpki_state
-                .key_state(bob.clone(), Timestamp::now())
-                .await
-                .unwrap();
-            assert_matches!(key_state, KeyState::Valid(_));
-        }
+        assert_key_valid_in_dpki(&conductors[1], bob.clone()).await;
 
         // Revoke Alice's key
         {
@@ -614,6 +589,27 @@ mod multi_conductor {
                 .unwrap();
             assert_matches!(key_state, KeyState::Invalid(_));
         }
+
+        // Delete Alice's key on the source chain
+        let mut alice_source_chain = conductors[0]
+            .get_agent_source_chain(&alice, dna_file.dna_hash())
+            .await;
+        delete_agent_key_from_source_chain(
+            &conductors[0],
+            &mut alice_source_chain,
+            alice_cell.cell_id(),
+        )
+        .await;
+
+        // Await app cell consistency.
+        await_consistency(60, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
+
+        // Check Alice's agent key `Delete` has been accepted by Alice's validation.
+        assert_delete_agent_key_accepted_by_validation(&alice, &conductors[0], dna_file.dna_hash());
+        // Check Alice's agent key `Delete` has been accepted by Bob's validation.
+        assert_delete_agent_key_accepted_by_validation(&alice, &conductors[1], dna_file.dna_hash());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -675,42 +671,15 @@ mod multi_conductor {
         .unwrap();
 
         // Delete agent key of cell 1 of the app and publish and integrate ops
-        let alice_source_chain_1 = SourceChain::new(
-            conductors[0]
-                .get_or_create_authored_db(alice_cell_1.dna_hash(), alice.clone())
-                .unwrap(),
-            conductors[0].get_dht_db(alice_cell_1.dna_hash()).unwrap(),
-            conductors[0]
-                .get_dht_db_cache(alice_cell_1.dna_hash())
-                .unwrap(),
-            conductors[0].keystore().clone(),
-            alice.clone(),
+        let mut alice_source_chain_1 = conductors[0]
+            .get_agent_source_chain(&alice, dna_file_1.dna_hash())
+            .await;
+        delete_agent_key_from_source_chain(
+            &conductors[0],
+            &mut alice_source_chain_1,
+            alice_cell_1.cell_id(),
         )
-        .await
-        .unwrap();
-        alice_source_chain_1
-            .delete_valid_agent_pub_key()
-            .await
-            .unwrap();
-        alice_source_chain_1
-            .flush(&conductors[0].holochain_p2p().to_dna(
-                alice_cell_1.dna_hash().clone(),
-                conductors[0].get_chc(alice_cell_1.cell_id()),
-            ))
-            .await
-            .unwrap();
-        conductors[0]
-            .get_cell_triggers(alice_cell_1.cell_id())
-            .await
-            .unwrap()
-            .publish_dht_ops
-            .trigger(&"key deletion");
-        conductors[0]
-            .get_cell_triggers(alice_cell_1.cell_id())
-            .await
-            .unwrap()
-            .integrate_dht_ops
-            .trigger(&"key deletion");
+        .await;
 
         // Check agent key is invalid in cell 1
         let invalid_agent_key_error = alice_source_chain_1
@@ -724,6 +693,19 @@ mod multi_conductor {
             .await
             .unwrap();
 
+        // Check Alice's agent key `Delete` in cell 1 has been accepted by Alice's validation.
+        assert_delete_agent_key_accepted_by_validation(
+            &alice,
+            &conductors[0],
+            dna_file_1.dna_hash(),
+        );
+        // Check Alice's agent key `Delete` in cell 1 has been accepted by Bob's validation.
+        assert_delete_agent_key_accepted_by_validation(
+            &alice,
+            &conductors[1],
+            dna_file_1.dna_hash(),
+        );
+
         // Calling key revocation should succeed and return an error result for cell 1
         let revocation_result_per_cell = conductors[0]
             .clone()
@@ -736,6 +718,19 @@ mod multi_conductor {
         await_consistency(20, [alice_cell_2, bob_cell_2])
             .await
             .unwrap();
+
+        // Check Alice's agent key `Delete` in cell 2 has been accepted by Alice's validation.
+        assert_delete_agent_key_accepted_by_validation(
+            &alice,
+            &conductors[0],
+            dna_file_2.dna_hash(),
+        );
+        // Check Alice's agent key `Delete` in cell 2 has been accepted by Bob's validation.
+        assert_delete_agent_key_accepted_by_validation(
+            &alice,
+            &conductors[1],
+            dna_file_2.dna_hash(),
+        );
     }
 }
 
@@ -839,6 +834,16 @@ fn assert_delete_agent_key_present_in_source_chain(
         .test_read(move |txn| txn.query_row(sql, [], row_fn).unwrap());
 }
 
+async fn assert_key_valid_in_dpki(conductor: &SweetConductor, agent_key: AgentPubKey) {
+    let dpki = conductor.running_services().dpki.unwrap();
+    let dpki_state = dpki.state().await;
+    let key_state = dpki_state
+        .key_state(agent_key, Timestamp::now())
+        .await
+        .unwrap();
+    assert_matches!(key_state, KeyState::Valid(_));
+}
+
 fn assert_error_due_to_invalid_dpki_agent_key(error: ConductorApiError, agent_key: AgentPubKey) {
     if let ConductorApiError::CellError(CellError::WorkflowError(workflow_error)) = error {
         assert_matches!(
@@ -905,4 +910,61 @@ async fn revoke_agent_key_in_dpki(conductor: &SweetConductor, agent_key: AgentPu
         }
         _state => panic!("key must be valid but is {_state:?}"),
     }
+}
+
+async fn delete_agent_key_from_source_chain(
+    conductor: &SweetConductor,
+    source_chain: &mut SourceChain,
+    cell_id: &CellId,
+) {
+    source_chain.delete_valid_agent_pub_key().await.unwrap();
+    source_chain
+        .flush(
+            &conductor
+                .holochain_p2p()
+                .to_dna(cell_id.dna_hash().clone(), conductor.get_chc(cell_id)),
+        )
+        .await
+        .unwrap();
+    conductor
+        .get_cell_triggers(cell_id)
+        .await
+        .unwrap()
+        .publish_dht_ops
+        .trigger(&"key deletion");
+    conductor
+        .get_cell_triggers(cell_id)
+        .await
+        .unwrap()
+        .integrate_dht_ops
+        .trigger(&"key deletion");
+}
+
+fn assert_delete_agent_key_accepted_by_validation(
+    agent_key: &AgentPubKey,
+    conductor: &SweetConductor,
+    dna_hash: &DnaHash,
+) {
+    let sql = "\
+        SELECT Action.author, Action.type, Action.deletes_entry_hash
+        FROM Action
+        JOIN DhtOp On DhtOp.action_hash = Action.hash
+        WHERE DhtOp.validation_status = 0
+        AND Action.deletes_entry_hash IS NOT NULL
+        ORDER BY seq DESC";
+    conductor.get_dht_db(dna_hash).unwrap().test_read({
+        let agent_key = agent_key.clone();
+        move |txn| {
+            let mut stmt = txn.prepare(sql).unwrap();
+            let mut rows = stmt.query([]).unwrap();
+            while let Some(row) = rows.next().unwrap() {
+                let author = row.get::<_, AgentPubKey>("author").unwrap();
+                let action_type = row.get::<_, String>("type").unwrap();
+                let deletes_entry_hash = row.get::<_, EntryHash>("deletes_entry_hash").unwrap();
+                assert_eq!(author, agent_key.clone());
+                assert_eq!(action_type, ActionType::Delete.to_string());
+                assert_eq!(deletes_entry_hash, agent_key.clone().into());
+            }
+        }
+    });
 }
