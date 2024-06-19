@@ -546,9 +546,10 @@ pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMut
             let action_hash = Some(action.0.clone());
             let exists = txn
                 .prepare_cached(
-                    "SELECT 1 FROM Action WHERE base_hash = :base_hash AND prev_hash = :prev_hash",
+                    "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash = :prev_hash",
                 )?
                 .exists(named_params! {
+                    ":type": WarrantType::ChainIntegrityWarrant,                    
                     ":base_hash": basis,
                     ":prev_hash": action_hash,
                 })?;
@@ -557,9 +558,10 @@ pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMut
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. }) => {
             let exists = txn
                 .prepare_cached(
-                    "SELECT 1 FROM Action WHERE base_hash = :base_hash AND prev_hash IS NULL",
+                    "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash IS NULL",
                 )?
                 .exists(named_params! {
+                    ":type": WarrantType::ChainIntegrityWarrant,
                     ":base_hash": basis
                 })?;
             (exists, None)
