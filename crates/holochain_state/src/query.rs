@@ -354,7 +354,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         check_valid: bool,
     ) -> StateQueryResult<Vec<Warrant>> {
         let sql = if check_valid {
-            "            
+            "
             SELECT
             Action.blob
             FROM Action
@@ -364,7 +364,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
             AND DhtOp.validation_status = :status
             "
         } else {
-            "            
+            "
             SELECT
             Action.blob
             FROM Action

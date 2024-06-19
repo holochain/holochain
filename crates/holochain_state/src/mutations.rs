@@ -556,7 +556,9 @@ pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMut
         }
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. }) => {
             let exists = txn
-                .prepare_cached("SELECT 1 FROM Action WHERE base_hash = :base_hash")?
+                .prepare_cached(
+                    "SELECT 1 FROM Action WHERE base_hash = :base_hash AND prev_hash IS NULL",
+                )?
                 .exists(named_params! {
                     ":base_hash": basis
                 })?;
@@ -916,8 +918,7 @@ mod tests {
 
     #[test]
     fn can_write_and_read_warrants() {
-        let dir = tempfile::tempdir().unwrap().into_path();
-        println!("dir: {:?}", dir);
+        let dir = tempfile::tempdir().unwrap();
 
         let cell_id = Arc::new(fixt!(CellId));
 
