@@ -33,7 +33,7 @@ impl WarrantOp {
     }
 
     /// Sign the warrant for use as an Op
-    pub async fn author(keystore: &MetaLairClient, warrant: Warrant) -> LairResult<Self> {
+    pub async fn sign(keystore: &MetaLairClient, warrant: Warrant) -> LairResult<Self> {
         let signature = warrant.author.sign(keystore, warrant.clone()).await?;
         Ok(Self::from(SignedWarrant::new(warrant, signature)))
     }

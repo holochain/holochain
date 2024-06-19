@@ -1394,7 +1394,7 @@ pub async fn make_invalid_chain_warrant_op_inner(
         validation_type,
     });
     let warrant = Warrant::new(proof, warrant_author, Timestamp::now());
-    let warrant_op = WarrantOp::author(keystore, warrant)
+    let warrant_op = WarrantOp::sign(keystore, warrant)
         .await
         .map_err(|e| super::WorkflowError::Other(e.into()))?;
     let op: DhtOp = warrant_op.into();
@@ -1423,7 +1423,7 @@ pub async fn make_fork_warrant_op_inner(
         warrant_author,
         Timestamp::now(),
     );
-    let warrant_op = WarrantOp::author(keystore, warrant)
+    let warrant_op = WarrantOp::sign(keystore, warrant)
         .await
         .map_err(|e| super::WorkflowError::Other(e.into()))?;
     let op: DhtOp = warrant_op.into();

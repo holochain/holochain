@@ -7,7 +7,7 @@ use kitsune_p2p_timestamp::Timestamp;
 
 use crate::signature::Signed;
 
-/// A "sticky" warrant with author
+/// A Warrant is an authored, timestamped proof of wrongdoing by another agent.
 #[derive(
     Clone,
     Debug,
@@ -30,7 +30,7 @@ pub struct Warrant {
     pub proof: WarrantProof,
     /// The author of the warrant
     pub author: AgentPubKey,
-    /// time when the warrant was issued
+    /// Time when the warrant was issued
     pub timestamp: Timestamp,
 }
 
