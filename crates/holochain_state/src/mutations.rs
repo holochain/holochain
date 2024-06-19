@@ -536,13 +536,24 @@ pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMut
     let hash = warrant.to_hash();
     let author = &warrant.author;
 
-    Ok(sql_insert!(txn, Action, {
-        "hash": hash,
-        "type": warrant_type,
-        "author": author,
-        "base_hash": warrant.dht_basis(),
-        "blob": to_blob(&warrant)?,
-    })?)
+    // Don't produce a warrant if one, of any kind, already exists
+    let basis = warrant.dht_basis();
+    let sql = "SELECT 1 FROM Action WHERE base_hash = :base_hash";
+    let exists = txn.prepare_cached(&sql)?.exists(named_params! {
+        ":base_hash": basis
+    })?;
+
+    Ok(if !exists {
+        sql_insert!(txn, Action, {
+            "hash": hash,
+            "type": warrant_type,
+            "author": author,
+            "base_hash": warrant.dht_basis(),
+            "blob": to_blob(&warrant)?,
+        })?
+    } else {
+        0
+    })
 }
 
 /// Insert a [`Action`] into the database.

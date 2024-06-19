@@ -1053,6 +1053,7 @@ async fn app_validation_produces_warrants() {
         let warrants = store
             .get_warrants_for_basis(&alice_pubkey.into(), false)
             .unwrap();
+        // 3 warrants, one for each op
         assert_eq!(warrants.len(), 1);
     });
 
@@ -1087,6 +1088,7 @@ async fn app_validation_produces_warrants() {
         )
         .await;
 
+    // 1 warrant, even though there are 3 ops
     assert_eq!(activity.warrants.len(), 1);
     match &activity.warrants.first().unwrap().proof {
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {

@@ -25,7 +25,7 @@ use crate::signature::Signed;
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary,)
 )]
 pub struct Warrant {
-    /// The warrant data
+    /// The self-proving part of the warrant containing evidence of bad behavior
     #[deref]
     pub proof: WarrantProof,
     /// The author of the warrant
