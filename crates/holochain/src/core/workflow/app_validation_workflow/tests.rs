@@ -1088,7 +1088,7 @@ async fn app_validation_produces_warrants() {
         )
         .await;
 
-    // 1 warrant, even though there are 3 ops
+    // 1 warrant, even though there are 3 ops, because we de-dupe
     assert_eq!(activity.warrants.len(), 1);
     match &activity.warrants.first().unwrap().proof {
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {

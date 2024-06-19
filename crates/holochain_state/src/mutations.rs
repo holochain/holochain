@@ -538,17 +538,39 @@ pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMut
 
     // Don't produce a warrant if one, of any kind, already exists
     let basis = warrant.dht_basis();
-    let sql = "SELECT 1 FROM Action WHERE base_hash = :base_hash";
-    let exists = txn.prepare_cached(&sql)?.exists(named_params! {
-        ":base_hash": basis
-    })?;
+
+    // XXX: this is a terrible misuse of databases. When putting a Warrant in the Action table,
+    //      if it's an InvalidChainOp warrant, we store the action hash in the prev_hash field.
+    let (exists, action_hash) = match &warrant.proof {
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp { action, .. }) => {
+            let action_hash = Some(action.0.clone());
+            let exists = txn
+                .prepare_cached(
+                    "SELECT 1 FROM Action WHERE base_hash = :base_hash AND prev_hash = :prev_hash",
+                )?
+                .exists(named_params! {
+                    ":base_hash": basis,
+                    ":prev_hash": action_hash,
+                })?;
+            (exists, action_hash)
+        }
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. }) => {
+            let exists = txn
+                .prepare_cached("SELECT 1 FROM Action WHERE base_hash = :base_hash")?
+                .exists(named_params! {
+                    ":base_hash": basis
+                })?;
+            (exists, None)
+        }
+    };
 
     Ok(if !exists {
         sql_insert!(txn, Action, {
             "hash": hash,
             "type": warrant_type,
             "author": author,
-            "base_hash": warrant.dht_basis(),
+            "base_hash": basis,
+            "prev_hash": action_hash,
             "blob": to_blob(&warrant)?,
         })?
     } else {
