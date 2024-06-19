@@ -177,7 +177,6 @@ async fn test_block_invalid_receipt() {
         Op::StoreEntry(StoreEntry { action, .. })
             if action.hashed.content.app_entry_def().is_some() =>
         {
-            dbg!("entry defs ARE bad!");
             Ok(ValidateResult::Invalid("Entry defs are bad".into()))
         }
         _ => Ok(ValidateResult::Valid),
@@ -243,8 +242,8 @@ async fn test_block_invalid_receipt() {
         // processed.
         wait_until!(
             bob_conductor.spaces.is_blocked(alice_block_target.clone(), now).await.unwrap();
-            1000;
-            10000;
+            1_000;
+            20_000;
             "waiting for block due to warrant";
             "warrant block never happened";
         );

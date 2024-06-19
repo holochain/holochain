@@ -573,8 +573,9 @@ async fn test_gossip_startup() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_recent() {
-    holochain_trace::test_run();
     // hc_sleuth::init_subscriber();
+    holochain_trace::test_run();
+
     let config = TestConfig {
         publish: false,
         recent: true,
@@ -590,8 +591,9 @@ async fn three_way_gossip_recent() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_historical() {
-    holochain_trace::test_run();
     // hc_sleuth::init_subscriber();
+    holochain_trace::test_run();
+
     let config = TestConfig {
         publish: false,
         recent: false,

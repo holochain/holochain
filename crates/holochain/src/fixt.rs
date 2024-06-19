@@ -478,7 +478,7 @@ fixturator!(
 
 fixturator!(
     ValidateHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pDna);
+    constructor fn new(HostFnWorkspace, HolochainP2pDna, bool);
 );
 
 fixturator!(

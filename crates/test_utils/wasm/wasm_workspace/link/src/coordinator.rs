@@ -1,4 +1,4 @@
-use crate::integrity::LinkTypes;
+use crate::integrity::*;
 use hdk::prelude::*;
 
 #[hdk_dependent_link_types]
@@ -293,4 +293,39 @@ fn get_links_from_network(_: ()) -> ExternResult<Vec<Link>> {
         .get_options(GetStrategy::Network)
         .build();
     hdk::prelude::get_links(get_links_input)
+}
+
+#[hdk_extern]
+fn test_entry_create() -> ExternResult<ActionHash> {
+    create_entry(&EntryTypes::Test(Test))
+}
+
+#[hdk_extern]
+fn link_validation_calls_must_get_valid_record(input: (ActionHash, AgentPubKey)) -> ExternResult<ActionHash> {
+    hdk::prelude::create_link(
+        input.0,
+        input.1,
+        LinkTypes::LinkValidationCallsMustGetValidRecord,
+        (),
+    )
+}
+
+#[hdk_extern]
+fn link_validation_calls_must_get_action_then_entry(input: (ActionHash, AgentPubKey)) -> ExternResult<ActionHash> {
+    hdk::prelude::create_link(
+        input.0,
+        input.1,
+        LinkTypes::LinkValidationCallsMustGetActionThenEntry,
+        (),
+    )
+}
+
+#[hdk_extern]
+fn link_validation_calls_must_get_agent_activity(input: (ActionHash, AgentPubKey)) -> ExternResult<ActionHash> {
+    hdk::prelude::create_link(
+        input.0,
+        input.1,
+        LinkTypes::LinkValidationCallsMustGetAgentActivity,
+        (),
+    )
 }

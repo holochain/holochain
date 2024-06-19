@@ -35,8 +35,8 @@ macro_rules! wait_for_1m {
 
 #[macro_export]
 macro_rules! assert_retry {
-    ($wait:expr, $test:expr, $check:expr $(, $reason:literal)?) => {
-        $crate::wait_for!($wait, $test, $check, |x| assert!(x $(, $reason)?))
+    ($wait:expr, $test:expr $(, $reason:literal)?) => {
+        $crate::wait_for!($wait, $test, |x: &bool| *x, |x: bool| assert!(x $(, $reason)?))
     };
 }
 
@@ -49,9 +49,9 @@ macro_rules! assert_eq_retry {
 
 #[macro_export]
 macro_rules! assert_retry_10s {
-    ($test:expr, $check:expr $(, $reason:literal)? $(,)?) => {
+    ($test:expr $(, $reason:literal)? $(,)?) => {
         let wait_for = $crate::test_utils::WaitFor::ten_s();
-        $crate::assert_retry!(wait_for, $test, $check  $(, $reason:literal)?)
+        $crate::assert_retry!(wait_for, $test  $(, $reason:literal)?)
     };
 }
 
@@ -65,9 +65,9 @@ macro_rules! assert_eq_retry_10s {
 
 #[macro_export]
 macro_rules! assert_retry_1m {
-    ($test:expr, $check:expr $(, $reason:literal)? $(,)?) => {
+    ($test:expr $(, $reason:literal)? $(,)?) => {
         let wait_for = $crate::test_utils::WaitFor::one_m();
-        $crate::assert_retry!(wait_for, $test, $check  $(, $reason:literal)?)
+        $crate::assert_retry!(wait_for, $test $(, $reason:literal)?)
     };
 }
 

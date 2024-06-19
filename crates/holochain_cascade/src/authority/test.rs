@@ -194,7 +194,7 @@ async fn get_agent_activity() {
     use holochain_state::mutations::*;
 
     holochain_trace::test_run();
-    let mut db = test_dht_db();
+    let db = test_dht_db();
 
     let td = ActivityTestData::valid_chain_scenario();
 
@@ -252,8 +252,6 @@ async fn get_agent_activity() {
         .await
         .unwrap();
     }
-
-    db.persist();
 
     let options = actor::GetActivityOptions {
         include_valid_activity: true,

@@ -38,7 +38,7 @@ async fn validate_with_dpki() {
     let mut conductors = SweetConductorBatch::new(vec![
         SweetConductor::from_config_rendezvous(config.clone(), rendezvous.clone()).await,
         SweetConductor::from_config_rendezvous(config.clone(), rendezvous.clone()).await,
-        SweetConductor::from_config_rendezvous(standard_config(), rendezvous.clone()).await,
+        SweetConductor::from_config_rendezvous(config.clone().no_dpki(), rendezvous.clone()).await,
     ]);
 
     let (app_dna_file, _, _) =
@@ -82,13 +82,28 @@ async fn validate_with_dpki() {
 
     conductors.exchange_peer_info().await;
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    conductors.persist_dbs();
+
+    println!("--------------------------------------------");
+    println!("AGENTS:");
+    println!("alice: {:?}", alice.agent_pubkey());
+    println!("bob:   {:?}", bob.agent_pubkey());
+    println!("carol: {:?}", carol.agent_pubkey());
+    println!("--------------------------------------------");
+
+    await_consistency(30, &conductors.dpki_cells()[0..=1])
+        .await
+        .unwrap();
+    await_consistency(30, [&alice, &bob]).await.unwrap();
 
     let hash: ActionHash = conductors[0]
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    await_consistency(60, [&alice, &bob]).await.unwrap();
+    await_consistency(30, &conductors.dpki_cells()[0..=1])
+        .await
+        .unwrap();
+    await_consistency(30, [&alice, &bob]).await.unwrap();
 
     // Both see each other in DPKI
     assert!(matches!(

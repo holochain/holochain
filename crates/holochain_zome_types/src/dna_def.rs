@@ -103,7 +103,7 @@ impl DnaDef {
             .map(|(name, def)| IntegrityZome::new(name, def))
             .ok_or_else(|| {
                 tracing::error!(
-                    "ZomeNotFound: {zome_name}. Existing zomes: integrity={:?}, coordinator={:?}",
+                    "ZomeNotFound: {zome_name}. (get_integrity_zome) Existing zomes: integrity={:?}, coordinator={:?}",
                     self.integrity_zomes,
                     self.coordinator_zomes,
                 );
@@ -128,7 +128,7 @@ impl DnaDef {
             .map(|(name, def)| CoordinatorZome::new(name, def))
             .ok_or_else(|| {
                 tracing::error!(
-                    "ZomeNotFound: {zome_name}. Existing zomes: integrity={:?}, coordinator={:?}",
+                    "ZomeNotFound: {zome_name}. (get_coordinator_zome) Existing zomes: integrity={:?}, coordinator={:?}",
                     self.integrity_zomes,
                     self.coordinator_zomes,
                 );
@@ -152,7 +152,7 @@ impl DnaDef {
             })
             .ok_or_else(|| {
                 tracing::error!(
-                    "ZomeNotFound: {zome_name}. Existing zomes: integrity={:?}, coordinator={:?}",
+                    "ZomeNotFound: {zome_name}. (get_zome) Existing zomes: integrity={:?}, coordinator={:?}",
                     self.integrity_zomes,
                     self.coordinator_zomes,
                 );
@@ -176,7 +176,7 @@ impl DnaDef {
             .map(|(_, def)| def)
             .ok_or_else(|| {
                 tracing::error!(
-                    "ZomeNotFound: {zome_name}. Existing zomes: integrity={:?}, coordinator={:?}",
+                    "ZomeNotFound: {zome_name}. (get_wasm_zome) Existing zomes: integrity={:?}, coordinator={:?}",
                     self.integrity_zomes,
                     self.coordinator_zomes,
                 );
@@ -198,7 +198,7 @@ impl DnaDef {
             .map(|(_, def)| def)
             .ok_or_else(|| {
                 tracing::error!(
-                    "ZomeNotFound: {zome_name}. Existing zomes: integrity={:?}, coordinator={:?}",
+                    "ZomeNotFound: {zome_name}. (get_wasm_zome_hash) Existing zomes: integrity={:?}, coordinator={:?}",
                     self.integrity_zomes,
                     self.coordinator_zomes,
                 );

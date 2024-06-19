@@ -64,6 +64,12 @@ where
         .ribosome
         .dna_def()
         .get_coordinator_zome(args.invocation.zome.zome_name())
+        .or_else(|_| {
+            args.ribosome
+                .dna_def()
+                .get_integrity_zome(args.invocation.zome.zome_name())
+                .map(CoordinatorZome::from)
+        })
         .ok();
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
@@ -295,6 +301,7 @@ where
                 &ribosome,
                 &conductor_handle,
                 validation_dependencies.clone(),
+                true, // is_inline
             )
             .await;
             let outcome = outcome.or_else(Outcome::try_from);
