@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cascade"
-version = "0.4.0-dev.8"
+version = "0.4.0-dev.9"
 description = "Logic for cascading updates to Holochain state and network interaction"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -15,16 +15,16 @@ futures = "0.3"
 holo_hash = { version = "^0.4.0-dev.6", path = "../holo_hash", features = [
   "full",
 ] }
-holochain_sqlite = { version = "^0.4.0-dev.8", path = "../holochain_sqlite" }
-holochain_p2p = { version = "^0.4.0-dev.8", path = "../holochain_p2p" }
+holochain_sqlite = { version = "^0.4.0-dev.9", path = "../holochain_sqlite" }
+holochain_p2p = { version = "^0.4.0-dev.9", path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_state = { version = "^0.4.0-dev.8", path = "../holochain_state" }
-holochain_types = { version = "^0.4.0-dev.8", path = "../holochain_types" }
+holochain_state = { version = "^0.4.0-dev.9", path = "../holochain_state" }
+holochain_types = { version = "^0.4.0-dev.9", path = "../holochain_types" }
 holochain_trace = { version = "^0.4.0-dev.3", path = "../holochain_trace" }
 holochain_util = { version = "^0.4.0-dev.1", path = "../holochain_util" }
-holochain_zome_types = { version = "^0.4.0-dev.7", path = "../holochain_zome_types" }
+holochain_zome_types = { version = "^0.4.0-dev.8", path = "../holochain_zome_types" }
 holochain_nonce = { version = "^0.4.0-dev.4", path = "../holochain_nonce" }
-kitsune_p2p = { version = "^0.4.0-dev.8", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p = { version = "^0.4.0-dev.9", path = "../kitsune_p2p/kitsune_p2p" }
 tokio = { version = "1.36.0", features = ["full"] }
 thiserror = "1.0"
 tracing = "0.1"
