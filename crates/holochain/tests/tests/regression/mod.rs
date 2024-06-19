@@ -2,6 +2,7 @@ use holo_hash::ActionHash;
 use holochain::conductor::conductor::WASM_CACHE;
 use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::*;
+use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
@@ -129,6 +130,7 @@ async fn zero_arc_can_link_to_uncached_base() {
     network_config.tuning_params = Arc::new(tuning_params);
 
     empty_arc_conductor_config.network = network_config;
+    empty_arc_conductor_config.dpki = DpkiConfig::disabled();
 
     let mut conductors = SweetConductorBatch::from_configs(vec![
         ConductorConfig::default(),
