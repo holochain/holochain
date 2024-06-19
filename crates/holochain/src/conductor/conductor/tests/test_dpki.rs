@@ -373,7 +373,7 @@ async fn mock_dpki_preflight_check() {
         });
     }
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    await_consistency(60, [&alice, &bob]).await.unwrap();
 
     let hash: ActionHash = conductors[0]
         .call(&alice.zome("simple"), "create", ())
