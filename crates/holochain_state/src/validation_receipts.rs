@@ -1,13 +1,15 @@
 //! Module for items related to aggregating validation_receipts
 
-use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
+use holo_hash::{ActionHash, AgentPubKey};
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_types::dht_op::DhtOpType;
 use holochain_types::prelude::{SignedValidationReceipt, ValidationReceipt};
 use mutations::StateMutationResult;
+use std::collections::HashMap;
 
 use crate::mutations;
 use crate::prelude::from_blob;
@@ -91,6 +93,52 @@ pub fn get_pending_validation_receipts(
         .collect::<StateQueryResult<Vec<_>>>()?;
 
     Ok(ops)
+}
+
+pub fn validation_receipts_for_action(txn: &Transaction, action_hash: ActionHash) -> StateQueryResult<()> {
+    let mut stmt = txn.prepare(
+        "
+            SELECT
+              ValidationReceipt.blob as receipt,
+              DhtOp.hash as op_hash,
+              DhtOp.type as op_type,
+              DhtOp.receipts_complete as op_receipts_complete,
+            FROM
+              Action
+              LEFT JOIN DhtOp ON DhtOp.action_hash = Action.hash
+              LEFT JOIN ValidationReceipt ON DhtOp.hash = ValidationReceipt.op_hash
+            WHERE
+              Action.hash = :action_hash
+            ",
+    )?;
+    let iter = stmt
+        .query_and_then(
+            named_params! {
+                ":action_hash": action_hash
+            },
+            |row| {
+                let receipt = from_blob::<SignedValidationReceipt>(row.get("receipt")?);
+                let op_hash: DhtOpHash = row.get("op_hash")?;
+                let op_type: DhtOpType = row.get("op_type")?;
+                let receipts_complete: bool = row.get("op_receipts_complete")?;
+
+                Ok((receipt, op_hash, op_type, receipts_complete))
+            },
+        )?
+        .collect::<StateQueryResult<Vec<_>>>()?
+        .into_iter()
+        .fold(
+            HashMap::new(),
+            |mut acc, (receipt, op_hash, op_type, receipts_complete)| {
+                let mut entry = acc
+                    .entry(op_hash)
+                    .or_insert((op_type, receipts_complete, vec![]));
+                entry.2.push(receipt);
+                acc
+            },
+        );
+
+    Ok(())
 }
 
 #[cfg(test)]
