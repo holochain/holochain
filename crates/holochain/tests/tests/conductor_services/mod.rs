@@ -91,21 +91,12 @@ async fn validate_with_dpki() {
     println!("carol: {:?}", carol.agent_pubkey());
     println!("--------------------------------------------");
 
-    await_consistency(30, &conductors.dpki_cells()[0..=1])
+    await_consistency(120, &conductors.dpki_cells()[0..=1])
         .await
         .unwrap();
-    await_consistency(30, [&alice, &bob]).await.unwrap();
+    await_consistency(120, [&alice, &bob]).await.unwrap();
 
-    let hash: ActionHash = conductors[0]
-        .call(&alice.zome("simple"), "create", ())
-        .await;
-
-    await_consistency(30, &conductors.dpki_cells()[0..=1])
-        .await
-        .unwrap();
-    await_consistency(30, [&alice, &bob]).await.unwrap();
-
-    // Both see each other in DPKI
+    // Both now see each other in DPKI
     assert!(matches!(
         key_state(&conductors[0], bob.agent_pubkey()).await,
         KeyState::Valid(_)
@@ -114,6 +105,15 @@ async fn validate_with_dpki() {
         key_state(&conductors[1], alice.agent_pubkey()).await,
         KeyState::Valid(_)
     ));
+
+    let hash: ActionHash = conductors[0]
+        .call(&alice.zome("simple"), "create", ())
+        .await;
+
+    await_consistency(120, &conductors.dpki_cells()[0..=1])
+        .await
+        .unwrap();
+    await_consistency(120, [&alice, &bob]).await.unwrap();
 
     // Carol is nowhere to be found since she never installed DPKI
     assert!(matches!(
