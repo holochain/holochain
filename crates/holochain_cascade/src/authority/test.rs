@@ -205,31 +205,31 @@ async fn get_agent_activity() {
         fill_db(&db.to_db(), hash_op).await;
     }
 
-    let warrant_valid = Warrant::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
-        action_author: td.agent.clone(),
-        action: (fixt!(ActionHash), fixt!(Signature)),
-        validation_type: ValidationType::Sys,
-    });
-    let warrant_invalid = Warrant::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
-        action_author: td.agent.clone(),
-        action: (fixt!(ActionHash), fixt!(Signature)),
-        validation_type: ValidationType::Sys,
-    });
+    let warrant_valid = Warrant::new_now(
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+            action_author: td.agent.clone(),
+            action: (fixt!(ActionHash), fixt!(Signature)),
+            validation_type: ValidationType::Sys,
+        }),
+        fixt!(AgentPubKey),
+    );
+    let warrant_invalid = Warrant::new_now(
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+            action_author: td.agent.clone(),
+            action: (fixt!(ActionHash), fixt!(Signature)),
+            validation_type: ValidationType::Sys,
+        }),
+        fixt!(AgentPubKey),
+    );
     {
-        let warrant_op_valid = WarrantOp::new(
-            warrant_valid.clone(),
-            fixt!(AgentPubKey),
-            fixt!(Signature),
-            Timestamp::now(),
-        )
-        .into_hashed();
+        let warrant_op_valid =
+            WarrantOp::from(SignedWarrant::new(warrant_valid.clone(), fixt!(Signature)))
+                .into_hashed();
 
-        let warrant_op_invalid = WarrantOp::new(
+        let warrant_op_invalid = WarrantOp::from(SignedWarrant::new(
             warrant_invalid.clone(),
-            fixt!(AgentPubKey),
             fixt!(Signature),
-            Timestamp::now(),
-        )
+        ))
         .into_hashed();
 
         db.write_async(move |txn| {

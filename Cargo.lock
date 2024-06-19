@@ -3481,6 +3481,7 @@ dependencies = [
  "holochain_wasm_test_utils",
  "holochain_zome_types 0.4.0-dev.8",
  "kitsune_p2p",
+ "kitsune_p2p_timestamp",
  "matches",
  "nanoid",
  "one_err",
