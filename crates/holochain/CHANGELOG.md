@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Moved the WASM cache from the data directory to a subdirectory of the data directory named `wasm-cache`. Old content
   won't be removed and WASMs will have to be recompiled into the new cache. #3920
 - App manifest now includes a new `membrane_proofs_deferred: bool` field, which allows the membrane proofs for the app's cells to be provided at a time after installation, allowing the app's UI to guide the process of creating membrane proofs.
+
+## 0.4.0-dev.9
+
 - Warrants: When an authority rejects another agent's authored data, that authority creates a Warrant which is gossiped to the offending agent's Agent Activity Authority, who then serves that warrant along with any `get_agent_activity` request.
 - The `warrants` field of `AgentActivity` is now populated with warrants for that agent.
 - Authorities author ChainFork warrants when detecting two actions by the same author with the same `prev_action`

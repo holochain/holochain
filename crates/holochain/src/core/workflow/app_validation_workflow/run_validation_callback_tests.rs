@@ -116,6 +116,7 @@ async fn validation_callback_must_get_action() {
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        false, // is_inline
     )
     .await
     .unwrap();
@@ -136,6 +137,7 @@ async fn validation_callback_must_get_action() {
         workspace,
         network,
         validation_dependencies.clone(),
+        false, // is_inline
     )
     .await
     .unwrap();
@@ -228,6 +230,7 @@ async fn validation_callback_awaiting_deps_hashes() {
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        false, // is_inline
     )
     .await
     .unwrap();
@@ -249,6 +252,7 @@ async fn validation_callback_awaiting_deps_hashes() {
         workspace,
         network,
         validation_dependencies.clone(),
+        false, // is_inline
     )
     .await
     .unwrap();
@@ -371,6 +375,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        false, // is_inline
     )
     .await
     .unwrap();
@@ -395,6 +400,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         workspace,
         network,
         validation_dependencies.clone(),
+        false, // is_inline
     )
     .await
     .unwrap();
@@ -496,6 +502,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        false, // is_inline
     )
     .await;
 
@@ -523,6 +530,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
         workspace,
         network,
         validation_dependencies.clone(),
+        false, // is_inline
     )
     .await;
 
@@ -646,6 +654,7 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        false, // is_inline
     )
     .await;
     let _validate_2 = run_validation_callback(
@@ -655,6 +664,7 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
         workspace,
         network,
         validation_dependencies.clone(),
+        false, // is_inline
     )
     .await;
     // futures::future::join_all([validate_1, validate_2]).await;
@@ -787,6 +797,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        false, // is_inline
     )
     .await
     .unwrap();
@@ -816,6 +827,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        false, // is_inline
     )
     .await
     .unwrap();

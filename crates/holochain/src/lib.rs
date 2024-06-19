@@ -6,6 +6,9 @@
 #![allow(clippy::ptr_arg)]
 #![recursion_limit = "256"]
 
+#[cfg(doc)]
+pub mod docs;
+
 #[cfg(feature = "hdk")]
 pub use hdk::HDI_VERSION;
 
