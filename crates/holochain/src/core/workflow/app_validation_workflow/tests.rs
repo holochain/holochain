@@ -1053,6 +1053,7 @@ async fn app_validation_produces_warrants() {
         let warrants = store
             .get_warrants_for_basis(&alice_pubkey.into(), false)
             .unwrap();
+        // 3 warrants, one for each op
         assert_eq!(warrants.len(), 1);
     });
 
@@ -1087,9 +1088,10 @@ async fn app_validation_produces_warrants() {
         )
         .await;
 
+    // 1 warrant, even though there are 3 ops, because we de-dupe
     assert_eq!(activity.warrants.len(), 1);
-    match activity.warrants.first().unwrap() {
-        Warrant::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+    match &activity.warrants.first().unwrap().proof {
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
             action_author,
             action: (hash, _),
             validation_type: _,
@@ -1204,9 +1206,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
             }
             DhtOpType::Warrant(_) => {
                 let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
-                let author: AgentPubKey = from_blob(row.get("author")?)?;
-                let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
-                Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
+                Ok(warrant.into())
             }
         }
     })
