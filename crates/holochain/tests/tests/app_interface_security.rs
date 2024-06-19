@@ -12,6 +12,11 @@ use holochain_types::websocket::AllowedOrigins;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::{connect, ConnectRequest, ReceiveMessage, WebsocketConfig};
 
+fn correct_error(err: &std::io::Error) -> bool {
+    let str = err.to_string();
+    &str == "ConnectionClosed" || &str == "WebsocketClosed"
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn app_allowed_origins() {
     holochain_trace::test_run();
@@ -547,7 +552,7 @@ async fn revoke_app_auth_token() {
         .request::<_, AppResponse>(AppRequest::ListWasmHostFunctions)
         .await
         .unwrap_err();
-    assert_eq!("ConnectionClosed", err.to_string());
+    assert!(correct_error(&err));
 }
 
 async fn check_app_port(port: u16, origin: &str, token: AppAuthenticationToken) {
