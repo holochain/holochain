@@ -949,14 +949,14 @@ fn assert_delete_agent_key_accepted_by_validation(
         SELECT Action.author, Action.type, Action.deletes_entry_hash
         FROM Action
         JOIN DhtOp On DhtOp.action_hash = Action.hash
-        WHERE DhtOp.validation_status = 0
+        WHERE DhtOp.validation_status = :valid_status
         AND Action.deletes_entry_hash IS NOT NULL
         ORDER BY seq DESC";
     conductor.get_dht_db(dna_hash).unwrap().test_read({
         let agent_key = agent_key.clone();
         move |txn| {
             let mut stmt = txn.prepare(sql).unwrap();
-            let mut rows = stmt.query([]).unwrap();
+            let mut rows = stmt.query(named_params! { ":valid_status": ValidationStatus::Valid } ).unwrap();
             while let Some(row) = rows.next().unwrap() {
                 let author = row.get::<_, AgentPubKey>("author").unwrap();
                 let action_type = row.get::<_, String>("type").unwrap();
