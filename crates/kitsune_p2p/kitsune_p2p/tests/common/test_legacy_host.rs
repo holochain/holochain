@@ -245,7 +245,7 @@ impl TestLegacyHost {
                             respond.respond(Ok(async move { Ok(()) }.boxed().into()))
                         }
                         KitsuneP2pEvent::QueryOpHashes { respond, input, .. } => {
-                            tracing::info!("QueryOpHashes: {:?}", input);
+                            tracing::debug!("QueryOpHashes: {:?}", input);
                             let op_store = op_store.read();
                             let selected_ops: Vec<TestHostOp> = op_store
                                 .iter()
@@ -268,8 +268,15 @@ impl TestLegacyHost {
                                         for interval in intervals {
                                             match interval {
                                                 DhtArcRange::Bounded(lower, upper) => {
-                                                    if lower < op.location()
-                                                        && op.location() < upper
+                                                    if lower <= upper {
+                                                        if lower <= op.location()
+                                                            && op.location() <= upper
+                                                        {
+                                                            in_any = true;
+                                                            break;
+                                                        }
+                                                    } else if lower < op.location()
+                                                        || op.location() < upper
                                                     {
                                                         in_any = true;
                                                         break;
