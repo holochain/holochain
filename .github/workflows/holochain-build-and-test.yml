@@ -38,6 +38,9 @@ jobs:
             extra_arg: "--override-input versions ./versions/0_2"
           - pkgs:
               - build-holonix-tests-integration
+            extra_arg: "--override-input versions ./versions/0_3"
+          - pkgs:
+              - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/weekly"
         platform:
           - system: aarch64-darwin

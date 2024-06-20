@@ -108,6 +108,8 @@ lto = true
 # tx5-go-pion-sys = { path = "../tx5/crates/tx5-go-pion-sys" }
 # tx5-go-pion-turn = { path = "../tx5/crates/tx5-go-pion-turn" }
 # tx5-signal = { path = "../tx5/crates/tx5-signal" }
+# sbd-e2e-crypto-client = { path = "../sbd/rust/sbd-e2e-crypto-client" }
+# sbd-server = { path = "../sbd/rust/sbd-server" }
 # tx5 = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # tx5-signal = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }

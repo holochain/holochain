@@ -940,7 +940,6 @@ async fn check_app_entry_def_test() {
 /// Alice and Bob join the network, and Alice commits an invalid action.
 /// Bob blocks Alice and authors a Warrant.
 /// Carol joins the network, and receives Bob's warrant via gossip.
-/// (TODO: write similar test for publish.)
 #[tokio::test(flavor = "multi_thread")]
 async fn app_validation_produces_warrants() {
     holochain_trace::test_run();
@@ -949,9 +948,8 @@ async fn app_validation_produces_warrants() {
     struct AppString(String);
 
     let string_entry_def = EntryDef::default_from_id("string");
-    let zome_common = SweetInlineZomes::new(vec![string_entry_def], 0).function(
-        "create_string",
-        move |api, s: AppString| {
+    let zome_common = SweetInlineZomes::new(vec![string_entry_def], 0)
+        .function("create_string", move |api, s: AppString| {
             let entry = Entry::app(s.try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
@@ -960,8 +958,14 @@ async fn app_validation_produces_warrants() {
                 ChainTopOrdering::default(),
             ))?;
             Ok(hash)
-        },
-    );
+        })
+        .function("get_agent_activity", move |api, agent_pubkey| {
+            Ok(api.get_agent_activity(GetAgentActivityInput {
+                agent_pubkey,
+                chain_query_filter: Default::default(),
+                activity_request: ActivityRequest::Full,
+            })?)
+        });
 
     let zome_sans_validation = zome_common
         .clone()
@@ -1022,7 +1026,7 @@ async fn app_validation_produces_warrants() {
 
     conductors[2].shutdown().await;
 
-    let _: ActionHash = conductors[0]
+    let invalid_action_hash: ActionHash = conductors[0]
         .call(
             &alice.zome(SweetInlineZomes::COORDINATOR),
             "create_string",
@@ -1046,7 +1050,10 @@ async fn app_validation_produces_warrants() {
     conductors[1].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
         let store = Txn::from(&txn);
 
-        let warrants = store.get_warrants_for_basis(&alice_pubkey.into()).unwrap();
+        let warrants = store
+            .get_warrants_for_basis(&alice_pubkey.into(), false)
+            .unwrap();
+        // 3 warrants, one for each op
         assert_eq!(warrants.len(), 1);
     });
 
@@ -1066,12 +1073,34 @@ async fn app_validation_produces_warrants() {
                 .unwrap()
                 .test_read(move |txn| {
                     let store = Txn::from(&txn);
-                    store.get_warrants_for_basis(&basis).unwrap()
+                    store.get_warrants_for_basis(&basis, true).unwrap()
                 })
                 .len()
         },
         1
     );
+
+    let activity: AgentActivity = conductors[2]
+        .call(
+            &carol.zome(SweetInlineZomes::COORDINATOR),
+            "get_agent_activity",
+            alice.agent_pubkey().clone(),
+        )
+        .await;
+
+    // 1 warrant, even though there are 3 ops, because we de-dupe
+    assert_eq!(activity.warrants.len(), 1);
+    match &activity.warrants.first().unwrap().proof {
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+            action_author,
+            action: (hash, _),
+            validation_type: _,
+        }) => {
+            assert_eq!(action_author, alice.agent_pubkey());
+            assert_eq!(*hash, invalid_action_hash);
+        }
+        _ => unreachable!(),
+    }
 }
 
 // These are the expected invalid ops
@@ -1169,17 +1198,15 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     .unwrap()
     .query_and_then([], |row| {
         let op_type: DhtOpType = row.get("type")?;
-        let hash: ActionHash = row.get("hash")?;
         match op_type {
             DhtOpType::Chain(op_type) => {
+                let hash: ActionHash = row.get("hash")?;
                 let action: SignedAction = from_blob(row.get("blob")?)?;
                 Ok(ChainOpLite::from_type(op_type, hash, &action)?.into())
             }
             DhtOpType::Warrant(_) => {
                 let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
-                let author: AgentPubKey = from_blob(row.get("author")?)?;
-                let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
-                Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
+                Ok(warrant.into())
             }
         }
     })

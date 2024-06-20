@@ -226,6 +226,7 @@ async fn app_validation_workflow_inner(
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone().into();
     let sorted_dht_ops = validation_query::get_ops_to_app_validate(&db).await?;
+
     // filter out ops that have missing dependencies
     tracing::debug!("number of ops to validate {:?}", sorted_dht_ops.len());
     let sorted_dht_ops = validation_dependencies
@@ -253,13 +254,15 @@ async fn app_validation_workflow_inner(
     // Validate ops sequentially
     for sorted_dht_op in sorted_dht_ops.into_iter() {
         let (dht_op, dht_op_hash) = sorted_dht_op.into_inner();
+        let deps = dht_op.sys_validation_dependencies();
+
         let chain_op = match dht_op {
             DhtOp::ChainOp(chain_op) => chain_op,
-            _ => continue,
+            _ => unreachable!("warrant ops are never sent to app validation"),
         };
+
         let op_type = chain_op.get_type();
         let action = chain_op.action();
-        let deps = op_type.sys_validation_dependencies(&action);
         let dht_op_lite = chain_op.to_lite();
 
         // If this is agent activity, track it for the cache.
@@ -449,9 +452,9 @@ pub async fn record_to_op(
         record.privatized()
     };
 
-    let (shh, entry) = record.into_inner();
+    let (sah, entry) = record.into_inner();
     let mut entry = entry.into_option();
-    let action = shh.into();
+    let action = sah.into();
     // Register agent activity doesn't store the entry so we need to
     // save it so we can reconstruct the record later.
     if matches!(op_type, RegisterAgentActivity) {
@@ -561,10 +564,12 @@ async fn validate_op_outer(
         &ribosome,
         conductor_handle,
         validation_dependencies,
+        false, // is_inline
     )
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn validate_op(
     op: &Op,
     dht_op_hash: &DhtOpHash,
@@ -573,6 +578,7 @@ pub async fn validate_op(
     ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    is_inline: bool,
 ) -> AppValidationOutcome<Outcome> {
     check_entry_def(op, &network.dna_hash(), conductor_handle)
         .await
@@ -595,6 +601,7 @@ pub async fn validate_op(
         workspace,
         network,
         validation_dependencies,
+        is_inline,
     )
     .await?;
 
@@ -784,9 +791,10 @@ async fn run_validation_callback(
     workspace: HostFnWorkspaceRead,
     network: GenericNetwork,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    is_inline: bool,
 ) -> AppValidationResult<Outcome> {
     let validate_result = ribosome.run_validate(
-        ValidateHostAccess::new(workspace.clone(), network.clone()),
+        ValidateHostAccess::new(workspace.clone(), network.clone(), is_inline),
         invocation.clone(),
     )?;
     match validate_result {
