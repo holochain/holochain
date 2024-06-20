@@ -99,6 +99,16 @@ pub enum CascadeSource {
     Network,
 }
 
+/// Result of requesting data from a remote node
+pub enum RemoteGetResponse<D> {
+    /// The node has the data and asserts it is valid
+    Data(D),
+    /// The node rejected this data and is responding with a warrant instead
+    Warrant(Warrant),
+    /// The node does not have the data
+    None,
+}
+
 /// The Cascade is a multi-tiered accessor for Holochain DHT data.
 ///
 /// See the module-level docs for more info.
@@ -390,7 +400,16 @@ impl CascadeImpl {
 
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_rendered_ops(txn: &mut Transaction, ops: &RenderedOps) -> CascadeResult<()> {
-        let RenderedOps { ops, entry } = ops;
+        let RenderedOps {
+            ops,
+            entry,
+            warrant,
+        } = ops;
+
+        if let Some(warrant) = warrant {
+            let op = DhtOpHashed::from_content_sync(warrant.clone());
+            insert_op(txn, &op)?;
+        }
         if let Some(entry) = entry {
             insert_entry(txn, entry.as_hash(), entry.as_content())?;
         }
