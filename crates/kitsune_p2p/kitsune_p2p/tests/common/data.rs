@@ -40,6 +40,13 @@ impl TestHostOp {
         self
     }
 
+    pub fn with_forced_location(mut self, loc: DhtLocation) -> Self {
+        assert_eq!(36, self.hash.len(), "Should already have a hash");
+        let x = loc.as_u32().to_le_bytes();
+        self.hash.0[32..].copy_from_slice(&x);
+        self
+    }
+
     pub fn space(&self) -> KSpace {
         self.space.clone()
     }
