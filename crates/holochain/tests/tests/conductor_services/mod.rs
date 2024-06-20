@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use holochain::{
     conductor::config::DpkiConfig, sweettest::*, test_utils::inline_zomes::simple_create_read_zome,
 };
@@ -33,7 +35,9 @@ async fn validate_with_dpki() {
     holochain_trace::test_run();
 
     let rendezvous = SweetLocalRendezvous::new().await;
-    let config = SweetConductorConfig::rendezvous(true);
+    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|p| {
+        p.sys_validation_retry_delay = Some(Duration::from_secs(1));
+    });
 
     let mut conductors = SweetConductorBatch::new(vec![
         SweetConductor::from_config_rendezvous(config.clone(), rendezvous.clone()).await,
@@ -91,10 +95,10 @@ async fn validate_with_dpki() {
     println!("carol: {:?}", carol.agent_pubkey());
     println!("--------------------------------------------");
 
-    await_consistency(120, &conductors.dpki_cells()[0..=1])
+    await_consistency(60, &conductors.dpki_cells()[0..=1])
         .await
         .unwrap();
-    await_consistency(120, [&alice, &bob]).await.unwrap();
+    await_consistency(60, [&alice, &bob]).await.unwrap();
 
     // Both now see each other in DPKI
     assert!(matches!(
@@ -110,10 +114,10 @@ async fn validate_with_dpki() {
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    await_consistency(120, &conductors.dpki_cells()[0..=1])
+    await_consistency(60, &conductors.dpki_cells()[0..=1])
         .await
         .unwrap();
-    await_consistency(120, [&alice, &bob]).await.unwrap();
+    await_consistency(60, [&alice, &bob]).await.unwrap();
 
     // Carol is nowhere to be found since she never installed DPKI
     assert!(matches!(
