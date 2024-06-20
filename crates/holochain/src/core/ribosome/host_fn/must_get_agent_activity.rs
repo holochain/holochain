@@ -57,6 +57,11 @@ pub fn must_get_agent_activity(
 
                 let result: Result<_, RuntimeError> = match (result, &call_context.host_context) {
                     (Activity(activity), _) => Ok(activity),
+                    (Warrants(_), _) => {
+                        // TODO: we probably want to handle this differently
+                        tracing::warn!("must_get_agent_activity encountered Warrants. Returning empty activity.");
+                        Ok(vec![])
+                    }
                     (IncompleteChain | ChainTopNotFound(_), HostContext::Init(_)) => {
                         Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(

@@ -1238,7 +1238,7 @@ pub enum WireOps {
     Record(WireRecordOps),
     /// A warrant in place of data in the case that the data is invalid.
     /// There is no "wire" version because this is about as compact as it gets.
-    Warrant(WarrantOp),
+    Warrant(Box<WarrantOp>),
 }
 
 impl WireOps {
@@ -1250,7 +1250,7 @@ impl WireOps {
             WireOps::Warrant(warrant) => Ok(RenderedOps {
                 entry: Default::default(),
                 ops: Default::default(),
-                warrant: Some(warrant),
+                warrant: Some(*warrant),
             }),
         }
     }

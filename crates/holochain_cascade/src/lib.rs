@@ -100,7 +100,7 @@ pub enum CascadeSource {
 }
 
 /// Result of requesting data from a remote node
-pub enum RemoteGetResponse<D> {
+pub enum RemoteFetchResponse<D> {
     /// The node has the data and asserts it is valid
     Data(D),
     /// The node rejected this data and is responding with a warrant instead
@@ -497,10 +497,16 @@ impl CascadeImpl {
                 "Got different must_get_agent_activity responses from different authorities"
             );
             // TODO: Handle conflict.
-            // For now try to find one that has got the activity.
+            // For now try to find one that has got the activity, unless any have Warrants
             responses
-                .into_iter()
-                .find(|a| matches!(a, MustGetAgentActivityResponse::Activity(_)))
+                .iter()
+                .find(|a| matches!(a, MustGetAgentActivityResponse::Warrants(_)))
+                .or_else(|| {
+                    responses
+                        .iter()
+                        .find(|a| matches!(a, MustGetAgentActivityResponse::Activity(_)))
+                })
+                .cloned()
         };
 
         let cache = some_or_return!(
@@ -510,6 +516,21 @@ impl CascadeImpl {
 
         // Commit the activity to the chain.
         match response {
+            Some(MustGetAgentActivityResponse::Warrants(warrants)) => {
+                cache
+                    .write_async({
+                        let warrants = warrants.clone();
+                        move |txn| {
+                            for warrant in warrants {
+                                let op = DhtOpHashed::from_content_sync(warrant);
+                                insert_op(txn, &op)?;
+                            }
+                            CascadeResult::Ok(())
+                        }
+                    })
+                    .await?;
+                Ok(MustGetAgentActivityResponse::Warrants(warrants))
+            }
             Some(MustGetAgentActivityResponse::Activity(activity)) => {
                 // TODO: Avoid this clone by committing the ops as references to the db.
                 cache
@@ -1013,8 +1034,15 @@ impl CascadeImpl {
             // this point then the chain is incomplete for this request.
             Ok(MustGetAgentActivityResponse::IncompleteChain)
         } else {
-            self.fetch_must_get_agent_activity(author.clone(), filter)
-                .await
+            match self
+                .fetch_must_get_agent_activity(author.clone(), filter)
+                .await?
+            {
+                MustGetAgentActivityResponse::Warrants(_) => {
+                    todo!("Handle warrants in must_get_agent_activity")
+                }
+                r => Ok(r),
+            }
         }
     }
 

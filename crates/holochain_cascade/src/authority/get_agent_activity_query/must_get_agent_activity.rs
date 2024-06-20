@@ -68,6 +68,9 @@ pub fn filter_then_check(
             MustGetAgentActivityResponse::ChainTopNotFound(a)
         }
         BoundedMustGetAgentActivityResponse::EmptyRange => MustGetAgentActivityResponse::EmptyRange,
+        BoundedMustGetAgentActivityResponse::Warrants(ws) => {
+            MustGetAgentActivityResponse::Warrants(ws)
+        }
     }
 }
 
