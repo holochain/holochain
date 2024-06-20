@@ -99,16 +99,6 @@ pub enum CascadeSource {
     Network,
 }
 
-/// Result of requesting data from a remote node
-pub enum RemoteFetchResponse<D> {
-    /// The node has the data and asserts it is valid
-    Data(D),
-    /// The node rejected this data and is responding with a warrant instead
-    Warrant(Warrant),
-    /// The node does not have the data
-    None,
-}
-
 /// The Cascade is a multi-tiered accessor for Holochain DHT data.
 ///
 /// See the module-level docs for more info.
