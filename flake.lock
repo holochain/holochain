@@ -252,18 +252,6 @@
         "type": "github"
       }
     },
-    "repo-git": {
-      "flake": false,
-      "locked": {
-        "narHash": "sha256-d6xi4mKdjkX2JFicDIv5niSzpyI0m/Hnm8GGAIU04kY=",
-        "type": "file",
-        "url": "file:/dev/null"
-      },
-      "original": {
-        "type": "file",
-        "url": "file:/dev/null"
-      }
-    },
     "root": {
       "inputs": {
         "cargo-chef": "cargo-chef",
@@ -285,7 +273,6 @@
         "nix-filter": "nix-filter",
         "nixpkgs": "nixpkgs",
         "pre-commit-hooks-nix": "pre-commit-hooks-nix",
-        "repo-git": "repo-git",
         "rust-overlay": "rust-overlay",
         "scaffolding": [
           "empty"
