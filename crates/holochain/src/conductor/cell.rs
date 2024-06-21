@@ -1063,6 +1063,12 @@ impl Cell {
             .trigger(&"notify_authored_ops_moved_to_limbo");
     }
 
+    pub(crate) fn publish_authored_ops(&self) {
+        self.queue_triggers
+            .publish_dht_ops
+            .trigger(&"publish_authored_ops");
+    }
+
     #[cfg(any(test, feature = "test_utils"))]
     /// Get the triggers for the cell
     /// Useful for testing when you want to

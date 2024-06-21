@@ -41,19 +41,17 @@ impl Conductor {
                 |(cell_id, _)| {
                     let conductor = self.clone();
                     async move {
-                        match conductor.get_cell_triggers(cell_id).await {
-                            Ok(cell_triggers) => {
-                                cell_triggers.publish_dht_ops.trigger(&"agent key deleted");
+                        match conductor.cell_by_id(cell_id).await {
+                            Ok(cell) => {
+                                cell.publish_authored_ops();
                                 // Even though integration somehow happens in multi-conductor tests,
                                 // it's not clear why it does, so it's safer to trigger it explicitly.
-                                cell_triggers
-                                    .integrate_dht_ops
-                                    .trigger(&"agent key deleted");
+                                cell.notify_authored_ops_moved_to_limbo();
                             }
                             Err(err) => tracing::warn!(
                                 ?err,
                                 ?cell_id,
-                                "Could not get cell triggers to publish agent key deletion"
+                                "Could not find cell to publish agent key deletion"
                             ),
                         }
                     }
@@ -126,13 +124,12 @@ impl Conductor {
             let agent_key = agent_key.clone();
             async move {
                 // Instantiate source chain
-                let authored_db = conductor
-                    .get_or_create_authored_db(cell_id.dna_hash(), agent_key.clone())
-                    .unwrap();
                 let source_chain = SourceChain::new(
-                    authored_db,
-                    conductor.get_dht_db(cell_id.dna_hash())?,
-                    conductor.get_dht_db_cache(cell_id.dna_hash())?,
+                    conductor.get_or_create_authored_db(cell_id.dna_hash(), agent_key.clone())?,
+                    conductor.get_or_create_dht_db(cell_id.dna_hash())?,
+                    conductor
+                        .get_or_create_space(cell_id.dna_hash())?
+                        .dht_query_cache,
                     conductor.keystore().clone(),
                     agent_key.clone(),
                 )

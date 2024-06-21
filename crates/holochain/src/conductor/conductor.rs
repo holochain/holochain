@@ -142,9 +142,8 @@ mod app_auth_token_store;
 /// revocation and key update.
 ///
 /// When revoking a key, it becomes invalid and the source chain can no longer be written to.
-/// Clone cells can not be created any more either.
-///
-/// The source remains read-only until a new key is created.
+/// Clone cells can not be created any more either. This source chain state if final and can not
+/// be reverted or changed.
 mod agent_key_operations;
 
 pub(crate) mod app_broadcast;
