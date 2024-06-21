@@ -80,29 +80,21 @@ async fn validate_with_dpki() {
         KeyState::Valid(_)
     ));
 
-    conductors.exchange_peer_info().await;
-
-    conductors.persist_dbs();
-
-    println!("--------------------------------------------");
-    println!("AGENTS:");
-    println!("alice: {:?}", alice.agent_pubkey());
-    println!("bob:   {:?}", bob.agent_pubkey());
-    println!("carol: {:?}", carol.agent_pubkey());
-    println!("--------------------------------------------");
-
-    await_consistency(30, &conductors.dpki_cells()[0..=1])
-        .await
-        .unwrap();
+    await_consistency(
+        30,
+        [
+            &conductors[0].dpki_cell().unwrap(),
+            &conductors[1].dpki_cell().unwrap(),
+        ],
+    )
+    .await
+    .unwrap();
     await_consistency(30, [&alice, &bob]).await.unwrap();
 
     let hash: ActionHash = conductors[0]
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    await_consistency(30, &conductors.dpki_cells()[0..=1])
-        .await
-        .unwrap();
     await_consistency(30, [&alice, &bob]).await.unwrap();
 
     // Both see each other in DPKI
