@@ -8,8 +8,8 @@
     empty.flake = false;
 
     # workaround to allow the passing in of the `.git` directory into the release-automation tests
-    repo-git.url = "file+file:/dev/null";
-    repo-git.flake = false;
+    #    repo-git.url = "file+file:/dev/null";
+    #    repo-git.flake = false;
 
     # nix packages pointing to the github repo
     nixpkgs.url = "nixpkgs/nixos-unstable";
