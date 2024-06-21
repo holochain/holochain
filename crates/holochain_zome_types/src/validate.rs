@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::prelude::*;
 use holochain_wasmer_common::*;
 
@@ -60,4 +61,24 @@ impl rusqlite::types::FromSql for ValidationStatus {
             Self::try_from(int).map_err(|_| rusqlite::types::FromSqlError::InvalidType)
         })
     }
+}
+
+pub struct ValidationReceiptInfo {
+    /// the result of the validation.
+    pub validation_status: ValidationStatus,
+
+    /// the remote validators who signed the receipt.
+    pub validators: Vec<AgentPubKey>,
+
+    /// The op hash that this receipt is for.
+    pub op_hash: DhtOpHash,
+
+    /// The type of the op that was validated.
+    ///
+    /// Note that the original type is discarded here because DhtOpType is part of `holochain_types`
+    /// and moving it would be a breaking change. For now this is just informational.
+    pub op_type: String,
+
+    /// Whether this op has received the required number of receipts.
+    pub receipts_complete: bool,
 }

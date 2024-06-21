@@ -8,6 +8,7 @@ use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::DhtOpType;
 use holochain_types::prelude::{SignedValidationReceipt, ValidationReceipt};
+use holochain_zome_types::prelude::ValidationReceiptInfo;
 use mutations::StateMutationResult;
 use std::collections::HashMap;
 
@@ -95,7 +96,10 @@ pub fn get_pending_validation_receipts(
     Ok(ops)
 }
 
-pub fn validation_receipts_for_action(txn: &Transaction, action_hash: ActionHash) -> StateQueryResult<()> {
+pub fn validation_receipts_for_action(
+    txn: &Transaction,
+    action_hash: ActionHash,
+) -> StateQueryResult<Vec<ValidationReceiptInfo>> {
     let mut stmt = txn.prepare(
         "
             SELECT
@@ -111,13 +115,13 @@ pub fn validation_receipts_for_action(txn: &Transaction, action_hash: ActionHash
               Action.hash = :action_hash
             ",
     )?;
-    let iter = stmt
+    Ok(stmt
         .query_and_then(
             named_params! {
                 ":action_hash": action_hash
             },
             |row| {
-                let receipt = from_blob::<SignedValidationReceipt>(row.get("receipt")?);
+                let receipt = from_blob::<SignedValidationReceipt>(row.get("receipt")?)?;
                 let op_hash: DhtOpHash = row.get("op_hash")?;
                 let op_type: DhtOpType = row.get("op_type")?;
                 let receipts_complete: bool = row.get("op_receipts_complete")?;
@@ -127,18 +131,19 @@ pub fn validation_receipts_for_action(txn: &Transaction, action_hash: ActionHash
         )?
         .collect::<StateQueryResult<Vec<_>>>()?
         .into_iter()
-        .fold(
-            HashMap::new(),
-            |mut acc, (receipt, op_hash, op_type, receipts_complete)| {
-                let mut entry = acc
-                    .entry(op_hash)
-                    .or_insert((op_type, receipts_complete, vec![]));
-                entry.2.push(receipt);
-                acc
+        .filter_map(
+            |(receipt, op_hash, op_type, receipts_complete)| match op_type {
+                DhtOpType::Chain(op_type) => Some(ValidationReceiptInfo {
+                    validation_status: receipt.receipt.validation_status,
+                    validators: receipt.receipt.validators,
+                    op_hash,
+                    op_type: format!("{}", op_type),
+                    receipts_complete,
+                }),
+                _ => None,
             },
-        );
-
-    Ok(())
+        )
+        .collect())
 }
 
 #[cfg(test)]
