@@ -12,8 +12,9 @@ use holochain_zome_types::cell::CellId;
 use holochain_zome_types::dependencies::holochain_integrity_types::{DnaModifiersOpt, Signature};
 use holochain_zome_types::record::Record;
 use holochain_zome_types::timestamp::Timestamp;
+use holochain_zome_types::validate::ValidationStatus;
 use matches::assert_matches;
-use rusqlite::Row;
+use rusqlite::{named_params, Row};
 
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::{conductor::ConductorError, CellError};
@@ -834,6 +835,43 @@ fn assert_delete_agent_key_present_in_source_chain(
         .test_read(move |txn| txn.query_row(sql, [], row_fn).unwrap());
 }
 
+fn assert_delete_agent_key_accepted_by_validation(
+    agent_key: &AgentPubKey,
+    conductor: &SweetConductor,
+    dna_hash: &DnaHash,
+) {
+    let sql = "\
+        SELECT Action.author, Action.type, Action.deletes_entry_hash
+        FROM Action
+        JOIN DhtOp On DhtOp.action_hash = Action.hash
+        WHERE DhtOp.validation_status = :valid_status
+        AND Action.deletes_entry_hash IS NOT NULL
+        ORDER BY seq DESC";
+    conductor.get_dht_db(dna_hash).unwrap().test_read({
+        let agent_key = agent_key.clone();
+        move |txn| {
+            let mut stmt = txn.prepare(sql).unwrap();
+            let rows: Vec<_> = stmt
+                .query_map(
+                    named_params! { ":valid_status": ValidationStatus::Valid },
+                    |row| {
+                        let author = row.get::<_, AgentPubKey>("author").unwrap();
+                        let action_type = row.get::<_, String>("type").unwrap();
+                        let deletes_entry_hash =
+                            row.get::<_, EntryHash>("deletes_entry_hash").unwrap();
+                        assert_eq!(author, agent_key.clone());
+                        assert_eq!(action_type, ActionType::Delete.to_string());
+                        assert_eq!(deletes_entry_hash, agent_key.clone().into());
+                        Ok(())
+                    },
+                )
+                .unwrap()
+                .collect();
+            assert!(rows.len() > 0);
+        }
+    });
+}
+
 async fn assert_key_valid_in_dpki(conductor: &SweetConductor, agent_key: AgentPubKey) {
     let dpki = conductor.running_services().dpki.unwrap();
     let dpki_state = dpki.state().await;
@@ -938,33 +976,4 @@ async fn delete_agent_key_from_source_chain(
         .unwrap()
         .integrate_dht_ops
         .trigger(&"key deletion");
-}
-
-fn assert_delete_agent_key_accepted_by_validation(
-    agent_key: &AgentPubKey,
-    conductor: &SweetConductor,
-    dna_hash: &DnaHash,
-) {
-    let sql = "\
-        SELECT Action.author, Action.type, Action.deletes_entry_hash
-        FROM Action
-        JOIN DhtOp On DhtOp.action_hash = Action.hash
-        WHERE DhtOp.validation_status = :valid_status
-        AND Action.deletes_entry_hash IS NOT NULL
-        ORDER BY seq DESC";
-    conductor.get_dht_db(dna_hash).unwrap().test_read({
-        let agent_key = agent_key.clone();
-        move |txn| {
-            let mut stmt = txn.prepare(sql).unwrap();
-            let mut rows = stmt.query(named_params! { ":valid_status": ValidationStatus::Valid } ).unwrap();
-            while let Some(row) = rows.next().unwrap() {
-                let author = row.get::<_, AgentPubKey>("author").unwrap();
-                let action_type = row.get::<_, String>("type").unwrap();
-                let deletes_entry_hash = row.get::<_, EntryHash>("deletes_entry_hash").unwrap();
-                assert_eq!(author, agent_key.clone());
-                assert_eq!(action_type, ActionType::Delete.to_string());
-                assert_eq!(deletes_entry_hash, agent_key.clone().into());
-            }
-        }
-    });
 }
