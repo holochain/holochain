@@ -112,7 +112,6 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
-
     let ((alice,), (bob,)) = conductors
         .setup_app("app", [&dna])
         .await
@@ -164,8 +163,6 @@ async fn sys_validation_produces_forked_chain_warrant() {
         insert_op(txn, &forked_op).unwrap();
     });
 
-    conductors.persist_dbs();
-
     //- Trigger sys validation
     conductors[1]
         .get_cell_triggers(bob.cell_id())
@@ -190,8 +187,8 @@ async fn sys_validation_produces_forked_chain_warrant() {
         |warrants: &Vec<Warrant>| { !warrants.is_empty() },
         |mut warrants: Vec<Warrant>| {
             matches::assert_matches!(
-                warrants.pop().unwrap(),
-                Warrant::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. })
+                warrants.pop().unwrap().proof,
+                WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. })
             )
         }
     );
@@ -459,9 +456,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
             }
             DhtOpType::Warrant(_) => {
                 let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
-                let author: AgentPubKey = row.get("author")?;
-                let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
-                Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
+                Ok(warrant.into())
             }
         }
     })
