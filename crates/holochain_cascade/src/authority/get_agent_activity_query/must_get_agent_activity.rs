@@ -35,6 +35,12 @@ pub fn get_bounded_activity(
     filter: ChainFilter,
 ) -> StateQueryResult<BoundedMustGetAgentActivityResponse> {
     // Find the bounds of the range specified in the filter.
+    let warrants = Txn::from(txn)
+        .get_warrants_for_basis(&AnyLinkableHash::from(author.clone().into()), true)?;
+    if !warrants.is_empty() {
+        return Ok(BoundedMustGetAgentActivityResponse::Warrants(warrants));
+    }
+
     match find_bounds(txn, scratch, author, filter)? {
         Sequences::Found(filter_range) => {
             // Get the full range of actions from the database.

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use futures::io::Chain;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_cascade::test_utils::*;
@@ -61,18 +62,65 @@ async fn get_activity() {
     assert_eq!(r, expected);
 }
 
+// #[tokio::test(flavor = "multi_thread")]
+// async fn test_must_get_agent_activity_with_warrants() {
+//     let dht = commit_chain(
+//         DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
+//         agent_chain(&[(0, 0..3)]),
+//     );
+//     let cache = commit_chain(
+//         DbKindCache(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
+//         vec![],
+//     );
+//     let authored = commit_chain(
+//         DbKindAuthored(Arc::new(CellId::new(
+//             DnaHash::from_raw_36(vec![0; 36]),
+//             AgentPubKey::from_raw_36(vec![0; 36]),
+//         ))),
+//         vec![],
+//     );
+//     let network = PassThroughNetwork::authority_for_nothing(vec![dht.into()]);
+//     let cascade = CascadeImpl::empty()
+//         .with_authored(authored.into())
+//         .with_network(network, cache);
+//     let filter = ChainFilter::new(action_hash(&[2]));
+//     let r = cascade
+//         .must_get_agent_activity(agent_hash(&[0]), filter)
+//         .await
+//         .unwrap();
+//     dbg!(&r);
+// }
+
 #[derive(Default)]
 struct Data {
     scratch: Option<Vec<(AgentPubKey, Vec<TestChainItem>)>>,
     authored: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     cache: Vec<(AgentPubKey, Vec<TestChainItem>)>,
-    authority: Vec<(AgentPubKey, Vec<TestChainItem>)>,
+    dht: Vec<(AgentPubKey, Vec<TestChainItem>)>,
+    warrants: Vec<WarrantOp>,
+}
+
+fn warrant(author: u8, action: u8) -> WarrantOp {
+    let p = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+        action_author: AgentPubKey::from_raw_36(vec![author; 36]),
+        action: (
+            ActionHash::from_raw_36(vec![action; 36]),
+            ::fixt::fixt!(Signature),
+        ),
+        validation_type: ValidationType::Sys,
+    });
+    let warrant = Warrant::new(p, AgentPubKey::from_raw_36(vec![255; 36]), Timestamp::now());
+    WarrantOp::from(SignedWarrant::new(warrant, ::fixt::fixt!(Signature)))
 }
 
 #[test_case(
-    Data { authority: agent_chain(&[(0, 0..3)]), ..Default::default() },
+    Data { dht: agent_chain(&[(0, 0..3)]), ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
-    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 2; "1 to genesis with authority 0 till 2")]
+    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 2; "1 to genesis with dht 0 till 2")]
+#[test_case(
+    Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(0, 0)], ..Default::default() },
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
+    => matches MustGetAgentActivityResponse::Warrants(a) if a.len() == 1; "1 to genesis with dht 0 till 2 with 1 chain warrant")]
 #[test_case(
     Data { cache: agent_chain(&[(0, 0..3)]), ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
@@ -99,12 +147,10 @@ async fn test_must_get_agent_activity(
         scratch,
         authored,
         cache,
-        authority,
+        dht,
+        warrants,
     } = data;
-    let authority = commit_chain(
-        DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
-        authority,
-    );
+    let dht = commit_chain(DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))), dht);
     let cache = commit_chain(
         DbKindCache(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         cache,
@@ -116,6 +162,12 @@ async fn test_must_get_agent_activity(
         ))),
         authored,
     );
+    authored.test_write(|txn| {
+        for w in warrants {
+            let w = DhtOp::from(w).into_hashed();
+            insert_op(txn, &w).unwrap();
+        }
+    });
     let sync_scratch = match scratch {
         Some(scratch) => {
             let sync_scratch = Scratch::new().into_sync();
@@ -124,7 +176,7 @@ async fn test_must_get_agent_activity(
         }
         None => None,
     };
-    let network = PassThroughNetwork::authority_for_nothing(vec![authority.into()]);
+    let network = PassThroughNetwork::authority_for_nothing(vec![dht.into()]);
     let mut cascade = CascadeImpl::empty()
         .with_authored(authored.into())
         .with_network(network, cache);

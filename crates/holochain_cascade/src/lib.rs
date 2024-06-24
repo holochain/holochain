@@ -1024,15 +1024,9 @@ impl CascadeImpl {
             // this point then the chain is incomplete for this request.
             Ok(MustGetAgentActivityResponse::IncompleteChain)
         } else {
-            match self
+            Ok(self
                 .fetch_must_get_agent_activity(author.clone(), filter)
-                .await?
-            {
-                MustGetAgentActivityResponse::Warrants(_) => {
-                    todo!("Handle warrants in must_get_agent_activity")
-                }
-                r => Ok(r),
-            }
+                .await?)
         }
     }
 
