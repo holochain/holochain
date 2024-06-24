@@ -1,14 +1,14 @@
 //! Module for items related to aggregating validation_receipts
 
-use holo_hash::DhtOpHash;
 use holo_hash::{ActionHash, AgentPubKey};
+use holo_hash::{DhtOpHash, EntryHash};
 use holochain_sqlite::prelude::*;
-use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_sqlite::rusqlite::{named_params, Params, Statement};
 use holochain_types::dht_op::DhtOpType;
 use holochain_types::prelude::{SignedValidationReceipt, ValidationReceipt};
-use holochain_zome_types::prelude::ValidationReceiptInfo;
+use holochain_zome_types::prelude::{ValidationReceiptInfo, ValidationReceiptSet};
 use mutations::StateMutationResult;
 use std::collections::HashMap;
 
@@ -99,14 +99,14 @@ pub fn get_pending_validation_receipts(
 pub fn validation_receipts_for_action(
     txn: &Transaction,
     action_hash: ActionHash,
-) -> StateQueryResult<Vec<ValidationReceiptInfo>> {
-    let mut stmt = txn.prepare(
+) -> StateQueryResult<Vec<ValidationReceiptSet>> {
+    let stmt = txn.prepare(
         "
             SELECT
               ValidationReceipt.blob as receipt,
               DhtOp.hash as op_hash,
               DhtOp.type as op_type,
-              DhtOp.receipts_complete as op_receipts_complete,
+              DhtOp.receipts_complete as op_receipts_complete
             FROM
               Action
               LEFT JOIN DhtOp ON DhtOp.action_hash = Action.hash
@@ -115,34 +115,92 @@ pub fn validation_receipts_for_action(
               Action.hash = :action_hash
             ",
     )?;
-    Ok(stmt
-        .query_and_then(
-            named_params! {
-                ":action_hash": action_hash
-            },
-            |row| {
-                let receipt = from_blob::<SignedValidationReceipt>(row.get("receipt")?)?;
-                let op_hash: DhtOpHash = row.get("op_hash")?;
-                let op_type: DhtOpType = row.get("op_type")?;
-                let receipts_complete: bool = row.get("op_receipts_complete")?;
 
-                Ok((receipt, op_hash, op_type, receipts_complete))
-            },
-        )?
-        .collect::<StateQueryResult<Vec<_>>>()?
+    query_validation_receipts(
+        stmt,
+        named_params! {
+            ":action_hash": action_hash
+        },
+    )
+}
+
+pub fn validation_receipts_for_entry(
+    txn: &Transaction,
+    entry_hash: EntryHash,
+) -> StateQueryResult<Vec<ValidationReceiptSet>> {
+    let stmt = txn.prepare(
+        "
+            SELECT
+              ValidationReceipt.blob as receipt,
+              DhtOp.hash as op_hash,
+              DhtOp.type as op_type,
+              DhtOp.receipts_complete as op_receipts_complete
+            FROM
+              Entry
+              INNER JOIN Action ON Action.entry_hash = Entry.hash
+              LEFT JOIN DhtOp ON DhtOp.action_hash = Action.hash
+              LEFT JOIN ValidationReceipt ON DhtOp.hash = ValidationReceipt.op_hash
+            WHERE
+              Action.entry_hash = :entry_hash
+            ",
+    )?;
+
+    query_validation_receipts(
+        stmt,
+        named_params! {
+            ":entry_hash": entry_hash
+        },
+    )
+}
+
+fn query_validation_receipts<P: Params>(
+    mut stmt: Statement,
+    params: P,
+) -> StateQueryResult<Vec<ValidationReceiptSet>> {
+    let db_result = stmt
+        .query_and_then(params, |row| {
+            let receipt = from_blob::<SignedValidationReceipt>(row.get("receipt")?)?;
+            let op_hash: DhtOpHash = row.get("op_hash")?;
+            let op_type: DhtOpType = row.get("op_type")?;
+            let receipts_complete: Option<bool> = row.get("op_receipts_complete")?;
+
+            Ok((
+                receipt,
+                op_hash,
+                op_type,
+                receipts_complete.unwrap_or(false),
+            ))
+        })?
+        .collect::<StateQueryResult<Vec<_>>>()?;
+    Ok(db_result
         .into_iter()
         .filter_map(
             |(receipt, op_hash, op_type, receipts_complete)| match op_type {
-                DhtOpType::Chain(op_type) => Some(ValidationReceiptInfo {
-                    validation_status: receipt.receipt.validation_status,
-                    validators: receipt.receipt.validators,
+                DhtOpType::Chain(op_type) => Some((
                     op_hash,
-                    op_type: format!("{}", op_type),
+                    op_type.to_string(),
                     receipts_complete,
-                }),
+                    ValidationReceiptInfo {
+                        validation_status: receipt.receipt.validation_status,
+                        validators: receipt.receipt.validators,
+                    },
+                )),
                 _ => None,
             },
         )
+        .fold(HashMap::new(), |mut acc, item| {
+            acc.entry(item.0.clone())
+                .or_insert_with(|| ValidationReceiptSet {
+                    op_hash: item.0,
+                    op_type: item.1.clone(),
+                    receipts_complete: item.2,
+                    receipts: Vec::new(),
+                })
+                .receipts
+                .push(item.3);
+            acc
+        })
+        .into_values()
         .collect())
 }
 
@@ -374,5 +432,127 @@ mod tests {
         assert!(pending_ops.contains(&valid_op_hash));
         assert!(pending_ops.contains(&rejected_op_hash));
         assert!(pending_ops.contains(&abandoned_op_hash));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn validation_receipts_from_action() {
+        let test_db = test_dht_db();
+        let env = test_db.to_db();
+
+        let keystore = test_keystore();
+
+        let action = fixt!(Action);
+
+        let action_hash = ActionHash::with_data_sync(&action);
+        let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
+            fixt!(Signature),
+            action,
+        ));
+        let test_op_hash = op.as_hash().clone();
+        env.write_async(move |txn| insert_op(txn, &op))
+            .await
+            .unwrap();
+
+        let vr1 = fake_vr(&test_op_hash, &keystore).await;
+        let vr2 = fake_vr(&test_op_hash, &keystore).await;
+
+        env.write_async({
+            let put_vr1 = vr1.clone();
+            let put_vr2 = vr2.clone();
+
+            move |txn| -> StateMutationResult<()> {
+                add_if_unique(txn, put_vr1.clone())?;
+                add_if_unique(txn, put_vr2.clone())?;
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
+
+        let receipt_sets = env
+            .read_async(move |txn| validation_receipts_for_action(&txn, action_hash))
+            .await
+            .unwrap();
+
+        check_receipt_sets(receipt_sets, test_op_hash, vr1, vr2);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn validation_receipts_from_entry() {
+        let test_db = test_dht_db();
+        let env = test_db.to_db();
+
+        let keystore = test_keystore();
+
+        let entry = fixt!(Entry);
+
+        let mut create_action = fixt!(Create);
+        let entry_hash = EntryHash::with_data_sync(&entry);
+        create_action.entry_hash = entry_hash.clone();
+        let action = Action::Create(create_action);
+
+        let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
+            fixt!(Signature),
+            action,
+        ));
+        let test_op_hash = op.as_hash().clone();
+        env.write_async({
+            let entry_hash = entry_hash.clone();
+            move |txn| {
+                insert_entry(txn, &entry_hash, &entry)?;
+                insert_op(txn, &op)
+            }
+        })
+        .await
+        .unwrap();
+
+        let vr1 = fake_vr(&test_op_hash, &keystore).await;
+        let vr2 = fake_vr(&test_op_hash, &keystore).await;
+
+        env.write_async({
+            let put_vr1 = vr1.clone();
+            let put_vr2 = vr2.clone();
+
+            move |txn| -> StateMutationResult<()> {
+                add_if_unique(txn, put_vr1.clone())?;
+                add_if_unique(txn, put_vr2.clone())?;
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
+
+        let receipt_sets = env
+            .read_async(move |txn| validation_receipts_for_entry(&txn, entry_hash))
+            .await
+            .unwrap();
+
+        check_receipt_sets(receipt_sets, test_op_hash, vr1, vr2);
+    }
+
+    fn check_receipt_sets(
+        receipt_sets: Vec<ValidationReceiptSet>,
+        test_op_hash: DhtOpHash,
+        vr1: SignedValidationReceipt,
+        vr2: SignedValidationReceipt,
+    ) {
+        assert_eq!(receipt_sets.len(), 1);
+
+        assert_eq!(test_op_hash, receipt_sets[0].op_hash);
+        assert_eq!("RegisterAgentActivity", receipt_sets[0].op_type);
+
+        let receipts_count = receipt_sets[0].receipts.len();
+        assert_eq!(receipts_count, 2);
+
+        assert_eq!(
+            vr1.receipt.validation_status,
+            receipt_sets[0].receipts[0].validation_status
+        );
+        assert_eq!(1, receipt_sets[0].receipts[0].validators.len());
+        assert_eq!(
+            vr2.receipt.validation_status,
+            receipt_sets[0].receipts[1].validation_status
+        );
+        assert_eq!(1, receipt_sets[0].receipts[1].validators.len());
     }
 }
