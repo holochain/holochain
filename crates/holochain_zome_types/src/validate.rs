@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use crate::prelude::*;
 use holochain_wasmer_common::*;
 
@@ -63,13 +62,12 @@ impl rusqlite::types::FromSql for ValidationStatus {
     }
 }
 
-pub struct ValidationReceiptInfo {
-    /// the result of the validation.
-    pub validation_status: ValidationStatus,
-
-    /// the remote validators who signed the receipt.
-    pub validators: Vec<AgentPubKey>,
-
+/// A set of validation receipts, grouped by op.
+///
+/// This is intended to be returned as the result of a query for validation receipts by an action
+/// or entry hash. It would also be valid to return this for a query that uniquely identified an op
+/// but those are generally not available to hApp developers.
+pub struct ValidationReceiptSet {
     /// The op hash that this receipt is for.
     pub op_hash: DhtOpHash,
 
@@ -81,4 +79,16 @@ pub struct ValidationReceiptInfo {
 
     /// Whether this op has received the required number of receipts.
     pub receipts_complete: bool,
+
+    /// The validation receipts for this op.
+    pub receipts: Vec<ValidationReceiptInfo>
+}
+
+/// Summary information for a validation receipt.
+pub struct ValidationReceiptInfo {
+    /// the result of the validation.
+    pub validation_status: ValidationStatus,
+
+    /// the remote validators who signed the receipt.
+    pub validators: Vec<AgentPubKey>,
 }
