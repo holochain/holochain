@@ -418,7 +418,19 @@ pub async fn check_dpki_agent_validity_for_op(
     } else {
         Some(op.timestamp())
     };
-    check_dpki_agent_validity(dpki, author, timestamp).await
+    let agent_validity_result = check_dpki_agent_validity(dpki, author, timestamp).await;
+    // If agent key is invalid in Dpki and the op being validated is a `Delete` of that agent key, it must pass
+    // for the delete to succeed. Otherwise Dpki would prevent deletion of an agent key on the source chain.
+    if let Err(SysValidationError::ValidationOutcome(ValidationOutcome::DpkiAgentInvalid(_, _))) =
+        &agent_validity_result
+    {
+        if let Action::Delete(d) = &op.action() {
+            if d.deletes_entry_address == op.author().clone().into() {
+                return Ok(());
+            }
+        }
+    }
+    agent_validity_result
 }
 
 /// Check that the agent is valid from the perspective of DPKI.

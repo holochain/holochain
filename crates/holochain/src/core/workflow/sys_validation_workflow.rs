@@ -285,7 +285,7 @@ async fn sys_validation_workflow_inner(
         let dpki = workspace
             .dpki
             .clone()
-            .filter(|dpki| dpki.should_run(workspace.dna_def_hashed().as_hash()));
+            .filter(|dpki| !dpki.is_deepkey_dna(workspace.dna_def_hashed().as_hash()));
 
         // Note that this is async only because of the signature checks done during countersigning.
         // In most cases this will be a fast synchronous call.
@@ -669,12 +669,14 @@ async fn validate_chain_op(
     dpki: Option<DpkiImpl>,
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
+    // Check agent validity in Deepkey first
     if let Some(dpki) = dpki {
         // Don't run DPKI agent validity checks on the DPKI service itself
-        if dpki.should_run(dna_def.as_hash()) {
+        if !dpki.is_deepkey_dna(dna_def.as_hash()) {
             check_dpki_agent_validity_for_op(&dpki, op).await?;
         }
     }
+
     match op {
         ChainOp::StoreRecord(_, action, entry) => {
             check_prev_action(action)?;
@@ -771,6 +773,21 @@ async fn validate_chain_op(
             register_delete_link(action, validation_dependencies)
         }
     }
+}
+
+/// Verify agent key validity.
+///
+/// If the previous action is a `Delete` of the current agent pub key,
+/// that agent key is invalid.
+fn check_agent_validity(agent: &AgentPubKey, prev_action: &Action) -> SysValidationResult<()> {
+    if let Action::Delete(delete) = prev_action {
+        if delete.deletes_entry_address == agent.clone().into() {
+            return Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::InvalidAgentKey(agent.clone()),
+            ));
+        }
+    }
+    Ok(())
 }
 
 // TODO: should this check DPKI for agent validity?
@@ -917,6 +934,19 @@ async fn sys_validate_record_inner(
         )
         .await;
 
+        // Check agent validity
+        if let Some(previous_action_hash) = action.prev_action() {
+            let deps = validation_dependencies.same_dht.lock();
+            // Previous action was fetched in the preceding call `fetch_previous_actions`.
+            let previous_action = deps
+                .get(previous_action_hash)
+                .and_then(|s| s.as_action())
+                .ok_or_else(|| {
+                    ValidationOutcome::DepMissingFromDht(previous_action_hash.clone().into())
+                })?;
+            check_agent_validity(action.author(), &previous_action)?;
+        }
+
         store_record(action, validation_dependencies.clone())?;
         if let Some(maybe_entry) = maybe_entry {
             store_entry(
@@ -995,6 +1025,9 @@ fn register_agent_activity(
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
+
+        // Agent key updates are only validated by agent authorities.
+        check_agent_validity(action.author(), &prev_action)?;
 
         match prev_action {
             Action::CloseChain(_) => Err(ValidationOutcome::PrevActionError(

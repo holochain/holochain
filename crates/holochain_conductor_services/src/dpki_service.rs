@@ -22,7 +22,7 @@ pub struct DpkiService {
     /// Mirrored from the State.
     /// Note, this is a little weird for DPKI implementations which are not backed by a Holochain DNA.
     /// In that case, the impl still needs an AgentPubKey to sign new key registrations with, and it still
-    /// needs a unique identifier to advertise network compatibility, which is coved by the DnaHash.
+    /// needs a unique identifier to advertise network compatibility, which is covered by the DnaHash.
     /// So such an implementation should just use 32 unique bytes and create a DnaHash from that, to be
     /// used in this CellId.
     pub cell_id: CellId,
@@ -33,7 +33,7 @@ pub struct DpkiService {
     state: tokio::sync::Mutex<Box<dyn DpkiState>>,
 }
 
-// /// Interface for the DPKI service
+/// Interface for the DPKI service
 impl DpkiService {
     pub fn new(
         cell_id: CellId,
@@ -48,8 +48,10 @@ impl DpkiService {
             state,
         }
     }
-    pub fn should_run(&self, dna_hash: &DnaHash) -> bool {
-        self.cell_id.dna_hash() != dna_hash
+
+    /// Whether the passed in DNA hash is Deepkey DNA hash
+    pub fn is_deepkey_dna(&self, dna_hash: &DnaHash) -> bool {
+        self.cell_id.dna_hash() == dna_hash
     }
 
     /// Get the UUID of the DPKI service.
@@ -87,10 +89,20 @@ pub trait DpkiState: Send + Sync {
         agent_key: Option<AgentPubKey>,
     ) -> DpkiServiceResult<DerivationDetails>;
 
+    /// Create a new key for a given app.
     async fn register_key(
         &self,
         input: CreateKeyInput,
     ) -> DpkiServiceResult<(ActionHash, KeyRegistration, KeyMeta)>;
+
+    /// Query meta data for a given key.
+    async fn query_key_meta(&self, key: AgentPubKey) -> DpkiServiceResult<KeyMeta>;
+
+    /// Revoke a registered key.
+    async fn revoke_key(
+        &self,
+        input: RevokeKeyInput,
+    ) -> DpkiServiceResult<(ActionHash, KeyRegistration)>;
 
     /// Check if the key is valid (properly created and not revoked) as-at the given Timestamp
     async fn key_state(
@@ -110,6 +122,12 @@ pub enum DpkiServiceError {
     Serialization(#[from] SerializedBytesError),
     #[error("Error talking to lair keystore: {0}")]
     Lair(anyhow::Error),
+    #[error("DPKI service not installed")]
+    DpkiNotInstalled,
+    #[error("The agent {0} could not be found in DPKI")]
+    DpkiAgentMissing(AgentPubKey),
+    #[error("The agent {0} was found to be invalid at {1} according to the DPKI service")]
+    DpkiAgentInvalid(AgentPubKey, Timestamp),
 }
 /// Alias
 pub type DpkiServiceResult<T> = Result<T, DpkiServiceError>;

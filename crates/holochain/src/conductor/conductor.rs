@@ -53,6 +53,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
 use tracing::*;
 
+pub use agent_key_operations::RevokeAgentKeyForAppResult;
 pub use builder::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::{DpkiConfig, KeystoreConfig};
@@ -77,7 +78,7 @@ use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
 pub use holochain_types::share;
-use holochain_zome_types::prelude::ClonedCell;
+use holochain_zome_types::prelude::{ClonedCell, Signature, Timestamp};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
 use crate::conductor::cell::Cell;
@@ -133,6 +134,17 @@ mod chc;
 mod graft_records_onto_source_chain;
 
 mod app_auth_token_store;
+
+/// Operations to manipulate agent keys.
+///
+/// Agent keys are handled in 2 places in Holochain, on the source chain of a cell and in the
+/// Deepkey service, should it be installed. Operations to manipulate these keys include key
+/// revocation and key update.
+///
+/// When revoking a key, it becomes invalid and the source chain can no longer be written to.
+/// Clone cells can not be created any more either. This source chain state if final and can not
+/// be reverted or changed.
+mod agent_key_operations;
 
 pub(crate) mod app_broadcast;
 
@@ -1465,6 +1477,7 @@ mod app_impls {
         ) -> ConductorResult<InstalledApp> {
             let dpki = self.running_services().dpki.clone();
 
+            // if dpki is installed, load dpki state
             let mut dpki = if let Some(d) = dpki.as_ref() {
                 let lock = d.state().await;
                 Some((d.clone(), lock))
@@ -1475,11 +1488,14 @@ mod app_impls {
             let (agent_key, derivation_details): (AgentPubKey, Option<DerivationDetailsInput>) =
                 if let Some(agent_key) = agent_key {
                     if dpki.is_some() {
-                        // TODO: allow adding additional apps to an existing DPKI KeyRegistration.
-                        tracing::warn!("Using app with a pre-existing agent key: DPKI will not be used to manage keys for this app.");
+                        // dpki installed, agent key given
+                        tracing::warn!("App is being installed with an existing agent key: DPKI will not be used to manage keys for this app.");
                     }
                     (agent_key, None)
                 } else if let Some((dpki, state)) = &mut dpki {
+                    // dpki installed, no agent key given
+
+                    // register a new key derivation for this app
                     let derivation_details = state.next_derivation_details(None).await?;
 
                     let dst_tag = format!(
@@ -1516,6 +1532,7 @@ mod app_impls {
 
                     (AgentPubKey::from_raw_32(seed), Some(derivation))
                 } else {
+                    // dpki not installed, no agent key given
                     (self.keystore.new_sign_keypair_random().await?, None)
                 };
 
@@ -1596,6 +1613,7 @@ mod app_impls {
             if app_result.is_ok() {
                 // Register the key in DPKI
 
+                // Register initial agent key in Deepkey
                 if let (Some((dpki, state)), Some(derivation)) = (dpki, derivation_details) {
                     let dpki_agent = dpki.cell_id.agent_pubkey();
 
@@ -1989,9 +2007,7 @@ mod clone_cell_impls {
     impl Conductor {
         /// Create a new cell in an existing app based on an existing DNA.
         ///
-        /// # Returns
-        ///
-        /// A struct with the created cell's clone id and cell id.
+        /// Cells of an invalid agent key cannot be cloned.
         pub async fn create_clone_cell(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,
@@ -2010,6 +2026,36 @@ mod clone_cell_impls {
                         .to_string(),
                 ));
             }
+
+            let state = self.get_state().await?;
+            let app = state.get_app(installed_app_id)?;
+            // Check Deepkey first if agent key is valid
+            if let Some(dpki) = self.running_services().dpki {
+                let agent_key = app.agent_key().clone();
+                let key_state = dpki
+                    .state()
+                    .await
+                    .key_state(agent_key.clone(), Timestamp::now())
+                    .await?;
+                if let KeyState::Invalid(_) = key_state {
+                    return Err(
+                        DpkiServiceError::DpkiAgentInvalid(agent_key, Timestamp::now()).into(),
+                    );
+                }
+            }
+
+            // Check source chain if agent key is valid
+            let app_role = app.role(&role_name)?;
+            let source_chain = SourceChain::new(
+                self.get_or_create_authored_db(app_role.dna_hash(), app.agent_key().clone())?,
+                self.get_or_create_dht_db(app_role.dna_hash())?,
+                self.get_or_create_space(app_role.dna_hash())?
+                    .dht_query_cache,
+                self.keystore.clone(),
+                app.agent_key().clone(),
+            )
+            .await?;
+            source_chain.valid_create_agent_key_action().await?;
 
             // add cell to app
             let clone_cell = self

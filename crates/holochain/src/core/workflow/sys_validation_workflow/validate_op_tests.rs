@@ -192,6 +192,124 @@ async fn validate_valid_agent_validation_package_op() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn validate_delete_agent_key_op() {
+    holochain_trace::test_run();
+
+    let mut test_case = TestCase::new().await;
+
+    // Create agent pub key action
+    let create_agent_pub_key = Create {
+        author: test_case.agent.clone(),
+        action_seq: 2,
+        entry_type: EntryType::AgentPubKey,
+        entry_hash: test_case.agent.clone().into(),
+        prev_action: fixt!(ActionHash),
+        weight: Default::default(),
+        timestamp: Timestamp::now().into(),
+    };
+    let create_agent_pub_key_action = test_case
+        .sign_action(Action::Create(create_agent_pub_key))
+        .await;
+
+    // Op to validate
+    let mut action = fixt!(Delete);
+    action.author = test_case.agent.clone();
+    action.prev_action = create_agent_pub_key_action.as_hash().clone();
+    action.action_seq = create_agent_pub_key_action.action().action_seq() + 1;
+    action.deletes_entry_address = test_case.agent.clone().into();
+    action.timestamp = Timestamp::now();
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Delete(action)).into();
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![create_agent_pub_key_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert!(
+        matches!(outcome, Outcome::Accepted),
+        "Expected Accepted but actual outcome was {outcome:?}",
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn reject_action_after_deleted_agent_key() {
+    holochain_trace::test_run();
+
+    let mut test_case = TestCase::new().await;
+
+    // Delete agent pub key action
+    let mut delete_agent_pub_key = fixt!(Delete);
+    delete_agent_pub_key.author = test_case.agent.clone();
+    delete_agent_pub_key.deletes_entry_address = test_case.agent.clone().into();
+    delete_agent_pub_key.action_seq = 4;
+    delete_agent_pub_key.timestamp = Timestamp::now();
+    let delete_agent_pub_key_action = test_case
+        .sign_action(Action::Delete(delete_agent_pub_key))
+        .await;
+
+    // An agent activity op to validate
+    let op = test_op(&delete_agent_pub_key_action);
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![delete_agent_pub_key_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert_eq!(
+        outcome,
+        Outcome::Rejected(ValidationOutcome::InvalidAgentKey(test_case.agent.clone()).to_string()),
+        "Expected Rejected but actual outcome was {outcome:?}",
+    );
+}
+
+// Test that actions after a deleted key, validated by an authority other than the agent authority,
+// are accepted. Only the agent authority will reject ops after a deleted key action.
+#[tokio::test(flavor = "multi_thread")]
+async fn non_agent_authority_accepts_action_after_deleted_agent_key() {
+    holochain_trace::test_run();
+
+    let mut test_case = TestCase::new().await;
+
+    // Delete agent pub key action
+    let mut delete_agent_pub_key = fixt!(Delete);
+    delete_agent_pub_key.author = test_case.agent.clone();
+    delete_agent_pub_key.deletes_entry_address = test_case.agent.clone().into();
+    delete_agent_pub_key.action_seq = 4;
+    delete_agent_pub_key.timestamp = Timestamp::now();
+    let delete_agent_pub_key_action = test_case
+        .sign_action(Action::Delete(delete_agent_pub_key))
+        .await;
+
+    // An agent activity op to validate
+    let mut create_action = fixt!(Create);
+    let entry = Entry::App(fixt!(AppEntryBytes));
+    create_action.author = delete_agent_pub_key_action.action().author().clone();
+    create_action.action_seq = delete_agent_pub_key_action.action().action_seq() + 1;
+    create_action.prev_action = delete_agent_pub_key_action.as_hash().clone();
+    create_action.timestamp = Timestamp::now();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
+    create_action.entry_hash = entry.to_hash();
+    let action = Action::Create(create_action.clone());
+    let op = ChainOp::StoreRecord(fixt!(Signature), action, RecordEntry::Present(entry)).into();
+
+    let outcome = test_case.with_op(op).run().await.unwrap();
+
+    assert_eq!(
+        outcome,
+        Outcome::Accepted,
+        "Expected Accepted but actual outcome was {outcome:?}",
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_create_op() {
     holochain_trace::test_run();
 
@@ -1061,15 +1179,15 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let signed_action = test_case.sign_action(Action::Create(action)).await;
+    let previous_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut update_action = fixt!(Update);
-    update_action.author = signed_action.action().author().clone();
-    update_action.action_seq = signed_action.action().action_seq() + 1;
-    update_action.prev_action = signed_action.as_hash().clone();
+    update_action.author = previous_action.action().author().clone();
+    update_action.action_seq = previous_action.action().action_seq() + 1;
+    update_action.prev_action = previous_action.as_hash().clone();
     update_action.timestamp = Timestamp::now();
     update_action.entry_type = EntryType::App(AppEntryDef::new(
         0.into(),
@@ -1133,15 +1251,15 @@ async fn validate_store_record_update_changes_entry_type() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let signed_action = test_case.sign_action(Action::Create(action)).await;
+    let previous_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut update_action = fixt!(Update);
-    update_action.author = signed_action.action().author().clone();
-    update_action.action_seq = signed_action.action().action_seq() + 1;
-    update_action.prev_action = signed_action.as_hash().clone();
+    update_action.author = previous_action.action().author().clone();
+    update_action.action_seq = previous_action.action().action_seq() + 1;
+    update_action.prev_action = previous_action.as_hash().clone();
     update_action.timestamp = Timestamp::now();
     // Different entry type defined here
     update_action.entry_type = EntryType::App(AppEntryDef::new(
@@ -1439,15 +1557,15 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let signed_action = test_case.sign_action(Action::Create(action)).await;
+    let previous_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut update_action = fixt!(Update);
-    update_action.author = signed_action.action().author().clone();
-    update_action.action_seq = signed_action.action().action_seq() + 1;
-    update_action.prev_action = signed_action.as_hash().clone();
+    update_action.author = previous_action.action().author().clone();
+    update_action.action_seq = previous_action.action().action_seq() + 1;
+    update_action.prev_action = previous_action.as_hash().clone();
     update_action.timestamp = Timestamp::now();
     update_action.entry_type = EntryType::App(AppEntryDef::new(
         0.into(),
@@ -1511,15 +1629,15 @@ async fn validate_store_entry_update_changes_entry_type() {
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let signed_action = test_case.sign_action(Action::Create(action)).await;
+    let previous_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
     let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
     let mut update_action = fixt!(Update);
-    update_action.author = signed_action.action().author().clone();
-    update_action.action_seq = signed_action.action().action_seq() + 1;
-    update_action.prev_action = signed_action.as_hash().clone();
+    update_action.author = previous_action.action().author().clone();
+    update_action.action_seq = previous_action.action().action_seq() + 1;
+    update_action.prev_action = previous_action.as_hash().clone();
     update_action.timestamp = Timestamp::now();
     // Different entry type defined here
     update_action.entry_type = EntryType::App(AppEntryDef::new(
@@ -2085,7 +2203,7 @@ async fn validate_remove_link_missing_link_add_ref() {
 
     let mut test_case = TestCase::new().await;
 
-    // Previous action
+    // Dummy action to set up the mock, won't be referenced
     let mut dummy_action = fixt!(CreateLink);
     dummy_action.author = test_case.agent.clone();
     dummy_action.timestamp = Timestamp::now();
@@ -2227,7 +2345,7 @@ async fn crash_case() {
         .unwrap();
 
     // and current which needs values from previous
-    let op = test_op(signed_action.clone());
+    let op = test_op(&signed_action);
 
     let dna_def = DnaDef::unique_from_zomes(vec![], vec![]);
     let dna_def = DnaDefHashed::from_content_sync(dna_def);
@@ -2368,7 +2486,7 @@ impl TestCase {
     }
 }
 
-fn test_op(previous: SignedHashed<Action>) -> DhtOp {
+fn test_op(previous: &SignedHashed<Action>) -> DhtOp {
     let mut create_action = fixt!(Create);
     create_action.author = previous.action().author().clone();
     create_action.action_seq = previous.action().action_seq() + 1;

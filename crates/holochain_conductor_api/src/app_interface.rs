@@ -421,6 +421,13 @@ impl AppInfo {
     }
 }
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+/// The parameters to revoke an agent for an app.
+pub struct RevokeAgentKeyPayload {
+    pub agent_key: AgentPubKey,
+    pub app_id: InstalledAppId,
+}
+
 /// A flat, slightly more API-friendly representation of [`AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]

@@ -108,7 +108,7 @@ impl SweetConductorBatch {
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
     pub async fn from_standard_config_rendezvous(num: usize) -> SweetConductorBatch {
-        Self::from_config_rendezvous(num, SweetConductorConfig::standard()).await
+        Self::from_config_rendezvous(num, SweetConductorConfig::rendezvous(true)).await
     }
 
     /// Iterate over the SweetConductors

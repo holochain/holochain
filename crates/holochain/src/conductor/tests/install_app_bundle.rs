@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::conductor::api::error::ConductorApiError;
 use crate::{conductor::error::ConductorError, sweettest::*};
 use ::fixt::prelude::strum_macros;
 use holo_hash::DnaHash;
@@ -128,9 +127,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             .unwrap_err();
         assert_matches!(
             err,
-            ConductorApiError::ConductorError(ConductorError::AppError(
-                AppError::CloneLimitExceeded(1, _)
-            ))
+            ConductorError::AppError(AppError::CloneLimitExceeded(1, _))
         );
         let state = conductor.get_state().await.unwrap();
         let app = state.get_app(&"app_1".to_string()).unwrap();

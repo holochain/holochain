@@ -84,8 +84,6 @@ async fn validate_with_dpki() {
         KeyState::Valid(_)
     ));
 
-    conductors.exchange_peer_info().await;
-
     conductors.persist_dbs();
 
     println!("--------------------------------------------");
@@ -114,9 +112,6 @@ async fn validate_with_dpki() {
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    await_consistency(60, &conductors.dpki_cells()[0..=1])
-        .await
-        .unwrap();
     await_consistency(60, [&alice, &bob]).await.unwrap();
 
     // Carol is nowhere to be found since she never installed DPKI

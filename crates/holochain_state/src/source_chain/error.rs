@@ -19,6 +19,9 @@ pub enum SourceChainError {
     #[error("The source chain is empty, but is expected to have been initialized")]
     ChainEmpty,
 
+    #[error("Agent key {0} invalid in cell {1}")]
+    InvalidAgentKey(AgentPubKey, CellId),
+
     #[error(
         "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {2:?}, Current head: {3:?}"
     )]

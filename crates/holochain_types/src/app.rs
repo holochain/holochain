@@ -84,7 +84,7 @@ pub struct UpdateCoordinatorsPayload {
     pub source: CoordinatorSource,
 }
 
-/// The arguments to create a clone of an existing cell.
+/// The parameters to create a clone of an existing cell.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateCloneCellPayload {
     /// The DNA's role name to clone
@@ -99,17 +99,17 @@ pub struct CreateCloneCellPayload {
     pub name: Option<String>,
 }
 
-/// Arguments to specify the clone cell to be disabled.
+/// Parameters to specify the clone cell to be disabled.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct DisableCloneCellPayload {
     /// The clone id or cell id of the clone cell
     pub clone_cell_id: CloneCellId,
 }
 
-/// Arguments to specify the clone cell to be enabled.
+/// Parameters to specify the clone cell to be enabled.
 pub type EnableCloneCellPayload = DisableCloneCellPayload;
 
-/// Arguments to delete a disabled clone cell of an app.
+/// Parameters to delete a disabled clone cell of an app.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct DeleteCloneCellPayload {
     /// The app id that the DNA to clone belongs to
@@ -1023,6 +1023,8 @@ pub enum DisabledAppReason {
     AwaitingMemproofs,
     /// The disabling was done manually by the user (via admin interface)
     User,
+    /// Disabling app in order to revoke its agent key and render all chains read-only.
+    DeletingAgentKey,
     /// The disabling was due to an UNRECOVERABLE error
     Error(String),
 }

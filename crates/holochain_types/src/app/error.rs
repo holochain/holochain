@@ -27,5 +27,8 @@ pub enum AppError {
 
     #[error("Tried to install app '{0}' which contains duplicate role names. The following role names have duplicates: {1:?}")]
     DuplicateRoleNames(InstalledAppId, Vec<RoleName>),
+
+    #[error("Agent key '{0}' does not exist for app '{1}")]
+    AgentKeyMissing(AgentPubKey, InstalledAppId),
 }
 pub type AppResult<T> = Result<T, AppError>;

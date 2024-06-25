@@ -1,3 +1,5 @@
+use serde::de::DeserializeOwned;
+
 use super::*;
 
 use crate::CellRunner;
@@ -24,21 +26,23 @@ pub struct DeepkeyState {
     pub(crate) cell_id: CellId,
 }
 
-#[async_trait::async_trait]
-impl DpkiState for DeepkeyState {
-    async fn next_derivation_details(
+const DEEPKEY_ZOME_NAME: &str = "deepkey_csr";
+
+impl DeepkeyState {
+    async fn call_deepkey_zome<
+        I: serde::Serialize + std::fmt::Debug,
+        O: std::fmt::Debug + DeserializeOwned,
+    >(
         &self,
-        agent_key: Option<AgentPubKey>,
-    ) -> DpkiServiceResult<DerivationDetails> {
+        fn_name: &str,
+        input: I,
+    ) -> DpkiServiceResult<O> {
         let cell_id = self.cell_id.clone();
         let provenance = cell_id.agent_pubkey().clone();
-        let zome_name: ZomeName = "deepkey_csr".into();
-        let fn_name: FunctionName = "next_derivation_details".into();
-        let agent_bytes = agent_key.map(|agent_key| {
-            serde_bytes::ByteArray::<32>::new(agent_key.get_raw_32().try_into().unwrap())
-        });
-        let payload = ExternIO::encode(agent_bytes)?;
         let cap_secret = None;
+        let zome_name: ZomeName = DEEPKEY_ZOME_NAME.into();
+        let fn_name: FunctionName = fn_name.into();
+        let payload = ExternIO::encode(input)?;
         self.runner
             .call_zome(
                 &provenance,
@@ -53,30 +57,39 @@ impl DpkiState for DeepkeyState {
             .decode()
             .map_err(Into::into)
     }
+}
+
+#[async_trait::async_trait]
+impl DpkiState for DeepkeyState {
+    async fn next_derivation_details(
+        &self,
+        agent_key: Option<AgentPubKey>,
+    ) -> DpkiServiceResult<DerivationDetails> {
+        let payload = agent_key.map(|agent_key| {
+            serde_bytes::ByteArray::<32>::new(agent_key.get_raw_32().try_into().unwrap())
+        });
+        self.call_deepkey_zome("next_derivation_details", payload)
+            .await
+    }
 
     async fn register_key(
         &self,
         input: CreateKeyInput,
     ) -> DpkiServiceResult<(ActionHash, KeyRegistration, KeyMeta)> {
-        let cell_id = self.cell_id.clone();
-        let provenance = cell_id.agent_pubkey().clone();
-        let zome_name: ZomeName = "deepkey_csr".into();
-        let fn_name: FunctionName = "create_key".into();
-        let payload = ExternIO::encode(input)?;
-        let cap_secret = None;
-        self.runner
-            .call_zome(
-                &provenance,
-                cap_secret,
-                cell_id,
-                zome_name,
-                fn_name,
-                payload,
-            )
+        self.call_deepkey_zome("create_key", input).await
+    }
+
+    async fn query_key_meta(&self, agent_key: AgentPubKey) -> DpkiServiceResult<KeyMeta> {
+        let payload = agent_key.get_raw_32();
+        self.call_deepkey_zome("query_key_meta_for_key", payload)
             .await
-            .map_err(DpkiServiceError::ZomeCallFailed)?
-            .decode()
-            .map_err(Into::into)
+    }
+
+    async fn revoke_key(
+        &self,
+        input: RevokeKeyInput,
+    ) -> DpkiServiceResult<(ActionHash, KeyRegistration)> {
+        self.call_deepkey_zome("revoke_key", input).await
     }
 
     async fn key_state(
@@ -84,26 +97,8 @@ impl DpkiState for DeepkeyState {
         key: AgentPubKey,
         timestamp: Timestamp,
     ) -> DpkiServiceResult<KeyState> {
-        let cell_id = self.cell_id.clone();
-        let provenance = cell_id.agent_pubkey().clone();
         let agent_anchor = key.get_raw_32();
-        let zome_name: ZomeName = "deepkey_csr".into();
-        let fn_name: FunctionName = "key_state".into();
-        let payload = ExternIO::encode((agent_anchor, timestamp))?;
-        let cap_secret = None;
-        let response = self
-            .runner
-            .call_zome(
-                &provenance,
-                cap_secret,
-                cell_id,
-                zome_name,
-                fn_name,
-                payload,
-            )
-            .await
-            .map_err(DpkiServiceError::ZomeCallFailed)?;
-        let state: KeyState = response.decode()?;
-        Ok(state)
+        let payload = (agent_anchor, timestamp);
+        self.call_deepkey_zome("key_state", payload).await
     }
 }
