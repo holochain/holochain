@@ -249,7 +249,8 @@ async fn app_validation_workflow_inner(
     let rejected_ops = Arc::new(AtomicUsize::new(0));
     let warranted_ops = Arc::new(AtomicUsize::new(0));
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
-    let mut agent_activity = Vec::new();
+    let mut agent_activity = vec![];
+    let mut warrant_op_hashes = vec![];
 
     // Validate ops sequentially
     for sorted_dht_op in sorted_dht_ops.into_iter() {
@@ -325,6 +326,8 @@ async fn app_validation_workflow_inner(
                         )
                         .await?;
 
+                    warrant_op_hashes.push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
+
                     workspace
                         .authored_db
                         .write_async(move |txn| {
@@ -392,6 +395,15 @@ async fn app_validation_workflow_inner(
             }
         }
     }
+
+    holochain_state::integrate::authored_ops_to_dht_db(
+        network,
+        warrant_op_hashes,
+        workspace.authored_db.clone().into(),
+        workspace.dht_db.clone(),
+        &workspace.dht_db_cache,
+    )
+    .await?;
 
     // Once the database transaction is committed, add agent activity to the cache
     // that is ready for integration.

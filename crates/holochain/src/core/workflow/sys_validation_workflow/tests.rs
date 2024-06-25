@@ -181,8 +181,8 @@ async fn sys_validation_produces_forked_chain_warrant() {
                     store.get_warrants_for_basis(&basis, false).unwrap()
                 })
         },
-        |warrants: &Vec<Warrant>| { !warrants.is_empty() },
-        |mut warrants: Vec<Warrant>| {
+        |warrants: &Vec<WarrantOp>| { !warrants.is_empty() },
+        |mut warrants: Vec<WarrantOp>| {
             matches::assert_matches!(
                 warrants.pop().unwrap().proof,
                 WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. })

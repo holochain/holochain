@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use futures::io::Chain;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_cascade::test_utils::*;
@@ -8,6 +7,7 @@ use holochain_cascade::CascadeImpl;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::db::DbKindCache;
 use holochain_sqlite::db::DbKindDht;
+use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::prelude::*;
 use holochain_types::test_utils::chain::*;
 use test_case::test_case;
@@ -118,6 +118,10 @@ fn warrant(author: u8, action: u8) -> WarrantOp {
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
     => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 2; "1 to genesis with dht 0 till 2")]
 #[test_case(
+    Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(1, 1)], ..Default::default() },
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
+    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 2; "1 to genesis with dht 0 till 2 with 1 unrelated chain warrant")]
+#[test_case(
     Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(0, 0)], ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
     => matches MustGetAgentActivityResponse::Warrants(a) if a.len() == 1; "1 to genesis with dht 0 till 2 with 1 chain warrant")]
@@ -151,6 +155,7 @@ async fn test_must_get_agent_activity(
         warrants,
     } = data;
     let dht = commit_chain(DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))), dht);
+    let network = PassThroughNetwork::authority_for_nothing(vec![dht.clone().into()]);
     let cache = commit_chain(
         DbKindCache(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         cache,
@@ -162,12 +167,19 @@ async fn test_must_get_agent_activity(
         ))),
         authored,
     );
+    let hashes = warrants.iter().map(|w| w.to_hash()).collect();
     authored.test_write(|txn| {
         for w in warrants {
             let w = DhtOp::from(w).into_hashed();
             insert_op(txn, &w).unwrap();
         }
     });
+
+    let dht_cache = DhtDbQueryCache::new(dht.clone().into());
+    authored_ops_to_dht_db_without_check(hashes, authored.clone().into(), dht, &dht_cache)
+        .await
+        .unwrap();
+
     let sync_scratch = match scratch {
         Some(scratch) => {
             let sync_scratch = Scratch::new().into_sync();
@@ -176,7 +188,6 @@ async fn test_must_get_agent_activity(
         }
         None => None,
     };
-    let network = PassThroughNetwork::authority_for_nothing(vec![dht.into()]);
     let mut cascade = CascadeImpl::empty()
         .with_authored(authored.into())
         .with_network(network, cache);

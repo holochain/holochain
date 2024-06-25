@@ -29,22 +29,22 @@ pub async fn must_get_agent_activity(
 }
 
 pub fn get_bounded_activity(
-    txn: &mut Transaction,
+    txn: &Transaction,
     scratch: Option<&Scratch>,
     author: &AgentPubKey,
     filter: ChainFilter,
 ) -> StateQueryResult<BoundedMustGetAgentActivityResponse> {
     // Find the bounds of the range specified in the filter.
-    let warrants = Txn::from(txn)
-        .get_warrants_for_basis(&AnyLinkableHash::from(author.clone().into()), true)?;
+    let txn = Txn::from(txn);
+    let warrants = txn.get_warrants_for_basis(&AnyLinkableHash::from(author.clone()), true)?;
     if !warrants.is_empty() {
         return Ok(BoundedMustGetAgentActivityResponse::Warrants(warrants));
     }
 
-    match find_bounds(txn, scratch, author, filter)? {
+    match find_bounds(&txn, scratch, author, filter)? {
         Sequences::Found(filter_range) => {
             // Get the full range of actions from the database.
-            get_activity(txn, scratch, author, filter_range.range())
+            get_activity(&txn, scratch, author, filter_range.range())
                 .map(|a| BoundedMustGetAgentActivityResponse::Activity(a, filter_range))
         }
         // One of the actions specified in the filter does not exist in the database.
@@ -82,7 +82,7 @@ pub fn filter_then_check(
 
 /// Find the filters sequence bounds.
 fn find_bounds(
-    txn: &mut Transaction,
+    txn: &Transaction,
     scratch: Option<&Scratch>,
     author: &AgentPubKey,
     filter: ChainFilter,
@@ -111,7 +111,7 @@ fn find_bounds(
 /// Get the agent activity for a given range of actions
 /// from the database.
 fn get_activity(
-    txn: &mut Transaction,
+    txn: &Transaction,
     scratch: Option<&Scratch>,
     author: &AgentPubKey,
     range: &RangeInclusive<u32>,

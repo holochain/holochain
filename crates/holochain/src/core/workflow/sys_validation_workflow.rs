@@ -137,6 +137,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
         workspace.clone(),
         current_validation_dependencies.clone(),
         config,
+        &network,
         keystore,
         representative_agent,
     )
@@ -230,6 +231,7 @@ async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     config: Arc<ConductorConfig>,
+    network: &impl HolochainP2pDnaT,
     keystore: MetaLairClient,
     representative_agent: AgentPubKey,
 ) -> WorkflowResult<OutcomeSummary> {
@@ -375,6 +377,11 @@ async fn sys_validation_workflow_inner(
         warrants.push(warrant_op);
     }
 
+    let warrant_op_hashes = warrants
+        .iter()
+        .map(|w| (w.as_hash().clone(), w.dht_basis()))
+        .collect::<Vec<_>>();
+
     workspace
         .authored_db
         .write_async(move |txn| {
@@ -385,6 +392,17 @@ async fn sys_validation_workflow_inner(
             StateMutationResult::Ok(())
         })
         .await?;
+
+    if let Some(cache) = workspace.dht_query_cache.as_ref() {
+        holochain_state::integrate::authored_ops_to_dht_db(
+            network,
+            warrant_op_hashes,
+            workspace.authored_db.clone().into(),
+            workspace.dht_db.clone(),
+            cache,
+        )
+        .await?;
+    }
 
     tracing::debug!(
         ?summary,
