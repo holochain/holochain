@@ -69,7 +69,7 @@ jobs:
           # TODO replace with nix-cache-check
           function do_nix_build {
             nix build -L --refresh -j0 \
-              --override-input versions "github:holochain/holochain?dir=versions/0_1" \
+              --override-input versions "github:holochain/holochain?dir=versions/0_3" \
               github:holochain/holochain#devShells.${nix_system}.holonix
           }
 

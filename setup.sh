@@ -2,9 +2,7 @@
 
 set -e
 
-# bump this to the most recent version when the following bugs have been resolved
-# - https://github.com/NixOS/nix/issues/7984
-export NIX_INSTALLER_URL=${NIX_INSTALLER_URL:-https://releases.nixos.org/nix/nix-2.17.0/install}
+export NIX_INSTALLER_URL=${NIX_INSTALLER_URL:-https://releases.nixos.org/nix/nix-2.23.0/install}
 
 run_cmd() {
     echo "$@"
@@ -35,7 +33,7 @@ if ! command -v nix &>/dev/null; then
 fi
 
 echo "Setting up binary cache for all users (requires root access)"
-run_cmd sudo --preserve-env=NIX_CONFIG,PATH $(which nix) run nixpkgs/nixos-22.11#cachix --extra-experimental-features "nix-command flakes" -- use holochain-ci -m root-nixconf
+run_cmd sudo --preserve-env=NIX_CONFIG,PATH "$(which nix)" run nixpkgs/nixos-24.05#cachix --extra-experimental-features "nix-command flakes" -- use holochain-ci -m root-nixconf
 echo
 
 echo "Restarting Nix daemon"
