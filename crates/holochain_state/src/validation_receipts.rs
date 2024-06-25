@@ -96,6 +96,11 @@ pub fn get_pending_validation_receipts(
     Ok(ops)
 }
 
+/// Finds [DhtOp]s for the given [ActionHash] and returns the associated [ValidationReceiptSet]s.
+///
+/// Each [ValidationReceiptSet] contains the validation receipts we have received for a single [DhtOp].
+/// If we have received enough validation receipts for an op, then its validation receipt set will
+/// have the `receipts_complete` field set to `true`.
 pub fn validation_receipts_for_action(
     txn: &Transaction,
     action_hash: ActionHash,
@@ -124,6 +129,10 @@ pub fn validation_receipts_for_action(
     )
 }
 
+/// Convenience alternative to calling [validation_receipts_for_action].
+///
+/// This function looks up the actions associated with the given [EntryHash] and then finds [DhtOp]s
+/// and [ValidationReceiptSet]s for those actions.
 pub fn validation_receipts_for_entry(
     txn: &Transaction,
     entry_hash: EntryHash,
