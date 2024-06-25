@@ -984,14 +984,14 @@ impl CascadeImpl {
             move || {
                 let mut results = Vec::with_capacity(txn_guards.len() + 1);
                 for txn_guard in &mut txn_guards {
-                    let mut txn = txn_guard.transaction()?;
+                    let txn = txn_guard.transaction()?;
                     let r = match &scratch {
                         Some(scratch) => {
                             scratch.apply_and_then(|scratch| {
-                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, Some(scratch), &author, filter.clone())
+                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&txn, Some(scratch), &author, filter.clone())
                             })?
                         }
-                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, None, &author, filter.clone())?
+                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&txn, None, &author, filter.clone())?
                     };
                     results.push(r);
                 }
