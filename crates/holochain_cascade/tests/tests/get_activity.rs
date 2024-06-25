@@ -100,18 +100,12 @@ async fn get_activity_with_warrants() {
         let warrant = Warrant::new(p, AgentPubKey::from_raw_36(vec![255; 36]), Timestamp::now());
         WarrantOp::from(SignedWarrant::new(warrant, ::fixt::fixt!(Signature)))
     };
+
+    // Insert unvalidated warrant op
     dht.test_write({
         let op = DhtOp::from(warrant.clone()).into_hashed();
         move |txn| {
             holochain_state::mutations::insert_op(txn, &op).unwrap();
-            holochain_state::mutations::set_validation_status(
-                txn,
-                op.as_hash(),
-                ValidationStatus::Valid,
-            )
-            .unwrap();
-            holochain_state::mutations::set_when_integrated(txn, op.as_hash(), Timestamp::now())
-                .unwrap();
         }
     });
 
@@ -128,20 +122,46 @@ async fn get_activity_with_warrants() {
     // Cascade
     let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
 
-    let r = cascade
+    let mut expected = AgentActivityResponse {
+        agent: td.agent.clone(),
+        valid_activity: td.valid_records.clone(),
+        rejected_activity: ChainItems::NotRequested,
+        warrants: vec![],
+        status: ChainStatus::Valid(td.chain_head.clone()),
+        highest_observed: Some(td.highest_observed.clone()),
+    };
+
+    let r1 = cascade
+        .get_agent_activity(td.agent.clone(), ChainQueryFilter::new(), options.clone())
+        .await
+        .unwrap();
+
+    assert_eq!(r1, expected);
+
+    // If the warrant is validated, it will be returned
+    dht.test_write({
+        let op = DhtOp::from(warrant.clone()).into_hashed();
+        let op_hash = op.as_hash().clone();
+        move |txn| {
+            holochain_state::mutations::set_validation_status(
+                txn,
+                &op_hash,
+                ValidationStatus::Valid,
+            )
+            .unwrap();
+            holochain_state::mutations::set_when_integrated(txn, &op_hash, Timestamp::now())
+                .unwrap();
+        }
+    });
+
+    let r2 = cascade
         .get_agent_activity(td.agent.clone(), ChainQueryFilter::new(), options)
         .await
         .unwrap();
 
-    let expected = AgentActivityResponse {
-        agent: td.agent.clone(),
-        valid_activity: td.valid_records.clone(),
-        rejected_activity: ChainItems::NotRequested,
-        warrants: vec![warrant.into_warrant()],
-        status: ChainStatus::Valid(td.chain_head.clone()),
-        highest_observed: Some(td.highest_observed.clone()),
-    };
-    assert_eq!(r, expected);
+    expected.warrants = vec![warrant.into_warrant()];
+
+    assert_eq!(r2, expected);
 }
 
 #[derive(Default)]
