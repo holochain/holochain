@@ -85,6 +85,9 @@ pub struct ValidationReceiptSet {
 }
 
 /// Summary information for a validation receipt.
+///
+/// Currently, this is ignoring `dht_op_hash` because it's already on the parent type and
+/// `when_integrated` because that's not relevant to the validation receipt itself.
 pub struct ValidationReceiptInfo {
     /// the result of the validation.
     pub validation_status: ValidationStatus,
