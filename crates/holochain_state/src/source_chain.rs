@@ -1086,7 +1086,7 @@ pub async fn genesis(
 
     // We don't check for authorityship here because during genesis we have no opportunity
     // to discover that the network is sharded and that we should not be an authority for
-    // these items, so we assume we are an authority. 
+    // these items, so we assume we are an authority.
     authored_ops_to_dht_db_without_check(
         ops_to_integrate,
         authored.clone().into(),

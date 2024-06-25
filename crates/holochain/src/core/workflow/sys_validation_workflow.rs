@@ -394,6 +394,7 @@ async fn sys_validation_workflow_inner(
         .await?;
 
     if let Some(cache) = workspace.dht_query_cache.as_ref() {
+        // "self-publish" warrants
         holochain_state::integrate::authored_ops_to_dht_db(
             network,
             warrant_op_hashes,
