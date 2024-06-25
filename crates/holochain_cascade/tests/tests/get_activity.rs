@@ -62,34 +62,87 @@ async fn get_activity() {
     assert_eq!(r, expected);
 }
 
-// #[tokio::test(flavor = "multi_thread")]
-// async fn test_must_get_agent_activity_with_warrants() {
-//     let dht = commit_chain(
-//         DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
-//         agent_chain(&[(0, 0..3)]),
-//     );
-//     let cache = commit_chain(
-//         DbKindCache(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
-//         vec![],
-//     );
-//     let authored = commit_chain(
-//         DbKindAuthored(Arc::new(CellId::new(
-//             DnaHash::from_raw_36(vec![0; 36]),
-//             AgentPubKey::from_raw_36(vec![0; 36]),
-//         ))),
-//         vec![],
-//     );
-//     let network = PassThroughNetwork::authority_for_nothing(vec![dht.into()]);
-//     let cascade = CascadeImpl::empty()
-//         .with_authored(authored.into())
-//         .with_network(network, cache);
-//     let filter = ChainFilter::new(action_hash(&[2]));
-//     let r = cascade
-//         .must_get_agent_activity(agent_hash(&[0]), filter)
-//         .await
-//         .unwrap();
-//     dbg!(&r);
-// }
+#[tokio::test(flavor = "multi_thread")]
+async fn get_activity_with_warrants() {
+    holochain_trace::test_run();
+
+    // DBs
+    let cache = test_cache_db();
+    let dht = test_dht_db();
+
+    // Data
+    let td = ActivityTestData::valid_chain_scenario();
+
+    for hash_op in td.hash_ops.iter().cloned() {
+        fill_db(&dht.to_db(), hash_op).await;
+    }
+    for hash_op in td.noise_ops.iter().cloned() {
+        fill_db(&dht.to_db(), hash_op).await;
+    }
+    for hash_op in td.store_ops.iter().cloned() {
+        fill_db(&cache.to_db(), hash_op).await;
+    }
+
+    let warrant = {
+        let action_pair = (
+            (td.hash_ops[0].action().to_hash(), ::fixt::fixt!(Signature)),
+            (td.hash_ops[1].action().to_hash(), ::fixt::fixt!(Signature)),
+        );
+        let p = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+            chain_author: td.agent.clone(),
+            action_pair,
+        });
+        // let p = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+        //     action_author: td.agent.clone(),
+        //     action: (td.chain_head.hash.clone(), ::fixt::fixt!(Signature)),
+        //     validation_type: ValidationType::Sys,
+        // });
+        let warrant = Warrant::new(p, AgentPubKey::from_raw_36(vec![255; 36]), Timestamp::now());
+        WarrantOp::from(SignedWarrant::new(warrant, ::fixt::fixt!(Signature)))
+    };
+    dht.test_write({
+        let op = DhtOp::from(warrant.clone()).into_hashed();
+        move |txn| {
+            holochain_state::mutations::insert_op(txn, &op).unwrap();
+            holochain_state::mutations::set_validation_status(
+                txn,
+                op.as_hash(),
+                ValidationStatus::Valid,
+            )
+            .unwrap();
+            holochain_state::mutations::set_when_integrated(txn, op.as_hash(), Timestamp::now())
+                .unwrap();
+        }
+    });
+
+    let options = holochain_p2p::actor::GetActivityOptions {
+        include_valid_activity: true,
+        include_rejected_activity: false,
+        include_full_actions: true,
+        ..Default::default()
+    };
+
+    // Network
+    let network = PassThroughNetwork::authority_for_nothing(vec![dht.to_db().clone().into()]);
+
+    // Cascade
+    let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
+
+    let r = cascade
+        .get_agent_activity(td.agent.clone(), ChainQueryFilter::new(), options)
+        .await
+        .unwrap();
+
+    let expected = AgentActivityResponse {
+        agent: td.agent.clone(),
+        valid_activity: td.valid_records.clone(),
+        rejected_activity: ChainItems::NotRequested,
+        warrants: vec![warrant.into_warrant()],
+        status: ChainStatus::Valid(td.chain_head.clone()),
+        highest_observed: Some(td.highest_observed.clone()),
+    };
+    assert_eq!(r, expected);
+}
 
 #[derive(Default)]
 struct Data {
