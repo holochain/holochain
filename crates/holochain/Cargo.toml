@@ -108,7 +108,10 @@ tx5-go-pion-turn = { version = "=0.0.13-alpha", optional = true }
 
 # chc deps
 bytes = { version = "1", optional = true }
-reqwest = { version = "0.12", features = ["json"], optional = true }
+reqwest = { version = "0.12", features = [
+  "json",
+  "native-tls-vendored",
+], optional = true }
 
 # TODO: make optional?
 aitia = { version = "^0.3.0-dev.3", path = "../aitia" }
