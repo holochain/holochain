@@ -357,12 +357,12 @@ async fn app_validation_workflow_inner(
                                 put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Valid)
                             }
                         }
-                        Outcome::AwaitingDeps(deps) => {
+                        Outcome::AwaitingDeps(_) => {
                             awaiting_ops.fetch_add(1, Ordering::SeqCst);
                             put_validation_limbo(
                                 txn,
                                 &dht_op_hash,
-                                ValidationStage::AwaitingAppDeps(deps),
+                                ValidationStage::AwaitingAppDeps,
                             )
                         }
                         Outcome::Rejected(_) => {

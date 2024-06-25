@@ -13,7 +13,8 @@ pub use chc_local::*;
 mod chc_remote;
 pub use chc_remote::*;
 
-static CHC_LOCAL_MAP: Lazy<parking_lot::Mutex<HashMap<CellId, Arc<ChcLocal>>>> =
+/// Storage for the local CHC implementations
+pub static CHC_LOCAL_MAP: Lazy<parking_lot::Mutex<HashMap<CellId, Arc<ChcLocal>>>> =
     Lazy::new(|| parking_lot::Mutex::new(HashMap::new()));
 
 /// The URL which indicates that the fake local CHC service should be used,

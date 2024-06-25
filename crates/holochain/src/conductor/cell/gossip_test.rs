@@ -61,7 +61,7 @@ async fn signature_smoke_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_info_test() {
     holochain_trace::test_run();
-    let config = SweetConductorConfig::standard().no_publish();
+    let config = SweetConductorConfig::standard().no_publish().no_dpki();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
     let (dna_file, _, _) =

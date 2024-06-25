@@ -910,7 +910,6 @@ impl Cell {
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
 
         let dna_def = ribosome.dna_def().as_content().clone();
-
         // If there is no existing zome call then this is the root zome call
         let is_root_zome_call = workspace_lock.is_none();
         let workspace_lock = match workspace_lock {
@@ -928,7 +927,6 @@ impl Cell {
                 .await?
             }
         };
-
         let args = CallZomeWorkflowArgs {
             cell_id: self.id.clone(),
             ribosome,
@@ -1009,17 +1007,20 @@ impl Cell {
     }
 
     /// Clean up long-running managed tasks.
+    #[tracing::instrument(skip_all, fields(cell_id = ?self.id()))]
     pub async fn cleanup(&self) -> CellResult<()> {
         use holochain_p2p::HolochainP2pDnaT;
         let shutdown = self
             .conductor_handle
             .task_manager()
             .stop_cell_tasks(self.id().clone())
-            .map(|r| CellResult::Ok(r?));
+            .map(|r| CellResult::Ok(r?))
+            .in_current_span();
         let leave = self
             .holochain_p2p_dna()
             .leave(self.id.agent_pubkey().clone())
-            .map(|r| CellResult::Ok(r?));
+            .map(|r| CellResult::Ok(r?))
+            .in_current_span();
         let (shutdown, leave) = futures::future::join(shutdown, leave).await;
         shutdown?;
         leave?;
@@ -1060,6 +1061,12 @@ impl Cell {
         self.queue_triggers
             .integrate_dht_ops
             .trigger(&"notify_authored_ops_moved_to_limbo");
+    }
+
+    pub(crate) fn publish_authored_ops(&self) {
+        self.queue_triggers
+            .publish_dht_ops
+            .trigger(&"publish_authored_ops");
     }
 
     #[cfg(any(test, feature = "test_utils"))]

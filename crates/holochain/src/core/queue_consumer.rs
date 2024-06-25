@@ -165,6 +165,7 @@ pub async fn spawn_queue_consumer_tasks(
                 dht_query_cache.clone(),
                 cache.clone(),
                 Arc::new(dna_def),
+                conductor.running_services().dpki.clone(),
                 conductor
                     .get_config()
                     .conductor_tuning_params()

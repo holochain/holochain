@@ -12,13 +12,16 @@ use rand::{thread_rng, Rng};
 async fn must_get_agent_activity_saturation() {
     use holochain::sweettest::await_consistency;
 
-    holochain_trace::test_run();
+    holochain_trace::init_fmt(holochain_trace::Output::LogTimed).unwrap();
+
     let mut rng = thread_rng();
     let (dna, _, _) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MustGetAgentActivity]).await;
-    let mut conductors =
-        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(true))
-            .await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(
+        2,
+        SweetConductorConfig::rendezvous(true).no_dpki_mustfix(),
+    )
+    .await;
     let apps = conductors
         .setup_app("", [&dna])
         .await

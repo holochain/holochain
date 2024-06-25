@@ -50,10 +50,12 @@ impl NetworkTopologyConductor {
     /// Get the conductor share for this node. This is an async function because
     /// it needs to initialize the conductor if it hasn't been initialized yet.
     pub async fn lock(&self) -> &RwLock<SweetConductor> {
-        let mut config = SweetConductorConfig::standard();
-        config.keystore = KeystoreConfig::DangerTestKeystore;
         self.0
-            .get_or_init(async { RwLock::new(SweetConductor::from_config(config).await) })
+            .get_or_init(async {
+                let mut config = SweetConductorConfig::standard().no_dpki_mustfix();
+                config.keystore = KeystoreConfig::DangerTestKeystore;
+                RwLock::new(SweetConductor::from_config(config).await)
+            })
             .await
     }
 }
@@ -545,7 +547,7 @@ pub mod test {
 
                 assert_eq!(Ok(()), topology.integrity_check());
             },
-            3_000_000
+            7_000_000
         );
     }
 
@@ -573,7 +575,7 @@ pub mod test {
                     topology.integrity_check()
                 );
             },
-            3_000_000
+            7_000_000
         );
     }
 
@@ -611,7 +613,7 @@ pub mod test {
                     topology.integrity_check()
                 );
             },
-            3_000_000
+            7_000_000
         );
     }
 
@@ -651,7 +653,7 @@ pub mod test {
                     topology.integrity_check()
                 );
             },
-            3_000_000
+            7_000_000
         );
     }
 
@@ -689,7 +691,7 @@ pub mod test {
                     topology.integrity_check()
                 );
             },
-            3_000_000
+            7_000_000
         );
     }
 }

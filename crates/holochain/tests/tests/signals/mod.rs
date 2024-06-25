@@ -44,7 +44,8 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
     // Make sure the conductors are talking to each other before sending signals.
     conductors[1]
         .require_initial_gossip_activity_for_cell(&bob, 3, Duration::from_secs(90))
-        .await;
+        .await
+        .unwrap();
 
     // Listen for signals on Bob's and Carol's conductors.
     // These are all the signals on that conductor but the only app installed

@@ -7,6 +7,7 @@ use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::ConductorHandle;
+use crate::core::check_dpki_agent_validity_for_record;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
@@ -63,6 +64,12 @@ where
         .ribosome
         .dna_def()
         .get_coordinator_zome(args.invocation.zome.zome_name())
+        .or_else(|_| {
+            args.ribosome
+                .dna_def()
+                .get_integrity_zome(args.invocation.zome.zome_name())
+                .map(CoordinatorZome::from)
+        })
         .ok();
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
@@ -70,7 +77,6 @@ where
     let result =
         call_zome_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
-
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
@@ -122,7 +128,6 @@ where
             }
         }
     };
-
     Ok(result)
 }
 
@@ -240,9 +245,28 @@ where
         Arc::new(network.clone()),
     ));
 
-    let to_app_validate = {
+    let scratch_records = workspace.source_chain().scratch_records()?;
+
+    if let Some(dpki) = conductor_handle.running_services().dpki.clone() {
+        // Don't check DPKI validity on DPKI itself!
+        if !dpki.is_deepkey_dna(workspace.source_chain().cell_id().dna_hash()) {
+            // Check the validity of the author as-at the first and the last record to be committed.
+            // If these are valid, then the author is valid for the entire commit.
+            let first = scratch_records.first();
+            let last = scratch_records.last();
+            if let Some(r) = first {
+                check_dpki_agent_validity_for_record(&dpki, r).await?;
+            }
+            if let Some(r) = last {
+                if first != last {
+                    check_dpki_agent_validity_for_record(&dpki, r).await?;
+                }
+            }
+        }
+    }
+
+    let records = {
         // collect all the records we need to validate in wasm
-        let scratch_records = workspace.source_chain().scratch_records()?;
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
         // Loop forwards through all the new records
         for record in scratch_records {
@@ -258,7 +282,7 @@ where
         to_app_validate
     };
 
-    for mut chain_record in to_app_validate {
+    for mut chain_record in records {
         for op_type in action_to_op_types(chain_record.action()) {
             let op =
                 app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;
@@ -331,7 +355,10 @@ fn map_outcome(
     match outcome.map_err(SourceChainError::other)? {
         app_validation_workflow::Outcome::Accepted => {}
         app_validation_workflow::Outcome::Rejected(reason) => {
-            return Err(SourceChainError::InvalidCommit(reason).into());
+            return Err(SourceChainError::InvalidCommit(format!(
+                "Validation failed while committing: {reason}"
+            ))
+            .into());
         }
         // when the wasm is being called directly in a zome invocation any
         // state other than valid is not allowed for new entries

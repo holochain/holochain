@@ -299,9 +299,10 @@ impl TaskManagerClient {
     }
 
     /// Stop all tasks for a Cell and await their completion.
+    #[instrument(skip(self))]
     pub fn stop_cell_tasks(&self, cell_id: CellId) -> ShutdownHandle {
         if let Some(tm) = self.tm.lock().as_mut() {
-            tokio::spawn(tm.stop_group(&TaskGroup::Cell(cell_id)))
+            tokio::spawn(tm.stop_group(&TaskGroup::Cell(cell_id)).in_current_span())
         } else {
             tracing::warn!("Tried to shutdown cell's tasks while they're already shutting down");
             tokio::spawn(async move {})

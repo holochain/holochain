@@ -23,6 +23,9 @@ use holochain_zome_types::op::Op;
 use maplit::hashset;
 use matches::assert_matches;
 
+mod agent_key_revocation;
+mod test_dpki;
+
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
     let db_dir = test_db_dir();
@@ -72,7 +75,7 @@ async fn can_update_state() {
             .all_cells()
             .collect::<Vec<_>>()
             .as_slice(),
-        &[&cell_id]
+        &[cell_id]
     );
 }
 
@@ -134,10 +137,11 @@ async fn app_ids_are_unique() {
 /// App can't be installed if it contains duplicate RoleNames
 #[tokio::test(flavor = "multi_thread")]
 async fn role_names_are_unique() {
+    let agent = fixt!(AgentPubKey);
     let cells = vec![
-        InstalledCell::new(fixt!(CellId), "1".into()),
-        InstalledCell::new(fixt!(CellId), "1".into()),
-        InstalledCell::new(fixt!(CellId), "2".into()),
+        InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "1".into()),
+        InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "1".into()),
+        InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "2".into()),
     ];
     let result = InstalledAppCommon::new_legacy("id", cells.into_iter());
     matches::assert_matches!(
@@ -149,14 +153,16 @@ async fn role_names_are_unique() {
 #[tokio::test(flavor = "multi_thread")]
 async fn can_set_fake_state() {
     let db_dir = test_db_dir();
-    let state = ConductorState::default();
+    let expected = ConductorState::default();
     let conductor = ConductorBuilder::new()
-        .fake_state(state.clone())
+        .config(SweetConductorConfig::standard().no_dpki().into())
+        .fake_state(expected.clone())
         .with_data_root_path(db_dir.path().to_path_buf().into())
         .test(&[])
         .await
         .unwrap();
-    assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
+    let actual = conductor.get_state_from_handle().await.unwrap();
+    assert_eq!(actual, expected);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -179,13 +185,10 @@ async fn test_list_running_apps_for_dependent_cell_id() {
     // Install two apps on the Conductor:
     // Both share a CellId in common, and also include a distinct CellId each.
     let mut conductor = SweetConductor::from_standard_config().await;
-    let alice = SweetAgents::one(conductor.keystore()).await;
-    let app1 = conductor
-        .setup_app_for_agent("app1", alice.clone(), [&dna1, &dna2])
-        .await
-        .unwrap();
+    let app1 = conductor.setup_app("app1", [&dna1, &dna2]).await.unwrap();
+    let alice = app1.agent().clone();
     let app2 = conductor
-        .setup_app_for_agent("app2", alice.clone(), [&dna1, &dna3])
+        .setup_app_for_agent("app2", alice, [&dna1, &dna3])
         .await
         .unwrap();
 
@@ -254,7 +257,7 @@ async fn common_genesis_test_app(
 async fn test_uninstall_app() {
     holochain_trace::test_run();
     let (dna, _, _) = mk_dna(simple_crud_zome()).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductorConfig::standard().build_conductor().await;
 
     let app1 = conductor.setup_app("app1", [&dna]).await.unwrap();
 
@@ -372,6 +375,7 @@ async fn test_signing_error_during_genesis() {
     let db_dir = test_db_dir();
     let config = ConductorConfig {
         data_root_path: Some(db_dir.path().to_path_buf().into()),
+        dpki: DpkiConfig::disabled(),
         ..Default::default()
     };
     let mut conductor = SweetConductor::new(
@@ -729,12 +733,8 @@ async fn test_enable_disable_enable_clone_cell() {
 async fn name_has_no_effect_on_dna_hash() {
     holochain_trace::test_run();
     let mut conductor = SweetConductor::from_standard_config().await;
-    let (agent1, agent2, agent3) = SweetAgents::three(conductor.keystore()).await;
     let dna = SweetDnaFile::unique_empty().await;
-    let apps = conductor
-        .setup_app_for_agents("app", [&agent1, &agent2, &agent3], [&dna])
-        .await
-        .unwrap();
+    let apps = conductor.setup_apps("app", 3, [&dna]).await.unwrap();
     let app_id1 = apps[0].installed_app_id().clone();
     let app_id2 = apps[1].installed_app_id().clone();
     let app_id3 = apps[2].installed_app_id().clone();
@@ -847,7 +847,10 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
                 Ok(hash)
             });
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductorConfig::standard()
+        .no_dpki()
+        .build_conductor()
+        .await;
     let app = common_genesis_test_app(&mut conductor, bad_zome)
         .await
         .unwrap();
@@ -1015,7 +1018,8 @@ async fn test_cell_and_app_status_reconciliation() {
         mk_dna(mk_zome()).await.0,
     ];
     let app_id = "app".to_string();
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
     conductor.setup_app(&app_id, &dnas).await.unwrap();
 
     let cell_ids: Vec<_> = conductor.running_cell_ids().into_iter().collect();
@@ -1182,16 +1186,15 @@ async fn test_deferred_provisioning() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
     let app_id = "app-id".to_string();
-    let agent_key = SweetAgents::one(conductor.keystore()).await;
     let role_name = "role".to_string();
-    let bundle = app_bundle_from_dnas([&(role_name.clone(), dna)], true).await;
+    let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true).await;
 
     //- Install with deferred memproofs
     let app = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             source: AppBundleSource::Bundle(bundle),
-            agent_key: agent_key.clone(),
+            agent_key: None,
             installed_app_id: Some(app_id.clone()),
             membrane_proofs: Default::default(),
             network_seed: None,
@@ -1282,16 +1285,15 @@ async fn test_deferred_provisioning_uninstall() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
     let conductor = SweetConductor::from_standard_config().await;
     let app_id = "app-id".to_string();
-    let agent_key = SweetAgents::one(conductor.keystore()).await;
     let role_name = "role".to_string();
-    let bundle = app_bundle_from_dnas([&(role_name.clone(), dna)], true).await;
+    let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true).await;
 
     //- Install with deferred memproofs
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             source: AppBundleSource::Bundle(bundle),
-            agent_key: agent_key.clone(),
+            agent_key: None,
             installed_app_id: Some(app_id.clone()),
             membrane_proofs: Default::default(),
             network_seed: None,

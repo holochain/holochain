@@ -26,11 +26,7 @@ async fn authored_test() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(zomes).await;
     let ((alice,), (bob,)) = conductor
-        .setup_app_for_agents(
-            "app",
-            SweetAgents::get(conductor.keystore(), 2).await.as_slice(),
-            [&dna],
-        )
+        .setup_apps("app", 2, [&dna])
         .await
         .unwrap()
         .into_tuples();

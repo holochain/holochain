@@ -5,7 +5,7 @@ use holochain_zome_types::prelude::*;
 use std::collections::BTreeSet;
 
 use crate::fixt::AgentPubKeyFixturator;
-use crate::sweettest::{SweetAgents, SweetConductor, SweetDnaFile};
+use crate::sweettest::{SweetConductor, SweetDnaFile};
 use ::fixt::fixt;
 use arbitrary::Arbitrary;
 
@@ -19,12 +19,9 @@ async fn signed_zome_call() {
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    let agent_pub_key = SweetAgents::one(conductor.keystore()).await;
-    let app = conductor
-        .setup_app_for_agent("app", agent_pub_key.clone(), [&dna])
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
+    let agent_pub_key = cell_id.agent_pubkey().clone();
 
     // generate a cap access public key
     let cap_access_public_key = fixt!(AgentPubKey, ::fixt::Predictable, 1);
@@ -176,12 +173,9 @@ async fn signed_zome_call_wildcard() {
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    let agent_pub_key = SweetAgents::one(conductor.keystore()).await;
-    let app = conductor
-        .setup_app_for_agent("app", agent_pub_key.clone(), [&dna])
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
+    let agent_pub_key = app.agent().clone();
 
     // generate a cap access public key
     let cap_access_public_key = fixt!(AgentPubKey, ::fixt::Predictable, 1);

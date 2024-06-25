@@ -401,21 +401,9 @@ async fn create_test_data(
         ..Default::default()
     };
     let mut conductor = SweetConductor::from_config(config).await;
-    let mut agents = Vec::new();
-
-    for i in 0..num_agents {
-        eprintln!("generating agent {}", i);
-        let agent = conductor
-            .keystore()
-            .clone()
-            .new_sign_keypair_random()
-            .await
-            .unwrap();
-        agents.push(agent);
-    }
 
     let apps = conductor
-        .setup_app_for_agents("app", &agents, [&dna_file])
+        .setup_apps("app", num_agents, [&dna_file])
         .await
         .unwrap();
 

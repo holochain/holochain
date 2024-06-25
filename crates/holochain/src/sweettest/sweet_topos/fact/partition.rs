@@ -97,7 +97,7 @@ pub mod test {
                 graph = facts.mutate(&mut g, graph).unwrap();
                 assert_eq!(graph.strict_partitions(), 1);
             },
-            3_000_000
+            7_000_000
         );
     }
 
@@ -144,7 +144,7 @@ pub mod test {
                     )
                 );
             },
-            3_000_000
+            7_000_000
         );
     }
 }

@@ -3,7 +3,7 @@ use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use matches::matches;
 
-use crate::sweettest::{SweetAgents, SweetConductor, SweetDnaFile};
+use crate::sweettest::{SweetConductor, SweetDnaFile};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_info_returns_all_cells_with_info() {
@@ -11,15 +11,13 @@ async fn app_info_returns_all_cells_with_info() {
     let (dna_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let (dna_2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    let agent_pub_key = SweetAgents::one(conductor.keystore()).await;
 
     let app_id: InstalledAppId = "app".into();
     let role_name_1: RoleName = "role_1".into();
     let role_name_2: RoleName = "role_2".into();
-    conductor
-        .setup_app_for_agent(
+    let app = conductor
+        .setup_app(
             &app_id,
-            agent_pub_key.clone(),
             [
                 &(role_name_1.clone(), dna_1.clone()),
                 &(role_name_2.clone(), dna_2.clone()),
@@ -27,6 +25,7 @@ async fn app_info_returns_all_cells_with_info() {
         )
         .await
         .unwrap();
+    let agent_pub_key = app.agent().clone();
 
     // create 1 clone cell for role 1 = clone cell 1
     let clone_cell_1 = conductor
@@ -65,7 +64,7 @@ async fn app_info_returns_all_cells_with_info() {
         .disable_clone_cell(
             &app_id,
             &DisableCloneCellPayload {
-                clone_cell_id: CloneCellId::CellId(clone_cell_2.cell_id.clone()),
+                clone_cell_id: CloneCellId::DnaHash(clone_cell_2.cell_id.dna_hash().clone()),
             },
         )
         .await
@@ -125,7 +124,7 @@ async fn app_info_returns_all_cells_with_info() {
         .enable_clone_cell(
             &app_id,
             &EnableCloneCellPayload {
-                clone_cell_id: CloneCellId::CellId(clone_cell_2.cell_id.clone()),
+                clone_cell_id: CloneCellId::DnaHash(clone_cell_2.cell_id.dna_hash().clone()),
             },
         )
         .await
