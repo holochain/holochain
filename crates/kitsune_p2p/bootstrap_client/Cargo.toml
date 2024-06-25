@@ -19,7 +19,7 @@ kitsune_p2p_types = { version = "^0.4.0-dev.7", path = "../types" }
 kitsune_p2p_bin_data = { version = "^0.4.0-dev.6", path = "../bin_data" }
 serde_bytes = "0.11"
 serde = "1"
-reqwest = "0.12"
+reqwest = { version = "0.12", features = ["native-tls-vendored"] }
 url2 = "0.0.6"
 
 [dev-dependencies]

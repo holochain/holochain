@@ -18,7 +18,7 @@ kitsune_p2p_types = { version = "^0.4.0-dev.7", path = "../types" }
 kitsune_p2p_bin_data = { version = "^0.4.0-dev.6", path = "../bin_data" }
 parking_lot = "0.12.1"
 rand = "0.8.5"
-reqwest = "0.12"
+reqwest = { version = "0.12", features = ["native-tls-vendored"] }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 thiserror = "1"
@@ -31,7 +31,7 @@ kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 kitsune_p2p = { path = "../kitsune_p2p", features = ["sqlite", "test_utils"] }
 fixt = { path = "../../fixt", version = "^0.4.0-dev.2"}
 criterion = "0.5.1"
-reqwest = "0.12"
+reqwest = { version = "0.12", features = ["native-tls-vendored"] }
 
 [[bench]]
 name = "bench"
