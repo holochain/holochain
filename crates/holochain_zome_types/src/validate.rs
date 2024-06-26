@@ -81,7 +81,7 @@ pub struct ValidationReceiptSet {
     pub receipts_complete: bool,
 
     /// The validation receipts for this op.
-    pub receipts: Vec<ValidationReceiptInfo>
+    pub receipts: Vec<ValidationReceiptInfo>,
 }
 
 /// Summary information for a validation receipt.
