@@ -1,13 +1,12 @@
 { self, lib, ... }: {
-  perSystem = { config, self', inputs', pkgs, ... }:
+  perSystem = { config, self', inputs', pkgs, system, ... }:
     let
       holonixPackages = { holochainOverrides ? { } }:
         with self'.packages; [
           (holochain.override holochainOverrides)
           lair-keystore
-          hc-launch
           hc-scaffold
-        ];
+        ] ++ (if system != "x86_64-darwin" then [ hc-launch ] else [ ]);
       versionsFileText = builtins.concatStringsSep "\n"
         (
           builtins.map
