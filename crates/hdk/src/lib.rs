@@ -581,3 +581,4 @@ pub mod clone;
 
 /// Tools for working with migrations from one DNA to another.
 mod migrate;
+mod validation_receipt;
