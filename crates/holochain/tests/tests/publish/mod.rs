@@ -37,18 +37,29 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         .await
         .unwrap();
 
-    let ops_to_publish = alice
-        .authored_db()
-        .read_async({
-            let alice_pub_key = alice.agent_pubkey().clone();
-            // Note that this test is relying on this being the same check that the publish workflow uses.
-            // If this returns 0 then the publish workflow is expected to suspend. So the test isn't directly
-            // observing that behaviour but it's close enough given that there are unit tests for the actual
-            // behavior.
-            move |txn| num_still_needing_publish(&txn, alice_pub_key)
-        })
-        .await
-        .unwrap();
+    let ops_to_publish = tokio::time::timeout(std::time::Duration::from_secs(60), async {
+        let mut ops_to_publish = 1;
+        while ops_to_publish > 0 {
+            ops_to_publish = alice
+                .authored_db()
+                .read_async({
+                    let alice_pub_key = alice.agent_pubkey().clone();
+                    // Note that this test is relying on this being the same check that the publish workflow uses.
+                    // If this returns 0 then the publish workflow is expected to suspend. So the test isn't directly
+                    // observing that behaviour but it's close enough given that there are unit tests for the actual
+                    // behavior.
+                    move |txn| num_still_needing_publish(&txn, alice_pub_key)
+                })
+                .await
+                .unwrap();
+        }
+
+        ops_to_publish
+    })
+    .await
+    .expect("timed out waiting for all receipts to be received");
+
+    assert_eq!(ops_to_publish, 0);
 
     // Get the validation receipts to check that they are all complete
     let receipt_sets: Vec<ValidationReceiptSet> = conductors[0]
@@ -69,6 +80,4 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         agent_activity_receipt_set.receipts.len(),
         holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE as usize
     );
-
-    assert_eq!(ops_to_publish, 0);
 }
