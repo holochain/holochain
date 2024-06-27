@@ -132,8 +132,6 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     keystore: MetaLairClient,
     representative_agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
-    tracing::warn!("XOXO 61");
-
     // Run the actual sys validation using data we have locally
     let outcome_summary = sys_validation_workflow_inner(
         workspace.clone(),
@@ -144,8 +142,6 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
         representative_agent,
     )
     .await?;
-
-    tracing::warn!("XOXO 62");
 
     // trigger app validation to process any ops that have been processed so far
     if outcome_summary.accepted > 0 {
@@ -205,8 +201,6 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     .into_iter()
     .sum();
 
-    tracing::warn!("XOXO 63");
-
     if outcome_summary.missing > 0 {
         tracing::debug!(
             "Fetched {}/{} missing dependencies from the network",
@@ -241,13 +235,9 @@ async fn sys_validation_workflow_inner(
     keystore: MetaLairClient,
     representative_agent: AgentPubKey,
 ) -> WorkflowResult<OutcomeSummary> {
-    tracing::warn!("XOXO 30");
-
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
     let sleuth_id = config.sleuth_id();
-
-    tracing::warn!("XOXO 31");
 
     // Forget what dependencies are currently in use
     current_validation_dependencies.lock().clear_retained_deps();
@@ -276,8 +266,6 @@ async fn sys_validation_workflow_inner(
     )
     .await;
 
-    tracing::warn!("XOXO 32");
-
     // Now drop all the dependencies that we didn't just try to access while searching the current set of ops to validate.
     current_validation_dependencies.lock().purge_held_deps();
 
@@ -300,8 +288,6 @@ async fn sys_validation_workflow_inner(
         }
     }
 
-    tracing::warn!("XOXO 33");
-
     let mut warrants = vec![];
 
     let (mut summary, invalid_ops, forked_pairs) = workspace
@@ -315,7 +301,6 @@ async fn sys_validation_workflow_inner(
                 let (op, op_hash) = hashed_op.into_inner();
                 let op_type = op.get_type();
 
-                tracing::warn!("XOXO 35");
                 if let DhtOp::ChainOp(chain_op) = &op {
                     // Author a ChainFork warrant if fork is detected
                     let action = chain_op.action();
@@ -333,7 +318,6 @@ async fn sys_validation_workflow_inner(
                 // rejected and don't have dependencies.
                 let deps = op.sys_validation_dependencies();
 
-                tracing::warn!("XOXO 36");
                 match outcome {
                     Outcome::Accepted => {
                         summary.accepted += 1;
@@ -373,8 +357,6 @@ async fn sys_validation_workflow_inner(
         })
         .await?;
 
-    tracing::warn!("XOXO 37");
-
     for (_, op) in invalid_ops {
         if let Some(chain_op) = op.as_chain_op() {
             let warrant_op = crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op_inner(
@@ -395,14 +377,10 @@ async fn sys_validation_workflow_inner(
         warrants.push(warrant_op);
     }
 
-    tracing::warn!("XOXO 38");
-
     let warrant_op_hashes = warrants
         .iter()
         .map(|w| (w.as_hash().clone(), w.dht_basis()))
         .collect::<Vec<_>>();
-
-    tracing::warn!("XOXO 39");
 
     workspace
         .authored_db
@@ -415,8 +393,6 @@ async fn sys_validation_workflow_inner(
         })
         .await?;
 
-    tracing::warn!("XOXO 391");
-
     if let Some(cache) = workspace.dht_query_cache.as_ref() {
         // "self-publish" warrants
         holochain_state::integrate::authored_ops_to_dht_db(
@@ -428,8 +404,6 @@ async fn sys_validation_workflow_inner(
         )
         .await?;
     }
-
-    tracing::warn!("XOXO 392");
 
     tracing::debug!(
         ?summary,

@@ -23,22 +23,16 @@ pub async fn authored_ops_to_dht_db(
     // Check if any agents in this space are an authority for these hashes.
     let mut should_hold_hashes = Vec::new();
 
-    tracing::warn!("XOXO 21");
-
     for (op_hash, basis) in hashes {
         if network.authority_for_hash(basis).await? {
             should_hold_hashes.push(op_hash);
         }
     }
 
-    tracing::warn!("XOXO 22");
-
     // Clone the ops into the dht db for the hashes that should be held.
     let r =
         authored_ops_to_dht_db_without_check(should_hold_hashes, authored_db, dht_db, dht_db_cache)
             .await;
-
-    tracing::warn!("XOXO 23");
 
     r
 }
@@ -56,7 +50,6 @@ pub async fn authored_ops_to_dht_db_without_check(
     dht_db: DbWrite<DbKindDht>,
     dht_db_cache: &DhtDbQueryCache,
 ) -> StateMutationResult<()> {
-    tracing::warn!("XOXO 11");
     // Get the ops from the authored database.
     let mut ops = Vec::with_capacity(hashes.len());
     let ops = authored_db
@@ -72,7 +65,6 @@ pub async fn authored_ops_to_dht_db_without_check(
         })
         .await?;
     let mut activity = Vec::new();
-    tracing::warn!("XOXO 12");
     let activity = dht_db
         .write_async(|txn| {
             for op in ops {
@@ -83,12 +75,10 @@ pub async fn authored_ops_to_dht_db_without_check(
             StateMutationResult::Ok(activity)
         })
         .await?;
-    tracing::warn!("XOXO 13");
     for op in activity {
         let deps = op.sys_validation_dependencies();
 
         if deps.is_empty() {
-            tracing::warn!("XOXO 14a");
             let _ = dht_db_cache
                 .set_activity_to_integrated(
                     &op.author(),
@@ -96,7 +86,6 @@ pub async fn authored_ops_to_dht_db_without_check(
                 )
                 .await;
         } else {
-            tracing::warn!("XOXO 14b");
             dht_db_cache
                 .set_activity_ready_to_integrate(
                     &op.author(),
@@ -105,7 +94,6 @@ pub async fn authored_ops_to_dht_db_without_check(
                 .await?;
         }
     }
-    tracing::warn!("XOXO 15");
     Ok(())
 }
 
