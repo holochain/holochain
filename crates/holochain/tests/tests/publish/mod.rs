@@ -2,11 +2,12 @@ use holo_hash::ActionHash;
 use holochain::core::workflow::publish_dht_ops_workflow::num_still_needing_publish;
 use holochain::sweettest::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::prelude::GetValidationReceiptsInput;
+use holochain_zome_types::validate::ValidationReceiptSet;
 
 /// Verifies that publishing terminates naturally when enough validation receipts are received.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "receipt completion is flaky, revise once integration logic is merged into app validation workflow"]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
     holochain_trace::test_run();
 
@@ -27,7 +28,7 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
 
     let ((alice,), (bobbo,), (carol,), (danny,), (emma,), (fred,)) = apps.into_tuples();
 
-    let _: ActionHash = conductors[0]
+    let action_hash: ActionHash = conductors[0]
         .call(&alice.zome(TestWasm::Create), "create_entry", ())
         .await;
 
@@ -48,6 +49,14 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         })
         .await
         .unwrap();
+
+    // Get the validation receipts to check that they are all complete
+    let receipts: Vec<ValidationReceiptSet> = conductors[0].call(&alice.zome(TestWasm::Create), "get_validation_receipts", GetValidationReceiptsInput::for_action(action_hash)).await;
+    assert_eq!(receipts.len(), 3);
+    assert!(receipts.iter().all(|r| r.receipts_complete));
+
+    let agent_activity_receipts = receipts.into_iter().filter(|r| r.op_type == "RegisterAgentActivity").next().unwrap();
+    assert_eq!(agent_activity_receipts.receipts.len(), holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE as usize);
 
     assert_eq!(ops_to_publish, 0);
 }

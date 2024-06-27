@@ -226,3 +226,8 @@ fn call_create_entry_remotely_no_rec(agent: AgentPubKey) -> ExternResult<ActionH
         ))),
     }
 }
+
+#[hdk_extern]
+fn get_validation_receipts(input: GetValidationReceiptsInput) -> ExternResult<Vec<ValidationReceiptSet>> {
+    hdk::prelude::get_validation_receipts(input)
+}
