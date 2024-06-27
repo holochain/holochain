@@ -6,7 +6,7 @@
           (holochain.override holochainOverrides)
           lair-keystore
           hc-scaffold
-        ] ++ (if system != "x86_64-darwin" then [ hc-launch ] else [ ]);
+        ] ++ (lib.optionals system != "x86_64-darwin" [hc-launch]);
       versionsFileText = builtins.concatStringsSep "\n"
         (
           builtins.map
