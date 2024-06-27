@@ -65,21 +65,21 @@ impl rusqlite::types::FromSql for ValidationStatus {
 /// Input for the get_validation_receipts host function.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GetValidationReceiptsInput {
-    pub for_hash: AnyDhtHash
+    pub for_hash: AnyDhtHash,
 }
 
 impl GetValidationReceiptsInput {
     /// Get validation receipts for an action.
     pub fn for_action(action_hash: ActionHash) -> Self {
         Self {
-            for_hash: AnyDhtHash::from(action_hash)
+            for_hash: AnyDhtHash::from(action_hash),
         }
     }
 
     /// Get validation receipts for an entry.
     pub fn for_entry(entry_hash: EntryHash) -> Self {
         Self {
-            for_hash: AnyDhtHash::from(entry_hash)
+            for_hash: AnyDhtHash::from(entry_hash),
         }
     }
 }
