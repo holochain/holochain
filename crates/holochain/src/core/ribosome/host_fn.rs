@@ -1,5 +1,3 @@
-mod get_validation_receipts;
-
 use super::CallContext;
 use super::RibosomeT;
 use holochain_types::prelude::*;
@@ -238,4 +236,7 @@ host_fn_api_impls! {
 
     // Open your chain, pointing to the previous DNA
     fn open_chain(zt::chain::OpenChainInput) -> holo_hash::ActionHash;
+
+    // Get validation receipts for an action or entry
+    fn get_validation_receipts(zt::validate::GetValidationReceiptsInput) -> Vec<zt::validate::ValidationReceiptSet>;
 }

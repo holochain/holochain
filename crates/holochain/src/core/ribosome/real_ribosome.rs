@@ -117,6 +117,7 @@ use std::sync::Arc;
 use wasmer_middlewares::metering::get_remaining_points;
 use wasmer_middlewares::metering::set_remaining_points;
 use wasmer_middlewares::metering::MeteringPoints;
+use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
 
 pub type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
 
@@ -606,7 +607,8 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__enable_clone_cell_1", enable_clone_cell)
             .with_host_function(&mut ns, "__hc__delete_clone_cell_1", delete_clone_cell)
             .with_host_function(&mut ns, "__hc__close_chain_1", close_chain)
-            .with_host_function(&mut ns, "__hc__open_chain_1", open_chain);
+            .with_host_function(&mut ns, "__hc__open_chain_1", open_chain)
+            .with_host_function(&mut ns, "__hc__get_validation_receipts_1", get_validation_receipts);
 
         imports.register_namespace("env", ns);
 

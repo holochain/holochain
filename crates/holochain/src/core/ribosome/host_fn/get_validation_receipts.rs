@@ -1,12 +1,12 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::{CallContext, RibosomeT};
-use holo_hash::{hash_type, AnyDhtHash};
+use holo_hash::hash_type;
 use holochain_sqlite::prelude::{DbKindDht, DbRead};
 use holochain_state::prelude::{validation_receipts_for_action, validation_receipts_for_entry};
 use holochain_types::access::{HostFnAccess, Permission};
 use holochain_util::tokio_helper;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
-use holochain_zome_types::prelude::ValidationReceiptSet;
+use holochain_zome_types::prelude::{GetValidationReceiptsInput, ValidationReceiptSet};
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
@@ -14,7 +14,7 @@ use wasmer::RuntimeError;
 pub fn get_validation_receipts(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    hash: AnyDhtHash,
+    input: GetValidationReceiptsInput,
 ) -> Result<Vec<ValidationReceiptSet>, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
@@ -24,6 +24,7 @@ pub fn get_validation_receipts(
             let results = tokio_helper::block_forever_on(async move {
                 let dht_db: DbRead<DbKindDht> = call_context.host_context.workspace().databases().1;
 
+                let hash = input.for_hash;
                 match hash.hash_type() {
                     hash_type::AnyDht::Action => {
                         dht_db
@@ -108,7 +109,7 @@ mod tests {
         let receipts = get_validation_receipts(
             ribosome_handle.clone(),
             Arc::new(call_context.clone()),
-            action_hash.clone().into(),
+            GetValidationReceiptsInput::for_action(action_hash),
         )
         .unwrap();
 
@@ -122,7 +123,7 @@ mod tests {
         let receipts = get_validation_receipts(
             ribosome_handle.clone(),
             Arc::new(call_context.clone()),
-            entry_hash.clone().into(),
+            GetValidationReceiptsInput::for_entry(entry_hash),
         )
         .unwrap();
         assert!(receipts.is_empty());
