@@ -51,12 +51,12 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         .unwrap();
 
     // Get the validation receipts to check that they are all complete
-    let receipts: Vec<ValidationReceiptSet> = conductors[0].call(&alice.zome(TestWasm::Create), "get_validation_receipts", GetValidationReceiptsInput::for_action(action_hash)).await;
-    assert_eq!(receipts.len(), 3);
-    assert!(receipts.iter().all(|r| r.receipts_complete));
+    let receipt_sets: Vec<ValidationReceiptSet> = conductors[0].call(&alice.zome(TestWasm::Create), "get_validation_receipts", GetValidationReceiptsInput::for_action(action_hash)).await;
+    assert_eq!(receipt_sets.len(), 3);
+    assert!(receipt_sets.iter().all(|r| r.receipts_complete));
 
-    let agent_activity_receipts = receipts.into_iter().filter(|r| r.op_type == "RegisterAgentActivity").next().unwrap();
-    assert_eq!(agent_activity_receipts.receipts.len(), holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE as usize);
+    let agent_activity_receipt_set = receipt_sets.into_iter().filter(|r| r.op_type == "RegisterAgentActivity").next().unwrap();
+    assert_eq!(agent_activity_receipt_set.receipts.len(), holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE as usize);
 
     assert_eq!(ops_to_publish, 0);
 }
