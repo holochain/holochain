@@ -103,6 +103,7 @@ use wasmer::Type;
 
 use crate::core::ribosome::host_fn::close_chain::close_chain;
 use crate::core::ribosome::host_fn::count_links::count_links;
+use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
 use crate::core::ribosome::host_fn::open_chain::open_chain;
 use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
@@ -117,7 +118,6 @@ use std::sync::Arc;
 use wasmer_middlewares::metering::get_remaining_points;
 use wasmer_middlewares::metering::set_remaining_points;
 use wasmer_middlewares::metering::MeteringPoints;
-use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
 
 pub type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
 
@@ -608,7 +608,11 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__delete_clone_cell_1", delete_clone_cell)
             .with_host_function(&mut ns, "__hc__close_chain_1", close_chain)
             .with_host_function(&mut ns, "__hc__open_chain_1", open_chain)
-            .with_host_function(&mut ns, "__hc__get_validation_receipts_1", get_validation_receipts);
+            .with_host_function(
+                &mut ns,
+                "__hc__get_validation_receipts_1",
+                get_validation_receipts,
+            );
 
         imports.register_namespace("env", ns);
 

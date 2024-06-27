@@ -99,7 +99,10 @@ pub trait HdkT: HdiT {
     // Migrate DNA
     fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
     fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
-    fn get_validation_receipts(&self, input: GetValidationReceiptsInput) -> ExternResult<Vec<ValidationReceiptSet>>;
+    fn get_validation_receipts(
+        &self,
+        input: GetValidationReceiptsInput,
+    ) -> ExternResult<Vec<ValidationReceiptSet>>;
 }
 
 #[cfg(feature = "mock")]
@@ -473,7 +476,10 @@ impl HdkT for ErrHdk {
     }
 
     // Validation receipts
-    fn get_validation_receipts(&self, _input: GetValidationReceiptsInput) -> ExternResult<Vec<ValidationReceiptSet>> {
+    fn get_validation_receipts(
+        &self,
+        _input: GetValidationReceiptsInput,
+    ) -> ExternResult<Vec<ValidationReceiptSet>> {
         Self::err()
     }
 }
@@ -731,8 +737,14 @@ impl HdkT for HostHdk {
         host_call::<OpenChainInput, ActionHash>(__hc__open_chain_1, input)
     }
 
-    fn get_validation_receipts(&self, input: GetValidationReceiptsInput) -> ExternResult<Vec<ValidationReceiptSet>> {
-        host_call::<GetValidationReceiptsInput, Vec<ValidationReceiptSet>>(__hc__get_validation_receipts_1, input)
+    fn get_validation_receipts(
+        &self,
+        input: GetValidationReceiptsInput,
+    ) -> ExternResult<Vec<ValidationReceiptSet>> {
+        host_call::<GetValidationReceiptsInput, Vec<ValidationReceiptSet>>(
+            __hc__get_validation_receipts_1,
+            input,
+        )
     }
 }
 
