@@ -1287,6 +1287,7 @@ pub mod wasm_test {
                 "__hc__get_details_1",
                 "__hc__get_link_details_1",
                 "__hc__get_links_1",
+                "__hc__get_validation_receipts_1",
                 "__hc__hash_1",
                 "__hc__must_get_action_1",
                 "__hc__must_get_agent_activity_1",
