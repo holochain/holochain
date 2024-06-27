@@ -63,8 +63,7 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
 
     let agent_activity_receipt_set = receipt_sets
         .into_iter()
-        .filter(|r| r.op_type == "RegisterAgentActivity")
-        .next()
+        .find(|r| r.op_type == "RegisterAgentActivity")
         .unwrap();
     assert_eq!(
         agent_activity_receipt_set.receipts.len(),

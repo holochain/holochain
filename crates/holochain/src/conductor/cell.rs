@@ -824,6 +824,15 @@ impl Cell {
                             |row| row.get(0),
                         )?;
 
+                        if receipt_count >= required_validation_count as usize {
+                            // If we have enough receipts then set receipts to complete.
+                            //
+                            // Don't fail here if this doesn't work, it's only informational. Getting
+                            // the same flag set in the authored db is what will stop the publish
+                            // workflow from republishing this op.
+                            set_receipts_complete(txn, &receipt_op_hash, true).ok();
+                        }
+
                         Ok(receipt_count)
                     }
                 })

@@ -114,8 +114,8 @@ pub fn validation_receipts_for_action(
               DhtOp.receipts_complete as op_receipts_complete
             FROM
               Action
-              LEFT JOIN DhtOp ON DhtOp.action_hash = Action.hash
-              LEFT JOIN ValidationReceipt ON DhtOp.hash = ValidationReceipt.op_hash
+              INNER JOIN DhtOp ON DhtOp.action_hash = Action.hash
+              INNER JOIN ValidationReceipt ON DhtOp.hash = ValidationReceipt.op_hash
             WHERE
               Action.hash = :action_hash
             ",
@@ -147,8 +147,8 @@ pub fn validation_receipts_for_entry(
             FROM
               Entry
               INNER JOIN Action ON Action.entry_hash = Entry.hash
-              LEFT JOIN DhtOp ON DhtOp.action_hash = Action.hash
-              LEFT JOIN ValidationReceipt ON DhtOp.hash = ValidationReceipt.op_hash
+              INNER JOIN DhtOp ON DhtOp.action_hash = Action.hash
+              INNER JOIN ValidationReceipt ON DhtOp.hash = ValidationReceipt.op_hash
             WHERE
               Action.entry_hash = :entry_hash
             ",
