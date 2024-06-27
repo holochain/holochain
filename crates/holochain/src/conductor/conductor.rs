@@ -3238,16 +3238,19 @@ pub async fn integration_dump<Db: ReadAccess<DbKindDht>>(
 ) -> ConductorApiResult<IntegrationStateDump> {
     vault
         .read_async(move |txn| {
+            tracing::warn!("XOXO");
             let integrated = txn.query_row(
                 "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
                 [],
                 |row| row.get(0),
             )?;
+            tracing::warn!("XOXO");
             let integration_limbo = txn.query_row(
                 "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
                 [],
                 |row| row.get(0),
             )?;
+            tracing::warn!("XOXO");
             let validation_limbo = txn.query_row(
                 "
                 SELECT count(hash) FROM DhtOp
@@ -3258,6 +3261,7 @@ pub async fn integration_dump<Db: ReadAccess<DbKindDht>>(
                 [],
                 |row| row.get(0),
             )?;
+            tracing::warn!("XOXO");
             ConductorApiResult::Ok(IntegrationStateDump {
                 validation_limbo,
                 integration_limbo,

@@ -20,6 +20,7 @@ async fn sys_validation_workflow_test() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    tracing::warn!("XOXO");
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
     let alice_cell_id = alice.cell_id().clone();
@@ -27,6 +28,7 @@ async fn sys_validation_workflow_test() {
 
     conductors.exchange_peer_info().await;
 
+    tracing::warn!("XOXO");
     run_test(alice_cell_id, bob_cell_id, conductors, dna_file).await;
 }
 
@@ -202,8 +204,10 @@ async fn run_test(
     // if they are there.
     let num_attempts = 100;
     let delay_per_attempt = Duration::from_millis(100);
+    tracing::warn!("XOXO");
 
     bob_links_in_a_legit_way(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
+    tracing::warn!("XOXO");
 
     // Integration should have 9 ops in it.
     // Plus another 14 for genesis.
@@ -217,12 +221,14 @@ async fn run_test(
         num_attempts,
         delay_per_attempt,
     )
-    .await;
+    .await
+    .unwrap();
+    tracing::warn!("XOXO");
 
     let limbo_is_empty = |txn: &Transaction| {
         let not_empty: bool = txn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NULL)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
                 [],
                 |row| row.get(0),
             )
@@ -233,36 +239,47 @@ async fn run_test(
     // holochain_state::prelude::dump_tmp(&alice_dht_db);
     // Validation should be empty
     alice_dht_db.read_async(move |txn| -> DatabaseResult<()> {
+        tracing::warn!("XOXO");
         let limbo = show_limbo(&txn);
+        tracing::warn!("XOXO");
         assert!(limbo_is_empty(&txn), "{:?}", limbo);
+        tracing::warn!("XOXO");
 
         let num_valid_ops: usize = txn
-                .query_row("SELECT COUNT(hash) FROM DhtOP WHERE when_integrated IS NOT NULL AND validation_status = :status",
-                named_params!{
-                    ":status": ValidationStatus::Valid,
-                },
-                |row| row.get(0))
-                .unwrap();
+            .query_row("SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NOT NULL AND validation_status = :status",
+            named_params!{
+                ":status": ValidationStatus::Valid,
+            },
+            |row| row.get(0))
+            .unwrap();
+        tracing::warn!("XOXO");
+        
         assert_eq!(num_valid_ops, expected_count);
-
+        
         Ok(())
     }).await.unwrap();
-
+    
+    tracing::warn!("XOXO");
+    
     let (bad_update_action, bad_update_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
+    
+    tracing::warn!("XOXO");
 
-    // Integration should have 14 ops in it + the running tally
-    let expected_count = 14 + expected_count;
+    // Integration should have 14 chain ops in it + 1 warrant op + the running tally
+    let expected_count = 14 + 1 + expected_count;
 
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
     let num_valid_ops = move |txn: Transaction| -> DatabaseResult<usize> {
         let valid_ops: usize = txn
                 .query_row(
                     "
-                    SELECT COUNT(hash) FROM DhtOP
+                    SELECT COUNT(hash) FROM DhtOp
                     WHERE
                     when_integrated IS NOT NULL
                     AND
@@ -300,16 +317,17 @@ async fn run_test(
         Ok(valid_ops)
     };
 
-    alice_db
-        .read_async(move |txn| -> DatabaseResult<()> {
+    let (limbo, empty) = alice_db
+        .read_async(move |txn| {
             // Validation should be empty
             let limbo = show_limbo(&txn);
-            assert!(limbo_is_empty(&txn), "{:?}", limbo);
-
-            Ok(())
+            let empty = limbo_is_empty(&txn);
+            DatabaseResult::Ok((limbo, empty))
         })
         .await
         .unwrap();
+
+    assert!(empty, "{:?}", limbo);
 
     let valid_ops = alice_db.read_async(num_valid_ops.clone()).await.unwrap();
     assert_eq!(valid_ops, expected_count);
@@ -433,6 +451,7 @@ async fn bob_makes_a_large_link(
 }
 
 fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
+    tracing::warn!("XOXO 51");
     txn.prepare(
         "
         SELECT DhtOp.type, Action.hash, Action.blob, Action.author
@@ -444,15 +463,22 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     )
     .unwrap()
     .query_and_then([], |row| {
+        tracing::warn!("XOXO 52");
         let op_type: DhtOpType = row.get("type")?;
         match op_type {
             DhtOpType::Chain(op_type) => {
+                tracing::warn!("XOXO 53");
+                
                 let hash: ActionHash = row.get("hash")?;
+                tracing::warn!("XOXO 54");
+
                 let action: SignedAction = from_blob(row.get("blob")?)?;
                 Ok(ChainOpLite::from_type(op_type, hash, &action)?.into())
             }
             DhtOpType::Warrant(_) => {
+                tracing::warn!("XOXO 56");
                 let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
+                tracing::warn!("XOXO 57");
                 Ok(warrant.into())
             }
         }
