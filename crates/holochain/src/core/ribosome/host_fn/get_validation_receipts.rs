@@ -88,7 +88,6 @@ mod tests {
             .coordinator
             .erase_type();
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let host_access_2 = host_access.clone();
         call_context.host_context = host_access.into();
 
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
