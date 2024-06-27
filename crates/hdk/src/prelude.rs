@@ -56,7 +56,7 @@ pub use crate::random::*;
 pub use crate::time::schedule;
 pub use crate::time::sleep;
 pub use crate::time::sys_time;
-
+pub use crate::validation_receipt::get_validation_receipts;
 pub use crate::clone::*;
 pub use crate::migrate::*;
 pub use crate::x_salsa20_poly1305::create_x25519_keypair;
@@ -175,7 +175,8 @@ macro_rules! holochain_externs {
             enable_clone_cell:1,
             delete_clone_cell:1,
             close_chain:1,
-            open_chain:1
+            open_chain:1,
+            get_validation_receipts:1
         );
     };
 }

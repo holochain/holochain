@@ -62,11 +62,34 @@ impl rusqlite::types::FromSql for ValidationStatus {
     }
 }
 
+/// Input for the get_validation_receipts host function.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GetValidationReceiptsInput {
+    pub for_hash: AnyDhtHash
+}
+
+impl GetValidationReceiptsInput {
+    /// Get validation receipts for an action.
+    pub fn for_action(action_hash: ActionHash) -> Self {
+        Self {
+            for_hash: AnyDhtHash::from(action_hash)
+        }
+    }
+
+    /// Get validation receipts for an entry.
+    pub fn for_entry(entry_hash: EntryHash) -> Self {
+        Self {
+            for_hash: AnyDhtHash::from(entry_hash)
+        }
+    }
+}
+
 /// A set of validation receipts, grouped by op.
 ///
 /// This is intended to be returned as the result of a query for validation receipts by an action
 /// or entry hash. It would also be valid to return this for a query that uniquely identified an op
 /// but those are generally not available to hApp developers.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ValidationReceiptSet {
     /// The op hash that this receipt is for.
     pub op_hash: DhtOpHash,
@@ -88,6 +111,7 @@ pub struct ValidationReceiptSet {
 ///
 /// Currently, this is ignoring `dht_op_hash` because it's already on the parent type and
 /// `when_integrated` because that's not relevant to the validation receipt itself.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ValidationReceiptInfo {
     /// the result of the validation.
     pub validation_status: ValidationStatus,
