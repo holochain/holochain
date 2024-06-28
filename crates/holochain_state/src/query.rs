@@ -375,15 +375,12 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         };
 
         let row_fn = |row: &Row<'_>| {
-            dbg!();
             let r = Ok(from_blob::<SignedWarrant>(
                 row.get(row.as_ref().column_index("action_blob")?)?,
             )
             .map(Into::into));
-            dbg!();
             r
         };
-        dbg!();
         let warrants = if check_valid {
             self.txn
                 .prepare_cached(sql)?
@@ -408,7 +405,6 @@ impl<'stmt> Store for Txn<'stmt, '_> {
                 )?
                 .collect::<Result<Vec<_>, _>>()?
         };
-        dbg!();
         warrants.into_iter().collect::<Result<Vec<_>, _>>()
     }
 

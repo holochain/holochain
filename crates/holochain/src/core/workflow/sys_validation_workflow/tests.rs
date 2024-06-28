@@ -131,14 +131,15 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let record = records.unwrap();
     let (action, _) = record.into_inner();
     let mut action = action.into_inner().0.into_content();
-    let entry = Entry::App(::fixt::fixt!(AppEntryBytes));
+    let entry = Entry::App(AppEntryBytes(UnsafeBytes::from(vec![11; 11]).into()));
     *action.entry_data_mut().unwrap().0 = entry.to_hash();
     let action = SignedActionHashed::sign(&conductors[0].keystore(), action.into_hashed())
         .await
         .unwrap();
     let (action, signature) = action.into_inner();
     let action = SignedAction::new(action.into_content(), signature);
-    let forked_op = ChainOp::from_type(ChainOpType::StoreRecord, action, Some(entry)).unwrap();
+    let forked_op =
+        ChainOp::from_type(ChainOpType::StoreRecord, action.clone(), Some(entry)).unwrap();
 
     //- Check that the op is valid
     let dna_def = dna.dna_def().clone().into_hashed();
@@ -151,7 +152,15 @@ async fn sys_validation_produces_forked_chain_warrant() {
     .unwrap();
     matches::assert_matches!(outcome, Outcome::Accepted);
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    //- Check that the op creates a fork
+    let maybe_fork = conductors[0]
+        .spaces
+        .dht_db(dna.dna_hash())
+        .unwrap()
+        .test_write(move |txn| detect_fork(txn, &action).unwrap());
+    assert!(maybe_fork.is_some());
+
+    await_consistency(30, [&alice, &bob]).await.unwrap();
 
     //- Inject the forked op directly into bob's DHT db
     let forked_op = DhtOpHashed::from_content_sync(forked_op);
@@ -160,17 +169,17 @@ async fn sys_validation_produces_forked_chain_warrant() {
         insert_op(txn, &forked_op).unwrap();
     });
 
-    //- Trigger sys validation
-    conductors[1]
-        .get_cell_triggers(bob.cell_id())
-        .await
-        .unwrap()
-        .sys_validation
-        .trigger(&"test");
-
     //- Check that bob authored a chain fork warrant
-    crate::wait_for_10s!(
+    crate::wait_for_1m!(
         {
+            //- Trigger sys validation
+            conductors[1]
+                .get_cell_triggers(bob.cell_id())
+                .await
+                .unwrap()
+                .sys_validation
+                .trigger(&"test");
+
             let basis: AnyLinkableHash = alice_pubkey.clone().into();
             conductors[1]
                 .spaces
