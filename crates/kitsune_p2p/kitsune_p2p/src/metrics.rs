@@ -39,6 +39,24 @@ pub(crate) static METRIC_MSG_OUT_TIME: Lazy<opentelemetry_api::metrics::Histogra
             .init()
     });
 
+pub(crate) static GENERATE_OP_BLOOMS_TIME: Lazy<opentelemetry_api::metrics::Histogram<f64>> =
+    Lazy::new(|| {
+        opentelemetry_api::global::meter("kitsune")
+            .f64_histogram("kitsune.gossip.generate_op_blooms.duration")
+            .with_description("Time taken to generate op blooms for gossip")
+            .with_unit(opentelemetry_api::metrics::Unit::new("s"))
+            .init()
+    });
+
+pub(crate) static GENERATE_OP_REGION_SET_TIME: Lazy<opentelemetry_api::metrics::Histogram<f64>> =
+    Lazy::new(|| {
+        opentelemetry_api::global::meter("kitsune")
+            .f64_histogram("kitsune.gossip.generate_op_region_set.duration")
+            .with_description("Time taken to generate region set for gossip")
+            .with_unit(opentelemetry_api::metrics::Unit::new("s"))
+            .init()
+    });
+
 /// how long historical metric records should be kept
 /// (currently set to 1 week)
 const HISTORICAL_RECORD_EXPIRE_DURATION_MICROS: i64 = 1000 * 1000 * 60 * 60 * 24 * 7;
