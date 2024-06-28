@@ -42,6 +42,7 @@ use holochain_zome_types::prelude::*;
 ///     let links = get_links(GetLinksInputBuilder::try_new(my_base, ..)?.get_options(GetStrategy::Local).build())?;
 /// #   Ok(())
 /// # }
+/// ```
 #[derive(PartialEq, Clone, Debug)]
 pub struct GetLinksInputBuilder(GetLinksInput);
 
