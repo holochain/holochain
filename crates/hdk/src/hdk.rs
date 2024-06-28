@@ -99,6 +99,7 @@ pub trait HdkT: HdiT {
     // Migrate DNA
     fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
     fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
+    // Validation receipts
     fn get_validation_receipts(
         &self,
         input: GetValidationReceiptsInput,

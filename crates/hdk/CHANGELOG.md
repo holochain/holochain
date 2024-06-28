@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Added a new HDK function `get_validation_receipts` which can be used to look up validation receipts for an action or
+  entry that you have authored.
+
 ## 0.4.0-dev.10
 
 ## 0.4.0-dev.9

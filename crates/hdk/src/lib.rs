@@ -583,4 +583,4 @@ pub mod clone;
 mod migrate;
 
 /// Look up validation receipts for actions and entries that a local agent has authored.
-mod validation_receipt;
+pub mod validation_receipt;
