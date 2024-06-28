@@ -27,6 +27,11 @@ jobs:
           - x86_64-darwin
           - aarch64-darwin
           - x86_64-linux
+        include:
+          # used by Holo's reserve-controller CI
+          - target: "github:holochain/holochain#devShells.{0}.holochainBinaries"
+            extra_args: "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly --override-input versions/holochain github:holochain/holochain/holochain-0.4.0-dev.2"
+            platform: x86_64-linux
 
     runs-on: [self-hosted, multi-arch]
     steps:
@@ -75,10 +80,16 @@ jobs:
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3_rc"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly"
+          - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly --override-input versions/holochain github:holochain/holochain/holochain-0.4.0-dev.2"
         platform:
           - x86_64-darwin
           - aarch64-darwin
           - x86_64-linux
+        include:
+          # used by Holo's reserve-controller CI
+          - target: "github:holochain/holochain#devShells.{0}.holochainBinaries"
+            extra_args: "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly --override-input versions/holochain github:holochain/holochain/holochain-0.4.0-dev.2"
+            platform: x86_64-linux
     runs-on: ubuntu-latest
     steps:
       - uses: cachix/install-nix-action@v26
