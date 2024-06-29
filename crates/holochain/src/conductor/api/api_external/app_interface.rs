@@ -149,7 +149,8 @@ impl AppInterfaceApi {
                     .ok_or(ConductorApiError::other("app not found".to_string()))?
                     .status;
                 match status {
-                    AppInfoStatus::Disabled {
+                    AppInfoStatus::Running
+                    | AppInfoStatus::Disabled {
                         reason: DisabledAppReason::MemproofsProvided,
                     } => {
                         self.conductor_handle
