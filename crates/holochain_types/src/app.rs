@@ -966,6 +966,9 @@ pub enum StoppedAppReason {
 
     /// Same meaning as [`InstalledAppInfoStatus::Disabled`](https://docs.rs/holochain_conductor_api/0.0.33/holochain_conductor_api/enum.InstalledAppInfoStatus.html#variant.Disabled).
     Disabled(DisabledAppReason),
+
+    /// Same meaning as [`InstalledAppInfoStatus::AwaitingMemProofs`](https://docs.rs/holochain_conductor_api/0.0.33/holochain_conductor_api/enum.InstalledAppInfoStatus.html#variant.AwaitingMemProofs).
+    AwaitingMemproofs,
 }
 
 impl StoppedAppReason {
@@ -975,9 +978,7 @@ impl StoppedAppReason {
         match status {
             AppStatus::Paused(reason) => Some(Self::Paused(reason.clone())),
             AppStatus::Disabled(reason) => Some(Self::Disabled(reason.clone())),
-            AppStatus::AwaitingMemproofs => {
-                Some(Self::Disabled(DisabledAppReason::AwaitingMemproofs))
-            }
+            AppStatus::AwaitingMemproofs => Some(Self::AwaitingMemproofs),
             AppStatus::Running => None,
         }
     }
@@ -988,6 +989,7 @@ impl From<StoppedAppReason> for AppStatus {
         match reason {
             StoppedAppReason::Paused(reason) => Self::Paused(reason),
             StoppedAppReason::Disabled(reason) => Self::Disabled(reason),
+            StoppedAppReason::AwaitingMemproofs => Self::AwaitingMemproofs,
         }
     }
 }
@@ -1007,8 +1009,6 @@ pub enum PausedAppReason {
 pub enum DisabledAppReason {
     /// The app is freshly installed, and never started
     NeverStarted,
-    /// The app is partially installed, i.e. awaiting membrane proofs
-    AwaitingMemproofs,
     /// The app is fully installed and deferred memproofs have been provided by the UI,
     /// but the app has not been enabled. The app can be enabled via the app interface.
     MemproofsProvided,
