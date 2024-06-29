@@ -30,11 +30,9 @@ pub async fn authored_ops_to_dht_db(
     }
 
     // Clone the ops into the dht db for the hashes that should be held.
-    let r =
-        authored_ops_to_dht_db_without_check(should_hold_hashes, authored_db, dht_db, dht_db_cache)
-            .await;
 
-    r
+    authored_ops_to_dht_db_without_check(should_hold_hashes, authored_db, dht_db, dht_db_cache)
+        .await
 }
 
 /// Insert any authored ops that have been locally validated

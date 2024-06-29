@@ -375,11 +375,10 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         };
 
         let row_fn = |row: &Row<'_>| {
-            let r = Ok(from_blob::<SignedWarrant>(
-                row.get(row.as_ref().column_index("action_blob")?)?,
+            Ok(
+                from_blob::<SignedWarrant>(row.get(row.as_ref().column_index("action_blob")?)?)
+                    .map(Into::into),
             )
-            .map(Into::into));
-            r
         };
         let warrants = if check_valid {
             self.txn
