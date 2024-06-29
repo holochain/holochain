@@ -1009,6 +1009,9 @@ pub enum DisabledAppReason {
     NeverStarted,
     /// The app is partially installed, i.e. awaiting membrane proofs
     AwaitingMemproofs,
+    /// The app is fully installed and deferred memproofs have been provided by the UI,
+    /// but the app has not been enabled. The app can be enabled via the app interface.
+    MemproofsProvided,
     /// The disabling was done manually by the user (via admin interface)
     User,
     /// The disabling was due to an UNRECOVERABLE error

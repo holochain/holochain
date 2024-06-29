@@ -84,6 +84,13 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::Ok`]
     ProvideMemproofs(MemproofMap),
+
+    /// Enable the app. Can only be called while the app is in the `MemproofsProvided` state.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::Ok`]
+    EnableAfterMemproofsProvided,
     //
     // TODO: implement after DPKI lands
     // /// Replace the agent key associated with this app with a new one.

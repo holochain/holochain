@@ -1,3 +1,4 @@
+use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::api::error::SerializationError;
 use crate::conductor::interface::error::InterfaceError;
@@ -139,6 +140,28 @@ impl AppInterfaceApi {
                     .provide_memproofs(&installed_app_id, memproofs)
                     .await?;
                 Ok(AppResponse::Ok)
+            }
+            AppRequest::EnableAfterMemproofsProvided => {
+                let status = self
+                    .conductor_handle
+                    .get_app_info(&installed_app_id)
+                    .await?
+                    .ok_or(ConductorApiError::other("app not found".to_string()))?
+                    .status;
+                match status {
+                    AppInfoStatus::Disabled {
+                        reason: DisabledAppReason::MemproofsProvided,
+                    } => {
+                        self.conductor_handle
+                            .clone()
+                            .enable_app(installed_app_id.clone())
+                            .await?;
+                        Ok(AppResponse::Ok)
+                    }
+                    _ => Err(ConductorApiError::other(
+                        "app not in correct state to enable".to_string(),
+                    )),
+                }
             } //
               // TODO: implement after DPKI lands
               // AppRequest::RotateAppAgentKey => {
