@@ -961,13 +961,13 @@ impl AppStatusFx {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum StoppedAppReason {
-    /// Same meaning as [`InstalledAppInfoStatus::Paused`](https://docs.rs/holochain_conductor_api/0.0.33/holochain_conductor_api/enum.InstalledAppInfoStatus.html#variant.Paused).
+    /// Same meaning as [`AppStatus::Paused`].
     Paused(PausedAppReason),
 
-    /// Same meaning as [`InstalledAppInfoStatus::Disabled`](https://docs.rs/holochain_conductor_api/0.0.33/holochain_conductor_api/enum.InstalledAppInfoStatus.html#variant.Disabled).
+    /// Same meaning as [`AppStatus::Disabled`].
     Disabled(DisabledAppReason),
 
-    /// Same meaning as [`InstalledAppInfoStatus::AwaitingMemProofs`](https://docs.rs/holochain_conductor_api/0.0.33/holochain_conductor_api/enum.InstalledAppInfoStatus.html#variant.AwaitingMemProofs).
+    /// Same meaning as [`AppStatus::AwaitingMemProofs`].
     AwaitingMemproofs,
 }
 
