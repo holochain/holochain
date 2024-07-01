@@ -157,17 +157,27 @@ static CONTEXT_MAP: ContextMap = Lazy::new(Default::default);
 // host fn calls.
 static CONTEXT_KEY: AtomicU64 = AtomicU64::new(0);
 
+#[derive(Clone)]
+struct WasmInstanceContextEnv {
+    host_env: Env,
+    context_key: u64,
+    ribosome_arc: Arc<RealRibosome>,
+}
+
+struct HostFnEnv<I, O> {
+    wasm_instance: Arc<Mutex<WasmInstanceContextEnv>>,
+    host_function: fn(Arc<RealRibosome>, Arc<CallContext>, I) -> Result<O, RuntimeError>,
+}
+
 struct HostFnBuilder {
     store: Arc<Mutex<Store>>,
-    function_env: FunctionEnv<Env>,
-    ribosome_arc: Arc<RealRibosome>,
-    context_key: u64,
 }
 
 impl HostFnBuilder {
     fn with_host_function<I, O>(
         &self,
         ns: &mut Exports,
+        wasm_instance_context_env: Arc<Mutex<WasmInstanceContextEnv>>,
         host_function_name: &str,
         host_function: fn(Arc<RealRibosome>, Arc<CallContext>, I) -> Result<O, RuntimeError>,
     ) -> &Self
@@ -175,55 +185,71 @@ impl HostFnBuilder {
         I: serde::de::DeserializeOwned + std::fmt::Debug + 'static,
         O: serde::Serialize + std::fmt::Debug + 'static,
     {
-        let ribosome_arc = Arc::clone(&self.ribosome_arc);
-        let context_key = self.context_key;
-        {
-            let mut store_lock = self.store.lock();
-            let mut store_mut = store_lock.as_store_mut();
-            ns.insert(
-                host_function_name,
-                Function::new_typed_with_env(
-                    &mut store_mut,
-                    &self.function_env,
-                    move |mut function_env_mut: FunctionEnvMut<Env>, guest_ptr: GuestPtr, len: Len| -> Result<u64, RuntimeError> {
-                        let context_arc = {
-                            CONTEXT_MAP
-                                .lock()
-                                .get(&context_key)
-                                .unwrap_or_else(|| {
-                                    panic!(
-                                    "Context must be set before call, this is a bug. context_key: {}",
-                                    &context_key,
-                                )
-                                })
-                                .clone()
-                        };
-                        let (env, mut store_mut) = function_env_mut.data_and_store_mut();
-                        let result = match env.consume_bytes_from_guest(&mut store_mut, guest_ptr, len) {
-                            Ok(input) => host_function(Arc::clone(&ribosome_arc), context_arc, input),
-                            Err(runtime_error) => Result::<_, RuntimeError>::Err(runtime_error),
-                        };
-                        Ok(u64::from_le_bytes(
-                            env.move_data_to_guest(&mut store_mut, match result {
-                                Err(runtime_error) => match runtime_error.downcast::<WasmError>() {
-                                    Ok(wasm_error) => match wasm_error {
-                                        WasmError {
-                                            error: WasmErrorInner::HostShortCircuit(_),
-                                            ..
-                                        } => return Err(WasmHostError(wasm_error).into()),
-                                        _ => Err(WasmHostError(wasm_error)),
-                                    },
-                                    Err(runtime_error) => return Err(runtime_error),
-                                },
-                                Ok(o) => Result::<_, WasmHostError>::Ok(o),
-                            })?
-                            .to_le_bytes(),
-                        ))
-                    },
-                ),
-            );
-        }
+        let mut store_lock = self.store.lock();
+        let mut store_mut = store_lock.as_store_mut();
 
+        // Include host function pointer in the FunctionEnv
+        let function_env = FunctionEnv::new(
+            &mut store_mut, 
+            HostFnEnv { 
+                wasm_instance: wasm_instance_context_env.clone(), 
+                host_function
+            }
+        );
+       
+        ns.insert(
+            host_function_name,
+            Function::new_typed_with_env(
+                &mut store_mut,
+                &function_env,
+                move |mut function_env_mut: FunctionEnvMut<HostFnEnv<I, O>>, guest_ptr: GuestPtr, len: Len| {
+                    let (env, mut store_mut) = function_env_mut.data_and_store_mut();
+                    let wasm_instance_lock = env.wasm_instance.lock();
+
+                    // Get the Zome Call Context this host function is being run within
+                    let context_arc = {
+                        CONTEXT_MAP
+                            .lock()
+                            .get(&wasm_instance_lock.context_key)
+                            .unwrap_or_else(|| {
+                                panic!(
+                                "Context must be set before call, this is a bug. context_key: {}",
+                                wasm_instance_lock.context_key,
+                            )
+                            })
+                            .clone()
+                    };
+
+                    let bytes_res = wasm_instance_lock.host_env.consume_bytes_from_guest(&mut store_mut, guest_ptr, len);
+                    let result = bytes_res.and_then(|input| {
+                        (env.host_function)(Arc::clone(&wasm_instance_lock.ribosome_arc), context_arc, input)
+                    });
+
+                    // Serialize the result into bytes and move them to the guest memory.
+                    Ok(u64::from_le_bytes(
+                        wasm_instance_lock.host_env.move_data_to_guest(&mut store_mut, {
+                                match result {
+                                    Err(runtime_error) => {
+                                        match runtime_error.downcast::<WasmError>() {
+                                            Ok(wasm_error) => match wasm_error {
+                                                WasmError {
+                                                    error: WasmErrorInner::HostShortCircuit(_),
+                                                    ..
+                                                } => return Err(WasmHostError(wasm_error).into()),
+                                                _ => Err(WasmHostError(wasm_error)),
+                                            },
+                                            Err(runtime_error) => return Err(runtime_error),
+                                        }
+                                    },
+                                    Ok(o) => Result::<_, WasmHostError>::Ok(o),
+                            }
+                        })?
+                        .to_le_bytes(),
+                    ))
+                },
+            ),
+        );
+    
         self
     }
 }
@@ -416,8 +442,18 @@ impl RealRibosome {
         context_key: u64,
     ) -> RibosomeResult<Arc<InstanceWithStore>> {
         let store = Arc::new(Mutex::new(Store::default()));
-        let function_env = FunctionEnv::new(&mut store.lock().as_store_mut(), Env::default());
-        let (function_env, imports) = Self::imports(self, context_key, store.clone(), function_env);
+
+        // it is important that RealRibosome and ZomeCallInvocation are cheap to clone here
+        let ribosome_arc = Arc::new((*self).clone());
+
+        // include context data in env
+        let wasm_instance_context_env = Arc::new(Mutex::new(WasmInstanceContextEnv {
+            host_env: Env::default(),
+            context_key,
+            ribosome_arc,
+        }));
+
+        let imports = Self::imports(self, store.clone(), wasm_instance_context_env.clone());
         let instance;
         {
             let mut store = store.lock();
@@ -430,9 +466,10 @@ impl RealRibosome {
         // It is only possible to initialize the function env after the instance is created.
         {
             let mut store_lock = store.lock();
+            let function_env = FunctionEnv::new(&mut store_lock.as_store_mut(), wasm_instance_context_env.clone());
             let mut function_env_mut = function_env.into_mut(&mut store_lock);
             let (data_mut, store_mut) = function_env_mut.data_and_store_mut();
-            data_mut.memory = Some(
+            data_mut.lock().host_env.memory = Some(
                 instance
                     .exports
                     .get_memory("memory")
@@ -441,7 +478,7 @@ impl RealRibosome {
                     })?
                     .clone(),
             );
-            data_mut.deallocate = Some(
+            data_mut.lock().host_env.deallocate = Some(
                 instance
                     .exports
                     .get_typed_function(&store_mut, "__hc__deallocate_1")
@@ -449,7 +486,7 @@ impl RealRibosome {
                         wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
                     })?,
             );
-            data_mut.allocate = Some(
+            data_mut.lock().host_env.allocate = Some(
                 instance
                     .exports
                     .get_typed_function(&store_mut, "__hc__allocate_1")
@@ -488,12 +525,18 @@ impl RealRibosome {
         )
         .await?;
         let context_key = RealRibosome::next_context_key();
-        let mut store = Store::default();
+        let store = Store::default();      
+
         // We just leave this Env uninitialized as default because we never make it
         // to an instance that needs to run on this code path.
-        let function_env = FunctionEnv::new(&mut store.as_store_mut(), Env::default());
-        let (_function_env, imports) =
-            empty_ribosome.imports(context_key, Arc::new(Mutex::new(store)), function_env);
+        let wasm_instance_context_env = Arc::new(Mutex::new(WasmInstanceContextEnv {
+            host_env: Env::default(),
+            context_key,
+            ribosome_arc: Arc::new(empty_ribosome.clone()),
+        }));
+
+        let imports =
+            empty_ribosome.imports(Arc::new(Mutex::new(store)), wasm_instance_context_env);
         let mut imports: Vec<String> = imports.into_iter().map(|((_ns, name), _)| name).collect();
         imports.sort();
         Ok(imports)
@@ -501,137 +544,144 @@ impl RealRibosome {
 
     fn imports(
         &self,
-        context_key: u64,
         store: Arc<Mutex<Store>>,
-        function_env: FunctionEnv<Env>,
-    ) -> (FunctionEnv<Env>, Imports) {
+        wasm_instance_context: Arc<Mutex<WasmInstanceContextEnv>>,
+    ) -> Imports {
+
         let mut imports = wasmer::imports! {};
         let mut ns = Exports::new();
 
-        // it is important that RealRibosome and ZomeCallInvocation are cheap to clone here
-        let ribosome_arc = std::sync::Arc::new((*self).clone());
-
         let host_fn_builder = HostFnBuilder {
             store,
-            function_env,
-            ribosome_arc,
-            context_key,
         };
 
         host_fn_builder
             .with_host_function(
                 &mut ns,
+                wasm_instance_context.clone(),
                 "__hc__accept_countersigning_preflight_request_1",
                 accept_countersigning_preflight_request,
             )
-            .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
-            .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
-            .with_host_function(&mut ns, "__hc__trace_1", trace)
-            .with_host_function(&mut ns, "__hc__hash_1", hash)
-            .with_host_function(&mut ns, "__hc__version_1", version)
-            .with_host_function(&mut ns, "__hc__verify_signature_1", verify_signature)
-            .with_host_function(&mut ns, "__hc__sign_1", sign)
-            .with_host_function(&mut ns, "__hc__sign_ephemeral_1", sign_ephemeral)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__agent_info_1", agent_info)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__block_agent_1", block_agent)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__unblock_agent_1", unblock_agent)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__trace_1", trace)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__hash_1", hash)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__version_1", version)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__verify_signature_1", verify_signature)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__sign_1", sign)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__sign_ephemeral_1", sign_ephemeral)
             .with_host_function(
                 &mut ns,
+                wasm_instance_context.clone(),
                 "__hc__x_salsa20_poly1305_shared_secret_create_random_1",
                 x_salsa20_poly1305_shared_secret_create_random,
             )
             .with_host_function(
                 &mut ns,
+                wasm_instance_context.clone(),
                 "__hc__x_salsa20_poly1305_shared_secret_export_1",
                 x_salsa20_poly1305_shared_secret_export,
             )
             .with_host_function(
                 &mut ns,
+                wasm_instance_context.clone(),
                 "__hc__x_salsa20_poly1305_shared_secret_ingest_1",
                 x_salsa20_poly1305_shared_secret_ingest,
             )
             .with_host_function(
                 &mut ns,
+                wasm_instance_context.clone(),
                 "__hc__x_salsa20_poly1305_encrypt_1",
                 x_salsa20_poly1305_encrypt,
             )
             .with_host_function(
                 &mut ns,
+                wasm_instance_context.clone(),
                 "__hc__x_salsa20_poly1305_decrypt_1",
                 x_salsa20_poly1305_decrypt,
             )
             .with_host_function(
                 &mut ns,
+                wasm_instance_context.clone(),
                 "__hc__create_x25519_keypair_1",
                 create_x25519_keypair,
             )
             .with_host_function(
                 &mut ns,
+                wasm_instance_context.clone(),
                 "__hc__x_25519_x_salsa20_poly1305_encrypt_1",
                 x_25519_x_salsa20_poly1305_encrypt,
             )
             .with_host_function(
                 &mut ns,
+                wasm_instance_context.clone(),
                 "__hc__x_25519_x_salsa20_poly1305_decrypt_1",
                 x_25519_x_salsa20_poly1305_decrypt,
             )
             .with_host_function(
                 &mut ns,
+                wasm_instance_context.clone(),
                 "__hc__ed_25519_x_salsa20_poly1305_encrypt_1",
                 ed_25519_x_salsa20_poly1305_encrypt,
             )
             .with_host_function(
                 &mut ns,
+                wasm_instance_context.clone(),
                 "__hc__ed_25519_x_salsa20_poly1305_decrypt_1",
                 ed_25519_x_salsa20_poly1305_decrypt,
             )
-            .with_host_function(&mut ns, "__hc__zome_info_1", zome_info)
-            .with_host_function(&mut ns, "__hc__dna_info_1", dna_info_1)
-            .with_host_function(&mut ns, "__hc__dna_info_2", dna_info_2)
-            .with_host_function(&mut ns, "__hc__call_info_1", call_info)
-            .with_host_function(&mut ns, "__hc__random_bytes_1", random_bytes)
-            .with_host_function(&mut ns, "__hc__sys_time_1", sys_time)
-            .with_host_function(&mut ns, "__hc__sleep_1", sleep)
-            .with_host_function(&mut ns, "__hc__capability_claims_1", capability_claims)
-            .with_host_function(&mut ns, "__hc__capability_grants_1", capability_grants)
-            .with_host_function(&mut ns, "__hc__capability_info_1", capability_info)
-            .with_host_function(&mut ns, "__hc__get_1", get)
-            .with_host_function(&mut ns, "__hc__get_details_1", get_details)
-            .with_host_function(&mut ns, "__hc__get_links_1", get_links)
-            .with_host_function(&mut ns, "__hc__get_link_details_1", get_link_details)
-            .with_host_function(&mut ns, "__hc__count_links_1", count_links)
-            .with_host_function(&mut ns, "__hc__get_agent_activity_1", get_agent_activity)
-            .with_host_function(&mut ns, "__hc__must_get_entry_1", must_get_entry)
-            .with_host_function(&mut ns, "__hc__must_get_action_1", must_get_action)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__zome_info_1", zome_info)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__dna_info_1", dna_info_1)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__dna_info_2", dna_info_2)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__call_info_1", call_info)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__random_bytes_1", random_bytes)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__sys_time_1", sys_time)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__sleep_1", sleep)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__capability_claims_1", capability_claims)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__capability_grants_1", capability_grants)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__capability_info_1", capability_info)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__get_1", get)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__get_details_1", get_details)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__get_links_1", get_links)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__get_link_details_1", get_link_details)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__count_links_1", count_links)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__get_agent_activity_1", get_agent_activity)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__must_get_entry_1", must_get_entry)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__must_get_action_1", must_get_action)
             .with_host_function(
                 &mut ns,
+                wasm_instance_context.clone(),
                 "__hc__must_get_valid_record_1",
                 must_get_valid_record,
             )
             .with_host_function(
                 &mut ns,
+                wasm_instance_context.clone(),
                 "__hc__must_get_agent_activity_1",
                 must_get_agent_activity,
             )
-            .with_host_function(&mut ns, "__hc__query_1", query)
-            .with_host_function(&mut ns, "__hc__send_remote_signal_1", send_remote_signal)
-            .with_host_function(&mut ns, "__hc__call_1", call)
-            .with_host_function(&mut ns, "__hc__create_1", create)
-            .with_host_function(&mut ns, "__hc__emit_signal_1", emit_signal)
-            .with_host_function(&mut ns, "__hc__create_link_1", create_link)
-            .with_host_function(&mut ns, "__hc__delete_link_1", delete_link)
-            .with_host_function(&mut ns, "__hc__update_1", update)
-            .with_host_function(&mut ns, "__hc__delete_1", delete)
-            .with_host_function(&mut ns, "__hc__schedule_1", schedule)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
-            .with_host_function(&mut ns, "__hc__create_clone_cell_1", create_clone_cell)
-            .with_host_function(&mut ns, "__hc__disable_clone_cell_1", disable_clone_cell)
-            .with_host_function(&mut ns, "__hc__enable_clone_cell_1", enable_clone_cell)
-            .with_host_function(&mut ns, "__hc__delete_clone_cell_1", delete_clone_cell)
-            .with_host_function(&mut ns, "__hc__close_chain_1", close_chain)
-            .with_host_function(&mut ns, "__hc__open_chain_1", open_chain);
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__query_1", query)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__send_remote_signal_1", send_remote_signal)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__call_1", call)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__create_1", create)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__emit_signal_1", emit_signal)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__create_link_1", create_link)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__delete_link_1", delete_link)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__update_1", update)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__delete_1", delete)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__schedule_1", schedule)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__unblock_agent_1", unblock_agent)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__create_clone_cell_1", create_clone_cell)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__disable_clone_cell_1", disable_clone_cell)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__enable_clone_cell_1", enable_clone_cell)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__delete_clone_cell_1", delete_clone_cell)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__close_chain_1", close_chain)
+            .with_host_function(&mut ns, wasm_instance_context.clone(), "__hc__open_chain_1", open_chain);
 
         imports.register_namespace("env", ns);
 
-        (host_fn_builder.function_env, imports)
+        imports
     }
 
     pub fn get_zome_dependencies(&self, zome_name: &ZomeName) -> RibosomeResult<&[ZomeIndex]> {
@@ -893,16 +943,19 @@ impl RibosomeT for RealRibosome {
                         .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store.clone())
                         .map(Some);
 
-                    #[cfg(feature = "wasmer_sys")]
                     {
                         let mut store_lock = instance_with_store.store.lock();
                         let mut store_mut = store_lock.as_store_mut();
-                        let points_used =
-                            match get_remaining_points(&mut store_mut, instance.as_ref()) {
-                                MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
-                                MeteringPoints::Exhausted => WASM_METERING_LIMIT,
-                            };
-                        self.usage_meter.add(points_used, &otel_info);
+
+                        #[cfg(feature = "wasmer_sys")]
+                        {
+                            let points_used =
+                                match get_remaining_points(&mut store_mut, instance.as_ref()) {
+                                    MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
+                                    MeteringPoints::Exhausted => WASM_METERING_LIMIT,
+                                };
+                            self.usage_meter.add(points_used, &otel_info);
+                        }
                     }
 
                     // remove context from map after call
