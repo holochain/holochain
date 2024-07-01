@@ -141,7 +141,7 @@ impl AppInterfaceApi {
                     .await?;
                 Ok(AppResponse::Ok)
             }
-            AppRequest::EnableAfterMemproofsProvided => {
+            AppRequest::EnableApp => {
                 let status = self
                     .conductor_handle
                     .get_app_info(&installed_app_id)
