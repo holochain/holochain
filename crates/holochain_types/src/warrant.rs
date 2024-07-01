@@ -2,10 +2,8 @@
 
 use std::str::FromStr;
 
-use holochain_keystore::MetaLairClient;
+use holochain_keystore::{AgentPubKeyExt, LairResult, MetaLairClient};
 use holochain_zome_types::prelude::*;
-
-use crate::dht_op::DhtOpUniqueForm;
 
 /// A Warrant DhtOp
 #[derive(
@@ -17,60 +15,42 @@ use crate::dht_op::DhtOpUniqueForm;
     Eq,
     PartialEq,
     Hash,
-    derive_more::Constructor,
+    derive_more::From,
+    derive_more::Deref,
 )]
 #[cfg_attr(
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
-pub struct WarrantOp {
-    /// The warrant which was issued
-    pub warrant: Warrant,
-    /// author of the warrant
-    pub author: AgentPubKey,
-    /// signature of (Warrant, Timestamp) by the author
-    pub signature: Signature,
-    /// time when the warrant was issued
-    pub timestamp: Timestamp,
-}
+pub struct WarrantOp(SignedWarrant);
 
 impl WarrantOp {
     /// Get the type of warrant
     pub fn get_type(&self) -> WarrantOpType {
-        match self.warrant {
-            Warrant::ChainIntegrity(_) => WarrantOpType::ChainIntegrityWarrant,
+        match self.proof {
+            WarrantProof::ChainIntegrity(_) => WarrantOpType::ChainIntegrityWarrant,
         }
     }
 
-    /// Convert the WarrantOp into a SignedWarrant
-    pub fn into_signed_warrant(self) -> SignedWarrant {
-        Signed::new((self.warrant, self.timestamp).into(), self.signature)
+    /// Sign the warrant for use as an Op
+    pub async fn sign(keystore: &MetaLairClient, warrant: Warrant) -> LairResult<Self> {
+        let signature = warrant.author.sign(keystore, warrant.clone()).await?;
+        Ok(Self::from(SignedWarrant::new(warrant, signature)))
     }
 
-    /// Convenience for authoring a warrant
-    pub async fn author(
-        keystore: &MetaLairClient,
-        author: AgentPubKey,
-        warrant: Warrant,
-    ) -> Result<Self, String> {
-        let timestamp = Timestamp::now();
-        let data = holochain_serialized_bytes::encode(&(&warrant, timestamp))
-            .map_err(|e| e.to_string())?;
-        let signature = keystore
-            .sign(author.clone(), data.into())
-            .await
-            .map_err(|e| e.to_string())?;
-        Ok(Self {
-            warrant,
-            author,
-            signature,
-            timestamp,
-        })
+    /// Accessor for the timestamp of the warrant
+    pub fn timestamp(&self) -> Timestamp {
+        self.timestamp
     }
 
-    /// Get the hashable content
-    pub fn as_unique_form(&self) -> DhtOpUniqueForm {
-        DhtOpUniqueForm::Warrant(&self.warrant, &self.author, self.timestamp)
+    /// Accessor for the warrant
+    pub fn warrant(&self) -> &Warrant {
+        self
+    }
+
+    /// Accessor for the warrant
+    pub fn into_warrant(self) -> Warrant {
+        self.0.into_data()
     }
 }
 
@@ -100,11 +80,7 @@ impl HashableContent for WarrantOp {
     }
 
     fn hashable_content(&self) -> HashableContentBytes {
-        HashableContentBytes::Content(
-            (&self.as_unique_form())
-                .try_into()
-                .expect("Could not serialize HashableContent"),
-        )
+        self.warrant().hashable_content()
     }
 }
 

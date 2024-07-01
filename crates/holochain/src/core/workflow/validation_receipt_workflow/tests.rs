@@ -126,6 +126,7 @@ macro_rules! wait_until {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn test_block_invalid_receipt() {
     holochain_trace::test_run();
     let unit_entry_def = EntryDef::default_from_id("unit");

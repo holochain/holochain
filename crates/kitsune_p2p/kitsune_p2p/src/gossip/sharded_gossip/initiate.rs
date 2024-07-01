@@ -49,6 +49,7 @@ impl ShardedGossipLocal {
         {
             let id = rand::thread_rng().gen();
 
+            // TODO Why send both the agents and the intervals? The agents contain their arcs
             let gossip = ShardedGossipWire::initiate(
                 intervals,
                 id,

@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_bootstrap_client"
-version = "0.4.0-dev.8"
+version = "0.4.0-dev.9"
 description = "a client library for the bootstrap service used by Kitsune P2P"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -12,20 +12,20 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-kitsune_p2p_bootstrap = { version = "^0.3.0-dev.8", path = "../bootstrap", features = [
+kitsune_p2p_bootstrap = { version = "^0.3.0-dev.9", path = "../bootstrap", features = [
   "sqlite",
 ] }
-kitsune_p2p_types = { version = "^0.4.0-dev.7", path = "../types" }
-kitsune_p2p_bin_data = { version = "^0.4.0-dev.6", path = "../bin_data" }
+kitsune_p2p_types = { version = "^0.4.0-dev.8", path = "../types" }
+kitsune_p2p_bin_data = { version = "^0.4.0-dev.7", path = "../bin_data" }
 serde_bytes = "0.11"
 serde = "1"
-reqwest = "0.12"
+reqwest = { version = "0.12", features = ["native-tls-vendored"] }
 url2 = "0.0.6"
 
 [dev-dependencies]
 arbitrary = { version = "1.0", features = ["derive"] }
 kitsune_p2p_bootstrap_client = { path = ".", features = ["tx2", "test_utils"] }
-kitsune_p2p_types = { version = "^0.4.0-dev.7", path = "../types", features = ["test_utils"] }
+kitsune_p2p_types = { version = "^0.4.0-dev.8", path = "../types", features = ["test_utils"] }
 fixt = { version = "^0.4.0-dev.2", path = "../../fixt" }
 tokio = "1"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
