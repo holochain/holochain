@@ -16,4 +16,4 @@ Test code should be as close as possible to the code it is testing.
 
 Unit tests should be in a submodule of the code under test.
 
-It may be hard to know where to find a tests of certain functionality since many of our tests are integration tests. The principle we'd like to follow is that it should be possible to discover where to look for a given test by reading the crate-level docs. The docs of one crate or module should describe the structure of what's below, including tests, so that we can hone in on whatever we want to find with the help of the docs.
+It may be hard to know where to find tests of certain functionality since many of our tests are integration tests. The principle we'd like to follow is that it should be possible to discover where to look for a given test by reading the crate-level docs. The docs of one crate or module should describe the structure of what's below, including tests, so that we can hone in on whatever we want to find with the help of the docs.
