@@ -2778,7 +2778,10 @@ impl Conductor {
     }
 
     /// Remove all Cells which are not referenced by any Enabled app.
-    /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed)
+    /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed).
+    ///
+    /// Additionally, if the cell is being removed because the last app referencing it was uninstalled,
+    /// all data used by that cell (across Authored, DHT, and Cache databases) will also be removed.
     #[tracing::instrument(skip_all)]
     async fn remove_dangling_cells(&self) -> ConductorResult<()> {
         let state = self.get_state().await?;
