@@ -32,6 +32,7 @@ async fn direct_validation_test() {
             },
             integrity_zomes: vec![TestZomes::from(TestWasm::Update).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::Update).coordinator.into_inner()],
+            lineage: vec![],
         },
         [integrity, coordinator],
     )

@@ -80,11 +80,31 @@ pub struct DnaManifestV1 {
     /// Only this affects the [`DnaHash`].
     pub integrity: IntegrityManifest,
 
-    #[serde(default)]
     /// Coordinator zomes to install with this DNA.
     ///
     /// Does not affect the [`DnaHash`].
+    #[serde(default)]
     pub coordinator: CoordinatorManifest,
+
+    /// A list of past "ancestors" of this DNA.
+    ///
+    /// Whenever a DNA is created which is intended to be used as a migration from
+    /// a previous DNA, the lineage should be updated to include the hash of the
+    /// DNA being migrated from. DNA hashes may also be removed from this list if
+    /// it is desired to remove them from the lineage.
+    ///
+    /// The meaning of the "ancestor" relationship is as follows:
+    /// - For any DNA, there is a migration path from any of its ancestors to itself.
+    /// - When an app depends on a DnaHash via UseExisting, it means that any installed
+    ///     DNA in the lineage which contains that DnaHash can be used.
+    /// - The app's Coordinator interface is expected to be compatible across the lineage.
+    ///     (Though this cannot be enforced, since Coordinators can be swapped out at
+    ///      will by the user, the intention is still there.)
+    ///
+    /// Holochain does nothing to ensure the correctness of the lineage, it is up to
+    /// the app developer to make the necessary guarantees.
+    #[serde(default)]
+    pub lineage: Vec<DnaHashB64>,
 }
 
 impl DnaManifestV1 {
