@@ -2816,49 +2816,43 @@ impl Conductor {
         }
 
         // Find any DNAs from cleaned up cells which don't have representation in any cells
-        // in any app. In other words, find the DNAs which are *only* represented in uninstalled apps.
+        // in any installed app, so that we can remove their data from the databases.
         let all_dnas: HashSet<_> = all_cells
             .into_iter()
             .map(|cell_id| cell_id.dna_hash())
             .collect();
-        let dnas_to_cleanup = cells_to_cleanup
+        let dnas_to_purge = cells_to_cleanup
             .iter()
             .map(|cell| cell.id().dna_hash())
             .filter(|dna| !all_dnas.contains(dna));
 
-        // For any unrepresented DNAs, clean up those DNA-specific databases
-        for dna_hash in dnas_to_cleanup {
+        // For any unrepresented DNAs, purge data from those DNA-specific databases
+        for dna_hash in dnas_to_purge {
+            // Delete all data from authored databases
+            // TODO: we should delete the entire database directory, since these databases
+            //       are per-cell and will never be used again.
             futures::future::join_all(
                 self.spaces
                     .get_all_authored_dbs(dna_hash)
                     .unwrap()
                     .iter()
-                    .map(|db| {
-                        db.write_async(|txn| -> DatabaseResult<usize> {
-                            Ok(txn.execute("DELETE FROM Action", ())?)
-                        })
-                        .boxed()
-                    }),
+                    .map(|db| db.write_async(purge_data).boxed()),
             )
             .await
             .into_iter()
-            .collect::<Result<Vec<usize>, _>>()?;
+            .collect::<Result<Vec<()>, _>>()?;
 
             futures::future::join_all(
                 [
                     self.spaces
                         .dht_db(dna_hash)
                         .unwrap()
-                        .write_async(|txn| {
-                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
-                        })
+                        .write_async(purge_data)
                         .boxed(),
                     self.spaces
                         .cache(dna_hash)
                         .unwrap()
-                        .write_async(|txn| {
-                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
-                        })
+                        .write_async(purge_data)
                         .boxed(),
                     // TODO: also delete stale Wasms
                 ]
@@ -2866,7 +2860,7 @@ impl Conductor {
             )
             .await
             .into_iter()
-            .collect::<Result<Vec<usize>, _>>()?;
+            .collect::<Result<Vec<()>, _>>()?;
         }
 
         Ok(())
@@ -3170,6 +3164,16 @@ mod test_utils_impls {
             Ok(cell.triggers().clone())
         }
     }
+}
+
+fn purge_data(txn: &mut Transaction) -> DatabaseResult<()> {
+    txn.execute("DELETE FROM DhtOp", ())?;
+    txn.execute("DELETE FROM Action", ())?;
+    txn.execute("DELETE FROM Entry", ())?;
+    txn.execute("DELETE FROM ValidationReceipt", ())?;
+    txn.execute("DELETE FROM ChainLock", ())?;
+    txn.execute("DELETE FROM ScheduledFunctions", ())?;
+    Ok(())
 }
 
 /// Perform Genesis on the source chains for each of the specified CellIds.
