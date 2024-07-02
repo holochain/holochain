@@ -294,6 +294,13 @@ async fn test_uninstall_app() {
         (2, 0)
     );
 
+    let dbs = conductor
+        .spaces
+        .get_all_authored_dbs(dna.dna_hash())
+        .unwrap();
+    std::fs::File::open(dbs[0].path()).unwrap();
+    std::fs::File::open(dbs[1].path()).unwrap();
+
     // - Uninstall the first app
     conductor
         .raw_handle()
