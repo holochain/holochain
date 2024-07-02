@@ -1177,7 +1177,7 @@ async fn test_init_concurrency() {
 /// - conductor can be restarted and app still in AwaitingMemproofs state,
 /// - app functions normally after memproofs provided
 #[tokio::test(flavor = "multi_thread")]
-async fn test_deferred_provisioning() {
+async fn test_deferred_memproof_provisioning() {
     holochain_trace::test_run();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -1265,6 +1265,17 @@ async fn test_deferred_provisioning() {
         .await
         .unwrap();
 
+    //- Status is now Disabled with the special `MemproofsProvided` reason.
+    //    It's not tested in this test, but this status allows the app to be enabled
+    //    over the app interface.
+    let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    assert_eq!(
+        app_info.status,
+        AppInfoStatus::Disabled {
+            reason: DisabledAppReason::MemproofsProvided
+        }
+    );
+
     conductor.enable_app(app_id.clone()).await.unwrap();
 
     //- Status is now Running and there is 1 cell assignment
@@ -1277,7 +1288,7 @@ async fn test_deferred_provisioning() {
 
 /// Can uninstall an app with deferred memproofs before providing memproofs
 #[tokio::test(flavor = "multi_thread")]
-async fn test_deferred_provisioning_uninstall() {
+async fn test_deferred_memproof_provisioning_uninstall() {
     holochain_trace::test_run();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
     let conductor = SweetConductor::from_standard_config().await;

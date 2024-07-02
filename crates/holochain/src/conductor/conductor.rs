@@ -1709,7 +1709,7 @@ mod app_impls {
                 let installed_app_id = installed_app_id.clone();
                 move |mut state| {
                     let app = state.get_app_mut(&installed_app_id)?;
-                    app.status = AppStatus::Disabled(DisabledAppReason::NeverStarted);
+                    app.status = AppStatus::Disabled(DisabledAppReason::MemproofsProvided);
                     Ok(state)
                 }
             })

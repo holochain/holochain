@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Adds a new `DisabledAppReason::MemproofsProvided` variant which effectively allows a new app status, corresponding to the specific state where a UI has just called `AppRequest::ProvideMemproofs`, but the app has not yet been Enabled for the first time.
+- Adds a new app interface method `AppRequest::EnableAfterMemproofsProvided`, which allows enabling an app only if the app is in the `AppStatus::Disabled(DisabledAppReason::MemproofsProvided)` state. Attempting to enable the app from other states (other than Running) will fail.
+
 ## 0.4.0-dev.10
 
 ## 0.4.0-dev.9
