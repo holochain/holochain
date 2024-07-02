@@ -49,7 +49,7 @@ pub fn fake_dna_zomes_named(
         },
         integrity_zomes: Vec::new(),
         coordinator_zomes: Vec::new(),
-        lineage: Vec::new(),
+        lineage: Default::default(),
     };
     tokio_helper::block_forever_on(async move {
         let mut wasm_code = Vec::new();

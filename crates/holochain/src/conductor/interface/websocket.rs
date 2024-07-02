@@ -1210,7 +1210,7 @@ pub mod test {
                     .map(TestZomes::from)
                     .map(|z| z.coordinator.into_inner())
                     .collect(),
-                lineage: vec![],
+                lineage: Default::default(),
             },
             zomes.into_iter().flat_map(Vec::<DnaWasm>::from),
         )

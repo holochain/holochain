@@ -250,7 +250,7 @@ async fn test_multi_integrity() {
                 .into(),
             ),
         ],
-        lineage,
+        lineage: lineage.into_iter().collect(),
     };
     assert_eq!(
         dna.dna_def().integrity_zomes[0]

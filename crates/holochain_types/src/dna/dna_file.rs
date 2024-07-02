@@ -156,9 +156,15 @@ impl DnaFile {
     }
 
     /// Construct a DnaFile from its constituent parts
-    #[cfg(feature = "fixturators")]
+    #[cfg(feature = "test_utils")]
     pub fn from_parts(dna: DnaDefHashed, code: WasmMap) -> Self {
         Self { dna, code }
+    }
+
+    /// Construct a DnaFile from its constituent parts
+    #[cfg(feature = "test_utils")]
+    pub fn into_parts(self) -> (DnaDefHashed, WasmMap) {
+        (self.dna, self.code)
     }
 
     /// The DnaDef along with its hash

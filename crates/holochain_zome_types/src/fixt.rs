@@ -742,7 +742,7 @@ fixturator!(
         coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
-        lineage: vec![],
+        lineage: Default::default(),
     };
 
     curve Unpredictable DnaDef {
@@ -766,7 +766,7 @@ fixturator!(
             .next()
             .unwrap(),
         // TODO: non-empty lineage
-        lineage: vec![],
+        lineage: Default::default(),
     };
 
     curve Predictable DnaDef {
@@ -790,7 +790,7 @@ fixturator!(
             .next()
             .unwrap(),
         // TODO: non-empty lineage
-        lineage: vec![],
+        lineage: Default::default(),
     };
 );
 

@@ -1,5 +1,7 @@
 //! Defines DnaDef struct
 
+use std::collections::HashSet;
+
 use crate::prelude::*;
 
 #[cfg(feature = "full-dna-def")]
@@ -68,7 +70,8 @@ pub struct DnaDef {
     /// Holochain does nothing to ensure the correctness of the lineage, it is up to
     /// the app developer to make the necessary guarantees.
     #[serde(default)]
-    pub lineage: Vec<DnaHash>,
+    #[cfg_attr(feature = "full-dna-def", builder(default))]
+    pub lineage: HashSet<DnaHash>,
 }
 
 #[derive(Serialize, Debug, PartialEq, Eq)]

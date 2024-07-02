@@ -574,6 +574,12 @@ mod dna_impls {
             self.ribosome_store().share_ref(|ds| ds.get_dna_def(hash))
         }
 
+        /// Get a [`DnaDefHashed`] from the [`RibosomeStore`]
+        pub fn get_dna_def_hashed(&self, hash: &DnaHash) -> Option<DnaDefHashed> {
+            self.ribosome_store()
+                .share_ref(|ds| ds.get_dna_def_hashed(hash))
+        }
+
         /// Get a [`DnaFile`] from the [`RibosomeStore`]
         pub fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
             self.ribosome_store().share_ref(|ds| ds.get_dna_file(hash))
@@ -1768,6 +1774,8 @@ mod app_impls {
 
 /// Methods related to cell access
 mod cell_impls {
+    use std::collections::BTreeSet;
+
     use super::*;
 
     impl Conductor {
@@ -1801,6 +1809,53 @@ mod cell_impls {
         pub fn running_cell_ids(&self) -> HashSet<CellId> {
             self.running_cells
                 .share_ref(|cells| cells.keys().cloned().collect())
+        }
+
+        /// Return the list of all cell IDs with DNAs "in the lineage" of the given DnaHash.
+        /// The lineage is specified in the DnaDef.
+        pub async fn cells_by_dna_lineage(
+            &self,
+            dna_hash: &DnaHash,
+        ) -> ConductorResult<BTreeSet<(InstalledAppId, BTreeSet<CellId>)>> {
+            // TODO: OPTIMIZE: cache the DNA lineages
+            let lineage = self.get_dna_def(dna_hash).map(|d| d.lineage);
+            Ok(self
+                .get_state()
+                .await?
+                // Look in all installed apps
+                .installed_apps()
+                .values()
+                .filter_map(|app| {
+                    let cells_in_lineage: BTreeSet<_> = app
+                        // Look in all cells for the app
+                        .all_cells()
+                        .filter_map(|cell_id| {
+                            let cell_dna_hash = cell_id.dna_hash();
+                            if cell_dna_hash == dna_hash
+                                || lineage
+                                    .as_ref()
+                                    .map(|lin| lin.contains(cell_dna_hash))
+                                    .unwrap_or(false)
+                            {
+                                // If a direct hit, or the given DNA contains this cell's DNA in its lineage,
+                                // include this CellId in the list of candidates
+                                Some(cell_id.clone())
+                            } else {
+                                // If this cell *contains* the given DNA in *its* lineage, include it.
+                                self.get_dna_def(cell_id.dna_hash())
+                                    .map(|dna_def| dna_def.lineage.contains(dna_hash))
+                                    .unwrap_or(false)
+                                    .then(|| cell_id.clone())
+                            }
+                        })
+                        .collect();
+                    if cells_in_lineage.is_empty() {
+                        None
+                    } else {
+                        Some((app.installed_app_id.clone(), cells_in_lineage))
+                    }
+                })
+                .collect())
         }
     }
 }
