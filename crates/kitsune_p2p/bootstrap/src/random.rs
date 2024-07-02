@@ -67,6 +67,7 @@ mod tests {
             vec![], // no url means offline
             0,
             std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64 + 60_000_000,
+            true,
             |_| async move { Ok(Arc::new(fixt!(KitsuneSignature, Unpredictable))) },
         )
         .await
@@ -118,6 +119,7 @@ mod tests {
                 vec![TxUrl::from_str_panicking("fake:")],
                 0,
                 std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64 + 60_000_000,
+                true,
                 |_| async move { Ok(Arc::new(fixt!(KitsuneSignature, Unpredictable))) },
             )
             .await
