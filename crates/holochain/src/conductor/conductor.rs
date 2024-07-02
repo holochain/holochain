@@ -39,7 +39,6 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Instant;
 
-use anyhow::anyhow;
 use futures::future;
 use futures::future::FutureExt;
 use futures::future::TryFutureExt;
