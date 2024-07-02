@@ -190,6 +190,18 @@ async fn test_multi_integrity() {
     // Create the expected dependencies on the coordinator zomes.
     let s = "2022-02-11T23:05:19.470323Z";
     let origin_time = Timestamp::from_str(s).unwrap();
+    let lineage = vec![
+        DnaHash::from_raw_39(
+            holo_hash_decode_unchecked("uhC0k71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o")
+                .unwrap(),
+        )
+        .unwrap(),
+        DnaHash::from_raw_39(
+            holo_hash_decode_unchecked("uhC0k84P2XTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF8d3w")
+                .unwrap(),
+        )
+        .unwrap(),
+    ];
     let expected = DnaDef {
         name: "multi integrity dna".into(),
         modifiers: DnaModifiers {
@@ -238,6 +250,7 @@ async fn test_multi_integrity() {
                 .into(),
             ),
         ],
+        lineage,
     };
     assert_eq!(
         dna.dna_def().integrity_zomes[0]
@@ -295,6 +308,7 @@ fn test_default_dna_manifest_matches_schema() {
         Some("00000000-0000-0000-0000-000000000000".to_string()),
         None,
         Timestamp::now().into(),
+        vec![],
         vec![],
         vec![],
     );

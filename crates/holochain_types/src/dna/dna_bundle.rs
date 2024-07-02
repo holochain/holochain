@@ -127,6 +127,12 @@ impl DnaBundle {
                     },
                     integrity_zomes,
                     coordinator_zomes,
+                    lineage: manifest
+                        .lineage
+                        .clone()
+                        .into_iter()
+                        .map(Into::into)
+                        .collect(),
                 };
 
                 let original_hash = DnaHash::with_data_sync(&dna_def);
@@ -198,6 +204,7 @@ impl DnaBundle {
                 })
             })
             .collect();
+        let lineage = dna_def.lineage.into_iter().map(Into::into).collect();
         Ok(DnaManifestCurrent {
             name: dna_def.name,
             integrity: IntegrityManifest {
@@ -212,6 +219,7 @@ impl DnaBundle {
                 zomes: integrity,
             },
             coordinator: CoordinatorManifest { zomes: coordinator },
+            lineage,
         }
         .into())
     }
@@ -264,6 +272,7 @@ mod tests {
         let wasm2 = vec![4, 5, 6];
         let hash1 = DnaWasm::from(wasm1.clone()).to_hash().await;
         let hash2 = DnaWasm::from(wasm2.clone()).to_hash().await;
+        let lineage = vec![DnaHash::from_raw_36(vec![11; 36]).into()];
         let mut manifest = DnaManifestCurrent {
             name: "name".into(),
             integrity: IntegrityManifest {
@@ -289,6 +298,7 @@ mod tests {
                 ],
             },
             coordinator: CoordinatorManifest { zomes: vec![] },
+            lineage,
         };
         let resources = vec![(path1, wasm1.into()), (path2, wasm2.into())];
 

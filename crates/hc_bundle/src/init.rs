@@ -53,6 +53,7 @@ fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
         Timestamp::now().into(),
         vec![],
         vec![],
+        vec![],
     );
     Ok(DnaBundle::new(manifest.try_into()?, vec![], root_dir)?)
 }

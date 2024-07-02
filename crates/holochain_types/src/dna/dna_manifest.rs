@@ -53,6 +53,7 @@ impl DnaManifest {
         origin_time: HumanTimestamp,
         integrity_zomes: Vec<ZomeManifest>,
         coordinator_zomes: Vec<ZomeManifest>,
+        lineage: Vec<DnaHash>,
     ) -> Self {
         DnaManifestCurrent::new(
             name,
@@ -60,6 +61,7 @@ impl DnaManifest {
             CoordinatorManifest {
                 zomes: coordinator_zomes,
             },
+            lineage.into_iter().map(Into::into).collect(),
         )
         .into()
     }

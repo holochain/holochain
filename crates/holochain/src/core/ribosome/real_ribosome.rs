@@ -458,6 +458,7 @@ impl RealRibosome {
             },
             integrity_zomes: Default::default(),
             coordinator_zomes: Default::default(),
+            lineage: Default::default(),
         };
         let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
         let empty_ribosome = RealRibosome::new(
