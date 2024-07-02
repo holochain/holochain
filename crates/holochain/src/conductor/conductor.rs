@@ -1812,7 +1812,14 @@ mod cell_impls {
         }
 
         /// Return the list of all cell IDs with DNAs "in the lineage" of the given DnaHash.
-        /// The lineage is specified in the DnaDef.
+        ///
+        /// Each DnaDef specifies a "lineage" field of DNA hashes, which indicates backward compatibility with those DNAs.
+        /// By checking a given DNA's lineage, we can determine which other DNAs are backward-compatible with it.
+        /// We also obtain a notion of forward-compatibility by checking other installed cells' DNA lineages:
+        /// if the target DNA is any installed DNA's lineage, then that DNA is forward-compatible with the target DNA.
+        ///
+        /// This function returns all installed cells which are either forward or backward compatible with the specified DNA,
+        /// including direct matches.
         pub async fn cells_by_dna_lineage(
             &self,
             dna_hash: &DnaHash,
