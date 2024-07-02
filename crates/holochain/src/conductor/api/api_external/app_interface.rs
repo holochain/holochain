@@ -151,7 +151,7 @@ impl AppInterfaceApi {
                 match status {
                     AppInfoStatus::Running
                     | AppInfoStatus::Disabled {
-                        reason: DisabledAppReason::MemproofsProvided,
+                        reason: DisabledAppReason::NotStartedAfterProvidingMemproofs,
                     } => {
                         self.conductor_handle
                             .clone()

@@ -1265,14 +1265,14 @@ async fn test_deferred_memproof_provisioning() {
         .await
         .unwrap();
 
-    //- Status is now Disabled with the special `MemproofsProvided` reason.
+    //- Status is now Disabled with the special `NotStartedAfterProvidingMemproofs` reason.
     //    It's not tested in this test, but this status allows the app to be enabled
     //    over the app interface.
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
     assert_eq!(
         app_info.status,
         AppInfoStatus::Disabled {
-            reason: DisabledAppReason::MemproofsProvided
+            reason: DisabledAppReason::NotStartedAfterProvidingMemproofs
         }
     );
 

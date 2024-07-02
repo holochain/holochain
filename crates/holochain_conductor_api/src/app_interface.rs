@@ -86,7 +86,7 @@ pub enum AppRequest {
     ProvideMemproofs(MemproofMap),
 
     /// Enable the app, only in special circumstances.
-    /// Can only be called while the app is in the `Disabled(MemproofsProvided)` state.
+    /// Can only be called while the app is in the `Disabled(NotStartedAfterProvidingMemproofs)` state.
     /// Cannot be used to enable the app if it's in any other state, or Disabled for any other reason.
     ///
     /// # Returns

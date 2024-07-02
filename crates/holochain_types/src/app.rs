@@ -1010,8 +1010,10 @@ pub enum DisabledAppReason {
     /// The app is freshly installed, and never started
     NeverStarted,
     /// The app is fully installed and deferred memproofs have been provided by the UI,
-    /// but the app has not been enabled. The app can be enabled via the app interface.
-    MemproofsProvided,
+    /// but the app has not been enabled.
+    /// The app can be enabled via the app interface in this state, which is why this is
+    /// separate from other disabled states.
+    NotStartedAfterProvidingMemproofs,
     /// The disabling was done manually by the user (via admin interface)
     User,
     /// The disabling was due to an UNRECOVERABLE error
