@@ -99,6 +99,11 @@ pub trait HdkT: HdiT {
     // Migrate DNA
     fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
     fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
+    // Validation receipts
+    fn get_validation_receipts(
+        &self,
+        input: GetValidationReceiptsInput,
+    ) -> ExternResult<Vec<ValidationReceiptSet>>;
 }
 
 #[cfg(feature = "mock")]
@@ -182,6 +187,7 @@ mockall::mock! {
         fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()>;
         fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
         fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
+        fn get_validation_receipts(&self, input: GetValidationReceiptsInput) -> ExternResult<Vec<ValidationReceiptSet>>;
     }
 
     impl HdiT for HdkT {
@@ -469,6 +475,14 @@ impl HdkT for ErrHdk {
     fn open_chain(&self, _input: OpenChainInput) -> ExternResult<ActionHash> {
         Self::err()
     }
+
+    // Validation receipts
+    fn get_validation_receipts(
+        &self,
+        _input: GetValidationReceiptsInput,
+    ) -> ExternResult<Vec<ValidationReceiptSet>> {
+        Self::err()
+    }
 }
 
 /// The HDK implemented as externs provided by the host.
@@ -722,6 +736,16 @@ impl HdkT for HostHdk {
 
     fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash> {
         host_call::<OpenChainInput, ActionHash>(__hc__open_chain_1, input)
+    }
+
+    fn get_validation_receipts(
+        &self,
+        input: GetValidationReceiptsInput,
+    ) -> ExternResult<Vec<ValidationReceiptSet>> {
+        host_call::<GetValidationReceiptsInput, Vec<ValidationReceiptSet>>(
+            __hc__get_validation_receipts_1,
+            input,
+        )
     }
 }
 

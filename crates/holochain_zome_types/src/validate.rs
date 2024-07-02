@@ -61,3 +61,61 @@ impl rusqlite::types::FromSql for ValidationStatus {
         })
     }
 }
+
+/// Input for the get_validation_receipts host function.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GetValidationReceiptsInput {
+    pub for_hash: AnyDhtHash,
+}
+
+impl GetValidationReceiptsInput {
+    /// Get validation receipts for an action.
+    pub fn for_action(action_hash: ActionHash) -> Self {
+        Self {
+            for_hash: AnyDhtHash::from(action_hash),
+        }
+    }
+
+    /// Get validation receipts for an entry.
+    pub fn for_entry(entry_hash: EntryHash) -> Self {
+        Self {
+            for_hash: AnyDhtHash::from(entry_hash),
+        }
+    }
+}
+
+/// A set of validation receipts, grouped by op.
+///
+/// This is intended to be returned as the result of a query for validation receipts by an action
+/// or entry hash. It would also be valid to return this for a query that uniquely identified an op
+/// but those are generally not available to hApp developers.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ValidationReceiptSet {
+    /// The op hash that this receipt is for.
+    pub op_hash: DhtOpHash,
+
+    /// The type of the op that was validated.
+    ///
+    /// Note that the original type is discarded here because DhtOpType is part of `holochain_types`
+    /// and moving it would be a breaking change. For now this is just informational.
+    pub op_type: String,
+
+    /// Whether this op has received the required number of receipts.
+    pub receipts_complete: bool,
+
+    /// The validation receipts for this op.
+    pub receipts: Vec<ValidationReceiptInfo>,
+}
+
+/// Summary information for a validation receipt.
+///
+/// Currently, this is ignoring `dht_op_hash` because it's already on the parent type and
+/// `when_integrated` because that's not relevant to the validation receipt itself.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ValidationReceiptInfo {
+    /// the result of the validation.
+    pub validation_status: ValidationStatus,
+
+    /// the remote validators who signed the receipt.
+    pub validators: Vec<AgentPubKey>,
+}
