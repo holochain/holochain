@@ -574,12 +574,6 @@ mod dna_impls {
             self.ribosome_store().share_ref(|ds| ds.get_dna_def(hash))
         }
 
-        /// Get a [`DnaDefHashed`] from the [`RibosomeStore`]
-        pub fn get_dna_def_hashed(&self, hash: &DnaHash) -> Option<DnaDefHashed> {
-            self.ribosome_store()
-                .share_ref(|ds| ds.get_dna_def_hashed(hash))
-        }
-
         /// Get a [`DnaFile`] from the [`RibosomeStore`]
         pub fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
             self.ribosome_store().share_ref(|ds| ds.get_dna_file(hash))

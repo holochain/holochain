@@ -42,11 +42,6 @@ impl RibosomeStore {
             .map(|d| d.dna_def().clone().into_content())
     }
 
-    #[instrument(skip(self))]
-    pub fn get_dna_def_hashed(&self, hash: &DnaHash) -> Option<DnaDefHashed> {
-        self.ribosomes.get(hash).map(|d| d.dna_def().clone())
-    }
-
     // TODO: use Arc, eliminate cloning
     #[instrument(skip(self))]
     pub fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
