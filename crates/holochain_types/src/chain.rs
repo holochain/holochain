@@ -4,6 +4,7 @@ use std::ops::RangeInclusive;
 
 use crate::activity::AgentActivityResponse;
 use crate::activity::ChainItems;
+use crate::warrant::WarrantOp;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::HasHash;
@@ -169,6 +170,8 @@ pub enum MustGetAgentActivityResponse {
     ChainTopNotFound(ActionHash),
     /// The filter produces an empty range.
     EmptyRange,
+    /// The agent has a warrant, so the activity is invalid and not returned
+    Warrants(Vec<WarrantOp>),
 }
 
 /// Identical structure to [`MustGetAgentActivityResponse`] except it includes
@@ -184,6 +187,8 @@ pub enum BoundedMustGetAgentActivityResponse {
     ChainTopNotFound(ActionHash),
     /// The filter produces an empty range.
     EmptyRange,
+    /// The agent has a warrant, so the activity is invalid and not returned
+    Warrants(Vec<WarrantOp>),
 }
 
 impl BoundedMustGetAgentActivityResponse {

@@ -13,8 +13,8 @@ use super::error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_state::query::link::GetLinksQuery;
-use holochain_state::query::Query;
 use holochain_state::query::Txn;
+use holochain_state::query::{Query, Store};
 use holochain_types::prelude::*;
 use holochain_zome_types::agent_activity::DeterministicGetAgentActivityFilter;
 use tracing::*;
@@ -61,9 +61,17 @@ pub async fn handle_get_agent_activity(
     query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
 ) -> CascadeResult<AgentActivityResponse<ActionHash>> {
-    let query = GetAgentActivityQuery::new(agent, query, options);
+    let query = GetAgentActivityQuery::new(agent.clone(), query, options);
     let results = env
-        .read_async(move |txn| query.run(Txn::from(&txn)))
+        .read_async(move |txn| {
+            let txn = Txn::from(&txn);
+            let warrants = txn.get_warrants_for_basis(&AnyLinkableHash::from(agent), true)?;
+            let mut r = query.run(txn)?;
+            if !warrants.is_empty() {
+                r.warrants = warrants.into_iter().map(|w| w.into_warrant()).collect();
+            }
+            CascadeResult::Ok(r)
+        })
         .await?;
     Ok(results)
 }

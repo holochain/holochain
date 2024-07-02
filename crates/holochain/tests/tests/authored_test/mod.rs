@@ -88,7 +88,8 @@ async fn authored_test() {
         num_attempts,
         delay_per_attempt,
     )
-    .await;
+    .await
+    .unwrap();
 
     bob
         .authored_db()

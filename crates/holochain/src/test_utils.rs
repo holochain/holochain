@@ -672,15 +672,16 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     num_published: usize,
     num_attempts: usize,
     delay: Duration,
-) {
+) -> Result<(), String> {
+    let mut num_integrated = 0;
     for i in 0..num_attempts {
-        let num_integrated = get_integrated_count(db).await;
+        num_integrated = get_integrated_count(db).await;
         if num_integrated >= num_published {
             if num_integrated > num_published {
                 tracing::warn!("num integrated ops > num published ops, meaning you may not be accounting for all nodes in this test.
                 Consistency may not be complete.")
             }
-            return;
+            return Ok(());
         } else {
             let total_time_waited = delay * i as u32;
             tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await);
@@ -688,7 +689,9 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
         tokio::time::sleep(delay).await;
     }
 
-    panic!("Consistency not achieved after {} attempts", num_attempts);
+    Err(format!(
+        "Consistency not achieved after {num_attempts} attempts. Expected {num_published} ops, but only {num_integrated} integrated.",
+    ))
 }
 
 #[tracing::instrument(skip(envs))]

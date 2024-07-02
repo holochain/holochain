@@ -164,7 +164,7 @@ async fn verify_ops_present(env: DbWrite<DbKindDht>, hash_list: Vec<DhtOpHash>, 
                 .query_row(
                     "
                 SELECT EXISTS(
-                    SELECT 1 FROM DhtOP
+                    SELECT 1 FROM DhtOp
                     WHERE when_integrated IS NULL
                     AND hash = :hash
                 )
@@ -188,7 +188,7 @@ async fn get_pending_op_hashes(env: DbWrite<DbKindDht>) -> Vec<DhtOpHash> {
     env.read_async(|txn| -> StateQueryResult<_> {
         let mut stmt = txn.prepare(
             "
-        SELECT hash FROM DhtOP
+        SELECT hash FROM DhtOp
         WHERE when_integrated IS NULL
         AND require_receipt = 1
     ",

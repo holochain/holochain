@@ -390,7 +390,16 @@ impl CascadeImpl {
 
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_rendered_ops(txn: &mut Transaction, ops: &RenderedOps) -> CascadeResult<()> {
-        let RenderedOps { ops, entry } = ops;
+        let RenderedOps {
+            ops,
+            entry,
+            warrant,
+        } = ops;
+
+        if let Some(warrant) = warrant {
+            let op = DhtOpHashed::from_content_sync(warrant.clone());
+            insert_op(txn, &op)?;
+        }
         if let Some(entry) = entry {
             insert_entry(txn, entry.as_hash(), entry.as_content())?;
         }
@@ -478,10 +487,16 @@ impl CascadeImpl {
                 "Got different must_get_agent_activity responses from different authorities"
             );
             // TODO: Handle conflict.
-            // For now try to find one that has got the activity.
+            // For now try to find one that has got the activity, unless any have Warrants
             responses
-                .into_iter()
-                .find(|a| matches!(a, MustGetAgentActivityResponse::Activity(_)))
+                .iter()
+                .find(|a| matches!(a, MustGetAgentActivityResponse::Warrants(_)))
+                .or_else(|| {
+                    responses
+                        .iter()
+                        .find(|a| matches!(a, MustGetAgentActivityResponse::Activity(_)))
+                })
+                .cloned()
         };
 
         let cache = some_or_return!(
@@ -491,6 +506,21 @@ impl CascadeImpl {
 
         // Commit the activity to the chain.
         match response {
+            Some(MustGetAgentActivityResponse::Warrants(warrants)) => {
+                cache
+                    .write_async({
+                        let warrants = warrants.clone();
+                        move |txn| {
+                            for warrant in warrants {
+                                let op = DhtOpHashed::from_content_sync(warrant);
+                                insert_op(txn, &op)?;
+                            }
+                            CascadeResult::Ok(())
+                        }
+                    })
+                    .await?;
+                Ok(MustGetAgentActivityResponse::Warrants(warrants))
+            }
             Some(MustGetAgentActivityResponse::Activity(activity)) => {
                 // TODO: Avoid this clone by committing the ops as references to the db.
                 cache
@@ -954,14 +984,14 @@ impl CascadeImpl {
             move || {
                 let mut results = Vec::with_capacity(txn_guards.len() + 1);
                 for txn_guard in &mut txn_guards {
-                    let mut txn = txn_guard.transaction()?;
+                    let txn = txn_guard.transaction()?;
                     let r = match &scratch {
                         Some(scratch) => {
                             scratch.apply_and_then(|scratch| {
-                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, Some(scratch), &author, filter.clone())
+                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&txn, Some(scratch), &author, filter.clone())
                             })?
                         }
-                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, None, &author, filter.clone())?
+                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&txn, None, &author, filter.clone())?
                     };
                     results.push(r);
                 }
@@ -994,8 +1024,9 @@ impl CascadeImpl {
             // this point then the chain is incomplete for this request.
             Ok(MustGetAgentActivityResponse::IncompleteChain)
         } else {
-            self.fetch_must_get_agent_activity(author.clone(), filter)
-                .await
+            Ok(self
+                .fetch_must_get_agent_activity(author.clone(), filter)
+                .await?)
         }
     }
 
