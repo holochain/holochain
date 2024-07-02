@@ -438,7 +438,7 @@ async fn cells_by_dna_lineage() {
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
         let (def, code) = dna.into_parts();
         let mut def = def.into_content();
-        def.lineage = lineage.into_iter().map(|h| (**h).to_owned()).collect();
+        def.lineage = lineage.iter().map(|h| (**h).to_owned()).collect();
         DnaFile::from_parts(def.into_hashed(), code)
     }
 
