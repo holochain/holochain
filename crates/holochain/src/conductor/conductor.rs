@@ -2849,10 +2849,13 @@ impl Conductor {
                                     path
                                 ))?;
                             }
-                            ffs::remove_file(&path).await.map_err(|err| anyhow!(err))?;
+                            if let Err(err) = ffs::remove_file(&path).await {
+                                tracing::warn!(?err, "Could not remove primary DB file, probably because it is still in use. Purging all data instead.");
+                                db.write_async(purge_data).await?;
+                            }
                             path.set_extension("");
                             let stem = path.to_string_lossy();
-                            for ext in ["sqlite3", "db-shm", "db-wal"] {
+                            for ext in ["db-shm", "db-wal"] {
                                 let path = PathBuf::from(format!("{stem}.{ext}"));
                                 if let Err(err) = ffs::remove_file(&path).await {
                                     let err = err.remove_backtrace();
