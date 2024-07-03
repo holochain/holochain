@@ -52,14 +52,18 @@ impl IoError {
         }
     }
 
-    #[cfg(feature = "backtrace")]
+    /// Add a backtrace to the error.
+    /// Only has an effect if the `backtrace` feature is enabled.
     pub fn with_backtrace(mut self) -> Self {
+        #[cfg(feature = "backtrace")]
         self.backtrace = Some(backtrace::Backtrace::new());
         self
     }
 
-    #[cfg(feature = "backtrace")]
+    /// Remove an associated backtrace from the error.
+    /// Only has an effect if the `backtrace` feature is enabled.
     pub fn remove_backtrace(mut self) -> Self {
+        #[cfg(feature = "backtrace")]
         self.backtrace = None;
         self
     }
