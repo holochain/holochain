@@ -2606,7 +2606,7 @@ dependencies = [
 
 [[package]]
 name = "hc_sleuth"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2630,7 +2630,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2821,7 +2821,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2934,7 +2934,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2964,7 +2964,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "anyhow",
  "clap 4.5.8",
@@ -2978,7 +2978,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -3018,7 +3018,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3046,7 +3046,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "derive_more",
  "holo_hash",
@@ -3072,7 +3072,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_services"
-version = "0.3.0-dev.10"
+version = "0.3.0-dev.11"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3123,7 +3123,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "assert_cmd",
  "base64 0.22.1",
@@ -3179,7 +3179,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "aitia",
  "async-trait",
@@ -3247,7 +3247,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3292,7 +3292,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "aitia",
  "anyhow",
@@ -3373,7 +3373,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3408,7 +3408,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.5.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3447,7 +3447,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -3506,7 +3506,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.4.0-dev.10"
+version = "0.4.0-dev.11"
 dependencies = [
  "async-trait",
  "criterion",
