@@ -224,7 +224,13 @@ impl ShardedGossipLocal {
                 (*common_arqs).clone(),
             )
             .await?;
-            GENERATE_OP_REGION_SET_TIME.record(start.elapsed().as_secs_f64(), &[]);
+            GENERATE_OP_REGION_SET_TIME.record(
+                start.elapsed().as_secs_f64(),
+                &[opentelemetry_api::KeyValue::new(
+                    "space",
+                    format!("{:?}", self.space),
+                )],
+            );
             gossip.push(ShardedGossipWire::op_regions(region_set.clone()));
             Some(region_set)
         } else {
@@ -287,7 +293,19 @@ impl ShardedGossipLocal {
         let blooms = self
             .generate_op_blooms_for_time_window(&state.common_arq_set, window)
             .await?;
-        GENERATE_OP_BLOOMS_TIME.record(start.elapsed().as_secs_f64(), &[]);
+        GENERATE_OP_BLOOMS_TIME.record(
+            start.elapsed().as_secs_f64(),
+            &[
+                opentelemetry_api::KeyValue::new("space", format!("{:?}", self.space)),
+                opentelemetry_api::KeyValue::new(
+                    "batch_size",
+                    match &blooms {
+                        bloom::Batch::Complete(blooms) => blooms.len() as i64,
+                        bloom::Batch::Partial { data, .. } => data.len() as i64,
+                    },
+                ),
+            ],
+        );
 
         let blooms = match blooms {
             bloom::Batch::Complete(blooms) => blooms,
