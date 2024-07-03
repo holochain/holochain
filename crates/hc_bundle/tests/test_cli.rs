@@ -192,12 +192,12 @@ async fn test_multi_integrity() {
     let origin_time = Timestamp::from_str(s).unwrap();
     let lineage = vec![
         DnaHash::from_raw_39(
-            holo_hash_decode_unchecked("uhC0k71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o")
+            holo_hash_decode_unchecked("uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm")
                 .unwrap(),
         )
         .unwrap(),
         DnaHash::from_raw_39(
-            holo_hash_decode_unchecked("uhC0k84P2XTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF8d3w")
+            holo_hash_decode_unchecked("uhC0k39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH")
                 .unwrap(),
         )
         .unwrap(),
