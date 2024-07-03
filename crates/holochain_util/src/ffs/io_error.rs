@@ -56,7 +56,9 @@ impl IoError {
     /// Only has an effect if the `backtrace` feature is enabled.
     pub fn with_backtrace(mut self) -> Self {
         #[cfg(feature = "backtrace")]
-        self.backtrace = Some(backtrace::Backtrace::new());
+        {
+            self.backtrace = Some(backtrace::Backtrace::new());
+        }
         self
     }
 
@@ -64,7 +66,9 @@ impl IoError {
     /// Only has an effect if the `backtrace` feature is enabled.
     pub fn remove_backtrace(mut self) -> Self {
         #[cfg(feature = "backtrace")]
-        self.backtrace = None;
+        {
+            self.backtrace = None;
+        }
         self
     }
 }
