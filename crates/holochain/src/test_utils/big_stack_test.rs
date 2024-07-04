@@ -21,4 +21,8 @@ macro_rules! big_stack_test {
             })
             .unwrap()
     };
+
+    ($what_do:expr) => {
+        $crate::big_stack_test!($what_do, 11_000_000)
+    };
 }
