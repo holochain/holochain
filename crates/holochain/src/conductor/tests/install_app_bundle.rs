@@ -492,13 +492,13 @@ async fn cells_by_dna_lineage() {
             app_cells(&app1, &[0]),
             app_cells(&app2, &[0]),
             app_cells(&app3, &[0]),
-            // no dna4
+            // no dna4: dna1 was "removed"
         ]
     );
     pretty_assertions::assert_eq!(
         lin2,
         btreeset![
-            app_cells(&app1, &[0]),
+            // no dna1: it's in the past
             app_cells(&app2, &[0]),
             app_cells(&app3, &[0]),
             app_cells(&app4, &[0]),
@@ -507,8 +507,7 @@ async fn cells_by_dna_lineage() {
     pretty_assertions::assert_eq!(
         lin3,
         btreeset![
-            app_cells(&app1, &[0]),
-            app_cells(&app2, &[0]),
+            // no dna1 or dna2: they're in the past
             app_cells(&app3, &[0]),
             app_cells(&app4, &[0]),
         ]
@@ -516,8 +515,7 @@ async fn cells_by_dna_lineage() {
     pretty_assertions::assert_eq!(
         lin4,
         btreeset![
-            app_cells(&app2, &[0]),
-            app_cells(&app3, &[0]),
+            // all other dnas are in the past
             app_cells(&app4, &[0]),
         ]
     );

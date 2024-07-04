@@ -1805,21 +1805,18 @@ mod cell_impls {
                 .share_ref(|cells| cells.keys().cloned().collect())
         }
 
-        /// Return the list of all cell IDs with DNAs "in the lineage" of the given DnaHash.
+        /// Returns all installed cells which are forward compatible with the specified DNA,
+        /// including direct matches, by examining the "lineage" specified by DNAs of currently installed cells.
         ///
-        /// Each DnaDef specifies a "lineage" field of DNA hashes, which indicates backward compatibility with those DNAs.
-        /// By checking a given DNA's lineage, we can determine which other DNAs are backward-compatible with it.
-        /// We also obtain a notion of forward-compatibility by checking other installed cells' DNA lineages:
-        /// if the target DNA is any installed DNA's lineage, then that DNA is forward-compatible with the target DNA.
-        ///
-        /// This function returns all installed cells which are either forward or backward compatible with the specified DNA,
-        /// including direct matches.
+        /// Each DnaDef specifies a "lineage" field of DNA hashes, which indicates that the DNA is forward-compatible
+        /// with the DNAs specified in its lineage. If the DnaHash parameter is contained within the lineage of any
+        /// installed cell's DNA, that cell will be returned in the result set, since it has declared
+        /// itself forward-compatible.
         pub async fn cells_by_dna_lineage(
             &self,
             dna_hash: &DnaHash,
         ) -> ConductorResult<BTreeSet<(InstalledAppId, BTreeSet<CellId>)>> {
             // TODO: OPTIMIZE: cache the DNA lineages
-            let lineage = self.get_dna_def(dna_hash).map(|d| d.lineage);
             Ok(self
                 .get_state()
                 .await?
@@ -1832,14 +1829,8 @@ mod cell_impls {
                         .all_cells()
                         .filter_map(|cell_id| {
                             let cell_dna_hash = cell_id.dna_hash();
-                            if cell_dna_hash == dna_hash
-                                || lineage
-                                    .as_ref()
-                                    .map(|lin| lin.contains(cell_dna_hash))
-                                    .unwrap_or(false)
-                            {
-                                // If a direct hit, or the given DNA contains this cell's DNA in its lineage,
-                                // include this CellId in the list of candidates
+                            if cell_dna_hash == dna_hash {
+                                // If a direct hit, include this CellId in the list of candidates
                                 Some(cell_id.clone())
                             } else {
                                 // If this cell *contains* the given DNA in *its* lineage, include it.

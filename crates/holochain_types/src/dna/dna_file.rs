@@ -161,7 +161,7 @@ impl DnaFile {
         Self { dna, code }
     }
 
-    /// Construct a DnaFile from its constituent parts
+    /// Split a DnaFile into its constituent parts
     #[cfg(feature = "test_utils")]
     pub fn into_parts(self) -> (DnaDefHashed, WasmMap) {
         (self.dna, self.code)
