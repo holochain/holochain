@@ -561,7 +561,7 @@ impl ExternalApiWireError {
 /// Filter for [`AdminRequest::ListApps`].
 ///
 /// App Status is a combination of two pieces of independent state:
-/// - Enabled/Disabled, which is a designation set by the user via the conductor admin interface.
+/// - Enabled/Disabled, which is a designation set by the user via the conductor interface.
 /// - Running/Stopped, which is a fact about the reality of the app in the course of its operation.
 pub enum AppStatusFilter {
     /// Filter on apps which are Enabled, which can include both Running and Paused apps.
