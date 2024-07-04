@@ -523,173 +523,158 @@ pub mod test {
 
     #[test]
     fn test_network_topology_integrity_check_pass() {
-        crate::big_stack_test!(
-            async move {
-                let mut topology = NetworkTopology::default();
+        crate::big_stack_test!(async move {
+            let mut topology = NetworkTopology::default();
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let node_a = NetworkTopologyNode::new();
-                assert!(topology.add_node(node_a.clone()));
+            let node_a = NetworkTopologyNode::new();
+            assert!(topology.add_node(node_a.clone()));
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let node_b = NetworkTopologyNode::new();
-                assert!(topology.add_node(node_b.clone()));
+            let node_b = NetworkTopologyNode::new();
+            assert!(topology.add_node(node_b.clone()));
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let edge = NetworkTopologyEdge::new_full_view_on_node(&node_a, &node_b);
+            let edge = NetworkTopologyEdge::new_full_view_on_node(&node_a, &node_b);
 
-                assert!(topology.add_simple_edge(0, 1, edge.clone()));
+            assert!(topology.add_simple_edge(0, 1, edge.clone()));
 
-                assert_eq!(Ok(()), topology.integrity_check());
-            },
-            3_000_000
-        );
+            assert_eq!(Ok(()), topology.integrity_check());
+        });
     }
 
     #[test]
     fn test_network_topology_integrity_check_self_edge_fail() {
-        crate::big_stack_test!(
-            async move {
-                let mut topology = NetworkTopology::default();
+        crate::big_stack_test!(async move {
+            let mut topology = NetworkTopology::default();
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let node = NetworkTopologyNode::new();
-                assert!(topology.add_node(node.clone()));
+            let node = NetworkTopologyNode::new();
+            assert!(topology.add_node(node.clone()));
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let edge = NetworkTopologyEdge::new_full_view_on_node(&node, &node);
-                // Adding a self node should fail for a simple edge.
-                assert!(!topology.add_simple_edge(0, 0, edge.clone()));
-                // Force add it for the test.
-                topology.graph.add_edge(0.into(), 0.into(), edge);
+            let edge = NetworkTopologyEdge::new_full_view_on_node(&node, &node);
+            // Adding a self node should fail for a simple edge.
+            assert!(!topology.add_simple_edge(0, 0, edge.clone()));
+            // Force add it for the test.
+            topology.graph.add_edge(0.into(), 0.into(), edge);
 
-                assert_eq!(
-                    Err(NetworkTopologyError::IntegritySelfEdge),
-                    topology.integrity_check()
-                );
-            },
-            3_000_000
-        );
+            assert_eq!(
+                Err(NetworkTopologyError::IntegritySelfEdge),
+                topology.integrity_check()
+            );
+        });
     }
 
     #[test]
     fn test_network_topology_integrity_check_duplicate_edge_fail() {
-        crate::big_stack_test!(
-            async move {
-                let mut topology = NetworkTopology::default();
+        crate::big_stack_test!(async move {
+            let mut topology = NetworkTopology::default();
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let node_a = NetworkTopologyNode::new();
-                assert!(topology.add_node(node_a.clone()));
+            let node_a = NetworkTopologyNode::new();
+            assert!(topology.add_node(node_a.clone()));
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let node_b = NetworkTopologyNode::new();
-                assert!(topology.add_node(node_b.clone()));
+            let node_b = NetworkTopologyNode::new();
+            assert!(topology.add_node(node_b.clone()));
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let edge = NetworkTopologyEdge::new_full_view_on_node(&node_a, &node_b);
+            let edge = NetworkTopologyEdge::new_full_view_on_node(&node_a, &node_b);
 
-                assert!(topology.add_simple_edge(0, 1, edge.clone()));
+            assert!(topology.add_simple_edge(0, 1, edge.clone()));
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                // Adding the same edge again should fail.
-                assert!(!topology.add_simple_edge(0, 1, edge.clone()));
-                // Force add it for the test.
-                topology.graph.add_edge(0.into(), 1.into(), edge);
+            // Adding the same edge again should fail.
+            assert!(!topology.add_simple_edge(0, 1, edge.clone()));
+            // Force add it for the test.
+            topology.graph.add_edge(0.into(), 1.into(), edge);
 
-                assert_eq!(
-                    Err(NetworkTopologyError::IntegrityDuplicateEdge),
-                    topology.integrity_check()
-                );
-            },
-            3_000_000
-        );
+            assert_eq!(
+                Err(NetworkTopologyError::IntegrityDuplicateEdge),
+                topology.integrity_check()
+            );
+        });
     }
 
     #[test]
     fn test_network_topology_integrity_check_source_conductor_mismatch_fail() {
-        crate::big_stack_test!(
-            async move {
-                let mut topology = NetworkTopology::default();
+        crate::big_stack_test!(async move {
+            let mut topology = NetworkTopology::default();
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let node_a = NetworkTopologyNode::new();
-                assert!(topology.add_node(node_a.clone()));
+            let node_a = NetworkTopologyNode::new();
+            assert!(topology.add_node(node_a.clone()));
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let node_b = NetworkTopologyNode::new();
-                assert!(topology.add_node(node_b.clone()));
+            let node_b = NetworkTopologyNode::new();
+            assert!(topology.add_node(node_b.clone()));
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let node_c = NetworkTopologyNode::new();
-                assert!(topology.add_node(node_c.clone()));
+            let node_c = NetworkTopologyNode::new();
+            assert!(topology.add_node(node_c.clone()));
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let edge = NetworkTopologyEdge::new_full_view_on_node(&node_c, &node_b);
+            let edge = NetworkTopologyEdge::new_full_view_on_node(&node_c, &node_b);
 
-                // Adding the edge should fail.
-                assert!(!topology.add_simple_edge(0, 1, edge.clone()));
+            // Adding the edge should fail.
+            assert!(!topology.add_simple_edge(0, 1, edge.clone()));
 
-                // Force add it for the test.
-                topology.graph.add_edge(0.into(), 1.into(), edge);
+            // Force add it for the test.
+            topology.graph.add_edge(0.into(), 1.into(), edge);
 
-                assert_eq!(
-                    Err(NetworkTopologyError::IntegritySourceConductorMismatch),
-                    topology.integrity_check()
-                );
-            },
-            3_000_000
-        );
+            assert_eq!(
+                Err(NetworkTopologyError::IntegritySourceConductorMismatch),
+                topology.integrity_check()
+            );
+        });
     }
 
     #[test]
     fn test_network_topology_integrity_check_target_conductor_mismatch_fail() {
-        crate::big_stack_test!(
-            async move {
-                let mut topology = NetworkTopology::default();
+        crate::big_stack_test!(async move {
+            let mut topology = NetworkTopology::default();
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let node_a = NetworkTopologyNode::new();
-                assert!(topology.add_node(node_a.clone()));
+            let node_a = NetworkTopologyNode::new();
+            assert!(topology.add_node(node_a.clone()));
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let node_b = NetworkTopologyNode::new();
-                assert!(topology.add_node(node_b.clone()));
+            let node_b = NetworkTopologyNode::new();
+            assert!(topology.add_node(node_b.clone()));
 
-                assert_eq!(Ok(()), topology.integrity_check());
+            assert_eq!(Ok(()), topology.integrity_check());
 
-                let node_c = NetworkTopologyNode::new();
-                assert!(topology.add_node(node_c.clone()));
+            let node_c = NetworkTopologyNode::new();
+            assert!(topology.add_node(node_c.clone()));
 
-                let edge = NetworkTopologyEdge::new_full_view_on_node(&node_a, &node_c);
+            let edge = NetworkTopologyEdge::new_full_view_on_node(&node_a, &node_c);
 
-                // Adding the edge should fail.
-                assert!(!topology.add_simple_edge(0, 1, edge.clone()));
+            // Adding the edge should fail.
+            assert!(!topology.add_simple_edge(0, 1, edge.clone()));
 
-                // Force add it for the test.
-                topology.graph.add_edge(0.into(), 1.into(), edge);
+            // Force add it for the test.
+            topology.graph.add_edge(0.into(), 1.into(), edge);
 
-                assert_eq!(
-                    Err(NetworkTopologyError::IntegrityTargetConductorMismatch),
-                    topology.integrity_check()
-                );
-            },
-            3_000_000
-        );
+            assert_eq!(
+                Err(NetworkTopologyError::IntegrityTargetConductorMismatch),
+                topology.integrity_check()
+            );
+        });
     }
 }
