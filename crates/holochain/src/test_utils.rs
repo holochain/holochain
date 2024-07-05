@@ -562,6 +562,7 @@ impl ConsistencyConditions {
         Ok(checked == self.warrants_issued)
     }
 
+    /// Return the total number of warrants expected to be published
     pub fn num_warrants(&self) -> usize {
         self.warrants_issued.values().sum()
     }
@@ -682,6 +683,42 @@ where
     let (unintegrated, unpublished) = diff_ops(published.iter(), integrated.iter());
     let diff = diff_report(unintegrated, unpublished);
 
+    if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
+        // If hc_sleuth has been initialized, print a sleuthy report
+
+        let other_node_ids: Vec<String> = cells
+            .iter()
+            .enumerate()
+            .filter_map(|(i, (node_id, _, _, d))| {
+                if c != i {
+                    None
+                } else {
+                    d.is_some().then_some((*node_id).to_owned())
+                }
+            })
+            .collect();
+
+        let ctx = s.lock();
+        for fact in published
+            .iter()
+            .map(DhtOpHash::with_data_sync)
+            .flat_map(|hash| {
+                other_node_ids
+                    .iter()
+                    .map(move |node_id| hc_sleuth::Event::Integrated {
+                        by: node_id.to_owned(),
+                        op: hash.clone(),
+                    })
+            })
+        {
+            let tr = fact.clone().traverse(&ctx);
+            if let Some(report) = aitia::simple_report(&tr) {
+                println!("aitia report for {fact:#?}:\n\n{report}")
+            }
+        }
+    }
+
+    #[allow(clippy::comparison_chain)]
     if integrated.len() > published.len() {
         Err(format!("{report}\nnum integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test. Consistency may not be complete. Report:\n\n{header}\n{diff}", integrated.len(), published.len()).into())
     } else if integrated.len() < published.len() {
