@@ -35,7 +35,7 @@ pub async fn await_consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
     timeout: impl Into<DurationOrSeconds>,
     all_cells: I,
 ) -> ConsistencyResult {
-    await_consistency_advanced(timeout, None, all_cells.into_iter().map(|c| (c, true))).await
+    await_consistency_advanced(timeout, (), all_cells.into_iter().map(|c| (c, true))).await
 }
 
 /// Wait for all cells to reach consistency

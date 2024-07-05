@@ -209,7 +209,7 @@ async fn test_block_invalid_receipt() {
         .call(&alice_cell.zome(coordinator_name), create_function_name, ())
         .await;
 
-    await_consistency_conditional(10, Some(1), [&alice_cell, &bob_cell])
+    await_consistency_conditional(60, vec![(alice_pubkey, 1)], [&alice_cell, &bob_cell])
         .await
         .unwrap();
 

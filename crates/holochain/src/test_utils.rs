@@ -45,6 +45,7 @@ use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Write;
 use std::sync::Arc;
@@ -508,8 +509,22 @@ async fn delay(elapsed: Duration) {
 /// Extra conditions that must be satisfied for consistency to be reached
 #[derive(Default)]
 pub struct ConsistencyConditions {
-    /// This many warrants must have been published
-    warrants_published: Option<usize>,
+    /// This many warrants must have been published against the keyed agent
+    warrants_issued: HashMap<AgentPubKey, usize>,
+}
+
+impl From<()> for ConsistencyConditions {
+    fn from(_: ()) -> Self {
+        Self::default()
+    }
+}
+
+impl From<Vec<(AgentPubKey, usize)>> for ConsistencyConditions {
+    fn from(items: Vec<(AgentPubKey, usize)>) -> Self {
+        Self {
+            warrants_issued: items.iter().cloned().collect(),
+        }
+    }
 }
 
 impl ConsistencyConditions {
@@ -517,41 +532,35 @@ impl ConsistencyConditions {
         &self,
         published_ops: impl Iterator<Item = &'a DhtOp>,
     ) -> Result<bool, ConsistencyError> {
-        if let Some(condition) = self.warrants_published {
-            let n = published_ops
-                .filter(|o| matches!(o, DhtOp::WarrantOp(_)))
-                .count();
-            if n == condition {
-                Ok(true)
-            } else if n < condition {
-                Ok(false)
-            } else {
-                return Err(format!(
-                    "Expected {} warrants to be published, but found {}",
-                    condition, n
-                )
-                .into());
-            }
-        } else {
-            Ok(true)
+        let mut checked = self.warrants_issued.clone();
+        for v in checked.values_mut() {
+            *v = 0;
         }
+
+        for op in published_ops {
+            if let DhtOp::WarrantOp(op) = op {
+                let author = &op.action_author();
+                if let Some(count) = checked.get_mut(author) {
+                    *count += 1;
+                    if *count > *self.warrants_issued.get(author).unwrap() {
+                        return Err(format!(
+                            "Expected exactly {} warrants to be published against agent {author}, but found more",
+                            self.warrants_issued.get(author).unwrap(),
+                        )
+                    .into());
+                    }
+                }    
+            }
+        }
+
+        Ok(checked == self.warrants_issued)
+    }
+
+    fn num_warrants(&self) -> usize {
+        self.warrants_issued.values().sum()
     }
 }
 
-impl From<usize> for ConsistencyConditions {
-    fn from(warrants_published: usize) -> Self {
-        Self {
-            warrants_published: Some(warrants_published),
-        }
-    }
-}
-impl From<Option<usize>> for ConsistencyConditions {
-    fn from(warrants_published: Option<usize>) -> Self {
-        Self {
-            warrants_published,
-        }
-    }
-}
 
 /// Wait for all cell envs to reach consistency, meaning that every op
 /// published by every cell has been integrated by every node
@@ -589,16 +598,32 @@ where
         }
 
         publish_complete = conditions.check(published.iter())?;
-        dbg!(publish_complete);
-
+        
         if publish_complete {
+            dbg!(publish_complete);
             // Compare the published ops to the integrated ops for each node
-            for (i, (_node_id, _, _, dht_db)) in cells.iter().enumerate() {
+            for (i, (_node_id, author, _, dht_db)) in cells.iter().enumerate() {
                 if done.contains(&i) {
                     continue;
                 }
                 if let Some(db) = dht_db.as_ref() {
                     integrated[i] = get_integrated_ops(*db).await.into_iter().collect();
+
+                    // We don't expect warrants which were issued against an agent to be integrated
+                    // by that agent, since typically the agent will have been blocked
+                    let mut num_warrants_to_skip = conditions.warrants_issued.get(author).cloned().unwrap_or_default();
+                    let published = published.iter().filter(|op| {
+                        if let DhtOp::WarrantOp(w) = op {
+                            if num_warrants_to_skip > 0 && w.action_author() == *author {
+                                num_warrants_to_skip -= 1;
+                                false
+                            } else {
+                                true
+                            }
+                        } else {
+                            true
+                        }
+                    }).cloned().collect::<HashSet<_>>();
                     if integrated[i] == published {
                         done.insert(i);
                         tracing::debug!(i, "Node reached consistency");
@@ -634,6 +659,12 @@ where
         "op_type (action_type)",
         "-".repeat(53 + 3 + 53 + 53 + 4 + 21)
     );
+
+    if !publish_complete {
+        let published = published.iter().map(display_op).collect::<Vec<_>>().join("\n");
+        return Err(format!("There are still ops which were expected to have been published which weren't:\n{header}\n{published}").into());
+    }
+
 
     let mut report = String::new();
     let not_consistent = (0..cells.len())
