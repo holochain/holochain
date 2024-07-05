@@ -170,7 +170,6 @@ async fn test_block_invalid_receipt() {
         Op::StoreEntry(StoreEntry { action, .. })
             if action.hashed.content.app_entry_def().is_some() =>
         {
-            dbg!("entry defs ARE bad!");
             Ok(ValidateResult::Invalid("Entry defs are bad".into()))
         }
         _ => Ok(ValidateResult::Valid),
@@ -209,9 +208,14 @@ async fn test_block_invalid_receipt() {
         .call(&alice_cell.zome(coordinator_name), create_function_name, ())
         .await;
 
-    await_consistency_conditional(60, vec![(alice_pubkey, 1)], [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    // await_consistency_conditional(60, vec![(alice_pubkey, 1)], [&alice_cell, &bob_cell])
+    await_consistency_advanced(
+        10,
+        vec![(alice_pubkey, 1)],
+        [(&alice_cell, false), (&bob_cell, true)],
+    )
+    .await
+    .unwrap();
 
     let alice_block_target = BlockTargetId::Cell(alice_cell.cell_id().to_owned());
     let bob_block_target = BlockTargetId::Cell(bob_cell.cell_id().to_owned());

@@ -584,7 +584,7 @@ where
         if !publish_complete {
             published = HashSet::new();
             for (_, author, db, _) in cells.iter() {
-                let p = request_published_ops(*db, Some((*author).to_owned()))
+                let p = request_published_ops(*db, None /*Some((*author).to_owned())*/)
                     .await
                     .unwrap()
                     .into_iter()
@@ -597,10 +597,13 @@ where
             }
         }
 
+        let prev_publish_complete = publish_complete;
         publish_complete = conditions.check(published.iter())?;
         
         if publish_complete {
-            dbg!(publish_complete);
+            if !prev_publish_complete {
+                println!("*** All expected ops were published ***");
+            }
             // Compare the published ops to the integrated ops for each node
             for (i, (_node_id, author, _, dht_db)) in cells.iter().enumerate() {
                 if done.contains(&i) {
@@ -609,21 +612,22 @@ where
                 if let Some(db) = dht_db.as_ref() {
                     integrated[i] = get_integrated_ops(*db).await.into_iter().collect();
 
-                    // We don't expect warrants which were issued against an agent to be integrated
-                    // by that agent, since typically the agent will have been blocked
-                    let mut num_warrants_to_skip = conditions.warrants_issued.get(author).cloned().unwrap_or_default();
-                    let published = published.iter().filter(|op| {
-                        if let DhtOp::WarrantOp(w) = op {
-                            if num_warrants_to_skip > 0 && w.action_author() == *author {
-                                num_warrants_to_skip -= 1;
-                                false
-                            } else {
-                                true
-                            }
-                        } else {
-                            true
-                        }
-                    }).cloned().collect::<HashSet<_>>();
+                    // // We don't expect warrants which were issued against an agent to be integrated
+                    // // by that agent, since typically the agent will have been blocked
+                    // let mut num_warrants_to_skip = conditions.warrants_issued.get(author).cloned().unwrap_or_default();
+                    // let published = published.iter().filter(|op| {
+                    //     if let DhtOp::WarrantOp(w) = op {
+                    //         if num_warrants_to_skip > 0 && w.action_author() == *author {
+                    //             num_warrants_to_skip -= 1;
+                    //             false
+                    //         } else {
+                    //             true
+                    //         }
+                    //     } else {
+                    //         true
+                    //     }
+                    // }).cloned().collect::<HashSet<_>>();
+
                     if integrated[i] == published {
                         done.insert(i);
                         tracing::debug!(i, "Node reached consistency");
@@ -636,7 +640,6 @@ where
                 } else {
                     // If the DHT db is not provided, don't check integration
                     done.insert(i);
-                    dbg!(i);
                 }
             }
         }
