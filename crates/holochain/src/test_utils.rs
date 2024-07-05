@@ -506,10 +506,16 @@ async fn delay(elapsed: Duration) {
     tokio::time::sleep(delay).await
 }
 
-/// Extra conditions that must be satisfied for consistency to be reached
+/// Extra conditions that must be satisfied for consistency to be reached.
+/// 
+/// Without supplying extra conditions, it's expected that at the time of beginning
+/// the consistency awaiting, all ops which will be published have already been published.
+/// However, in cases where more publishing is expected, such as when warrants will be authored
+/// due to recently publishing invalid ops, these conditions can be used to make sure that
+/// the consistency check will not proceed until all publishing expectations have occurred.
 #[derive(Default)]
 pub struct ConsistencyConditions {
-    /// This many warrants must have been published against the keyed agent
+    /// This many warrants must have been published against the keyed agent.
     warrants_issued: HashMap<AgentPubKey, usize>,
 }
 
@@ -556,7 +562,7 @@ impl ConsistencyConditions {
         Ok(checked == self.warrants_issued)
     }
 
-    fn num_warrants(&self) -> usize {
+    pub fn num_warrants(&self) -> usize {
         self.warrants_issued.values().sum()
     }
 }
@@ -603,7 +609,7 @@ where
         
         if publish_complete {
             if !prev_publish_complete {
-                println!("*** All expected ops were published ***");
+                tracing::info!("*** All expected ops were published ***");
             }
             // Compare the published ops to the integrated ops for each node
             for (i, (_node_id, _, _, dht_db)) in cells.iter().enumerate() {
