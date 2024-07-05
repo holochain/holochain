@@ -507,7 +507,7 @@ async fn delay(elapsed: Duration) {
 }
 
 /// Extra conditions that must be satisfied for consistency to be reached.
-/// 
+///
 /// Without supplying extra conditions, it's expected that at the time of beginning
 /// the consistency awaiting, all ops which will be published have already been published.
 /// However, in cases where more publishing is expected, such as when warrants will be authored
@@ -555,7 +555,7 @@ impl ConsistencyConditions {
                         )
                     .into());
                     }
-                }    
+                }
             }
         }
 
@@ -566,7 +566,6 @@ impl ConsistencyConditions {
         self.warrants_issued.values().sum()
     }
 }
-
 
 /// Wait for all cell envs to reach consistency, meaning that every op
 /// published by every cell has been integrated by every node
@@ -586,7 +585,6 @@ where
     let mut publish_complete = false;
 
     while start.elapsed() < timeout {
-        
         if !publish_complete {
             published = HashSet::new();
             for (_, _author, db, _) in cells.iter() {
@@ -596,7 +594,7 @@ where
                     .unwrap()
                     .into_iter()
                     .map(|(_, _, op)| op);
-    
+
                 // Assert that there are no duplicates
                 let expected = p.len() + published.len();
                 published.extend(p);
@@ -606,7 +604,7 @@ where
 
         let prev_publish_complete = publish_complete;
         publish_complete = conditions.check(published.iter())?;
-        
+
         if publish_complete {
             if !prev_publish_complete {
                 tracing::info!("*** All expected ops were published ***");
@@ -655,10 +653,13 @@ where
     );
 
     if !publish_complete {
-        let published = published.iter().map(display_op).collect::<Vec<_>>().join("\n");
+        let published = published
+            .iter()
+            .map(display_op)
+            .collect::<Vec<_>>()
+            .join("\n");
         return Err(format!("There are still ops which were expected to have been published which weren't:\n{header}\n{published}").into());
     }
-
 
     let mut report = String::new();
     let not_consistent = (0..cells.len())
@@ -670,7 +671,8 @@ where
         "{} cells did not reach consistency: {:?}",
         not_consistent.len(),
         not_consistent
-    ).unwrap();
+    )
+    .unwrap();
 
     let c = *not_consistent
         .first()
@@ -683,13 +685,10 @@ where
     if integrated.len() > published.len() {
         Err(format!("{report}\nnum integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test. Consistency may not be complete. Report:\n\n{header}\n{diff}", integrated.len(), published.len()).into())
     } else if integrated.len() < published.len() {
-
-        
         let db = cells[c].3.as_ref().expect("DhtDb must be provided");
         let integration_dump = integration_dump(*db).await.unwrap();
-            
+
         Err(format!(
-            
 "{}\nConsistency not achieved after {:?}. Expected {} ops, but only {} integrated. Report:\n\n{}\n{}\n\n{:?}",
 report,
         timeout,
@@ -701,7 +700,6 @@ report,
 
 
         ).into())
-
     } else {
         unreachable!()
     }
