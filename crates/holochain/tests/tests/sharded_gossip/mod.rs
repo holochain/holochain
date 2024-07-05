@@ -688,9 +688,13 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         start.elapsed()
     );
 
-    await_consistency_advanced(10, [(&cells[0], false), (&cells[1], true), (&cell, true)])
-        .await
-        .unwrap();
+    await_consistency_advanced(
+        10,
+        None,
+        [(&cells[0], false), (&cells[1], true), (&cell, true)],
+    )
+    .await
+    .unwrap();
 
     println!(
         "Done waiting for consistency between last two nodes. Elapsed: {:?}",

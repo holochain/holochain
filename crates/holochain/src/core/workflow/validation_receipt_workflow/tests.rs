@@ -157,14 +157,6 @@ async fn test_block_invalid_receipt() {
         ))?;
         Ok(hash)
     });
-    // .function(
-    //     coordinator_name,
-    //     get_function_name,
-    //     move |api, hash: AnyDhtHash| {
-    //         let records = api.get(vec![GetInput::new(hash, Default::default())])?;
-    //         Ok(records[0])
-    //     },
-    // );
 
     let zomes_that_check = InlineZomeSet::new_single(
         integrity_name,
@@ -217,7 +209,7 @@ async fn test_block_invalid_receipt() {
         .call(&alice_cell.zome(coordinator_name), create_function_name, ())
         .await;
 
-    await_consistency(10, [&alice_cell, &bob_cell])
+    await_consistency_conditional(10, Some(1), [&alice_cell, &bob_cell])
         .await
         .unwrap();
 

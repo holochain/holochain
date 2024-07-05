@@ -46,6 +46,7 @@ use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
 use std::collections::HashSet;
+use std::fmt::Write;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -493,176 +494,251 @@ impl std::fmt::Debug for ConsistencyError {
 /// Alias
 pub type ConsistencyResult = Result<(), ConsistencyError>;
 
+async fn delay(elapsed: Duration) {
+    let delay = if elapsed > Duration::from_secs(10) {
+        CONSISTENCY_DELAY_HIGH
+    } else if elapsed > Duration::from_secs(1) {
+        CONSISTENCY_DELAY_MID
+    } else {
+        CONSISTENCY_DELAY_LOW
+    };
+    tokio::time::sleep(delay).await
+}
+
+/// Extra conditions that must be satisfied for consistency to be reached
+#[derive(Default)]
+pub struct ConsistencyConditions {
+    /// This many warrants must have been published
+    warrants_published: Option<usize>,
+}
+
+impl ConsistencyConditions {
+    fn check<'a>(
+        &self,
+        published_ops: impl Iterator<Item = &'a DhtOp>,
+    ) -> Result<bool, ConsistencyError> {
+        if let Some(condition) = self.warrants_published {
+            let n = published_ops
+                .filter(|o| matches!(o, DhtOp::WarrantOp(_)))
+                .count();
+            if n == condition {
+                Ok(true)
+            } else if n < condition {
+                Ok(false)
+            } else {
+                return Err(format!(
+                    "Expected {} warrants to be published, but found {}",
+                    condition, n
+                )
+                .into());
+            }
+        } else {
+            Ok(true)
+        }
+    }
+}
+
+impl From<usize> for ConsistencyConditions {
+    fn from(warrants_published: usize) -> Self {
+        Self {
+            warrants_published: Some(warrants_published),
+        }
+    }
+}
+impl From<Option<usize>> for ConsistencyConditions {
+    fn from(warrants_published: Option<usize>) -> Self {
+        Self {
+            warrants_published,
+        }
+    }
+}
+
 /// Wait for all cell envs to reach consistency, meaning that every op
 /// published by every cell has been integrated by every node
-pub async fn consistency_dbs<AuthorDb, DhtDb>(
-    all_cell_dbs: &[(&SleuthId, &AgentPubKey, &AuthorDb, Option<&DhtDb>)],
+pub async fn wait_for_integration_diff<AuthorDb, DhtDb>(
+    cells: &[(&SleuthId, &AgentPubKey, &AuthorDb, Option<&DhtDb>)],
     timeout: Duration,
+    conditions: ConsistencyConditions,
 ) -> ConsistencyResult
 where
     AuthorDb: ReadAccess<DbKindAuthored>,
     DhtDb: ReadAccess<DbKindDht>,
 {
+    let start = tokio::time::Instant::now();
+    let mut done = HashSet::new();
+    let mut integrated = vec![HashSet::new(); cells.len()];
     let mut published = HashSet::new();
-    for (_, author, db, _) in all_cell_dbs.iter() {
-        published.extend(
-            request_published_ops(*db, Some((*author).to_owned()))
-                .await
-                .unwrap()
-                .into_iter()
-                .map(|(_, _, op)| op),
-        );
-    }
-    let published = Arc::new(published.into_iter().collect::<Vec<_>>());
-    let all_node_ids: HashSet<_> = all_cell_dbs
-        .iter()
-        .map(|(node_id, _, _, _)| node_id)
-        .collect();
+    let mut publish_complete = false;
 
-    futures::future::join_all(
-        all_cell_dbs
-            .iter()
-            .flat_map(|(node_id, _, _, d)| Some((d.as_ref()?, node_id)))
-            .map(move |(&db, node_id)| {
-                let others: Vec<String> = all_node_ids
-                    .difference(&[node_id].into_iter().collect())
-                    .map(|n| n.to_string())
-                    .collect();
-                wait_for_integration_diff(others, db.clone(), published.clone(), timeout)
-            }),
-    )
-    .await
-    .into_iter()
-    .collect::<Result<Vec<()>, ConsistencyError>>()?;
-    Ok(())
+    while start.elapsed() < timeout {
+        
+        if !publish_complete {
+            published = HashSet::new();
+            for (_, author, db, _) in cells.iter() {
+                let p = request_published_ops(*db, Some((*author).to_owned()))
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|(_, _, op)| op);
+    
+                // Assert that there are no duplicates
+                let expected = p.len() + published.len();
+                published.extend(p);
+                assert_eq!(published.len(), expected);
+            }
+        }
+
+        publish_complete = conditions.check(published.iter())?;
+        dbg!(publish_complete);
+
+        if publish_complete {
+            // Compare the published ops to the integrated ops for each node
+            for (i, (_node_id, _, _, dht_db)) in cells.iter().enumerate() {
+                if done.contains(&i) {
+                    continue;
+                }
+                if let Some(db) = dht_db.as_ref() {
+                    integrated[i] = get_integrated_ops(*db).await.into_iter().collect();
+                    if integrated[i] == published {
+                        done.insert(i);
+                        tracing::debug!(i, "Node reached consistency");
+                    } else {
+                        let total_time_waited = start.elapsed();
+                        let queries = query_integration(*db).await;
+                        let num_integrated = integrated.len();
+                        tracing::debug!(i, ?num_integrated, ?total_time_waited, counts = ?queries, "consistency-status");
+                    }
+                } else {
+                    // If the DHT db is not provided, don't check integration
+                    done.insert(i);
+                    dbg!(i);
+                }
+            }
+        }
+
+        // If all nodes reached consistency, exit successfully
+        if done.len() == cells.len() {
+            return Ok(());
+        }
+
+        let total_time_waited = start.elapsed();
+        delay(total_time_waited).await;
+    }
+
+    let header = format!(
+        "{:53} {:>3} {:53} {:53} {}\n{}",
+        "author",
+        "seq",
+        "op_hash",
+        "action_hash",
+        "op_type (action_type)",
+        "-".repeat(53 + 3 + 53 + 53 + 4 + 21)
+    );
+
+    let mut report = String::new();
+    let not_consistent = (0..cells.len())
+        .filter(|i| !done.contains(i))
+        .collect::<Vec<_>>();
+
+    writeln!(
+        report,
+        "{} cells did not reach consistency: {:?}",
+        not_consistent.len(),
+        not_consistent
+    ).unwrap();
+
+    let c = *not_consistent
+        .first()
+        .expect("At least one node must not have reached consistency");
+    let integrated = integrated.remove(c);
+
+    let (unintegrated, unpublished) = diff_ops(published.iter(), integrated.iter());
+    let diff = diff_report(unintegrated, unpublished);
+
+    if integrated.len() > published.len() {
+        Err(format!("{report}\nnum integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test. Consistency may not be complete. Report:\n\n{header}\n{diff}", integrated.len(), published.len()).into())
+    } else if integrated.len() < published.len() {
+
+        
+        let db = cells[c].3.as_ref().expect("DhtDb must be provided");
+        let integration_dump = integration_dump(*db).await.unwrap();
+            
+        Err(format!(
+            
+"{}\nConsistency not achieved after {:?}. Expected {} ops, but only {} integrated. Report:\n\n{}\n{}\n\n{:?}",
+report,
+        timeout,
+        published.len(),
+        integrated.len(),
+        header,
+        diff,
+        integration_dump,
+
+
+        ).into())
+
+    } else {
+        unreachable!()
+    }
 }
 
 const CONSISTENCY_DELAY_LOW: Duration = Duration::from_millis(100);
 const CONSISTENCY_DELAY_MID: Duration = Duration::from_millis(500);
 const CONSISTENCY_DELAY_HIGH: Duration = Duration::from_millis(1000);
 
-/// Wait for num_attempts * delay, or until all published ops have been integrated.
-/// If the timeout is reached, print a report including a diff of all published ops
-/// which were not integrated.
-#[tracing::instrument(skip(db, published))]
-async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
-    node_ids: Vec<SleuthId>,
-    db: Db,
-    published: Arc<Vec<DhtOp>>,
-    timeout: Duration,
-) -> ConsistencyResult {
-    fn display_op(op: &DhtOp) -> String {
-        match op {
-            DhtOp::ChainOp(op) => format!(
-                "{} {:>3} {} {} {} ({})",
-                op.action().author(),
-                op.action().action_seq(),
-                op.to_hash(),
-                op.action().to_hash(),
-                op.get_type(),
-                op.action().action_type(),
-            ),
-            DhtOp::WarrantOp(op) => {
-                format!("{} WARRANT ({})", op.author, op.get_type(),)
-            }
-        }
-    }
-
-    let header = format!(
-        "{:53} {:>3} {:53} {:53} {}",
-        "author", "seq", "op_hash", "action_hash", "op_type (action_type)",
-    );
-    let start = tokio::time::Instant::now();
-
-    let num_published = published.len();
-    while start.elapsed() < timeout {
-        let num_integrated = get_integrated_count(&db).await;
-        let delay = if num_integrated >= num_published {
-            if num_integrated > num_published {
-                tracing::warn!("num integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test.
-                Consistency may not be complete.", num_integrated, num_published)
-            }
-            return Ok(());
-        } else {
-            let total_time_waited = start.elapsed();
-            let queries = query_integration(&db).await;
-            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?queries, "consistency-status");
-
-            if total_time_waited > Duration::from_secs(10) {
-                CONSISTENCY_DELAY_HIGH
-            } else if total_time_waited > Duration::from_secs(1) {
-                CONSISTENCY_DELAY_MID
-            } else {
-                CONSISTENCY_DELAY_LOW
-            }
-        };
-        tokio::time::sleep(delay).await;
-    }
-
-    // Timeout has been reached at this point, so print a helpful report
-
-    if published.is_empty() {
-        return Err(format!("No ops were published in {timeout:?}").into());
-    }
-
-    // Otherwise just print a report of which ops were not integrated
-    let mut published_displays: Vec<_> = published.iter().map(display_op).collect();
-    let mut integrated: Vec<_> = get_integrated_ops(&db)
-        .await
-        .iter()
-        .map(display_op)
-        .collect();
-    published_displays.sort();
+fn diff_ops<'a>(
+    published: impl Iterator<Item = &'a DhtOp>,
+    integrated: impl Iterator<Item = &'a DhtOp>,
+) -> (Vec<String>, Vec<String>) {
+    let mut published: Vec<_> = published.map(display_op).collect();
+    let mut integrated: Vec<_> = integrated.map(display_op).collect();
+    published.sort();
     integrated.sort();
 
-    let unintegrated = diff::slice(&published_displays, &integrated)
-        .into_iter()
-        .filter_map(|d| match d {
-            diff::Result::Left(l) => Some(l),
-            _ => None,
-        })
-        .cloned()
-        .collect::<Vec<_>>();
+    let mut unintegrated = vec![];
+    let mut unpublished = vec![];
 
-    if unintegrated.is_empty() {
-        // Even though the main loop failed, the final check shows that we have all ops!
-        return Ok(());
-    }
-
-    if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
-        // If hc_sleuth has been initialized, print a sleuthy report
-
-        let ctx = s.lock();
-        for fact in published
-            .iter()
-            .map(DhtOpHash::with_data_sync)
-            .flat_map(|hash| {
-                node_ids
-                    .iter()
-                    .map(move |node_id| hc_sleuth::Event::Integrated {
-                        by: node_id.clone(),
-                        op: hash.clone(),
-                    })
-            })
-        {
-            let tr = fact.clone().traverse(&ctx);
-            if let Some(report) = aitia::simple_report(&tr) {
-                println!("aitia report for {fact:#?}:\n\n{report}")
-            }
+    for d in diff::slice(&published, &integrated) {
+        match d {
+            diff::Result::Left(l) => unintegrated.push(l.to_owned()),
+            diff::Result::Right(r) => unpublished.push(r.to_owned()),
+            _ => (),
         }
     }
 
-    let integration_dump = integration_dump(&db).await.unwrap();
+    (unintegrated, unpublished)
+}
 
-    Err(format!(
-        "Consistency not achieved after {:?}. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n\n{:?}",
-        timeout,
-        num_published,
-        integrated.len(),
-        header,
-        unintegrated.join("\n"),
-        integration_dump,
-    ).into())
+fn diff_report(unintegrated: Vec<String>, unpublished: Vec<String>) -> String {
+    let unintegrated = if unintegrated.is_empty() {
+        "".to_string()
+    } else {
+        format!("Unintegrated:\n\n{}\n", unintegrated.join("\n"))
+    };
+    let unpublished = if unpublished.is_empty() {
+        "".to_string()
+    } else {
+        format!("Unpublished:\n\n{}\n", unpublished.join("\n"))
+    };
+
+    format!("{}{}", unintegrated, unpublished)
+}
+
+fn display_op(op: &DhtOp) -> String {
+    match op {
+        DhtOp::ChainOp(op) => format!(
+            "{} {:>3} {} {} {} ({})",
+            op.action().author(),
+            op.action().action_seq(),
+            op.to_hash(),
+            op.action().to_hash(),
+            op.get_type(),
+            op.action().action_type(),
+        ),
+        DhtOp::WarrantOp(op) => {
+            format!("{} WARRANT ({})", op.author, op.get_type(),)
+        }
+    }
 }
 
 /// Wait for num_attempts * delay, or until all published ops have been integrated.
