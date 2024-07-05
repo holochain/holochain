@@ -583,7 +583,8 @@ where
         
         if !publish_complete {
             published = HashSet::new();
-            for (_, author, db, _) in cells.iter() {
+            for (_, _author, db, _) in cells.iter() {
+                // Providing the author is redundant
                 let p = request_published_ops(*db, None /*Some((*author).to_owned())*/)
                     .await
                     .unwrap()
@@ -605,28 +606,12 @@ where
                 println!("*** All expected ops were published ***");
             }
             // Compare the published ops to the integrated ops for each node
-            for (i, (_node_id, author, _, dht_db)) in cells.iter().enumerate() {
+            for (i, (_node_id, _, _, dht_db)) in cells.iter().enumerate() {
                 if done.contains(&i) {
                     continue;
                 }
                 if let Some(db) = dht_db.as_ref() {
                     integrated[i] = get_integrated_ops(*db).await.into_iter().collect();
-
-                    // // We don't expect warrants which were issued against an agent to be integrated
-                    // // by that agent, since typically the agent will have been blocked
-                    // let mut num_warrants_to_skip = conditions.warrants_issued.get(author).cloned().unwrap_or_default();
-                    // let published = published.iter().filter(|op| {
-                    //     if let DhtOp::WarrantOp(w) = op {
-                    //         if num_warrants_to_skip > 0 && w.action_author() == *author {
-                    //             num_warrants_to_skip -= 1;
-                    //             false
-                    //         } else {
-                    //             true
-                    //         }
-                    //     } else {
-                    //         true
-                    //     }
-                    // }).cloned().collect::<HashSet<_>>();
 
                     if integrated[i] == published {
                         done.insert(i);
