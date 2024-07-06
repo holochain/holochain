@@ -513,7 +513,7 @@ async fn delay(elapsed: Duration) {
 /// However, in cases where more publishing is expected, such as when warrants will be authored
 /// due to recently publishing invalid ops, these conditions can be used to make sure that
 /// the consistency check will not proceed until all publishing expectations have occurred.
-#[derive(Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ConsistencyConditions {
     /// This many warrants must have been published against the keyed agent.
     warrants_issued: HashMap<AgentPubKey, usize>,
