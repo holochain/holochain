@@ -116,6 +116,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
         .unwrap()
         .into_tuples();
     let alice_pubkey = alice.agent_pubkey().clone();
+    let bob_pubkey = bob.agent_pubkey().clone();
 
     // For this test we want bob to get alice's chain so he can detect the fork
     conductors.exchange_peer_info().await;
@@ -131,7 +132,9 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let record = records.unwrap();
     let (action, _) = record.into_inner();
     let mut action = action.into_inner().0.into_content();
-    let entry = Entry::App(::fixt::fixt!(AppEntryBytes));
+    let entry = Entry::App(
+        AppEntryBytes::try_from(SerializedBytes::from(UnsafeBytes::from(vec![1, 2, 3]))).unwrap(),
+    );
     *action.entry_data_mut().unwrap().0 = entry.to_hash();
     let action = SignedActionHashed::sign(&conductors[0].keystore(), action.into_hashed())
         .await
@@ -174,8 +177,8 @@ async fn sys_validation_produces_forked_chain_warrant() {
             let basis: AnyLinkableHash = alice_pubkey.clone().into();
             conductors[1]
                 .spaces
-                .get_all_authored_dbs(dna.dna_hash())
-                .unwrap()[0]
+                .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
+                .unwrap()
                 .test_read(move |txn| {
                     let store = Txn::from(&txn);
                     store.get_warrants_for_basis(&basis, false).unwrap()
