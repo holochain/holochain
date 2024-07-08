@@ -1,7 +1,7 @@
 //! Module for items related to aggregating validation_receipts
 
+use holo_hash::DhtOpHash;
 use holo_hash::{ActionHash, AgentPubKey};
-use holo_hash::{DhtOpHash, EntryHash};
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;

@@ -1,6 +1,5 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::{CallContext, RibosomeT};
-use holo_hash::hash_type;
 use holochain_sqlite::prelude::DbRead;
 use holochain_state::prelude::validation_receipts_for_action;
 use holochain_types::access::{HostFnAccess, Permission};

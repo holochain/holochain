@@ -77,9 +77,10 @@ impl GetValidationReceiptsInput {
 
 /// A set of validation receipts, grouped by op.
 ///
-/// This is intended to be returned as the result of a query for validation receipts by an action
-/// or entry hash. It would also be valid to return this for a query that uniquely identified an op
-/// but those are generally not available to hApp developers.
+/// This is intended to be returned as the result of a query for validation receipts by action.
+///
+/// It would also be valid to return this for a query that uniquely identified an op but those are
+/// generally not available to hApp developers.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ValidationReceiptSet {
     /// The op hash that this receipt is for.
