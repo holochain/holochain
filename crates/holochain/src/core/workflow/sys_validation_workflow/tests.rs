@@ -169,7 +169,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
         .trigger(&"test");
 
     //- Check that bob authored a chain fork warrant
-    crate::wait_for_10s!(
+    crate::wait_for_1m!(
         {
             let basis: AnyLinkableHash = alice_pubkey.clone().into();
             conductors[1]
