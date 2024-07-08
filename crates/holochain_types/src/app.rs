@@ -795,6 +795,12 @@ impl InstalledAppCommon {
 }
 
 /// The status of an installed app.
+///
+/// App Status is a combination of two pieces of independent state:
+/// - Enabled/Disabled, which is a designation set by the user via the conductor admin interface.
+/// - Running/Stopped, which is a fact about the reality of the app in the course of its operation.
+///
+/// The combinations of these basic states give rise to the unified App Status.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]
 pub enum AppStatus {
