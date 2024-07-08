@@ -8,7 +8,9 @@ use crate::core::workflow::app_validation_workflow::{
 use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
-use crate::test_utils::{host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration};
+use crate::test_utils::{
+    host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration, ConsistencyConditions,
+};
 use ::fixt::fixt;
 use arbitrary::Arbitrary;
 use hdk::hdi::test_utils::set_zome_types;
@@ -1034,9 +1036,15 @@ async fn app_validation_produces_warrants() {
         )
         .await;
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
-    // TODO: fix await_consistency to recognize warrants
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    let conditions = ConsistencyConditions::from(vec![(alice.agent_pubkey().clone(), 1)]);
+
+    await_consistency_advanced(
+        10,
+        conditions.clone(),
+        [(&alice, false), (&bob, true), (&carol, false)],
+    )
+    .await
+    .unwrap();
 
     conductors[0].shutdown().await;
     conductors[2].startup().await;
@@ -1059,7 +1067,13 @@ async fn app_validation_produces_warrants() {
 
     // TODO: ensure that bob blocked alice
 
-    await_consistency(10, [&bob, &carol]).await.unwrap();
+    await_consistency_advanced(
+        10,
+        conditions,
+        [(&alice, false), (&bob, true), (&carol, true)],
+    )
+    .await
+    .unwrap();
 
     //- Ensure that carol gets gossiped the warrant for alice from bob
 
