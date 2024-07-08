@@ -559,11 +559,21 @@ impl ExternalApiWireError {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
 /// Filter for [`AdminRequest::ListApps`].
+///
+/// App Status is a combination of two pieces of independent state:
+/// - Enabled/Disabled, which is a designation set by the user via the conductor interface.
+/// - Running/Stopped, which is a fact about the reality of the app in the course of its operation.
 pub enum AppStatusFilter {
+    /// Filter on apps which are Enabled, which can include both Running and Paused apps.
     Enabled,
+    /// Filter only on apps which are Disabled.
     Disabled,
+    /// Filter on apps which are currently Running (meaning they are also Enabled).
     Running,
+    /// Filter on apps which are Stopped, i.e. not Running.
+    /// This includes apps in the Disabled status, as well as the Paused status.
     Stopped,
+    /// Filter only on Paused apps.
     Paused,
 }
 

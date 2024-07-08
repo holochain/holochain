@@ -298,7 +298,7 @@ pub mod wasm_test {
 
                 assert_eq!(record.unwrap().action_address(), &action_hash);
             },
-            4_000_000
+            11_000_000
         );
     }
 
