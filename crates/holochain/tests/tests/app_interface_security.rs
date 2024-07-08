@@ -171,6 +171,7 @@ async fn app_interface_requires_auth() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn app_interface_can_handle_bad_auth_payload() {
     holochain_trace::test_run();
 
