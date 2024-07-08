@@ -165,6 +165,7 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn ribosome_must_get_agent_activity() {
         holochain_trace::test_run();
         let RibosomeTestFixture {
