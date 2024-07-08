@@ -132,7 +132,9 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let record = records.unwrap();
     let (action, _) = record.into_inner();
     let mut action = action.into_inner().0.into_content();
-    let entry = Entry::App(::fixt::fixt!(AppEntryBytes));
+    let entry = Entry::App(
+        AppEntryBytes::try_from(SerializedBytes::from(UnsafeBytes::from(vec![1, 2, 3]))).unwrap(),
+    );
     *action.entry_data_mut().unwrap().0 = entry.to_hash();
     let action = SignedActionHashed::sign(&conductors[0].keystore(), action.into_hashed())
         .await
