@@ -227,6 +227,9 @@ pub mod test {
             .call(&bob, "commit_something", Something(vec![21]))
             .await;
 
+        // Give bob time to integrate
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
         let _: ActionHash = conductor
             .call(
                 &alice,
