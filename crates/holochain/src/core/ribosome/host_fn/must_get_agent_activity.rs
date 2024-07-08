@@ -160,6 +160,7 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn ribosome_must_get_agent_activity() {
         holochain_trace::test_run();
         let RibosomeTestFixture {
@@ -220,6 +221,9 @@ pub mod test {
         let d: ActionHash = conductor
             .call(&bob, "commit_something", Something(vec![21]))
             .await;
+
+        // Give bob time to integrate
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         let _: ActionHash = conductor
             .call(

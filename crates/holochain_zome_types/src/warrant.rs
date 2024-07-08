@@ -159,14 +159,15 @@ impl WarrantProof {
     /// Warrants always have the authoring agent as a basis, so that warrants
     /// can be accumulated by the agent activity authorities.
     pub fn dht_basis(&self) -> OpBasis {
+        self.action_author().clone().into()
+    }
+
+    /// The author of the action which led to this warrant, i.e. the target of the warrant
+    pub fn action_author(&self) -> &AgentPubKey {
         match self {
             Self::ChainIntegrity(w) => match w {
-                ChainIntegrityWarrant::InvalidChainOp { action_author, .. } => {
-                    action_author.clone().into()
-                }
-                ChainIntegrityWarrant::ChainFork { chain_author, .. } => {
-                    chain_author.clone().into()
-                }
+                ChainIntegrityWarrant::InvalidChainOp { action_author, .. } => action_author,
+                ChainIntegrityWarrant::ChainFork { chain_author, .. } => chain_author,
             },
         }
     }
