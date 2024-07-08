@@ -2,7 +2,7 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::{CallContext, RibosomeT};
 use holo_hash::hash_type;
 use holochain_sqlite::prelude::DbRead;
-use holochain_state::prelude::{validation_receipts_for_action, validation_receipts_for_entry};
+use holochain_state::prelude::validation_receipts_for_action;
 use holochain_types::access::{HostFnAccess, Permission};
 use holochain_util::tokio_helper;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
@@ -25,31 +25,14 @@ pub fn get_validation_receipts(
             let results = tokio_helper::block_forever_on(async move {
                 let dht_db: DbRead<DbKindDht> = call_context.host_context.workspace().databases().1;
 
-                let hash = input.for_hash;
-                match hash.hash_type() {
-                    hash_type::AnyDht::Action => {
-                        dht_db
-                            .read_async(move |txn| {
-                                validation_receipts_for_action(
-                                    &txn,
-                                    hash.into_action_hash()
-                                        .expect("Type has been checked as action hash"),
-                                )
-                            })
-                            .await
-                    }
-                    hash_type::AnyDht::Entry => {
-                        dht_db
-                            .read_async(move |txn| {
-                                validation_receipts_for_entry(
-                                    &txn,
-                                    hash.into_entry_hash()
-                                        .expect("Type has been checked as entry hash"),
-                                )
-                            })
-                            .await
-                    }
-                }
+                dht_db
+                    .read_async(move |txn| {
+                        validation_receipts_for_action(
+                            &txn,
+                            input.action_hash.clone(),
+                        )
+                    })
+                    .await
             })
             .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
 
@@ -109,23 +92,12 @@ mod tests {
         let receipts = get_validation_receipts(
             ribosome_handle.clone(),
             Arc::new(call_context.clone()),
-            GetValidationReceiptsInput::for_action(action_hash),
+            GetValidationReceiptsInput::new(action_hash),
         )
         .unwrap();
 
         // Not the most useful test/assertion. Just checking that this doesn't error and checking
         // that this gives back validation receipts will require an integration test.
-        assert!(receipts.is_empty());
-
-        // Try with an entry hash that doesn't exist, which exercises the code path for entry hash
-        // and should return an empty list of validation receipts.
-        let entry_hash = fixt!(EntryHash);
-        let receipts = get_validation_receipts(
-            ribosome_handle.clone(),
-            Arc::new(call_context.clone()),
-            GetValidationReceiptsInput::for_entry(entry_hash),
-        )
-        .unwrap();
         assert!(receipts.is_empty());
     }
 }

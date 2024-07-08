@@ -582,5 +582,5 @@ pub mod clone;
 /// Tools for working with migrations from one DNA to another.
 mod migrate;
 
-/// Look up validation receipts for actions and entries that a local agent has authored.
+/// Look up validation receipts for actions that a local agent has authored.
 pub mod validation_receipt;

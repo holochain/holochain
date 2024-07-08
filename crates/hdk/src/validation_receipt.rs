@@ -2,20 +2,16 @@ use crate::hdk::HDK;
 use hdi::map_extern::ExternResult;
 use holochain_zome_types::prelude::{GetValidationReceiptsInput, ValidationReceiptSet};
 
-/// Get validation receipts associated with an action or an entry.
+/// Get validation receipts associated with an action.
 ///
 /// When an action is created, it is represented as multiple DHT ops to be published on the network.
 /// Each op will be validated by other agents on the network and a receipt will be sent back to the
 /// author. The return value of this function is organized by DHT op hash. Each [ValidationReceiptSet]
 /// contains all the validation receipts that have been received for that DHT op.
 ///
-/// Getting validation receipts for an entry is equivalent to getting them for an action that is
-/// associated with the entry. The entry hash is used to identify actions and validation receipts
-/// are then found for those actions.
-///
-/// Note: This function will permit you to look for validation receipts for any action or entry hash,
-/// but you will only have receipts if the action or entry was authored on the same conductor. Not
-/// necessarily the same agent, but it must be the same conductor.
+/// Note: This function will permit you to look for validation receipts for any action hash, but you
+/// will only have receipts if the action was authored on the same conductor. Not necessarily the
+/// same agent, but it must be the same conductor.
 ///
 /// ### Example
 /// ```rust,no_run
@@ -41,7 +37,7 @@ use holochain_zome_types::prelude::{GetValidationReceiptsInput, ValidationReceip
 ///     }))?;
 ///
 ///     // Later on
-///     let receipts = get_validation_receipts(GetValidationReceiptsInput::for_action(action_hash))?;
+///     let receipts = get_validation_receipts(GetValidationReceiptsInput::new(action_hash))?;
 ///     let count = receipts
 ///         .into_iter()
 ///         .filter(|receipt_set| receipt_set.op_type == "RegisterAgentActivity")

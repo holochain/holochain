@@ -129,39 +129,6 @@ pub fn validation_receipts_for_action(
     )
 }
 
-/// Convenience alternative to calling [validation_receipts_for_action].
-///
-/// This function looks up the actions associated with the given [EntryHash] and then finds [DhtOp]s
-/// and [ValidationReceiptSet]s for those actions.
-pub fn validation_receipts_for_entry(
-    txn: &Transaction,
-    entry_hash: EntryHash,
-) -> StateQueryResult<Vec<ValidationReceiptSet>> {
-    let stmt = txn.prepare(
-        "
-            SELECT
-              ValidationReceipt.blob as receipt,
-              DhtOp.hash as op_hash,
-              DhtOp.type as op_type,
-              DhtOp.receipts_complete as op_receipts_complete
-            FROM
-              Entry
-              INNER JOIN Action ON Action.entry_hash = Entry.hash
-              INNER JOIN DhtOp ON DhtOp.action_hash = Action.hash
-              INNER JOIN ValidationReceipt ON DhtOp.hash = ValidationReceipt.op_hash
-            WHERE
-              Action.entry_hash = :entry_hash
-            ",
-    )?;
-
-    query_validation_receipts(
-        stmt,
-        named_params! {
-            ":entry_hash": entry_hash
-        },
-    )
-}
-
 fn query_validation_receipts<P: Params>(
     mut stmt: Statement,
     params: P,
@@ -480,59 +447,6 @@ mod tests {
 
         let receipt_sets = env
             .read_async(move |txn| validation_receipts_for_action(&txn, action_hash))
-            .await
-            .unwrap();
-
-        check_receipt_sets(receipt_sets, test_op_hash, vr1, vr2);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn validation_receipts_from_entry() {
-        let test_db = test_dht_db();
-        let env = test_db.to_db();
-
-        let keystore = test_keystore();
-
-        let entry = fixt!(Entry);
-
-        let mut create_action = fixt!(Create);
-        let entry_hash = EntryHash::with_data_sync(&entry);
-        create_action.entry_hash = entry_hash.clone();
-        let action = Action::Create(create_action);
-
-        let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
-            fixt!(Signature),
-            action,
-        ));
-        let test_op_hash = op.as_hash().clone();
-        env.write_async({
-            let entry_hash = entry_hash.clone();
-            move |txn| {
-                insert_entry(txn, &entry_hash, &entry)?;
-                insert_op(txn, &op)
-            }
-        })
-        .await
-        .unwrap();
-
-        let vr1 = fake_vr(&test_op_hash, &keystore).await;
-        let vr2 = fake_vr(&test_op_hash, &keystore).await;
-
-        env.write_async({
-            let put_vr1 = vr1.clone();
-            let put_vr2 = vr2.clone();
-
-            move |txn| -> StateMutationResult<()> {
-                add_if_unique(txn, put_vr1.clone())?;
-                add_if_unique(txn, put_vr2.clone())?;
-                Ok(())
-            }
-        })
-        .await
-        .unwrap();
-
-        let receipt_sets = env
-            .read_async(move |txn| validation_receipts_for_entry(&txn, entry_hash))
             .await
             .unwrap();
 

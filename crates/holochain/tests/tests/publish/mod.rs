@@ -67,7 +67,7 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         .call(
             &alice.zome(TestWasm::Create),
             "get_validation_receipts",
-            GetValidationReceiptsInput::for_action(action_hash),
+            GetValidationReceiptsInput::new(action_hash),
         )
         .await;
     assert_eq!(receipt_sets.len(), 3);
