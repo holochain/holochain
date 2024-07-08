@@ -294,12 +294,18 @@ async fn test_uninstall_app() {
         (2, 0)
     );
 
-    let dbs = conductor
+    let db1 = conductor
         .spaces
-        .get_all_authored_dbs(dna.dna_hash())
+        .get_or_create_authored_db(dna.dna_hash(), app1.cells()[0].agent_pubkey().clone())
         .unwrap();
-    std::fs::File::open(dbs[0].path()).unwrap();
-    std::fs::File::open(dbs[1].path()).unwrap();
+    let db2 = conductor
+        .spaces
+        .get_or_create_authored_db(dna.dna_hash(), app2.cells()[0].agent_pubkey().clone())
+        .unwrap();
+
+    // - Check that both authored database files exist
+    std::fs::File::open(db1.path()).unwrap();
+    std::fs::File::open(db2.path()).unwrap();
 
     // - Uninstall the first app
     conductor
@@ -307,6 +313,10 @@ async fn test_uninstall_app() {
         .uninstall_app(&"app1".to_string())
         .await
         .unwrap();
+
+    // - Check that the first authored DB file is deleted since the cell was removed.
+    std::fs::File::open(db1.path()).unwrap_err();
+    std::fs::File::open(db2.path()).unwrap();
 
     // - Ensure that the remaining app can still access both hashes
     assert!(conductor
@@ -324,6 +334,9 @@ async fn test_uninstall_app() {
         .uninstall_app(&"app2".to_string())
         .await
         .unwrap();
+
+    // - Check that second authored DB file is deleted since the cell was removed.
+    std::fs::File::open(db2.path()).unwrap_err();
 
     // - Ensure that the apps are removed
     assert_eq_retry_10s!(
