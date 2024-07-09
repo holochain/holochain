@@ -116,6 +116,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
         .unwrap()
         .into_tuples();
     let alice_pubkey = alice.agent_pubkey().clone();
+    let bob_pubkey = bob.agent_pubkey().clone();
 
     // For this test we want bob to get alice's chain so he can detect the fork
     conductors.exchange_peer_info().await;
@@ -183,8 +184,8 @@ async fn sys_validation_produces_forked_chain_warrant() {
             let basis: AnyLinkableHash = alice_pubkey.clone().into();
             conductors[1]
                 .spaces
-                .get_all_authored_dbs(dna.dna_hash())
-                .unwrap()[0]
+                .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
+                .unwrap()
                 .test_read(move |txn| {
                     let store = Txn::from(&txn);
                     store.get_warrants_for_basis(&basis, false).unwrap()
