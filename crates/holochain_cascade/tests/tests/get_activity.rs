@@ -189,31 +189,31 @@ fn warrant(author: u8, action: u8) -> WarrantOp {
 #[test_case(
     Data { dht: agent_chain(&[(0, 0..3)]), ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
-    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 2; "1 to genesis with dht 0 till 2")]
+    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with dht 0 till 2")]
 #[test_case(
     Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(1, 1)], ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
-    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 2; "1 to genesis with dht 0 till 2 with 1 unrelated chain warrant")]
+    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with dht 0 till 2 with 1 unrelated chain warrant")]
 #[test_case(
     Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(0, 0)], ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
-    => matches MustGetAgentActivityResponse::Warrants(a) if a.len() == 1; "1 to genesis with dht 0 till 2 with 1 chain warrant")]
+    => matches MustGetAgentActivityResponse::Activity { warrants, .. } if warrants.len() == 1; "1 to genesis with dht 0 till 2 with 1 chain warrant")]
 #[test_case(
     Data { cache: agent_chain(&[(0, 0..3)]), ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
-    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 2; "1 to genesis with cache 0 till 2")]
+    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with cache 0 till 2")]
 #[test_case(
     Data { scratch: Some(agent_chain(&[(0, 0..3)])), ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
-    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 2; "1 to genesis with scratch 0 till 2")]
+    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with scratch 0 till 2")]
 #[test_case(
     Data { authored: agent_chain(&[(0, 0..3)]), scratch: Some(agent_chain(&[(0, 3..6)])), ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[4])).take(4).until(action_hash(&[0]))
-    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 4; "4 take 4 until 0 with authored 0 till 2 and scratch 3 till 5")]
+    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 4; "4 take 4 until 0 with authored 0 till 2 and scratch 3 till 5")]
 #[test_case(
     Data { authored: agent_chain(&[(0, 0..6)]), ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[4])).take(4).until(action_hash(&[0]))
-    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 4; "4 take 4 until 0 with authored 0 till 5")]
+    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 4; "4 take 4 until 0 with authored 0 till 5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_must_get_agent_activity(
     data: Data,

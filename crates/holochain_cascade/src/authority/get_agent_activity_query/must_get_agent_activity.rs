@@ -37,15 +37,17 @@ pub fn get_bounded_activity(
     // Find the bounds of the range specified in the filter.
     let txn = Txn::from(txn);
     let warrants = txn.get_warrants_for_basis(&AnyLinkableHash::from(author.clone()), true)?;
-    if !warrants.is_empty() {
-        return Ok(BoundedMustGetAgentActivityResponse::Warrants(warrants));
-    }
 
     match find_bounds(&txn, scratch, author, filter)? {
-        Sequences::Found(filter_range) => {
+        Sequences::Found(filter) => {
             // Get the full range of actions from the database.
-            get_activity(&txn, scratch, author, filter_range.range())
-                .map(|a| BoundedMustGetAgentActivityResponse::Activity(a, filter_range))
+            get_activity(&txn, scratch, author, filter.range()).map(|activity| {
+                BoundedMustGetAgentActivityResponse::Activity {
+                    activity,
+                    filter,
+                    warrants,
+                }
+            })
         }
         // One of the actions specified in the filter does not exist in the database.
         Sequences::ChainTopNotFound(a) => {
@@ -62,10 +64,14 @@ pub fn filter_then_check(
     response: BoundedMustGetAgentActivityResponse,
 ) -> MustGetAgentActivityResponse {
     match response {
-        BoundedMustGetAgentActivityResponse::Activity(activity, filter_range) => {
+        BoundedMustGetAgentActivityResponse::Activity {
+            activity,
+            filter,
+            warrants,
+        } => {
             // Filter the activity from the database and check the invariants of the
             // filter still hold.
-            filter_range.filter_then_check(activity)
+            filter.filter_then_check(activity, warrants)
         }
         BoundedMustGetAgentActivityResponse::IncompleteChain => {
             MustGetAgentActivityResponse::IncompleteChain
@@ -74,9 +80,6 @@ pub fn filter_then_check(
             MustGetAgentActivityResponse::ChainTopNotFound(a)
         }
         BoundedMustGetAgentActivityResponse::EmptyRange => MustGetAgentActivityResponse::EmptyRange,
-        BoundedMustGetAgentActivityResponse::Warrants(ws) => {
-            MustGetAgentActivityResponse::Warrants(ws)
-        }
     }
 }
 

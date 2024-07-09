@@ -487,15 +487,10 @@ impl CascadeImpl {
                 "Got different must_get_agent_activity responses from different authorities"
             );
             // TODO: Handle conflict.
-            // For now try to find one that has got the activity, unless any have Warrants
+            // For now try to find one that has got the activity
             responses
                 .iter()
-                .find(|a| matches!(a, MustGetAgentActivityResponse::Warrants(_)))
-                .or_else(|| {
-                    responses
-                        .iter()
-                        .find(|a| matches!(a, MustGetAgentActivityResponse::Activity(_)))
-                })
+                .find(|a| matches!(a, MustGetAgentActivityResponse::Activity { .. }))
                 .cloned()
         };
 
@@ -506,33 +501,24 @@ impl CascadeImpl {
 
         // Commit the activity to the chain.
         match response {
-            Some(MustGetAgentActivityResponse::Warrants(warrants)) => {
-                cache
-                    .write_async({
-                        let warrants = warrants.clone();
-                        move |txn| {
-                            for warrant in warrants {
-                                let op = DhtOpHashed::from_content_sync(warrant);
-                                insert_op(txn, &op)?;
-                            }
-                            CascadeResult::Ok(())
-                        }
-                    })
-                    .await?;
-                Ok(MustGetAgentActivityResponse::Warrants(warrants))
-            }
-            Some(MustGetAgentActivityResponse::Activity(activity)) => {
+            Some(MustGetAgentActivityResponse::Activity { activity, warrants }) => {
                 // TODO: Avoid this clone by committing the ops as references to the db.
                 cache
                     .write_async({
                         let activity = activity.clone();
+                        let warrants = warrants.clone();
                         move |txn| {
                             Self::insert_activity(txn, activity)?;
+                            for warrant in warrants {
+                                let op = DhtOpHashed::from_content_sync(warrant);
+                                insert_op(txn, &op)?;
+                            }
+
                             CascadeResult::Ok(())
                         }
                     })
                     .await?;
-                Ok(MustGetAgentActivityResponse::Activity(activity))
+                Ok(MustGetAgentActivityResponse::Activity { activity, warrants })
             }
             Some(response) => Ok(response),
             // Got no responses so the chain is incomplete.
@@ -1013,7 +999,7 @@ impl CascadeImpl {
             );
 
         // Short circuit if we have a result.
-        if matches!(result, MustGetAgentActivityResponse::Activity(_)) {
+        if matches!(result, MustGetAgentActivityResponse::Activity { .. }) {
             return Ok(result);
         }
 
