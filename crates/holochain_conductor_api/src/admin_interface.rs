@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
@@ -374,6 +376,10 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::AppAuthenticationTokenRevoked`]
     RevokeAppAuthenticationToken(AppAuthenticationToken),
+
+    /// Find installed cells which use a DNA that's forward-compatible with the given DNA hash.
+    /// Namely, this finds cells with DNAs whose manifest lists the given DNA hash in its `lineage` field.
+    GetCompatibleCells(DnaHash),
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -521,7 +527,12 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::RevokeAppAuthenticationToken`].
     AppAuthenticationTokenRevoked,
+
+    /// The successful response to an [`AdminRequest::GetCompatibleCells`].
+    CompatibleCells(CompatibleCells),
 }
+
+pub type CompatibleCells = BTreeSet<(InstalledAppId, BTreeSet<CellId>)>;
 
 /// Error type that goes over the websocket wire.
 /// This intends to be application developer facing
