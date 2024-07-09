@@ -29,7 +29,9 @@
 //!
 //! # }
 //! ```
-//!
+
+/// Name of the wasm cache folder within the data root directory.
+pub const WASM_CACHE: &str = "wasm-cache";
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -290,6 +292,14 @@ mod startup_shutdown_impls {
                 .clone()
                 .map(|path| PathBuf::from(path.deref()));
 
+            if let Some(path) = &maybe_data_root_path {
+                let mut path = path.clone();
+                path.push(WASM_CACHE);
+
+                // best effort to ensure the cache dir exists if configured
+                let _ = std::fs::create_dir_all(&path);
+            }
+
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),
@@ -306,7 +316,7 @@ mod startup_shutdown_impls {
                 post_commit,
                 services: RwShare::new(None),
                 wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
-                    maybe_data_root_path.map(|p| p.join("wasm-cache")),
+                    maybe_data_root_path.map(|p| p.join(WASM_CACHE)),
                 ))),
                 app_auth_token_store: RwShare::default(),
                 app_broadcast: AppBroadcast::default(),
@@ -1696,7 +1706,8 @@ mod app_impls {
                 let installed_app_id = installed_app_id.clone();
                 move |mut state| {
                     let app = state.get_app_mut(&installed_app_id)?;
-                    app.status = AppStatus::Disabled(DisabledAppReason::NeverStarted);
+                    app.status =
+                        AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs);
                     Ok(state)
                 }
             })
@@ -2765,7 +2776,10 @@ impl Conductor {
     }
 
     /// Remove all Cells which are not referenced by any Enabled app.
-    /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed)
+    /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed).
+    ///
+    /// Additionally, if the cell is being removed because the last app referencing it was uninstalled,
+    /// all data used by that cell (across Authored, DHT, and Cache databases) will also be removed.
     #[tracing::instrument(skip_all)]
     async fn remove_dangling_cells(&self) -> ConductorResult<()> {
         let state = self.get_state().await?;
@@ -2780,6 +2794,8 @@ impl Conductor {
             .iter()
             .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
+
+        let all_dnas: HashSet<_> = all_cells.iter().map(|cell_id| cell_id.dna_hash()).collect();
 
         // Clean up all cells that will be dropped (leave network, etc.)
         let cells_to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
@@ -2802,50 +2818,60 @@ impl Conductor {
             cell.cleanup().await?;
         }
 
+        // Find any cleaned up cells which are no longer used by any app,
+        // so that we can remove their data from the databases.
+        let cells_to_purge = cells_to_cleanup
+            .iter()
+            .filter_map(|cell| (!all_cells.contains(cell.id())).then_some(cell.id().clone()));
+
         // Find any DNAs from cleaned up cells which don't have representation in any cells
-        // in any app. In other words, find the DNAs which are *only* represented in uninstalled apps.
-        let all_dnas: HashSet<_> = all_cells
-            .into_iter()
-            .map(|cell_id| cell_id.dna_hash())
-            .collect();
-        let dnas_to_cleanup = cells_to_cleanup
+        // in any installed app, so that we can remove their data from the databases.
+        let dnas_to_purge = cells_to_cleanup
             .iter()
             .map(|cell| cell.id().dna_hash())
             .filter(|dna| !all_dnas.contains(dna));
 
-        // For any unrepresented DNAs, clean up those DNA-specific databases
-        for dna_hash in dnas_to_cleanup {
-            futures::future::join_all(
-                self.spaces
-                    .get_all_authored_dbs(dna_hash)
-                    .unwrap()
-                    .iter()
-                    .map(|db| {
-                        db.write_async(|txn| -> DatabaseResult<usize> {
-                            Ok(txn.execute("DELETE FROM Action", ())?)
-                        })
-                        .boxed()
-                    }),
-            )
-            .await
-            .into_iter()
-            .collect::<Result<Vec<usize>, _>>()?;
+        // Delete all data from authored databases which are longer installed
+        for cell_id in cells_to_purge {
+            let db = self
+                .spaces
+                .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
+            let mut path = db.path().clone();
+            if path.extension() != Some(std::ffi::OsStr::new("sqlite3")) {
+                DatabaseResult::Err(
+                    anyhow::anyhow!("Unexpected file extension for database path: {:?}", path)
+                        .into(),
+                )?;
+            }
+            if let Err(err) = ffs::remove_file(&path).await {
+                tracing::warn!(?err, "Could not remove primary DB file, probably because it is still in use. Purging all data instead.");
+                db.write_async(purge_data).await?;
+            }
+            path.set_extension("");
+            let stem = path.to_string_lossy();
+            for ext in ["db-shm", "db-wal"] {
+                let path = PathBuf::from(format!("{stem}.{ext}"));
+                if let Err(err) = ffs::remove_file(&path).await {
+                    let err = err.remove_backtrace();
+                    tracing::warn!(?err, "Failed to remove DB file");
+                }
+            }
+        }
 
+        // For any DNAs no longer represented in any installed app,
+        // purge data from those DNA-specific databases
+        for dna_hash in dnas_to_purge {
             futures::future::join_all(
                 [
                     self.spaces
                         .dht_db(dna_hash)
                         .unwrap()
-                        .write_async(|txn| {
-                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
-                        })
+                        .write_async(purge_data)
                         .boxed(),
                     self.spaces
                         .cache(dna_hash)
                         .unwrap()
-                        .write_async(|txn| {
-                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
-                        })
+                        .write_async(purge_data)
                         .boxed(),
                     // TODO: also delete stale Wasms
                 ]
@@ -2853,7 +2879,7 @@ impl Conductor {
             )
             .await
             .into_iter()
-            .collect::<Result<Vec<usize>, _>>()?;
+            .collect::<Result<Vec<()>, _>>()?;
         }
 
         Ok(())
@@ -3157,6 +3183,16 @@ mod test_utils_impls {
             Ok(cell.triggers().clone())
         }
     }
+}
+
+fn purge_data(txn: &mut Transaction) -> DatabaseResult<()> {
+    txn.execute("DELETE FROM DhtOp", ())?;
+    txn.execute("DELETE FROM Action", ())?;
+    txn.execute("DELETE FROM Entry", ())?;
+    txn.execute("DELETE FROM ValidationReceipt", ())?;
+    txn.execute("DELETE FROM ChainLock", ())?;
+    txn.execute("DELETE FROM ScheduledFunctions", ())?;
+    Ok(())
 }
 
 /// Perform Genesis on the source chains for each of the specified CellIds.

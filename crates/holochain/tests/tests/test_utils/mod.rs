@@ -231,6 +231,7 @@ pub async fn register_and_install_dna(
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn register_and_install_dna_named(
     client: &mut WebsocketSender,
     _orig_dna_hash: DnaHash,
@@ -282,7 +283,7 @@ pub async fn register_and_install_dna_named(
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(name),
         network_seed: None,
-        membrane_proofs: std::collections::HashMap::new().into(),
+        membrane_proofs: std::collections::HashMap::new(),
         ignore_genesis_failure: false,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));

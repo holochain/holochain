@@ -2,6 +2,7 @@
 
 use std::str::FromStr;
 
+use holochain_keystore::{AgentPubKeyExt, LairResult, MetaLairClient};
 use holochain_zome_types::prelude::*;
 
 /// A Warrant DhtOp
@@ -14,34 +15,42 @@ use holochain_zome_types::prelude::*;
     Eq,
     PartialEq,
     Hash,
-    derive_more::Constructor,
+    derive_more::From,
+    derive_more::Deref,
 )]
 #[cfg_attr(
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
-pub struct WarrantOp {
-    /// The warrant which was issued
-    pub warrant: Warrant,
-    /// author of the warrant
-    pub author: AgentPubKey,
-    /// signature of (Warrant, Timestamp) by the author
-    pub signature: Signature,
-    /// time when the warrant was issued
-    pub timestamp: Timestamp,
-}
+pub struct WarrantOp(SignedWarrant);
 
 impl WarrantOp {
     /// Get the type of warrant
     pub fn get_type(&self) -> WarrantOpType {
-        match self.warrant {
-            Warrant::ChainIntegrity(_) => WarrantOpType::ChainIntegrityWarrant,
+        match self.proof {
+            WarrantProof::ChainIntegrity(_) => WarrantOpType::ChainIntegrityWarrant,
         }
     }
 
-    /// Convert the WarrantOp into a SignedWarrant
-    pub fn into_signed_warrant(self) -> SignedWarrant {
-        Signed::new((self.warrant, self.timestamp), self.signature)
+    /// Sign the warrant for use as an Op
+    pub async fn sign(keystore: &MetaLairClient, warrant: Warrant) -> LairResult<Self> {
+        let signature = warrant.author.sign(keystore, warrant.clone()).await?;
+        Ok(Self::from(SignedWarrant::new(warrant, signature)))
+    }
+
+    /// Accessor for the timestamp of the warrant
+    pub fn timestamp(&self) -> Timestamp {
+        self.timestamp
+    }
+
+    /// Accessor for the warrant
+    pub fn warrant(&self) -> &Warrant {
+        self
+    }
+
+    /// Accessor for the warrant
+    pub fn into_warrant(self) -> Warrant {
+        self.0.into_data()
     }
 }
 
@@ -61,6 +70,18 @@ impl WarrantOp {
 pub enum WarrantOpType {
     /// A chain integrity warrant
     ChainIntegrityWarrant,
+}
+
+impl HashableContent for WarrantOp {
+    type HashType = hash_type::DhtOp;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::DhtOp
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        self.warrant().hashable_content()
+    }
 }
 
 impl holochain_sqlite::rusqlite::ToSql for WarrantOpType {

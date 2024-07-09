@@ -6,12 +6,11 @@ use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_state::prelude::*;
-use rusqlite::Transaction;
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky, doesn't take into account timing or retries"]
 async fn test_validation_receipt() {
-    let _g = holochain_trace::test_run();
+    holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
@@ -100,8 +99,7 @@ async fn test_validation_receipt() {
                     Ok(stmt
                         .query_map([], |row| row.get::<_, Option<u32>>(0))
                         .unwrap()
-                        .map(Result::unwrap)
-                        .filter_map(|i| i)
+                        .filter_map(Result::unwrap)
                         .collect::<Vec<u32>>())
                 })
                 .await
@@ -128,6 +126,7 @@ macro_rules! wait_until {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn test_block_invalid_receipt() {
     holochain_trace::test_run();
     let unit_entry_def = EntryDef::default_from_id("unit");

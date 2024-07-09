@@ -1,3 +1,5 @@
+// We can't fix this until Derivative updates their codegen
+#![allow(clippy::non_canonical_partial_ord_impl)]
 use super::*;
 
 /// A type which generates a sequence of exponentially expanding TimeSegments,
@@ -9,7 +11,6 @@ use super::*;
 ///
 /// The set of segments grows logarithmically with the number of time quanta
 /// to be covered.
-#[allow(clippy::non_canonical_partial_ord_impl)] // We can't fix this until Derivative updates their codegen
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Derivative, serde::Serialize, serde::Deserialize)]
 #[derivative(PartialOrd, Ord)]
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]

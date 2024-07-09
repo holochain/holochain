@@ -44,17 +44,15 @@ pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysVal
 
 /// Verify the signature for this warrant
 pub async fn verify_warrant_signature(warrant_op: &WarrantOp) -> SysValidationResult<()> {
-    let WarrantOp {
-        author,
-        signature,
-        warrant,
-        timestamp: _,
-    } = warrant_op;
-    if author.verify_signature(signature, warrant).await? {
+    if warrant_op
+        .author
+        .verify_signature(warrant_op.signature(), warrant_op.warrant().clone())
+        .await?
+    {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::CounterfeitWarrant(warrant_op.clone()),
+            ValidationOutcome::CounterfeitWarrant(warrant_op.warrant().clone()),
         ))
     }
 }

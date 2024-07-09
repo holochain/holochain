@@ -7,6 +7,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- When uninstalling an app or removing a clone cell, only some of the data used by that cell was deleted. Now all data is deleted, freeing up disk space.
+- Adds a new `DisabledAppReason::NotStartedAfterProvidingMemproofs` variant which effectively allows a new app status, corresponding to the specific state where a UI has just called `AppRequest::ProvideMemproofs`, but the app has not yet been Enabled for the first time.
+- Adds a new app interface method `AppRequest::EnableAfterMemproofsProvided`, which allows enabling an app only if the app is in the `AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs)` state. Attempting to enable the app from other states (other than Running) will fail.
+
+## 0.4.0-dev.11
+
+## 0.4.0-dev.10
+
+## 0.4.0-dev.9
+
+- Warrants: When an authority rejects another agent’s authored data, that authority creates a Warrant which is gossiped to the offending agent’s Agent Activity Authority, who then serves that warrant along with any `get_agent_activity` request.
+- The `warrants` field of `AgentActivity` is now populated with warrants for that agent.
+- Authorities author ChainFork warrants when detecting two actions by the same author with the same `prev_action`
+
+## 0.4.0-dev.8
+
 ## 0.4.0-dev.7
 
 - App manifest now includes a new `membrane_proofs_deferred: bool` field, which allows the membrane proofs for the app’s cells to be provided at a time after installation, allowing the app’s UI to guide the process of creating membrane proofs.

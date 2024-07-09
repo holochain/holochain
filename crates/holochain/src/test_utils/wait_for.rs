@@ -5,10 +5,12 @@ use std::time::Duration;
 macro_rules! wait_for {
     ($wait:expr, $test:expr, $check:expr, $assert:expr) => {{
         let mut w = $wait;
+        let assert = $assert;
         loop {
             let o = $test;
-            if !w.wait_any().await || $check(&o) {
-                $assert(o);
+            let check = $check;
+            if !w.wait_any().await || check(&o) {
+                assert(o);
                 break;
             }
         }

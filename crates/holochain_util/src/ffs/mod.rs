@@ -20,7 +20,7 @@ pub use self::io_error::{IoError, IoResult};
 use std::path::PathBuf;
 
 fn mapper<P: AsRef<std::path::Path>>(path: P) -> impl FnOnce(std::io::Error) -> IoError {
-    move |e| IoError::new(e, path.as_ref().to_owned())
+    move |e| IoError::new(e, path.as_ref().to_owned()).with_backtrace()
 }
 
 macro_rules! impl_ffs {
@@ -65,5 +65,8 @@ impl_ffs! {
     fn create_dir_all(path) -> ();
     fn read(path) -> Vec<u8>;
     fn read_to_string(path) -> String;
+    fn remove_dir(path) -> ();
+    fn remove_dir_all(path) -> ();
+    fn remove_file(path) -> ();
     fn write(path, data: &[u8]) -> ();
 }

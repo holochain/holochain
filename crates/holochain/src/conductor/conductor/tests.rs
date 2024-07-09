@@ -110,15 +110,12 @@ async fn app_ids_are_unique() {
     let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
     let app = InstalledAppCommon::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
 
-    conductor
-        .add_disabled_app_to_db(app.clone().into())
-        .await
-        .unwrap();
+    conductor.add_disabled_app_to_db(app.clone()).await.unwrap();
 
     assert_matches!(
-        conductor.add_disabled_app_to_db(app.clone().into()).await,
+        conductor.add_disabled_app_to_db(app.clone()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
-        if id == "id".to_string()
+        if id == *"id"
     );
 
     //- it doesn't matter whether the app is active or inactive
@@ -128,9 +125,9 @@ async fn app_ids_are_unique() {
         .unwrap();
     assert_eq!(delta, AppStatusFx::SpinUp);
     assert_matches!(
-        conductor.add_disabled_app_to_db(app.clone().into()).await,
+        conductor.add_disabled_app_to_db(app.clone()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
-        if id == "id".to_string()
+        if &id == "id"
     );
 }
 
@@ -249,7 +246,7 @@ async fn common_genesis_test_app(
 
     // Install both DNAs under the same app:
     conductor
-        .setup_app(&"app", &[dna_hardcoded, dna_custom])
+        .setup_app("app", &[dna_hardcoded, dna_custom])
         .await
 }
 
@@ -259,7 +256,7 @@ async fn test_uninstall_app() {
     let (dna, _, _) = mk_dna(simple_crud_zome()).await;
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    let app1 = conductor.setup_app(&"app1", [&dna]).await.unwrap();
+    let app1 = conductor.setup_app("app1", [&dna]).await.unwrap();
 
     let hash1: ActionHash = conductor
         .call(
@@ -269,7 +266,7 @@ async fn test_uninstall_app() {
         )
         .await;
 
-    let app2 = conductor.setup_app(&"app2", [&dna]).await.unwrap();
+    let app2 = conductor.setup_app("app2", [&dna]).await.unwrap();
 
     let hash2: ActionHash = conductor
         .call(
@@ -297,12 +294,30 @@ async fn test_uninstall_app() {
         (2, 0)
     );
 
+    let db1 = conductor
+        .spaces
+        .get_or_create_authored_db(dna.dna_hash(), app1.cells()[0].agent_pubkey().clone())
+        .unwrap();
+    let db2 = conductor
+        .spaces
+        .get_or_create_authored_db(dna.dna_hash(), app2.cells()[0].agent_pubkey().clone())
+        .unwrap();
+
+    // - Check that both authored database files exist
+    std::fs::File::open(db1.path()).unwrap();
+    std::fs::File::open(db2.path()).unwrap();
+
     // - Uninstall the first app
     conductor
         .raw_handle()
         .uninstall_app(&"app1".to_string())
         .await
         .unwrap();
+
+    // - Check that the first authored DB file is deleted since the cell was removed.
+    #[cfg(not(windows))]
+    std::fs::File::open(db1.path()).unwrap_err();
+    std::fs::File::open(db2.path()).unwrap();
 
     // - Ensure that the remaining app can still access both hashes
     assert!(conductor
@@ -321,6 +336,10 @@ async fn test_uninstall_app() {
         .await
         .unwrap();
 
+    // - Check that second authored DB file is deleted since the cell was removed.
+    #[cfg(not(windows))]
+    std::fs::File::open(db2.path()).unwrap_err();
+
     // - Ensure that the apps are removed
     assert_eq_retry_10s!(
         {
@@ -332,7 +351,7 @@ async fn test_uninstall_app() {
 
     // - A new app can't read any of the data from the previous two, because once the last instance
     //   of the cells was destroyed, all data was destroyed as well.
-    let app3 = conductor.setup_app(&"app2", [&dna]).await.unwrap();
+    let app3 = conductor.setup_app("app2", [&dna]).await.unwrap();
     assert!(conductor
         .call::<_, Option<Record>>(&app3.cells()[0].zome("coordinator"), "read", hash1.clone())
         .await
@@ -388,7 +407,7 @@ async fn test_signing_error_during_genesis() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign]).await;
 
     let result = conductor
-        .setup_app_for_agents(&"app", &[fixt!(AgentPubKey)], [&dna])
+        .setup_app_for_agents("app", &[fixt!(AgentPubKey)], [&dna])
         .await;
 
     // - Assert that we got an error during Genesis. However, this test is
@@ -1157,7 +1176,7 @@ async fn test_init_concurrency() {
 
     // Perform 100 concurrent zome calls
     let num_iters = Arc::new(AtomicU32::new(0));
-    let call_tasks = (0..100 as u32).map(|_i| {
+    let call_tasks = (0..100_u32).map(|_i| {
         let conductor = conductor.clone();
         let zome = cell.zome("zome");
         let num_iters = num_iters.clone();
@@ -1180,7 +1199,7 @@ async fn test_init_concurrency() {
 /// - conductor can be restarted and app still in AwaitingMemproofs state,
 /// - app functions normally after memproofs provided
 #[tokio::test(flavor = "multi_thread")]
-async fn test_deferred_provisioning() {
+async fn test_deferred_memproof_provisioning() {
     holochain_trace::test_run();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -1198,6 +1217,7 @@ async fn test_deferred_provisioning() {
             installed_app_id: Some(app_id.clone()),
             membrane_proofs: Default::default(),
             network_seed: None,
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await
@@ -1267,6 +1287,17 @@ async fn test_deferred_provisioning() {
         .await
         .unwrap();
 
+    //- Status is now Disabled with the special `NotStartedAfterProvidingMemproofs` reason.
+    //    It's not tested in this test, but this status allows the app to be enabled
+    //    over the app interface.
+    let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    assert_eq!(
+        app_info.status,
+        AppInfoStatus::Disabled {
+            reason: DisabledAppReason::NotStartedAfterProvidingMemproofs
+        }
+    );
+
     conductor.enable_app(app_id.clone()).await.unwrap();
 
     //- Status is now Running and there is 1 cell assignment
@@ -1279,7 +1310,7 @@ async fn test_deferred_provisioning() {
 
 /// Can uninstall an app with deferred memproofs before providing memproofs
 #[tokio::test(flavor = "multi_thread")]
-async fn test_deferred_provisioning_uninstall() {
+async fn test_deferred_memproof_provisioning_uninstall() {
     holochain_trace::test_run();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
     let conductor = SweetConductor::from_standard_config().await;
@@ -1297,6 +1328,7 @@ async fn test_deferred_provisioning_uninstall() {
             installed_app_id: Some(app_id.clone()),
             membrane_proofs: Default::default(),
             network_seed: None,
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await

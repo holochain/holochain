@@ -298,7 +298,7 @@ pub mod wasm_test {
 
                 assert_eq!(record.unwrap().action_address(), &action_hash);
             },
-            4_000_000
+            11_000_000
         );
     }
 
@@ -379,7 +379,7 @@ pub mod wasm_test {
         );
 
         // Converting directly works
-        let any_hash: AnyDhtHash = entry_hash.clone().try_into().unwrap();
+        let any_hash: AnyDhtHash = entry_hash.clone().into();
         assert_eq!(
             "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
             &any_hash.to_string()

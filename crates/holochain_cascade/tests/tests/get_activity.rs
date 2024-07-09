@@ -54,6 +54,7 @@ async fn get_activity() {
         agent: td.agent.clone(),
         valid_activity: td.valid_records.clone(),
         rejected_activity: ChainItems::NotRequested,
+        warrants: vec![],
         status: ChainStatus::Valid(td.chain_head.clone()),
         highest_observed: Some(td.highest_observed.clone()),
     };

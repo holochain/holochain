@@ -26,9 +26,17 @@ pub fn must_get_entry<'a>(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
+                use crate::core::ribosome::ValidateHostAccess;
                 let cascade = match call_context.host_context {
-                    HostContext::Validate(_) => {
-                        CascadeImpl::from_workspace_stores(workspace.stores(), None)
+                    HostContext::Validate(ValidateHostAccess { is_inline, .. }) => {
+                        if is_inline {
+                            CascadeImpl::from_workspace_and_network(
+                                &workspace,
+                                call_context.host_context.network().clone(),
+                            )
+                        } else {
+                            CascadeImpl::from_workspace_stores(workspace.stores(), None)
+                        }
                     }
                     _ => CascadeImpl::from_workspace_and_network(
                         &workspace,
@@ -112,7 +120,7 @@ pub mod test {
     test_entry_impl!(Something);
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_must_get_entry_test<'a>() {
+    async fn ribosome_must_get_entry_test() {
         holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
@@ -169,7 +177,7 @@ pub mod test {
         // Must get entry returns the entry if it exists regardless of the
         // validation status.
         let must_get_entry: EntryHashed = conductor
-            .call(&bob, "must_get_entry", action.entry_hash().clone())
+            .call(&bob, "must_get_entry", action.entry_hash())
             .await;
         assert_eq!(Entry::from(must_get_entry), entry);
 

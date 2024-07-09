@@ -160,6 +160,16 @@ pub trait Store {
     /// Get an [`SignedActionHashed`] from this store.
     fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>>;
 
+    /// Get a [`Warrant`] from this store.
+    /// The second parameter determines whether the warrant op should be checked for validity.
+    /// It should be set to false if reading from an Authored DB, where everything is valid,
+    /// and true if reading from a DHT DB, where validation status matters
+    fn get_warrants_for_basis(
+        &self,
+        hash: &AnyLinkableHash,
+        check_valid: bool,
+    ) -> StateQueryResult<Vec<Warrant>>;
+
     /// Get an [`Record`] from this store.
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>>;
 
@@ -336,6 +346,65 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         } else {
             Ok(Some(shh??))
         }
+    }
+
+    fn get_warrants_for_basis(
+        &self,
+        hash: &AnyLinkableHash,
+        check_valid: bool,
+    ) -> StateQueryResult<Vec<Warrant>> {
+        let sql = if check_valid {
+            "
+            SELECT
+            Action.blob
+            FROM Action
+            JOIN DhtOp ON DhtOp.action_hash = Action.hash
+            WHERE Action.base_hash = :hash
+            AND Action.type = :type
+            AND DhtOp.validation_status = :status
+            "
+        } else {
+            "
+            SELECT
+            Action.blob
+            FROM Action
+            WHERE Action.base_hash = :hash
+            AND Action.type = :type
+            "
+        };
+
+        let row_fn = |row: &Row<'_>| {
+            Ok(
+                from_blob::<SignedWarrant>(row.get(row.as_ref().column_index("blob")?)?)
+                    .map(|signed_warrant| signed_warrant.into_data()),
+            )
+        };
+
+        let warrants = if check_valid {
+            self.txn
+                .prepare_cached(sql)?
+                .query_map(
+                    named_params! {
+                        ":hash": hash,
+                        ":type": WarrantType::ChainIntegrityWarrant,
+                        ":status": ValidationStatus::Valid
+                    },
+                    row_fn,
+                )?
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            self.txn
+                .prepare_cached(sql)?
+                .query_map(
+                    named_params! {
+                        ":hash": hash,
+                        ":type": WarrantType::ChainIntegrityWarrant
+                    },
+                    row_fn,
+                )?
+                .collect::<Result<Vec<_>, _>>()?
+        };
+        warrants.into_iter().collect::<Result<Vec<_>, _>>()
     }
 
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
@@ -606,6 +675,19 @@ impl<'stmt> Store for Txns<'stmt, '_> {
         Ok(None)
     }
 
+    fn get_warrants_for_basis(
+        &self,
+        hash: &AnyLinkableHash,
+        check_validity: bool,
+    ) -> StateQueryResult<Vec<Warrant>> {
+        let mut warrants = vec![];
+        for txn in &self.txns {
+            let r = txn.get_warrants_for_basis(hash, check_validity)?;
+            warrants.extend(r.into_iter());
+        }
+        Ok(warrants)
+    }
+
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
         for txn in &self.txns {
             let r = txn.get_record(hash)?;
@@ -702,6 +784,15 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
         } else {
             Ok(r)
         }
+    }
+
+    fn get_warrants_for_basis(
+        &self,
+        hash: &AnyLinkableHash,
+        check_validity: bool,
+    ) -> StateQueryResult<Vec<Warrant>> {
+        // The scratch will never contain warrants, since they are not committed to chain
+        self.txns.get_warrants_for_basis(hash, check_validity)
     }
 
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
@@ -1003,11 +1094,7 @@ pub fn map_sql_dht_op_common(
         }
         DhtOpType::Warrant(_) => {
             let warrant = from_blob::<SignedWarrant>(row.get("action_blob")?)?;
-            let author: AgentPubKey = row.get("author")?;
-            let ((warrant, timestamp), signature) = warrant.into();
-            Ok(Some(
-                WarrantOp::new(warrant, author, signature, timestamp).into(),
-            ))
+            Ok(Some(warrant.into()))
         }
     }
 }

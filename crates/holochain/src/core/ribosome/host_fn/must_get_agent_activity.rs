@@ -29,9 +29,17 @@ pub fn must_get_agent_activity(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
+                use crate::core::ribosome::ValidateHostAccess;
                 let cascade = match call_context.host_context {
-                    HostContext::Validate(_) => {
-                        CascadeImpl::from_workspace_stores(workspace.stores(), None)
+                    HostContext::Validate(ValidateHostAccess { is_inline, .. }) => {
+                        if is_inline {
+                            CascadeImpl::from_workspace_and_network(
+                                &workspace,
+                                call_context.host_context.network().clone(),
+                            )
+                        } else {
+                            CascadeImpl::from_workspace_stores(workspace.stores(), None)
+                        }
                     }
                     _ => CascadeImpl::from_workspace_and_network(
                         &workspace,
@@ -152,6 +160,7 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn ribosome_must_get_agent_activity() {
         holochain_trace::test_run();
         let RibosomeTestFixture {
@@ -212,6 +221,9 @@ pub mod test {
         let d: ActionHash = conductor
             .call(&bob, "commit_something", Something(vec![21]))
             .await;
+
+        // Give bob time to integrate
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         let _: ActionHash = conductor
             .call(

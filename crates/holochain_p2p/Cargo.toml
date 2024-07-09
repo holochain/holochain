@@ -1,6 +1,6 @@
 [package]
 name = "holochain_p2p"
-version = "0.4.0-dev.7"
+version = "0.4.0-dev.11"
 description = "holochain specific wrapper around more generic p2p module"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -15,18 +15,18 @@ edition = "2021"
 aitia = { version = "^0.3.0-dev.3", path = "../aitia" }
 async-trait = "0.1"
 derive_more = "0.99"
-fixt = { path = "../fixt", version = "^0.4.0-dev.1" }
+fixt = { path = "../fixt", version = "^0.4.0-dev.2" }
 futures = "0.3"
 ghost_actor = "0.3.0-alpha.6"
-hc_sleuth = { version = "^0.4.0-dev.7", path = "../hc_sleuth" }
-holo_hash = { version = "^0.4.0-dev.5", path = "../holo_hash" }
-holochain_keystore = { version = "^0.4.0-dev.7", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.54"
-holochain_types = { version = "^0.4.0-dev.7", path = "../holochain_types" }
-holochain_zome_types = { version = "^0.4.0-dev.6", path = "../holochain_zome_types" }
-kitsune_p2p = { version = "^0.4.0-dev.7", path = "../kitsune_p2p/kitsune_p2p" }
-kitsune_p2p_types = { version = "^0.4.0-dev.6", path = "../kitsune_p2p/types" }
-holochain_nonce = { version = "^0.4.0-dev.3", path = "../holochain_nonce" }
+hc_sleuth = { version = "^0.4.0-dev.11", path = "../hc_sleuth" }
+holo_hash = { version = "^0.4.0-dev.7", path = "../holo_hash" }
+holochain_keystore = { version = "^0.4.0-dev.11", path = "../holochain_keystore" }
+holochain_serialized_bytes = "=0.0.55"
+holochain_types = { version = "^0.4.0-dev.11", path = "../holochain_types" }
+holochain_zome_types = { version = "^0.4.0-dev.9", path = "../holochain_zome_types" }
+kitsune_p2p = { version = "^0.4.0-dev.10", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p_types = { version = "^0.4.0-dev.8", path = "../kitsune_p2p/types" }
+holochain_nonce = { version = "^0.4.0-dev.4", path = "../holochain_nonce" }
 mockall = "0.11.3"
 holochain_trace = { version = "^0.4.0-dev.3", path = "../holochain_trace" }
 rand = "0.8.5"

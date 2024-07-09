@@ -159,15 +159,18 @@ mod types;
 #[instrument(skip(
     workspace,
     trigger_integration,
+    trigger_publish,
     conductor_handle,
     network,
     dht_query_cache,
     validation_dependencies,
 ))]
+#[allow(clippy::too_many_arguments)]
 pub async fn app_validation_workflow(
     dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
     trigger_integration: TriggerSender,
+    trigger_publish: TriggerSender,
     conductor_handle: ConductorHandle,
     network: HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
@@ -187,6 +190,11 @@ pub async fn app_validation_workflow(
     // If ops have been accepted or rejected, trigger integration.
     if outcome_summary.validated > 0 {
         trigger_integration.trigger(&"app_validation_workflow");
+    }
+
+    // If ops have been warranted, trigger publishing.
+    if outcome_summary.warranted > 0 {
+        trigger_publish.trigger(&"app_validation_workflow");
     }
 
     let validations_dependencies = validation_dependencies.lock();
@@ -218,6 +226,7 @@ async fn app_validation_workflow_inner(
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone().into();
     let sorted_dht_ops = validation_query::get_ops_to_app_validate(&db).await?;
+
     // filter out ops that have missing dependencies
     tracing::debug!("number of ops to validate {:?}", sorted_dht_ops.len());
     let sorted_dht_ops = validation_dependencies
@@ -238,19 +247,22 @@ async fn app_validation_workflow_inner(
     let accepted_ops = Arc::new(AtomicUsize::new(0));
     let awaiting_ops = Arc::new(AtomicUsize::new(0));
     let rejected_ops = Arc::new(AtomicUsize::new(0));
+    let warranted_ops = Arc::new(AtomicUsize::new(0));
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity = Vec::new();
 
     // Validate ops sequentially
     for sorted_dht_op in sorted_dht_ops.into_iter() {
         let (dht_op, dht_op_hash) = sorted_dht_op.into_inner();
+        let deps = dht_op.sys_validation_dependencies();
+
         let chain_op = match dht_op {
             DhtOp::ChainOp(chain_op) => chain_op,
-            _ => continue,
+            _ => unreachable!("warrant ops are never sent to app validation"),
         };
+
         let op_type = chain_op.get_type();
         let action = chain_op.action();
-        let deps = op_type.sys_validation_dependencies(&action);
         let dht_op_lite = chain_op.to_lite();
 
         // If this is agent activity, track it for the cache.
@@ -303,6 +315,27 @@ async fn app_validation_workflow_inner(
                 let awaiting_ops = awaiting_ops.clone();
                 let rejected_ops = rejected_ops.clone();
 
+                if let Outcome::Rejected(_) = &outcome {
+                    let warrant_op =
+                        crate::core::workflow::sys_validation_workflow::make_warrant_op(
+                            &conductor,
+                            &dna_hash,
+                            &chain_op,
+                            ValidationType::App,
+                        )
+                        .await?;
+
+                    workspace
+                        .authored_db
+                        .write_async(move |txn| {
+                            warn!("Inserting warrant op");
+                            insert_op(txn, &warrant_op)
+                        })
+                        .await?;
+
+                    warranted_ops.fetch_add(1, Ordering::SeqCst);
+                }
+
                 let write_result = workspace
                     .dht_db
                     .write_async(move|txn| match outcome {
@@ -334,9 +367,9 @@ async fn app_validation_workflow_inner(
                         }
                         Outcome::Rejected(_) => {
                             rejected_ops.fetch_add(1, Ordering::SeqCst);
-                            tracing::info!(
-                            "Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}"
-                        );
+
+                            tracing::info!("Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}");
+
                             if deps.is_empty() {
                                 put_integrated(txn, &dht_op_hash, ValidationStatus::Rejected)
                             } else {
@@ -379,6 +412,7 @@ async fn app_validation_workflow_inner(
     let accepted_ops = accepted_ops.load(Ordering::SeqCst);
     let awaiting_ops = awaiting_ops.load(Ordering::SeqCst);
     let rejected_ops = rejected_ops.load(Ordering::SeqCst);
+    let warranted_ops = warranted_ops.load(Ordering::SeqCst);
     let ops_validated = accepted_ops + rejected_ops;
     let failed_ops = Arc::try_unwrap(failed_ops)
         .expect("must be only reference")
@@ -391,6 +425,7 @@ async fn app_validation_workflow_inner(
         accepted: accepted_ops,
         missing: awaiting_ops,
         rejected: rejected_ops,
+        warranted: warranted_ops,
         failed: failed_ops,
     };
     Ok(outcome_summary)
@@ -417,9 +452,9 @@ pub async fn record_to_op(
         record.privatized()
     };
 
-    let (shh, entry) = record.into_inner();
+    let (sah, entry) = record.into_inner();
     let mut entry = entry.into_option();
-    let action = shh.into();
+    let action = sah.into();
     // Register agent activity doesn't store the entry so we need to
     // save it so we can reconstruct the record later.
     if matches!(op_type, RegisterAgentActivity) {
@@ -529,10 +564,12 @@ async fn validate_op_outer(
         &ribosome,
         conductor_handle,
         validation_dependencies,
+        false, // is_inline
     )
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn validate_op(
     op: &Op,
     dht_op_hash: &DhtOpHash,
@@ -541,6 +578,7 @@ pub async fn validate_op(
     ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    is_inline: bool,
 ) -> AppValidationOutcome<Outcome> {
     check_entry_def(op, &network.dna_hash(), conductor_handle)
         .await
@@ -563,6 +601,7 @@ pub async fn validate_op(
         workspace,
         network,
         validation_dependencies,
+        is_inline,
     )
     .await?;
 
@@ -752,9 +791,10 @@ async fn run_validation_callback(
     workspace: HostFnWorkspaceRead,
     network: GenericNetwork,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    is_inline: bool,
 ) -> AppValidationResult<Outcome> {
     let validate_result = ribosome.run_validate(
-        ValidateHostAccess::new(workspace.clone(), network.clone()),
+        ValidateHostAccess::new(workspace.clone(), network.clone(), is_inline),
         invocation.clone(),
     )?;
     match validate_result {
@@ -858,6 +898,7 @@ struct OutcomeSummary {
     accepted: usize,
     missing: usize,
     rejected: usize,
+    warranted: usize,
     failed: HashSet<DhtOpHash>,
 }
 
@@ -869,6 +910,7 @@ impl OutcomeSummary {
             accepted: 0,
             missing: 0,
             rejected: 0,
+            warranted: 0,
             failed: HashSet::new(),
         }
     }
@@ -881,7 +923,8 @@ impl Default for OutcomeSummary {
 }
 
 pub struct AppValidationWorkspace {
-    authored_db: DbRead<DbKindAuthored>,
+    // Writeable because of warrants
+    authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
     dht_db_cache: DhtDbQueryCache,
     cache: DbWrite<DbKindCache>,
@@ -891,7 +934,8 @@ pub struct AppValidationWorkspace {
 
 impl AppValidationWorkspace {
     pub fn new(
-        authored_db: DbRead<DbKindAuthored>,
+        // Writeable because of warrants
+        authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
         dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
@@ -910,7 +954,7 @@ impl AppValidationWorkspace {
 
     pub async fn validation_workspace(&self) -> AppValidationResult<HostFnWorkspaceRead> {
         Ok(HostFnWorkspace::new(
-            self.authored_db.clone(),
+            self.authored_db.clone().into(),
             self.dht_db.clone().into(),
             self.dht_db_cache.clone(),
             self.cache.clone(),
@@ -923,7 +967,7 @@ impl AppValidationWorkspace {
 
     pub fn full_cascade<Network: HolochainP2pDnaT>(&self, network: Network) -> CascadeImpl {
         CascadeImpl::empty()
-            .with_authored(self.authored_db.clone())
+            .with_authored(self.authored_db.clone().into())
             .with_dht(self.dht_db.clone().into())
             .with_network(Arc::new(network), self.cache.clone())
     }

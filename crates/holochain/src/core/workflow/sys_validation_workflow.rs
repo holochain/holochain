@@ -75,6 +75,7 @@
 //! - Once all ops have an outcome, the workflow is complete and will wait to be triggered again by new incoming ops.
 //!
 
+use crate::conductor::Conductor;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::sys_validate::*;
@@ -86,9 +87,11 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_conductor_api::conductor::ConductorConfig;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::GenericNetwork;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
+use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
 use holochain_state::prelude::*;
 use parking_lot::Mutex;
 use rusqlite::Transaction;
@@ -116,27 +119,26 @@ mod unit_tests;
 mod validate_op_tests;
 
 /// The sys validation worfklow. It is described in the module level documentation.
-#[instrument(skip(
-    workspace,
-    current_validation_dependencies,
-    trigger_app_validation,
-    trigger_self,
-    network,
-    config
-))]
+#[instrument(skip_all)]
+#[allow(clippy::too_many_arguments)]
 pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     trigger_app_validation: TriggerSender,
+    trigger_publish: TriggerSender,
     trigger_self: TriggerSender,
     network: Network,
     config: Arc<ConductorConfig>,
+    keystore: MetaLairClient,
+    representative_agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
     // Run the actual sys validation using data we have locally
     let outcome_summary = sys_validation_workflow_inner(
         workspace.clone(),
         current_validation_dependencies.clone(),
         config,
+        keystore,
+        representative_agent,
     )
     .await?;
 
@@ -145,6 +147,15 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
         tracing::debug!("Sys validation accepted {} ops", outcome_summary.accepted);
 
         trigger_app_validation.trigger(&"sys_validation_workflow");
+    }
+
+    if outcome_summary.warranted > 0 {
+        tracing::debug!(
+            "Sys validation created {} warrants",
+            outcome_summary.warranted
+        );
+
+        trigger_publish.trigger(&"sys_validation_workflow");
     }
 
     // Now go to the network to try to fetch missing dependencies
@@ -219,6 +230,8 @@ async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     config: Arc<ConductorConfig>,
+    keystore: MetaLairClient,
+    representative_agent: AgentPubKey,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
@@ -256,33 +269,66 @@ async fn sys_validation_workflow_inner(
 
     let mut validation_outcomes = Vec::with_capacity(sorted_ops.len());
     for hashed_op in sorted_ops {
-        let (op, op_hash) = hashed_op.into_inner();
-
-        // This is an optimization to skip app validation and integration for ops that are
-        // rejected and don't have dependencies.
-        let deps = op.sys_validation_dependencies();
-
         // Note that this is async only because of the signature checks done during countersigning.
         // In most cases this will be a fast synchronous call.
-        let r = validate_op(&op, &dna_def, current_validation_dependencies.clone()).await;
+        let r = validate_op(
+            hashed_op.as_content(),
+            &dna_def,
+            current_validation_dependencies.clone(),
+        )
+        .await;
 
         match r {
-            Ok(outcome) => validation_outcomes.push((op_hash, outcome, deps)),
+            Ok(outcome) => validation_outcomes.push((hashed_op, outcome)),
             Err(e) => {
                 tracing::error!(error = ?e, "Error validating op");
             }
         }
     }
 
-    let summary: OutcomeSummary = workspace
+    let mut warrants = vec![];
+
+    let (mut summary, invalid_ops, forked_pairs) = workspace
         .dht_db
         .write_async(move |txn| {
             let mut summary = OutcomeSummary::default();
-            for (op_hash, outcome, deps) in validation_outcomes {
+            let mut invalid_ops = vec![];
+            let mut forked_pairs = vec![];
+
+            for (hashed_op, outcome) in validation_outcomes {
+                let (op, op_hash) = hashed_op.into_inner();
+                let op_type = op.get_type();
+
+                if let DhtOp::ChainOp(chain_op) = &op {
+                    // Author a ChainFork warrant if fork is detected
+                    let action = chain_op.action();
+                    if let Some(forked_action) = detect_fork(txn, &action)? {
+                        let signature = chain_op.signature().clone();
+                        let action_hash = action.to_hash();
+                        forked_pairs.push((
+                            action.author().clone(),
+                            ((action_hash, signature), forked_action),
+                        ));
+                    }
+                }
+
+                // This is an optimization to skip app validation and integration for ops that are
+                // rejected and don't have dependencies.
+                let deps = op.sys_validation_dependencies();
+
                 match outcome {
                     Outcome::Accepted => {
                         summary.accepted += 1;
-                        put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?;
+                        match op_type {
+                            DhtOpType::Chain(_) => {
+                                put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?
+                            }
+                            DhtOpType::Warrant(_) => {
+                                // XXX: integrate accepted warrants immediately, because we don't
+                                //      want them to go to app validation.
+                                put_integrated(txn, &op_hash, ValidationStatus::Valid)?
+                            }
+                        };
                         aitia::trace!(&hc_sleuth::Event::SysValidated {
                             by: sleuth_id.clone(),
                             op: op_hash
@@ -294,6 +340,8 @@ async fn sys_validation_workflow_inner(
                         put_validation_limbo(txn, &op_hash, status)?;
                     }
                     Outcome::Rejected(_) => {
+                        invalid_ops.push((op_hash.clone(), op.clone()));
+
                         summary.rejected += 1;
                         if deps.is_empty() {
                             put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
@@ -303,7 +351,38 @@ async fn sys_validation_workflow_inner(
                     }
                 }
             }
-            WorkflowResult::Ok(summary)
+            WorkflowResult::Ok((summary, invalid_ops, forked_pairs))
+        })
+        .await?;
+
+    for (_, op) in invalid_ops {
+        if let Some(chain_op) = op.as_chain_op() {
+            let warrant_op = crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op_inner(
+                &keystore,
+                representative_agent.clone(),
+                chain_op,
+                ValidationType::Sys,
+            )
+            .await?;
+            warrants.push(warrant_op);
+        }
+    }
+
+    for (author, pair) in forked_pairs {
+        let warrant_op =
+            make_fork_warrant_op_inner(&keystore, representative_agent.clone(), author, pair)
+                .await?;
+        warrants.push(warrant_op);
+    }
+
+    workspace
+        .authored_db
+        .write_async(move |txn| {
+            for warrant_op in warrants {
+                insert_op(txn, &warrant_op)?;
+                summary.warranted += 1;
+            }
+            StateMutationResult::Ok(())
         })
         .await?;
 
@@ -469,8 +548,8 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                     }
                     _ => None,
                 },
-                DhtOp::WarrantOp(op) => match &op.warrant {
-                    Warrant::ChainIntegrity(warrant) => match warrant {
+                DhtOp::WarrantOp(op) => match &op.proof {
+                    WarrantProof::ChainIntegrity(warrant) => match warrant {
                         ChainIntegrityWarrant::InvalidChainOp {
                             action: (action_hash, _),
                             ..
@@ -696,8 +775,8 @@ async fn validate_warrant_op(
     _dna_def: &DnaDefHashed,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> SysValidationResult<()> {
-    match &op.warrant {
-        Warrant::ChainIntegrity(warrant) => match warrant {
+    match &op.proof {
+        WarrantProof::ChainIntegrity(warrant) => match warrant {
             ChainIntegrityWarrant::InvalidChainOp {
                 action: (action_hash, action_sig),
                 action_author,
@@ -713,8 +792,8 @@ async fn validate_warrant_op(
                         })?;
 
                     if action.author() != action_author {
-                        return Err(ValidationOutcome::InvalidWarrantOp(
-                            op.clone(),
+                        return Err(ValidationOutcome::InvalidWarrant(
+                            op.warrant().clone(),
                             "action author mismatch".into(),
                         )
                         .into());
@@ -743,8 +822,8 @@ async fn validate_warrant_op(
 
                     // chain_author basis must match the author of the action
                     if action1.author() != chain_author {
-                        return Err(ValidationOutcome::InvalidWarrantOp(
-                            op.clone(),
+                        return Err(ValidationOutcome::InvalidWarrant(
+                            op.warrant().clone(),
                             "chain author mismatch".into(),
                         )
                         .into());
@@ -752,8 +831,8 @@ async fn validate_warrant_op(
 
                     // Both actions must be by same author
                     if action1.author() != action2.author() {
-                        return Err(ValidationOutcome::InvalidWarrantOp(
-                            op.clone(),
+                        return Err(ValidationOutcome::InvalidWarrant(
+                            op.warrant().clone(),
                             "action pair author mismatch".into(),
                         )
                         .into());
@@ -766,8 +845,8 @@ async fn validate_warrant_op(
                     // Using seq numbers makes it easier to detect and prove a fork, but using prev_action
                     // prevents the attack.
                     if action1.prev_action() != action2.prev_action() {
-                        return Err(ValidationOutcome::InvalidWarrantOp(
-                            op.clone(),
+                        return Err(ValidationOutcome::InvalidWarrant(
+                            op.warrant().clone(),
                             "action pair seq mismatch".into(),
                         )
                         .into());
@@ -1092,7 +1171,8 @@ fn update_check(entry_update: &Update, original_action: &Action) -> SysValidatio
 
 pub struct SysValidationWorkspace {
     scratch: Option<SyncScratch>,
-    authored_db: DbRead<DbKindAuthored>,
+    // Authored DB is writeable because warrants may be written.
+    authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
     dht_query_cache: Option<DhtDbQueryCache>,
     cache: DbWrite<DbKindCache>,
@@ -1102,7 +1182,7 @@ pub struct SysValidationWorkspace {
 
 impl SysValidationWorkspace {
     pub fn new(
-        authored_db: DbRead<DbKindAuthored>,
+        authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
         dht_query_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
@@ -1223,7 +1303,7 @@ impl SysValidationWorkspace {
             .with_cache(self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade
-                .with_authored(self.authored_db.clone())
+                .with_authored(self.authored_db.clone().into())
                 .with_scratch(scratch.clone()),
             None => cascade,
         }
@@ -1276,11 +1356,111 @@ pub fn put_integrated(
     Ok(())
 }
 
+pub async fn make_warrant_op(
+    conductor: &Conductor,
+    dna_hash: &DnaHash,
+    op: &ChainOp,
+    validation_type: ValidationType,
+) -> WorkflowResult<DhtOpHashed> {
+    let keystore = conductor.keystore();
+    let warrant_author = get_representative_agent(conductor, dna_hash).expect("TODO: handle");
+    make_invalid_chain_warrant_op_inner(keystore, warrant_author, op, validation_type).await
+}
+
+/// Gets an arbitrary agent with a cell running the given DNA, needed for processes
+/// which require an agent signature but happens at the DNA level, so doesn't specify
+/// any particular agent.
+pub fn get_representative_agent(conductor: &Conductor, dna_hash: &DnaHash) -> Option<AgentPubKey> {
+    conductor
+        .running_cell_ids()
+        .into_iter()
+        .find(|id| id.dna_hash() == dna_hash)
+        .map(|id| id.agent_pubkey().clone())
+}
+
+pub async fn make_invalid_chain_warrant_op_inner(
+    keystore: &MetaLairClient,
+    warrant_author: AgentPubKey,
+    op: &ChainOp,
+    validation_type: ValidationType,
+) -> WorkflowResult<DhtOpHashed> {
+    let action = op.action();
+    let action_author = action.author().clone();
+    tracing::warn!("Authoring warrant for invalid op authored by {action_author}");
+
+    let proof = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+        action_author,
+        action: (action.to_hash().clone(), op.signature().clone()),
+        validation_type,
+    });
+    let warrant = Warrant::new(proof, warrant_author, Timestamp::now());
+    let warrant_op = WarrantOp::sign(keystore, warrant)
+        .await
+        .map_err(|e| super::WorkflowError::Other(e.into()))?;
+    let op: DhtOp = warrant_op.into();
+    let op = op.into_hashed();
+    Ok(op)
+}
+
+pub async fn make_fork_warrant_op_inner(
+    keystore: &MetaLairClient,
+    warrant_author: AgentPubKey,
+    chain_author: AgentPubKey,
+    action_pair: ((ActionHash, Signature), (ActionHash, Signature)),
+) -> WorkflowResult<DhtOpHashed> {
+    debug_assert_ne!(action_pair.0 .0, action_pair.1 .0);
+    tracing::warn!(
+        "Authoring warrant for chain fork by {chain_author}. Action hashes: ({}, {})",
+        action_pair.0 .0,
+        action_pair.1 .0
+    );
+
+    let warrant = Warrant::new(
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+            chain_author,
+            action_pair,
+        }),
+        warrant_author,
+        Timestamp::now(),
+    );
+    let warrant_op = WarrantOp::sign(keystore, warrant)
+        .await
+        .map_err(|e| super::WorkflowError::Other(e.into()))?;
+    let op: DhtOp = warrant_op.into();
+    let op = op.into_hashed();
+    Ok(op)
+}
+
+pub fn detect_fork(
+    txn: &mut Transaction<'_>,
+    action: &Action,
+) -> StateQueryResult<Option<(ActionHash, Signature)>> {
+    let mut statement = txn.prepare(ACTION_HASH_BY_PREV)?;
+    statement
+        .query_row(
+            named_params! {
+                ":prev_hash": action.prev_action(),
+                ":hash": action.to_hash(),
+            },
+            |row| {
+                let hash: ActionHash = row.get("hash")?;
+                let action_blob: Vec<u8> = row.get("blob")?;
+                Ok((hash, action_blob))
+            },
+        )
+        .optional()?
+        .map(|(hash, action_blob)| {
+            from_blob::<SignedAction>(action_blob).map(|action| (hash, action.signature().clone()))
+        })
+        .transpose()
+}
+
 #[derive(Debug, Clone)]
 struct OutcomeSummary {
     accepted: usize,
     missing: usize,
     rejected: usize,
+    warranted: usize,
 }
 
 impl OutcomeSummary {
@@ -1289,6 +1469,7 @@ impl OutcomeSummary {
             accepted: 0,
             missing: 0,
             rejected: 0,
+            warranted: 0,
         }
     }
 }

@@ -73,18 +73,18 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         let mut out = Vec::new();
         match dht_hash.into_primitive() {
             AnyDhtHashPrimitive::Entry(hash) => {
-                for env in &self.envs {
+                for db in &self.envs {
                     let r =
-                        authority::handle_get_entry(env.clone(), hash.clone(), (&options).into())
+                        authority::handle_get_entry(db.clone(), hash.clone(), (&options).into())
                             .await
                             .map_err(|e| HolochainP2pError::Other(e.into()))?;
                     out.push(WireOps::Entry(r));
                 }
             }
             AnyDhtHashPrimitive::Action(hash) => {
-                for env in &self.envs {
+                for db in &self.envs {
                     let r =
-                        authority::handle_get_record(env.clone(), hash.clone(), (&options).into())
+                        authority::handle_get_record(db.clone(), hash.clone(), (&options).into())
                             .await
                             .map_err(|e| HolochainP2pError::Other(e.into()))?;
                     out.push(WireOps::Record(r));
@@ -108,8 +108,8 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         options: actor::GetLinksOptions,
     ) -> actor::HolochainP2pResult<Vec<WireLinkOps>> {
         let mut out = Vec::new();
-        for env in &self.envs {
-            let r = authority::handle_get_links(env.clone(), link_key.clone(), (&options).into())
+        for db in &self.envs {
+            let r = authority::handle_get_links(db.clone(), link_key.clone(), (&options).into())
                 .await
                 .map_err(|e| HolochainP2pError::Other(e.into()))?;
             out.push(r);
@@ -123,8 +123,8 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     ) -> actor::HolochainP2pResult<CountLinksResponse> {
         let mut out = HashSet::new();
 
-        for env in &self.envs {
-            let r = authority::handle_get_links_query(env.clone(), query.clone())
+        for db in &self.envs {
+            let r = authority::handle_get_links_query(db.clone(), query.clone())
                 .await
                 .map_err(|e| HolochainP2pError::Other(e.into()))?;
             out.extend(r);
@@ -144,9 +144,9 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         options: actor::GetActivityOptions,
     ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>> {
         let mut out = Vec::new();
-        for env in &self.envs {
+        for db in &self.envs {
             let r = authority::handle_get_agent_activity(
-                env.clone(),
+                db.clone(),
                 agent.clone(),
                 query.clone(),
                 (&options).into(),
@@ -164,9 +164,9 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         filter: ChainFilter,
     ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
         let mut out = Vec::new();
-        for env in &self.envs {
+        for db in &self.envs {
             let r = authority::handle_must_get_agent_activity(
-                env.clone(),
+                db.clone(),
                 agent.clone(),
                 filter.clone(),
             )
@@ -278,8 +278,8 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 }
 
 /// Insert ops directly into the database and mark integrated as valid
-pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashed) {
-    env.write_async(move |txn| -> DatabaseResult<()> {
+pub async fn fill_db<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed) {
+    db.write_async(move |txn| -> DatabaseResult<()> {
         let hash = op.to_hash();
         insert_op(txn, &op.downcast()).unwrap();
         set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
@@ -291,8 +291,8 @@ pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashe
 }
 
 /// Insert ops directly into the database and mark integrated as rejected
-pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashed) {
-    env.write_async(move |txn| -> DatabaseResult<()> {
+pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed) {
+    db.write_async(move |txn| -> DatabaseResult<()> {
         let hash = op.to_hash();
         insert_op(txn, &op.downcast()).unwrap();
         set_validation_status(txn, &hash, ValidationStatus::Rejected).unwrap();
@@ -304,8 +304,8 @@ pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: Cha
 }
 
 /// Insert ops directly into the database and mark valid and pending integration
-pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: ChainOpHashed) {
-    env.write_async(move |txn| -> DatabaseResult<()> {
+pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed) {
+    db.write_async(move |txn| -> DatabaseResult<()> {
         let hash = op.to_hash();
         insert_op(txn, &op.downcast()).unwrap();
         set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
@@ -316,8 +316,8 @@ pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: Chai
 }
 
 /// Insert ops into the authored database
-pub async fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: ChainOpHashed) {
-    env.write_async(move |txn| -> DatabaseResult<()> {
+pub async fn fill_db_as_author(db: &DbWrite<DbKindAuthored>, op: ChainOpHashed) {
+    db.write_async(move |txn| -> DatabaseResult<()> {
         insert_op(txn, &op.downcast()).unwrap();
         Ok(())
     })
@@ -396,7 +396,7 @@ pub fn commit_chain<Kind: DbKindT>(
                 let timestamp = Timestamp::now();
                 let op_type = op_lite.get_type();
                 let (_, hash) =
-                    DhtOpUniqueForm::op_hash(op_type, op.action.hashed.content.clone()).unwrap();
+                    ChainOpUniqueForm::op_hash(op_type, op.action.hashed.content.clone()).unwrap();
                 insert_action(txn, &op.action).unwrap();
                 insert_op_lite(
                     txn,

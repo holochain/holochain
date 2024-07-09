@@ -65,9 +65,7 @@ mod test {
         } = RibosomeTestFixture::new(TestWasm::Capability).await;
 
         let secret: CapSecret = conductor.call(&bob, "cap_secret", ()).await;
-        let _action_hash: ActionHash = conductor
-            .call(&bob, "transferable_cap_grant", secret.clone())
-            .await;
+        let _action_hash: ActionHash = conductor.call(&bob, "transferable_cap_grant", secret).await;
         let cap_for = CapFor(secret, bob_pubkey);
         let _response0: ZomeCallResponse = conductor
             .call(&alice, "try_cap_claim", cap_for.clone())
@@ -93,7 +91,8 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn zome_call_get_block() {
-        hc_sleuth::init_subscriber();
+        // hc_sleuth::init_subscriber();
+        holochain_trace::test_run();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
