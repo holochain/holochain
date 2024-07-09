@@ -3,7 +3,7 @@ pub struct IoError {
     pub(crate) original: std::io::Error,
     pub(crate) path: Option<std::path::PathBuf>,
     #[cfg(feature = "backtrace")]
-    pub(crate) backtrace: backtrace::Backtrace,
+    pub(crate) backtrace: Option<backtrace::Backtrace>,
 }
 
 pub type IoResult<T> = Result<T, IoError>;
@@ -45,10 +45,30 @@ impl IoError {
         let path = Some(path);
         cfg_if::cfg_if! {
             if #[cfg(feature = "backtrace")] {
-                Self {original, path, backtrace: backtrace::Backtrace::new() }
+                Self {original, path, backtrace: None }
             } else {
                 Self {original, path }
             }
         }
+    }
+
+    /// Add a backtrace to the error.
+    /// Only has an effect if the `backtrace` feature is enabled.
+    pub fn with_backtrace(mut self) -> Self {
+        #[cfg(feature = "backtrace")]
+        {
+            self.backtrace = Some(backtrace::Backtrace::new());
+        }
+        self
+    }
+
+    /// Remove an associated backtrace from the error.
+    /// Only has an effect if the `backtrace` feature is enabled.
+    pub fn remove_backtrace(mut self) -> Self {
+        #[cfg(feature = "backtrace")]
+        {
+            self.backtrace = None;
+        }
+        self
     }
 }
