@@ -1461,11 +1461,14 @@ pub fn detect_fork(
                 ":prev_hash": action.prev_action(),
                 ":hash": action.to_hash(),
             },
+            // First, try to deserialize the hash as an ActionHash...
             |row| match row.get("hash") {
                 Ok(hash) => {
                     let action_blob: Vec<u8> = row.get("blob")?;
                     Ok(Some((hash, action_blob)))
                 }
+                // ...if that fails, we can skip it if it deserializes as a WarrantHash
+                //    (checking the row type this way makes it so we don't have to join on the DhtOp table in the query)
                 Err(err) => match row.get::<_, WarrantHash>("hash") {
                     Ok(_) => Ok(None),
                     Err(_) => Err(err),
