@@ -152,18 +152,10 @@ pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
     Create { deferred: bool },
 
-    /*
-        TODO: implement
+    /// Require that a Cell is already installed which has a DNA that's compatible with the
+    /// `installed_hash` specified in the manifest.
+    UseExisting { deferred: bool },
 
-        /// Require that a Cell is already installed which matches the DNA installed_hash
-        /// spec, and which has an Agent that's associated with this App's agent
-        /// via DPKI. If no such Cell exists, *app installation fails*.
-        UseExisting { deferred: bool },
-
-        /// Try `UseExisting`, and if that fails, fallback to `Create`
-        CreateIfNotExists { deferred: bool },
-
-    */
     /// Install or locate the DNA, but never create a Cell for this DNA.
     /// Only allow clones to be created from the DNA specified.
     /// This case requires `clone_limit > 0`, otherwise no Cells will ever be created.
