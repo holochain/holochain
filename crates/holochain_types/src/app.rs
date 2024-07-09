@@ -501,7 +501,11 @@ impl InstalledAppCommon {
         self.disabled_clone_cells().map(|(_, cell_id)| cell_id)
     }
 
-    /// Iterator of all cells, both provisioned and cloned
+    /// Iterator of all cells, both provisioned and cloned.
+    // NOTE: as our app state model becomes more nuanced, we need to give careful attention to
+    // the definition of this function, since this represents all cells in use by the conductor.
+    // Any cell which exists and is not returned by this function is fair game for purging
+    // during app installation. See [`Conductor::remove_dangling_cells`].
     pub fn all_cells(&self) -> impl Iterator<Item = &CellId> {
         self.provisioned_cells()
             .map(|(_, c)| c)
