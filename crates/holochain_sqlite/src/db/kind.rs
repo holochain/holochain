@@ -192,9 +192,7 @@ impl DbKindT for DbKindP2pAgents {
     }
 
     fn filename_inner(&self) -> PathBuf {
-        ["p2p", &format!("agent_store-{}", self.0)]
-            .iter()
-            .collect()
+        ["p2p", &format!("agent_store-{}", self.0)].iter().collect()
     }
 
     fn if_corrupt_wipe(&self) -> bool {
