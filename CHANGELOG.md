@@ -14,6 +14,88 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240710.004628
+
+## [hc\_service\_check-0.1.0-dev.10](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.10)
+
+## [hcterm-0.4.0-dev.12](crates/hcterm/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_cli-0.4.0-dev.12](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain-0.4.0-dev.12](crates/holochain/CHANGELOG.md#0.4.0-dev.12)
+
+- When uninstalling an app or removing a clone cell, only some of the data used by that cell was deleted. Now all data is deleted, freeing up disk space.
+- Adds a new `DisabledAppReason::NotStartedAfterProvidingMemproofs` variant which effectively allows a new app status, corresponding to the specific state where a UI has just called `AppRequest::ProvideMemproofs`, but the app has not yet been Enabled for the first time.
+- Adds a new app interface method `AppRequest::EnableAfterMemproofsProvided`, which allows enabling an app only if the app is in the `AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs)` state. Attempting to enable the app from other states (other than Running) will fail.
+- Adds a `lineage` field to the DNA manifest, which declares forward compatibility for any hash in that list with this DNA
+- Adds a `AdminRequest::GetCompatibleCells` method which returns CellId for all installed cells which use a DNA that is forward-compatible with a given DNA hash. This can be used to find a compatible cell for use with the `UseExisting` cell provisioning method (still to be implemented)
+
+## [holochain\_cli\_bundle-0.4.0-dev.12](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.11](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.12](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_cascade-0.4.0-dev.12](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_conductor\_api-0.4.0-dev.12](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_conductor\_services-0.3.0-dev.12](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.12)
+
+## [holochain\_metrics-0.4.0-dev.4](crates/holochain_metrics/CHANGELOG.md#0.4.0-dev.4)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.10](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.12](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_websocket-0.4.0-dev.12](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.12)
+
+## [hdk-0.4.0-dev.10](crates/hdk/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_state-0.4.0-dev.12](crates/holochain_state/CHANGELOG.md#0.4.0-dev.12)
+
+## [hdi-0.5.0-dev.9](crates/hdi/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_p2p-0.4.0-dev.12](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.12)
+
+## [hc\_sleuth-0.4.0-dev.12](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.12)
+
+## [hdk\_derive-0.4.0-dev.9](crates/hdk_derive/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_state\_types-0.4.0-dev.9](crates/holochain_state_types/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_types-0.4.0-dev.12](crates/holochain_types/CHANGELOG.md#0.4.0-dev.12)
+
+## [kitsune\_p2p-0.4.0-dev.11](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_keystore-0.4.0-dev.12](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_sqlite-0.4.0-dev.12](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.12)
+
+## [kitsune\_p2p\_bootstrap\_client-0.4.0-dev.10](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.4.0-dev.10)
+
+## [kitsune\_p2p\_fetch-0.4.0-dev.9](crates/kitsune_p2p_fetch/CHANGELOG.md#0.4.0-dev.9)
+
+## [kitsune\_p2p\_proxy-0.4.0-dev.9](crates/kitsune_p2p_proxy/CHANGELOG.md#0.4.0-dev.9)
+
+## [mr\_bundle-0.4.0-dev.5](crates/mr_bundle/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_zome\_types-0.4.0-dev.10](crates/holochain_zome_types/CHANGELOG.md#0.4.0-dev.10)
+
+## [kitsune\_p2p\_bootstrap-0.3.0-dev.10](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.3.0-dev.10)
+
+## [holochain\_integrity\_types-0.4.0-dev.9](crates/holochain_integrity_types/CHANGELOG.md#0.4.0-dev.9)
+
+## [kitsune\_p2p\_block-0.4.0-dev.8](crates/kitsune_p2p_block/CHANGELOG.md#0.4.0-dev.8)
+
+## [kitsune\_p2p\_types-0.4.0-dev.9](crates/kitsune_p2p_types/CHANGELOG.md#0.4.0-dev.9)
+
+## [holo\_hash-0.4.0-dev.8](crates/holo_hash/CHANGELOG.md#0.4.0-dev.8)
+
+## [kitsune\_p2p\_bin\_data-0.4.0-dev.8](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_util-0.4.0-dev.2](crates/holochain_util/CHANGELOG.md#0.4.0-dev.2)
+
 # 20240703.004549
 
 ## [hcterm-0.4.0-dev.11](crates/hcterm/CHANGELOG.md#0.4.0-dev.11)
