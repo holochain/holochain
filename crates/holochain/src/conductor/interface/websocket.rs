@@ -565,7 +565,6 @@ pub mod test {
             installed_app_id: None,
             membrane_proofs: HashMap::new(),
             network_seed: None,
-            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         }));
         let response: AdminResponse = admin_tx.request(request).await.unwrap();
@@ -1210,6 +1209,7 @@ pub mod test {
                     .map(TestZomes::from)
                     .map(|z| z.coordinator.into_inner())
                     .collect(),
+                lineage: Default::default(),
             },
             zomes.into_iter().flat_map(Vec::<DnaWasm>::from),
         )

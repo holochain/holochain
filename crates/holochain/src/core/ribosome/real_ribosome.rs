@@ -103,6 +103,7 @@ use wasmer::Type;
 
 use crate::core::ribosome::host_fn::close_chain::close_chain;
 use crate::core::ribosome::host_fn::count_links::count_links;
+use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
 use crate::core::ribosome::host_fn::open_chain::open_chain;
 use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
@@ -458,6 +459,7 @@ impl RealRibosome {
             },
             integrity_zomes: Default::default(),
             coordinator_zomes: Default::default(),
+            lineage: Default::default(),
         };
         let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
         let empty_ribosome = RealRibosome::new(
@@ -605,7 +607,12 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__enable_clone_cell_1", enable_clone_cell)
             .with_host_function(&mut ns, "__hc__delete_clone_cell_1", delete_clone_cell)
             .with_host_function(&mut ns, "__hc__close_chain_1", close_chain)
-            .with_host_function(&mut ns, "__hc__open_chain_1", open_chain);
+            .with_host_function(&mut ns, "__hc__open_chain_1", open_chain)
+            .with_host_function(
+                &mut ns,
+                "__hc__get_validation_receipts_1",
+                get_validation_receipts,
+            );
 
         imports.register_namespace("env", ns);
 
@@ -1280,6 +1287,7 @@ pub mod wasm_test {
                 "__hc__get_details_1",
                 "__hc__get_link_details_1",
                 "__hc__get_links_1",
+                "__hc__get_validation_receipts_1",
                 "__hc__hash_1",
                 "__hc__must_get_action_1",
                 "__hc__must_get_agent_activity_1",

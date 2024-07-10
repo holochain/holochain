@@ -1450,10 +1450,7 @@ mod app_impls {
             self: Arc<Self>,
             payload: InstallAppPayload,
         ) -> ConductorResult<InstalledApp> {
-            #[cfg(feature = "chc")]
             let ignore_genesis_failure = payload.ignore_genesis_failure;
-            #[cfg(not(feature = "chc"))]
-            let ignore_genesis_failure = false;
 
             let InstallAppPayload {
                 source,
@@ -1769,6 +1766,10 @@ mod app_impls {
 
 /// Methods related to cell access
 mod cell_impls {
+    use std::collections::BTreeSet;
+
+    use holochain_conductor_api::CompatibleCells;
+
     use super::*;
 
     impl Conductor {
@@ -1802,6 +1803,51 @@ mod cell_impls {
         pub fn running_cell_ids(&self) -> HashSet<CellId> {
             self.running_cells
                 .share_ref(|cells| cells.keys().cloned().collect())
+        }
+
+        /// Returns all installed cells which are forward compatible with the specified DNA,
+        /// including direct matches, by examining the "lineage" specified by DNAs of currently installed cells.
+        ///
+        /// Each DnaDef specifies a "lineage" field of DNA hashes, which indicates that the DNA is forward-compatible
+        /// with the DNAs specified in its lineage. If the DnaHash parameter is contained within the lineage of any
+        /// installed cell's DNA, that cell will be returned in the result set, since it has declared
+        /// itself forward-compatible.
+        pub async fn cells_by_dna_lineage(
+            &self,
+            dna_hash: &DnaHash,
+        ) -> ConductorResult<CompatibleCells> {
+            // TODO: OPTIMIZE: cache the DNA lineages
+            Ok(self
+                .get_state()
+                .await?
+                // Look in all installed apps
+                .installed_apps()
+                .values()
+                .filter_map(|app| {
+                    let cells_in_lineage: BTreeSet<_> = app
+                        // Look in all cells for the app
+                        .all_cells()
+                        .filter_map(|cell_id| {
+                            let cell_dna_hash = cell_id.dna_hash();
+                            if cell_dna_hash == dna_hash {
+                                // If a direct hit, include this CellId in the list of candidates
+                                Some(cell_id.clone())
+                            } else {
+                                // If this cell *contains* the given DNA in *its* lineage, include it.
+                                self.get_dna_def(cell_id.dna_hash())
+                                    .map(|dna_def| dna_def.lineage.contains(dna_hash))
+                                    .unwrap_or(false)
+                                    .then(|| cell_id.clone())
+                            }
+                        })
+                        .collect();
+                    if cells_in_lineage.is_empty() {
+                        None
+                    } else {
+                        Some((app.installed_app_id.clone(), cells_in_lineage))
+                    }
+                })
+                .collect())
         }
     }
 }

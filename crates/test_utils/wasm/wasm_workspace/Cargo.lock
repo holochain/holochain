@@ -1031,7 +1031,7 @@ checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
 name = "hdi"
-version = "0.5.0-dev.8"
+version = "0.5.0-dev.9"
 dependencies = [
  "getrandom",
  "hdk_derive",
@@ -1047,7 +1047,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.4.0-dev.9"
+version = "0.4.0-dev.10"
 dependencies = [
  "getrandom",
  "hdi",
@@ -1066,7 +1066,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.4.0-dev.8"
+version = "0.4.0-dev.9"
 dependencies = [
  "darling 0.14.4",
  "heck 0.5.0",
@@ -1107,7 +1107,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "holo_hash"
-version = "0.4.0-dev.7"
+version = "0.4.0-dev.8"
 dependencies = [
  "base64 0.22.1",
  "blake2b_simd",
@@ -1127,7 +1127,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.4.0-dev.8"
+version = "0.4.0-dev.9"
 dependencies = [
  "derive_builder 0.20.0",
  "holo_hash",
@@ -1195,7 +1195,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.4.0-dev.9"
+version = "0.4.0-dev.10"
 dependencies = [
  "hdk",
  "serde",
@@ -1203,7 +1203,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.4.0-dev.1"
+version = "0.4.0-dev.2"
 dependencies = [
  "cfg-if",
  "colored",
@@ -1243,7 +1243,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.4.0-dev.9"
+version = "0.4.0-dev.10"
 dependencies = [
  "derive_builder 0.20.0",
  "derive_more",
@@ -1392,7 +1392,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bin_data"
-version = "0.4.0-dev.7"
+version = "0.4.0-dev.8"
 dependencies = [
  "base64 0.22.1",
  "derive_more",
@@ -1405,7 +1405,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_block"
-version = "0.4.0-dev.7"
+version = "0.4.0-dev.8"
 dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_timestamp",

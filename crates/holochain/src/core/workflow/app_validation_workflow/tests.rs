@@ -870,6 +870,7 @@ async fn check_app_entry_def_test() {
             coordinator_zomes: vec![TestZomes::from(TestWasm::EntryDefs)
                 .coordinator
                 .into_inner()],
+            lineage: Default::default(),
         },
         [integrity, coordinator],
     )
