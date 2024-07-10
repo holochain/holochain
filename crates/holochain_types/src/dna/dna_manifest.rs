@@ -126,3 +126,27 @@ impl TryFrom<DnaManifestV1> for ValidatedDnaManifest {
         DnaManifest::from(value).try_into()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builder_defaults() {
+        let manifest: DnaManifest = DnaManifestCurrentBuilder::default()
+            .name("my_dna".to_owned())
+            .integrity(IntegrityManifest {
+                network_seed: None,
+                origin_time: HumanTimestamp::Micros(Timestamp::now()),
+                properties: None,
+                zomes: vec![],
+            })
+            .coordinator(CoordinatorManifest { zomes: vec![] })
+            .build()
+            .unwrap()
+            .into();
+
+        let s = serde_yaml::to_string(&manifest).unwrap();
+        println!("{s}");
+    }
+}
