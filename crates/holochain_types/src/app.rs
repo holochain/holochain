@@ -135,11 +135,18 @@ pub struct InstallAppPayload {
 
     /// Include proof-of-membrane-membership data for cells that require it,
     /// keyed by the RoleName specified in the app bundle manifest.
+    #[serde(default)]
     pub membrane_proofs: MemproofMap,
+
+    /// For each role in the app manifest which has UseExisting cell provisioning,
+    /// a CellId of a currently installed cell must be specified in this map.
+    #[serde(default)]
+    pub existing_cells: ExistingCellsMap,
 
     /// Optional: overwrites all network seeds for all DNAs of Cells created by this app.
     /// The app can still use existing Cells, i.e. this does not require that
     /// all Cells have DNAs with the same overridden DNA.
+    #[serde(default)]
     pub network_seed: Option<NetworkSeed>,
 
     /// Optional: If app installation fails due to genesis failure, normally the app will be
@@ -151,6 +158,8 @@ pub struct InstallAppPayload {
 
 /// Alias
 pub type MemproofMap = HashMap<RoleName, MembraneProof>;
+/// Alias
+pub type ExistingCellsMap = HashMap<RoleName, CellId>;
 
 /// The possible locations of an AppBundle
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

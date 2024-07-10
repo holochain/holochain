@@ -1457,6 +1457,7 @@ mod app_impls {
                 agent_key,
                 installed_app_id,
                 membrane_proofs,
+                existing_cells,
                 network_seed,
                 ..
             } = payload;
@@ -1489,11 +1490,21 @@ mod app_impls {
                 //      it doesn't really need to know about the memproofs, it just needs to associate
                 //      the proper cells with the proper memproofs.
                 bundle
-                    .resolve_cells(&local_dnas, agent_key.clone(), Default::default())
+                    .resolve_cells(
+                        &local_dnas,
+                        agent_key.clone(),
+                        Default::default(),
+                        existing_cells,
+                    )
                     .await?
             } else {
                 bundle
-                    .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
+                    .resolve_cells(
+                        &local_dnas,
+                        agent_key.clone(),
+                        membrane_proofs,
+                        existing_cells,
+                    )
                     .await?
             };
             let cells_to_create = ops.cells_to_create();

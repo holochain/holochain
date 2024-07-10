@@ -54,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
             agent_key,
             source: AppBundleSource::Bundle(bundle),
             membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
         };

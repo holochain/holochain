@@ -535,6 +535,7 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         agent_key,
         source: AppBundleSource::Path(path),
         membrane_proofs: Default::default(),
+        existing_cells: Default::default(),
         network_seed,
         ignore_genesis_failure: false,
     };
