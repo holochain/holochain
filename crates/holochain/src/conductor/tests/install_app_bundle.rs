@@ -597,7 +597,7 @@ async fn use_existing_happy_path() {
     assert_eq!(cells.len(), 1);
     let cell_id = cells.first().unwrap().clone();
 
-    let err = conductor
+    conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: bob.clone(),

@@ -82,17 +82,11 @@ impl AppBundle {
             .into_iter()
             .collect::<AppBundleResult<Vec<_>>>()?
             .into_iter()
-            .fold(
-                Ok(AppRoleResolution::new(agent.clone())),
-                |mut resolution: AppBundleResult<AppRoleResolution>, (role_name, op)| {
-                    match (&mut resolution, op) {
-                        // Errors remain unchanged
-                        (Err(_), _) => (),
-
-                        (
-                            Ok(resolution),
-                            CellProvisioningOp::CreateFromDnaFile(dna, clone_limit),
-                        ) => {
+            .try_fold(
+                AppRoleResolution::new(agent.clone()),
+                |mut resolution: AppRoleResolution, (role_name, op)| {
+                    match op {
+                        CellProvisioningOp::CreateFromDnaFile(dna, clone_limit) => {
                             let agent = resolution.agent.clone();
                             let dna_hash = dna.dna_hash().clone();
                             let cell_id = CellId::new(dna_hash, agent);
@@ -103,12 +97,12 @@ impl AppBundle {
                             resolution.role_assignments.push((role_name, role));
                         }
 
-                        (Ok(resolution), CellProvisioningOp::Existing(cell_id, clone_limit)) => {
+                        CellProvisioningOp::Existing(cell_id, clone_limit) => {
                             let role = AppRoleAssignment::new(cell_id, true, clone_limit);
                             resolution.role_assignments.push((role_name, role));
                         }
 
-                        (Ok(resolution), CellProvisioningOp::ProvisionOnly(dna, clone_limit)) => {
+                        CellProvisioningOp::ProvisionOnly(dna, clone_limit) => {
                             let agent = resolution.agent.clone();
                             let dna_hash = dna.dna_hash().clone();
                             let cell_id = CellId::new(dna_hash, agent);
@@ -122,23 +116,20 @@ impl AppBundle {
                             ));
                         }
 
-                        (
-                            Ok(_),
-                            other @ (CellProvisioningOp::HashMismatch(_, _)
-                            | CellProvisioningOp::Unresolvable(_)),
-                        ) => {
+                        other @ (CellProvisioningOp::HashMismatch(_, _)
+                        | CellProvisioningOp::Unresolvable(_)) => {
                             tracing::error!(
                                 "Encountered unexpected CellProvisioningOp: {:?}",
                                 other
                             );
-                            resolution = Err(AppBundleError::CellResolutionFailure(
+                            return Err(AppBundleError::CellResolutionFailure(
                                 role_name,
                                 format!("{other:?}"),
                             ));
                         }
                     }
 
-                    resolution
+                    Ok(resolution)
                 },
             )
     }
