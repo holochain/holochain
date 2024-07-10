@@ -182,8 +182,7 @@ jobs:
           nix run .#scripts-release-automation-check-and-bump -- $PWD
           
           ./scripts/format-toml.sh
-          git add *.toml
-          git commit -m "Format toml files"
+          git add **/*.toml
           
           nix run .#scripts-ci-generate-readmes
           nix run .#cargo-sweep -- sweep -f
