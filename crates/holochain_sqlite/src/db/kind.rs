@@ -112,7 +112,7 @@ impl DbKindT for DbKindDht {
     }
 
     fn filename_inner(&self) -> PathBuf {
-        ["dht", &format!("{}", self.0)].iter().collect()
+        ["dht", &self.0.to_string()].iter().collect()
     }
 
     fn if_corrupt_wipe(&self) -> bool {
@@ -137,7 +137,7 @@ impl DbKindT for DbKindCache {
     }
 
     fn filename_inner(&self) -> PathBuf {
-        ["cache", &format!("{}", self.0)].iter().collect()
+        ["cache", &self.0.to_string()].iter().collect()
     }
 
     fn if_corrupt_wipe(&self) -> bool {
