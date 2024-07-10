@@ -29,7 +29,7 @@ warp = "0.3"
 kitsune_p2p_bootstrap = { path = ".", features = ["test_utils"] }
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 kitsune_p2p = { path = "../kitsune_p2p", features = ["sqlite", "test_utils"] }
-fixt = { path = "../../fixt", version = "^0.4.0-dev.2"}
+fixt = { path = "../../fixt", version = "^0.4.0-dev.2" }
 criterion = "0.5.1"
 reqwest = { version = "0.12", features = ["native-tls-vendored"] }
 

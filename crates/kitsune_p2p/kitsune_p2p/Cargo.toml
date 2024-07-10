@@ -48,7 +48,7 @@ tracing = "0.1"
 tokio-stream = "0.1"
 tx5 = { version = "=0.0.13-alpha", optional = true }
 url2 = "0.0.6"
-fixt = { path = "../../fixt", version = "^0.4.0-dev.2"}
+fixt = { path = "../../fixt", version = "^0.4.0-dev.2" }
 
 # fuzzing
 arbitrary = { version = "1.0", features = ["derive"], optional = true }

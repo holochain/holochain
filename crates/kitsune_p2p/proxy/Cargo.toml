@@ -30,7 +30,5 @@ crossterm = "0.27.0"
 workspace = true
 
 [features]
-sqlite-encrypted = [
-  "kitsune_p2p_types/sqlite-encrypted",
-]
+sqlite-encrypted = ["kitsune_p2p_types/sqlite-encrypted"]
 sqlite = ["kitsune_p2p_types/sqlite"]

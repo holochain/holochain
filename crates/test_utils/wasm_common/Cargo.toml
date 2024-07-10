@@ -14,5 +14,5 @@ path = "src/lib.rs"
 
 # reminder - do not use workspace deps
 [dependencies]
-hdk = { path = "../../hdk", version = "^0.4.0-dev.10"}
+hdk = { path = "../../hdk", version = "^0.4.0-dev.10" }
 serde = "1.0"
