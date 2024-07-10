@@ -2,11 +2,13 @@ use holo_hash::ActionHash;
 use holochain::core::workflow::publish_dht_ops_workflow::num_still_needing_publish;
 use holochain::sweettest::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::prelude::GetValidationReceiptsInput;
+use holochain_zome_types::validate::ValidationReceiptSet;
 
 /// Verifies that publishing terminates naturally when enough validation receipts are received.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "receipt completion is flaky, revise once integration logic is merged into app validation workflow"]
+#[ignore = "receipt completion is flaky, which has been rechecked since the workflow reviews"]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
     holochain_trace::test_run();
 
@@ -27,7 +29,7 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
 
     let ((alice,), (bobbo,), (carol,), (danny,), (emma,), (fred,)) = apps.into_tuples();
 
-    let _: ActionHash = conductors[0]
+    let action_hash: ActionHash = conductors[0]
         .call(&alice.zome(TestWasm::Create), "create_entry", ())
         .await;
 
@@ -36,18 +38,47 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         .await
         .unwrap();
 
-    let ops_to_publish = alice
-        .authored_db()
-        .read_async({
-            let alice_pub_key = alice.agent_pubkey().clone();
-            // Note that this test is relying on this being the same check that the publish workflow uses.
-            // If this returns 0 then the publish workflow is expected to suspend. So the test isn't directly
-            // observing that behaviour but it's close enough given that there are unit tests for the actual
-            // behavior.
-            move |txn| num_still_needing_publish(&txn, alice_pub_key)
-        })
-        .await
-        .unwrap();
+    let ops_to_publish = tokio::time::timeout(std::time::Duration::from_secs(60), async {
+        let mut ops_to_publish = 1;
+        while ops_to_publish > 0 {
+            ops_to_publish = alice
+                .authored_db()
+                .read_async({
+                    let alice_pub_key = alice.agent_pubkey().clone();
+                    // Note that this test is relying on this being the same check that the publish workflow uses.
+                    // If this returns 0 then the publish workflow is expected to suspend. So the test isn't directly
+                    // observing that behaviour but it's close enough given that there are unit tests for the actual
+                    // behavior.
+                    move |txn| num_still_needing_publish(&txn, alice_pub_key)
+                })
+                .await
+                .unwrap();
+        }
+
+        ops_to_publish
+    })
+    .await
+    .expect("timed out waiting for all receipts to be received");
 
     assert_eq!(ops_to_publish, 0);
+
+    // Get the validation receipts to check that they are all complete
+    let receipt_sets: Vec<ValidationReceiptSet> = conductors[0]
+        .call(
+            &alice.zome(TestWasm::Create),
+            "get_validation_receipts",
+            GetValidationReceiptsInput::new(action_hash),
+        )
+        .await;
+    assert_eq!(receipt_sets.len(), 3);
+    assert!(receipt_sets.iter().all(|r| r.receipts_complete));
+
+    let agent_activity_receipt_set = receipt_sets
+        .into_iter()
+        .find(|r| r.op_type == "RegisterAgentActivity")
+        .unwrap();
+    assert_eq!(
+        agent_activity_receipt_set.receipts.len(),
+        holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE as usize
+    );
 }
