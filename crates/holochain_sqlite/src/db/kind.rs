@@ -33,11 +33,9 @@ pub enum DbKind {
 pub trait DbKindT: Clone + std::fmt::Debug + Send + Sync + 'static {
     fn kind(&self) -> DbKind;
 
-    /// Constuct a partial Path based on the kind
+    /// Construct a partial Path based on the kind
     fn filename(&self) -> PathBuf {
-        let mut path = self.filename_inner();
-        path.set_extension("sqlite3");
-        path
+        self.filename_inner()
     }
 
     /// The above provided `filename` method attaches the .sqlite3 extension.
