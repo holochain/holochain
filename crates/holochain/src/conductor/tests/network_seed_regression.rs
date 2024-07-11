@@ -1,3 +1,6 @@
+// `cargo clippy --tests` emits warnings without this
+#![allow(dead_code)]
+
 use ::fixt::prelude::strum_macros;
 use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};

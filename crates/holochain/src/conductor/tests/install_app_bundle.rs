@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
