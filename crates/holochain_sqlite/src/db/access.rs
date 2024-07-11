@@ -456,11 +456,7 @@ pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
                 .and_then(|s| s.to_str())
                 .ok_or_else(|| DatabaseError::DatabaseMissing(path.to_owned()))?
                 .to_string()
-                + "-encrypted."
-                + path
-                    .extension()
-                    .and_then(|s| s.to_str())
-                    .ok_or_else(|| DatabaseError::DatabaseMissing(path.to_owned()))?,
+                + "-encrypted",
         );
 
     tracing::warn!(
