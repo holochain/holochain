@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use std::collections::BTreeSet;
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{conductor::error::ConductorError, sweettest::*};
@@ -6,6 +7,7 @@ use ::fixt::prelude::strum_macros;
 use holo_hash::DnaHash;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use maplit::btreeset;
 use matches::assert_matches;
 use tempfile::{tempdir, TempDir};
 
@@ -54,7 +56,6 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             installed_app_id: Some("app_1".into()),
             network_seed: None,
             membrane_proofs: HashMap::new(),
-            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         }
     }
@@ -175,7 +176,6 @@ async fn reject_duplicate_app_for_same_agent() {
             installed_app_id: Some("app_1".into()),
             network_seed: None,
             membrane_proofs: HashMap::new(),
-            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await
@@ -195,7 +195,6 @@ async fn reject_duplicate_app_for_same_agent() {
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
             membrane_proofs: HashMap::new(),
-            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
             network_seed: None,
         })
@@ -219,7 +218,6 @@ async fn reject_duplicate_app_for_same_agent() {
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
             membrane_proofs: HashMap::new(),
-            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
             network_seed: None,
         })
@@ -240,7 +238,6 @@ async fn reject_duplicate_app_for_same_agent() {
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
             membrane_proofs: HashMap::new(),
-            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
             network_seed: Some("network".into()),
         })
@@ -291,7 +288,6 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             installed_app_id: Some("app_1".into()),
             network_seed: Some("final seed".into()),
             membrane_proofs: HashMap::new(),
-            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await
@@ -335,7 +331,6 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             installed_app_id: Some("app_2".into()),
             network_seed: None,
             membrane_proofs: HashMap::new(),
-            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await
@@ -399,7 +394,6 @@ async fn network_seed_regression() {
             installed_app_id: Some("no-seed".into()),
             network_seed: None,
             membrane_proofs: HashMap::new(),
-            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await
@@ -413,11 +407,102 @@ async fn network_seed_regression() {
             installed_app_id: Some("yes-seed".into()),
             network_seed: Some("seed".into()),
             membrane_proofs: HashMap::new(),
-            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await
         .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn cells_by_dna_lineage() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+
+    async fn mk_dna(lineage: &[&DnaHash]) -> DnaFile {
+        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+        let (def, code) = dna.into_parts();
+        let mut def = def.into_content();
+        def.lineage = lineage.iter().map(|h| (**h).to_owned()).collect();
+        DnaFile::from_parts(def.into_hashed(), code)
+    }
+
+    // The lineage of a DNA includes the DNA itself
+    let dna1 = mk_dna(&[]).await;
+    let dna2 = mk_dna(&[dna1.dna_hash()]).await;
+    let dna3 = mk_dna(&[dna1.dna_hash(), dna2.dna_hash()]).await;
+    // dna1 is removed from the lineage
+    let dna4 = mk_dna(&[dna2.dna_hash(), dna3.dna_hash()]).await;
+    let dnax = mk_dna(&[]).await;
+
+    let app1 = conductor.setup_app("app1", [&dna1, &dnax]).await.unwrap();
+    let app2 = conductor.setup_app("app2", [&dna2]).await.unwrap();
+    let app3 = conductor.setup_app("app3", [&dna3]).await.unwrap();
+    let app4 = conductor.setup_app("app4", [&dna4]).await.unwrap();
+
+    let lin1 = conductor
+        .cells_by_dna_lineage(dna1.dna_hash())
+        .await
+        .unwrap();
+    let lin2 = conductor
+        .cells_by_dna_lineage(dna2.dna_hash())
+        .await
+        .unwrap();
+    let lin3 = conductor
+        .cells_by_dna_lineage(dna3.dna_hash())
+        .await
+        .unwrap();
+    let lin4 = conductor
+        .cells_by_dna_lineage(dna4.dna_hash())
+        .await
+        .unwrap();
+    let linx = conductor
+        .cells_by_dna_lineage(dnax.dna_hash())
+        .await
+        .unwrap();
+
+    fn app_cells(app: &SweetApp, indices: &[usize]) -> (String, BTreeSet<CellId>) {
+        (
+            app.installed_app_id().clone(),
+            indices
+                .iter()
+                .map(|i| app.cells()[*i].cell_id().clone())
+                .collect(),
+        )
+    }
+
+    pretty_assertions::assert_eq!(
+        lin1,
+        btreeset![
+            app_cells(&app1, &[0]),
+            app_cells(&app2, &[0]),
+            app_cells(&app3, &[0]),
+            // no dna4: dna1 was "removed"
+        ]
+    );
+    pretty_assertions::assert_eq!(
+        lin2,
+        btreeset![
+            // no dna1: it's in the past
+            app_cells(&app2, &[0]),
+            app_cells(&app3, &[0]),
+            app_cells(&app4, &[0]),
+        ]
+    );
+    pretty_assertions::assert_eq!(
+        lin3,
+        btreeset![
+            // no dna1 or dna2: they're in the past
+            app_cells(&app3, &[0]),
+            app_cells(&app4, &[0]),
+        ]
+    );
+    pretty_assertions::assert_eq!(
+        lin4,
+        btreeset![
+            // all other dnas are in the past
+            app_cells(&app4, &[0]),
+        ]
+    );
+    pretty_assertions::assert_eq!(linx, btreeset![app_cells(&app1, &[1]),]);
 }
 
 /// Test all possible combinations of Locations and network seeds:
@@ -663,7 +748,6 @@ impl TestCase {
                 installed_app_id: Some(case_str.clone()),
                 network_seed,
                 membrane_proofs: HashMap::new(),
-                #[cfg(feature = "chc")]
                 ignore_genesis_failure: false,
             })
             .await

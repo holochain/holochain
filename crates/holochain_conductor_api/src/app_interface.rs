@@ -84,6 +84,15 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::Ok`]
     ProvideMemproofs(MemproofMap),
+
+    /// Enable the app, only in special circumstances.
+    /// Can only be called while the app is in the `Disabled(NotStartedAfterProvidingMemproofs)` state.
+    /// Cannot be used to enable the app if it's in any other state, or Disabled for any other reason.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::Ok`]
+    EnableApp,
     //
     // TODO: implement after DPKI lands
     // /// Replace the agent key associated with this app with a new one.
@@ -475,12 +484,10 @@ pub enum ScottyPanel {
     GossipInfo { last_round: Option<Timestamp> },
 }
 
-// once this is in stable, replace the pinned version in the URL by `latest``
-/// The request payload that should be sent in a [`WireMessage::Authenticate`](https://docs.rs/holochain_websocket/0.3.0-beta-dev.22/holochain_websocket/enum.WireMessage.html#variant.Authenticate) message.
+/// The request payload that should be sent in a [`holochain_websocket::WireMessage::Authenticate`]
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppAuthenticationRequest {
-    // once this is in stable, replace the pinned version in the URL by `latest``
-    /// The authentication token that was provided by the conductor when [`AdminRequest::IssueAppInterfaceToken`](https://docs.rs/holochain_conductor_api/0.3.0-beta-dev.47/holochain_conductor_api/enum.AdminRequest.html#variant.IssueAppAuthenticationToken) was called.
+    /// The authentication token that was provided by the conductor when [`AdminRequest::IssueAppInterfaceToken`] was called.
     pub token: AppAuthenticationToken,
 }
 

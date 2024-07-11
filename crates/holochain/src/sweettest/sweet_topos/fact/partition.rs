@@ -81,70 +81,64 @@ pub mod test {
     /// Test that we can build a network with one partition.
     #[test]
     fn test_sweet_topos_strictly_partitioned_network_one_partition() {
-        crate::big_stack_test!(
-            async move {
-                let mut g = unstructured_noise().into();
-                let size_fact = SizedNetworkFact {
-                    nodes: 3,
-                    agents: 3..=5,
-                };
-                let partition_fact = StrictlyPartitionedNetworkFact {
-                    partitions: 1,
-                    efficiency: 1.0,
-                };
-                let mut facts = facts![size_fact, partition_fact];
-                let mut graph = NetworkTopology::default();
-                graph = facts.mutate(&mut g, graph).unwrap();
-                assert_eq!(graph.strict_partitions(), 1);
-            },
-            7_000_000
-        );
+        crate::big_stack_test!(async move {
+            let mut g = unstructured_noise().into();
+            let size_fact = SizedNetworkFact {
+                nodes: 3,
+                agents: 3..=5,
+            };
+            let partition_fact = StrictlyPartitionedNetworkFact {
+                partitions: 1,
+                efficiency: 1.0,
+            };
+            let mut facts = facts![size_fact, partition_fact];
+            let mut graph = NetworkTopology::default();
+            graph = facts.mutate(&mut g, graph).unwrap();
+            assert_eq!(graph.strict_partitions(), 1);
+        });
     }
 
     /// Test that we can build a network with a dozen nodes and three partitions.
     #[test]
     fn test_sweet_topos_strictly_partitioned_network_dozen_nodes_three_partitions() {
-        crate::big_stack_test!(
-            async move {
-                let mut g = unstructured_noise().into();
-                let mut size_fact = SizedNetworkFact {
-                    nodes: 12,
-                    agents: 1..=2,
-                };
-                let mut partition_fact = StrictlyPartitionedNetworkFact {
-                    partitions: 3,
-                    efficiency: 0.2,
-                };
-                // let facts = facts![size_fact, partition_fact];
-                let mut graph = NetworkTopology::default();
-                graph = size_fact.mutate(&mut g, graph).unwrap();
-                tracing::info!(
-                    "{:?}",
-                    Dot::with_config(
-                        graph.as_ref(),
-                        &[
-                            //     Config::GraphContentOnly,
-                            Config::NodeNoLabel,
-                            Config::EdgeNoLabel,
-                        ],
-                    )
-                );
-                graph = partition_fact.mutate(&mut g, graph).unwrap();
-                assert_eq!(connected_components(graph.as_ref()), 3);
+        crate::big_stack_test!(async move {
+            let mut g = unstructured_noise().into();
+            let mut size_fact = SizedNetworkFact {
+                nodes: 12,
+                agents: 1..=2,
+            };
+            let mut partition_fact = StrictlyPartitionedNetworkFact {
+                partitions: 3,
+                efficiency: 0.2,
+            };
+            // let facts = facts![size_fact, partition_fact];
+            let mut graph = NetworkTopology::default();
+            graph = size_fact.mutate(&mut g, graph).unwrap();
+            tracing::info!(
+                "{:?}",
+                Dot::with_config(
+                    graph.as_ref(),
+                    &[
+                        //     Config::GraphContentOnly,
+                        Config::NodeNoLabel,
+                        Config::EdgeNoLabel,
+                    ],
+                )
+            );
+            graph = partition_fact.mutate(&mut g, graph).unwrap();
+            assert_eq!(connected_components(graph.as_ref()), 3);
 
-                tracing::info!(
-                    "{:?}",
-                    Dot::with_config(
-                        graph.as_ref(),
-                        &[
-                            //     Config::GraphContentOnly,
-                            Config::NodeNoLabel,
-                            Config::EdgeNoLabel,
-                        ],
-                    )
-                );
-            },
-            7_000_000
-        );
+            tracing::info!(
+                "{:?}",
+                Dot::with_config(
+                    graph.as_ref(),
+                    &[
+                        //     Config::GraphContentOnly,
+                        Config::NodeNoLabel,
+                        Config::EdgeNoLabel,
+                    ],
+                )
+            );
+        });
     }
 }

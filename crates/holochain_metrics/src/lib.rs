@@ -87,6 +87,8 @@
 //! | ---------------- | ---- | --------------- | ----------- | ---------- |
 //! | `kitsune.peer.send.duration` | `f64_histogram` | `s` | When kitsune sends data to a remote peer. |- `remote_id`: the base64 remote peer id.<br />- `is_error`: if the send failed. |
 //! | `kitsune.peer.send.byte.count` | `u64_histogram` | `By` | When kitsune sends data to a remote peer. |- `remote_id`: the base64 remote peer id.<br />- `is_error`: if the send failed. |
+//! | `kitsune.gossip.generate_op_blooms.duration` | `f64_histogram` | `s` | The time taken to generate op blooms for gossip. | - `space`: The space (dna_hash representation) that gossip is being performed for.<br />- `batch_size`: The number of ops that were included in the bloom batch for this observation. |
+//! | `kitsune.gossip.generate_op_region_set.duration` | `f64_histogram` | `s` | The time taken to generate op region sets for gossip. | - `space`: The space (dna_hash representation) that gossip is being performed for. |
 //! | `tx5.conn.ice.send` | `u64_observable_counter` | `By` | Bytes sent on ice channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 //! | `tx5.conn.ice.recv` | `u64_observable_counter` | `By` | Bytes received on ice channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 //! | `tx5.conn.data.send` | `u64_observable_counter` | `By` | Bytes sent on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |

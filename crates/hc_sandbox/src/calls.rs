@@ -531,7 +531,6 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         source: AppBundleSource::Path(path),
         membrane_proofs: Default::default(),
         network_seed,
-        #[cfg(feature = "chc")]
         ignore_genesis_failure: false,
     };
 

@@ -144,7 +144,9 @@ mod test {
         let action1: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
         // Now that bob is blocked by alice he cannot get data from alice.
-        await_consistency(10, [&alice_cell]).await.unwrap();
+        await_consistency_advanced(10, vec![], [(&alice_cell, true), (&bob_cell, false)])
+            .await
+            .unwrap();
         let bob_get1: Option<Record> = bob_conductor.call(&bob, "get_post", action1.clone()).await;
 
         assert!(bob_get1.is_none());
