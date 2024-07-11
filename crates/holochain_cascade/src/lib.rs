@@ -229,6 +229,11 @@ impl CascadeImpl {
             duration_metric: create_cascade_duration_metric(),
         }
     }
+
+    /// Getter
+    pub fn cache(&self) -> Option<&DbWrite<DbKindCache>> {
+        self.cache.as_ref()
+    }
 }
 
 /// TODO
