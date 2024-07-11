@@ -150,20 +150,17 @@ fn query_validation_receipts<P: Params>(
         .collect::<StateQueryResult<Vec<_>>>()?;
     Ok(db_result
         .into_iter()
-        .filter_map(
-            |(receipt, op_hash, op_type, receipts_complete)| match op_type {
-                DhtOpType::Chain(op_type) => Some((
-                    op_hash,
-                    op_type.to_string(),
-                    receipts_complete,
-                    ValidationReceiptInfo {
-                        validation_status: receipt.receipt.validation_status,
-                        validators: receipt.receipt.validators,
-                    },
-                )),
-                _ => None,
-            },
-        )
+        .map(|(receipt, op_hash, op_type, receipts_complete)| {
+            (
+                op_hash,
+                op_type.to_string(),
+                receipts_complete,
+                ValidationReceiptInfo {
+                    validation_status: receipt.receipt.validation_status,
+                    validators: receipt.receipt.validators,
+                },
+            )
+        })
         .fold(HashMap::new(), |mut acc, item| {
             acc.entry(item.0.clone())
                 .or_insert_with(|| ValidationReceiptSet {
@@ -420,10 +417,8 @@ mod tests {
         let action = fixt!(Action);
 
         let action_hash = ActionHash::with_data_sync(&action);
-        let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
-            fixt!(Signature),
-            action,
-        ));
+        let op =
+            DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(fixt!(Signature), action));
         let test_op_hash = op.as_hash().clone();
         env.write_async(move |txn| insert_op(txn, &op))
             .await
