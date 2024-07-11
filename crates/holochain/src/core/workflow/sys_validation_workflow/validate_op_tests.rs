@@ -205,7 +205,7 @@ async fn validate_delete_agent_key_op() {
         entry_hash: test_case.agent.clone().into(),
         prev_action: fixt!(ActionHash),
         weight: Default::default(),
-        timestamp: Timestamp::now().into(),
+        timestamp: Timestamp::now(),
     };
     let create_agent_pub_key_action = test_case
         .sign_action(Action::Create(create_agent_pub_key))

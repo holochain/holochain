@@ -944,7 +944,7 @@ async fn sys_validate_record_inner(
                 .ok_or_else(|| {
                     ValidationOutcome::DepMissingFromDht(previous_action_hash.clone().into())
                 })?;
-            check_agent_validity(action.author(), &previous_action)?;
+            check_agent_validity(action.author(), previous_action)?;
         }
 
         store_record(action, validation_dependencies.clone())?;
@@ -1027,7 +1027,7 @@ fn register_agent_activity(
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
 
         // Agent key updates are only validated by agent authorities.
-        check_agent_validity(action.author(), &prev_action)?;
+        check_agent_validity(action.author(), prev_action)?;
 
         match prev_action {
             Action::CloseChain(_) => Err(ValidationOutcome::PrevActionError(

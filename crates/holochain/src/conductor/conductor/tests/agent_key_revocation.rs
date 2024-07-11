@@ -634,10 +634,10 @@ mod multi_conductor {
             .into_iter();
         let alice_app = apps.next().unwrap();
         let alice = alice_app.agent().clone();
-        let alice_cell_1 = alice_app.cells().get(0).unwrap();
+        let alice_cell_1 = alice_app.cells().first().unwrap();
         let alice_cell_2 = alice_app.cells().get(1).unwrap();
         let bob_app = apps.next().unwrap();
-        let bob_cell_1 = bob_app.cells().get(0).unwrap();
+        let bob_cell_1 = bob_app.cells().first().unwrap();
         let bob_cell_2 = bob_app.cells().get(1).unwrap();
 
         // Await initial DHT sync of Dpki and both cells
@@ -867,7 +867,7 @@ fn assert_delete_agent_key_accepted_by_validation(
                 )
                 .unwrap()
                 .collect();
-            assert!(rows.len() > 0);
+            assert!(rows.is_empty());
         }
     });
 }
