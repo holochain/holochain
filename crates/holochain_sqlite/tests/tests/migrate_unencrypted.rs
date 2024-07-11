@@ -15,7 +15,7 @@ async fn migrate_unencrypted() {
 
     // Set up an unencrypted database
     {
-        let conn = Connection::open(tmp_dir.path().join("conductor/conductor.sqlite3")).unwrap();
+        let conn = Connection::open(tmp_dir.path().join("conductor/conductor")).unwrap();
 
         // Needs to contain data otherwise encryption will just succeed!
         conn.execute("CREATE TABLE migrate_me (name TEXT NOT NULL)", ())
