@@ -313,6 +313,11 @@ impl AdminInterfaceApi {
                     .revoke_app_authentication_token(token)?;
                 Ok(AdminResponse::AppAuthenticationTokenRevoked)
             }
+            GetCompatibleCells(dna_hash) => Ok(AdminResponse::CompatibleCells(
+                self.conductor_handle
+                    .cells_by_dna_lineage(&dna_hash)
+                    .await?,
+            )),
         }
     }
 }

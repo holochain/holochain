@@ -204,6 +204,9 @@ wasm_io_types! {
 
     // Open your chain, pointing to the previous DNA
     fn open_chain(zt::chain::OpenChainInput) -> holo_hash::ActionHash;
+
+    // Get validation receipts for an action
+    fn get_validation_receipts(zt::validate::GetValidationReceiptsInput) -> Vec<zt::validate::ValidationReceiptSet>;
 }
 
 /// Anything that can go wrong while calling a HostFnApi method

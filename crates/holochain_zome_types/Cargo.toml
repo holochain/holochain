@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.4.0-dev.9"
+version = "0.4.0-dev.10"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,11 +13,11 @@ edition = "2021"
 [dependencies]
 kitsune_p2p_dht = { version = "^0.4.0-dev.7", path = "../kitsune_p2p/dht", optional = true }
 kitsune_p2p_timestamp = { version = "^0.4.0-dev.2", path = "../kitsune_p2p/timestamp" }
-kitsune_p2p_block = { version = "^0.4.0-dev.7", path = "../kitsune_p2p/block" }
-holo_hash = { version = "^0.4.0-dev.7", path = "../holo_hash", features = [
+kitsune_p2p_block = { version = "^0.4.0-dev.8", path = "../kitsune_p2p/block" }
+holo_hash = { version = "^0.4.0-dev.8", path = "../holo_hash", features = [
   "encoding",
 ] }
-holochain_integrity_types = { version = "^0.4.0-dev.8", path = "../holochain_integrity_types", features = [
+holochain_integrity_types = { version = "^0.4.0-dev.9", path = "../holochain_integrity_types", features = [
   "tracing",
 ] }
 holochain_nonce = { version = "^0.4.0-dev.4", path = "../holochain_nonce" }

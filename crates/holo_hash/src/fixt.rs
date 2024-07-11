@@ -15,6 +15,8 @@ use crate::DnaHash;
 use crate::DnaHashB64;
 use crate::EntryHash;
 use crate::EntryHashB64;
+use crate::ExternalHash;
+use crate::ExternalHashB64;
 use crate::NetIdHash;
 use crate::NetIdHashB64;
 use crate::WasmHash;
@@ -170,4 +172,13 @@ fixturator!(
 fixturator!(
     AnyLinkableHashB64;
     constructor fn new(AnyLinkableHash);
+);
+
+fixturator!(
+    ExternalHash;
+    constructor fn from_raw_32(ThirtyTwoHashBytes);
+);
+fixturator!(
+    ExternalHashB64;
+    constructor fn new(ExternalHash);
 );

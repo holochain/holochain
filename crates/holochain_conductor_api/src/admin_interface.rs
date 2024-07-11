@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
@@ -374,6 +376,10 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::AppAuthenticationTokenRevoked`]
     RevokeAppAuthenticationToken(AppAuthenticationToken),
+
+    /// Find installed cells which use a DNA that's forward-compatible with the given DNA hash.
+    /// Namely, this finds cells with DNAs whose manifest lists the given DNA hash in its `lineage` field.
+    GetCompatibleCells(DnaHash),
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -521,7 +527,12 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::RevokeAppAuthenticationToken`].
     AppAuthenticationTokenRevoked,
+
+    /// The successful response to an [`AdminRequest::GetCompatibleCells`].
+    CompatibleCells(CompatibleCells),
 }
+
+pub type CompatibleCells = BTreeSet<(InstalledAppId, BTreeSet<CellId>)>;
 
 /// Error type that goes over the websocket wire.
 /// This intends to be application developer facing
@@ -559,11 +570,21 @@ impl ExternalApiWireError {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
 /// Filter for [`AdminRequest::ListApps`].
+///
+/// App Status is a combination of two pieces of independent state:
+/// - Enabled/Disabled, which is a designation set by the user via the conductor interface.
+/// - Running/Stopped, which is a fact about the reality of the app in the course of its operation.
 pub enum AppStatusFilter {
+    /// Filter on apps which are Enabled, which can include both Running and Paused apps.
     Enabled,
+    /// Filter only on apps which are Disabled.
     Disabled,
+    /// Filter on apps which are currently Running (meaning they are also Enabled).
     Running,
+    /// Filter on apps which are Stopped, i.e. not Running.
+    /// This includes apps in the Disabled status, as well as the Paused status.
     Stopped,
+    /// Filter only on Paused apps.
     Paused,
 }
 
