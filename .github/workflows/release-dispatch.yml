@@ -1,0 +1,29 @@
+name: "Holochain release dispatch"
+
+on:
+  push:
+    tags:
+      # Expect tags to be `holochain-<semver-version>`
+      - holochain-*
+
+jobs:
+  holochain-tag-created:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Add repositories here to trigger their `workflow_dispatch` event when Holochain releases.
+        target: ["holochain/holonix"]
+    steps:
+      - name: dispatch
+        env:
+          GH_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
+        # See https://github.com/holochain/holonix/blob/main/.github/workflows/dispatch-listener.yaml
+        # For an example of how to handle this event.
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/${{ matrix.target }}/dispatches \
+            -f "event_type=holochain-released" -F "client_payload[tag]=${{ github.ref_name }}"
