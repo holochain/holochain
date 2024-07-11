@@ -9,6 +9,7 @@ use holochain_types::websocket::AllowedOrigins;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use super::error::{ConductorError, ConductorResult};
@@ -227,6 +228,31 @@ impl ConductorState {
                 None
             },
         }
+    }
+
+    /// Getter for a single app. Returns error if app missing.
+    pub fn get_dependents(
+        &self,
+        id: &InstalledAppId,
+        protected: bool,
+    ) -> ConductorResult<Vec<&InstalledAppId>> {
+        let app = self.get_app(id)?;
+        let cell_ids: HashSet<_> = app.all_cells().collect();
+        Ok(self
+            .installed_apps
+            .iter()
+            .filter_map(|(app_id, app)| {
+                app.role_assignments
+                    .values()
+                    .any(|r| match r {
+                        AppRoleAssignment::Primary(_) => false,
+                        AppRoleAssignment::Dependency(d) => {
+                            cell_ids.contains(&d.cell_id) && (!protected || d.protected)
+                        }
+                    })
+                    .then_some(app_id)
+            })
+            .collect())
     }
 }
 

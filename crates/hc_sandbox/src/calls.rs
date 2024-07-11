@@ -183,6 +183,11 @@ pub struct InstallApp {
 pub struct UninstallApp {
     /// The InstalledAppId to uninstall.
     pub app_id: String,
+
+    /// Force uninstallation of the app even if there are any protections in place.
+    /// Don't use this unless you know what you're doing.
+    #[arg(long, default_value_t = false)]
+    pub force: bool,
 }
 
 /// Calls AdminRequest::EnableApp
@@ -559,6 +564,7 @@ pub async fn uninstall_app(cmd: &mut CmdRunner, args: UninstallApp) -> anyhow::R
     let resp = cmd
         .command(AdminRequest::UninstallApp {
             installed_app_id: args.app_id,
+            force: args.force,
         })
         .await?;
 

@@ -1574,6 +1574,7 @@ mod app_impls {
         pub async fn uninstall_app(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,
+            force: bool,
         ) -> ConductorResult<()> {
             let self_clone = self.clone();
             let app = self.remove_app_from_db(installed_app_id).await?;
@@ -1708,7 +1709,7 @@ mod app_impls {
             let cells_to_genesis = app
                 .roles()
                 .iter()
-                .map(|(role_name, role)| (role.base_cell_id.clone(), memproofs.remove(role_name)))
+                .map(|(role_name, role)| (role.cell_id().clone(), memproofs.remove(role_name)))
                 .collect();
 
             crate::conductor::conductor::genesis_cells(self.clone(), cells_to_genesis).await?;
@@ -1953,7 +1954,7 @@ mod clone_cell_impls {
                         let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
                         let (cell_id, _) = app.enable_clone_cell(&clone_id)?.into_inner();
                         let app_role = app.role(&clone_id.as_base_role_name())?;
-                        let original_dna_hash = app_role.dna_hash().clone();
+                        let original_dna_hash = app_role.cell_id().dna_hash().clone();
                         let ribosome = conductor.get_ribosome(cell_id.dna_hash())?;
                         let dna = ribosome.dna_file.dna();
                         let dna_modifiers = dna.modifiers.clone();
@@ -3104,7 +3105,7 @@ impl Conductor {
                 let role_name = role_name.clone();
                 move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
-                    let app_role = app.role(&role_name)?;
+                    let app_role = app.primary_role(&role_name)?;
                     if app_role.is_clone_limit_reached() {
                         return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
                             app_role.clone_limit(),
@@ -3138,7 +3139,7 @@ impl Conductor {
             .update_state_prime(move |mut state| {
                 let state_copy = state.clone();
                 let app = state.get_app_mut(&app_id)?;
-                let agent_key = app.role(&role_name)?.agent_key().to_owned();
+                let agent_key = app.primary_role(&role_name)?.agent_key().to_owned();
                 let clone_cell_id = CellId::new(clone_dna_hash, agent_key);
 
                 // if cell id of new clone cell already exists, reject as duplicate

@@ -154,7 +154,15 @@ pub enum CellProvisioning {
 
     /// Require that a Cell is already installed which has a DNA that's compatible with the
     /// `installed_hash` specified in the manifest.
-    UseExisting { deferred: bool },
+    ///
+    /// `protected` refers to the dependency. If the dependency is "protected", then the App
+    /// which owns the Cell which is shared by this role cannot be uninstalled as long as
+    /// this dependency exists. The dependency can be marked unprotected if this app is
+    /// written such that it can still function with the dependency being unavailable.
+    ///
+    /// If the dependency is protected, the depended-upon App can still be uninstalled
+    /// with the `AdminRequest::UninstallApp::force` flag
+    UseExisting { protected: bool },
 
     /// Install or locate the DNA, but never create a Cell for this DNA.
     /// Only allow clones to be created from the DNA specified.
@@ -216,10 +224,9 @@ impl AppManifestV1 {
                             modifiers,
                             installed_hash,
                         },
-                        CellProvisioning::UseExisting { deferred } => {
+                        CellProvisioning::UseExisting { protected } => {
                             AppRoleManifestValidated::UseExisting {
-                                deferred,
-                                clone_limit,
+                                protected,
                                 compatible_hash: Self::require(
                                     installed_hash,
                                     "roles.dna.installed_hash",

@@ -506,7 +506,7 @@ async fn use_existing_happy_path() {
                         installed_hash,
                         clone_limit: 0,
                     },
-                    provisioning: Some(CellProvisioning::UseExisting { deferred: false }),
+                    provisioning: Some(CellProvisioning::UseExisting { protected: true }),
                 },
             ];
 
