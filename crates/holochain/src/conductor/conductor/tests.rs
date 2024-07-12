@@ -1258,19 +1258,23 @@ async fn test_deferred_memproof_provisioning() {
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
     assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
 
-    //- Can create a clone cell, even though this is unusual
-    conductor
+    //- Can not create a clone cell until memproofs have been provided
+    let error = conductor
         .create_clone_cell(
             &app_id,
             CreateCloneCellPayload {
-                role_name,
+                role_name: role_name.clone(),
                 modifiers: DnaModifiersOpt::none().with_network_seed("seeeeed".into()),
                 membrane_proof: None,
                 name: None,
             },
         )
         .await
-        .unwrap();
+        .unwrap_err();
+    assert_matches!(
+        error,
+        ConductorError::SourceChainError(SourceChainError::ChainEmpty)
+    );
 
     //- Rotate app agent key a few times just for the heck of it
     // TODO: not yet implemented
@@ -1308,6 +1312,20 @@ async fn test_deferred_memproof_provisioning() {
 
     //- And now we can make a zome call successfully
     let _: String = conductor.call(&cell.zome("foo"), "foo", ()).await;
+
+    //- And create a clone cell
+    conductor
+        .create_clone_cell(
+            &app_id,
+            CreateCloneCellPayload {
+                role_name,
+                modifiers: DnaModifiersOpt::none().with_network_seed("seeeeed".into()),
+                membrane_proof: None,
+                name: None,
+            },
+        )
+        .await
+        .unwrap();
 }
 
 /// Can uninstall an app with deferred memproofs before providing memproofs
