@@ -3181,6 +3181,7 @@ dependencies = [
  "getrandom 0.2.14",
  "holo_hash",
  "holochain_nonce",
+ "holochain_p2p",
  "holochain_serialized_bytes",
  "holochain_sqlite",
  "holochain_trace",

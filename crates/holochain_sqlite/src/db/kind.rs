@@ -38,6 +38,11 @@ pub trait DbKindT: Clone + std::fmt::Debug + Send + Sync + 'static {
         self.filename_inner()
     }
 
+    /// Construct the legacy file name, so that we can move to the new file name.
+    ///
+    /// The return value will be `None` if this database kind has not been renamed.
+    fn legacy_filename(&self) -> Option<PathBuf>;
+
     /// The above provided `filename` method attaches the .sqlite3 extension.
     /// Implement this to provide the front part of the database filename.
     fn filename_inner(&self) -> PathBuf;
@@ -84,6 +89,17 @@ impl DbKindT for DbKindAuthored {
         DbKind::Authored(self.0.clone())
     }
 
+    fn legacy_filename(&self) -> Option<PathBuf> {
+        let mut path: PathBuf = [
+            "authored",
+            &format!("authored-{}-{}", self.0.dna_hash(), self.0.agent_pubkey()),
+        ]
+        .iter()
+        .collect();
+        path.set_extension("sqlite3");
+        Some(path)
+    }
+
     fn filename_inner(&self) -> PathBuf {
         [
             "authored",
@@ -111,6 +127,12 @@ impl DbKindT for DbKindDht {
         DbKind::Dht(self.0.clone())
     }
 
+    fn legacy_filename(&self) -> Option<PathBuf> {
+        let mut path: PathBuf = ["dht", &format!("dht-{}", self.0)].iter().collect();
+        path.set_extension("sqlite3");
+        Some(path)
+    }
+
     fn filename_inner(&self) -> PathBuf {
         ["dht", &self.0.to_string()].iter().collect()
     }
@@ -134,6 +156,12 @@ impl DbKindDht {
 impl DbKindT for DbKindCache {
     fn kind(&self) -> DbKind {
         DbKind::Cache(self.0.clone())
+    }
+
+    fn legacy_filename(&self) -> Option<PathBuf> {
+        let mut path: PathBuf = ["cache", &format!("cache-{}", self.0)].iter().collect();
+        path.set_extension("sqlite3");
+        Some(path)
     }
 
     fn filename_inner(&self) -> PathBuf {
@@ -161,6 +189,10 @@ impl DbKindT for DbKindConductor {
         DbKind::Conductor
     }
 
+    fn legacy_filename(&self) -> Option<PathBuf> {
+        None
+    }
+
     fn filename_inner(&self) -> PathBuf {
         ["conductor", "conductor"].iter().collect()
     }
@@ -173,6 +205,10 @@ impl DbKindT for DbKindConductor {
 impl DbKindT for DbKindWasm {
     fn kind(&self) -> DbKind {
         DbKind::Wasm
+    }
+
+    fn legacy_filename(&self) -> Option<PathBuf> {
+        None
     }
 
     fn filename_inner(&self) -> PathBuf {
@@ -189,6 +225,14 @@ impl DbKindT for DbKindP2pAgents {
         DbKind::P2pAgentStore(self.0.clone())
     }
 
+    fn legacy_filename(&self) -> Option<PathBuf> {
+        let mut path: PathBuf = ["p2p", &format!("p2p_agent_store-{}", self.0)]
+            .iter()
+            .collect();
+        path.set_extension("sqlite3");
+        Some(path)
+    }
+
     fn filename_inner(&self) -> PathBuf {
         ["p2p", &format!("agent_store-{}", self.0)].iter().collect()
     }
@@ -201,6 +245,12 @@ impl DbKindT for DbKindP2pAgents {
 impl DbKindT for DbKindP2pMetrics {
     fn kind(&self) -> DbKind {
         DbKind::P2pMetrics(self.0.clone())
+    }
+
+    fn legacy_filename(&self) -> Option<PathBuf> {
+        let mut path: PathBuf = ["p2p", &format!("p2p_metrics-{}", self.0)].iter().collect();
+        path.set_extension("sqlite3");
+        Some(path)
     }
 
     fn filename_inner(&self) -> PathBuf {
