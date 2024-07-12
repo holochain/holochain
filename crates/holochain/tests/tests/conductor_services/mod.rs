@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use holochain::{
     conductor::config::DpkiConfig, sweettest::*, test_utils::inline_zomes::simple_create_read_zome,
 };
@@ -35,9 +33,7 @@ async fn validate_with_dpki() {
     holochain_trace::test_run();
 
     let rendezvous = SweetLocalRendezvous::new().await;
-    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|p| {
-        p.sys_validation_retry_delay = Some(Duration::from_secs(1));
-    });
+    let config = SweetConductorConfig::rendezvous(true);
 
     let mut conductors = SweetConductorBatch::new(vec![
         SweetConductor::from_config_rendezvous(config.clone(), rendezvous.clone()).await,

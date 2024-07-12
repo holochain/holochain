@@ -2076,33 +2076,37 @@ mod clone_cell_impls {
 
             let state = self.get_state().await?;
             let app = state.get_app(installed_app_id)?;
-            // Check Deepkey first if agent key is valid
-            if let Some(dpki) = self.running_services().dpki {
-                let agent_key = app.agent_key().clone();
-                let key_state = dpki
-                    .state()
-                    .await
-                    .key_state(agent_key.clone(), Timestamp::now())
-                    .await?;
-                if let KeyState::Invalid(_) = key_state {
-                    return Err(
-                        DpkiServiceError::DpkiAgentInvalid(agent_key, Timestamp::now()).into(),
-                    );
-                }
-            }
-
-            // Check source chain if agent key is valid
             let app_role = app.role(&role_name)?;
-            let source_chain = SourceChain::new(
-                self.get_or_create_authored_db(app_role.dna_hash(), app.agent_key().clone())?,
-                self.get_or_create_dht_db(app_role.dna_hash())?,
-                self.get_or_create_space(app_role.dna_hash())?
-                    .dht_query_cache,
-                self.keystore.clone(),
-                app.agent_key().clone(),
-            )
-            .await?;
-            source_chain.valid_create_agent_key_action().await?;
+            // If base cell has been provisioned, check first in Deepkey if agent key is valid
+            if app_role.is_provisioned {
+                if let Some(dpki) = self.running_services().dpki {
+                    let agent_key = app.agent_key().clone();
+                    let key_state = dpki
+                        .state()
+                        .await
+                        .key_state(agent_key.clone(), Timestamp::now())
+                        .await?;
+                    if let KeyState::Invalid(_) = key_state {
+                        return Err(DpkiServiceError::DpkiAgentInvalid(
+                            agent_key,
+                            Timestamp::now(),
+                        )
+                        .into());
+                    }
+                }
+
+                // Check source chain if agent key is valid
+                let source_chain = SourceChain::new(
+                    self.get_or_create_authored_db(app_role.dna_hash(), app.agent_key().clone())?,
+                    self.get_or_create_dht_db(app_role.dna_hash())?,
+                    self.get_or_create_space(app_role.dna_hash())?
+                        .dht_query_cache,
+                    self.keystore.clone(),
+                    app.agent_key().clone(),
+                )
+                .await?;
+                source_chain.valid_create_agent_key_action().await?;
+            }
 
             // add cell to app
             let clone_cell = self

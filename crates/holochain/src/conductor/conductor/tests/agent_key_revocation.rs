@@ -867,7 +867,7 @@ fn assert_delete_agent_key_accepted_by_validation(
                 )
                 .unwrap()
                 .collect();
-            assert!(rows.is_empty());
+            assert!(!rows.is_empty());
         }
     });
 }
