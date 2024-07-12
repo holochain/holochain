@@ -198,6 +198,57 @@ impl ConductorState {
         id: &InstalledAppId,
         transition: AppStatusTransition,
     ) -> ConductorResult<(&InstalledApp, AppStatusFx)> {
+        match transition {
+            AppStatusTransition::Disable(_) | AppStatusTransition::Pause(_) => {
+                let dependents: Vec<_> = self
+                    .get_dependent_apps(id, true)?
+                    .into_iter()
+                    .filter(|id| {
+                        self.installed_apps
+                            .get(id)
+                            .map(|app| app.status().is_running())
+                            .unwrap_or(false)
+                    })
+                    .collect();
+                if !dependents.is_empty() {
+                    tracing::warn!(
+                        "Disabling/pausing app '{}' which has running protected dependent apps: {:?}",
+                        id,
+                        dependents
+                    );
+                }
+            }
+            AppStatusTransition::Enable | AppStatusTransition::Start => {
+                let dependencies: Vec<_> = self
+                    .get_app(id)?
+                    .roles()
+                    .values()
+                    .flat_map(|r| match r {
+                        AppRoleAssignment::Primary(_) => vec![],
+                        AppRoleAssignment::Dependency(AppRoleDependency { cell_id, protected }) => {
+                            if *protected {
+                                self.installed_apps
+                                    .iter()
+                                    .filter_map(|(id, app)| {
+                                        (!app.status().is_running()
+                                            && app.all_cells().find(|id| *id == cell_id).is_some())
+                                        .then_some(id)
+                                    })
+                                    .collect()
+                            } else {
+                                vec![]
+                            }
+                        }
+                    })
+                    .collect();
+                if !dependencies.is_empty() {
+                    return Err(ConductorError::AppStatusError(format!(
+                        "Enabling/starting App '{}' which has protected dependencies that are not running: {:?}",
+                        id, dependencies
+                    )));
+                }
+            }
+        }
         let app = self
             .installed_apps
             .get_mut(id)
@@ -230,12 +281,16 @@ impl ConductorState {
         }
     }
 
-    /// Getter for a single app. Returns error if app missing.
-    pub fn get_dependents(
+    /// Find all installed apps that have a role which depends on a cell in this app
+    /// via `AppRoleAssignment::Dependency`.
+    ///
+    /// The `protected_only` field is a filter. If false, all dependent apps are returned.
+    /// If true, only dependent apps with at least one protected dependency are returned.
+    pub fn get_dependent_apps(
         &self,
         id: &InstalledAppId,
-        protected: bool,
-    ) -> ConductorResult<Vec<&InstalledAppId>> {
+        protected_only: bool,
+    ) -> ConductorResult<Vec<InstalledAppId>> {
         let app = self.get_app(id)?;
         let cell_ids: HashSet<_> = app.all_cells().collect();
         Ok(self
@@ -247,12 +302,48 @@ impl ConductorState {
                     .any(|r| match r {
                         AppRoleAssignment::Primary(_) => false,
                         AppRoleAssignment::Dependency(d) => {
-                            cell_ids.contains(&d.cell_id) && (!protected || d.protected)
+                            cell_ids.contains(&d.cell_id) && (!protected_only || d.protected)
                         }
                     })
-                    .then_some(app_id)
+                    .then(|| app_id.clone())
             })
             .collect())
+    }
+
+    /// Find all installed apps which have a cell that this app depends on
+    /// via `AppRoleAssignment::Dependency`.
+    ///
+    /// The `protected_only` field is a filter. If false, all dependency apps are returned.
+    /// If true, only protected dependencies are returned.
+    pub fn get_depdency_apps(
+        &self,
+        id: &InstalledAppId,
+        protected_only: bool,
+    ) -> ConductorResult<Vec<InstalledAppId>> {
+        let dependencies: Vec<_> = self
+            .get_app(id)?
+            .roles()
+            .values()
+            .flat_map(|r| match r {
+                AppRoleAssignment::Primary(_) => vec![],
+                AppRoleAssignment::Dependency(AppRoleDependency { cell_id, protected }) => {
+                    if !protected_only || *protected {
+                        self.installed_apps
+                            .iter()
+                            .filter_map(|(id, app)| {
+                                (app.all_cells().find(|id| *id == cell_id).is_some()
+                                    && !app.status().is_running())
+                                .then_some(id)
+                            })
+                            .collect()
+                    } else {
+                        vec![]
+                    }
+                }
+            })
+            .cloned()
+            .collect();
+        Ok(dependencies)
     }
 }
 

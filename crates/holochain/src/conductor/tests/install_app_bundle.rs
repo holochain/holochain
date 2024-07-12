@@ -614,4 +614,37 @@ async fn use_existing_happy_path() {
 
     conductor.enable_app("app_1".into()).await.unwrap();
     conductor.enable_app("app_2".into()).await.unwrap();
+
+    // Ideally, we shouldn't be able to disable app_1 because it's depended on by enabled app_2.
+    // For now, we are just emitting warnings about this.
+    conductor
+        .disable_app("app_1".into(), DisabledAppReason::User)
+        .await
+        .unwrap();
+    conductor
+        .disable_app("app_2".into(), DisabledAppReason::User)
+        .await
+        .unwrap();
+    conductor
+        .disable_app("app_1".into(), DisabledAppReason::User)
+        .await
+        .unwrap();
+
+    // Can't uninstall app because of dependents
+    let err = conductor
+        .clone()
+        .uninstall_app(&"app_1".to_string(), false)
+        .await
+        .unwrap_err();
+    assert_matches!(
+        err,
+        ConductorError::AppHasDependents(a, b) if a == "app_1".to_string() && b == vec!["app_2".to_string()]
+    );
+
+    // Can still uninstall app with force
+    conductor
+        .clone()
+        .uninstall_app(&"app_1".to_string(), true)
+        .await
+        .unwrap();
 }

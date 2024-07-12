@@ -1576,25 +1576,37 @@ mod app_impls {
             installed_app_id: &InstalledAppId,
             force: bool,
         ) -> ConductorResult<()> {
-            let self_clone = self.clone();
-            let app = self.remove_app_from_db(installed_app_id).await?;
-            tracing::debug!(msg = "Removed app from db.", app = ?app);
-
-            // Remove cells which may now be dangling due to the removed app
-            self_clone
-                .process_app_status_fx(AppStatusFx::SpinDown, None)
-                .await?;
-
-            let installed_app_ids = self
+            let deps = self
                 .get_state()
                 .await?
-                .installed_apps()
-                .iter()
-                .map(|(app_id, _)| app_id.clone())
-                .collect::<HashSet<_>>();
-            self.app_broadcast.retain(installed_app_ids);
+                .get_dependent_apps(installed_app_id, true)?;
 
-            Ok(())
+            if force || deps.is_empty() {
+                let self_clone = self.clone();
+                let app = self.remove_app_from_db(installed_app_id).await?;
+                tracing::debug!(msg = "Removed app from db.", app = ?app);
+
+                // Remove cells which may now be dangling due to the removed app
+                self_clone
+                    .process_app_status_fx(AppStatusFx::SpinDown, None)
+                    .await?;
+
+                let installed_app_ids = self
+                    .get_state()
+                    .await?
+                    .installed_apps()
+                    .iter()
+                    .map(|(app_id, _)| app_id.clone())
+                    .collect::<HashSet<_>>();
+                self.app_broadcast.retain(installed_app_ids);
+
+                Ok(())
+            } else {
+                Err(ConductorError::AppHasDependents(
+                    installed_app_id.clone(),
+                    deps,
+                ))
+            }
         }
 
         /// List active AppIds
