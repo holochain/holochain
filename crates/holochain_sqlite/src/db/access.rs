@@ -249,6 +249,15 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         let path = match path_prefix {
             Some(path_prefix) => {
                 let path = path_prefix.join(kind.filename());
+
+                // Database may be in a previous location, try to rename it
+                if let Some(legacy_filename) = kind.legacy_filename() {
+                    let legacy_path = path_prefix.join(legacy_filename);
+                    if legacy_path.exists() {
+                        move_db(&legacy_path, path.clone())?;
+                    }
+                }
+
                 let parent = path
                     .parent()
                     .ok_or_else(|| DatabaseError::DatabaseMissing(path_prefix.to_owned()))?;
@@ -444,6 +453,22 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     }
 }
 
+fn move_db(from: &PathBuf, to: PathBuf) -> DatabaseResult<()> {
+    // Compact the WAL for the 'from' database
+    {
+        let conn = Connection::open(from)?;
+
+        // Ensure everything in the WAL is written to the main database
+        conn.execute("VACUUM", ())?;
+
+        conn.close().map_err(|(_, err)| err)?;
+    }
+
+    std::fs::rename(from, to)?;
+
+    Ok(())
+}
+
 // The method for this function is taken from https://discuss.zetetic.net/t/how-to-encrypt-a-plaintext-sqlite-database-to-use-sqlcipher-and-avoid-file-is-encrypted-or-is-not-a-database-errors/868
 #[cfg(feature = "sqlite-encrypted")]
 pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
@@ -456,11 +481,7 @@ pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
                 .and_then(|s| s.to_str())
                 .ok_or_else(|| DatabaseError::DatabaseMissing(path.to_owned()))?
                 .to_string()
-                + "-encrypted."
-                + path
-                    .extension()
-                    .and_then(|s| s.to_str())
-                    .ok_or_else(|| DatabaseError::DatabaseMissing(path.to_owned()))?,
+                + "-encrypted",
         );
 
     tracing::warn!(

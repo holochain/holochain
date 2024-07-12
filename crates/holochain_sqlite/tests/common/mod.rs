@@ -20,6 +20,10 @@ impl DbKindT for TestDatabaseKind {
         DbKind::Test(self.name.clone())
     }
 
+    fn legacy_filename(&self) -> Option<PathBuf> {
+        None
+    }
+
     fn filename_inner(&self) -> PathBuf {
         PathBuf::from(self.name.as_str())
     }

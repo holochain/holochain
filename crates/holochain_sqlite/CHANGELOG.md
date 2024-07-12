@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Shorten paths to database files by removing the name prefix where that prefix matches the directory name.
+  The file extensions have also been removed. For example, an authored database would have been stored at 
+ `<root-dir>/authored/authored-<dna-hash>-<agent-key>.sqlite` and will now be stored at `<root-dir>/authored/<dna-hash>-<agent-key>`.
+  This also affects the DHT, cache, agent store and metrics databases. This is not a breaking change because Holochain
+  will automatically move the databases to the new location on startup.
+
 ## 0.3.1
 
 ## 0.3.1-rc.1
