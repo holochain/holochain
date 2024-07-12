@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use holochain::{
     conductor::config::DpkiConfig, sweettest::*, test_utils::inline_zomes::simple_create_read_zome,
 };
