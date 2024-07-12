@@ -104,6 +104,9 @@ async fn check_db_kind<Kind: DbKindT + Send + Sync + 'static>(
         conn.close().unwrap();
     }
 
+    // Will also need to become encrypted because the test is creating a plain database.
+    std::env::set_var("HOLOCHAIN_MIGRATE_UNENCRYPTED", "true");
+
     let f = DbWrite::open(path_prefix, kind).unwrap();
 
     // Should be in the new location, whether it was moved or not

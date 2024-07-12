@@ -252,7 +252,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
 
                 // Database may be in a previous location, try to rename it
                 if let Some(legacy_filename) = kind.legacy_filename() {
-                    let legacy_path = path_prefix.join(&legacy_filename);
+                    let legacy_path = path_prefix.join(legacy_filename);
                     if legacy_path.exists() {
                         move_db(&legacy_path, path.clone())?;
                     }
