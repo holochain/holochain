@@ -13,7 +13,7 @@
 
       # holochain_cli_launch
       launcher = {
-        url = "github:holochain/launcher/holochain-weekly";
+        url = "github:holochain/hc-launch/holochain-weekly";
         flake = false;
       };
 
