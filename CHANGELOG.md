@@ -14,6 +14,67 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240715.171536
+
+## [hcterm-0.3.2-rc.0](crates/hcterm/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_cli-0.3.2-rc.0](crates/holochain_cli/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain-0.3.2-rc.0](crates/holochain/CHANGELOG.md#0.3.2-rc.0)
+
+- System validation: Added a new rule that no new actions are allowed following a chain close action.
+
+## [holochain\_cli\_bundle-0.3.2-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_cli\_sandbox-0.3.2-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_cascade-0.3.2-rc.0](crates/holochain_cascade/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_conductor\_api-0.3.2-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_conductor\_services-0.2.2-rc.0](crates/holochain_conductor_services/CHANGELOG.md#0.2.2-rc.0)
+
+## [holochain\_metrics-0.3.2-rc.0](crates/holochain_metrics/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_test\_wasm\_common-0.3.2-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_wasm\_test\_utils-0.3.2-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_websocket-0.3.2-rc.0](crates/holochain_websocket/CHANGELOG.md#0.3.2-rc.0)
+
+## [hdk-0.3.2-rc.0](crates/hdk/CHANGELOG.md#0.3.2-rc.0)
+
+- Added a new HDK function `get_validation_receipts` which can be used to look up validation receipts for an action that you have authored.
+- Adds two new HDK functions `close_chain` and `open_chain` that allow `Action::CloseChain` and `Action::OpenChain` respectively, to be created. These are intended to be used for DNA migrations. There is an example in the Holochain functions tests in ‘migration.rs’ \#3804
+
+## [holochain\_state-0.3.2-rc.0](crates/holochain_state/CHANGELOG.md#0.3.2-rc.0)
+
+## [hdi-0.4.2-rc.0](crates/hdi/CHANGELOG.md#0.4.2-rc.0)
+
+## [holochain\_p2p-0.3.2-rc.0](crates/holochain_p2p/CHANGELOG.md#0.3.2-rc.0)
+
+## [hc\_sleuth-0.2.2-rc.0](crates/hc_sleuth/CHANGELOG.md#0.2.2-rc.0)
+
+## [hdk\_derive-0.3.2-rc.0](crates/hdk_derive/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_state\_types-0.3.2-rc.0](crates/holochain_state_types/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_types-0.3.2-rc.0](crates/holochain_types/CHANGELOG.md#0.3.2-rc.0)
+
+## [kitsune\_p2p-0.3.2-rc.0](crates/kitsune_p2p/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_keystore-0.3.2-rc.0](crates/holochain_keystore/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_sqlite-0.3.2-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.3.2-rc.0)
+
+- Shorten paths to database files by removing the name prefix where that prefix matches the directory name. The file extensions have also been removed. For example, an authored database would have been stored at `<root-dir>/authored/authored-<dna-hash>-<agent-key>.sqlite` and will now be stored at `<root-dir>/authored/<dna-hash>-<agent-key>`. This also affects the DHT, cache, agent store and metrics databases. This is not a breaking change because Holochain will automatically move the databases to the new location on startup.
+
+## [holochain\_zome\_types-0.3.2-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.3.2-rc.0)
+
+## [holochain\_integrity\_types-0.3.2-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.3.2-rc.0)
+
+## [holo\_hash-0.3.2-rc.0](crates/holo_hash/CHANGELOG.md#0.3.2-rc.0)
+
 # 20240611.214700
 
 ## [hcterm-0.3.1](crates/hcterm/CHANGELOG.md#0.3.1)
