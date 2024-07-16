@@ -160,7 +160,8 @@ pub enum Sequences {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, SerializedBytes, Serialize, Deserialize)]
-/// Response to a `must_get_agent_activity` call.
+/// Intermediate data structure used during a `must_get_agent_activity` call.
+/// Note that this is not the final return value of `must_get_agent_activity`.
 pub enum MustGetAgentActivityResponse {
     /// The activity was found.
     Activity {
@@ -191,6 +192,7 @@ impl MustGetAgentActivityResponse {
 /// Identical structure to [`MustGetAgentActivityResponse`] except it includes
 /// the [`ChainFilterRange`] that was used to produce the response. Doesn't need
 /// to be serialized because it is only used internally.
+/// Note that this is not the final return value of `must_get_agent_activity`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BoundedMustGetAgentActivityResponse {
     /// The activity was found.

@@ -58,13 +58,15 @@ pub fn must_get_agent_activity(
 
                 let result: Result<_, RuntimeError> = match (result, &call_context.host_context) {
                     (Activity {activity, warrants}, _) => {
-                        if let Some(db) = cascade.cache() {
-                            db.write_async(|txn| {
-                                for warrant in warrants {
-                                    insert_op(txn, &DhtOpHashed::from_content_sync(warrant))?;
-                                }
-                                crate::conductor::error::ConductorResult::Ok(())
-                            }).await.map_err(|e| -> RuntimeError { wasm_error!(e).into() })?;
+                        if !warrants.is_empty() {
+                            if let Some(db) = cascade.cache() {
+                                db.write_async(|txn| {
+                                    for warrant in warrants {
+                                        insert_op(txn, &DhtOpHashed::from_content_sync(warrant))?;
+                                    }
+                                    crate::conductor::error::ConductorResult::Ok(())
+                                }).await.map_err(|e| -> RuntimeError { wasm_error!(e).into() })?;
+                            }
                         }
                         Ok(activity)},
                     (IncompleteChain | ChainTopNotFound(_), HostContext::Init(_)) => {

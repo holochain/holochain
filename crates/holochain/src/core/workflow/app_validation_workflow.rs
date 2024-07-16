@@ -396,7 +396,7 @@ async fn app_validation_workflow_inner(
         }
     }
 
-    // "self-publish" warrants
+    // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
     holochain_state::integrate::authored_ops_to_dht_db(
         network,
         warrant_op_hashes,
