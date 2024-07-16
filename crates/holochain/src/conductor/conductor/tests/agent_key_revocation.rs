@@ -660,7 +660,7 @@ mod multi_conductor {
         // Revoke agent key in Dpki
         revoke_agent_key_in_dpki(&conductors[0], alice.clone()).await;
 
-        // Await for revocatino to reach bob's Dpki
+        // Await for revocation to reach bob's Dpki
         await_consistency(
             20,
             [
