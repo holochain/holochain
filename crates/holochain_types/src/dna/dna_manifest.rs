@@ -143,10 +143,16 @@ mod tests {
                 properties: None,
                 zomes: vec![],
             })
-            .coordinator(CoordinatorManifest { zomes: vec![] })
             .build()
             .unwrap()
             .into();
+
+        match &manifest {
+            DnaManifest::V1(m) => {
+                assert_eq!(m.coordinator, CoordinatorManifest::default());
+                assert_eq!(m.lineage, vec![]);
+            }
+        }
 
         let s = serde_yaml::to_string(&manifest).unwrap();
         println!("{s}");
