@@ -111,8 +111,8 @@ pub enum ValidationOutcome {
     ActionNotInCounterSigningSession(CounterSigningSessionData, NewEntryAction),
     #[error(transparent)]
     CounterSigningError(#[from] CounterSigningError),
-    #[error("The dependency {0:?} was not found on the DHT")]
-    DepMissingFromDht(AnyDhtHash),
+    #[error("The dependency {0:?} was not found on the DHT - {1:?}")]
+    DepMissingFromDht(AnyDhtHash, String),
     #[error("The entry def index for {0:?} was out of range")]
     EntryDefId(AppEntryDef),
     #[error("The entry has a different hash to the action's entry hash")]
@@ -156,8 +156,8 @@ pub enum ValidationOutcome {
 }
 
 impl ValidationOutcome {
-    pub fn not_found<I: Into<AnyDhtHash> + Clone>(h: &I) -> Self {
-        Self::DepMissingFromDht(h.clone().into())
+    pub fn not_found<I: Into<AnyDhtHash> + Clone>(h: &I, context: String) -> Self {
+        Self::DepMissingFromDht(h.clone().into(), context)
     }
 
     /// Convert into a OutcomeOrError<ValidationOutcome, SysValidationError>

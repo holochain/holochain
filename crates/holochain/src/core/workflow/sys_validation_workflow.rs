@@ -483,18 +483,23 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                             RecordEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
                                 // Discard errors here because we'll check later whether the input is valid. If it's not then it
                                 // won't matter that we've skipped fetching deps for it
-                                if let Ok(entry_rate_weight) = action_to_entry_rate_weight(action) {
-                                    make_action_set_for_session_data(
+                                match action_to_entry_rate_weight(action) {
+                                    Ok(entry_rate_weight) => make_action_set_for_session_data(
                                         entry_rate_weight,
                                         entry,
                                         session_data,
                                     )
-                                    .unwrap_or_else(|_| vec![])
+                                    .unwrap_or_else(|e| {
+                                        info!("Failed to make action set for session data: {e:?}");
+                                        vec![]
+                                    })
                                     .into_iter()
                                     .map(|action| action.into_hash())
-                                    .collect::<Vec<_>>()
-                                } else {
-                                    vec![]
+                                    .collect::<Vec<_>>(),
+                                    Err(e) => {
+                                        info!("Failed to get entry rate weight: {e:?}");
+                                        vec![]
+                                    }
                                 }
                             }
                             _ => vec![],
@@ -598,10 +603,11 @@ pub(crate) async fn validate_op(
             match e {
                 // This is expected if the dependency isn't held locally and needs to be fetched from the network
                 // so downgrade the logging to trace.
-                ValidationOutcome::DepMissingFromDht(_) => {
+                ValidationOutcome::DepMissingFromDht(_, ref ctx) => {
                     tracing::trace!(
                         msg = "DhtOp has a missing dependency",
                         ?op,
+                        ctx = ?ctx,
                         error = ?e,
                         error_msg = %e
                     );
@@ -635,7 +641,7 @@ fn handle_failed(error: &ValidationOutcome) -> Outcome {
         ValidationOutcome::CounterfeitAction(_, _) => {
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
-        ValidationOutcome::DepMissingFromDht(dep) => MissingDhtDep(dep.clone()),
+        ValidationOutcome::DepMissingFromDht(dep, _) => MissingDhtDep(dep.clone()),
         reason => Rejected(reason.to_string()),
     }
 }
@@ -676,20 +682,23 @@ async fn validate_chain_op(
         ChainOp::StoreRecord(_, action, entry) => {
             check_prev_action(action)?;
             if let Some(entry) = entry.as_option() {
-                // Retrieve for all other actions on countersigned entry.
+                // Build the set of actions that will be created by the signers for this countersigned entry
                 if let Entry::CounterSign(session_data, _) = entry {
                     for action_hash in make_action_set_for_session_data(
                         action_to_entry_rate_weight(action)?,
                         entry,
                         session_data,
                     )? {
+                        // TODO Is this right? We are trying to validate the entry from the perspective of each agent
+                        //      but we won't have all the actions. We just want to check that the actions are valid
+                        //      and not that they are actually present.
                         // Just require that we are holding all the other actions
                         let validation_dependencies = validation_dependencies.lock();
                         validation_dependencies
                             .get(&action_hash)
                             .and_then(|s| s.as_action())
                             .ok_or_else(|| {
-                                ValidationOutcome::DepMissingFromDht(action_hash.clone().into())
+                                ValidationOutcome::DepMissingFromDht(action_hash.clone().into(), format!("action not found for store record {entry:?}"))
                             })?;
                     }
                 }
@@ -713,13 +722,16 @@ async fn validate_chain_op(
                     entry,
                     session_data,
                 )? {
+                    // TODO again, why are we checking the *presence* of these actions?
+                    //      we should just be checking that the actions are valid against the
+                    //      previous action.
                     // Just require that we are holding all the other actions
                     let validation_dependencies = validation_dependencies.lock();
                     validation_dependencies
                         .get(&action_hash)
                         .and_then(|s| s.as_action())
                         .ok_or_else(|| {
-                            ValidationOutcome::DepMissingFromDht(action_hash.clone().into())
+                            ValidationOutcome::DepMissingFromDht(action_hash.clone().into(), format!("action not found for store entry {entry:?}"))
                         })?;
                 }
             }
@@ -788,7 +800,7 @@ async fn validate_warrant_op(
                         .get(action_hash)
                         .and_then(|s| s.as_action())
                         .ok_or_else(|| {
-                            ValidationOutcome::DepMissingFromDht(action_hash.clone().into())
+                            ValidationOutcome::DepMissingFromDht(action_hash.clone().into(), format!("action not found for invalid chain op warrant {warrant:?}"))
                         })?;
 
                     if action.author() != action_author {
@@ -814,11 +826,11 @@ async fn validate_warrant_op(
                     let action1 = deps
                         .get(a1)
                         .and_then(|s| s.as_action())
-                        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a1.clone().into()))?;
+                        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a1.clone().into(), format!("action hash 1 not found for chain fork warrant {warrant:?}")))?;
                     let action2 = deps
                         .get(a2)
                         .and_then(|s| s.as_action())
-                        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a2.clone().into()))?;
+                        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(a2.clone().into(), format!("action hash 2 not found for chain fork warrant {warrant:?}")))?;
 
                     // chain_author basis must match the author of the action
                     if action1.author() != chain_author {
@@ -990,7 +1002,14 @@ fn register_agent_activity(
         let prev_action = validation_dependencies
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
-            .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
+            .ok_or_else(|| {
+                ValidationOutcome::DepMissingFromDht(
+                    prev_action_hash.clone().into(),
+                    format!(
+                        "previous action not found while registering agent activity for {action:?}"
+                    ),
+                )
+            })?;
 
         match prev_action {
             Action::CloseChain(_) => Err(ValidationOutcome::PrevActionError(
@@ -1018,7 +1037,12 @@ fn store_record(
         let prev_action = validation_dependencies
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
-            .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
+            .ok_or_else(|| {
+                ValidationOutcome::DepMissingFromDht(
+                    prev_action_hash.clone().into(),
+                    format!("previous action not found while storing record for {action:?}"),
+                )
+            })?;
         check_prev_author(action, prev_action)?;
         check_prev_timestamp(action, prev_action)?;
         check_prev_seq(action, prev_action)?;
@@ -1050,7 +1074,10 @@ async fn store_entry(
             .get(original_action_address)
             .and_then(|s| s.as_action())
             .ok_or_else(|| {
-                ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
+                ValidationOutcome::DepMissingFromDht(
+                    original_action_address.clone().into(),
+                    format!("original action not found while storing entry update for {action:?}"),
+                )
             })?;
         update_check(entry_update, original_action)?;
     }
@@ -1075,7 +1102,12 @@ fn register_updated_content(
         .get(original_action_address)
         .and_then(|s| s.as_action())
         .ok_or_else(|| {
-            ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
+            ValidationOutcome::DepMissingFromDht(
+                original_action_address.clone().into(),
+                format!(
+                    "original action not found while registering updated content for {entry_update:?}"
+                ),
+            )
         })?;
 
     update_check(entry_update, original_action)
@@ -1093,7 +1125,12 @@ fn register_updated_record(
         .get(original_action_address)
         .and_then(|s| s.as_action())
         .ok_or_else(|| {
-            ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
+            ValidationOutcome::DepMissingFromDht(
+                original_action_address.clone().into(),
+                format!(
+                    "original action not found while registering updated record for {record_update:?}"
+                ),
+            )
         })?;
 
     update_check(record_update, original_action)
@@ -1111,7 +1148,10 @@ fn register_deleted_by(
         .get(removed_action_address)
         .and_then(|s| s.as_action())
         .ok_or_else(|| {
-            ValidationOutcome::DepMissingFromDht(removed_action_address.clone().into())
+            ValidationOutcome::DepMissingFromDht(
+                removed_action_address.clone().into(),
+                format!("removed action not found while registering deleted by for {record_delete:?}"),
+            )
         })?;
 
     check_new_entry_action(action)
@@ -1129,7 +1169,7 @@ fn register_deleted_entry_action(
         .get(removed_action_address)
         .and_then(|s| s.as_action())
         .ok_or_else(|| {
-            ValidationOutcome::DepMissingFromDht(removed_action_address.clone().into())
+            ValidationOutcome::DepMissingFromDht(removed_action_address.clone().into(), format!("removed action not found while registering deleted entry action for {record_delete:?}"))
         })?;
 
     check_new_entry_action(action)
@@ -1151,7 +1191,12 @@ fn register_delete_link(
     let add_link_action = validation_dependencies
         .get(link_add_address)
         .and_then(|s| s.as_action())
-        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(link_add_address.clone().into()))?;
+        .ok_or_else(|| {
+            ValidationOutcome::DepMissingFromDht(
+                link_add_address.clone().into(),
+                format!("add link action not found while registering delete link for {link_remove:?}"),
+            )
+        })?;
 
     match add_link_action {
         Action::CreateLink(_) => Ok(()),
