@@ -1,12 +1,10 @@
 name: test
 
 on:
-  push:
-    branches:
-      - develop
   pull_request:
     branches:
       - develop
+      - develop-*
 
 concurrency:
   group: test-${{ github.workflow }}-${{ github.ref || github.run_id }}

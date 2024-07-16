@@ -2912,12 +2912,6 @@ impl Conductor {
                 .spaces
                 .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
             let mut path = db.path().clone();
-            if path.extension() != Some(std::ffi::OsStr::new("sqlite3")) {
-                DatabaseResult::Err(
-                    anyhow::anyhow!("Unexpected file extension for database path: {:?}", path)
-                        .into(),
-                )?;
-            }
             if let Err(err) = ffs::remove_file(&path).await {
                 tracing::warn!(?err, "Could not remove primary DB file, probably because it is still in use. Purging all data instead.");
                 db.write_async(purge_data).await?;
