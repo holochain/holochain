@@ -84,6 +84,7 @@ pub struct DnaManifestV1 {
     ///
     /// Does not affect the [`DnaHash`].
     #[serde(default)]
+    #[builder(default)]
     pub coordinator: CoordinatorManifest,
 
     /// A list of past "ancestors" of this DNA.
@@ -104,6 +105,7 @@ pub struct DnaManifestV1 {
     /// Holochain does nothing to ensure the correctness of the lineage, it is up to
     /// the app developer to make the necessary guarantees.
     #[serde(default)]
+    #[builder(default)]
     pub lineage: Vec<DnaHashB64>,
 }
 
