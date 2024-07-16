@@ -1569,7 +1569,11 @@ mod app_impls {
             }
         }
 
-        /// Uninstall an app
+        /// Uninstall an app, removing all traces of it including its cells.
+        ///
+        /// This will fail if the app is depended upon by other apps via the UseExisting
+        /// cell provisioning strategy, in which case the dependent app(s) would first need
+        /// to be uninstalled, or the `force` param can be set to true.
         #[tracing::instrument(skip(self))]
         pub async fn uninstall_app(
             self: Arc<Self>,
