@@ -264,9 +264,6 @@ async fn private_entries_dont_leak() {
     let dnas = vec![dna_file];
 
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
-
-    conductors.exchange_peer_info().await;
-
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app

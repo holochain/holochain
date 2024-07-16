@@ -3249,6 +3249,10 @@ impl Conductor {
                 .collect()
         });
 
+        if !cells_to_cleanup.is_empty() {
+            tracing::debug!(?cells_to_cleanup, "Cleaning up cells");
+        }
+
         // Stop all long-running tasks for cells about to be dropped
         for cell in cells_to_cleanup.iter() {
             cell.cleanup().await?;
@@ -3256,16 +3260,25 @@ impl Conductor {
 
         // Find any cleaned up cells which are no longer used by any app,
         // so that we can remove their data from the databases.
-        let cells_to_purge = cells_to_cleanup
+        let cells_to_purge: Vec<_> = cells_to_cleanup
             .iter()
-            .filter_map(|cell| (!all_cells.contains(cell.id())).then_some(cell.id().clone()));
+            .filter_map(|cell| (!all_cells.contains(cell.id())).then_some(cell.id().clone()))
+            .collect();
 
         // Find any DNAs from cleaned up cells which don't have representation in any cells
         // in any installed app, so that we can remove their data from the databases.
-        let dnas_to_purge = cells_to_cleanup
+        let dnas_to_purge: Vec<_> = cells_to_cleanup
             .iter()
             .map(|cell| cell.id().dna_hash())
-            .filter(|dna| !all_dnas.contains(dna));
+            .filter(|dna| !all_dnas.contains(dna))
+            .collect();
+
+        if !cells_to_purge.is_empty() {
+            tracing::info!(?cells_to_purge, "Purging cells");
+        }
+        if !dnas_to_purge.is_empty() {
+            tracing::info!(?dnas_to_purge, "Purging DNAs");
+        }
 
         // Delete all data from authored databases which are longer installed
         for cell_id in cells_to_purge {
