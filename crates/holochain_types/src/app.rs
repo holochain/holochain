@@ -1135,7 +1135,7 @@ impl AppRoleAssignment {
     }
 }
 
-/// App "roles" correspond to cell entries in the AppManifest.
+/// An app role whose cell(s) were created by the installation of this app.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct AppRolePrimary {
     /// The Id of the Cell which will be provisioned for this role.
@@ -1227,7 +1227,7 @@ impl AppRolePrimary {
     }
 }
 
-/// Info about a dependency on one app's cell by another app.
+/// An app role which is filled by a cell created by another app's primary role.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct AppRoleDependency {
     /// The cell which is depended upon.

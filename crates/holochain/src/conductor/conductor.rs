@@ -1581,6 +1581,8 @@ mod app_impls {
                 .await?
                 .get_dependent_apps(installed_app_id, true)?;
 
+            // Only uninstall the app if there are no protected dependents,
+            // or if force is used
             if force || deps.is_empty() {
                 let self_clone = self.clone();
                 let app = self.remove_app_from_db(installed_app_id).await?;
