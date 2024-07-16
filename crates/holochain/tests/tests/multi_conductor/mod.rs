@@ -274,7 +274,7 @@ async fn private_entries_dont_leak() {
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    await_consistency(60, [&alice, &bobbo]).await.unwrap();
+    await_consistency(10, [&alice, &bobbo]).await.unwrap();
 
     let entry_hash =
         EntryHash::with_data_sync(&Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap());
@@ -298,7 +298,7 @@ async fn private_entries_dont_leak() {
     let bob_hash: ActionHash = conductors[1]
         .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
-    await_consistency(60, [&alice, &bobbo]).await.unwrap();
+    await_consistency(10, [&alice, &bobbo]).await.unwrap();
 
     check_all_gets_for_private_entry(
         &conductors[0],

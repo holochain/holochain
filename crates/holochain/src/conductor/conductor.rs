@@ -3220,14 +3220,10 @@ impl Conductor {
     async fn remove_dangling_cells(&self) -> ConductorResult<()> {
         let state = self.get_state().await?;
 
-        let mut keepers: HashSet<CellId> = state
-            .enabled_apps()
+        let keepers: HashSet<CellId> = state
+            .enabled_apps_and_services()
             .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
-        // DPKI cell must be kept as well if DPKI is installed.
-        if let Some(dpki) = &state.conductor_services.dpki {
-            keepers.extend([dpki.cell_id.clone()]);
-        }
 
         let all_cells: HashSet<CellId> = state
             .installed_apps_and_services()
