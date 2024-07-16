@@ -92,11 +92,6 @@ async fn get_activity_with_warrants() {
             chain_author: td.agent.clone(),
             action_pair,
         });
-        // let p = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
-        //     action_author: td.agent.clone(),
-        //     action: (td.chain_head.hash.clone(), ::fixt::fixt!(Signature)),
-        //     validation_type: ValidationType::Sys,
-        // });
         let warrant = Warrant::new(p, AgentPubKey::from_raw_36(vec![255; 36]), Timestamp::now());
         WarrantOp::from(SignedWarrant::new(warrant, ::fixt::fixt!(Signature)))
     };
