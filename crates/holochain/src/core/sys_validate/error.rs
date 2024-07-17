@@ -111,7 +111,7 @@ pub enum ValidationOutcome {
     ActionNotInCounterSigningSession(CounterSigningSessionData, NewEntryAction),
     #[error(transparent)]
     CounterSigningError(#[from] CounterSigningError),
-    #[error("The dependency {0:?} was not found on the DHT - {1:?}")]
+    #[error("The dependency {0:?} was not found on the DHT - {1}")]
     DepMissingFromDht(AnyDhtHash, String),
     #[error("The entry def index for {0:?} was out of range")]
     EntryDefId(AppEntryDef),
