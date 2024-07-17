@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.0-dev.13
+
 ## 0.4.0-dev.12
 
 - When uninstalling an app or removing a clone cell, only some of the data used by that cell was deleted. Now all data is deleted, freeing up disk space.
