@@ -131,15 +131,18 @@ pub struct InstallAppPayload {
 
     /// The unique identifier for an installed app in this conductor.
     /// If not specified, it will be derived from the app name in the bundle manifest.
+    #[serde(default)]
     pub installed_app_id: Option<InstalledAppId>,
 
     /// Include proof-of-membrane-membership data for cells that require it,
     /// keyed by the RoleName specified in the app bundle manifest.
-    pub membrane_proofs: MemproofMap,
+    #[serde(default)]
+    pub membrane_proofs: Option<MemproofMap>,
 
     /// Optional: overwrites all network seeds for all DNAs of Cells created by this app.
     /// The app can still use existing Cells, i.e. this does not require that
     /// all Cells have DNAs with the same overridden DNA.
+    #[serde(default)]
     pub network_seed: Option<NetworkSeed>,
 
     /// Optional: If app installation fails due to genesis failure, normally the app will be

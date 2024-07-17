@@ -1473,9 +1473,14 @@ mod app_impls {
             };
 
             let manifest = bundle.manifest().clone();
+
+            // Use deferred memproofs only if no memproofs are provided.
+            // If a memproof map is provided, it will override the membrane_proofs_deferred setting,
+            // and the provided memproofs will be used immediately.
             let defer_memproofs = match &manifest {
-                AppManifest::V1(m) => m.membrane_proofs_deferred,
+                AppManifest::V1(m) => m.membrane_proofs_deferred && membrane_proofs.is_none(),
             };
+            let membrane_proofs = membrane_proofs.unwrap_or_default();
 
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
@@ -1484,18 +1489,9 @@ mod app_impls {
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
 
-            let ops = if defer_memproofs {
-                // XXX: passing in empty memproofs, because this function is not constructed well.
-                //      it doesn't really need to know about the memproofs, it just needs to associate
-                //      the proper cells with the proper memproofs.
-                bundle
-                    .resolve_cells(&local_dnas, agent_key.clone(), Default::default())
-                    .await?
-            } else {
-                bundle
-                    .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
-                    .await?
-            };
+            let ops = bundle
+                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
+                .await?;
             let cells_to_create = ops.cells_to_create();
 
             // check if cells_to_create contains a cell identical to an existing one
