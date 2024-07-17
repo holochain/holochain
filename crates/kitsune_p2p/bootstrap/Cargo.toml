@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_bootstrap"
-version = "0.3.0-dev.10"
+version = "0.3.0-dev.11"
 description = "Bootstrap server written in rust for kitsune nodes to find each other"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,8 +14,8 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.3.21", features = ["derive"] }
 futures = "0.3"
-kitsune_p2p_types = { version = "^0.4.0-dev.9", path = "../types" }
-kitsune_p2p_bin_data = { version = "^0.4.0-dev.8", path = "../bin_data" }
+kitsune_p2p_types = { version = "^0.4.0-dev.10", path = "../types" }
+kitsune_p2p_bin_data = { version = "^0.4.0-dev.9", path = "../bin_data" }
 parking_lot = "0.12.1"
 rand = "0.8.5"
 reqwest = { version = "0.12", features = ["native-tls-vendored"] }
@@ -29,7 +29,7 @@ warp = "0.3"
 kitsune_p2p_bootstrap = { path = ".", features = ["test_utils"] }
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 kitsune_p2p = { path = "../kitsune_p2p", features = ["sqlite", "test_utils"] }
-fixt = { path = "../../fixt", version = "^0.4.0-dev.2" }
+fixt = { path = "../../fixt", version = "^0.4.0-dev.3"}
 criterion = "0.5.1"
 reqwest = { version = "0.12", features = ["native-tls-vendored"] }
 
