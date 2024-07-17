@@ -735,6 +735,11 @@ impl SweetConductor {
             }
         }
     }
+
+    /// Getter
+    pub fn rendezvous(&self) -> Option<&Arc<dyn SweetRendezvous + Send + Sync>> {
+        self.rendezvous.as_ref()
+    }
 }
 
 /// You do not need to do anything with this type. While it is held it will keep polling a websocket
