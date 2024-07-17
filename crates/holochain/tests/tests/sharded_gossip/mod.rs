@@ -593,11 +593,13 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
-    let cells: Vec<_> = futures::future::join_all(conductors.iter_mut().map(|c| async {
-        let (cell,) = c.setup_app("app", [&dna_file]).await.unwrap().into_tuple();
-        cell
-    }))
-    .await;
+    let cells = conductors
+        .setup_app("app", [&dna_file])
+        .await
+        .unwrap()
+        .cells_flattened();
+
+    conductors.exchange_peer_info().await;
 
     println!(
         "Initial agents: {:#?}",

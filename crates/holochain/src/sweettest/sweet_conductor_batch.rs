@@ -197,13 +197,6 @@ impl SweetConductorBatch {
 
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(&self) {
-        if self
-            .0
-            .iter()
-            .any(|c| c.get_config().has_rendezvous_bootstrap())
-        {
-            panic!("exchange_peer_info cannot reliably be used with rendezvous bootstrap servers");
-        }
         SweetConductor::exchange_peer_info(&self.0).await
     }
 

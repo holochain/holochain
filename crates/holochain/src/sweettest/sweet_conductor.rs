@@ -636,6 +636,11 @@ impl SweetConductor {
     pub async fn exchange_peer_info(conductors: impl IntoIterator<Item = &Self>) {
         let mut all = Vec::new();
         for c in conductors.into_iter() {
+            if c.get_config().has_rendezvous_bootstrap() {
+                panic!(
+                    "exchange_peer_info cannot reliably be used with rendezvous bootstrap servers"
+                );
+            }
             for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
                 all.push(env.clone());
             }
