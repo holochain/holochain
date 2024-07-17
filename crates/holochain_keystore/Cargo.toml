@@ -17,7 +17,7 @@ futures = "0.3"
 holo_hash = { version = "^0.3.2-rc.0", path = "../holo_hash", features = [
     "full",
 ] }
-holochain_serialized_bytes = "=0.0.54"
+holochain_serialized_bytes = "=0.0.55"
 holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.2-rc.0"}
 kitsune_p2p_types = { version = "^0.3.1", path = "../kitsune_p2p/types" }
 holochain_secure_primitive = { version = "^0.3.1", path = "../holochain_secure_primitive" }

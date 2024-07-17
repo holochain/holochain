@@ -16,7 +16,7 @@ derive_more = "0.99"
 fallible-iterator = "0.2.0"
 futures = "0.3"
 holo_hash = { path = "../holo_hash", version = "^0.3.2-rc.0"}
-holochain_serialized_bytes = "=0.0.54"
+holochain_serialized_bytes = "=0.0.55"
 holochain_util = { version = "^0.3.1", path = "../holochain_util", features = [
   "backtrace",
   "time",
@@ -33,8 +33,8 @@ once_cell = "1.4.1"
 num_cpus = "1.13.0"
 parking_lot = "0.12"
 r2d2 = "0.8"
-r2d2_sqlite = { version = "0.1", package = "r2d2_sqlite_neonphog" }
-rmp-serde = "=1.1.2"
+r2d2_sqlite = { version = "0.24.0", package = "hc_r2d2_sqlite" }
+rmp-serde = "=1.3.0"
 scheduled-thread-pool = "0.2"
 serde = "1.0"
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
@@ -52,7 +52,7 @@ tracing = "0.1.18"
 getrandom = "0.2.7"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-rusqlite = { version = "0.29", features = [
+rusqlite = { version = "0.31", features = [
   "blob",      # better integration with blob types (Read, Write, etc)
   "backup",
   "trace",

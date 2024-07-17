@@ -34,7 +34,7 @@ kitsune_p2p_fetch = { path = ".", features = [
     "fuzzing",
 ] }
 
-holochain_serialized_bytes = "=0.0.54"
+holochain_serialized_bytes = "=0.0.55"
 holochain_trace = { version = "^0.3.1", path = "../../holochain_trace" }
 pretty_assertions = "1.4.0"
 test-case = "3.3"
