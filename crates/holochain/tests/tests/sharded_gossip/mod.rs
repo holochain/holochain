@@ -666,6 +666,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         .unwrap()
         .into_tuple();
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
+    SweetConductor::exchange_peer_info([&conductors[1], &conductors[2]]).await;
 
     println!(
         "Newcomer agent joined: scope={}, agent={:#?}",
