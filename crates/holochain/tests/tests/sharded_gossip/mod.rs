@@ -286,8 +286,6 @@ async fn test_zero_arc_no_gossip_2way() {
     let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
     let ((cell_0,), (cell_1,)) = apps.into_tuples();
 
-    conductors.exchange_peer_info().await;
-
     let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
     let hash_0: ActionHash = conductors[0]
         .call(&zome_0, "create_string", "hi".to_string())
@@ -397,8 +395,6 @@ async fn test_zero_arc_no_gossip_4way() {
         assert_eq!(stored_agents, vec![cell.agent_pubkey().clone()]);
     }
 
-    conductors.exchange_peer_info().await;
-
     // Ensure that each node has all agents in their local p2p store.
     for c in conductors.iter() {
         let stored_agents = holochain::conductor::p2p_agent_store::all_agent_infos(
@@ -473,7 +469,7 @@ async fn test_gossip_shutdown() {
             publish: false,
             recent: true,
             historical: true,
-            bootstrap: true,
+            bootstrap: false,
             recent_threshold: None,
         },
     )
@@ -547,7 +543,6 @@ async fn test_gossip_startup() {
 
     // Wait a bit so that conductor 0 doesn't publish in the next step.
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-    SweetConductor::exchange_peer_info([&conductor0, &conductor1]).await;
 
     await_consistency(60, [&cell0, &cell1]).await.unwrap();
     let record: Option<Record> = conductor1.call(&zome1, "read", hash.clone()).await;
@@ -603,8 +598,6 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         cell
     }))
     .await;
-
-    conductors.exchange_peer_info().await;
 
     println!(
         "Initial agents: {:#?}",
@@ -671,7 +664,6 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         .unwrap()
         .into_tuple();
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
-    SweetConductor::exchange_peer_info([&conductors[1], &conductors[2]]).await;
 
     println!(
         "Newcomer agent joined: scope={}, agent={:#?}",

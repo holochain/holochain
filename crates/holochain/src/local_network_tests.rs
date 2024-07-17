@@ -7,7 +7,6 @@ use test_case::test_case;
 #[test_case(2)]
 #[test_case(4)]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn conductors_call_remote(num_conductors: usize) {
     holochain_trace::test_run();
 
@@ -23,8 +22,6 @@ async fn conductors_call_remote(num_conductors: usize) {
         .into_iter()
         .map(|c| c.into_cells().into_iter().next().unwrap())
         .collect();
-
-    conductors.exchange_peer_info().await;
 
     // Make sure that genesis records are integrated now that conductors have discovered each other. This makes it
     // more likely that Kitsune knows about all the agents in the network to be able to make remote calls to them.
