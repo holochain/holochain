@@ -269,7 +269,7 @@ async fn test_zero_arc_no_gossip_2way() {
         publish: true,
         recent: true,
         historical: true,
-        bootstrap: true,
+        bootstrap: false,
         recent_threshold: None,
     }
     .into();
@@ -278,13 +278,15 @@ async fn test_zero_arc_no_gossip_2way() {
     // This should result in no publishing or gossip
     let mut tuning_1 = make_tuning(false, true, true, None);
     tuning_1.gossip_arc_clamping = "empty".into();
-    let config_1 = SweetConductorConfig::rendezvous(true).set_tuning_params(tuning_1);
+    let config_1 = SweetConductorConfig::rendezvous(false).set_tuning_params(tuning_1);
 
     let mut conductors = SweetConductorBatch::from_configs_rendezvous([config_0, config_1]).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
     let ((cell_0,), (cell_1,)) = apps.into_tuples();
+
+    conductors.exchange_peer_info().await;
 
     let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
     let hash_0: ActionHash = conductors[0]
