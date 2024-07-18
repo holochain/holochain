@@ -3494,6 +3494,7 @@ dependencies = [
  "chrono",
  "contrafact",
  "cron",
+ "derive_more",
  "fallible-iterator 0.3.0",
  "fixt",
  "hc_sleuth",

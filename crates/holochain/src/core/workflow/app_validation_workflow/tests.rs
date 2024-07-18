@@ -1192,7 +1192,7 @@ fn expected_invalid_remove_link(txn: &Transaction, invalid_remove_hash: &ActionH
 fn limbo_is_empty(txn: &Transaction) -> bool {
     let not_empty: bool = txn
         .query_row(
-            "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NULL)",
+            "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
             [],
             |row| row.get(0),
         )
@@ -1232,7 +1232,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
 
 fn num_valid(txn: &Transaction) -> usize {
     txn
-    .query_row("SELECT COUNT(hash) FROM DhtOP WHERE when_integrated IS NOT NULL AND validation_status = :status",
+    .query_row("SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NOT NULL AND validation_status = :status",
             named_params!{
                 ":status": ValidationStatus::Valid,
             },
@@ -1268,7 +1268,9 @@ async fn run_test(
     // Plus 2 for Cap Grant
     let expected_count = 3 + 16 + 2;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
 
@@ -1294,7 +1296,9 @@ async fn run_test(
     // RegisterAgentActivity will be valid.
     let expected_count = 3 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     alice_db
         .read_async({
@@ -1334,7 +1338,9 @@ async fn run_test(
     // Integration should have 6 ops in it
     let expected_count = 6 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     alice_db
         .read_async({
@@ -1382,7 +1388,9 @@ async fn run_test(
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     alice_db
         .read_async({
@@ -1430,7 +1438,9 @@ async fn run_test(
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     alice_db
         .read_async({
@@ -1480,7 +1490,9 @@ async fn run_test(
     // Integration should have 12 ops in it
     let expected_count = 12 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     alice_db
         .read_async({
@@ -1536,7 +1548,9 @@ async fn run_test_entry_def_id(
     // StoreEntry and StoreRecord should be invalid.
     let expected_count = 3 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     alice_db
         .read_async(move |txn| -> DatabaseResult<()> {

@@ -87,6 +87,7 @@ impl WireRecordOps {
         Ok(RenderedOps {
             entry: entry.map(EntryHashed::from_content_sync),
             ops,
+            warrant: None,
         })
     }
 }
