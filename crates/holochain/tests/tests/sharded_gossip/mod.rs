@@ -311,7 +311,6 @@ async fn test_zero_arc_no_gossip_2way() {
 /// Test that conductors with arcs clamped to zero do not gossip.
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_zero_arc_no_gossip_4way() {
     use futures::future::join_all;
 
@@ -323,7 +322,7 @@ async fn test_zero_arc_no_gossip_4way() {
             publish: true,
             recent: true,
             historical: true,
-            bootstrap: true,
+            bootstrap: false,
             recent_threshold: None,
         })
         .tune_conductor(|params| {
@@ -335,7 +334,7 @@ async fn test_zero_arc_no_gossip_4way() {
             publish: false,
             recent: true,
             historical: true,
-            bootstrap: true,
+            bootstrap: false,
             recent_threshold: None,
         })
         .tune_conductor(|params| {
@@ -394,6 +393,8 @@ async fn test_zero_arc_no_gossip_4way() {
         .collect::<Vec<_>>();
         assert_eq!(stored_agents, vec![cell.agent_pubkey().clone()]);
     }
+
+    conductors.exchange_peer_info().await;
 
     // Ensure that each node has all agents in their local p2p store.
     for c in conductors.iter() {
