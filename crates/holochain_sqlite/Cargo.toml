@@ -13,7 +13,7 @@ edition = "2021"
 async-trait = "0.1"
 anyhow = "1.0"
 derive_more = "0.99"
-fallible-iterator = "0.2.0"
+fallible-iterator = "0.3.0"
 futures = "0.3"
 holo_hash = { path = "../holo_hash", version = "^0.3.2-rc.0"}
 holochain_serialized_bytes = "=0.0.55"
