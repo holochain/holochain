@@ -102,8 +102,6 @@ jobs:
             git config --global --add safe.directory ${{ inputs.repo_path }}
           fi
 
-          mkdir -p ./target/tx5-cache
-
           # first build all derivations. this could be enough for test derivations.
           nix build -L --show-trace \
             ${{ matrix.cmd.extra_arg }} \
