@@ -1680,8 +1680,7 @@ mod app_impls {
             Ok(maybe_app_info)
         }
 
-        /// Run genesis for cells of an app which was installed using
-        /// [`MemproofProvisioning::Deferred`]
+        /// Run genesis for cells of an app which was installed using `membrane_proofs_deferred`
         pub async fn provide_memproofs(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,

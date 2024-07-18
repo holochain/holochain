@@ -38,9 +38,12 @@ pub struct AppManifestV1 {
     /// The roles that need to be filled (by DNAs) for this app.
     pub roles: Vec<AppRoleManifest>,
 
-    /// Declares that the app should be installed without the need to
-    /// specify membrane proofs at installation time. The membrane proofs
-    /// will instead be provided later by [`AppRequest::ProvideMemproofs`]
+    /// Declares that the app may be installed without the need to
+    /// specify membrane proofs at installation time. If memproofs are not
+    /// provided at install time, they must be provided later by the
+    /// [`AppRequest::ProvideMemproofs`] call. If memproofs are provided
+    /// at install time, the app will be installed as normal, without the
+    /// special deferred memproof flow.
     #[serde(default)]
     #[builder(default)]
     pub membrane_proofs_deferred: bool,

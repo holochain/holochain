@@ -78,7 +78,8 @@ pub enum AppRequest {
     ListWasmHostFunctions,
 
     /// Provide the membrane proofs for this app, if this app was installed
-    /// using [`MemproofProvisioning::Deferred`].
+    /// using `membrane_proofs_deferred` and memproofs were not provided at
+    /// installation time.
     ///
     /// # Returns
     ///
@@ -99,7 +100,7 @@ pub enum AppRequest {
     // /// The new key will be created using the same method which is used
     // /// when installing an app with no agent key provided.
     // ///
-    // /// This method is only available if this app was installed using [`MemproofProvisioning::Deferred`],
+    // /// This method is only available if this app was installed using `membrane_proofs_deferred`,
     // /// and can only be called before [`AppRequest::ProvideMemproofs`] has been called.
     // /// Until then, it can be called as many times as needed.
     // ///
