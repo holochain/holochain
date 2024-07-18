@@ -20,7 +20,6 @@
         version = "workspace";
 
         CARGO_PROFILE = "";
-        TX5_CACHE_DIRECTORY = "./target/tx5-cache";
 
         buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
@@ -91,6 +90,8 @@
             ${import ../../.config/test-args.nix} \
             ${import ../../.config/nextest-args.nix}
           '';
+
+          TX5_CACHE_DIRECTORY = "./target/tx5-cache";
 
           cargoNextestExtraArgs = builtins.getEnv "NEXTEST_EXTRA_ARGS";
 
