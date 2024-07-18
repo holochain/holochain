@@ -12,7 +12,7 @@ async fn conductors_call_remote(num_conductors: usize) {
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-    let config = SweetConductorConfig::standard();
+    let config = SweetConductorConfig::rendezvous(true);
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(num_conductors, config).await;
 
