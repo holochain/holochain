@@ -225,7 +225,7 @@ impl Store for Scratch {
         &self,
         _hash: &AnyLinkableHash,
         _check_validity: bool,
-    ) -> StateQueryResult<Vec<Warrant>> {
+    ) -> StateQueryResult<Vec<WarrantOp>> {
         unimplemented!(
             "Warrants are not committed to the chain, so the scratch will never contain one."
         )

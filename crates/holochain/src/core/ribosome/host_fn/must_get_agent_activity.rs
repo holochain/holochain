@@ -4,6 +4,7 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::CascadeImpl;
+use holochain_state::mutations::insert_op;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -56,7 +57,18 @@ pub fn must_get_agent_activity(
                 use MustGetAgentActivityResponse::*;
 
                 let result: Result<_, RuntimeError> = match (result, &call_context.host_context) {
-                    (Activity(activity), _) => Ok(activity),
+                    (Activity {activity, warrants}, _) => {
+                        if !warrants.is_empty() {
+                            if let Some(db) = cascade.cache() {
+                                db.write_async(|txn| {
+                                    for warrant in warrants {
+                                        insert_op(txn, &DhtOpHashed::from_content_sync(warrant))?;
+                                    }
+                                    crate::conductor::error::ConductorResult::Ok(())
+                                }).await.map_err(|e| -> RuntimeError { wasm_error!(e).into() })?;
+                            }
+                        }
+                        Ok(activity)},
                     (IncompleteChain | ChainTopNotFound(_), HostContext::Init(_)) => {
                         Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(
