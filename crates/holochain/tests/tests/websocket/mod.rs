@@ -710,7 +710,6 @@ async fn concurrent_install_dna() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore)]
 async fn network_stats() {
     holochain_trace::test_run();
 
@@ -721,7 +720,6 @@ async fn network_stats() {
     let dna_file = SweetDnaFile::unique_empty().await;
 
     let _ = batch.setup_app("app", &[dna_file]).await.unwrap();
-    batch.exchange_peer_info().await;
 
     let (client, _rx) = batch
         .get(0)

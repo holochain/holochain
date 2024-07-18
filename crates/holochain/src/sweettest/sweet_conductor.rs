@@ -699,7 +699,13 @@ impl SweetConductor {
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(conductors: impl Clone + IntoIterator<Item = &Self>) {
         let mut all = Vec::new();
-        for c in conductors.clone().into_iter() {
+        for c in conductors.into_iter() {
+            if c.get_config().has_rendezvous_bootstrap() {
+                panic!(
+                    "exchange_peer_info cannot reliably be used with rendezvous bootstrap servers"
+                );
+            }
+
             if let Some(dpki_dna_hash) = c
                 .running_services()
                 .dpki
@@ -823,6 +829,11 @@ impl SweetConductor {
         )
         .await
         .unwrap()
+    }
+
+    /// Getter
+    pub fn rendezvous(&self) -> Option<&Arc<dyn SweetRendezvous + Send + Sync>> {
+        self.rendezvous.as_ref()
     }
 }
 

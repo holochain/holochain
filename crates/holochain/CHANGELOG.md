@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Adds DPKI support. This is not fully hooked up, so the main implication for this particular implementation is that you must be using the same DPKI implementation as all other nodes on the network that you wish to talk to. If the DPKI version mismatches, you cannot establish connections, and will see so as an error in the logs. This work is in preparation for future work which will make it possible to restore your keys if you lose your device, and to revoke and replace your keys if your device is stolen or compromised.
 - Add feature to revoke agent keys. A new call `AdminRequest::RevokeAgentKey` is exposed on the Admin API. Revoking a key for an app will render the key invalid from that moment on and make the source chain of all cells of the app read-only. The key is revoked in the Deepkey service if installed and deleted on all cells' source chains. No more actions can be written to any of these source chains. Further it will fail to clone a cell of the app.
 
+## 0.4.0-dev.13
+
 ## 0.4.0-dev.12
 
 - When uninstalling an app or removing a clone cell, only some of the data used by that cell was deleted. Now all data is deleted, freeing up disk space.
