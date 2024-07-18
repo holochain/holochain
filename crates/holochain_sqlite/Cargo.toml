@@ -95,6 +95,7 @@ slow_tests = []
 # Use at-rest encryption of databases
 sqlite-encrypted = [
   "rusqlite/bundled-sqlcipher-vendored-openssl",
+  "r2d2_sqlite/bundled-sqlcipher-vendored-openssl",
   "holo_hash/sqlite-encrypted",
   "holochain_zome_types/sqlite-encrypted",
   "kitsune_p2p_bin_data/sqlite-encrypted",
@@ -105,10 +106,10 @@ sqlite-encrypted = [
 # Compile SQLite from source rather than depending on a library
 sqlite = [
   "rusqlite/bundled",
+  "r2d2_sqlite/bundled",
   "holo_hash/sqlite",
   "holochain_zome_types/sqlite",
   "kitsune_p2p_bin_data/sqlite",
   "kitsune_p2p_dht_arc/sqlite",
   "kitsune_p2p_types/sqlite",
-  "r2d2_sqlite/bundled",
 ]
