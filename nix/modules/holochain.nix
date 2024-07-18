@@ -20,6 +20,7 @@
         version = "workspace";
 
         CARGO_PROFILE = "";
+        TX5_CACHE_DIRECTORY = "./target/tx5-cache";
 
         buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
