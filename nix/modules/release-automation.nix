@@ -118,6 +118,7 @@
             export HOME="$(mktemp -d)"
             export TEST_WORKSPACE="''${HOME:?}/src"
 
+            git config --global --add safe.directory ''${TEST_WORKSPACE}
             git clone --single-branch ${inputs.repo-git} ''${TEST_WORKSPACE}
 
             cd ''${TEST_WORKSPACE:?}
