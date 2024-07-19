@@ -8,7 +8,7 @@
         version = "latest";
       };
 
-      craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
+      craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
 
       cargo-rdme = craneLib.buildPackage {
         src = inputs.cargo-rdme;
