@@ -2833,7 +2833,7 @@ dependencies = [
  "kitsune_p2p_dht_arc",
  "must_future",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -3136,7 +3136,7 @@ dependencies = [
  "holochain_util",
  "kitsune_p2p_timestamp",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3433,7 +3433,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3569,7 +3569,7 @@ dependencies = [
  "num_enum",
  "once_cell",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -4278,7 +4278,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "rand 0.8.5",
  "sbd-server",
  "serde",
@@ -4305,7 +4305,7 @@ dependencies = [
  "holochain_util",
  "kitsune_p2p_dht_arc",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "serde",
  "serde_bytes",
  "shrinkwraprs",
@@ -4427,7 +4427,7 @@ dependencies = [
  "kitsune_p2p_types",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "rand 0.8.5",
  "serde",
  "test-case",
@@ -4504,7 +4504,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "paste",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "rmp-serde",
  "rustls 0.21.12",
  "serde",
@@ -8308,9 +8308,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.13-alpha"
+version = "0.1.0-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f3fa6f0662915bdc6e50ead429b24c42b9aa8d3f8e4f2c3cfc5974203cd31b8"
+checksum = "43c0b3457f7b3120fbdcb2e8247b7c9d7187f2d140341ea4264248289367e881"
 dependencies = [
  "base64 0.22.1",
  "influxive-otel-atomic-obs",
@@ -8324,9 +8324,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-connection"
-version = "0.0.13-alpha"
+version = "0.1.0-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4af97cb5c4ef5c2c1c3a02a3b6025d7eacbfff0c7cc69c8ff49682668b7a1281"
+checksum = "d75812e4b79f889675cca44e79f8e8f39a69c0df53a96bdc92b3e3955c07104c"
 dependencies = [
  "bit_field",
  "tokio",
@@ -8338,9 +8338,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-core"
-version = "0.0.13-alpha"
+version = "0.1.0-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dbcda1421f6ffc361133d90d3ad8b9df813c62b3a2b0bd205dfc33205162bdf"
+checksum = "48a97f9525ca81f320b0cddcba3ce8b8b16c6b7db65b2f3f1aa285119c423329"
 dependencies = [
  "app_dirs2",
  "base64 0.22.1",
@@ -8357,9 +8357,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion"
-version = "0.0.13-alpha"
+version = "0.1.0-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d18eeb48190fe7f1e2ae7a58802ef3cc8f6a3c8164550bd7a0bb6d9015a537a"
+checksum = "6b27f9fb5d0e10a333dc24ba2dfe9d6ddf7c913faa441a5319ea67ff66b6068d"
 dependencies = [
  "futures",
  "parking_lot 0.12.3",
@@ -8371,9 +8371,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-sys"
-version = "0.0.13-alpha"
+version = "0.1.0-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "594e080a0c0883f526337ffeed768908a711e5eddddeeec7b65851faf0c3d211"
+checksum = "96c3a98e21debbb837f73024ecdafa052b7cc9f516399cd934a3cd44ed0740c0"
 dependencies = [
  "Inflector",
  "base64 0.22.1",
@@ -8390,9 +8390,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-turn"
-version = "0.0.13-alpha"
+version = "0.1.0-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8a35d3a876ab999f2ba39246676061ca1b2c24f0e3f632535c3e68bdc65f666"
+checksum = "5856ad1d35f99fce44def05f190832a8459f0918535116c1a57613d0db1a2c97"
 dependencies = [
  "base64 0.22.1",
  "dirs",
@@ -8408,9 +8408,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal"
-version = "0.0.13-alpha"
+version = "0.1.0-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "509f9e2ab94e4513084a34c1f89d23a2935206ed65c5ea14afbb3b286f7af47b"
+checksum = "40bfdbf14f0e3a53f15a6832d7e89864435a4ce522652c723121c701b57ee455"
 dependencies = [
  "rand 0.8.5",
  "sbd-e2e-crypto-client",
