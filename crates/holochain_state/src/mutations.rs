@@ -957,16 +957,23 @@ mod tests {
         let op2 = make_op(warrant2.clone());
 
         let db = DbWrite::<DbKindAuthored>::open(dir.as_ref(), DbKindAuthored(cell_id)).unwrap();
-        db.test_write(move |txn| {
-            insert_op(txn, &op1).unwrap();
-            insert_op(txn, &op2).unwrap();
+        db.test_write({
+            let op1 = op1.clone();
+            let op2 = op2.clone();
+            move |txn| {
+                insert_op(txn, &op1).unwrap();
+                insert_op(txn, &op2).unwrap();
+            }
         });
 
         db.test_read(move |txn| {
-            let warrants = Txn::from(&txn)
+            let warrants: Vec<DhtOp> = Txn::from(&txn)
                 .get_warrants_for_basis(&action_author.into(), false)
-                .unwrap();
-            assert_eq!(warrants, vec![warrant1, warrant2]);
+                .unwrap()
+                .into_iter()
+                .map(Into::into)
+                .collect();
+            assert_eq!(warrants, vec![op1.into_content(), op2.into_content()]);
         });
     }
 }

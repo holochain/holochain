@@ -283,6 +283,8 @@ pub(crate) async fn countersigning_success(
     if result {
         // If all signatures are valid (above) and i signed then i must have
         // validated it previously so i now agree that i authored it.
+        // TODO: perhaps this should be `authored_ops_to_dht_db`, i.e. the arc check should
+        //       be performed, because we may not be an authority for these ops
         authored_ops_to_dht_db_without_check(
             this_cell_actions_op_basis_hashes
                 .into_iter()

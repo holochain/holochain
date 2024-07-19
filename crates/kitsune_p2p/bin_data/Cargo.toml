@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_bin_data"
-version = "0.4.0-dev.8"
+version = "0.4.0-dev.9"
 description = "Binary data types for kitsune_p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -23,7 +23,7 @@ serde_bytes = "0.11"
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
-fixt = { version = "^0.4.0-dev.2", path = "../../fixt", optional = true }
+fixt = { version = "^0.4.0-dev.3", path = "../../fixt", optional = true }
 
 [lints]
 workspace = true

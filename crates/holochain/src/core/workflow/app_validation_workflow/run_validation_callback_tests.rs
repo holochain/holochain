@@ -351,7 +351,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
             times_same_hash_is_fetched
                 .clone()
                 .fetch_add(1, Ordering::Relaxed);
-            Ok(vec![MustGetAgentActivityResponse::Activity(vec![
+            Ok(vec![MustGetAgentActivityResponse::activity(vec![
                 RegisterAgentActivity {
                     action: create_action_signed_hashed.clone(),
                     cached_entry: None,
@@ -630,7 +630,7 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
             times_same_hash_is_fetched
                 .clone()
                 .fetch_add(1, Ordering::SeqCst);
-            Ok(vec![MustGetAgentActivityResponse::Activity(vec![
+            Ok(vec![MustGetAgentActivityResponse::activity(vec![
                 RegisterAgentActivity {
                     action: create_action_signed_hashed.clone(),
                     cached_entry: None,
