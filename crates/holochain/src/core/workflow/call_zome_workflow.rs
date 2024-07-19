@@ -182,6 +182,7 @@ where
                     .await?
                 && !workspace.source_chain().is_chain_locked(lock).await?
             {
+                tracing::error!("You made an invalid commit, removing lock");
                 if let Err(error) = workspace.source_chain().unlock_chain().await {
                     tracing::error!(?error);
                 }
