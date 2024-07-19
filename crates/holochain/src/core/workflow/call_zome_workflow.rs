@@ -170,6 +170,7 @@ where
             SourceChainError::InvalidCommit(_)
         ))
     ) {
+        tracing::error!("Validation failed, checking chain lock");
         let scratch_records = workspace.source_chain().scratch_records()?;
         if scratch_records.len() == 1 {
             let lock = holochain_state::source_chain::lock_for_entry(
