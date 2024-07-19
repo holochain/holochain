@@ -131,6 +131,7 @@ pub(crate) async fn countersigning_workflow(
 
     // For each complete session notify the agents of success.
     for (agents, actions) in notify_agents {
+        tracing::info!("Sending authority response to agents: {:?} - {:?}", agents, actions);
         if let Err(e) = network
             .countersigning_session_negotiation(
                 agents,
