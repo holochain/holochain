@@ -46,7 +46,7 @@ pub struct AppManifestV1 {
     /// special deferred memproof flow.
     #[serde(default)]
     #[builder(default)]
-    pub membrane_proofs_deferred: bool,
+    pub allow_deferred_memproofs: bool,
 }
 
 /// Description of an app "role" defined by this app.
@@ -204,7 +204,7 @@ impl AppManifestV1 {
             name,
             roles,
             description: _,
-            membrane_proofs_deferred: _,
+            allow_deferred_memproofs: _,
         } = self;
         let roles = roles
             .into_iter()
@@ -316,7 +316,7 @@ pub mod tests {
             name: "Test app".to_string(),
             description: Some("Serialization roundtrip test".to_string()),
             roles,
-            membrane_proofs_deferred: false,
+            allow_deferred_memproofs: false,
         }
     }
 

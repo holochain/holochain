@@ -1475,10 +1475,10 @@ mod app_impls {
             let manifest = bundle.manifest().clone();
 
             // Use deferred memproofs only if no memproofs are provided.
-            // If a memproof map is provided, it will override the membrane_proofs_deferred setting,
+            // If a memproof map is provided, it will override the allow_deferred_memproofs setting,
             // and the provided memproofs will be used immediately.
             let defer_memproofs = match &manifest {
-                AppManifest::V1(m) => m.membrane_proofs_deferred && membrane_proofs.is_none(),
+                AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.is_none(),
             };
             let membrane_proofs = membrane_proofs.unwrap_or_default();
 
@@ -1680,7 +1680,7 @@ mod app_impls {
             Ok(maybe_app_info)
         }
 
-        /// Run genesis for cells of an app which was installed using `membrane_proofs_deferred`
+        /// Run genesis for cells of an app which was installed using `allow_deferred_memproofs`
         pub async fn provide_memproofs(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,

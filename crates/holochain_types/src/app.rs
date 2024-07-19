@@ -137,7 +137,7 @@ pub struct InstallAppPayload {
     /// Include proof-of-membrane-membership data for cells that require it,
     /// keyed by the RoleName specified in the app bundle manifest.
     ///
-    /// When the app being installed has the `membrane_proofs_deferred` manifest flag set,
+    /// When the app being installed has the `allow_deferred_memproofs` manifest flag set,
     /// passing `None` for this field will allow the app to enter the "deferred membrane proofs"
     /// state, so that memproofs can be provided later via [`AppRequest::ProvideMemproofs`].
     /// If `Some` is used here, whatever memproofs are provided will be used, and the app will

@@ -8,7 +8,7 @@ use super::DnaWithRole;
 /// with no modifiers, clone limit of 255, and arbitrary role names
 pub async fn app_bundle_from_dnas<'a>(
     dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)>,
-    memproofs_deferred: bool,
+    deferred_memproofs: bool,
 ) -> AppBundle {
     let (roles, resources): (Vec<_>, Vec<_>) = dnas_with_roles
         .into_iter()
@@ -37,7 +37,7 @@ pub async fn app_bundle_from_dnas<'a>(
         .name("[generated]".into())
         .description(None)
         .roles(roles)
-        .membrane_proofs_deferred(memproofs_deferred)
+        .allow_deferred_memproofs(deferred_memproofs)
         .build()
         .unwrap();
 
