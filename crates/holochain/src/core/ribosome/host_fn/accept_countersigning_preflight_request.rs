@@ -73,6 +73,7 @@ pub fn accept_countersigning_preflight_request<'a>(
                         // Attempt to unlock the chain again.
                         // If this fails the chain will remain locked until the session end time.
                         // But also we're handling a keystore error already so we should return that.
+                        tracing::warn!("Failed to sign the response, unlocking chain");
                         if let Err(unlock_result) = call_context
                             .host_context
                             .workspace_write()
