@@ -63,6 +63,9 @@ pub fn is_lock_expired(
             },
         )
         .optional()?;
+
+    tracing::info!("Checking chain lock expiration: {:?}", r);
+
     // If there's no lock then it's expired.
     Ok(r.unwrap_or(true))
 }

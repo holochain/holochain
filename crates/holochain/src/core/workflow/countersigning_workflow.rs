@@ -230,6 +230,7 @@ pub(crate) async fn countersigning_success(
             .verify_signature(sa.signature(), sa.action())
             .await?
         {
+            tracing::error!("Failed to verify signature of action: {:?}", sa);
             return Ok(());
         }
         if sa.action().author() == &author {

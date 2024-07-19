@@ -611,7 +611,7 @@ impl Cell {
                 Ok(())
             }
             CountersigningSessionNegotiationMessage::AuthorityResponse(signed_actions) => {
-                tracing::warn!("Received countersigning response: {:?}", signed_actions);
+                tracing::warn!("Received countersigning response: {:?} at {:?}", signed_actions, self.id.agent_pubkey());
                 Ok(countersigning_success(
                     self.space.clone(),
                     &self.holochain_p2p_cell,
