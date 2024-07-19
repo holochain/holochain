@@ -164,32 +164,32 @@ where
 
     // If the validation failed remove any active chain lock that matches the
     // entry that failed validation.
-    if matches!(
-        validation_result,
-        Err(WorkflowError::SourceChainError(
-            SourceChainError::InvalidCommit(_)
-        ))
-    ) {
-        tracing::error!("Validation failed, checking chain lock");
-        let scratch_records = workspace.source_chain().scratch_records()?;
-        if scratch_records.len() == 1 {
-            let lock = holochain_state::source_chain::lock_for_entry(
-                scratch_records[0].entry().as_option(),
-            )?;
-            if !lock.is_empty()
-                && workspace
-                    .source_chain()
-                    .is_chain_locked(Vec::with_capacity(0))
-                    .await?
-                && !workspace.source_chain().is_chain_locked(lock).await?
-            {
-                tracing::error!("You made an invalid commit, removing lock");
-                if let Err(error) = workspace.source_chain().unlock_chain().await {
-                    tracing::error!(?error);
-                }
-            }
-        }
-    }
+    // if matches!(
+    //     validation_result,
+    //     Err(WorkflowError::SourceChainError(
+    //         SourceChainError::InvalidCommit(_)
+    //     ))
+    // ) {
+    //     tracing::error!("Validation failed, checking chain lock");
+    //     let scratch_records = workspace.source_chain().scratch_records()?;
+    //     if scratch_records.len() == 1 {
+    //         let lock = holochain_state::source_chain::lock_for_entry(
+    //             scratch_records[0].entry().as_option(),
+    //         )?;
+    //         if !lock.is_empty()
+    //             && workspace
+    //                 .source_chain()
+    //                 .is_chain_locked(Vec::with_capacity(0))
+    //                 .await?
+    //             && !workspace.source_chain().is_chain_locked(lock).await?
+    //         {
+    //             tracing::error!("You made an invalid commit, removing lock");
+    //             if let Err(error) = workspace.source_chain().unlock_chain().await {
+    //                 tracing::error!(?error);
+    //             }
+    //         }
+    //     }
+    // }
     validation_result?;
     Ok(result)
 }
