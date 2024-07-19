@@ -82,6 +82,10 @@
 
           preCheck = ''
             export DYLD_FALLBACK_LIBRARY_PATH=$(rustc --print sysroot)/lib
+
+            echo "Setting up tx5 cache directory $(pwd)"
+            export TX5_CACHE_DIRECTORY="$(pwd)/tx5-cache/"
+            mkdir -p $TX5_CACHE_DIRECTORY
           '';
 
           cargoExtraArgs = ''

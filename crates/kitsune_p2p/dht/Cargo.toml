@@ -34,7 +34,7 @@ proptest-derive = { version = "0", optional = true }
 kitsune_p2p_dht = { path = ".", features = ["test_utils", "sqlite"] }
 
 kitsune_p2p_dht_arc = { path = "../dht_arc", features = ["test_utils"] }
-holochain_serialized_bytes = "=0.0.54"
+holochain_serialized_bytes = "=0.0.55"
 maplit = "1"
 holochain_trace = { path = "../../holochain_trace" }
 pretty_assertions = "1.4.0"
