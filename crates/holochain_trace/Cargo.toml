@@ -1,6 +1,6 @@
 [package]
 name = "holochain_trace"
-version = "0.3.1"
+version = "0.3.2-rc.0"
 authors = ["freesig <tom.gowan@holo.host>", "Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "tracing helpers"

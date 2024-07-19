@@ -1,6 +1,6 @@
 [package]
 name = "aitia"
-version = "0.2.1"
+version = "0.2.2-rc.0"
 description = "Library for making sense of events in terms of causal graphs"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,7 +13,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 derive_more = "0.99"
-holochain_trace = { version = "^0.3.1", path = "../holochain_trace" }
+holochain_trace = { version = "^0.3.2-rc.0", path = "../holochain_trace" }
 parking_lot = "0.12"
 petgraph = "0.6"
 regex = "1"

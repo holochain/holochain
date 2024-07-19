@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_bin_data"
-version = "0.3.1"
+version = "0.3.2-rc.0"
 description = "Binary data types for kitsune_p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,7 +13,7 @@ edition = "2021"
 # reminder - do not use workspace deps
 [dependencies]
 holochain_util = { version = "^0.3.1", path = "../../holochain_util", default-features = false }
-kitsune_p2p_dht_arc = { version = "^0.3.1", path = "../dht_arc" }
+kitsune_p2p_dht_arc = { version = "^0.3.2-rc.0", path = "../dht_arc" }
 shrinkwraprs = "0.3.0"
 derive_more = "0.99"
 serde = { version = "1", features = [ "derive", "rc" ] }
@@ -23,7 +23,7 @@ serde_bytes = "0.11"
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
-fixt = { version = "^0.3.1", path = "../../fixt", optional = true }
+fixt = { version = "^0.3.2-rc.0", path = "../../fixt", optional = true }
 
 [lints]
 workspace = true

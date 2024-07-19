@@ -1,6 +1,6 @@
 [package]
 name = "hcterm"
-version = "0.3.2-rc.0"
+version = "0.3.2-rc.1"
 description = "A terminal for Holochain"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -17,14 +17,14 @@ clap = { version = "4", features = ["derive"] }
 url = "2"
 once_cell = "1"
 chrono = "0.4"
-holo_hash = { version = "^0.3.2-rc.0", path = "../holo_hash", features = ["encoding"] }
-kitsune_p2p_types = { version = "^0.3.1", path = "../kitsune_p2p/types" }
-kitsune_p2p_bin_data = { version = "^0.3.1", path = "../kitsune_p2p/bin_data" }
-kitsune_p2p_bootstrap_client = { version = "^0.3.1", path = "../kitsune_p2p/bootstrap_client" }
+holo_hash = { version = "^0.3.2-rc.1", path = "../holo_hash", features = ["encoding"] }
+kitsune_p2p_types = { version = "^0.3.2-rc.0", path = "../kitsune_p2p/types" }
+kitsune_p2p_bin_data = { version = "^0.3.2-rc.0", path = "../kitsune_p2p/bin_data" }
+kitsune_p2p_bootstrap_client = { version = "^0.3.2-rc.0", path = "../kitsune_p2p/bootstrap_client" }
 holochain_util = { version = "^0.3.1", path = "../holochain_util" }
-holochain_conductor_api = { version = "^0.3.2-rc.0", path = "../holochain_conductor_api" }
-holochain_websocket = { version = "^0.3.2-rc.0", path = "../holochain_websocket" }
-holochain_types = { version = "^0.3.2-rc.0", path = "../holochain_types" }
+holochain_conductor_api = { version = "^0.3.2-rc.1", path = "../holochain_conductor_api" }
+holochain_websocket = { version = "^0.3.2-rc.1", path = "../holochain_websocket" }
+holochain_types = { version = "^0.3.2-rc.1", path = "../holochain_types" }
 tokio = { version = "1.36.0", features = ["full"] }
 
 [lints]
