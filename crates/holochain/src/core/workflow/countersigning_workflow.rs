@@ -245,6 +245,8 @@ pub(crate) async fn countersigning_success(
         return Ok(());
     }
 
+
+
     // Hash actions.
     let incoming_actions: Vec<_> = signed_actions
         .iter()
@@ -257,8 +259,10 @@ pub(crate) async fn countersigning_success(
             let entry_hash = entry_hash.clone();
             move |txn| {
             if let Some((cs_entry_hash, cs)) = current_countersigning_session(txn, Arc::new(author.clone()))? {
+                tracing::info!("We're in a countersigning session [{:?}]", cs);
                 // Check we have the right session.
                 if cs_entry_hash == entry_hash {
+                    tracing::info!("It's the right one, proceeding to unlock");
                     let weight = weigh_placeholder();
                     let stored_actions = cs.build_action_set(entry_hash, weight)?;
                     if stored_actions.len() == incoming_actions.len() {
@@ -267,7 +271,6 @@ pub(crate) async fn countersigning_success(
                             let a = ActionHash::with_data_sync(a);
                             incoming_actions.iter().any(|i| *i == a)
                         }) {
-                            tracing::info!("Countersigning success for: {:?}", entry_hash);
                             // All checks have passed so unlock the chain.
                             mutations::unlock_chain(txn, &author)?;
                             // Update ops to publish.
