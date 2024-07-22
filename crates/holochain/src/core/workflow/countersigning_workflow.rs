@@ -159,6 +159,8 @@ pub(crate) async fn countersigning_success(
     trigger: QueueTriggers,
     signal: broadcast::Sender<Signal>,
 ) -> WorkflowResult<()> {
+    tracing::info!("Got a countersigning success for myself {:?}", author);
+
     let authored_db = space.get_or_create_authored_db(author.clone())?;
     let dht_db = space.dht_db;
     let dht_db_cache = space.dht_query_cache;
@@ -265,6 +267,7 @@ pub(crate) async fn countersigning_success(
                             let a = ActionHash::with_data_sync(a);
                             incoming_actions.iter().any(|i| *i == a)
                         }) {
+                            tracing::info!("Countersigning success for: {:?}", entry_hash);
                             // All checks have passed so unlock the chain.
                             mutations::unlock_chain(txn, &author)?;
                             // Update ops to publish.
