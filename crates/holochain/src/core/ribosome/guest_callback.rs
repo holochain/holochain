@@ -33,22 +33,21 @@ pub fn call_stream<R: RibosomeT + 'static, I: Invocation + 'static>(
             .into_iter()
             .collect();
         let remaining_components_original: VecDeque<_> = invocation.fn_components().collect();
-        let mut remaining_components: VecDeque<_> = remaining_components_original.clone();
 
         while let Some(zome) = remaining_zomes.pop_front() {
+            // reset fn components
+            let mut remaining_components = remaining_components_original.clone();
             while let Some(to_call) = remaining_components.pop_front() {
                 let to_call = to_call.into();
                 let r = ribosome
                     .maybe_call(host_context.clone(), &invocation, &zome, &to_call)
                     .await;
                 match r {
+                    Ok(None) => {}
                     Ok(Some(result)) => tx.send(Ok((zome.clone(), result))).await?,
-                    Ok(None) => (),
                     Err(e) => tx.send(Err((zome.clone(), e))).await?,
                 }
             }
-            // reset fn components and move to the next zome
-            remaining_components = remaining_components_original.clone();
         }
         Ok(())
     });
@@ -130,13 +129,6 @@ mod tests {
                         )))
                     });
             }
-
-            // the fn components are reset from the invocation every zome
-            invocation
-                .expect_fn_components()
-                .times(1)
-                .in_sequence(&mut sequence)
-                .return_const(fn_components.clone());
         }
 
         let (calls, _h) = call_stream(host_access.into(), ribosome, invocation);
