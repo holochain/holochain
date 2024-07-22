@@ -187,7 +187,6 @@ impl FetchSourceBackoff {
 mod tests {
     use std::{sync::Arc, time::Duration};
 
-    #[allow(warnings)]
     use super::{SourceState, Sources, NUM_PROBE_ATTEMPTS};
     use crate::{
         backoff::{FetchBackoff, BACKOFF_RETRY_COUNT},

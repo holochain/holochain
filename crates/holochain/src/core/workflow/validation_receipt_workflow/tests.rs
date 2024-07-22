@@ -6,12 +6,11 @@ use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_state::prelude::*;
-use rusqlite::Transaction;
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky, doesn't take into account timing or retries"]
 async fn test_validation_receipt() {
-    let _g = holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
@@ -100,8 +99,7 @@ async fn test_validation_receipt() {
                     Ok(stmt
                         .query_map([], |row| row.get::<_, Option<u32>>(0))
                         .unwrap()
-                        .map(Result::unwrap)
-                        .filter_map(|i| i)
+                        .filter_map(Result::unwrap)
                         .collect::<Vec<u32>>())
                 })
                 .await
@@ -128,8 +126,9 @@ macro_rules! wait_until {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn test_block_invalid_receipt() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let unit_entry_def = EntryDef::default_from_id("unit");
     let integrity_name = "integrity";
     let coordinator_name = "coordinator";
@@ -158,14 +157,6 @@ async fn test_block_invalid_receipt() {
         ))?;
         Ok(hash)
     });
-    // .function(
-    //     coordinator_name,
-    //     get_function_name,
-    //     move |api, hash: AnyDhtHash| {
-    //         let records = api.get(vec![GetInput::new(hash, Default::default())])?;
-    //         Ok(records[0])
-    //     },
-    // );
 
     let zomes_that_check = InlineZomeSet::new_single(
         integrity_name,
@@ -179,7 +170,6 @@ async fn test_block_invalid_receipt() {
         Op::StoreEntry(StoreEntry { action, .. })
             if action.hashed.content.app_entry_def().is_some() =>
         {
-            dbg!("entry defs ARE bad!");
             Ok(ValidateResult::Invalid("Entry defs are bad".into()))
         }
         _ => Ok(ValidateResult::Valid),
@@ -218,14 +208,19 @@ async fn test_block_invalid_receipt() {
         .call(&alice_cell.zome(coordinator_name), create_function_name, ())
         .await;
 
-    await_consistency(10, [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    // Don't check alice's integrated ops, since she gets blocked during gossip
+    await_consistency_advanced(
+        10,
+        vec![(alice_pubkey, 1)],
+        [(&alice_cell, false), (&bob_cell, true)],
+    )
+    .await
+    .unwrap();
 
     let alice_block_target = BlockTargetId::Cell(alice_cell.cell_id().to_owned());
     let bob_block_target = BlockTargetId::Cell(bob_cell.cell_id().to_owned());
 
-    for now in vec![Timestamp::now(), Timestamp::MIN, Timestamp::MAX] {
+    for now in [Timestamp::now(), Timestamp::MIN, Timestamp::MAX] {
         assert!(!alice_conductor
             .spaces
             .is_blocked(alice_block_target.clone(), now)

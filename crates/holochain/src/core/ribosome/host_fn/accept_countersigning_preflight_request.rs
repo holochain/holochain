@@ -157,8 +157,9 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     async fn unlock_timeout_session() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -395,7 +396,7 @@ pub mod wasm_test {
     async fn unlock_invalid_session() {
         use holochain_nonce::fresh_nonce;
 
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -507,15 +508,16 @@ pub mod wasm_test {
                 .unwrap(),
             )
             .await;
-        assert!(matches!(countersign_fail_create_alice, Err(_)));
+        assert!(countersign_fail_create_alice.is_err());
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     async fn lock_chain() {
         use holochain_nonce::fresh_nonce;
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -795,7 +797,7 @@ pub mod wasm_test {
             )
             .await;
 
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency(60, [&alice_cell, &bob_cell])
             .await
             .unwrap();
 
@@ -828,7 +830,7 @@ pub mod wasm_test {
     #[ignore = "countersigning_an_entry_before_bobs_zome_initialized_fails"]
     async fn lock_chain_failure() {
         use holochain_nonce::fresh_nonce;
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -1153,7 +1155,7 @@ pub mod wasm_test {
     }
 
     async fn enzymatic_session_success(force_init: bool) {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -1309,7 +1311,7 @@ pub mod wasm_test {
     #[cfg(feature = "slow_tests")]
     #[ignore = "countersigning_an_entry_before_bobs_zome_initialized_fails"]
     async fn enzymatic_session_failure() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;

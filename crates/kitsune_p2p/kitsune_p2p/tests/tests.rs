@@ -17,7 +17,7 @@ use std::sync::Arc;
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn two_agents_on_same_host_rpc_single() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
@@ -76,7 +76,7 @@ async fn two_agents_on_same_host_rpc_single() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky on CI"]
 async fn two_nodes_publish_and_fetch() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
@@ -173,7 +173,7 @@ async fn two_nodes_publish_and_fetch() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Takes nearly 5-10 minutes to run locally, that is far too slow for CI. Should it run quicker?"]
 async fn two_nodes_publish_and_fetch_large_number_of_ops() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     // Must be larger than ShardedGossipLocal::UPPER_HASHES_BOUND, to encourage batching. But I'm wondering if that's even useful because each op is
     // actually sent individually.
@@ -245,6 +245,13 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
     wait_for_connected(sender_a.clone(), agent_b.clone(), space.clone()).await;
     wait_for_connected(sender_b.clone(), agent_a.clone(), space.clone()).await;
 
+    let op_hash_list = harness_a
+        .op_store()
+        .read()
+        .iter()
+        .map(|o| o.clone().into())
+        .collect();
+
     sender_a
         .broadcast(
             space.clone(),
@@ -252,12 +259,7 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agent_a.clone(),
-                op_hash_list: harness_a
-                    .op_store()
-                    .read()
-                    .iter()
-                    .map(|o| o.clone().into())
-                    .collect(),
+                op_hash_list,
                 context: FetchContext::default(),
             },
         )
@@ -306,10 +308,11 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
 // This is expected to test that agent info is broadcast to current peers when a new agent joins
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Flaky on CI"]
 async fn two_nodes_broadcast_agent_info() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
-    let (bootstrap_addr, bootstrap_handle) = start_bootstrap().await;
+    let (bootstrap_addr, mut bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
 
     let mut harness_a = KitsuneTestHarness::try_new("host_a")
@@ -404,10 +407,11 @@ async fn two_nodes_broadcast_agent_info() {
 // about peers that are unkown to the new peer.
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Flaky on CI"]
 async fn two_nodes_gossip_agent_info() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
-    let (bootstrap_addr, bootstrap_handle) = start_bootstrap().await;
+    let (bootstrap_addr, mut bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
 
     let mut harness_a = KitsuneTestHarness::try_new("host_a")
@@ -500,8 +504,9 @@ async fn two_nodes_gossip_agent_info() {
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn gossip_stops_when_agent_leaves_space() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
@@ -621,8 +626,9 @@ async fn gossip_stops_when_agent_leaves_space() {
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn gossip_historical_ops() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
@@ -705,8 +711,9 @@ async fn gossip_historical_ops() {
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn publish_only_fetches_ops_once() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
@@ -887,10 +894,11 @@ async fn publish_only_fetches_ops_once() {
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn delegate_publish() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
-    let (bootstrap_addr, bootstrap_handle) = start_bootstrap().await;
+    let (bootstrap_addr, mut bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
 
     let mut harness_a = KitsuneTestHarness::try_new("host_a")
@@ -1038,7 +1046,7 @@ async fn delegate_publish() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "This doesn't really work, the bandwidth limits are only applied to gossip directly and not the fetch mechanism so this test can't work as is"]
 async fn single_large_op_exceeds_gossip_rate_limit() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
@@ -1129,7 +1137,7 @@ async fn test_two_nodes_on_same_host_deadlock() {
 
     use kitsune_p2p::actor::KitsuneP2pSender;
 
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;

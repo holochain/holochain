@@ -9,7 +9,7 @@ use super::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn entry_scratch_same_as_sql() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
@@ -29,7 +29,7 @@ async fn entry_scratch_same_as_sql() {
         ChainTopOrdering::default(),
     )
     .unwrap();
-    insert_valid_integrated_op(&mut txn, &td.store_entry_op).unwrap();
+    insert_valid_integrated_op(&mut txn, &td.store_entry_op.downcast()).unwrap();
     let r1 = query
         .run(Txn::from(&txn))
         .unwrap()
@@ -43,7 +43,7 @@ async fn entry_scratch_same_as_sql() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn record_scratch_same_as_sql() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
@@ -63,7 +63,7 @@ async fn record_scratch_same_as_sql() {
         ChainTopOrdering::default(),
     )
     .unwrap();
-    insert_valid_integrated_op(&mut txn, &td.store_record_op).unwrap();
+    insert_valid_integrated_op(&mut txn, &td.store_record_op.downcast()).unwrap();
     let r1 = query
         .run(Txn::from(&txn))
         .unwrap()

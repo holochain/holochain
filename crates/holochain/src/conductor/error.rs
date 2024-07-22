@@ -92,6 +92,9 @@ pub enum ConductorError {
     #[error("Tried to perform an operation on an app that was not running: {0}")]
     AppNotRunning(InstalledAppId),
 
+    #[error("App status could not be changed: {0}")]
+    AppStatusError(String),
+
     #[error(transparent)]
     HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
 
@@ -124,6 +127,12 @@ pub enum ConductorError {
 
     #[error(transparent)]
     RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
+
+    #[error("Authentication failed with reason: {0}")]
+    FailedAuthenticationError(String),
+
+    #[error("App {0} is not allowed to access: {1:?}")]
+    AppAccessError(InstalledAppId, Box<dyn std::fmt::Debug + Send + Sync>),
 
     /// Other
     #[error("Other: {0}")]

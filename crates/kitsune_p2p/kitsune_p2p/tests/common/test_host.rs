@@ -8,12 +8,10 @@ use kitsune_p2p_types::{
     config::RECENT_THRESHOLD_DEFAULT,
     dependencies::lair_keystore_api::LairClient,
     dht::{
-        arq::ArqSet,
         hash::RegionHash,
         region::RegionData,
         region_set::{RegionCoordSetLtcs, RegionSetLtcs},
         spacetime::*,
-        ArqStrat,
     },
 };
 use std::sync::Arc;
@@ -76,16 +74,11 @@ impl KitsuneHost for TestHost {
         input: kitsune_p2p_block::BlockTargetId,
         timestamp: kitsune_p2p_types::dht::prelude::Timestamp,
     ) -> kitsune_p2p::KitsuneHostResult<bool> {
-        let blocked = self
-            .blocks
-            .read()
-            .iter()
-            .find(|b| {
-                let target_id: BlockTargetId = b.target().clone().into();
+        let blocked = self.blocks.read().iter().any(|b| {
+            let target_id: BlockTargetId = b.target().clone().into();
 
-                target_id == input && b.start() <= timestamp && b.end() >= timestamp
-            })
-            .is_some();
+            target_id == input && b.start() <= timestamp && b.end() >= timestamp
+        });
 
         async move { Ok(blocked) }.boxed().into()
     }
@@ -126,17 +119,10 @@ impl KitsuneHost for TestHost {
     fn query_region_set(
         &self,
         space: Arc<kitsune_p2p_bin_data::KitsuneSpace>,
-        dht_arc_set: Arc<kitsune_p2p_types::dht_arc::DhtArcSet>,
+        arq_set: kitsune_p2p_types::dht::ArqSet,
     ) -> kitsune_p2p::KitsuneHostResult<kitsune_p2p_types::dht::prelude::RegionSetLtcs> {
         async move {
             let topology = self.get_topology(space.clone()).await?;
-
-            let arq_set =
-                ArqSet::from_dht_arc_set_exact(&topology, &ArqStrat::default(), &dht_arc_set)
-                    .ok_or_else(|| -> KitsuneP2pResult<()> {
-                        Err("Could not create arc set".into())
-                    })
-                    .unwrap();
 
             let times = TelescopingTimes::historical(&topology);
             let coords = RegionCoordSetLtcs::new(times, arq_set);

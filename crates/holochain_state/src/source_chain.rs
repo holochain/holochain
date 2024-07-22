@@ -291,7 +291,7 @@ impl SourceChain {
 
         let ops_to_integrate = ops
             .iter()
-            .map(|op| (op.1.clone(), op.0.dht_basis().clone()))
+            .map(|op| (op.1.clone(), op.0.dht_basis()))
             .collect::<Vec<_>>();
 
         // Write the entries, actions and ops to the database in one transaction.
@@ -813,7 +813,7 @@ where
                             args.iter().map(|a| (a.0.as_str(), a.1.as_ref())).collect::<Vec<(&str, &dyn rusqlite::ToSql)>>().as_slice(),
                             |row| {
                                 let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                                let SignedAction(action, signature) = action;
+                                let (action, signature) = action.into();
                                 let private_entry = action
                                     .entry_type()
                                     .map_or(false, |e| *e.visibility() == EntryVisibility::Private);
@@ -866,7 +866,7 @@ where
 
     /// If there is a countersigning session get the
     /// StoreEntry op to send to the entry authorities.
-    pub fn countersigning_op(&self) -> SourceChainResult<Option<DhtOp>> {
+    pub fn countersigning_op(&self) -> SourceChainResult<Option<ChainOp>> {
         let r = self.scratch.apply(|scratch| {
             scratch
                 .entries()
@@ -881,7 +881,7 @@ where
                                 .unwrap_or(false)
                         })
                         .and_then(|shh| {
-                            Some(DhtOp::StoreEntry(
+                            Some(ChainOp::StoreEntry(
                                 shh.signature().clone(),
                                 shh.action().clone().try_into().ok()?,
                                 (**entry).clone(),
@@ -924,7 +924,7 @@ fn build_ops_from_actions(
     actions: Vec<SignedActionHashed>,
 ) -> SourceChainResult<(
     Vec<SignedActionHashed>,
-    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, SysValDep)>,
+    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, SysValDeps)>,
 )> {
     // Actions end up back in here.
     let mut actions_output = Vec::with_capacity(actions.len());
@@ -946,15 +946,17 @@ fn build_ops_from_actions(
         let mut h = Some(action);
         for op in ops_inner {
             let op_type = op.get_type();
+            let op = DhtOpLite::from(op);
             // Action is required by value to produce the DhtOpHash.
-            let (action, op_hash) = UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
+            let (action, op_hash) =
+                ChainOpUniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
             let op_order = OpOrder::new(op_type, action.timestamp());
             let timestamp = action.timestamp();
             // Put the action back by value.
-            let dependency = op.get_type().sys_validation_dependency(&action);
+            let deps = op_type.sys_validation_dependencies(&action);
             h = Some(action);
             // Collect the DhtOpLite, DhtOpHash and OpOrder.
-            ops.push((op, op_hash, op_order, timestamp, dependency));
+            ops.push((op, op_hash, op_order, timestamp, deps));
         }
 
         // Put the SignedActionHashed back together.
@@ -1081,6 +1083,10 @@ pub async fn genesis(
             SourceChainResult::Ok(ops_to_integrate)
         })
         .await?;
+
+    // We don't check for authorityship here because during genesis we have no opportunity
+    // to discover that the network is sharded and that we should not be an authority for
+    // these items, so we assume we are an authority.
     authored_ops_to_dht_db_without_check(
         ops_to_integrate,
         authored.clone().into(),
@@ -1094,7 +1100,7 @@ pub async fn genesis(
 pub fn put_raw(
     txn: &mut Transaction,
     shh: SignedActionHashed,
-    ops: Vec<DhtOpLite>,
+    ops: Vec<ChainOpLite>,
     entry: Option<Entry>,
 ) -> StateMutationResult<Vec<DhtOpHash>> {
     let (action, signature) = shh.into_inner();
@@ -1105,7 +1111,7 @@ pub fn put_raw(
     for op in &ops {
         let op_type = op.get_type();
         let (h, op_hash) =
-            UniqueForm::op_hash(op_type, action.take().expect("This can't be empty"))?;
+            ChainOpUniqueForm::op_hash(op_type, action.take().expect("This can't be empty"))?;
         let op_order = OpOrder::new(op_type, h.timestamp());
         let timestamp = h.timestamp();
         action = Some(h);
@@ -1121,7 +1127,7 @@ pub fn put_raw(
     }
     insert_action(txn, &shh)?;
     for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, &op, &op_hash, &op_order, &timestamp)?;
+        insert_op_lite(txn, &op.into(), &op_hash, &op_order, &timestamp)?;
     }
     Ok(ops_to_integrate)
 }
@@ -1204,7 +1210,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
         action_seq,
         prev_action: prev_action.clone(),
     };
-    let action = action_builder.build(common).weightless().into();
+    let action = action_builder.build(common).weightless();
     let action = ActionHashed::from_content_sync(action);
     let action = SignedActionHashed::sign(keystore, action).await?;
     let record = Record::new(action, maybe_entry);
@@ -1267,7 +1273,8 @@ pub async fn dump_state(
                         ":author": author,
                     },
                     |row| {
-                        let SignedAction(action, signature) = from_blob(row.get("action_blob")?)?;
+                        let action: SignedAction = from_blob(row.get("action_blob")?)?;
+                        let (action, signature) = action.into();
                         let action_address = row.get("action_hash")?;
                         let entry: Option<Vec<u8>> = row.get("entry_blob")?;
                         let entry: Option<Entry> = match entry {
@@ -1575,6 +1582,7 @@ mod tests {
         let db = test_db.to_db();
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         // create transferable cap grant
+        #[allow(clippy::unnecessary_literal_unwrap)] // must be this type
         let secret_access = CapAccess::from(secret.unwrap());
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
@@ -1680,6 +1688,7 @@ mod tests {
         let mut assignees = BTreeSet::new();
         assignees.insert(bob.clone());
         let updated_secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
+        #[allow(clippy::unnecessary_literal_unwrap)] // must be this type
         let updated_access = CapAccess::from((updated_secret.unwrap(), assignees));
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
@@ -2065,7 +2074,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());

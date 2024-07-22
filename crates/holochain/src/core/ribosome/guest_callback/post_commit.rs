@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
@@ -14,6 +13,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
+use tokio::sync::broadcast;
 
 pub const POST_COMMIT_CHANNEL_BOUND: usize = 100;
 pub const POST_COMMIT_CONCURRENT_LIMIT: usize = 5;
@@ -35,7 +35,7 @@ pub struct PostCommitHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
     pub network: HolochainP2pDna,
-    pub signal_tx: SignalBroadcaster,
+    pub signal_tx: broadcast::Sender<Signal>,
 }
 
 impl std::fmt::Debug for PostCommitHostAccess {
@@ -91,6 +91,7 @@ pub async fn send_post_commit(
     keystore: MetaLairClient,
     actions: Vec<SignedActionHashed>,
     zomes: Vec<CoordinatorZome>,
+    signal_tx: broadcast::Sender<Signal>,
 ) -> Result<(), tokio::sync::mpsc::error::SendError<()>> {
     let cell_id = workspace.source_chain().cell_id();
 
@@ -103,7 +104,7 @@ pub async fn send_post_commit(
                     workspace: workspace.clone().into(),
                     keystore: keystore.clone(),
                     network: network.clone(),
-                    signal_tx: conductor_handle.signal_broadcaster(),
+                    signal_tx: signal_tx.clone(),
                 },
                 invocation: PostCommitInvocation::new(zome, actions.clone()),
                 cell_id: cell_id.clone(),
@@ -201,10 +202,9 @@ mod slow_tests {
             .unwrap();
         post_commit_invocation.zome = CoordinatorZome::from(TestWasm::Foo);
 
-        let result = ribosome
+        ribosome
             .run_post_commit(host_access, post_commit_invocation)
             .unwrap();
-        assert_eq!(result, ());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -220,17 +220,16 @@ mod slow_tests {
             .unwrap();
         post_commit_invocation.zome = CoordinatorZome::from(TestWasm::PostCommitSuccess);
 
-        let result = ribosome
+        ribosome
             .run_post_commit(host_access, post_commit_invocation)
             .unwrap();
-        assert_eq!(result, ());
     }
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "flakey. Sometimes fails the second last assert with 3 instead of 5"]
     #[cfg(feature = "test_utils")]
     async fn post_commit_test_volley() -> anyhow::Result<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,

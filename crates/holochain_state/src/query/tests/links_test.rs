@@ -291,7 +291,7 @@ impl TestData {
     }
 
     async fn add_link(&self) {
-        let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAddLink(
+        let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAddLink(
             fixt!(Signature),
             self.link_add.clone(),
         ));
@@ -304,7 +304,7 @@ impl TestData {
     }
 
     fn add_link_scratch(&mut self) {
-        let action = SignedActionHashed::from_content_sync(SignedAction(
+        let action = SignedActionHashed::from_content_sync(SignedAction::new(
             Action::CreateLink(self.link_add.clone()),
             fixt!(Signature),
         ));
@@ -312,7 +312,7 @@ impl TestData {
     }
 
     fn add_link_given_scratch(&mut self, scratch: &mut Scratch) {
-        let action = SignedActionHashed::from_content_sync(SignedAction(
+        let action = SignedActionHashed::from_content_sync(SignedAction::new(
             Action::CreateLink(self.link_add.clone()),
             fixt!(Signature),
         ));
@@ -320,7 +320,7 @@ impl TestData {
     }
 
     async fn delete_link(&self) {
-        let op = DhtOpHashed::from_content_sync(DhtOp::RegisterRemoveLink(
+        let op = DhtOpHashed::from_content_sync(ChainOp::RegisterRemoveLink(
             fixt!(Signature),
             self.link_remove.clone(),
         ));
@@ -333,7 +333,7 @@ impl TestData {
     }
 
     fn delete_link_scratch(&mut self) {
-        let action = SignedActionHashed::from_content_sync(SignedAction(
+        let action = SignedActionHashed::from_content_sync(SignedAction::new(
             Action::DeleteLink(self.link_remove.clone()),
             fixt!(Signature),
         ));
@@ -654,7 +654,7 @@ async fn multiple_links() {
 }
 #[tokio::test(flavor = "multi_thread")]
 async fn duplicate_links() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -716,7 +716,7 @@ async fn duplicate_links() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_base() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -808,7 +808,7 @@ async fn links_on_same_base() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_tag() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -885,7 +885,7 @@ async fn links_on_same_tag() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_type() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -950,7 +950,7 @@ async fn links_on_same_type() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn link_type_ranges() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 

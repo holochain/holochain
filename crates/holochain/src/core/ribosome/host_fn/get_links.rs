@@ -113,7 +113,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::HashPath).await;
@@ -152,7 +152,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn hash_path_anchor_list_anchors() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Anchor).await;
@@ -237,7 +237,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn baseless_get_links() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
@@ -254,7 +254,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn external_get_links() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
@@ -269,7 +269,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn multi_get_links() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
@@ -287,7 +287,7 @@ pub mod slow_tests {
         let hash_path_b: holo_hash::AnyLinkableHash =
             conductor.call(&alice, "get_path_hash", "b").await;
 
-        let forward_link_0 = forward_links.get(0).unwrap();
+        let forward_link_0 = forward_links.first().unwrap();
         assert_eq!(forward_link_0.base, hash_path_a);
         assert_eq!(forward_link_0.target, hash_path_b);
         assert_eq!(
@@ -299,7 +299,7 @@ pub mod slow_tests {
         assert_eq!(forward_link_0.zome_index, ZomeIndex(0));
         assert!(t1 <= forward_link_0.timestamp && t2 >= forward_link_0.timestamp);
 
-        let back_link_0 = back_links.get(0).unwrap();
+        let back_link_0 = back_links.first().unwrap();
         assert_eq!(back_link_0.base, hash_path_b);
         assert_eq!(back_link_0.target, hash_path_a);
         assert_eq!(back_link_0.author, alice.cell_id().agent_pubkey().clone());
@@ -324,7 +324,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dup_path_test() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
@@ -339,7 +339,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn get_links_filtered_by_tag_prefix() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -451,7 +451,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn get_links_filtered_by_timestamp_and_author() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -564,7 +564,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn get_links_local_only() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         // agents should not pass around data
         let config = SweetConductorConfig::rendezvous(false).tune(|config| {
             config.disable_historical_gossip = true;

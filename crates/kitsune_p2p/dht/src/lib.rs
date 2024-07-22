@@ -154,7 +154,7 @@ pub mod region;
 pub mod region_set;
 pub mod spacetime;
 
-pub use arq::{actual_coverage, Arq, ArqBounds, ArqStrat, PeerStrat, PeerView, PeerViewQ};
+pub use arq::{actual_coverage, Arq, ArqBounds, ArqSet, ArqStrat, PeerStrat, PeerView, PeerViewQ};
 
 // The persistence traits are currently unused except for test implementations of
 // a kitsune host. If we ever use them in actual host implementations, we can

@@ -84,7 +84,7 @@ fn to_local_types_test_nested() {
 
     #[hdi_to_coordinates]
     enum NoNesting {
-        A(Nested1),
+        A,
         #[allow(dead_code)]
         B {
             nested: Nested2,
@@ -92,9 +92,9 @@ fn to_local_types_test_nested() {
         C,
     }
 
-    assert_eq!(to_coords(NoNesting::A(Nested1::A)), (0, 0));
-    assert_eq!(to_coords(NoNesting::A(Nested1::B)), (0, 0));
-    assert_eq!(to_coords(&NoNesting::A(Nested1::B)), (0, 0));
+    assert_eq!(to_coords(NoNesting::A), (0, 0));
+    assert_eq!(to_coords(NoNesting::A), (0, 0));
+    assert_eq!(to_coords(&NoNesting::A), (0, 0));
     assert_eq!(to_coords(NoNesting::B { nested: Nested2::X }), (0, 1));
     assert_eq!(to_coords(NoNesting::B { nested: Nested2::Y }), (0, 1));
     assert_eq!(to_coords(NoNesting::B { nested: Nested2::Z }), (0, 1));

@@ -1,5 +1,5 @@
 ---
-default_semver_increment_mode: !pre_minor beta-dev
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
@@ -8,6 +8,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 
 - Renamed `hdk_entry_helper`, `hdk_entry_types`, `hdk_entry_types_conversions`, `hdk_entry_types_name_registration`, `hdk_link_types`, and `hdk_to_coordinates` to `hdi_*`, to reflect the fact that integrity zomes (the main consumer of the aforementioned macros) are the only place these are used. ([#4115](https://github.com/holochain/holochain/pull/4115))
+
+## 0.4.0-dev.10
+
+## 0.4.0-dev.9
+
+## 0.4.0-dev.8
+
+## 0.4.0-dev.7
+
+## 0.4.0-dev.6
+
+## 0.4.0-dev.5
+
+## 0.4.0-dev.4
+
+## 0.4.0-dev.3
+
+## 0.4.0-dev.2
+
+## 0.4.0-dev.1
+
+## 0.4.0-dev.0
+
+## 0.3.0
+
+## 0.3.0-beta-dev.34
 
 ## 0.3.0-beta-dev.33
 

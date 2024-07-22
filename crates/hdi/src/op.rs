@@ -27,19 +27,6 @@ pub trait OpHelper {
         LT: LinkTypesHelper,
         WasmError: From<<ET as EntryTypesHelper>::Error>,
         WasmError: From<<LT as LinkTypesHelper>::Error>;
-
-    /// Alias for `flattened`, for backward compatibility
-    #[deprecated = "`to_type` has been renamed to `flattened`, please use that name instead"]
-    fn to_type<ET, LT>(&self) -> Result<FlatOp<ET, LT>, WasmError>
-    where
-        ET: EntryTypesHelper + UnitEnum,
-        <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
-        LT: LinkTypesHelper,
-        WasmError: From<<ET as EntryTypesHelper>::Error>,
-        WasmError: From<<LT as LinkTypesHelper>::Error>,
-    {
-        self.flattened()
-    }
 }
 
 /// All possible variants that an [`RegisterAgentActivity`]
@@ -302,12 +289,7 @@ impl OpHelper for Op {
                 };
                 Ok(FlatOp::StoreEntry(r))
             }
-            Op::RegisterUpdate(RegisterUpdate {
-                update,
-                new_entry,
-                original_entry,
-                original_action,
-            }) => {
+            Op::RegisterUpdate(RegisterUpdate { update, new_entry }) => {
                 let Update {
                     original_action_address: original_action_hash,
                     original_entry_address: original_entry_hash,
@@ -315,13 +297,6 @@ impl OpHelper for Op {
                     entry_hash,
                     ..
                 } = &update.hashed.content;
-                if original_action.entry_type() != entry_type {
-                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "New entry type {:?} doesn't match original entry type {:?}",
-                        entry_type,
-                        original_action.entry_type()
-                    ))));
-                }
                 let update = match entry_type {
                     EntryType::AgentPubKey => OpUpdate::Agent {
                         original_key: original_entry_hash.clone().into(),
@@ -330,38 +305,20 @@ impl OpHelper for Op {
                         action: update.hashed.content.clone(),
                     },
                     EntryType::App(entry_def) => {
-                        let old = get_app_entry_type_for_record_authority::<ET>(
-                            entry_def,
-                            original_entry.as_ref(),
-                        )?;
-                        let new = get_app_entry_type_for_record_authority::<ET>(
+                        let new_entry = get_app_entry_type_for_record_authority::<ET>(
                             entry_def,
                             new_entry.as_ref(),
                         )?;
-                        match (old, new) {
-                            (UnitEnumEither::Enum(old), UnitEnumEither::Enum(new)) => {
-                                OpUpdate::Entry {
-                                    original_action: original_action.clone(),
-                                    app_entry: new,
-                                    original_app_entry: old,
-                                    action: update.hashed.content.clone(),
-                                }
-                            }
-                            (UnitEnumEither::Unit(old), UnitEnumEither::Unit(new)) => {
-                                OpUpdate::PrivateEntry {
-                                    original_action_hash: original_action_hash.clone(),
-                                    app_entry_type: new,
-                                    original_app_entry_type: old,
-                                    action: update.hashed.content.clone(),
-                                }
-                            }
-                            (_, _) => {
-                                return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                                    "Attempting to update a private entry to a public entry, or vice versa. old: {:?} new: {:?}",
-                                    original_action.entry_type(),
-                                    entry_type,
-                                ))))
-                            }
+                        match new_entry {
+                            UnitEnumEither::Enum(new) => OpUpdate::Entry {
+                                app_entry: new,
+                                action: update.hashed.content.clone(),
+                            },
+                            UnitEnumEither::Unit(new) => OpUpdate::PrivateEntry {
+                                original_action_hash: original_action_hash.clone(),
+                                app_entry_type: new,
+                                action: update.hashed.content.clone(),
+                            },
                         }
                     }
                     EntryType::CapClaim => OpUpdate::CapClaim {
@@ -563,51 +520,9 @@ impl OpHelper for Op {
                     action: delete_link.hashed.content.clone(),
                 })
             }
-            Op::RegisterDelete(RegisterDelete {
-                delete,
-                original_action,
-                original_entry: orig_entry,
-            }) => {
-                let Delete {
-                    deletes_entry_address: original_entry_hash,
-                    ..
-                } = &delete.hashed.content;
-                let r = match original_action.entry_type() {
-                    EntryType::AgentPubKey => OpDelete::Agent {
-                        original_action: original_action.clone(),
-                        original_key: original_entry_hash.clone().into(),
-                        action: delete.hashed.content.clone(),
-                    },
-                    EntryType::App(original_entry_type) => {
-                        match get_app_entry_type_for_record_authority::<ET>(
-                            original_entry_type,
-                            orig_entry.as_ref(),
-                        )? {
-                            UnitEnumEither::Enum(original_app_entry) => OpDelete::Entry {
-                                original_action: original_action.clone(),
-                                original_app_entry,
-                                action: delete.hashed.content.clone(),
-                            },
-                            UnitEnumEither::Unit(original_app_entry_type) => {
-                                OpDelete::PrivateEntry {
-                                    original_action: original_action.clone(),
-                                    original_app_entry_type,
-                                    action: delete.hashed.content.clone(),
-                                }
-                            }
-                        }
-                    }
-                    EntryType::CapClaim => OpDelete::CapClaim {
-                        original_action: original_action.clone(),
-                        action: delete.hashed.content.clone(),
-                    },
-                    EntryType::CapGrant => OpDelete::CapGrant {
-                        original_action: original_action.clone(),
-                        action: delete.hashed.content.clone(),
-                    },
-                };
-                Ok(FlatOp::RegisterDelete(r))
-            }
+            Op::RegisterDelete(RegisterDelete { delete }) => Ok(FlatOp::RegisterDelete(OpDelete {
+                action: delete.hashed.content.clone(),
+            })),
         }
     }
 }

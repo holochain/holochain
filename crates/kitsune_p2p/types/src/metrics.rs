@@ -415,7 +415,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_sys_info() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         init_sys_info_poll();
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         let sys_info = get_sys_info();

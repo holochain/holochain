@@ -9,6 +9,7 @@ use holochain_state::prelude::*;
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::action;
 use std::sync::Arc;
+use tokio::sync::broadcast;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
@@ -40,7 +41,9 @@ async fn test_cell_handle_publish() {
         .await
         .unwrap();
     handle.register_dna(dna_file.clone()).await.unwrap();
-    let wasmer_module_cache = Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(db_dir))));
+    let wasmer_module_cache = Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(
+        db_dir.join("wasm-cache"),
+    ))));
 
     let ribosome = RealRibosome::new(dna_file, wasmer_module_cache)
         .await
@@ -64,23 +67,24 @@ async fn test_cell_handle_publish() {
         handle.clone(),
         spaces.test_spaces[&dna].space.clone(),
         holochain_p2p_cell,
+        broadcast::channel(10).0,
     )
     .await
     .unwrap();
 
     let action = action::Action::Dna(action::Dna {
         author: agent.clone(),
-        timestamp: Timestamp::now().into(),
+        timestamp: Timestamp::now(),
         hash: dna.clone(),
     });
     let hh = ActionHashed::from_content_sync(action.clone());
     let shh = SignedActionHashed::sign(&keystore, hh).await.unwrap();
-    let op = DhtOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
+    let op = ChainOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
     spaces
         .spaces
-        .handle_publish(&dna, true, false, vec![op.clone()])
+        .handle_publish(&dna, true, false, vec![op.clone().into()])
         .await
         .unwrap();
 

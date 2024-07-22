@@ -1,13 +1,13 @@
 [package]
 name = "hdk_derive"
-version = "0.3.0-beta-dev.33"
+version = "0.4.0-dev.10"
 description = "derive macros for the holochain hdk"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/hdk_derive"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo", "hdk" ]
-categories = [ "cryptography" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "hdk"]
+categories = ["cryptography"]
 edition = "2021"
 
 [lib]
@@ -23,7 +23,7 @@ darling = "0.14.1"
 heck = "0.5"
 # it's important that we depend on holochain_zome_types with no default
 # features, both here AND in hdi, to reduce code bloat
-holochain_integrity_types = { version = "^0.3.0-beta-dev.32", path = "../holochain_integrity_types", default-features = false }
+holochain_integrity_types = { version = "^0.4.0-dev.10", path = "../holochain_integrity_types", default-features = false }
 proc-macro-error = "1.0.4"
 
 [lints]

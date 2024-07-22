@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cascade"
-version = "0.3.0-beta-dev.45"
+version = "0.4.0-dev.13"
 description = "Logic for cascading updates to Holochain state and network interaction"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -10,23 +10,25 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-fixt = { version = "^0.3.0-beta-dev.3", path = "../fixt" }
+fixt = { version = "^0.4.0-dev.3", path = "../fixt" }
 futures = "0.3"
-holo_hash = { version = "^0.3.0-beta-dev.27", path = "../holo_hash", features = ["full"] }
-holochain_sqlite = { version = "^0.3.0-beta-dev.41", path = "../holochain_sqlite" }
-holochain_p2p = { version = "^0.3.0-beta-dev.44", path = "../holochain_p2p" }
-holochain_serialized_bytes = "=0.0.53"
-holochain_state = { version = "^0.3.0-beta-dev.44", path = "../holochain_state" }
-holochain_types = { version = "^0.3.0-beta-dev.41", path = "../holochain_types" }
-holochain_trace = { version = "^0.3.0-beta-dev.10", path = "../holochain_trace" }
-holochain_util = { version = "^0.3.0-beta-dev.7", path = "../holochain_util" }
-holochain_zome_types = { version = "^0.3.0-beta-dev.34", path = "../holochain_zome_types" }
-holochain_nonce = {version = "^0.3.0-beta-dev.26", path = "../holochain_nonce"}
-kitsune_p2p = { version = "^0.3.0-beta-dev.38", path = "../kitsune_p2p/kitsune_p2p" }
+holo_hash = { version = "^0.4.0-dev.9", path = "../holo_hash", features = [
+  "full",
+] }
+holochain_sqlite = { version = "^0.4.0-dev.13", path = "../holochain_sqlite" }
+holochain_p2p = { version = "^0.4.0-dev.13", path = "../holochain_p2p" }
+holochain_serialized_bytes = "=0.0.55"
+holochain_state = { version = "^0.4.0-dev.13", path = "../holochain_state" }
+holochain_types = { version = "^0.4.0-dev.13", path = "../holochain_types" }
+holochain_trace = { version = "^0.4.0-dev.3", path = "../holochain_trace" }
+holochain_util = { version = "^0.4.0-dev.2", path = "../holochain_util" }
+holochain_zome_types = { version = "^0.4.0-dev.11", path = "../holochain_zome_types" }
+holochain_nonce = { version = "^0.4.0-dev.4", path = "../holochain_nonce" }
+kitsune_p2p = { version = "^0.4.0-dev.12", path = "../kitsune_p2p/kitsune_p2p" }
 tokio = { version = "1.36.0", features = ["full"] }
 thiserror = "1.0"
 tracing = "0.1"
-opentelemetry_api = { version = "=0.20.0", features = [ "metrics" ] }
+opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
 async-trait = "0.1"
 mockall = { version = "0.11.3", optional = true }
@@ -46,25 +48,25 @@ workspace = true
 default = []
 
 test_utils = [
-    "mockall",
-    "holochain_types/test_utils",
-    "holochain_p2p/test_utils",
-    "holochain_state/test_utils"
+  "mockall",
+  "holochain_types/test_utils",
+  "holochain_p2p/test_utils",
+  "holochain_state/test_utils",
 ]
 
 sqlite-encrypted = [
-    "holo_hash/sqlite-encrypted",
-    "holochain_sqlite/sqlite-encrypted",
-    "holochain_state/sqlite-encrypted",
-    "holochain_types/sqlite-encrypted",
-    "holochain_zome_types/sqlite-encrypted",
-    "kitsune_p2p/sqlite-encrypted",
+  "holo_hash/sqlite-encrypted",
+  "holochain_sqlite/sqlite-encrypted",
+  "holochain_state/sqlite-encrypted",
+  "holochain_types/sqlite-encrypted",
+  "holochain_zome_types/sqlite-encrypted",
+  "kitsune_p2p/sqlite-encrypted",
 ]
 sqlite = [
-    "holo_hash/sqlite",
-    "holochain_sqlite/sqlite",
-    "holochain_state/sqlite",
-    "holochain_types/sqlite",
-    "holochain_zome_types/sqlite",
-    "kitsune_p2p/sqlite",
+  "holo_hash/sqlite",
+  "holochain_sqlite/sqlite",
+  "holochain_state/sqlite",
+  "holochain_types/sqlite",
+  "holochain_zome_types/sqlite",
+  "kitsune_p2p/sqlite",
 ]

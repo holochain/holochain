@@ -21,7 +21,7 @@ use std::{
 };
 use tui::{backend::Backend, Terminal};
 
-const BASES: usize = 1;
+const BASES: usize = 2;
 
 const ENTRY_SIZE: usize = 3_000_000;
 const MAX_COMMITS: usize = 1_000;
@@ -70,7 +70,7 @@ fn config() -> ConductorConfig {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // holochain_trace::test_run().ok();
+    // holochain_trace::test_run();
 
     let show_ui = std::env::var("NOUI").is_err();
 

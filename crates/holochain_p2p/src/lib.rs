@@ -41,7 +41,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         &self,
         agent: AgentPubKey,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arc: Option<crate::dht_arc::DhtArc>,
+        initial_arq: Option<crate::dht::Arq>,
     ) -> actor::HolochainP2pResult<()>;
 
     /// If a cell is disabled, we'll need to \"leave\" the network module as well.
@@ -198,14 +198,14 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         &self,
         agent: AgentPubKey,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arc: Option<crate::dht_arc::DhtArc>,
+        initial_arq: Option<crate::dht::Arq>,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
             .join(
                 (*self.dna_hash).clone(),
                 agent,
                 maybe_agent_info,
-                initial_arc,
+                initial_arq,
             )
             .await
     }
@@ -311,7 +311,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .await
     }
 
-    /// Get [`DhtOp::StoreRecord`] or [`DhtOp::StoreEntry`] from the DHT.
+    /// Get [`ChainOp::StoreRecord`] or [`ChainOp::StoreEntry`] from the DHT.
     async fn get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,

@@ -130,6 +130,12 @@ impl HostHdi {
     }
 }
 
+impl Default for HostHdi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// The real hdi implements `host_call` for every hdi function.
 /// This is deferring to the standard `holochain_wasmer_guest` crate functionality.
 /// Every function works exactly the same way with the same basic signatures and patterns.
@@ -219,9 +225,9 @@ impl HdiT for HostHdi {
 /// At any time the global HDI can be set to a different HDI.
 /// Generally this is only useful during rust unit testing.
 /// When executing wasm without the `mock` feature, the host will be assumed.
-pub fn set_hdi<H: 'static>(hdi: H) -> Rc<dyn HdiT>
+pub fn set_hdi<H>(hdi: H) -> Rc<dyn HdiT>
 where
-    H: HdiT,
+    H: HdiT + 'static,
 {
     HDI.with(|h| std::mem::replace(&mut *h.borrow_mut(), Rc::new(hdi)))
 }

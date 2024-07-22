@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn no_running_cells() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let test_db = holochain_state::test_utils::test_dht_db();
     let vault = test_db.to_db();
@@ -46,7 +46,7 @@ async fn no_running_cells() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn do_not_block_or_send_to_self() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let test_db = holochain_state::test_utils::test_dht_db();
     let vault = test_db.to_db();
@@ -95,7 +95,7 @@ async fn do_not_block_or_send_to_self() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn block_invalid_op_author() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let test_db = holochain_state::test_utils::test_dht_db();
     let vault = test_db.to_db();
@@ -129,7 +129,7 @@ async fn block_invalid_op_author() {
             let blocks = blocks.clone();
             move |block| -> BoxFuture<DatabaseResult<()>> {
                 blocks.write().push(block);
-                async move { Ok(()) }.boxed().into()
+                async move { Ok(()) }.boxed()
             }
         },
     )
@@ -138,14 +138,16 @@ async fn block_invalid_op_author() {
 
     assert_eq!(WorkComplete::Complete, work_complete);
 
-    let read_blocks = blocks.read();
-    assert_eq!(1, read_blocks.len());
-    match read_blocks.first().unwrap().target() {
-        BlockTarget::Cell(cell_id, reason) => {
-            assert_eq!(CellBlockReason::InvalidOp(op_hash.clone()), *reason);
-            assert_eq!(author, *cell_id.agent_pubkey());
+    {
+        let read_blocks = blocks.read();
+        assert_eq!(1, read_blocks.len());
+        match read_blocks.first().unwrap().target() {
+            BlockTarget::Cell(cell_id, reason) => {
+                assert_eq!(CellBlockReason::InvalidOp(op_hash.clone()), *reason);
+                assert_eq!(author, *cell_id.agent_pubkey());
+            }
+            _ => unreachable!("Only expect a cell block"),
         }
-        _ => unreachable!("Only expect a cell block"),
     }
 
     // The op was rejected and the sender blocked but the `require_receipt` flag should still be cleared
@@ -155,7 +157,7 @@ async fn block_invalid_op_author() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn continues_if_receipt_cannot_be_signed() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let test_db = holochain_state::test_utils::test_dht_db();
     let vault = test_db.to_db();
@@ -193,7 +195,7 @@ async fn continues_if_receipt_cannot_be_signed() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn send_validation_receipt() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let test_db = holochain_state::test_utils::test_dht_db();
     let vault = test_db.to_db();
@@ -234,7 +236,7 @@ async fn send_validation_receipt() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let test_db = holochain_state::test_utils::test_dht_db();
     let vault = test_db.to_db();
@@ -298,7 +300,8 @@ async fn create_op_with_status(
     create_action.author = author.clone();
     let action = Action::Create(create_action);
 
-    let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(fixt!(Signature), action));
+    let op =
+        DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(fixt!(Signature), action));
 
     let test_op_hash = op.as_hash().clone();
     vault

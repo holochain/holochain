@@ -5,7 +5,7 @@ use holochain_zome_types::action::conversions::WrongActionError;
 use holochain_zome_types::prelude::*;
 use thiserror::Error;
 
-use super::DhtOpType;
+use super::ChainOpType;
 
 #[derive(Debug, Error)]
 pub enum DhtOpError {
@@ -18,7 +18,7 @@ pub enum DhtOpError {
     #[error(transparent)]
     WrongActionError(#[from] WrongActionError),
     #[error("Tried to create DhtOp type {0} with action type {1}")]
-    OpActionMismatch(DhtOpType, ActionType),
+    OpActionMismatch(ChainOpType, ActionType),
     #[error("Link requests without tags require a tag in the response")]
     LinkKeyTagMissing,
 }

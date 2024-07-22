@@ -113,8 +113,8 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_delete_entry_test<'a>() {
-        holochain_trace::test_run().ok();
+    async fn ribosome_delete_entry_test() {
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Crd).await;

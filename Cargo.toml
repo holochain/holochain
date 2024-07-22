@@ -18,7 +18,6 @@ members = [
   "crates/holochain_conductor_api",
   "crates/holochain_p2p",
   "crates/holochain_keystore",
-  "crates/holochain_sqlite",
   "crates/holochain_state",
   "crates/holochain_state_types",
   "crates/holochain_sqlite",
@@ -48,7 +47,6 @@ members = [
   "crates/kitsune_p2p/mdns",
   "crates/kitsune_p2p/proxy",
   "crates/kitsune_p2p/timestamp",
-  "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
 
   "crates/test_utils/wasm",
@@ -72,22 +70,21 @@ resolver = "2"
 
 [workspace.lints.clippy]
 nursery = "allow"
-cargo  = "allow"
+cargo = "allow"
 pedantic = "allow"
-restriction  = "allow"
+restriction = "allow"
 style = "deny"
 complexity = "deny"
 perf = "deny"
 correctness = "deny"
 dbg_macro = "deny"
 
-[profile.fast-test]
-inherits = "dev"
+[profile.dev]
 debug = 1
 
-[profile.fast-test.package."*"]
-opt-level = 3
-debug = 1
+[profile.dev.package."*"]
+opt-level = 2
+debug = 0
 debug-assertions = false
 overflow-checks = false
 incremental = false
@@ -106,13 +103,15 @@ lto = true
 # influxive-otel = { path = "../influxive/crates/influxive-otel" }
 # contrafact = { git = "https://github.com/maackle/contrafact-rs.git", branch = "lambda" }
 # tx5 = { path = "../tx5/crates/tx5" }
+# tx5-core = { path = "../tx5/crates/tx5-core" }
+# tx5-go-pion = { path = "../tx5/crates/tx5-go-pion" }
 # tx5-go-pion-sys = { path = "../tx5/crates/tx5-go-pion-sys" }
 # tx5-go-pion-turn = { path = "../tx5/crates/tx5-go-pion-turn" }
 # tx5-signal = { path = "../tx5/crates/tx5-signal" }
-# tx5-signal-srv = { path = "../tx5/crates/tx5-signal-srv" }
+# sbd-e2e-crypto-client = { path = "../sbd/rust/sbd-e2e-crypto-client" }
+# sbd-server = { path = "../sbd/rust/sbd-server" }
 # tx5 = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # tx5-signal = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
-# tx5-signal-srv = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }

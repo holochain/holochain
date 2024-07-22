@@ -62,7 +62,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn count_links() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -103,7 +103,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn count_links_filtered_by_author() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -172,7 +172,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn count_links_filtered_by_timestamp() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -224,7 +224,7 @@ mod tests {
                     base.clone(),
                     LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
                 )
-                .after(mid_time.clone()),
+                .after(mid_time),
             )
             .await;
         assert_eq!(1, count);
@@ -235,7 +235,7 @@ mod tests {
                 &bob,
                 "get_count",
                 LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))
-                    .before(mid_time.clone()),
+                    .before(mid_time),
             )
             .await;
         assert_eq!(1, count);

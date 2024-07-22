@@ -12,18 +12,18 @@ use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::ensure;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
-use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
-use holochain_types::prelude::DnaHash;
+use holochain_conductor_api::{AdminRequest, AppInterfaceInfo};
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::Timestamp;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
+use holochain_types::prelude::{DnaHash, InstalledAppId};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use std::convert::TryFrom;
@@ -79,6 +79,8 @@ pub enum AdminRequestCli {
     DisableApp(DisableApp),
     DumpState(DumpState),
     DumpConductorState,
+    DumpNetworkMetrics(DumpNetworkMetrics),
+    DumpNetworkStats,
     /// Calls AdminRequest::AddAgentInfo.
     /// _Unimplemented_.
     AddAgents,
@@ -119,6 +121,13 @@ pub struct AddAppWs {
     /// If not provided, defaults to `*` which allows any origin.
     #[arg(long, default_value_t = AllowedOrigins::Any)]
     pub allowed_origins: AllowedOrigins,
+
+    /// Optional app id to restrict this interface to.
+    ///
+    /// If provided then only apps with an authentication token issued to the same app id
+    /// will be allowed to connect to this interface.
+    #[arg(long)]
+    pub installed_app_id: Option<InstalledAppId>,
 }
 
 /// Calls AdminRequest::RegisterDna
@@ -205,6 +214,14 @@ pub struct DumpState {
     /// The agent half of the cell ID to dump.
     #[arg(value_parser = parse_agent_key)]
     pub agent_key: AgentPubKey,
+}
+
+/// Arguments for dumping network metrics.
+#[derive(Debug, Args, Clone)]
+pub struct DumpNetworkMetrics {
+    /// The DNA hash of the app network to dump.
+    #[arg(value_parser = parse_dna_hash)]
+    pub dna: Option<DnaHash>,
 }
 
 /// Calls AdminRequest::RequestAgentInfo
@@ -370,6 +387,16 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             let state = dump_conductor_state(cmd).await?;
             msg!("DUMP CONDUCTOR STATE \n{}", state);
         }
+        AdminRequestCli::DumpNetworkMetrics(args) => {
+            let metrics = dump_network_metrics(cmd, args).await?;
+            // Print without other text so it can be piped
+            println!("{}", metrics);
+        }
+        AdminRequestCli::DumpNetworkStats => {
+            let stats = dump_network_stats(cmd).await?;
+            // Print without other text so it can be piped
+            println!("{}", stats);
+        }
         AdminRequestCli::AddAgents => todo!("Adding agent info via CLI is coming soon"),
         AdminRequestCli::ListAgents(args) => {
             use std::fmt::Write;
@@ -509,7 +536,6 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         source: AppBundleSource::Path(path),
         membrane_proofs: Default::default(),
         network_seed,
-        #[cfg(feature = "chc")]
         ignore_genesis_failure: false,
     };
 
@@ -543,7 +569,7 @@ pub async fn uninstall_app(cmd: &mut CmdRunner, args: UninstallApp) -> anyhow::R
 }
 
 /// Calls [`AdminRequest::ListAppInterfaces`].
-pub async fn list_app_ws(cmd: &mut CmdRunner) -> anyhow::Result<Vec<u16>> {
+pub async fn list_app_ws(cmd: &mut CmdRunner) -> anyhow::Result<Vec<AppInterfaceInfo>> {
     let resp = cmd.command(AdminRequest::ListAppInterfaces).await?;
     Ok(expect_match!(resp => AdminResponse::AppInterfacesListed, "Failed to list app interfaces"))
 }
@@ -610,6 +636,7 @@ pub async fn attach_app_interface(cmd: &mut CmdRunner, args: AddAppWs) -> anyhow
         .command(AdminRequest::AttachAppInterface {
             port: args.port,
             allowed_origins: args.allowed_origins,
+            installed_app_id: args.installed_app_id,
         })
         .await?;
     tracing::debug!(?resp);
@@ -639,6 +666,23 @@ pub async fn dump_state(cmd: &mut CmdRunner, args: DumpState) -> anyhow::Result<
 pub async fn dump_conductor_state(cmd: &mut CmdRunner) -> anyhow::Result<String> {
     let resp = cmd.command(AdminRequest::DumpConductorState).await?;
     Ok(expect_match!(resp => AdminResponse::ConductorStateDumped, "Failed to dump state"))
+}
+
+/// Calls [`AdminRequest::DumpNetworkMetrics`] and dumps network metrics.
+async fn dump_network_metrics(
+    cmd: &mut CmdRunner,
+    args: DumpNetworkMetrics,
+) -> anyhow::Result<String> {
+    let resp = cmd
+        .command(AdminRequest::DumpNetworkMetrics { dna_hash: args.dna })
+        .await?;
+    Ok(expect_match!(resp => AdminResponse::NetworkMetricsDumped, "Failed to dump network metrics"))
+}
+
+/// Calls [`AdminRequest::DumpNetworkStats`] and dumps network stats.
+async fn dump_network_stats(cmd: &mut CmdRunner) -> anyhow::Result<String> {
+    let resp = cmd.command(AdminRequest::DumpNetworkStats).await?;
+    Ok(expect_match!(resp => AdminResponse::NetworkStatsDumped, "Failed to dump network stats"))
 }
 
 /// Calls [`AdminRequest::AddAgentInfo`] with and adds the list of agent info.

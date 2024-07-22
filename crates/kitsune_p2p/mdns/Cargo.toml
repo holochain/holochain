@@ -1,13 +1,13 @@
 [package]
 name = "kitsune_p2p_mdns"
-version = "0.3.0-beta-dev.3"
+version = "0.4.0-dev.2"
 description = "p2p / mdns discovery framework"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/kitsune_p2p_mdns"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo", "p2p", "mdns", "networking" ]
-categories = [ "network-programming" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "p2p", "mdns", "networking"]
+categories = ["network-programming"]
 edition = "2021"
 
 [[example]]
@@ -25,7 +25,7 @@ mdns = "=3.0.0"
 futures = "0.3"
 base64 = "0.22"
 err-derive = "0.3.1"
-tokio = { version = "1.27", features = [ "full" ] }
+tokio = { version = "1.27", features = ["full"] }
 tokio-stream = { version = "0.1" }
 
 [lints]

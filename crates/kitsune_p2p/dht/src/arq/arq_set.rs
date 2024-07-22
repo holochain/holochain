@@ -4,7 +4,7 @@ use kitsune_p2p_dht_arc::DhtArcSet;
 
 use crate::{arq::ArqBounds, spacetime::*, ArqStrat};
 
-use super::{power_and_count_from_length, power_and_count_from_length_exact, Arq, ArqStart};
+use super::{power_and_count_from_length_exact, Arq, ArqSize, ArqStart};
 
 /// A collection of ArqBounds.
 /// All bounds are guaranteed to be quantized to the same power
@@ -14,6 +14,7 @@ use super::{power_and_count_from_length, power_and_count_from_length_exact, Arq,
     Clone,
     PartialEq,
     Eq,
+    Hash,
     derive_more::Deref,
     derive_more::DerefMut,
     derive_more::IntoIterator,
@@ -63,6 +64,16 @@ impl<S: ArqStart> ArqSet<S> {
         Self::new(vec![arq])
     }
 
+    /// Singleton set
+    #[cfg(feature = "test_utils")]
+    pub fn full_std() -> Self {
+        Self::new(vec![Arq::<S>::new_full_max(
+            SpaceDimension::standard(),
+            &ArqStrat::default(),
+            S::zero(),
+        )])
+    }
+
     /// Get a reference to the arq set's power.
     pub fn power(&self) -> u8 {
         self.power
@@ -71,6 +82,11 @@ impl<S: ArqStart> ArqSet<S> {
     /// Get a reference to the arq set's arqs.
     pub fn arqs(&self) -> &[Arq<S>] {
         self.arqs.as_ref()
+    }
+
+    /// Convert to a set of "continuous" arcs using standard topology
+    pub fn to_dht_arc_set_std(&self) -> DhtArcSet {
+        self.to_dht_arc_set(SpaceDimension::standard())
     }
 
     /// Convert to a set of "continuous" arcs
@@ -153,36 +169,12 @@ impl ArqSet {
                 .into_iter()
                 .map(|i| {
                     let len = i.length();
-                    let (pow, _) = power_and_count_from_length_exact(dim, len, strat.min_chunks())?;
-                    ArqBounds::from_interval(dim, pow, i)
+                    let ArqSize { power, .. } =
+                        power_and_count_from_length_exact(dim, len, strat.min_chunks())?;
+                    ArqBounds::from_interval(dim, power, i)
                 })
                 .collect::<Option<Vec<_>>>()?,
         ))
-    }
-
-    /// Convert back from a continuous arc set to a quantized one.
-    /// If the match is not exact, return the nearest possible quantized arcs.
-    pub fn from_dht_arc_set_rounded(
-        dim: impl SpaceDim,
-        strat: &ArqStrat,
-        dht_arc_set: &DhtArcSet,
-    ) -> (Self, bool) {
-        let max_chunks = strat.max_chunks();
-        let mut rounded = false;
-        let arqs = dht_arc_set
-            .intervals()
-            .into_iter()
-            .map(|i| {
-                let len = i.length();
-                let (pow, _) = power_and_count_from_length(dim.get(), len, max_chunks);
-                let (a, r) = ArqBounds::from_interval_rounded(dim, pow, i);
-                if r {
-                    rounded = true;
-                }
-                a
-            })
-            .collect::<Vec<_>>();
-        (Self::new(arqs), rounded)
     }
 }
 
@@ -214,14 +206,13 @@ pub fn print_arqs<S: ArqStart>(dim: impl SpaceDim, arqs: &[Arq<S>], len: usize) 
 
 #[cfg(test)]
 mod tests {
-
-    use crate::prelude::pow2;
-
     use super::*;
+    use crate::prelude::pow2;
+    use kitsune_p2p_dht_arc::DhtArcRange;
 
     #[test]
     fn intersect_arqs() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let topo = Topology::unit_zero();
         let a = Arq::new(27, 536870912u32.into(), 11.into());
         let b = Arq::new(27, 805306368u32.into(), 11.into());
@@ -237,7 +228,7 @@ mod tests {
 
     #[test]
     fn intersect_arqs_multi() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let topo = Topology::unit_zero();
 
         let pow = 26;
@@ -313,66 +304,99 @@ mod tests {
         );
     }
 
-    proptest::proptest! {
-
-    /// Test that arqs maintain their resolution when the power factor is lost
     #[test]
-    #[ignore = "we KNOW this test doesn't pass, but it's a useful one to illustrate the problem
-                with using rounding for converting from DhtArcSet to ArqSet"]
-    fn rounded_arcset(
-        p1 in 12u8..17, s1: u32, c1: u32,
-        p2 in 12u8..17, s2: u32, c2: u32,
-        // p3 in 12u8..17, s3: u32, c3: u32,
-    ) {
-        use crate::Loc;
-
-        let topo = Topology::standard_epoch_full();
+    fn arq_set_is_union() {
+        let dim = SpaceDimension::standard();
         let strat = ArqStrat::default();
 
-        let c1 = strat.min_chunks() + c1 % (strat.max_chunks() - strat.min_chunks());
-        let c2 = strat.min_chunks() + c2 % (strat.max_chunks() - strat.min_chunks());
-        // let c3 = strat.min_chunks() + c3 % (strat.max_chunks() - strat.min_chunks());
+        let start_a = 10_000;
+        let len_a = 30_000;
+        let arq_a =
+            Arq::from_start_and_half_len_approximate(dim, &strat, start_a.into(), len_a / 2);
 
-        let arq1 = Arq::new(p1, Loc::from(s1), c1.into());
-        let arq2 = Arq::new(p2, Loc::from(s2), c2.into());
-        // let arq3 = Arq::new(p3, Loc::from(s3), c3.into());
+        let start_b = 10_000_000;
+        let len_b = 20_000;
+        let arq_b =
+            Arq::from_start_and_half_len_approximate(dim, &strat, start_b.into(), len_b / 2);
 
-        println!("...");
-        println!("### arqs ###");
-        println!("     |{}| {} {}", arq1.to_ascii(&topo, 64), arq1.power, *arq1.count);
-        println!("     |{}| {} {}", arq2.to_ascii(&topo, 64), arq2.power, *arq2.count);
+        let arq_set = ArqSet::new(vec![arq_a.to_bounds_std(), arq_b.to_bounds_std()]);
+        let arc_set = arq_set.to_dht_arc_set_std();
 
-        let arc1 = arq1.to_dht_arc_range(&topo);
-        let arc2 = arq2.to_dht_arc_range(&topo);
+        // Before first interval
+        {
+            let agent_arc_before_a =
+                Arq::from_start_and_half_len_approximate(dim, &strat, 100.into(), 100);
+            let interval = DhtArcRange::from(agent_arc_before_a.to_dht_arc_std());
 
-        println!("### arc conversion ###");
-        arc1.print(64);
-        arc2.print(64);
+            assert!(!arc_set.overlap(&interval.into()));
+        }
 
-        let arcset: DhtArcSet = vec![
-            arq1.to_bounds(&topo).to_dht_arc_range(&topo),
-            arq2.to_bounds(&topo).to_dht_arc_range(&topo),
-            // arq3.to_bounds(&topo).to_dht_arc_range(&topo)
-        ].into();
+        // Overlaps with start of first interval
+        {
+            let agent_arc_overlap_start_a = Arq::from_start_and_half_len_approximate(
+                dim,
+                &strat,
+                (start_a - 1_000).into(),
+                1_500,
+            );
+            let interval = DhtArcRange::from(agent_arc_overlap_start_a.to_dht_arc_std());
 
-        println!("### arcset ###");
-        arcset.print_arcs(64);
+            assert!(arc_set.overlap(&interval.into()));
+        }
 
-        println!("### roundtrip arcset ###");
-        let (arqs, rounded) = ArqSet::from_dht_arc_set_rounded(&topo, &strat, &arcset);
-        arqs.to_dht_arc_set(&topo).print_arcs(64);
+        // Inside first interval
+        {
+            let agent_arc_inside_a = Arq::from_start_and_half_len_approximate(
+                dim,
+                &strat,
+                (start_a + 100).into(),
+                len_a / 10,
+            );
+            let interval = DhtArcRange::from(agent_arc_inside_a.to_dht_arc_std());
 
-        println!("### roundtrip arqset ###");
-        arqs.print_arqs(&topo, 64);
+            assert!(arc_set.overlap(&interval.into()));
+        }
 
-        // The actual test
-        assert!(!rounded);
+        // Overlaps with the end of the first interval
+        {
+            let agent_arc_overlap_end_a = Arq::from_start_and_half_len_approximate(
+                dim,
+                &strat,
+                (start_a + len_a - 1_000).into(),
+                1_500,
+            );
+            let interval = agent_arc_overlap_end_a.to_dht_arc_range_std();
+
+            assert!(arc_set.overlap(&interval.into()));
+        }
+
+        // Between the two intervals
+        {
+            let agent_arc_between =
+                Arq::from_start_and_half_len_approximate(dim, &strat, 1_000_000.into(), 1_000);
+            let interval = DhtArcRange::from(agent_arc_between.to_dht_arc_std());
+
+            assert!(!arc_set.overlap(&interval.into()));
+        }
+
+        // Overlap with the start of the second interval
+        {
+            let agent_arc_overlap_start_b = Arq::from_start_and_half_len_approximate(
+                dim,
+                &strat,
+                (start_b - 10_000).into(),
+                15_000,
+            );
+            let interval = DhtArcRange::from(agent_arc_overlap_start_b.to_dht_arc_std());
+
+            assert!(arc_set.overlap(&interval.into()));
+        }
     }
 
+    proptest::proptest! {
+
     #[test]
-    #[ignore = "we KNOW this test doesn't pass, but it's a useful one to illustrate the problem
-                with using rounding for converting from DhtArcSet to ArqSet"]
-    fn rounded_arcset_intersections(
+    fn arqset_intersection_smoke(
         p1 in 12u8..17, s1: u32, c1: u32,
         p2 in 12u8..17, s2: u32, c2: u32,
         p3 in 12u8..17, s3: u32, c3: u32,
@@ -380,7 +404,6 @@ mod tests {
         p5 in 12u8..17, s5: u32, c5: u32,
         p6 in 12u8..17, s6: u32, c6: u32,
     ) {
-    // fn rounded_arcset_intersections() {
         use crate::Loc;
 
         let topo = Topology::standard_epoch_full();
@@ -400,40 +423,11 @@ mod tests {
         let arq5 = Arq::new(p5, Loc::from(s5), c5.into());
         let arq6 = Arq::new(p6, Loc::from(s6), c6.into());
 
-        let arcset1: DhtArcSet = vec![
-            arq1.to_bounds(&topo).to_dht_arc_range(&topo),
-            arq2.to_bounds(&topo).to_dht_arc_range(&topo),
-            arq3.to_bounds(&topo).to_dht_arc_range(&topo)
-        ].into();
-        let arcset2: DhtArcSet = vec![
-            arq4.to_bounds(&topo).to_dht_arc_range(&topo),
-            arq5.to_bounds(&topo).to_dht_arc_range(&topo),
-            arq6.to_bounds(&topo).to_dht_arc_range(&topo)
-        ].into();
+        let arcset1 = ArqSet::new(vec![ arq1, arq2, arq3 ]);
+        let arcset2 = ArqSet::new(vec![ arq4, arq5, arq6 ]);
 
-        println!("### original ###");
-        arcset1.print_arcs(64);
-        arcset2.print_arcs(64);
-
-        println!("### individual roundtrips ###");
-        let (arqs1, rounded1) = ArqSet::from_dht_arc_set_rounded(&topo, &strat, &arcset1);
-        let (arqs2, rounded2) = ArqSet::from_dht_arc_set_rounded(&topo, &strat, &arcset2);
-        arqs1.to_dht_arc_set(&topo).print_arcs(64);
-        assert!(!rounded1);
-        arqs2.to_dht_arc_set(&topo).print_arcs(64);
-        assert!(!rounded2);
-
-        println!("### common ###");
-        let common = arcset1.intersection(&arcset2);
-        common.print_arcs(64);
-        let (arqs, rounded) = ArqSet::from_dht_arc_set_rounded(&topo, &strat, &common);
-
-        println!("### common roundtrip ###");
-        let roundtrip = arqs.to_dht_arc_set(&topo);
-        roundtrip.print_arcs(64);
-
-        println!("...");
-        assert!(!rounded);
+        // This can panic
+        arcset1.intersection(&topo, &arcset2);
 
     }
     }

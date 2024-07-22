@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use super::InterfaceApi;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::api::error::SerializationError;
@@ -17,49 +16,51 @@ use tracing::*;
 
 pub use holochain_conductor_api::*;
 
-/// A trait for the interface that a Conductor exposes to the outside world to use for administering the conductor.
-/// This trait has one mock implementation and one "real" implementation
-#[async_trait::async_trait]
-pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
-    /// Call an admin function to modify this Conductor's behavior
-    async fn handle_admin_request_inner(
-        &self,
-        request: AdminRequest,
-    ) -> ConductorApiResult<AdminResponse>;
-
-    // -- provided -- //
-
-    /// Deal with error cases produced by `handle_admin_request_inner`
-    async fn handle_admin_request(&self, request: AdminRequest) -> AdminResponse {
-        debug!("admin request: {:?}", request);
-
-        let res = match self.handle_admin_request_inner(request).await {
-            Ok(response) => response,
-            Err(e) => AdminResponse::Error(e.into()),
-        };
-        debug!("admin response: {:?}", res);
-        res
-    }
-}
-
 /// The admin interface that external connections
 /// can use to make requests to the conductor
 /// The concrete (non-mock) implementation of the AdminInterfaceApi
 #[derive(Clone)]
-pub struct RealAdminInterfaceApi {
+pub struct AdminInterfaceApi {
     /// Mutable access to the Conductor
     conductor_handle: ConductorHandle,
 }
 
-impl RealAdminInterfaceApi {
+impl AdminInterfaceApi {
     /// Create an admin interface api.
     pub fn new(conductor_handle: ConductorHandle) -> Self {
-        RealAdminInterfaceApi { conductor_handle }
+        AdminInterfaceApi { conductor_handle }
     }
-}
 
-#[async_trait::async_trait]
-impl AdminInterfaceApi for RealAdminInterfaceApi {
+    /// Handle an [AdminRequest] and return an [AdminResponse].
+    pub async fn handle_request(
+        &self,
+        request: Result<AdminRequest, SerializedBytesError>,
+    ) -> InterfaceResult<AdminResponse> {
+        // Don't hold the read across both awaits
+        {
+            self.conductor_handle
+                .check_running()
+                .map_err(Box::new)
+                .map_err(InterfaceError::RequestHandler)?;
+        }
+        match request {
+            Ok(request) => Ok(self.handle_admin_request(request).await),
+            Err(e) => Ok(AdminResponse::Error(SerializationError::from(e).into())),
+        }
+    }
+
+    /// Deal with error cases produced by `handle_admin_request_inner`
+    pub(crate) async fn handle_admin_request(&self, request: AdminRequest) -> AdminResponse {
+        debug!("admin request: {:?}", request);
+
+        let res = self
+            .handle_admin_request_inner(request)
+            .await
+            .unwrap_or_else(|e| AdminResponse::Error(e.into()));
+        debug!("admin response: {:?}", res);
+        res
+    }
+
     async fn handle_admin_request_inner(
         &self,
         request: AdminRequest,
@@ -144,8 +145,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .conductor_handle
                     .clone()
                     .install_app_bundle(*payload)
-                    .await?
-                    .into();
+                    .await?;
                 let dna_definitions = self.conductor_handle.get_dna_definitions(&app)?;
                 Ok(AdminResponse::AppInstalled(AppInfo::from_installed_app(
                     &app,
@@ -222,12 +222,17 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             AttachAppInterface {
                 port,
                 allowed_origins,
+                installed_app_id,
             } => {
                 let port = port.unwrap_or(0);
                 let port = self
                     .conductor_handle
                     .clone()
-                    .add_app_interface(either::Either::Left(port), allowed_origins)
+                    .add_app_interface(
+                        either::Either::Left(port),
+                        allowed_origins,
+                        installed_app_id,
+                    )
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
@@ -297,29 +302,22 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             StorageInfo => Ok(AdminResponse::StorageInfo(
                 self.conductor_handle.storage_info().await?,
             )),
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl InterfaceApi for RealAdminInterfaceApi {
-    type ApiRequest = AdminRequest;
-    type ApiResponse = AdminResponse;
-
-    async fn handle_request(
-        &self,
-        request: Result<Self::ApiRequest, SerializedBytesError>,
-    ) -> InterfaceResult<Self::ApiResponse> {
-        // Don't hold the read across both awaits
-        {
-            self.conductor_handle
-                .check_running()
-                .map_err(Box::new)
-                .map_err(InterfaceError::RequestHandler)?;
-        }
-        match request {
-            Ok(request) => Ok(AdminInterfaceApi::handle_admin_request(self, request).await),
-            Err(e) => Ok(AdminResponse::Error(SerializationError::from(e).into())),
+            IssueAppAuthenticationToken(payload) => {
+                Ok(AdminResponse::AppAuthenticationTokenIssued(
+                    self.conductor_handle
+                        .issue_app_authentication_token(payload)?,
+                ))
+            }
+            RevokeAppAuthenticationToken(token) => {
+                self.conductor_handle
+                    .revoke_app_authentication_token(token)?;
+                Ok(AdminResponse::AppAuthenticationTokenRevoked)
+            }
+            GetCompatibleCells(dna_hash) => Ok(AdminResponse::CompatibleCells(
+                self.conductor_handle
+                    .cells_by_dna_lineage(&dna_hash)
+                    .await?,
+            )),
         }
     }
 }
@@ -339,14 +337,14 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_list_dna_app() -> Result<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let env_dir = test_db_dir();
         let handle = Conductor::builder()
             .with_data_root_path(env_dir.path().to_path_buf().into())
             .test(&[])
             .await?;
 
-        let admin_api = RealAdminInterfaceApi::new(handle.clone());
+        let admin_api = AdminInterfaceApi::new(handle.clone());
         let network_seed = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &network_seed.to_string(),
@@ -395,7 +393,7 @@ mod test {
             .await;
         assert_matches!(
             hash_install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna")
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == *"DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
         );
 
         // with a property should install and produce a different hash
@@ -469,7 +467,7 @@ mod test {
     // @todo fix test by using new InstallApp call
     // #[tokio::test(flavor = "multi_thread")]
     // async fn install_list_dna_app() {
-    // holochain_trace::test_run().ok();
+    // holochain_trace::test_run();
     // let db_dir = test_db_dir();
     // let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
     // let shutdown = handle.take_shutdown_handle().unwrap();

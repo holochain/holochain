@@ -238,6 +238,7 @@ pub(crate) fn peer_connect(
     })
 }
 
+#[derive(Debug)]
 pub(crate) enum SearchRemotesCoveringBasisLogicResult {
     Success(Vec<AgentInfoSigned>),
     Error(KitsuneP2pError),
@@ -288,12 +289,17 @@ impl SearchRemotesCoveringBasisLogic {
                 continue;
             }
 
-            // skip nodes that can't tell us about any peers
-            if node.storage_arc.range().is_empty() {
+            // skip nodes that aren't willing to store data
+            if node.storage_arc().range().is_empty() {
                 continue;
             }
 
-            if node.storage_arc.contains(self.basis_loc) {
+            if node.storage_arc().contains(self.basis_loc) {
+                tracing::info!(
+                    "found node covering basis_loc {:?} {:?}",
+                    node,
+                    self.basis_loc
+                );
                 cover_nodes.push(node);
             } else {
                 near_nodes.push(node);

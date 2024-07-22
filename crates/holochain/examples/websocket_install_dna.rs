@@ -3,7 +3,7 @@
 // use holochain_types::prelude::write_fake_dna_file;
 // use holochain_wasm_test_utils::TestWasm;
 
-#[path = "../tests/test_utils/mod.rs"]
+#[path = "../tests/tests/test_utils/mod.rs"]
 mod test_utils;
 
 // use test_utils::*;
@@ -15,7 +15,7 @@ pub async fn main() {
     //     static NUM_CONCURRENT_INSTALLS: usize = 2;
     //     static REQ_TIMEOUT_MS: u64 = 30000;
 
-    //     holochain_trace::test_run().ok();
+    //     holochain_trace::test_run();
     //     // NOTE: This is a full integration test that
     //     // actually runs the holochain binary
 

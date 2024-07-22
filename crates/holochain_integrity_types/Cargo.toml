@@ -1,6 +1,6 @@
 [package]
 name = "holochain_integrity_types"
-version = "0.3.0-beta-dev.32"
+version = "0.4.0-dev.10"
 description = "Holochain integrity types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -11,16 +11,16 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-holo_hash = { version = "^0.3.0-beta-dev.27", path = "../holo_hash" }
-holochain_serialized_bytes = "=0.0.53"
-holochain_util = { version = "^0.3.0-beta-dev.7", path = "../holochain_util", default-features = false }
-holochain_secure_primitive = { version = "^0.3.0-beta-dev.23", path = "../holochain_secure_primitive"}
+holo_hash = { version = "^0.4.0-dev.9", path = "../holo_hash" }
+holochain_serialized_bytes = "=0.0.55"
+holochain_util = { version = "^0.4.0-dev.2", path = "../holochain_util", default-features = false }
+holochain_secure_primitive = { version = "^0.4.0-dev.1", path = "../holochain_secure_primitive" }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 
 # Just the bare minimum timestamp with no extra features.
 # TODO: This needs to point to a published version of this crate and be pinned.
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.9", path = "../kitsune_p2p/timestamp", default-features = false }
+kitsune_p2p_timestamp = { version = "^0.4.0-dev.2", path = "../kitsune_p2p/timestamp", default-features = false }
 
 # TODO: Figure out how to remove these dependencies.
 subtle = "2"
@@ -30,13 +30,13 @@ derive_builder = { version = "0.20", optional = true }
 
 # Optional
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
-proptest = {version = "1", optional = true}
-proptest-derive = {version = "0", optional = true}
-subtle-encoding = {version = "0.5", optional = true}
+proptest = { version = "1", optional = true }
+proptest-derive = { version = "0", optional = true }
+subtle-encoding = { version = "0.5", optional = true }
 tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]
-holochain_integrity_types = { path = ".", features = ["test_utils", "fuzzing"]}
+holochain_integrity_types = { path = ".", features = ["test_utils", "fuzzing"] }
 serde_json = "1.0"
 
 [lints]
@@ -45,9 +45,7 @@ workspace = true
 [features]
 default = []
 
-hashing = [
-    "holo_hash/hashing",
-]
+hashing = ["holo_hash/hashing"]
 
 full = ["default", "hashing", "subtle-encoding", "kitsune_p2p_timestamp/full"]
 

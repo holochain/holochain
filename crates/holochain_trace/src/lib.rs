@@ -105,7 +105,6 @@ pub use open::channel;
 pub use open::should_run;
 pub use open::{Config, Context, MsgWrap, OpenSpanExt};
 
-use crate::flames::{toml_path, FlameTimedConsole};
 use crate::writer::InMemoryWriter;
 pub use tracing;
 use tracing_subscriber::fmt::MakeWriter;
@@ -157,12 +156,16 @@ impl FromStr for Output {
 /// Run logging in a unit test.
 ///
 /// RUST_LOG must be set or this is a no-op.
-pub fn test_run() -> Result<(), errors::TracingError> {
+pub fn test_run() {
     if std::env::var_os("RUST_LOG").is_none() {
-        return Ok(());
+        return;
     }
 
-    init_fmt(Output::Log)
+    static INIT_ONCE: std::sync::Once = std::sync::Once::new();
+
+    INIT_ONCE.call_once(|| {
+        init_fmt(Output::Log).unwrap();
+    });
 }
 
 /// Run tracing in a test that uses open telemetry to
@@ -205,29 +208,6 @@ pub fn test_run_timed_flame() -> Result<Option<Box<impl Drop>>, errors::TracingE
     Ok(Some(Box::new(FlameTimed::new(writer_handle))))
 }
 
-/// Generate a flamegraph from timed spans "busy time".
-/// Takes a path where you are piping the output into.
-/// If the path is provided a flamegraph will automatically be generated.
-/// TODO: Get auto inferno to work
-/// for now use (fish, or the bash equiv):
-/// `2>| inferno-flamegraph > flamegraph_test_ice_(date +'%d-%m-%y-%X').svg`
-/// And run with `cargo test --quiet`
-#[deprecated]
-pub fn test_run_timed_flame_console(
-    path: Option<&str>,
-) -> Result<Option<impl Drop>, errors::TracingError> {
-    if std::env::var_os("RUST_LOG").is_none() {
-        return Ok(None);
-    }
-    init_fmt(Output::FlameTimed)?;
-    Ok(path.and_then(|p| {
-        toml_path().map(|mut t| {
-            t.push(p);
-            FlameTimedConsole::new(t)
-        })
-    }))
-}
-
 /// Generate a flamegraph from timed spans of "idle time".
 pub fn test_run_timed_ice() -> Result<Option<Box<impl Drop>>, errors::TracingError> {
     if std::env::var_os("RUST_LOG").is_none() {
@@ -241,29 +221,6 @@ pub fn test_run_timed_ice() -> Result<Option<Box<impl Drop>>, errors::TracingErr
         InMemoryWriter::new(buffer.clone())
     })?;
     Ok(Some(Box::new(FlameTimed::new(writer_handle))))
-}
-
-/// Generate a flamegraph from timed spans "idle time".
-/// Takes a path where you are piping the output into.
-/// If the path is provided a flamegraph will automatically be generated.
-/// TODO: Get auto inferno to work
-/// for now use (fish, or the bash equiv):
-/// `2>| inferno-flamegraph -c blue > flamegraph_test_ice_(date +'%d-%m-%y-%X').svg`
-/// And run with `cargo test --quiet`
-#[deprecated]
-pub fn test_run_timed_ice_console(
-    path: Option<&str>,
-) -> Result<Option<impl Drop>, errors::TracingError> {
-    if std::env::var_os("RUST_LOG").is_none() {
-        return Ok(None);
-    }
-    init_fmt(Output::IceTimed)?;
-    Ok(path.and_then(|p| {
-        toml_path().map(|mut t| {
-            t.push(p);
-            FlameTimedConsole::new(t)
-        })
-    }))
 }
 
 /// Build the canonical filter based on env
@@ -325,6 +282,11 @@ where
     W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
 {
     let filter = standard_filter()?;
+
+    println!(
+        "Initialising log output formatting with option {:?}",
+        output
+    );
 
     match output {
         Output::Json => Registry::default()

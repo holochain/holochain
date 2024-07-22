@@ -1,4 +1,4 @@
-use crate::ExternalApiWireError;
+use crate::{AppAuthenticationToken, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
@@ -16,22 +16,17 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AppRequest {
-    /// Get info about the app identified by the given `installed_app_id` argument,
-    /// including info about each cell installed by this app.
-    ///
-    /// Requires `installed_app_id`, because an app interface can be the interface to multiple
-    /// apps at the same time.
+    /// Get info about the app that you are connected to, including info about each cell installed
+    /// by this app.
     ///
     /// # Returns
     ///
     /// [`AppResponse::AppInfo`]
-    AppInfo {
-        /// The app ID for which to get information
-        installed_app_id: InstalledAppId,
-    },
+    AppInfo,
 
-    /// Call a zome function. See [`ZomeCall`]
-    /// to understand the data that must be provided.
+    /// Call a zome function.
+    ///
+    /// See [`ZomeCall`] to understand the data that must be provided.
     ///
     /// # Returns
     ///
@@ -81,6 +76,37 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::ListWasmHostFunctions`]
     ListWasmHostFunctions,
+
+    /// Provide the membrane proofs for this app, if this app was installed
+    /// using [`MemproofProvisioning::Deferred`].
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::Ok`]
+    ProvideMemproofs(MemproofMap),
+
+    /// Enable the app, only in special circumstances.
+    /// Can only be called while the app is in the `Disabled(NotStartedAfterProvidingMemproofs)` state.
+    /// Cannot be used to enable the app if it's in any other state, or Disabled for any other reason.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::Ok`]
+    EnableApp,
+    //
+    // TODO: implement after DPKI lands
+    // /// Replace the agent key associated with this app with a new one.
+    // /// The new key will be created using the same method which is used
+    // /// when installing an app with no agent key provided.
+    // ///
+    // /// This method is only available if this app was installed using [`MemproofProvisioning::Deferred`],
+    // /// and can only be called before [`AppRequest::ProvideMemproofs`] has been called.
+    // /// Until then, it can be called as many times as needed.
+    // ///
+    // /// # Returns
+    // ///
+    // /// [`AppResponse::AppAgentKeyRotated`]
+    // RotateAppAgentKey,
 }
 
 /// Represents the possible responses to an [`AppRequest`].
@@ -92,7 +118,7 @@ pub enum AppResponse {
     /// There has been an error during the handling of the request.
     Error(ExternalApiWireError),
 
-    /// The succesful response to an [`AppRequest::AppInfo`].
+    /// The successful response to an [`AppRequest::AppInfo`].
     ///
     /// Option will be `None` if there is no installed app with the given `installed_app_id`.
     AppInfo(Option<AppInfo>),
@@ -126,6 +152,12 @@ pub enum AppResponse {
 
     /// All the wasm host functions supported by this conductor.
     ListWasmHostFunctions(Vec<String>),
+
+    /// The app agent key as been rotated, and the new key is returned.
+    AppAgentKeyRotated(AgentPubKey),
+
+    /// Operation successful, no payload.
+    Ok,
 }
 
 /// The data provided over an app interface in order to make a zome call
@@ -214,7 +246,6 @@ impl ZomeCall {
     }
 }
 
-///
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CellInfo {
@@ -401,6 +432,7 @@ pub enum AppInfoStatus {
     Paused { reason: PausedAppReason },
     Disabled { reason: DisabledAppReason },
     Running,
+    AwaitingMemproofs,
 }
 
 impl From<AppStatus> for AppInfoStatus {
@@ -409,6 +441,7 @@ impl From<AppStatus> for AppInfoStatus {
             AppStatus::Running => AppInfoStatus::Running,
             AppStatus::Disabled(reason) => AppInfoStatus::Disabled { reason },
             AppStatus::Paused(reason) => AppInfoStatus::Paused { reason },
+            AppStatus::AwaitingMemproofs => AppInfoStatus::AwaitingMemproofs,
         }
     }
 }
@@ -419,6 +452,7 @@ impl From<AppInfoStatus> for AppStatus {
             AppInfoStatus::Running => AppStatus::Running,
             AppInfoStatus::Disabled { reason } => AppStatus::Disabled(reason),
             AppInfoStatus::Paused { reason } => AppStatus::Paused(reason),
+            AppInfoStatus::AwaitingMemproofs => AppStatus::AwaitingMemproofs,
         }
     }
 }
@@ -438,77 +472,88 @@ pub enum ScottyPanel {
     GossipInfo { last_round: Option<Timestamp> },
 }
 
-#[test]
-fn app_request_serialization() {
-    use rmp_serde::Deserializer;
-
-    // make sure requests are serialized as expected
-    let request = AppRequest::AppInfo {
-        installed_app_id: "some_id".to_string(),
-    };
-    let serialized_request = holochain_serialized_bytes::encode(&request).unwrap();
-    assert_eq!(
-        serialized_request,
-        vec![
-            130, 164, 116, 121, 112, 101, 129, 168, 97, 112, 112, 95, 105, 110, 102, 111, 192, 164,
-            100, 97, 116, 97, 129, 176, 105, 110, 115, 116, 97, 108, 108, 101, 100, 95, 97, 112,
-            112, 95, 105, 100, 167, 115, 111, 109, 101, 95, 105, 100
-        ]
-    );
-
-    let json_expected = r#"{"type":{"app_info":null},"data":{"installed_app_id":"some_id"}}"#;
-    let mut deserializer = Deserializer::new(&*serialized_request);
-    let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
-    let json_actual = serde_json::to_string(&json_value).unwrap();
-
-    assert_eq!(json_actual, json_expected);
-
-    // make sure responses are serialized as expected
-    let response =
-        AppResponse::ListWasmHostFunctions(vec!["host_fn_1".to_string(), "host_fn_2".to_string()]);
-    let serialized_response = holochain_serialized_bytes::encode(&response).unwrap();
-    assert_eq!(
-        serialized_response,
-        vec![
-            130, 164, 116, 121, 112, 101, 129, 184, 108, 105, 115, 116, 95, 119, 97, 115, 109, 95,
-            104, 111, 115, 116, 95, 102, 117, 110, 99, 116, 105, 111, 110, 115, 192, 164, 100, 97,
-            116, 97, 146, 169, 104, 111, 115, 116, 95, 102, 110, 95, 49, 169, 104, 111, 115, 116,
-            95, 102, 110, 95, 50
-        ]
-    );
-
-    let json_expected =
-        r#"{"type":{"list_wasm_host_functions":null},"data":["host_fn_1","host_fn_2"]}"#;
-    let mut deserializer = Deserializer::new(&*serialized_response);
-    let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
-    let json_actual = serde_json::to_string(&json_value).unwrap();
-
-    assert_eq!(json_actual, json_expected);
+/// The request payload that should be sent in a [`holochain_websocket::WireMessage::Authenticate`]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct AppAuthenticationRequest {
+    /// The authentication token that was provided by the conductor when [`AdminRequest::IssueAppInterfaceToken`] was called.
+    pub token: AppAuthenticationToken,
 }
 
-#[test]
-fn status_serialization() {
-    use serde_json;
+#[cfg(test)]
+mod tests {
+    use crate::{AppInfoStatus, AppRequest, AppResponse};
+    use holochain_types::app::{AppStatus, DisabledAppReason, PausedAppReason};
+    use serde::Deserialize;
 
-    let status: AppInfoStatus =
-        AppStatus::Disabled(DisabledAppReason::Error("because".into())).into();
+    #[test]
+    fn app_request_serialization() {
+        use rmp_serde::Deserializer;
 
-    assert_eq!(
-        serde_json::to_string(&status).unwrap(),
-        "{\"disabled\":{\"reason\":{\"error\":\"because\"}}}"
-    );
+        // make sure requests are serialized as expected
+        let request = AppRequest::AppInfo;
+        let serialized_request = holochain_serialized_bytes::encode(&request).unwrap();
+        assert_eq!(
+            serialized_request,
+            vec![129, 164, 116, 121, 112, 101, 168, 97, 112, 112, 95, 105, 110, 102, 111]
+        );
 
-    let status: AppInfoStatus = AppStatus::Paused(PausedAppReason::Error("because".into())).into();
+        let json_expected = r#"{"type":"app_info"}"#;
+        let mut deserializer = Deserializer::new(&*serialized_request);
+        let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
+        let json_actual = serde_json::to_string(&json_value).unwrap();
 
-    assert_eq!(
-        serde_json::to_string(&status).unwrap(),
-        "{\"paused\":{\"reason\":{\"error\":\"because\"}}}"
-    );
+        assert_eq!(json_actual, json_expected);
 
-    let status: AppInfoStatus = AppStatus::Disabled(DisabledAppReason::User).into();
+        // make sure responses are serialized as expected
+        let response = AppResponse::ListWasmHostFunctions(vec![
+            "host_fn_1".to_string(),
+            "host_fn_2".to_string(),
+        ]);
+        let serialized_response = holochain_serialized_bytes::encode(&response).unwrap();
+        assert_eq!(
+            serialized_response,
+            vec![
+                130, 164, 116, 121, 112, 101, 184, 108, 105, 115, 116, 95, 119, 97, 115, 109, 95,
+                104, 111, 115, 116, 95, 102, 117, 110, 99, 116, 105, 111, 110, 115, 164, 100, 97,
+                116, 97, 146, 169, 104, 111, 115, 116, 95, 102, 110, 95, 49, 169, 104, 111, 115,
+                116, 95, 102, 110, 95, 50
+            ]
+        );
 
-    assert_eq!(
-        serde_json::to_string(&status).unwrap(),
-        "{\"disabled\":{\"reason\":\"user\"}}"
-    );
+        let json_expected =
+            r#"{"type":"list_wasm_host_functions","data":["host_fn_1","host_fn_2"]}"#;
+        let mut deserializer = Deserializer::new(&*serialized_response);
+        let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
+        let json_actual = serde_json::to_string(&json_value).unwrap();
+
+        assert_eq!(json_actual, json_expected);
+    }
+
+    #[test]
+    fn status_serialization() {
+        use serde_json;
+
+        let status: AppInfoStatus =
+            AppStatus::Disabled(DisabledAppReason::Error("because".into())).into();
+
+        assert_eq!(
+            serde_json::to_string(&status).unwrap(),
+            "{\"disabled\":{\"reason\":{\"error\":\"because\"}}}"
+        );
+
+        let status: AppInfoStatus =
+            AppStatus::Paused(PausedAppReason::Error("because".into())).into();
+
+        assert_eq!(
+            serde_json::to_string(&status).unwrap(),
+            "{\"paused\":{\"reason\":{\"error\":\"because\"}}}"
+        );
+
+        let status: AppInfoStatus = AppStatus::Disabled(DisabledAppReason::User).into();
+
+        assert_eq!(
+            serde_json::to_string(&status).unwrap(),
+            "{\"disabled\":{\"reason\":\"user\"}}"
+        );
+    }
 }

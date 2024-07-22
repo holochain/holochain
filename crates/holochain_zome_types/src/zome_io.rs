@@ -198,6 +198,15 @@ wasm_io_types! {
 
     // Delete a clone cell.
     fn delete_clone_cell(zt::clone::DeleteCloneCellInput) -> ();
+
+    // Close your source chain, indicating that you are migrating to a new DNA
+    fn close_chain(zt::chain::CloseChainInput) -> holo_hash::ActionHash;
+
+    // Open your chain, pointing to the previous DNA
+    fn open_chain(zt::chain::OpenChainInput) -> holo_hash::ActionHash;
+
+    // Get validation receipts for an action
+    fn get_validation_receipts(zt::validate::GetValidationReceiptsInput) -> Vec<zt::validate::ValidationReceiptSet>;
 }
 
 /// Anything that can go wrong while calling a HostFnApi method

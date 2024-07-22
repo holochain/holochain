@@ -225,7 +225,7 @@ impl AgentStore {
                     return None;
                 }
 
-                let interval = DhtArcRange::from(info.storage_arc);
+                let interval = DhtArcRange::from(info.storage_arq.to_dht_arc_std());
                 if !arcset.overlap(&interval.into()) {
                     return None;
                 }
@@ -242,7 +242,7 @@ impl AgentStore {
             .values()
             .filter_map(|v| {
                 if v.is_active() {
-                    Some((v.storage_arc.dist(basis), v))
+                    Some((v.storage_arc().dist(basis), v))
                 } else {
                     None
                 }
@@ -255,6 +255,7 @@ impl AgentStore {
 
         Ok(out
             .into_iter()
+            .filter(|(dist, _)| *dist != u32::MAX) // Filter out Zero arcs
             .take(limit as usize)
             .map(|(_, v)| v.clone())
             .collect())
@@ -645,13 +646,14 @@ impl P2pRecord {
 
         let signed_at_ms = signed.signed_at_ms;
         let expires_at_ms = signed.expires_at_ms;
-        let arc = signed.storage_arc;
+        let arq = signed.storage_arq;
 
-        let storage_center_loc = arc.start_loc().into();
+        let storage_center_loc = arq.start_loc().into();
 
         let is_active = signed.is_active();
 
-        let (storage_start_loc, storage_end_loc) = arc.to_primitive_bounds_detached();
+        let (storage_start_loc, storage_end_loc) =
+            arq.to_dht_arc_std().to_primitive_bounds_detached();
 
         Ok(Self {
             agent,

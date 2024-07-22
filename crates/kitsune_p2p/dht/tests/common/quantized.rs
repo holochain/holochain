@@ -46,7 +46,7 @@ where
     let mut runs = vec![];
     for i in 1..=iters {
         tracing::debug!("----- Running equilibrium iteration {} -----", i);
-        let run = seek_convergence(peers.clone(), |peers| step(peers));
+        let run = seek_convergence(peers.clone(), step.clone());
         let vergence = run.vergence;
         runs.push(run);
         if vergence == Divergent {
@@ -59,7 +59,7 @@ where
 /// Run iterations until there is no movement of any arc
 /// TODO: this may be unreasonable, and we may need to just ensure that arcs
 /// settle down into a reasonable level of oscillation
-pub fn seek_convergence<'a, F>(peers: Peers, step: F) -> Run
+pub fn seek_convergence<F>(peers: Peers, step: F) -> Run
 where
     F: Fn(Peers) -> (Peers, EpochStats),
 {
@@ -139,17 +139,19 @@ pub fn run_one_epoch(
                 continue;
             }
         }
-        let mut arq = peers.get_mut(i).unwrap();
+        let arq = peers.get_mut(i).unwrap();
         let before = arq.absolute_length(topo) as f64;
         let before_pow = arq.power();
 
-        let stats = view.update_arq_with_stats(&mut arq);
+        let stats = view.update_arq_with_stats(arq);
 
         let after = arq.absolute_length(topo) as f64;
         let delta = (after - before) / topo.space.quantum as f64;
 
         if detail {
             let d = delta as i64 / 2i64.pow(before_pow as u32);
+            // clippy... sometimes ifs are just easier to visually parse
+            #[allow(clippy::comparison_chain)]
             let delta_str = if d == 0 {
                 "    ".into()
             } else if d > 0 {
@@ -163,7 +165,7 @@ pub fn run_one_epoch(
                 delta_str
             };
 
-            let cov = view.extrapolated_coverage(&arq);
+            let cov = view.extrapolated_coverage(arq);
             let slack_factor = view.slack_factor(cov, stats.num_peers);
 
             let slack_str = if slack_factor == 1.0 {
@@ -332,7 +334,7 @@ impl RunBatch {
                 num_epochs,
                 redundancy_stats: Stats::new(DataVec::new(
                     self.histories()
-                        .map(|hs| {
+                        .flat_map(|hs| {
                             let mut hs = hs.clone();
                             hs.reverse();
                             hs.into_iter()
@@ -340,7 +342,6 @@ impl RunBatch {
                                 .map(|e| e.min_redundancy as f64)
                                 .collect::<Vec<_>>()
                         })
-                        .flatten()
                         .collect(),
                 )),
             },
@@ -425,9 +426,8 @@ pub struct EpochStats {
 
 impl EpochStats {
     pub fn oneline_header() -> String {
-        format!(
-            "rdun   net Δ%   gross Δ%   min Δ%   max Δ%   avg cov   min pow   avg pow   max pow"
-        )
+        "rdun   net Δ%   gross Δ%   min Δ%   max Δ%   avg cov   min pow   avg pow   max pow"
+            .to_string()
     }
 
     pub fn oneline(&self) -> String {

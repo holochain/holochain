@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 use crate::actor::BroadcastData;
 use crate::spawn::actor::{
     EvtRcv, InternalHandlerResult, KSpace, MaybeDelegate, OpHashList, VecMXM,
@@ -90,6 +91,10 @@ impl InternalStub {
 impl GhostControlHandler for InternalStub {}
 impl GhostHandler<Internal> for InternalStub {}
 impl InternalHandler for InternalStub {
+    fn handle_new_address(&mut self, _: String) -> InternalHandlerResult<()> {
+        todo!()
+    }
+
     fn handle_register_space_event_handler(&mut self, _recv: EvtRcv) -> InternalHandlerResult<()> {
         todo!()
     }

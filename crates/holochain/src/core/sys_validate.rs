@@ -13,7 +13,6 @@ pub use error::*;
 pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-pub use holochain_zome_types::prelude::*;
 
 #[allow(missing_docs)]
 mod error;
@@ -38,7 +37,22 @@ pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysVal
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::Counterfeit((*sig).clone(), (*action).clone()),
+            ValidationOutcome::CounterfeitAction((*sig).clone(), (*action).clone()),
+        ))
+    }
+}
+
+/// Verify the signature for this warrant
+pub async fn verify_warrant_signature(warrant_op: &WarrantOp) -> SysValidationResult<()> {
+    if warrant_op
+        .author
+        .verify_signature(warrant_op.signature(), warrant_op.warrant().clone())
+        .await?
+    {
+        Ok(())
+    } else {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::CounterfeitWarrant(warrant_op.warrant().clone()),
         ))
     }
 }
@@ -339,7 +353,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 }
 
 /// Check that the EntryVisibility is congruous with the presence or absence of entry data
-pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
+pub fn check_entry_visibility(op: &ChainOp) -> SysValidationResult<()> {
     use EntryVisibility::*;
     use RecordEntry::*;
 
@@ -361,7 +375,7 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
         (Some(_), NA) => err("There is action entry data but the entry itself is N/A"),
         (Some(Private), Present(_)) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
         (Some(Public), NotStored) => {
-            if op.get_type() == DhtOpType::RegisterAgentActivity
+            if op.get_type() == ChainOpType::RegisterAgentActivity
                 || op.action().entry_type() == Some(&EntryType::AgentPubKey)
             {
                 // RegisterAgentActivity is a special case, where the entry data can be omitted.
@@ -558,7 +572,7 @@ impl DhtOpSender for IncomingDhtOpSender {
     }
 
     async fn send_store_record(&self, record: Record) -> SysValidationResult<()> {
-        self.send_op(make_store_record(record)).await
+        self.send_op(make_store_record(record).into()).await
     }
 
     async fn send_store_entry(&self, record: Record) -> SysValidationResult<()> {
@@ -568,7 +582,7 @@ impl DhtOpSender for IncomingDhtOpSender {
         });
         if is_public_entry {
             if let Some(op) = make_store_entry(record) {
-                self.send_op(op).await?;
+                self.send_op(op.into()).await?;
             }
         }
         Ok(())
@@ -576,42 +590,43 @@ impl DhtOpSender for IncomingDhtOpSender {
 
     async fn send_register_add_link(&self, record: Record) -> SysValidationResult<()> {
         if let Some(op) = make_register_add_link(record) {
-            self.send_op(op).await?;
+            self.send_op(op.into()).await?;
         }
 
         Ok(())
     }
 
     async fn send_register_agent_activity(&self, record: Record) -> SysValidationResult<()> {
-        self.send_op(make_register_agent_activity(record)).await
+        self.send_op(make_register_agent_activity(record).into())
+            .await
     }
 }
 
-/// Make a StoreRecord DhtOp from a Record.
+/// Make a StoreRecord ChainOp from a Record.
 /// Note that this can fail if the op is missing an
 /// Entry when it was supposed to have one.
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_record(record: Record) -> DhtOp {
+fn make_store_record(record: Record) -> ChainOp {
     // Extract the data
     let (shh, record_entry) = record.privatized().0.into_inner();
     let (action, signature) = shh.into_inner();
     let action = action.into_content();
 
     // Create the op
-    DhtOp::StoreRecord(signature, action, record_entry)
+    ChainOp::StoreRecord(signature, action, record_entry)
 }
 
-/// Make a StoreEntry DhtOp from a Record.
+/// Make a StoreEntry ChainOp from a Record.
 /// Note that this can fail if the op is missing an Entry or
 /// the action is the wrong type.
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_entry(record: Record) -> Option<DhtOp> {
+fn make_store_entry(record: Record) -> Option<ChainOp> {
     // Extract the data
     let (shh, record_entry) = record.into_inner();
     let (action, signature) = shh.into_inner();
@@ -622,17 +637,17 @@ fn make_store_entry(record: Record) -> Option<DhtOp> {
     let action = action.into_content().try_into().ok()?;
 
     // Create the op
-    let op = DhtOp::StoreEntry(signature, action, entry_box);
+    let op = ChainOp::StoreEntry(signature, action, entry_box);
     Some(op)
 }
 
-/// Make a RegisterAddLink DhtOp from a Record.
+/// Make a RegisterAddLink ChainOp from a Record.
 /// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_add_link(record: Record) -> Option<DhtOp> {
+fn make_register_add_link(record: Record) -> Option<ChainOp> {
     // Extract the data
     let (shh, _) = record.into_inner();
     let (action, signature) = shh.into_inner();
@@ -641,17 +656,17 @@ fn make_register_add_link(record: Record) -> Option<DhtOp> {
     let action = action.into_content().try_into().ok()?;
 
     // Create the op
-    let op = DhtOp::RegisterAddLink(signature, action);
+    let op = ChainOp::RegisterAddLink(signature, action);
     Some(op)
 }
 
-/// Make a RegisterAgentActivity DhtOp from a Record.
+/// Make a RegisterAgentActivity ChainOp from a Record.
 /// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_agent_activity(record: Record) -> DhtOp {
+fn make_register_agent_activity(record: Record) -> ChainOp {
     // Extract the data
     let (shh, _) = record.into_inner();
     let (action, signature) = shh.into_inner();
@@ -661,7 +676,7 @@ fn make_register_agent_activity(record: Record) -> DhtOp {
     let action = action.into_content();
 
     // Create the op
-    DhtOp::RegisterAgentActivity(signature, action)
+    ChainOp::RegisterAgentActivity(signature, action)
 }
 
 #[cfg(test)]
@@ -709,11 +724,8 @@ pub mod test {
             .await
             .unwrap();
 
-        assert_eq!(
-            check_countersigning_preflight_response_signature(&preflight_response)
-                .await
-                .unwrap(),
-            (),
-        );
+        check_countersigning_preflight_response_signature(&preflight_response)
+            .await
+            .unwrap();
     }
 }

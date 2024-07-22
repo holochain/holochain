@@ -30,7 +30,7 @@ async fn test_trigger_send() {
 
 #[tokio::test]
 async fn test_trigger_only_permits_single_trigger() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let (tx, mut rx) = TriggerSender::new();
     let jh = tokio::spawn(async move {
@@ -233,7 +233,7 @@ async fn publish_loop() {
     let action = Action::arbitrary(&mut u).unwrap();
     let author = action.author().clone();
     let signature = Signature::arbitrary(&mut u).unwrap();
-    let op = DhtOp::RegisterAgentActivity(signature, action);
+    let op = ChainOp::RegisterAgentActivity(signature, action);
     let op = DhtOpHashed::from_content_sync(op);
     let op_hash = op.to_hash();
     db.write_async(move |txn| -> StateMutationResult<()> { mutations::insert_op(txn, &op) })

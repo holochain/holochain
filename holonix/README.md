@@ -11,7 +11,7 @@ input override feature.
 
 ```nix
 inputs = {
-  holochain-versions.url = "github:holochain/holochain?dir=versions/0_1";
+  holochain-versions.url = "github:holochain/holochain?dir=versions/0_2";
 
   holochain-flake.url = "github:holochain/holochain";
   holochain-flake.inputs.versions.follows = "holochain-versions";
@@ -22,7 +22,8 @@ inputs = {
 
 ```nix
 inputs = {
-  holochain-versions.url = "github:holochain/holochain?dir=versions/0_1"; holochain-versions.inputs.holochain.url = "github:holochain/holochain/holochain-0.1.5-beta-rc.0";
+  holochain-versions.url = "github:holochain/holochain?dir=versions/0_2";
+  holochain-versions.inputs.holochain.url = "github:holochain/holochain/holochain-0.2.6";
 
   holochain-flake.url = "github:holochain/holochain";
   holochain-flake.inputs.versions.follows = "holochain-versions";
@@ -33,12 +34,12 @@ or via their the toplevel component input:
 
 ```nix
 inputs = {
-  holochain-versions.url = "github:holochain/holochain?dir=versions/0_1";
+  holochain-versions.url = "github:holochain/holochain?dir=versions/0_2";
 
   holochain-flake.url = "github:holochain/holochain";
   holochain-flake.inputs.versions.follows = "holochain-versions";
 
-  holochain-flake.inputs.holochain.url = "github:holochain/holochain/holochain-0.1.5-beta-rc.0";
+  holochain-flake.inputs.holochain.url = "github:holochain/holochain/holochain-0.2.6";
 };
 ```
 

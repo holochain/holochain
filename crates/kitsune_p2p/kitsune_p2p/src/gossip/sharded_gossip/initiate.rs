@@ -1,7 +1,7 @@
-use kitsune_p2p_types::dht_arc::DhtArcRange;
-use rand::Rng;
-
 use super::*;
+use crate::metrics::{GENERATE_OP_BLOOMS_TIME, GENERATE_OP_REGION_SET_TIME};
+use kitsune_p2p_types::dht::{arq::ArqSet, ArqBounds};
+use rand::Rng;
 
 impl ShardedGossipLocal {
     /// Try to initiate gossip if we don't currently
@@ -30,15 +30,15 @@ impl ShardedGossipLocal {
         }
 
         // Get the local agents intervals.
-        let intervals: Vec<_> = agent_info_session
-            .local_arcs()
+        let intervals: Vec<ArqBounds> = agent_info_session
+            .local_arqs()
             .into_iter()
-            .map(DhtArcRange::from)
+            .map(|a| a.to_bounds_std())
             .collect();
 
         // Choose a remote agent to gossip with.
         let remote_agent = self
-            .find_remote_agent_within_arcset(Arc::new(intervals.clone().into()), agent_info_session)
+            .find_remote_agent_within_arcset(ArqSet::new(intervals.clone()), agent_info_session)
             .await?;
 
         let maybe_gossip = if let Some(next_target::Node {
@@ -49,6 +49,7 @@ impl ShardedGossipLocal {
         {
             let id = rand::thread_rng().gen();
 
+            // TODO Why send both the agents and the intervals? The agents contain their arcs
             let gossip = ShardedGossipWire::initiate(
                 intervals,
                 id,
@@ -80,7 +81,7 @@ impl ShardedGossipLocal {
     pub(super) async fn incoming_initiate(
         &self,
         peer_cert: NodeCert,
-        remote_arc_set: Vec<DhtArcRange>,
+        remote_arqs: Vec<ArqBounds>,
         remote_id: u32,
         remote_agent_list: Vec<AgentInfoSigned>,
         agent_info_session: &mut AgentInfoSession,
@@ -128,23 +129,23 @@ impl ShardedGossipLocal {
         }
 
         // Get the local intervals.
-        let local_arcs: Vec<DhtArcRange> = agent_info_session
-            .local_arcs()
+        let local_arqs: Vec<ArqBounds> = agent_info_session
+            .local_arqs()
             .into_iter()
-            .map(|arc| arc.into())
+            .map(|arc| arc.to_bounds_std())
             .collect();
 
         let agent_list = agent_info_session.get_local_agents().to_vec();
 
         // Send the intervals back as the accept message.
-        let mut gossip = vec![ShardedGossipWire::accept(local_arcs.clone(), agent_list)];
+        let mut gossip = vec![ShardedGossipWire::accept(local_arqs.clone(), agent_list)];
 
         // Generate the bloom filters and new state.
         let state = self
             .generate_blooms_or_regions(
                 remote_agent_list.clone(),
-                local_arcs,
-                remote_arc_set,
+                local_arqs,
+                remote_arqs,
                 &mut gossip,
                 agent_info_session,
             )
@@ -199,23 +200,37 @@ impl ShardedGossipLocal {
     pub(super) async fn generate_blooms_or_regions(
         &self,
         remote_agent_list: Vec<AgentInfoSigned>,
-        local_arcs: Vec<DhtArcRange>,
-        remote_arc_set: Vec<DhtArcRange>,
+        local_arqs: Vec<ArqBounds>,
+        remote_arqs: Vec<ArqBounds>,
         gossip: &mut Vec<ShardedGossipWire>,
         agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<RoundState> {
+        let topo = self
+            .host_api
+            .get_topology(self.space.clone())
+            .await
+            .map_err(KitsuneError::other)?;
+
         // Create the common arc set from the remote and local arcs.
-        let arc_set: DhtArcSet = local_arcs.into();
-        let remote_arc_set: DhtArcSet = remote_arc_set.into();
-        let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
+        let local_arqs = ArqSet::new(local_arqs);
+        let remote_arqs = ArqSet::new(remote_arqs);
+        let common_arqs = Arc::new(local_arqs.intersection(&topo, &remote_arqs));
 
         let region_set = if let GossipType::Historical = self.gossip_type {
+            let start = Instant::now();
             let region_set = store::query_region_set(
                 self.host_api.clone().api,
                 self.space.clone(),
-                common_arc_set.clone(),
+                (*common_arqs).clone(),
             )
             .await?;
+            GENERATE_OP_REGION_SET_TIME.record(
+                start.elapsed().as_secs_f64(),
+                &[opentelemetry_api::KeyValue::new(
+                    "space",
+                    format!("{:?}", self.space),
+                )],
+            );
             gossip.push(ShardedGossipWire::op_regions(region_set.clone()));
             Some(region_set)
         } else {
@@ -225,7 +240,7 @@ impl ShardedGossipLocal {
         // Generate the new state.
         let mut state = self.new_state(
             remote_agent_list,
-            common_arc_set,
+            common_arqs,
             region_set,
             self.tuning_params.gossip_round_timeout(),
         )?;
@@ -273,9 +288,24 @@ impl ShardedGossipLocal {
         if let Some(cursor) = state.bloom_batch_cursor.take() {
             window.start = cursor;
         }
+
+        let start = Instant::now();
         let blooms = self
-            .generate_op_blooms_for_time_window(&state.common_arc_set, window)
+            .generate_op_blooms_for_time_window(&state.common_arq_set, window)
             .await?;
+        GENERATE_OP_BLOOMS_TIME.record(
+            start.elapsed().as_secs_f64(),
+            &[
+                opentelemetry_api::KeyValue::new("space", format!("{:?}", self.space)),
+                opentelemetry_api::KeyValue::new(
+                    "batch_size",
+                    match &blooms {
+                        bloom::Batch::Complete(blooms) => blooms.len() as i64,
+                        bloom::Batch::Partial { data, .. } => data.len() as i64,
+                    },
+                ),
+            ],
+        );
 
         let blooms = match blooms {
             bloom::Batch::Complete(blooms) => blooms,

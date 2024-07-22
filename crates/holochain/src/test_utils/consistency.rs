@@ -687,6 +687,7 @@ where
         DhtOp.storage_center_loc as loc,
         DhtOp.type as dht_type,
         Action.blob as action_blob,
+        Action.author as author,
         Entry.blob as entry_blob
         FROM DhtOp
         JOIN
@@ -708,28 +709,15 @@ where
             ))?
             .query_and_then(
                 named_params! {
-                    ":store_entry": DhtOpType::StoreEntry,
+                    ":store_entry": ChainOpType::StoreEntry,
                     ":author": author,
                 },
                 |row| {
                     let h: DhtOpHash = row.get("dht_op_hash")?;
                     let loc: u32 = row.get("loc")?;
+                    let op = holochain_state::query::map_sql_dht_op(false, "dht_type", row)?;
 
-                    let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                    let op_type: DhtOpType = row.get("dht_type")?;
-                    let entry = match action.0.entry_type().map(|et| et.visibility()) {
-                        Some(EntryVisibility::Public) => {
-                            let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                            match entry {
-                                Some(entry) => Some(from_blob::<Entry>(entry)?),
-                                None => None,
-                            }
-                        }
-                        _ => None,
-                    };
-                    let op = DhtOp::from_type(op_type, action, entry)?;
-
-                    StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
+                    Ok((loc.into(), h.into_kitsune_raw(), op))
                 },
             )?
             .collect::<StateQueryResult<_>>()?
@@ -737,26 +725,12 @@ where
             txn.prepare(sql_common)?
                 .query_and_then(
                     named_params! {
-                        ":store_entry": DhtOpType::StoreEntry,
+                        ":store_entry": ChainOpType::StoreEntry,
                     },
                     |row| {
                         let h: DhtOpHash = row.get("dht_op_hash")?;
                         let loc: u32 = row.get("loc")?;
-
-                        let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                        let op_type: DhtOpType = row.get("dht_type")?;
-                        let entry = match action.0.entry_type().map(|et| et.visibility()) {
-                            Some(EntryVisibility::Public) => {
-                                let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                                match entry {
-                                    Some(entry) => Some(from_blob::<Entry>(entry)?),
-                                    None => None,
-                                }
-                            }
-                            _ => None,
-                        };
-                        let op = DhtOp::from_type(op_type, action, entry)?;
-
+                        let op = holochain_state::query::map_sql_dht_op(false, "dht_type", row)?;
                         StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
                     },
                 )?
@@ -772,5 +746,8 @@ async fn request_arc(
     db: &DbRead<DbKindP2pAgents>,
     agent: KitsuneAgent,
 ) -> StateQueryResult<Option<DhtArc>> {
-    Ok(db.p2p_get_agent(&agent).await?.map(|info| info.storage_arc))
+    Ok(db
+        .p2p_get_agent(&agent)
+        .await?
+        .map(|info| info.storage_arc()))
 }

@@ -1,5 +1,57 @@
 #![deny(missing_docs)]
-//! This module is used to configure the conductor
+//! This module is used to configure the conductor.
+//!
+//! #### Example minimum conductor config:
+//!
+//! ```rust
+//! let yaml = r#"---
+//!
+//! ## Configure the keystore to be used.
+//! keystore:
+//!
+//!   ## Use an in-process keystore with default database location.
+//!   type: lair_server_in_proc
+//!
+//! ## Configure an admin WebSocket interface at a specific port.
+//! admin_interfaces:
+//!   - driver:
+//!       type: websocket
+//!       port: 1234
+//!       allowed_origins: "*"
+//!
+//! ## Configure the network.
+//! network:
+//!
+//!   ## Use the Holo-provided default production bootstrap server.
+//!   bootstrap_service: https://bootstrap.holo.host
+//!
+//!   ## This currently has no effect on functionality but is required. Please just include as-is for now.
+//!   network_type: quic_bootstrap
+//!
+//!   ## Setup a specific network configuration.
+//!   transport_pool:
+//!     ## Use WebRTC, which is the only option for now.
+//!     - type: webrtc
+//!
+//!       ## Use the Holo-provided default production sbd (signal) server.
+//!       ## `signal_url` is REQUIRED.
+//!       signal_url: wss://sbd-0.main.infra.holo.host
+//!
+//!       ## Override the default WebRTC STUN configuration.
+//!       ## This is OPTIONAL. If this is not specified, it will default
+//!       ## to what you can see here:
+//!       webrtc_config: {
+//!         "iceServers": [
+//!           { "urls": "stun:stun-0.main.infra.holo.host:443" },
+//!           { "urls": "stun:stun-1.main.infra.holo.host:443" }
+//!         ]
+//!       }
+//! "#;
+//!
+//!use holochain_conductor_api::conductor::ConductorConfig;
+//!
+//!let _: ConductorConfig = serde_yaml::from_str(yaml).unwrap();
+//! ```
 
 use crate::conductor::process::ERROR_CODE;
 use holochain_types::prelude::DbSyncStrategy;
@@ -137,6 +189,11 @@ impl ConductorConfig {
     pub fn conductor_tuning_params(&self) -> ConductorTuningParams {
         self.tuning_params.clone().unwrap_or_default()
     }
+
+    /// Check if the config is set to use a rendezvous bootstrap server
+    pub fn has_rendezvous_bootstrap(&self) -> bool {
+        self.network.bootstrap_service == Some(url2::url2!("rendezvous:"))
+    }
 }
 
 /// Tuning parameters to adjust the behaviour of the conductor.
@@ -226,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_config_complete_config() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let yaml = r#"---
     data_root_path: /path/to/env
@@ -251,7 +308,13 @@ mod tests {
       bootstrap_service: https://bootstrap-staging.holo.host
       transport_pool:
         - type: webrtc
-          signal_url: wss://signal.holotest.net
+          signal_url: wss://sbd-0.main.infra.holo.host
+          webrtc_config: {
+            "iceServers": [
+              { "urls": "stun:stun-0.main.infra.holo.host:443" },
+              { "urls": "stun:stun-1.main.infra.holo.host:443" }
+            ]
+          }
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
         default_rpc_single_timeout_ms: 42
@@ -271,7 +334,13 @@ mod tests {
         let mut network_config = KitsuneP2pConfig::default();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
         network_config.transport_pool.push(TransportConfig::WebRTC {
-            signal_url: "wss://signal.holotest.net".into(),
+            signal_url: "wss://sbd-0.main.infra.holo.host".into(),
+            webrtc_config: Some(serde_json::json!({
+              "iceServers": [
+                { "urls": "stun:stun-0.main.infra.holo.host:443" },
+                { "urls": "stun:stun-1.main.infra.holo.host:443" }
+              ]
+            })),
         });
         let mut tuning_params =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
@@ -333,7 +402,7 @@ mod tests {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },
                 admin_interfaces: None,
-                db_sync_strategy: DbSyncStrategy::Fast,
+                db_sync_strategy: DbSyncStrategy::Resilient,
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,

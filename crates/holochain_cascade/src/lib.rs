@@ -229,6 +229,11 @@ impl CascadeImpl {
             duration_metric: create_cascade_duration_metric(),
         }
     }
+
+    /// Getter
+    pub fn cache(&self) -> Option<&DbWrite<DbKindCache>> {
+        self.cache.as_ref()
+    }
 }
 
 /// TODO
@@ -390,7 +395,16 @@ impl CascadeImpl {
 
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_rendered_ops(txn: &mut Transaction, ops: &RenderedOps) -> CascadeResult<()> {
-        let RenderedOps { ops, entry } = ops;
+        let RenderedOps {
+            ops,
+            entry,
+            warrant,
+        } = ops;
+
+        if let Some(warrant) = warrant {
+            let op = DhtOpHashed::from_content_sync(warrant.clone());
+            insert_op(txn, &op)?;
+        }
         if let Some(entry) = entry {
             insert_entry(txn, entry.as_hash(), entry.as_content())?;
         }
@@ -416,7 +430,7 @@ impl CascadeImpl {
                 ..
             } = op;
             let op =
-                DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(signature, content));
+                DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(signature, content));
             insert_op(txn, &op)?;
             // We set the integrated to for the cache so it can match the
             // same query as the vault. This can also be used for garbage collection.
@@ -478,10 +492,11 @@ impl CascadeImpl {
                 "Got different must_get_agent_activity responses from different authorities"
             );
             // TODO: Handle conflict.
-            // For now try to find one that has got the activity.
+            // For now try to find one that has got the activity
             responses
-                .into_iter()
-                .find(|a| matches!(a, MustGetAgentActivityResponse::Activity(_)))
+                .iter()
+                .find(|a| matches!(a, MustGetAgentActivityResponse::Activity { .. }))
+                .cloned()
         };
 
         let cache = some_or_return!(
@@ -491,18 +506,24 @@ impl CascadeImpl {
 
         // Commit the activity to the chain.
         match response {
-            Some(MustGetAgentActivityResponse::Activity(activity)) => {
+            Some(MustGetAgentActivityResponse::Activity { activity, warrants }) => {
                 // TODO: Avoid this clone by committing the ops as references to the db.
                 cache
                     .write_async({
                         let activity = activity.clone();
+                        let warrants = warrants.clone();
                         move |txn| {
                             Self::insert_activity(txn, activity)?;
+                            for warrant in warrants {
+                                let op = DhtOpHashed::from_content_sync(warrant);
+                                insert_op(txn, &op)?;
+                            }
+
                             CascadeResult::Ok(())
                         }
                     })
                     .await?;
-                Ok(MustGetAgentActivityResponse::Activity(activity))
+                Ok(MustGetAgentActivityResponse::Activity { activity, warrants })
             }
             Some(response) => Ok(response),
             // Got no responses so the chain is incomplete.
@@ -954,14 +975,14 @@ impl CascadeImpl {
             move || {
                 let mut results = Vec::with_capacity(txn_guards.len() + 1);
                 for txn_guard in &mut txn_guards {
-                    let mut txn = txn_guard.transaction()?;
+                    let txn = txn_guard.transaction()?;
                     let r = match &scratch {
                         Some(scratch) => {
                             scratch.apply_and_then(|scratch| {
-                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, Some(scratch), &author, filter.clone())
+                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&txn, Some(scratch), &author, filter.clone())
                             })?
                         }
-                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, None, &author, filter.clone())?
+                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&txn, None, &author, filter.clone())?
                     };
                     results.push(r);
                 }
@@ -983,7 +1004,7 @@ impl CascadeImpl {
             );
 
         // Short circuit if we have a result.
-        if matches!(result, MustGetAgentActivityResponse::Activity(_)) {
+        if matches!(result, MustGetAgentActivityResponse::Activity { .. }) {
             return Ok(result);
         }
 
@@ -994,8 +1015,9 @@ impl CascadeImpl {
             // this point then the chain is incomplete for this request.
             Ok(MustGetAgentActivityResponse::IncompleteChain)
         } else {
-            self.fetch_must_get_agent_activity(author.clone(), filter)
-                .await
+            Ok(self
+                .fetch_must_get_agent_activity(author.clone(), filter)
+                .await?)
         }
     }
 
@@ -1067,6 +1089,7 @@ impl CascadeImpl {
             rejected_activity,
             status,
             highest_observed,
+            warrants,
         } = merged_response;
         let valid_activity = match valid_activity {
             ChainItems::Hashes(hashes) => {
@@ -1121,6 +1144,7 @@ impl CascadeImpl {
             rejected_activity,
             status,
             highest_observed,
+            warrants,
         };
         Ok(r)
     }

@@ -2,7 +2,6 @@ pub mod curve;
 
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::MockCellConductorReadHandleT;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
@@ -41,6 +40,7 @@ use rand::Rng;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
+use tokio::sync::broadcast;
 
 pub use holochain_types::fixt::*;
 
@@ -216,19 +216,6 @@ fixturator!(
     curve Predictable test_keystore();
 );
 
-fixturator!(
-    SignalBroadcaster;
-    curve Empty {
-        SignalBroadcaster::new(Vec::new())
-    };
-    curve Unpredictable {
-        SignalBroadcaster::new(Vec::new())
-    };
-    curve Predictable {
-        SignalBroadcaster::new(Vec::new())
-    };
-);
-
 // XXX: This may not be great to just grab an environment for this purpose.
 //      It is assumed that this value is never really used in any "real"
 //      way, because previously, it was implemented as a null pointer
@@ -362,7 +349,35 @@ fixturator!(
 
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle);
+    curve Empty ZomeCallHostAccess {
+        workspace: HostFnWorkspaceFixturator::new(Empty).next().unwrap(),
+        keystore: MetaLairClientFixturator::new(Empty).next().unwrap(),
+        network: HolochainP2pDnaFixturator::new(Empty).next().unwrap(),
+        signal_tx: broadcast::channel(50).0,
+        call_zome_handle: CellConductorReadHandleFixturator::new(Empty).next().unwrap(),
+    };
+    curve Unpredictable ZomeCallHostAccess {
+        workspace: HostFnWorkspaceFixturator::new(Unpredictable).next().unwrap(),
+        keystore: MetaLairClientFixturator::new(Unpredictable).next().unwrap(),
+        network: HolochainP2pDnaFixturator::new(Unpredictable).next().unwrap(),
+        signal_tx: broadcast::channel(50).0,
+        call_zome_handle: CellConductorReadHandleFixturator::new(Unpredictable).next().unwrap(),
+    };
+    curve Predictable ZomeCallHostAccess {
+        workspace: HostFnWorkspaceFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        keystore: MetaLairClientFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        network: HolochainP2pDnaFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        signal_tx: broadcast::channel(50).0,
+        call_zome_handle: CellConductorReadHandleFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+    };
 );
 
 fixturator!(
@@ -382,7 +397,35 @@ fixturator!(
 
 fixturator!(
     InitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster, CellConductorReadHandle);
+    curve Empty InitHostAccess {
+        workspace: HostFnWorkspaceFixturator::new(Empty).next().unwrap(),
+        keystore: MetaLairClientFixturator::new(Empty).next().unwrap(),
+        network: HolochainP2pDnaFixturator::new(Empty).next().unwrap(),
+        signal_tx: broadcast::channel(50).0,
+        call_zome_handle: CellConductorReadHandleFixturator::new(Empty).next().unwrap(),
+    };
+    curve Unpredictable InitHostAccess {
+        workspace: HostFnWorkspaceFixturator::new(Unpredictable).next().unwrap(),
+        keystore: MetaLairClientFixturator::new(Unpredictable).next().unwrap(),
+        network: HolochainP2pDnaFixturator::new(Unpredictable).next().unwrap(),
+        signal_tx: broadcast::channel(50).0,
+        call_zome_handle: CellConductorReadHandleFixturator::new(Unpredictable).next().unwrap(),
+    };
+    curve Predictable InitHostAccess {
+        workspace: HostFnWorkspaceFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        keystore: MetaLairClientFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        network: HolochainP2pDnaFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        signal_tx: broadcast::channel(50).0,
+        call_zome_handle: CellConductorReadHandleFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+    };
 );
 
 fixturator!(
@@ -402,7 +445,30 @@ fixturator!(
 
 fixturator!(
     PostCommitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster);
+    curve Empty PostCommitHostAccess {
+        workspace: HostFnWorkspaceFixturator::new(Empty).next().unwrap(),
+        keystore: MetaLairClientFixturator::new(Empty).next().unwrap(),
+        network: HolochainP2pDnaFixturator::new(Empty).next().unwrap(),
+        signal_tx: broadcast::channel(50).0,
+    };
+    curve Unpredictable PostCommitHostAccess {
+        workspace: HostFnWorkspaceFixturator::new(Unpredictable).next().unwrap(),
+        keystore: MetaLairClientFixturator::new(Unpredictable).next().unwrap(),
+        network: HolochainP2pDnaFixturator::new(Unpredictable).next().unwrap(),
+        signal_tx: broadcast::channel(50).0,
+    };
+    curve Predictable PostCommitHostAccess {
+        workspace: HostFnWorkspaceFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        keystore: MetaLairClientFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        network: HolochainP2pDnaFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        signal_tx: broadcast::channel(50).0,
+    };
 );
 
 fixturator!(
@@ -412,7 +478,7 @@ fixturator!(
 
 fixturator!(
     ValidateHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pDna);
+    constructor fn new(HostFnWorkspace, HolochainP2pDna, bool);
 );
 
 fixturator!(

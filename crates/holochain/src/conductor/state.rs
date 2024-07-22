@@ -164,7 +164,7 @@ impl ConductorState {
             .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))
     }
 
-    /// Add an app in the Deactivated state. Returns an error if an app is already
+    /// Add an app in the Disabled state. Returns an error if an app is already
     /// present at the given ID.
     pub fn add_app(&mut self, app: InstalledAppCommon) -> ConductorResult<StoppedApp> {
         if self.installed_apps.contains_key(app.id()) {
@@ -173,6 +173,20 @@ impl ConductorState {
         let stopped_app = StoppedApp::new_fresh(app);
         self.installed_apps.insert(stopped_app.clone().into());
         Ok(stopped_app)
+    }
+
+    /// Add an app in the AwaitingMemproofs state. Returns an error if an app is already
+    /// present at the given ID.
+    pub fn add_app_awaiting_memproofs(
+        &mut self,
+        app: InstalledAppCommon,
+    ) -> ConductorResult<InstalledApp> {
+        if self.installed_apps.contains_key(app.id()) {
+            return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
+        }
+        let app = InstalledApp::new(app, AppStatus::AwaitingMemproofs);
+        self.installed_apps.insert(app.clone());
+        Ok(app)
     }
 
     /// Update the status of an installed app in-place.
@@ -231,15 +245,25 @@ pub struct AppInterfaceConfig {
     /// The signal subscription settings for each App
     pub signal_subscriptions: HashMap<InstalledAppId, SignalSubscription>,
 
+    /// The application that this interface is for. If `Some`, then this interface will only allow
+    /// connections which use a token that has been issued for the same app id. Otherwise, any app
+    /// is allowed to connect.
+    pub installed_app_id: Option<InstalledAppId>,
+
     /// The driver for the interface, e.g. Websocket
     pub driver: InterfaceDriver,
 }
 
 impl AppInterfaceConfig {
     /// Create config for a websocket interface
-    pub fn websocket(port: u16, allowed_origins: AllowedOrigins) -> Self {
+    pub fn websocket(
+        port: u16,
+        allowed_origins: AllowedOrigins,
+        installed_app_id: Option<InstalledAppId>,
+    ) -> Self {
         Self {
             signal_subscriptions: HashMap::new(),
+            installed_app_id,
             driver: InterfaceDriver::Websocket {
                 port,
                 allowed_origins,

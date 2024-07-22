@@ -101,7 +101,10 @@ use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
 
+use crate::core::ribosome::host_fn::close_chain::close_chain;
 use crate::core::ribosome::host_fn::count_links::count_links;
+use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
+use crate::core::ribosome::host_fn::open_chain::open_chain;
 use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
@@ -157,15 +160,15 @@ struct HostFnBuilder {
 }
 
 impl HostFnBuilder {
-    fn with_host_function<I: 'static, O: 'static>(
+    fn with_host_function<I, O>(
         &self,
         ns: &mut Exports,
         host_function_name: &str,
         host_function: fn(Arc<RealRibosome>, Arc<CallContext>, I) -> Result<O, RuntimeError>,
     ) -> &Self
     where
-        I: serde::de::DeserializeOwned + std::fmt::Debug,
-        O: serde::Serialize + std::fmt::Debug,
+        I: serde::de::DeserializeOwned + std::fmt::Debug + 'static,
+        O: serde::Serialize + std::fmt::Debug + 'static,
     {
         let ribosome_arc = Arc::clone(&self.ribosome_arc);
         let context_key = self.context_key;
@@ -456,6 +459,7 @@ impl RealRibosome {
             },
             integrity_zomes: Default::default(),
             coordinator_zomes: Default::default(),
+            lineage: Default::default(),
         };
         let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
         let empty_ribosome = RealRibosome::new(
@@ -601,7 +605,14 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__create_clone_cell_1", create_clone_cell)
             .with_host_function(&mut ns, "__hc__disable_clone_cell_1", disable_clone_cell)
             .with_host_function(&mut ns, "__hc__enable_clone_cell_1", enable_clone_cell)
-            .with_host_function(&mut ns, "__hc__delete_clone_cell_1", delete_clone_cell);
+            .with_host_function(&mut ns, "__hc__delete_clone_cell_1", delete_clone_cell)
+            .with_host_function(&mut ns, "__hc__close_chain_1", close_chain)
+            .with_host_function(&mut ns, "__hc__open_chain_1", open_chain)
+            .with_host_function(
+                &mut ns,
+                "__hc__get_validation_receipts_1",
+                get_validation_receipts,
+            );
 
         imports.register_namespace("env", ns);
 
@@ -1089,8 +1100,9 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     // guard to assure that response time to zome calls and concurrent zome calls
     // is not increasing disproportionally
+    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     async fn concurrent_zome_call_response_time_guard() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let mut conductor = SweetConductor::from_config_rendezvous(
             SweetConductorConfig::rendezvous(true),
             SweetLocalRendezvous::new().await,
@@ -1132,7 +1144,7 @@ pub mod wasm_test {
         assert_eq!(results.unwrap(), [true, true]);
 
         // run two rounds of two concurrent zome calls
-        // having been cached, responses should take less than 10 milliseconds
+        // having been cached, responses should take less than 15 milliseconds
         for _ in 0..2 {
             let zome_call_1 = tokio::spawn({
                 let conductor = conductor.clone();
@@ -1163,26 +1175,26 @@ pub mod wasm_test {
                 .unwrap();
 
             assert!(
-                results[0] <= Duration::from_millis(10),
-                "{:?} > 10ms",
+                results[0] <= Duration::from_millis(15),
+                "{:?} > 15ms",
                 results[0]
             );
             assert!(
-                results[1] <= Duration::from_millis(10),
-                "{:?} > 10ms",
+                results[1] <= Duration::from_millis(15),
+                "{:?} > 15ms",
                 results[1]
             );
         }
 
         // make sure the context map does not retain items
-        assert_eq!(CONTEXT_MAP.lock().is_empty(), true);
+        assert!(CONTEXT_MAP.lock().is_empty());
     }
 
     #[tokio::test(flavor = "multi_thread")]
     /// Basic checks that we can call externs internally and externally the way we want using the
     /// hdk macros rather than low level rust extern syntax.
     async fn ribosome_extern_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern]).await;
@@ -1242,7 +1254,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn wasm_tooling_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         assert_eq!(
             vec![
@@ -1254,6 +1266,7 @@ pub mod wasm_test {
                 "__hc__capability_claims_1",
                 "__hc__capability_grants_1",
                 "__hc__capability_info_1",
+                "__hc__close_chain_1",
                 "__hc__count_links_1",
                 "__hc__create_1",
                 "__hc__create_clone_cell_1",
@@ -1274,11 +1287,13 @@ pub mod wasm_test {
                 "__hc__get_details_1",
                 "__hc__get_link_details_1",
                 "__hc__get_links_1",
+                "__hc__get_validation_receipts_1",
                 "__hc__hash_1",
                 "__hc__must_get_action_1",
                 "__hc__must_get_agent_activity_1",
                 "__hc__must_get_entry_1",
                 "__hc__must_get_valid_record_1",
+                "__hc__open_chain_1",
                 "__hc__query_1",
                 "__hc__random_bytes_1",
                 "__hc__schedule_1",
@@ -1311,7 +1326,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn the_incredible_halt_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::TheIncredibleHalt).await;

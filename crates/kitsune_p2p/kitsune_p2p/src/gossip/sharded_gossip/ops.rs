@@ -73,7 +73,7 @@ impl ShardedGossipLocal {
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         // Check which ops are missing.
         let missing_hashes = self
-            .check_op_bloom((*state.common_arc_set).clone(), &remote_bloom)
+            .check_op_bloom((*state.common_arc_set()).clone(), &remote_bloom)
             .await?;
 
         let missing_hashes = match missing_hashes {
@@ -175,7 +175,7 @@ impl ShardedGossipLocal {
             .flatten()
             .collect();
 
-        // // TODO: make region set diffing more robust to different times (arc power differences are already handled)
+        // TODO: make region set diffing more robust to different times (arc power differences are already handled)
 
         let finished_val = if finished { 2 } else { 1 };
         Ok(vec![ShardedGossipWire::missing_op_hashes(
