@@ -160,13 +160,16 @@ where
         signal_tx,
         call_zome_handle,
     );
+    dbg!();
     let (ribosome, result) =
         call_zome_function_authorized(ribosome, host_access, invocation).await?;
     tracing::trace!("After zome call");
 
+    dbg!();
     let validation_result =
         inline_validation(workspace.clone(), network, conductor_handle, ribosome).await;
 
+    dbg!();
     // If the validation failed remove any active chain lock that matches the
     // entry that failed validation.
     if matches!(
@@ -180,6 +183,7 @@ where
             let lock = holochain_state::source_chain::lock_for_entry(
                 scratch_records[0].entry().as_option(),
             )?;
+            dbg!();
             if !lock.is_empty()
                 && workspace
                     .source_chain()
@@ -191,6 +195,7 @@ where
                     tracing::error!(?error);
                 }
             }
+            dbg!();
         }
     }
     validation_result?;
@@ -228,6 +233,7 @@ where
 }
 
 /// Run validation inline and wait for the result.
+#[instrument(skip_all)]
 pub async fn inline_validation<Ribosome>(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
@@ -243,6 +249,7 @@ where
     ));
 
     let scratch_records = workspace.source_chain().scratch_records()?;
+    dbg!();
 
     if let Some(dpki) = conductor_handle.running_services().dpki.clone() {
         // Don't check DPKI validity on DPKI itself!
@@ -252,15 +259,18 @@ where
             let first = scratch_records.first();
             let last = scratch_records.last();
             if let Some(r) = first {
+                dbg!();
                 check_dpki_agent_validity_for_record(&dpki, r).await?;
             }
             if let Some(r) = last {
                 if first != last {
+                    dbg!();
                     check_dpki_agent_validity_for_record(&dpki, r).await?;
                 }
             }
         }
     }
+    dbg!();
 
     let records = {
         // collect all the records we need to validate in wasm
@@ -278,6 +288,7 @@ where
 
         to_app_validate
     };
+    dbg!();
 
     for mut chain_record in records {
         for op_type in action_to_op_types(chain_record.action()) {
@@ -306,6 +317,7 @@ where
             chain_record = op_to_record(op, omitted_entry);
         }
     }
+    dbg!();
 
     Ok(())
 }

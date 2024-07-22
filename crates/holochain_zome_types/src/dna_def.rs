@@ -184,6 +184,7 @@ impl DnaDef {
     }
 
     /// Get all the [`CoordinatorZome`]s for this dna
+    #[tracing::instrument(skip_all)]
     pub fn get_all_coordinators(&self) -> Vec<CoordinatorZome> {
         self.coordinator_zomes
             .iter()

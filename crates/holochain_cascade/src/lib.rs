@@ -311,12 +311,14 @@ impl Cascade for CascadeImpl {
         hash: ActionHash,
         mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<(SignedActionHashed, CascadeSource)>> {
+        dbg!();
         let result = self
             .find_map({
                 let hash = hash.clone();
                 move |store| Ok(store.get_action(&hash)?)
             })
             .await?;
+        dbg!();
         if result.is_some() {
             return Ok(result.map(|a| (a, CascadeSource::Local)));
         }

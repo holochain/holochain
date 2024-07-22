@@ -179,6 +179,7 @@ impl HostFnBuilder {
         O: serde::Serialize + std::fmt::Debug + 'static,
     {
         let ribosome_arc = Arc::clone(&self.ribosome_arc);
+        let host_fn_name = host_function_name.to_string();
         let context_key = self.context_key;
         {
             let mut store_lock = self.store.lock();
@@ -202,10 +203,13 @@ impl HostFnBuilder {
                                 .clone()
                         };
                         let (env, mut store_mut) = function_env_mut.data_and_store_mut();
+
+                        dbg!(&host_fn_name);                        
                         let result = match env.consume_bytes_from_guest(&mut store_mut, guest_ptr, len) {
                             Ok(input) => host_function(Arc::clone(&ribosome_arc), context_arc, input),
                             Err(runtime_error) => Result::<_, RuntimeError>::Err(runtime_error),
                         };
+                        dbg!();
                         Ok(u64::from_le_bytes(
                             env.move_data_to_guest(&mut store_mut, match result {
                                 Err(runtime_error) => match runtime_error.downcast::<WasmError>() {
@@ -657,6 +661,7 @@ impl RealRibosome {
             .ok_or_else(|| ZomeTypesError::MissingDependenciesForZome(zome_name.clone()))?)
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn call_zome_fn<I: Invocation>(
         &self,
         invocation: &I,
@@ -669,6 +674,7 @@ impl RealRibosome {
 
         let mut store_lock = instance_with_store.store.lock();
         let mut store_mut = store_lock.as_store_mut();
+        dbg!();
         let result = holochain_wasmer_host::guest::call(
             &mut store_mut,
             instance,
@@ -678,6 +684,7 @@ impl RealRibosome {
             // @todo - is this a problem for large payloads like entries?
             invocation.to_owned().host_input()?,
         );
+        dbg!();
         if let Err(runtime_error) = &result {
             tracing::error!(?runtime_error, ?zome, ?fn_name);
         }
@@ -732,8 +739,11 @@ macro_rules! do_callback {
         use tokio_stream::StreamExt;
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
         // fallible iterator syntax instead of for loop
+        dbg!("a");
         let mut call_stream = $self.call_stream($access.into(), $invocation);
+        dbg!("b");
         loop {
+            dbg!("c");
             let (zome_name, callback_result): (ZomeName, $callback_result) =
                 match call_stream.next().await {
                     Some(Ok((zome, extern_io))) => (
@@ -752,6 +762,7 @@ macro_rules! do_callback {
                         break;
                     }
                 };
+            dbg!("d");
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
             if callback_result.is_definitive() {
@@ -759,6 +770,7 @@ macro_rules! do_callback {
             }
             results.push((zome_name, callback_result));
         }
+        dbg!("e");
         // fold all the non-definitive callbacks down into a single overall result
         Ok(results.into())
     }};
@@ -790,20 +802,27 @@ impl RealRibosome {
         zome: &Zome,
         fn_name: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
+        dbg!();
         let mut otel_info = vec![
             opentelemetry_api::KeyValue::new("dna", self.dna_file.dna().hash.to_string()),
             opentelemetry_api::KeyValue::new("zome", zome.zome_name().to_string()),
             opentelemetry_api::KeyValue::new("fn", fn_name.to_string()),
         ];
+        dbg!(&host_context);
+        dbg!(host_context.maybe_workspace().is_some());
 
         if let Some(agent_pubkey) = host_context.maybe_workspace().and_then(|workspace| {
+            dbg!();
             workspace
                 .source_chain()
                 .as_ref()
                 .map(|source_chain| source_chain.agent_pubkey().to_string())
         }) {
+            dbg!();
             otel_info.push(opentelemetry_api::KeyValue::new("agent", agent_pubkey));
+            dbg!();
         }
+        dbg!();
 
         let call_context = CallContext {
             zome: zome.clone(),
@@ -815,11 +834,13 @@ impl RealRibosome {
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
                 let module = self.get_module_for_zome(zome).await?;
+                dbg!();
                 if module.info().exports.contains_key(fn_name.as_ref()) {
                     // there is a corresponding zome fn
                     let context_key = Self::next_context_key();
                     let instance_with_store =
                         self.build_instance_with_store(module, context_key)?;
+                    dbg!();
                     // add call context to map for the following call
                     {
                         CONTEXT_MAP
@@ -827,6 +848,7 @@ impl RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
+                    dbg!();
                     let instance = instance_with_store.instance.clone();
                     {
                         let mut store_lock = instance_with_store.store.lock();
@@ -838,27 +860,35 @@ impl RealRibosome {
                         );
                     }
 
+                    dbg!();
                     let result = self
                         .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store.clone())
                         .map(Some);
-
+                    dbg!();
+                    
                     {
                         let mut store_lock = instance_with_store.store.lock();
+                        dbg!();
                         let mut store_mut = store_lock.as_store_mut();
+                        dbg!();
                         let points_used =
-                            match get_remaining_points(&mut store_mut, instance.as_ref()) {
-                                MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
-                                MeteringPoints::Exhausted => WASM_METERING_LIMIT,
+                        match get_remaining_points(&mut store_mut, instance.as_ref()) {
+                            MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
+                            MeteringPoints::Exhausted => WASM_METERING_LIMIT,
                             };
+                        dbg!();
                         self.usage_meter.add(points_used, &otel_info);
                     }
-
+                        
+                    dbg!();
                     // remove context from map after call
                     {
                         CONTEXT_MAP.lock().remove(&context_key);
                     }
+                    dbg!();
                     result
                 } else {
+                    dbg!();
                     // the callback fn does not exist
                     Ok(None)
                 }
@@ -866,9 +896,12 @@ impl RealRibosome {
             ZomeDef::Inline {
                 inline_zome: zome, ..
             } => {
+                dbg!();
                 let input = invocation.clone().host_input()?;
                 let api = HostFnApi::new(Arc::new(self.clone()), Arc::new(call_context));
+                dbg!();
                 let result = zome.0.maybe_call(Box::new(api), fn_name, input)?;
+                dbg!();
                 Ok(result)
             }
         }
@@ -885,7 +918,9 @@ impl RibosomeT for RealRibosome {
         let zome_dependencies = self.get_zome_dependencies(zome.zome_name())?;
         // Scope the zome types to these dependencies.
         let zome_types = self.zome_types.in_scope_subset(zome_dependencies);
-
+        
+        dbg!();
+        
         Ok(ZomeInfo {
             name: zome.zome_name().clone(),
             id: self
@@ -945,6 +980,7 @@ impl RibosomeT for RealRibosome {
 
     /// call a function in a zome for an invocation if it exists
     /// if it does not exist, then return Ok(None)
+    #[tracing::instrument(skip_all)]
     fn maybe_call<I: Invocation + 'static>(
         &self,
         host_context: HostContext,
@@ -1052,6 +1088,7 @@ impl RibosomeT for RealRibosome {
     /// Post commit works a bit different to the other callbacks.
     /// As it is dispatched from a spawned task there is nothing to handle any
     /// result, good or bad, other than to maybe log some error.
+    #[tracing::instrument(skip_all)]
     async fn run_post_commit(
         &self,
         host_access: PostCommitHostAccess,
@@ -1067,6 +1104,7 @@ impl RibosomeT for RealRibosome {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     async fn run_genesis_self_check(
         &self,
         host_access: GenesisSelfCheckHostAccess,
@@ -1092,6 +1130,7 @@ impl RibosomeT for RealRibosome {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     async fn run_validate(
         &self,
         host_access: ValidateHostAccess,
@@ -1100,6 +1139,7 @@ impl RibosomeT for RealRibosome {
         do_callback!(self, host_access, invocation, ValidateCallbackResult)
     }
 
+    #[tracing::instrument(skip_all)]
     async fn run_init(
         &self,
         host_access: InitHostAccess,
@@ -1108,6 +1148,7 @@ impl RibosomeT for RealRibosome {
         do_callback!(self, host_access, invocation, InitCallbackResult)
     }
 
+    #[tracing::instrument(skip_all)]
     async fn run_entry_defs(
         &self,
         host_access: EntryDefsHostAccess,
@@ -1116,6 +1157,7 @@ impl RibosomeT for RealRibosome {
         do_callback!(self, host_access, invocation, EntryDefsCallbackResult)
     }
 
+    #[tracing::instrument(skip_all)]
     async fn run_migrate_agent(
         &self,
         host_access: MigrateAgentHostAccess,

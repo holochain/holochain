@@ -394,6 +394,7 @@ pub fn check_entry_visibility(op: &ChainOp) -> SysValidationResult<()> {
 }
 
 /// Check that the record is valid from the perspective of DPKI.
+#[tracing::instrument(skip_all)]
 pub async fn check_dpki_agent_validity_for_record(
     dpki: &DpkiService,
     record: &Record,
@@ -404,6 +405,7 @@ pub async fn check_dpki_agent_validity_for_record(
     } else {
         Some(record.action().timestamp())
     };
+    dbg!();
     check_dpki_agent_validity(dpki, author, timestamp).await
 }
 
@@ -440,6 +442,7 @@ pub async fn check_dpki_agent_validity_for_op(
 ///   first key in the app's keyset, i.e. that key_index == 0.
 /// - For all other actions, we include the timestamp, and use `key_state` to check that the key
 ///   is valid as-at that timestamp.
+#[tracing::instrument(skip_all)]
 async fn check_dpki_agent_validity(
     dpki: &DpkiService,
     author: AgentPubKey,

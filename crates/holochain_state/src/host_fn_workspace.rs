@@ -67,6 +67,7 @@ impl SourceChainWorkspace {
     }
 
     /// Create a source chain workspace where the root caller is the init callback.
+    #[tracing::instrument(skip_all)]
     pub async fn init_as_root(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
@@ -111,6 +112,7 @@ impl SourceChainWorkspace {
         Self::new_inner(authored, dht, cache, source_chain, dna_def, false)
     }
 
+    #[tracing::instrument(skip_all)]
     fn new_inner(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,

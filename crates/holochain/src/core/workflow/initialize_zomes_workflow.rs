@@ -37,7 +37,7 @@ where
     }
 }
 
-// #[instrument(skip(network, keystore, workspace, args))]
+#[tracing::instrument(skip_all)]
 pub async fn initialize_zomes_workflow<Ribosome>(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
@@ -47,14 +47,17 @@ pub async fn initialize_zomes_workflow<Ribosome>(
 where
     Ribosome: RibosomeT + Clone + 'static,
 {
+    dbg!();
     let conductor_handle = args.conductor_handle.clone();
     let coordinators = args.ribosome.dna_def().get_all_coordinators();
     let integrate_dht_ops_trigger = args.integrate_dht_ops_trigger.clone();
     let signal_tx = args.signal_tx.clone();
+    dbg!();
     let result =
         initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
 
+    dbg!();
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // only commit if the result was successful
@@ -78,6 +81,7 @@ where
     Ok(result)
 }
 
+#[tracing::instrument(skip_all)]
 async fn initialize_zomes_workflow_inner<Ribosome>(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
@@ -95,6 +99,7 @@ where
         cell_id,
         ..
     } = args;
+    dbg!();
     let call_zome_handle =
         CellConductorApi::new(conductor_handle.clone(), cell_id.clone()).into_call_zome_handle();
 
@@ -110,6 +115,7 @@ where
         let invocation = InitInvocation { dna_def };
         ribosome.run_init(host_access, invocation).await?
     };
+    dbg!();
 
     // Insert the init marker
     // FIXME: For some reason if we don't spawn here
@@ -117,6 +123,7 @@ where
     let ws = workspace.clone();
 
     tokio::task::spawn(async move {
+        dbg!();
         ws.source_chain()
             .put(
                 builder::InitZomesComplete {},
@@ -127,6 +134,7 @@ where
     })
     .await??;
 
+    dbg!();
     // TODO: Validate scratch items
     super::inline_validation(workspace, network, conductor_handle, ribosome).await?;
 

@@ -34,6 +34,7 @@ pub fn call_stream<R: RibosomeT + 'static, I: Invocation + 'static>(
             .collect();
         let remaining_components_original: VecDeque<_> = invocation.fn_components().collect();
 
+        dbg!();
         while let Some(zome) = remaining_zomes.pop_front() {
             // reset fn components
             let mut remaining_components = remaining_components_original.clone();
@@ -49,6 +50,7 @@ pub fn call_stream<R: RibosomeT + 'static, I: Invocation + 'static>(
                 }
             }
         }
+        dbg!();
         Ok(())
     });
     (tokio_stream::wrappers::ReceiverStream::new(rx), h)

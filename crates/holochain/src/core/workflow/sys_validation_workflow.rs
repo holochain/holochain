@@ -439,8 +439,14 @@ async fn retrieve_actions(
     action_hashes: impl Iterator<Item = ActionHash>,
 ) {
     let action_fetches = action_hashes
-        .filter(|hash| !current_validation_dependencies.same_dht.lock().has(hash))
+        .filter(|hash| {
+            !current_validation_dependencies
+                .same_dht
+                .lock()
+                .has(dbg!(hash))
+        })
         .map(|h| {
+            dbg!();
             // For each previous action that will be needed for validation, map the action to a fetch Action for its hash
             let cascade = cascade.clone();
             async move {
@@ -451,6 +457,7 @@ async fn retrieve_actions(
             .boxed()
         });
 
+    dbg!();
     let new_deps: ValidationDependencies = ValidationDependencies::new_from_iter(futures::future::join_all(action_fetches)
         .await
         .into_iter()
@@ -469,7 +476,7 @@ async fn retrieve_actions(
                 }
             }
         }));
-
+    dbg!();
     current_validation_dependencies
         .same_dht
         .lock()
@@ -477,6 +484,7 @@ async fn retrieve_actions(
 }
 
 fn get_dependency_hashes_from_actions(actions: impl Iterator<Item = Action>) -> Vec<ActionHash> {
+    dbg!();
     actions
         .flat_map(|action| {
             vec![
@@ -938,13 +946,16 @@ async fn sys_validate_record_inner(
     let signature = record.signature();
     let action = record.action();
     let maybe_entry = record.entry().as_option();
+    dbg!();
     counterfeit_check_action(signature, action).await?;
+    dbg!();
 
     async fn validate(
         action: &Action,
         maybe_entry: Option<&Entry>,
         cascade: Arc<impl Cascade + Send + Sync>,
     ) -> SysValidationResult<()> {
+        dbg!();
         let validation_dependencies = SysValDeps::default();
         fetch_previous_actions(
             validation_dependencies.clone(),
@@ -952,6 +963,7 @@ async fn sys_validate_record_inner(
             vec![action.clone()].into_iter(),
         )
         .await;
+        dbg!();
 
         // Check agent validity
         if let Some(previous_action_hash) = action.prev_action() {
@@ -966,6 +978,7 @@ async fn sys_validate_record_inner(
             check_agent_validity(action.author(), previous_action)?;
         }
 
+        dbg!();
         store_record(action, validation_dependencies.clone())?;
         if let Some(maybe_entry) = maybe_entry {
             store_entry(
@@ -977,6 +990,7 @@ async fn sys_validate_record_inner(
             )
             .await?;
         }
+        dbg!();
         match action {
             Action::Update(action) => {
                 register_updated_content(action, validation_dependencies.clone())

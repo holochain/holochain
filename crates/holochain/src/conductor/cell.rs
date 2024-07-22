@@ -896,28 +896,36 @@ impl Cell {
     // we would disallow zome calls for cells which had not joined. If we want that behavior,
     // we can do that check at the time of the zome call, rather than at the time of trying
     // to access the Cell itself, as it was previously done.
+    #[tracing::instrument(skip_all)]
     pub async fn call_zome(
         &self,
         call: ZomeCall,
         workspace_lock: Option<SourceChainWorkspace>,
     ) -> CellResult<ZomeCallResult> {
+        dbg!();
         // Only check if init has run if this call is not coming from
         // an already running init call.
         if workspace_lock
             .as_ref()
             .map_or(true, |w| !w.called_from_init())
         {
-            // Check if init has run if not run it
+            dbg!();
+            // Check if init has run, and if not run it
             self.check_or_run_zome_init().await?;
         }
+        dbg!();
 
         let keystore = self.conductor_api.keystore().clone();
+        dbg!();
 
         let conductor_handle = self.conductor_handle.clone();
+        dbg!();
         let ribosome = self.get_ribosome()?;
+        dbg!();
         let invocation =
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
 
+        dbg!();
         let dna_def = ribosome.dna_def().as_content().clone();
         // If there is no existing zome call then this is the root zome call
         let is_root_zome_call = workspace_lock.is_none();
@@ -936,6 +944,7 @@ impl Cell {
                 .await?
             }
         };
+        dbg!();
         let args = CallZomeWorkflowArgs {
             cell_id: self.id.clone(),
             ribosome,
@@ -944,6 +953,7 @@ impl Cell {
             conductor_handle,
             is_root_zome_call,
         };
+        dbg!();
         Ok(call_zome_workflow(
             workspace_lock,
             self.holochain_p2p_cell.clone(),
@@ -959,6 +969,7 @@ impl Cell {
     /// Check if each Zome's init callback has been run, and if not, run it.
     #[tracing::instrument(skip(self))]
     pub(crate) async fn check_or_run_zome_init(&self) -> CellResult<()> {
+        dbg!("chonk");
         // Ensure that only one init check is run at a time
         let _guard = tokio::time::timeout(
             std::time::Duration::from_secs(INIT_MUTEX_TIMEOUT_SECS),
@@ -966,17 +977,20 @@ impl Cell {
         )
         .await
         .map_err(|_| CellError::InitTimeout)?;
+        dbg!();
 
         // If not run it
         let keystore = self.conductor_api.keystore().clone();
         let id = self.id.clone();
         let conductor_handle = self.conductor_handle.clone();
+        dbg!();
 
         // get the dna
         let ribosome = self.get_ribosome()?;
 
         let dna_def = ribosome.dna_def().clone();
 
+        dbg!();
         // Create the workspace
         let workspace = SourceChainWorkspace::init_as_root(
             self.get_or_create_authored_db()?,
@@ -988,6 +1002,7 @@ impl Cell {
             Arc::new(dna_def.into_content()),
         )
         .await?;
+        dbg!();
 
         // Check if initialization has run
         if workspace.source_chain().zomes_initialized().await? {
@@ -1003,6 +1018,7 @@ impl Cell {
             cell_id: self.id.clone(),
             integrate_dht_ops_trigger: self.queue_triggers.integrate_dht_ops.clone(),
         };
+        dbg!();
         let init_result =
             initialize_zomes_workflow(workspace, self.holochain_p2p_cell.clone(), keystore, args)
                 .await

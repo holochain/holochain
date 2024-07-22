@@ -484,6 +484,7 @@ where
     AuthorDb: ReadAccess<DbKindAuthored>,
     DhtDb: ReadAccess<DbKindDht>,
 {
+    #[tracing::instrument(skip_all)]
     pub async fn new(
         vault: AuthorDb,
         dht_db: DhtDb,

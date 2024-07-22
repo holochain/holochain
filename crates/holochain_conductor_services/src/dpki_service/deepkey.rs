@@ -29,6 +29,7 @@ pub struct DeepkeyState {
 const DEEPKEY_ZOME_NAME: &str = "deepkey_csr";
 
 impl DeepkeyState {
+    #[tracing::instrument(skip_all)]
     async fn call_deepkey_zome<
         I: serde::Serialize + std::fmt::Debug,
         O: std::fmt::Debug + DeserializeOwned,
@@ -43,6 +44,7 @@ impl DeepkeyState {
         let zome_name: ZomeName = DEEPKEY_ZOME_NAME.into();
         let fn_name: FunctionName = fn_name.into();
         let payload = ExternIO::encode(input)?;
+        dbg!();
         self.runner
             .call_zome(
                 &provenance,
@@ -61,6 +63,7 @@ impl DeepkeyState {
 
 #[async_trait::async_trait]
 impl DpkiState for DeepkeyState {
+    #[tracing::instrument(skip_all)]
     async fn next_derivation_details(
         &self,
         agent_key: Option<AgentPubKey>,
@@ -72,6 +75,7 @@ impl DpkiState for DeepkeyState {
             .await
     }
 
+    #[tracing::instrument(skip_all)]
     async fn register_key(
         &self,
         input: CreateKeyInput,
@@ -79,12 +83,14 @@ impl DpkiState for DeepkeyState {
         self.call_deepkey_zome("create_key", input).await
     }
 
+    #[tracing::instrument(skip_all)]
     async fn query_key_meta(&self, agent_key: AgentPubKey) -> DpkiServiceResult<KeyMeta> {
         let payload = agent_key.get_raw_32();
         self.call_deepkey_zome("query_key_meta_for_key", payload)
             .await
     }
 
+    #[tracing::instrument(skip_all)]
     async fn revoke_key(
         &self,
         input: RevokeKeyInput,
@@ -92,6 +98,7 @@ impl DpkiState for DeepkeyState {
         self.call_deepkey_zome("revoke_key", input).await
     }
 
+    #[tracing::instrument(skip_all)]
     async fn key_state(
         &self,
         key: AgentPubKey,

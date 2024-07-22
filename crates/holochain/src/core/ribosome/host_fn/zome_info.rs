@@ -17,7 +17,9 @@ pub fn zome_info(
             bindings_deterministic: Permission::Allow,
             ..
         } => {
+            dbg!();
             let f = ribosome.zome_info(call_context.zome.clone());
+            dbg!();
             tokio_helper::block_on(f, std::time::Duration::from_secs(60))
                 .map_err(|_| wasm_error!("60s timeout elapsed during zome_info()"))?
                 .map_err(|e| match e {
