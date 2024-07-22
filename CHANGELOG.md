@@ -2207,7 +2207,7 @@ Now it serializes to
 
 ## [hdk\_derive-0.3.0-beta-dev.23](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.23)
 
-- **BREAKING CHANGE**: Renamed macros `hdk_entry_defs` to `hdk_entry_types` and `entry_def` to `entry_type` for naming consistency with `hdk_link_types` [\#2979](https://github.com/holochain/holochain/pull/2979)
+- **BREAKING CHANGE**: Renamed macros `hdi_entry_defs` to `hdk_entry_types` and `entry_def` to `entry_type` for naming consistency with `hdk_link_types` [\#2979](https://github.com/holochain/holochain/pull/2979)
 
 ## [holochain\_state\_types-0.3.0-beta-dev.30](crates/holochain_state_types/CHANGELOG.md#0.3.0-beta-dev.30)
 

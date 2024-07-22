@@ -141,8 +141,8 @@ pub const HDI_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub use hdk_derive::hdi_entry_helper;
 pub use hdk_derive::hdi_entry_types;
-pub use hdk_derive::hdk_extern;
 pub use hdk_derive::hdi_link_types;
+pub use hdk_derive::hdk_extern;
 
 /// Working with app and system entries.
 ///
