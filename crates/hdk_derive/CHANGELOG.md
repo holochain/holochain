@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- Renamed `hdk_entry_helper`, `hdk_entry_types`, `hdk_entry_types_conversions`, `hdk_entry_types_name_registration`, `hdk_link_types`, and `hdk_to_coordinates` to `hdi_*`, to reflect the fact that integrity zomes (the main consumer of the aforementioned macros) are the only place these are used. ([#4115](https://github.com/holochain/holochain/pull/4115))
+- **BREAKING CHANGE**: Renamed `hdi_entry_helper`, `hdi_entry_types`, `hdi_entry_types_conversions`, `hdi_entry_types_name_registration`, `hdk_link_types`, and `hdk_to_coordinates` to `hdi_*`, to reflect the fact that integrity zomes (the main consumer of the aforementioned macros) are the only place these are used. ([#4115](https://github.com/holochain/holochain/pull/4115))
 
 ## 0.4.0-dev.10
 
