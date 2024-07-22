@@ -16,7 +16,7 @@
         track = "stable";
         version = "1.77.2";
       };
-      craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
+      craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
       moldOpensslDeps = craneLib.vendorCargoDeps {
         src = "${flake.config.srcCleanedHolonix}/holonix/test/mold_openssl";
       };

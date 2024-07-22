@@ -52,6 +52,11 @@
         # Want to update the root flake.lock if we're updating the version that is currently the default.
         if grep -qE "versions\.url = \".+\?dir=''${VERSIONS_DIR}\"" flake.nix; then
           nix flake update --refresh versions
+
+          nix flake update --refresh versions/holochain
+          nix flake update --refresh versions/lair
+          nix flake update --refresh versions/launcher
+          nix flake update --refresh versions/scaffolding
         fi
 
         if [[ $(git diff -- flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then

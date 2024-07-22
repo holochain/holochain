@@ -257,6 +257,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_migrate_agent(host_access, migrate_agent_invocation)
+            .await
             .unwrap();
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
@@ -276,6 +277,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_migrate_agent(host_access, migrate_agent_invocation)
+            .await
             .unwrap();
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
@@ -295,6 +297,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_migrate_agent(host_access, migrate_agent_invocation)
+            .await
             .unwrap();
         assert_eq!(
             result,
@@ -320,6 +323,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_migrate_agent(host_access, migrate_agent_invocation)
+            .await
             .unwrap();
         assert_eq!(
             result,

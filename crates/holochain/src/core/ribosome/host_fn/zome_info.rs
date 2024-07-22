@@ -16,12 +16,17 @@ pub fn zome_info(
         HostFnAccess {
             bindings_deterministic: Permission::Allow,
             ..
-        } => ribosome
-            .zome_info(call_context.zome.clone())
-            .map_err(|e| match e {
-                RibosomeError::WasmRuntimeError(wasm_error) => wasm_error,
-                other_error => wasm_error!(WasmErrorInner::Host(other_error.to_string())).into(),
-            }),
+        } => {
+            let f = ribosome.zome_info(call_context.zome.clone());
+            tokio_helper::block_on(f, std::time::Duration::from_secs(60))
+                .map_err(|_| wasm_error!("60s timeout elapsed during zome_info()"))?
+                .map_err(|e| match e {
+                    RibosomeError::WasmRuntimeError(wasm_error) => wasm_error,
+                    other_error => {
+                        wasm_error!(WasmErrorInner::Host(other_error.to_string())).into()
+                    }
+                })
+        }
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),

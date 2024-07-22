@@ -204,6 +204,7 @@ mod slow_tests {
 
         ribosome
             .run_post_commit(host_access, post_commit_invocation)
+            .await
             .unwrap();
     }
 
@@ -222,6 +223,7 @@ mod slow_tests {
 
         ribosome
             .run_post_commit(host_access, post_commit_invocation)
+            .await
             .unwrap();
     }
 

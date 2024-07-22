@@ -5,7 +5,6 @@ use criterion::Criterion;
 use criterion::Throughput;
 use hdk::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
-use holochain::core::ribosome::RibosomeT;
 use holochain::core::ribosome::ZomeCallInvocation;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasm_test_utils::TestZomes;

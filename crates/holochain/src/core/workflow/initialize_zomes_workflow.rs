@@ -108,7 +108,7 @@ where
             call_zome_handle,
         );
         let invocation = InitInvocation { dna_def };
-        ribosome.run_init(host_access, invocation)?
+        ribosome.run_init(host_access, invocation).await?
     };
 
     // Insert the init marker
