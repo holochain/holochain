@@ -17,7 +17,6 @@ use hdk::hdi::test_utils::set_zome_types;
 use hdk::prelude::*;
 use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, EntryHash};
 use holochain_conductor_api::conductor::paths::DataRootPath;
-use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations::insert_op;
@@ -515,9 +514,8 @@ async fn multi_create_link_validation() {
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AppValidation]).await;
 
-    let mut conductors = SweetConductorBatch::from_config(2, ConductorConfig::default()).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
     let apps = conductors.setup_app("posts_test", &[dna]).await.unwrap();
-    conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
