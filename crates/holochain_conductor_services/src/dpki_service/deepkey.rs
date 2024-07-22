@@ -43,6 +43,7 @@ impl DeepkeyState {
         let zome_name: ZomeName = DEEPKEY_ZOME_NAME.into();
         let fn_name: FunctionName = fn_name.into();
         let payload = ExternIO::encode(input)?;
+        dbg!();
         self.runner
             .call_zome(
                 &provenance,

@@ -176,6 +176,7 @@ impl HostFnBuilder {
         O: serde::Serialize + std::fmt::Debug + 'static,
     {
         let ribosome_arc = Arc::clone(&self.ribosome_arc);
+        let host_fn_name = host_function_name.to_string();
         let context_key = self.context_key;
         {
             let mut store_lock = self.store.lock();
@@ -199,10 +200,13 @@ impl HostFnBuilder {
                                 .clone()
                         };
                         let (env, mut store_mut) = function_env_mut.data_and_store_mut();
+
+                        dbg!(&host_fn_name);                        
                         let result = match env.consume_bytes_from_guest(&mut store_mut, guest_ptr, len) {
                             Ok(input) => host_function(Arc::clone(&ribosome_arc), context_arc, input),
                             Err(runtime_error) => Result::<_, RuntimeError>::Err(runtime_error),
                         };
+                        dbg!();
                         Ok(u64::from_le_bytes(
                             env.move_data_to_guest(&mut store_mut, match result {
                                 Err(runtime_error) => match runtime_error.downcast::<WasmError>() {
@@ -666,6 +670,7 @@ impl RealRibosome {
 
         let mut store_lock = instance_with_store.store.lock();
         let mut store_mut = store_lock.as_store_mut();
+        dbg!();
         let result = holochain_wasmer_host::guest::call(
             &mut store_mut,
             instance,
@@ -675,6 +680,7 @@ impl RealRibosome {
             // @todo - is this a problem for large payloads like entries?
             invocation.to_owned().host_input()?,
         );
+        dbg!();
         if let Err(runtime_error) = &result {
             tracing::error!(?runtime_error, ?zome, ?fn_name);
         }
@@ -728,8 +734,11 @@ macro_rules! do_callback {
     ( $self:ident, $access:ident, $invocation:ident, $callback_result:ty ) => {{
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
         // fallible iterator syntax instead of for loop
+        dbg!();
         let mut call_iterator = $self.call_iterator($access.into(), $invocation);
+        dbg!();
         loop {
+            dbg!();
             let (zome_name, callback_result): (ZomeName, $callback_result) =
                 match call_iterator.next() {
                     Ok(Some((zome, extern_io))) => (
@@ -748,6 +757,7 @@ macro_rules! do_callback {
                         break;
                     }
                 };
+            dbg!();
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
             if callback_result.is_definitive() {
@@ -786,22 +796,25 @@ impl RibosomeT for RealRibosome {
     fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo> {
         // Get the dependencies for this zome.
         let zome_dependencies = self.get_zome_dependencies(zome.zome_name())?;
+        dbg!();
         // Scope the zome types to these dependencies.
         let zome_types = self.zome_types.in_scope_subset(zome_dependencies);
-
-        Ok(ZomeInfo {
+        dbg!();
+        let r = Ok(ZomeInfo {
             name: zome.zome_name().clone(),
             id: self
                 .zome_name_to_id(zome.zome_name())
                 .expect("Failed to get ID for current zome"),
             properties: SerializedBytes::default(),
             entry_defs: {
+                dbg!();
                 match self
                     .run_entry_defs(EntryDefsHostAccess, EntryDefsInvocation)
                     .map_err(|e| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(e.to_string())).into()
                     })? {
                     EntryDefsResult::Err(zome, error_string) => {
+                        dbg!();
                         return Err(RibosomeError::WasmRuntimeError(
                             wasm_error!(WasmErrorInner::Host(format!(
                                 "{}: {}",
@@ -811,6 +824,7 @@ impl RibosomeT for RealRibosome {
                         ))
                     }
                     EntryDefsResult::Defs(defs) => {
+                        dbg!();
                         let vec = zome_dependencies
                             .iter()
                             .filter_map(|zome_index| {
@@ -820,6 +834,7 @@ impl RibosomeT for RealRibosome {
                                 defs.get(zome_name).map(|e| e.0.clone()).unwrap_or_default()
                             })
                             .collect::<Vec<_>>();
+                        dbg!();
                         vec.into()
                     }
                 }
@@ -828,21 +843,26 @@ impl RibosomeT for RealRibosome {
                 match zome.zome_def() {
                     ZomeDef::Wasm(wasm_zome) => {
                         let module = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
+                            dbg!();
                             Arc::new(holochain_wasmer_host::module::get_ios_module_from_file(
                                 path,
-                            )?)
+                                )?)
                         } else {
+                            dbg!();
                             tokio_helper::block_forever_on(
                                 self.runtime_compiled_module(zome.zome_name()),
                             )?
                         };
+                        dbg!();
                         self.get_extern_fns_for_wasm(module.clone())
                     }
                     ZomeDef::Inline { inline_zome, .. } => inline_zome.0.functions(),
                 }
             },
             zome_types,
-        })
+        });
+        dbg!();
+        r
     }
 
     /// call a function in a zome for an invocation if it exists
@@ -854,20 +874,27 @@ impl RibosomeT for RealRibosome {
         zome: &Zome,
         fn_name: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
+        dbg!();
         let mut otel_info = vec![
             opentelemetry_api::KeyValue::new("dna", self.dna_file.dna().hash.to_string()),
             opentelemetry_api::KeyValue::new("zome", zome.zome_name().to_string()),
             opentelemetry_api::KeyValue::new("fn", fn_name.to_string()),
         ];
+        dbg!(&host_context);
+        dbg!(host_context.maybe_workspace().is_some());
 
         if let Some(agent_pubkey) = host_context.maybe_workspace().and_then(|workspace| {
+            dbg!();
             workspace
                 .source_chain()
                 .as_ref()
                 .map(|source_chain| source_chain.agent_pubkey().to_string())
         }) {
+            dbg!();
             otel_info.push(opentelemetry_api::KeyValue::new("agent", agent_pubkey));
+            dbg!();
         }
+        dbg!();
 
         let call_context = CallContext {
             zome: zome.clone(),
@@ -879,11 +906,13 @@ impl RibosomeT for RealRibosome {
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
                 let module = self.get_module_for_zome(zome).await?;
+                dbg!();
                 if module.info().exports.contains_key(fn_name.as_ref()) {
                     // there is a corresponding zome fn
                     let context_key = Self::next_context_key();
                     let instance_with_store =
                         self.build_instance_with_store(module, context_key)?;
+                    dbg!();
                     // add call context to map for the following call
                     {
                         CONTEXT_MAP
@@ -891,6 +920,7 @@ impl RibosomeT for RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
+                    dbg!();
                     let instance = instance_with_store.instance.clone();
                     {
                         let mut store_lock = instance_with_store.store.lock();
@@ -902,9 +932,11 @@ impl RibosomeT for RealRibosome {
                         );
                     }
 
+                    dbg!();
                     let result = self
                         .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store.clone())
                         .map(Some);
+                    dbg!();
 
                     {
                         let mut store_lock = instance_with_store.store.lock();
@@ -930,9 +962,12 @@ impl RibosomeT for RealRibosome {
             ZomeDef::Inline {
                 inline_zome: zome, ..
             } => {
+                dbg!();
                 let input = invocation.clone().host_input()?;
                 let api = HostFnApi::new(Arc::new(self.clone()), Arc::new(call_context));
+                dbg!();
                 let result = zome.0.maybe_call(Box::new(api), fn_name, input)?;
+                dbg!();
                 Ok(result)
             }
         }

@@ -179,12 +179,16 @@ impl HostContext {
 
     /// Get the workspace if it was provided.
     pub fn maybe_workspace(&self) -> Option<HostFnWorkspaceRead> {
-        match self.clone() {
+        dbg!();
+        match dbg!(self.clone()) {
             Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
             | Self::Init(InitHostAccess { workspace, .. })
             | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
             | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => Some(workspace.into()),
-            Self::Validate(ValidateHostAccess { workspace, .. }) => Some(workspace),
+            Self::Validate(ValidateHostAccess { workspace, .. }) => {
+                dbg!();
+                Some(workspace)
+            }
             _ => None,
         }
     }
@@ -876,9 +880,13 @@ pub mod wasm_test {
         pub async fn new(test_wasm: TestWasm) -> Self {
             let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
+            dbg!();
+
             let mut conductor = SweetConductor::from_standard_config().await;
 
+            dbg!();
             let apps = conductor.setup_apps("app-", 2, [&dna_file]).await.unwrap();
+            dbg!();
 
             let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
 
@@ -889,6 +897,7 @@ pub mod wasm_test {
                 0,
             )
             .await;
+            dbg!();
 
             let bob_host_fn_caller = HostFnCaller::create_for_zome(
                 bob_cell.cell_id(),
@@ -897,12 +906,14 @@ pub mod wasm_test {
                 0,
             )
             .await;
+            dbg!();
 
             let alice = alice_cell.zome(test_wasm);
             let bob = bob_cell.zome(test_wasm);
 
             let alice_pubkey = alice_cell.agent_pubkey().clone();
             let bob_pubkey = bob_cell.agent_pubkey().clone();
+            dbg!();
 
             Self {
                 conductor,

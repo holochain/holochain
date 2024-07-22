@@ -1441,7 +1441,10 @@ mod app_impls {
             data: &[(impl DnaWithRole, Option<MembraneProof>)],
         ) -> ConductorResult<AgentPubKey> {
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
+
+            dbg!();
             let manifest = app_manifest_from_dnas(&dnas_with_roles, 255, false);
+            dbg!();
 
             let (dnas_to_register, role_assignments): (Vec<_>, Vec<_>) = data
                 .iter()
@@ -1454,6 +1457,7 @@ mod app_impls {
                 })
                 .unzip();
 
+            dbg!();
             let ops = AppRoleResolution {
                 dnas_to_register,
                 role_assignments,
@@ -1462,6 +1466,7 @@ mod app_impls {
             let app = self
                 .install_app_common(installed_app_id, manifest, agent.clone(), ops, false)
                 .await?;
+            dbg!();
 
             Ok(app.agent_key().clone())
         }
@@ -1485,6 +1490,8 @@ mod app_impls {
                 None
             };
 
+            dbg!();
+
             let (agent_key, derivation_details): (AgentPubKey, Option<DerivationDetailsInput>) =
                 if let Some(agent_key) = agent_key {
                     if dpki.is_some() {
@@ -1495,8 +1502,10 @@ mod app_impls {
                 } else if let Some((dpki, state)) = &mut dpki {
                     // dpki installed, no agent key given
 
+                    dbg!();
                     // register a new key derivation for this app
                     let derivation_details = state.next_derivation_details(None).await?;
+                    dbg!();
 
                     let dst_tag = format!(
                         "DPKI-{:04}-{:04}",
@@ -1521,6 +1530,7 @@ mod app_impls {
                         )
                         .await
                         .map_err(|e| DpkiServiceError::Lair(e.into()))?;
+                    dbg!();
                     let seed = info.ed25519_pub_key.0.to_vec();
 
                     let derivation = DerivationDetailsInput {
@@ -1536,6 +1546,7 @@ mod app_impls {
                     (self.keystore.new_sign_keypair_random().await?, None)
                 };
 
+            dbg!();
             let cells_to_create = ops.cells_to_create(agent_key.clone());
 
             // check if cells_to_create contains a cell identical to an existing one
@@ -1558,6 +1569,7 @@ mod app_impls {
                 self.clone().register_dna(dna).await?;
             }
 
+            dbg!();
             let cell_ids: Vec<_> = cells_to_create
                 .iter()
                 .map(|(cell_id, _)| cell_id.clone())
@@ -1609,6 +1621,8 @@ mod app_impls {
                     unreachable!()
                 }
             };
+
+            dbg!();
 
             if app_result.is_ok() {
                 // Register the key in DPKI
@@ -3159,8 +3173,10 @@ impl holochain_conductor_services::CellRunner for Conductor {
         payload: ExternIO,
     ) -> anyhow::Result<ExternIO> {
         let now = Timestamp::now();
+        dbg!();
         let (nonce, expires_at) =
             holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
+        dbg!();
         let call_unsigned = ZomeCallUnsigned {
             cell_id,
             zome_name,
@@ -3172,7 +3188,9 @@ impl holochain_conductor_services::CellRunner for Conductor {
             expires_at,
         };
         let call = ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
+        dbg!();
         let response = self.call_zome(call).await;
+        dbg!();
         match response {
             Ok(Ok(ZomeCallResponse::Ok(bytes))) => Ok(bytes),
             Ok(Ok(other)) => Err(anyhow::anyhow!(other.clone())),

@@ -518,7 +518,12 @@ pub mod wasm_test {
     #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     async fn lock_chain() {
         use holochain_nonce::fresh_nonce;
+
+        dbg!();
         holochain_trace::test_run();
+
+        dbg!();
+        dbg!();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -529,12 +534,18 @@ pub mod wasm_test {
             bob_pubkey,
             ..
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
+
+        dbg!();
         let now = Timestamp::now();
         // Before the preflight creation of things should work.
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
+        dbg!();
+
         // Bob's zome must be initialized for countersigning to work.
         let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
+
+        dbg!();
 
         // Alice can create a preflight request.
         let preflight_request: PreflightRequest = conductor
@@ -548,6 +559,8 @@ pub mod wasm_test {
             )
             .await;
 
+        dbg!();
+
         // Alice can accept the preflight request.
         let alice_acceptance: PreflightRequestAcceptance = conductor
             .call(
@@ -556,12 +569,16 @@ pub mod wasm_test {
                 preflight_request.clone(),
             )
             .await;
+
+        dbg!();
         let alice_response =
             if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
                 response
             } else {
                 unreachable!();
             };
+
+        dbg!();
 
         // Alice can create a second preflight request.
         let preflight_request_2: PreflightRequest = conductor
@@ -575,7 +592,11 @@ pub mod wasm_test {
             )
             .await;
 
+        dbg!();
+
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
+        dbg!();
 
         // Can't accept a second preflight request while the first is active.
         let preflight_acceptance_fail = conductor
@@ -598,6 +619,8 @@ pub mod wasm_test {
                 .unwrap(),
             )
             .await;
+
+        dbg!();
         assert!(matches!(
             preflight_acceptance_fail,
             Ok(Err(RibosomeError::WasmRuntimeError(RuntimeError { .. })))
@@ -611,6 +634,8 @@ pub mod wasm_test {
                 preflight_request.clone(),
             )
             .await;
+
+        dbg!();
         let bob_response =
             if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
                 response
@@ -618,7 +643,11 @@ pub mod wasm_test {
                 unreachable!();
             };
 
+        dbg!();
+
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
+        dbg!("1");
 
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
@@ -641,7 +670,12 @@ pub mod wasm_test {
                 .unwrap(),
             )
             .await;
+
+        dbg!();
+
         expect_chain_locked(thing_fail_create_alice);
+
+        dbg!();
 
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
@@ -666,6 +700,8 @@ pub mod wasm_test {
             )
             .await;
         expect_chain_locked(thing_fail_create_bob);
+
+        dbg!();
 
         // Creating the correct countersigned entry will NOT immediately unlock
         // the chain (it needs Bob to countersign).
@@ -704,6 +740,8 @@ pub mod wasm_test {
 
         expect_chain_locked(thing_fail_create_alice);
 
+        dbg!();
+
         // The countersigned entry does NOT appear in alice's activity yet.
         let alice_activity_pre: AgentActivity = conductor
             .call(
@@ -717,6 +755,8 @@ pub mod wasm_test {
             )
             .await;
         assert_eq!(alice_activity_pre.valid_activity.len(), 5);
+
+        dbg!("2");
 
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
@@ -742,6 +782,8 @@ pub mod wasm_test {
             )
             .await;
         expect_chain_locked(thing_fail_create_bob);
+
+        dbg!("3");
 
         // After bob commits the same countersigned entry he can unlock his chain.
         let countersigned_action_hash_bob: ActionHash = conductor
@@ -774,12 +816,15 @@ pub mod wasm_test {
         if let Some((countersigned_entry_hash_bob, _)) =
             countersigned_action_bob.action().entry_data()
         {
+            dbg!("THIS");
             let _countersigned_entry_bob: EntryHashed = conductor
                 .call(&bob, "must_get_entry", countersigned_entry_hash_bob)
                 .await;
         } else {
             unreachable!();
         }
+
+        dbg!("x");
 
         // Record get must not error.
         let _countersigned_record_bob: Record = conductor
@@ -801,6 +846,8 @@ pub mod wasm_test {
         await_consistency(60, [&alice_cell, &bob_cell])
             .await
             .unwrap();
+
+        dbg!();
 
         assert_eq!(alice_activity.valid_activity.len(), 7);
         assert_eq!(

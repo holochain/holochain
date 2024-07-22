@@ -55,6 +55,7 @@ where
         initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
 
+    dbg!();
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // only commit if the result was successful
@@ -95,6 +96,7 @@ where
         cell_id,
         ..
     } = args;
+    dbg!();
     let call_zome_handle =
         CellConductorApi::new(conductor_handle.clone(), cell_id.clone()).into_call_zome_handle();
 
@@ -110,6 +112,7 @@ where
         let invocation = InitInvocation { dna_def };
         ribosome.run_init(host_access, invocation)?
     };
+    dbg!();
 
     // Insert the init marker
     // FIXME: For some reason if we don't spawn here

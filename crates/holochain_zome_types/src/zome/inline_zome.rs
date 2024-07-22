@@ -89,6 +89,7 @@ impl<T> InlineZome<T> {
         name: &FunctionName,
         input: ExternIO,
     ) -> InlineZomeResult<Option<ExternIO>> {
+        dbg!();
         if let Some(f) = self.functions.get(name) {
             Ok(Some(f(api, input)?))
         } else {

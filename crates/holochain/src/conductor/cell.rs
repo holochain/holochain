@@ -903,21 +903,26 @@ impl Cell {
     ) -> CellResult<ZomeCallResult> {
         // Only check if init has run if this call is not coming from
         // an already running init call.
+        dbg!();
         if workspace_lock
             .as_ref()
             .map_or(true, |w| !w.called_from_init())
         {
+            dbg!();
             // Check if init has run if not run it
             self.check_or_run_zome_init().await?;
         }
+        dbg!();
 
         let keystore = self.conductor_api.keystore().clone();
 
         let conductor_handle = self.conductor_handle.clone();
         let ribosome = self.get_ribosome()?;
+        dbg!();
         let invocation =
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
 
+        dbg!();
         let dna_def = ribosome.dna_def().as_content().clone();
         // If there is no existing zome call then this is the root zome call
         let is_root_zome_call = workspace_lock.is_none();
@@ -936,6 +941,7 @@ impl Cell {
                 .await?
             }
         };
+        dbg!();
         let args = CallZomeWorkflowArgs {
             cell_id: self.id.clone(),
             ribosome,
@@ -944,6 +950,7 @@ impl Cell {
             conductor_handle,
             is_root_zome_call,
         };
+        dbg!();
         Ok(call_zome_workflow(
             workspace_lock,
             self.holochain_p2p_cell.clone(),
@@ -977,6 +984,7 @@ impl Cell {
 
         let dna_def = ribosome.dna_def().clone();
 
+        dbg!();
         // Create the workspace
         let workspace = SourceChainWorkspace::init_as_root(
             self.get_or_create_authored_db()?,
@@ -988,6 +996,7 @@ impl Cell {
             Arc::new(dna_def.into_content()),
         )
         .await?;
+        dbg!();
 
         // Check if initialization has run
         if workspace.source_chain().zomes_initialized().await? {
@@ -1003,6 +1012,7 @@ impl Cell {
             cell_id: self.id.clone(),
             integrate_dht_ops_trigger: self.queue_triggers.integrate_dht_ops.clone(),
         };
+        dbg!();
         let init_result =
             initialize_zomes_workflow(workspace, self.holochain_p2p_cell.clone(), keystore, args)
                 .await
