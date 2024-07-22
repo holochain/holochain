@@ -266,11 +266,13 @@ pub(crate) async fn countersigning_success(
                     let weight = weigh_placeholder();
                     let stored_actions = cs.build_action_set(entry_hash, weight)?;
                     if stored_actions.len() == incoming_actions.len() {
+                        tracing::info!("We have the right number of actions");
                         // Check all stored action hashes match an incoming action hash.
                         if stored_actions.iter().all(|a| {
                             let a = ActionHash::with_data_sync(a);
                             incoming_actions.iter().any(|i| *i == a)
                         }) {
+                            tracing::info!("All incoming actions match stored actions, doing unlock");
                             // All checks have passed so unlock the chain.
                             mutations::unlock_chain(txn, &author)?;
                             // Update ops to publish.
