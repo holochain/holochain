@@ -25,6 +25,9 @@ pub fn accept_countersigning_preflight_request<'a>(
             if let Err(e) = input.check_integrity() {
                 return Ok(PreflightRequestAcceptance::Invalid(e.to_string()));
             }
+
+            tracing::info!("accept_countersigning_preflight_request: {:?}", input);
+
             let author = super::agent_info::agent_info(_ribosome, call_context.clone(), ())?
                 .agent_latest_pubkey;
             tokio_helper::block_forever_on(async move {
