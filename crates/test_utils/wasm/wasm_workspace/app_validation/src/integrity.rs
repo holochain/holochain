@@ -1,18 +1,18 @@
 // pub mod post;
 use hdi::prelude::*;
 
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct Post(String);
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
-#[hdk_entry_types]
+#[hdi_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     Post(Post),
 }
 #[derive(Serialize, Deserialize)]
-#[hdk_link_types]
+#[hdi_link_types]
 pub enum LinkTypes {
     AllPosts,
     PostsByAuthor,

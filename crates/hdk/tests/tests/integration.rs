@@ -31,18 +31,18 @@ fn scoped_link(zome_index: u8, link_type: u8) -> ScopedLinkType {
 mod integrity_zomes {
     use hdi::prelude::*;
 
-    #[hdk_entry_helper]
+    #[hdi_entry_helper]
     pub struct A;
-    #[hdk_entry_helper]
+    #[hdi_entry_helper]
     pub struct B;
-    #[hdk_entry_helper]
+    #[hdi_entry_helper]
     pub struct C;
 
     pub mod integrity_a {
 
         use super::*;
 
-        #[hdk_entry_types(skip_hdk_extern = true)]
+        #[hdi_entry_types(skip_hdk_extern = true)]
         #[unit_enum(UnitFoo)]
         pub enum EntryTypes {
             A(A),
@@ -50,7 +50,7 @@ mod integrity_zomes {
             C(C),
         }
 
-        #[hdk_link_types(skip_no_mangle = true)]
+        #[hdi_link_types(skip_no_mangle = true)]
         pub enum LinkTypes {
             A,
             B,
@@ -61,7 +61,7 @@ mod integrity_zomes {
     pub mod integrity_b {
         use super::*;
 
-        #[hdk_entry_types(skip_hdk_extern = true)]
+        #[hdi_entry_types(skip_hdk_extern = true)]
         #[unit_enum(UnitFoo)]
         pub enum EntryTypes {
             A(A),
@@ -69,7 +69,7 @@ mod integrity_zomes {
             C(C),
         }
 
-        #[hdk_link_types(skip_no_mangle = true)]
+        #[hdi_link_types(skip_no_mangle = true)]
         pub enum LinkTypes {
             A,
             B,

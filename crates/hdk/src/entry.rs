@@ -319,7 +319,7 @@ pub fn get_details<H: Into<AnyDhtHash>>(
 ///  e.g. the following are equivalent
 ///
 /// ```ignore
-/// #[hdk_entry(id = "foo", visibility = "private", required_validations = 6, )]
+/// #[hdi_entry(id = "foo", visibility = "private", required_validations = 6, )]
 /// pub struct Foo;
 /// ```
 ///

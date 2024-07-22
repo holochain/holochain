@@ -2639,7 +2639,7 @@ Initial version
 - Fix: Countersigning test `lock_chain` which ensures that source chain is locked while in a countersigning session.
 
 - Major refactor of the sys validation workflow to improve reliability and performance:
-  
+
   - Reliability: The workflow will now prioritise validating ops that have their dependencies available locally. As soon as it has finished with those it will trigger app validation before dealing with missing dependencies.
   - Reliability: For ops which have dependencies we aren’t holding locally, the network get will now be retried. This was a cause of undesirable behaviour for validation where a failed get would result in validation for ops with missing dependencies not being retried until new ops arrived. The workflow now retries the get on an interval until it finds dependencies and can proceed with validation.
   - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was unnecessary and doing database queries so it should be good to have that gone.
@@ -5976,7 +5976,7 @@ It also introduces new functionality and improves some of the existing:
 ## [holochain-0.0.154](crates/holochain/CHANGELOG.md#0.0.154)
 
 - Revert: “Add the `hdi_version_req` key:value field to the output of the `--build-info` argument” because it broke. [\#1521](https://github.com/holochain/holochain/pull/1521)
-  
+
   Reason: it causes a build failure of the *holochain*  crate on crates.io
 
 ## [holochain\_test\_wasm\_common-0.0.47](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.47)
@@ -7991,7 +7991,7 @@ network:
 - **BREAKING CHANGE** `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
 
 - **BREAKING CHANGE**: The notion of “cell nicknames” (“nicks”) and “app slots” has been unified into the notion of “app roles”. This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
-  
+
   - The `slots` field in App manifests is now called `roles`
   - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
   - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
@@ -8145,7 +8145,7 @@ network:
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
-  
+
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
   - `DnaInfo` includes `name`, `hash`, `properties`
@@ -8754,14 +8754,14 @@ passphrase_service:
 - hdk: Now supports deserializing countersigned entries in app entry `try_from`
 
 - hdk: implements multi-call for:
-  
+
   - `remote_call`
   - `call`
   - `get`
   - `get_details`
   - `get_links`
   - `get_link_details`
-  
+
   We strictly only needed `remote_call` for countersigning, but feedback from the community was that having to sequentially loop over these common HDK functions is a pain point, so we enabled all of them to be async over a vector of inputs.
 
 ## [hdk\_derive-0.0.5](crates/hdk_derive/CHANGELOG.md#0.0.5)
