@@ -108,7 +108,6 @@ async fn test_publish() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
@@ -130,7 +129,6 @@ async fn multi_conductor() -> anyhow::Result<()> {
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    conductors.exchange_peer_info().await;
 
     let dpki_cells = conductors.dpki_cells();
 
@@ -264,9 +262,6 @@ async fn private_entries_dont_leak() {
     let dnas = vec![dna_file];
 
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
-
-    conductors.exchange_peer_info().await;
-
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app

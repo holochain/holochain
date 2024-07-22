@@ -271,7 +271,7 @@ async fn test_zero_arc_no_gossip_2way() {
         publish: true,
         recent: true,
         historical: true,
-        bootstrap: true,
+        bootstrap: false,
         recent_threshold: None,
     }
     .into();
@@ -280,7 +280,7 @@ async fn test_zero_arc_no_gossip_2way() {
     // This should result in no publishing or gossip
     let mut tuning_1 = make_tuning(false, true, true, None);
     tuning_1.gossip_arc_clamping = "empty".into();
-    let config_1 = SweetConductorConfig::rendezvous(true).set_tuning_params(tuning_1);
+    let config_1 = SweetConductorConfig::rendezvous(false).set_tuning_params(tuning_1);
 
     let mut conductors = SweetConductorBatch::from_configs_rendezvous([config_0, config_1]).await;
 
@@ -315,7 +315,6 @@ async fn test_zero_arc_no_gossip_2way() {
 /// Test that conductors with arcs clamped to zero do not gossip.
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_zero_arc_no_gossip_4way() {
     use futures::future::join_all;
     use maplit::hashset;
@@ -330,7 +329,7 @@ async fn test_zero_arc_no_gossip_4way() {
             publish: true,
             recent: true,
             historical: true,
-            bootstrap: true,
+            bootstrap: false,
             recent_threshold: None,
         })
         .no_dpki()
@@ -343,7 +342,7 @@ async fn test_zero_arc_no_gossip_4way() {
             publish: false,
             recent: true,
             historical: true,
-            bootstrap: true,
+            bootstrap: false,
             recent_threshold: None,
         })
         .no_dpki()
@@ -488,7 +487,7 @@ async fn test_gossip_shutdown() {
             publish: false,
             recent: true,
             historical: true,
-            bootstrap: true,
+            bootstrap: false,
             recent_threshold: None,
         },
     )
@@ -562,7 +561,6 @@ async fn test_gossip_startup() {
 
     // Wait a bit so that conductor 0 doesn't publish in the next step.
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-    SweetConductor::exchange_peer_info([&conductor0, &conductor1]).await;
 
     await_consistency(60, [&cell0, &cell1]).await.unwrap();
     let record: Option<Record> = conductor1.call(&zome1, "read", hash.clone()).await;
@@ -618,11 +616,11 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
-    let cells: Vec<_> = futures::future::join_all(conductors.iter_mut().map(|c| async {
-        let (cell,) = c.setup_app("app", [&dna_file]).await.unwrap().into_tuple();
-        cell
-    }))
-    .await;
+    let cells = conductors
+        .setup_app("app", [&dna_file])
+        .await
+        .unwrap()
+        .cells_flattened();
 
     conductors.exchange_peer_info().await;
 

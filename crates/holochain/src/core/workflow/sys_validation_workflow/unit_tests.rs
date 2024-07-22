@@ -227,7 +227,13 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
 async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_app_validation() {
     holochain_trace::test_run();
 
+    let mut network = MockHolochainP2pDnaT::new();
+    network
+        .expect_authority_for_hash()
+        .return_once(move |_| Ok(true));
+
     let mut test_case = TestCase::new().await;
+    test_case.with_network_behaviour(network);
 
     // Previous op, to be found in the cache
     let mut validation_package_action = fixt!(AgentValidationPkg);

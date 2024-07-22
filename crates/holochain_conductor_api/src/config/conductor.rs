@@ -196,6 +196,11 @@ impl ConductorConfig {
     pub fn conductor_tuning_params(&self) -> ConductorTuningParams {
         self.tuning_params.clone().unwrap_or_default()
     }
+
+    /// Check if the config is set to use a rendezvous bootstrap server
+    pub fn has_rendezvous_bootstrap(&self) -> bool {
+        self.network.bootstrap_service == Some(url2::url2!("rendezvous:"))
+    }
 }
 
 /// Tuning parameters to adjust the behaviour of the conductor.
