@@ -257,12 +257,12 @@ async fn app_validation_workflow_test() {
 async fn test_private_entries_are_passed_to_validation_only_when_authored_with_full_entry() {
     holochain_trace::test_run().ok();
 
-    #[hdk_entry_helper]
+    #[hdi_entry_helper]
     pub struct Post(String);
 
     #[derive(Serialize, Deserialize)]
     #[serde(tag = "type")]
-    #[hdk_entry_types(skip_hdk_extern = true)]
+    #[hdi_entry_types(skip_hdk_extern = true)]
     #[unit_enum(UnitEntryTypes)]
     pub enum EntryTypes {
         #[entry_type(visibility = "private")]

@@ -23,7 +23,7 @@ cfg_if::cfg_if! {
 macro_rules! wasm_common {
     () => {
         /// Storage structure for an hc demo-cli file.
-        #[hdk_entry_helper]
+        #[hdi_entry_helper]
         #[derive(Clone)]
         pub struct File {
             pub desc: String,
@@ -31,14 +31,14 @@ macro_rules! wasm_common {
         }
 
         /// Entry type enum for hc demo-cli.
-        #[hdk_entry_types]
+        #[hdi_entry_types]
         #[unit_enum(UnitEntryTypes)]
         pub enum EntryTypes {
             File(File),
         }
 
         /// Link type enum for hc demo-cli.
-        #[hdk_link_types]
+        #[hdi_link_types]
         pub enum LinkTypes {
             AllFiles,
         }

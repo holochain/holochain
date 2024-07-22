@@ -78,7 +78,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         .collect();
 
     let output = quote::quote! {
-        #[hdk_to_coordinates(nested = true, entry = true)]
+        #[hdi_to_coordinates(nested = true, entry = true)]
         #[derive(Debug)]
         #input
 

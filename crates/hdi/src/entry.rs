@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
-pub use hdk_derive::hdk_entry_helper;
-pub use hdk_derive::hdk_entry_types;
+pub use hdk_derive::hdi_entry_helper;
+pub use hdk_derive::hdi_entry_types;
 
 #[cfg(doc)]
 pub mod examples;

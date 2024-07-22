@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Renamed `hdk_entry_helper`, `hdk_entry_types`, `hdk_entry_types_conversions`, `hdk_entry_types_name_registration`, `hdk_link_types`, and `hdk_to_coordinates` to `hdi_*`, to reflect the fact that integrity zomes (the main consumer of the aforementioned macros) are the only place these are used.
+
 ## 0.3.0-beta-dev.33
 
 ## 0.3.0-beta-dev.32

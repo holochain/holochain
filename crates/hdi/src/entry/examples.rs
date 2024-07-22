@@ -2,15 +2,15 @@
 //!
 //! ```
 //! use hdi::prelude::*;
-//! #[hdk_entry_helper]
+//! #[hdi_entry_helper]
 //! pub struct Post(pub String);
-//! #[hdk_entry_helper]
+//! #[hdi_entry_helper]
 //! pub struct Msg(pub String);
 //!
-//! #[hdk_entry_helper]
+//! #[hdi_entry_helper]
 //! pub struct PrivMsg(pub String);
 //!
-//! #[hdk_entry_types]
+//! #[hdi_entry_types]
 //! #[unit_enum(UnitEntryTypes)]
 //! pub enum EntryTypes {
 //!     Post(Post),
@@ -27,15 +27,15 @@
 use self::hdi::prelude::*;
 use crate as hdi;
 
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 pub struct Post(pub String);
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 pub struct Msg(pub String);
 
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 pub struct PrivMsg(pub String);
 
-#[hdk_entry_types]
+#[hdi_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     Post(Post),

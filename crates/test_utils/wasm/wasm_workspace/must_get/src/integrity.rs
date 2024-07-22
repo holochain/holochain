@@ -1,23 +1,23 @@
 use hdi::prelude::*;
 use hdk::prelude::ChainFilter;
 
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 #[derive(Clone)]
 pub struct Something(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 pub struct AgentsChain(pub AgentPubKey, pub ChainFilter);
 
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 pub struct AgentsChainRec(pub AgentPubKey, pub ActionHash);
 
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 pub struct SelfAgentsChain;
 
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 pub struct SelfPrevAgentsChain;
 
-#[hdk_entry_types]
+#[hdi_entry_types]
 #[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     Something(Something),

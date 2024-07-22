@@ -13,7 +13,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         Item::Enum(ItemEnum {
             ident, variants, ..
         }) => (ident, variants),
-        _ => abort!(input, "hdk_link_types can only be used on Enums"),
+        _ => abort!(input, "hdi_link_types can only be used on Enums"),
     };
     let iter: proc_macro2::TokenStream = variants
         .iter()
@@ -32,7 +32,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         .collect();
 
     let output = quote::quote! {
-        #[hdk_to_coordinates(nested = true)]
+        #[hdi_to_coordinates(nested = true)]
         #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
         #input
 

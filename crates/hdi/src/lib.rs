@@ -68,17 +68,17 @@
 //! # #[cfg(feature = "test_utils")]
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # use hdi::prelude::*;
-//! # #[hdk_entry_helper]
+//! # #[hdi_entry_helper]
 //! # pub struct A;
-//! # #[hdk_entry_helper]
+//! # #[hdi_entry_helper]
 //! # pub struct B;
-//! # #[hdk_entry_types(skip_hdk_extern = true)]
+//! # #[hdi_entry_types(skip_hdk_extern = true)]
 //! # #[unit_enum(UnitEntryTypes)]
 //! # pub enum EntryTypes {
 //! #     A(A),
 //! #     B(B),
 //! # }
-//! # #[hdk_link_types(skip_no_mangle = true)]
+//! # #[hdi_link_types(skip_no_mangle = true)]
 //! # pub enum LinkTypes {
 //! #   A,
 //! #   B,
@@ -139,10 +139,10 @@
 /// Current HDI rust crate version.
 pub const HDI_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub use hdk_derive::hdk_entry_helper;
-pub use hdk_derive::hdk_entry_types;
+pub use hdk_derive::hdi_entry_helper;
+pub use hdk_derive::hdi_entry_types;
 pub use hdk_derive::hdk_extern;
-pub use hdk_derive::hdk_link_types;
+pub use hdk_derive::hdi_link_types;
 
 /// Working with app and system entries.
 ///

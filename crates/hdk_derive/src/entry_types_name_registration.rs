@@ -27,7 +27,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         }) => (ident, variants, attrs),
         _ => abort!(
             input,
-            "hdk_entry_types_name_registration can only be used on Enums"
+            "hdi_entry_types_name_registration can only be used on Enums"
         ),
     };
 
@@ -61,7 +61,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
     let output = quote::quote! {
         #[derive(EntryDefRegistration, UnitEnum)]
-        #[unit_attrs(forward(hdk_to_coordinates(entry = true)))]
+        #[unit_attrs(forward(hdi_to_coordinates(entry = true)))]
         #input
 
         #hdk_extern

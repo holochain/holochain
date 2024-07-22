@@ -12,7 +12,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         Item::Enum(ItemEnum { ident, .. }) | Item::Struct(ItemStruct { ident, .. }) => ident,
         _ => abort!(
             input,
-            "hdk_entry_helper can only be used on Enums or Structs"
+            "hdi_entry_helper can only be used on Enums or Structs"
         ),
     };
 

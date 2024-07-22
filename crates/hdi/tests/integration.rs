@@ -38,7 +38,7 @@ where
 
 #[test]
 fn to_local_types_test_unit() {
-    #[hdk_to_coordinates]
+    #[hdi_to_coordinates]
     enum Unit {
         A,
         B,
@@ -54,7 +54,7 @@ fn to_local_types_test_unit() {
 #[test]
 /// Setting the discriminant explicitly should have no effect.
 fn to_local_types_test_discriminant() {
-    #[hdk_to_coordinates]
+    #[hdi_to_coordinates]
     enum Unit {
         A = 12,
         B = 3000,
@@ -69,20 +69,20 @@ fn to_local_types_test_discriminant() {
 
 #[test]
 fn to_local_types_test_nested() {
-    #[hdk_to_coordinates]
+    #[hdi_to_coordinates]
     enum Nested1 {
         A,
         B,
     }
 
-    #[hdk_to_coordinates]
+    #[hdi_to_coordinates]
     enum Nested2 {
         X,
         Y,
         Z,
     }
 
-    #[hdk_to_coordinates]
+    #[hdi_to_coordinates]
     enum NoNesting {
         A(Nested1),
         #[allow(dead_code)]
@@ -100,7 +100,7 @@ fn to_local_types_test_nested() {
     assert_eq!(to_coords(NoNesting::B { nested: Nested2::Z }), (0, 1));
     assert_eq!(to_coords(NoNesting::C), (0, 2));
 
-    #[hdk_to_coordinates(nested)]
+    #[hdi_to_coordinates(nested)]
     enum Nesting {
         A(Nested1),
         #[allow(dead_code)]
@@ -129,7 +129,7 @@ fn to_local_types_test_nested() {
 fn to_zome_index_test_unit() {
     mod integrity_a {
         use super::*;
-        #[hdk_link_types(skip_no_mangle = true)]
+        #[hdi_link_types(skip_no_mangle = true)]
         pub enum Unit {
             A,
             B,
@@ -139,7 +139,7 @@ fn to_zome_index_test_unit() {
 
     mod integrity_b {
         use super::*;
-        #[hdk_link_types(skip_no_mangle = true)]
+        #[hdi_link_types(skip_no_mangle = true)]
         pub enum Unit {
             A,
             B,
@@ -166,19 +166,19 @@ mod entry_defs_to_entry_type_index_test {
     use hdi::prelude::*;
 
     #[derive(PartialEq, Eq)]
-    #[hdk_entry_helper]
+    #[hdi_entry_helper]
     pub struct A;
     #[derive(PartialEq, Eq)]
-    #[hdk_entry_helper]
+    #[hdi_entry_helper]
     pub struct B;
     #[derive(PartialEq, Eq)]
-    #[hdk_entry_helper]
+    #[hdi_entry_helper]
     pub struct C;
 
     pub mod integrity_a {
         use super::*;
 
-        #[hdk_entry_types(skip_hdk_extern = true)]
+        #[hdi_entry_types(skip_hdk_extern = true)]
         #[unit_enum(UnitFoo)]
         #[derive(PartialEq, Eq)]
         pub enum EntryTypes {
@@ -191,7 +191,7 @@ mod entry_defs_to_entry_type_index_test {
     pub mod integrity_b {
         use super::*;
 
-        #[hdk_entry_types(skip_hdk_extern = true)]
+        #[hdi_entry_types(skip_hdk_extern = true)]
         #[unit_enum(UnitFoo)]
         pub enum EntryTypes {
             A(A),
@@ -202,9 +202,9 @@ mod entry_defs_to_entry_type_index_test {
 }
 mod entry_defs_overrides_mod {
     use super::*;
-    #[hdk_entry_helper]
+    #[hdi_entry_helper]
     pub struct A;
-    #[hdk_entry_types(skip_hdk_extern = true)]
+    #[hdi_entry_types(skip_hdk_extern = true)]
     #[unit_enum(UnitFoo)]
     pub enum EntryTypes {
         #[entry_type(name = "hey")]
@@ -245,9 +245,9 @@ fn entry_defs_overrides() {
 
 mod entry_defs_default_mod {
     use super::*;
-    #[hdk_entry_helper]
+    #[hdi_entry_helper]
     pub struct A;
-    #[hdk_entry_types(skip_hdk_extern = true)]
+    #[hdi_entry_types(skip_hdk_extern = true)]
     #[unit_enum(UnitFoo2)]
     pub enum EntryTypes {
         A(A),
@@ -374,7 +374,7 @@ fn entry_defs_to_entry_type_index() {
 
 #[test]
 fn link_types_from_action() {
-    #[hdk_link_types(skip_no_mangle = true)]
+    #[hdi_link_types(skip_no_mangle = true)]
     pub enum LinkTypes {
         A,
         B,
@@ -399,7 +399,7 @@ fn link_types_from_action() {
 
 #[test]
 fn link_types_to_global() {
-    #[hdk_link_types(skip_no_mangle = true)]
+    #[hdi_link_types(skip_no_mangle = true)]
     pub enum LinkTypes {
         A,
         B,

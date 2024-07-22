@@ -54,16 +54,16 @@ where
 /// entry content when committing to the source chain.
 ///
 /// This function accepts any input that implements [`TryInto<CreateInput>`].
-/// The implementations of the #[hdk_entry_helper] macro includes this.
+/// The implementations of the #[hdi_entry_helper] macro includes this.
 ///
 /// With generic type handling it may make sense to directly construct [`CreateInput`] and [`create`].
 ///
 /// e.g.
 /// ```ignore
-/// #[hdk_entry_helper]
+/// #[hdi_entry_helper]
 /// pub struct Foo(u32);
 ///
-/// #[hdk_entry_types]
+/// #[hdi_entry_types]
 /// pub enum EntryTypes {
 ///    Foo(Foo)
 /// }
@@ -99,10 +99,10 @@ where
 /// specify the [`ChainTopOrdering`]. Refer to [`DeleteInput`] for details.
 ///
 /// ```ignore
-/// #[hdk_entry_helper]
+/// #[hdi_entry_helper]
 /// struct Foo(u32);
 ///
-/// #[hdk_entry_types]
+/// #[hdi_entry_types]
 /// pub enum EntryTypes {
 ///    Foo(Foo)
 /// }
@@ -139,10 +139,10 @@ where
 /// means for the happ.
 ///
 /// ```ignore
-/// #[hdk_entry_helper]
+/// #[hdi_entry_helper]
 /// pub struct Foo(u32);
 ///
-/// #[hdk_entry_types]
+/// #[hdi_entry_types]
 /// pub enum EntryTypes {
 ///    Foo(Foo)
 /// }

@@ -4,7 +4,7 @@
 //!
 //! ```
 //! use hdi::prelude::*;
-//! #[hdk_link_types]
+//! #[hdi_link_types]
 //! pub enum SomeLinkTypes {
 //!     SomeLinkType,
 //!     SomeOtherLinkType,
@@ -13,7 +13,7 @@
 //! ```
 use crate::prelude::*;
 
-#[hdk_link_types]
+#[hdi_link_types]
 /// This is an example of declaring your link types.
 pub enum SomeLinkTypes {
     SomeLinkType,

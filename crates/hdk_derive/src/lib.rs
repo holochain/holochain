@@ -236,7 +236,7 @@ pub fn derive_to_unit_enum(input: TokenStream) -> TokenStream {
 ///
 /// # Examples
 /// ```ignore
-/// #[hdk_entry_types]
+/// #[hdi_entry_types]
 /// #[unit_enum(UnitEntryTypes)]
 /// pub enum EntryTypes {
 ///     Post(Post),
@@ -248,32 +248,32 @@ pub fn derive_to_unit_enum(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_entry_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
+pub fn hdi_entry_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_types::build(attrs, code)
 }
 
 /// Implements all the required types needed for a `LinkTypes` enum.
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_link_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
+pub fn hdi_link_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
     link_types::build(attrs, code)
 }
 
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_to_coordinates(attrs: TokenStream, code: TokenStream) -> TokenStream {
+pub fn hdi_to_coordinates(attrs: TokenStream, code: TokenStream) -> TokenStream {
     to_coordinates::build(attrs, code)
 }
 
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_entry_types_name_registration(attrs: TokenStream, code: TokenStream) -> TokenStream {
+pub fn hdi_entry_types_name_registration(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_types_name_registration::build(attrs, code)
 }
 
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_entry_types_conversions(attrs: TokenStream, code: TokenStream) -> TokenStream {
+pub fn hdi_entry_types_conversions(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_types_conversions::build(attrs, code)
 }
 
@@ -297,12 +297,12 @@ pub fn hdk_dependent_link_types(attrs: TokenStream, code: TokenStream) -> TokenS
 ///
 /// # Examples
 /// ```ignore
-/// #[hdk_entry_helper]
+/// #[hdi_entry_helper]
 /// pub struct Post(pub String);
 /// ```
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_entry_helper(attrs: TokenStream, code: TokenStream) -> TokenStream {
+pub fn hdi_entry_helper(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_helper::build(attrs, code)
 }
 

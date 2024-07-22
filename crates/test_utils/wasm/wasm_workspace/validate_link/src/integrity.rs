@@ -1,19 +1,19 @@
 use hdi::prelude::*;
 
 #[derive(Clone, Copy)]
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 pub enum MaybeLinkable {
     AlwaysLinkable,
     NeverLinkable,
 }
 
-#[hdk_entry_types]
+#[hdi_entry_types]
 #[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     MaybeLinkable(MaybeLinkable),
 }
 
-#[hdk_link_types]
+#[hdi_link_types]
 pub enum LinkTypes {
     Any,
 }

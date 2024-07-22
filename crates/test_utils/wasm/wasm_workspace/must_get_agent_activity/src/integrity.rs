@@ -1,13 +1,13 @@
 use hdi::prelude::*;
 
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct Thing {
     pub content: u32,
 }
 
 #[derive(Serialize, Deserialize)]
-#[hdk_entry_types]
+#[hdi_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     Thing(Thing),
