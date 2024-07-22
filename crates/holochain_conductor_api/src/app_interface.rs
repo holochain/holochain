@@ -201,6 +201,7 @@ impl From<ZomeCall> for ZomeCallUnsigned {
 }
 
 impl ZomeCall {
+    #[tracing::instrument(skip_all)]
     pub async fn try_from_unsigned_zome_call(
         keystore: &MetaLairClient,
         unsigned_zome_call: ZomeCallUnsigned,
