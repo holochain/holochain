@@ -32,8 +32,7 @@ pub fn call_stream<R: RibosomeT + 'static, I: Invocation + 'static>(
             .zomes_to_invoke(invocation.zomes())
             .into_iter()
             .collect();
-        let remaining_components_original: VecDeque<_> =
-            invocation.fn_components().into_iter().collect();
+        let remaining_components_original: VecDeque<_> = invocation.fn_components().collect();
         let mut remaining_components: VecDeque<_> = remaining_components_original.clone();
 
         while let Some(zome) = remaining_zomes.pop_front() {

@@ -786,7 +786,7 @@ impl RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
-                let module = self.get_module_for_zome(&zome).await?;
+                let module = self.get_module_for_zome(zome).await?;
                 if module.info().exports.contains_key(fn_name.as_ref()) {
                     // there is a corresponding zome fn
                     let context_key = Self::next_context_key();
@@ -811,12 +811,7 @@ impl RealRibosome {
                     }
 
                     let result = self
-                        .call_zome_fn::<I>(
-                            &invocation,
-                            &zome,
-                            &fn_name,
-                            instance_with_store.clone(),
-                        )
+                        .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store.clone())
                         .map(Some);
 
                     {
@@ -845,7 +840,7 @@ impl RealRibosome {
             } => {
                 let input = invocation.clone().host_input()?;
                 let api = HostFnApi::new(Arc::new(self.clone()), Arc::new(call_context));
-                let result = zome.0.maybe_call(Box::new(api), &fn_name, input)?;
+                let result = zome.0.maybe_call(Box::new(api), fn_name, input)?;
                 Ok(result)
             }
         }
