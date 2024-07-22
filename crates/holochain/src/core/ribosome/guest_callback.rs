@@ -47,9 +47,9 @@ pub fn call_stream<R: RibosomeT + 'static, I: Invocation + 'static>(
                     Ok(None) => (),
                     Err(e) => tx.send(Err((zome.clone(), e))).await?,
                 }
-                // reset fn components and move to the next zome
-                remaining_components = remaining_components_original.clone();
             }
+            // reset fn components and move to the next zome
+            remaining_components = remaining_components_original.clone();
         }
         Ok(())
     });
