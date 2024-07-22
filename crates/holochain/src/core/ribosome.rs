@@ -69,9 +69,10 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::CallIterator;
+use crate::core::ribosome::guest_callback::CallStream;
 use derive_more::Constructor;
 use error::RibosomeResult;
+use ghost_actor::dependencies::must_future::MustBoxFuture;
 use guest_callback::entry_defs::EntryDefsHostAccess;
 use guest_callback::init::InitHostAccess;
 use guest_callback::migrate_agent::MigrateAgentHostAccess;
@@ -629,7 +630,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     fn dna_file(&self) -> &DnaFile;
 
-    fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
+    async fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
 
     #[tracing::instrument(skip_all)]
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
@@ -664,19 +665,21 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     fn get_integrity_zome(&self, zome_index: &ZomeIndex) -> Option<IntegrityZome>;
 
-    fn call_iterator<I: Invocation + 'static>(
+    fn call_stream<I: Invocation + 'static>(
         &self,
         host_context: HostContext,
         invocation: I,
-    ) -> CallIterator<Self, I>;
+    ) -> CallStream;
 
-    async fn maybe_call<I: Invocation + 'static>(
+    fn maybe_call<I: Invocation + 'static>(
         &self,
         host_context: HostContext,
         invocation: &I,
         zome: &Zome,
         to_call: &FunctionName,
-    ) -> Result<Option<ExternIO>, RibosomeError>;
+    ) -> MustBoxFuture<'static, Result<Option<ExternIO>, RibosomeError>>
+    where
+        Self: 'static;
 
     /// Get a value from a const wasm function.
     ///
@@ -702,31 +705,31 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         // self.instance().exports().filter(|e| !e.is_callback())
     }
 
-    fn run_genesis_self_check(
+    async fn run_genesis_self_check(
         &self,
         access: GenesisSelfCheckHostAccess,
         invocation: GenesisSelfCheckInvocation,
     ) -> RibosomeResult<GenesisSelfCheckResult>;
 
-    fn run_init(
+    async fn run_init(
         &self,
         access: InitHostAccess,
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult>;
 
-    fn run_migrate_agent(
+    async fn run_migrate_agent(
         &self,
         access: MigrateAgentHostAccess,
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult>;
 
-    fn run_entry_defs(
+    async fn run_entry_defs(
         &self,
         access: EntryDefsHostAccess,
         invocation: EntryDefsInvocation,
     ) -> RibosomeResult<EntryDefsResult>;
 
-    fn run_post_commit(
+    async fn run_post_commit(
         &self,
         access: PostCommitHostAccess,
         invocation: PostCommitInvocation,
@@ -734,7 +737,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     /// Helper function for running a validation callback. Calls
     /// private fn `do_callback!` under the hood.
-    fn run_validate(
+    async fn run_validate(
         &self,
         access: ValidateHostAccess,
         invocation: ValidateInvocation,
@@ -742,7 +745,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function(
+    async fn call_zome_function(
         &self,
         access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,

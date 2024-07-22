@@ -206,11 +206,8 @@ where
 {
     match invocation.is_authorized(&host_access).await? {
         ZomeCallAuthorization::Authorized => {
-            tokio::task::spawn_blocking(|| {
-                let r = ribosome.call_zome_function(host_access, invocation);
-                Ok((ribosome, r))
-            })
-            .await?
+            let r = ribosome.call_zome_function(host_access, invocation).await;
+            Ok((ribosome, r))
         }
         not_authorized_reason => Ok((
             ribosome,
