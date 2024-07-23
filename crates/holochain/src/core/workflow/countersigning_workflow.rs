@@ -190,6 +190,7 @@ pub(crate) async fn countersigning_success(
         let this_cells_action_hash = this_cells_action_hash.clone();
         let author = author.clone();
         move |txn: Transaction| {
+            // Check for any chain lock, not specifically one for this session
             if holochain_state::chain_lock::is_chain_locked(&txn, &[], &author)? {
                 let transaction: holochain_state::prelude::Txn = (&txn).into();
                 if transaction.contains_entry(&entry_hash)? {
@@ -251,6 +252,8 @@ pub(crate) async fn countersigning_success(
         .map(ActionHash::with_data_sync)
         .collect();
 
+    // Check that this success matches the current session.
+    // If it does, then the chain gets unlocked and
     let result = authored_db
         .write_async({
             let author = author.clone();
@@ -279,16 +282,16 @@ pub(crate) async fn countersigning_success(
                                 ":action_hash": this_cells_action_hash,
                                 }
                             ).map_err(holochain_state::prelude::StateMutationError::from)?;
-                            return Ok(true);
+                            return Ok(Some(cs));
                         }
                     }
                 }
             }
-            SourceChainResult::Ok(false)
+            SourceChainResult::Ok(None)
         }})
         .await?;
 
-    if result {
+    if let Some(session) = result {
         // If all signatures are valid (above) and i signed then i must have
         // validated it previously so i now agree that i authored it.
         authored_ops_to_dht_db_without_check(
@@ -326,7 +329,7 @@ pub(crate) async fn countersigning_success(
         // If there are no active connections this won't emit anything.
         signal
             .send(Signal::System(SystemSignal::SuccessfulCountersigning(
-                entry_hash,
+                session.preflight_request.app_entry_hash,
             )))
             .ok();
 
