@@ -634,23 +634,29 @@ async fn test_enable_disable_enable_app() {
     let all_apps = conductor.list_apps(None).await.unwrap();
     assert_eq!(all_apps.len(), 1);
 
-    // - Disabled app due to error still exists after a restart
-    let (_, fx) = conductor
-        .transition_app_status(
-            "app".to_string(),
-            AppStatusTransition::Disable(DisabledAppReason::Error("error".to_string())),
-        )
-        .await
-        .unwrap();
+    // - Paused app due to error still exists after a restart,
+    //   and is actually Running after restart
     conductor
-        .clone()
-        .process_app_status_fx(fx, None)
+        .update_state(|mut state| {
+            let app = state.get_app_mut(&"app".to_string()).unwrap();
+            app.status = AppStatus::Paused(PausedAppReason::Error("error".to_string()));
+            Ok(state)
+        })
         .await
         .unwrap();
+    let all_apps = conductor.list_apps(None).await.unwrap();
+    assert_eq!(all_apps.len(), 1);
+    assert_matches!(
+        all_apps[0].status,
+        AppInfoStatus::Paused {
+            reason: PausedAppReason::Error(_)
+        }
+    );
     conductor.shutdown().await;
     conductor.startup().await;
     let all_apps = conductor.list_apps(None).await.unwrap();
     assert_eq!(all_apps.len(), 1);
+    assert_matches!(all_apps[0].status, AppInfoStatus::Running);
 
     conductor.enable_app("app".to_string()).await.unwrap();
 
