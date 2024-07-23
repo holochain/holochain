@@ -16,7 +16,7 @@ use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
 use crate::core::ribosome::weigh_placeholder;
 
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
-
+use holochain_state::chain_lock::get_locks;
 use super::{error::WorkflowResult, incoming_dht_ops_workflow::incoming_dht_ops_workflow};
 
 #[derive(Clone)]
@@ -245,8 +245,6 @@ pub(crate) async fn countersigning_success(
         return Ok(());
     }
 
-
-
     // Hash actions.
     let incoming_actions: Vec<_> = signed_actions
         .iter()
@@ -298,7 +296,7 @@ pub(crate) async fn countersigning_success(
                 .into_iter()
                 .map(|(op_hash, _)| op_hash)
                 .collect(),
-            authored_db.into(),
+            authored_db.clone().into(),
             dht_db,
             &dht_db_cache,
         )
@@ -320,6 +318,10 @@ pub(crate) async fn countersigning_success(
             }
         }
 
+        authored_db.read_async(|txn| -> DatabaseResult<()> {
+            tracing::info!("At completion of session, the lock table contains the following locks: {:?}", get_locks(&txn));
+            Ok(())
+        }).await?;
         // Signal to the UI.
         // If there are no active connections this won't emit anything.
         signal

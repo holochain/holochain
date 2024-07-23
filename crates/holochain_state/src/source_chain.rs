@@ -2,7 +2,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::chain_lock::is_chain_locked;
+use crate::chain_lock::{get_locks, is_chain_locked};
 use crate::chain_lock::is_lock_expired;
 use crate::integrate::authored_ops_to_dht_db;
 use crate::integrate::authored_ops_to_dht_db_without_check;
@@ -240,10 +240,10 @@ impl SourceChain {
         network: &(dyn HolochainP2pDnaT + Send + Sync),
     ) -> SourceChainResult<Vec<SignedActionHashed>> {
         // Nothing to write
-
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(Vec::new());
         }
+
         let (scheduled_fns, actions, ops, entries, records) =
             self.scratch.apply_and_then(|scratch| {
                 let records: Vec<Record> = scratch.records().collect();
@@ -336,6 +336,7 @@ impl SourceChain {
                 else if is_countersigning_session {
                     // If the lock is expired then we can't write this countersigning session.
                     if is_lock_expired(txn, &lock, author.as_ref())? {
+                        tracing::info!("During flush, found an expired lock: {:?}", get_locks(txn));
                         return Err(SourceChainError::LockExpired);
                     }
                 }

@@ -69,3 +69,17 @@ pub fn is_lock_expired(
     // If there's no lock then it's expired.
     Ok(r.unwrap_or(true))
 }
+
+pub fn get_locks(txn: &Transaction) -> StateMutationResult<Vec<(Vec<u8>, Timestamp, AgentPubKey)>> {
+    let mut stmt = txn.prepare(
+        "
+        SELECT lock, expires_at_timestamp, author
+        FROM ChainLock
+        ",
+    )?;
+    let r = stmt.query_map([], |row| {
+        Ok((row.get::<_, Vec<u8>>(0)?, row.get(1)?, row.get(2)?))
+    })?.collect::<holochain_sqlite::rusqlite::Result<Vec<_>>>()?;
+
+    Ok(r)
+}
