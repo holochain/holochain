@@ -248,7 +248,7 @@ async fn remote_signals() -> anyhow::Result<()> {
     holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 2;
 
-    let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(NUM_CONDUCTORS).await;
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
@@ -263,8 +263,6 @@ async fn remote_signals() -> anyhow::Result<()> {
         .collect();
 
     assert_eq!(all_agents.len(), NUM_CONDUCTORS);
-
-    conductors.exchange_peer_info().await;
 
     let cells = apps.cells_flattened();
 

@@ -325,7 +325,6 @@ impl SweetConductor {
             .raw_handle()
             .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof)
             .await?;
-        // app.all_cells()
 
         self.raw_handle().enable_app(installed_app_id).await?;
         Ok(agent)
