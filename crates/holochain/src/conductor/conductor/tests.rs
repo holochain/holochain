@@ -628,9 +628,33 @@ async fn test_enable_disable_enable_app() {
         .await
         .is_err());
 
+    // - Disabled app still exists after a restart
+    conductor.shutdown().await;
+    conductor.startup().await;
+    let all_apps = conductor.list_apps(None).await.unwrap();
+    assert_eq!(all_apps.len(), 1);
+
+    // - Disabled app due to error still exists after a restart
+    let (_, fx) = conductor
+        .transition_app_status(
+            "app".to_string(),
+            AppStatusTransition::Disable(DisabledAppReason::Error("error".to_string())),
+        )
+        .await
+        .unwrap();
+    conductor
+        .clone()
+        .process_app_status_fx(fx, None)
+        .await
+        .unwrap();
+    conductor.shutdown().await;
+    conductor.startup().await;
+    let all_apps = conductor.list_apps(None).await.unwrap();
+    assert_eq!(all_apps.len(), 1);
+
     conductor.enable_app("app".to_string()).await.unwrap();
 
-    // - We can still make a zome call after reactivation
+    // - We can still make a zome call after re-enabling
     assert!(conductor
         .call_fallible::<_, Option<Record>>(&cell.zome("zome"), "get", hash.clone())
         .await
