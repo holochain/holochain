@@ -324,8 +324,9 @@ pub(crate) async fn countersigning_success(
             }
         }
 
-        authored_db.read_async(|txn| -> DatabaseResult<()> {
-            tracing::info!("At completion of session {:?}, the lock table contains the following locks: {:?}", session.preflight_request.app_entry_hash, get_locks(&txn));
+        let session_hash = session.preflight_request.app_entry_hash.clone();
+        authored_db.read_async(move |txn| -> DatabaseResult<()> {
+            tracing::info!("At completion of session {:?}, the lock table contains the following locks: {:?}", session_hash, get_locks(&txn));
             Ok(())
         }).await?;
         // Signal to the UI.
