@@ -294,7 +294,7 @@ pub(crate) async fn countersigning_success(
     if let Some(session) = result {
         // If all signatures are valid (above) and i signed then i must have
         // validated it previously so i now agree that i authored it.
-        authored_ops_to_dht_db_without_check(
+        let transfer_count = authored_ops_to_dht_db_without_check(
             this_cell_actions_op_basis_hashes
                 .into_iter()
                 .map(|(op_hash, _)| op_hash)
@@ -304,6 +304,9 @@ pub(crate) async fn countersigning_success(
             &dht_db_cache,
         )
         .await?;
+
+        tracing::info!("Transferred {} ops to DHT", transfer_count);
+
         integration_trigger.trigger(&"countersigning_success");
         // Publish other signers agent activity ops to their agent activity authorities.
         for sa in signed_actions {

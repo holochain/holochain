@@ -19,7 +19,7 @@ pub async fn authored_ops_to_dht_db(
     authored_db: DbRead<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
     dht_db_cache: &DhtDbQueryCache,
-) -> StateMutationResult<()> {
+) -> StateMutationResult<usize> {
     // Check if any agents in this space are an authority for these hashes.
     let mut should_hold_hashes = Vec::new();
     for (op_hash, basis) in hashes {
@@ -45,7 +45,7 @@ pub async fn authored_ops_to_dht_db_without_check(
     authored_db: DbRead<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
     dht_db_cache: &DhtDbQueryCache,
-) -> StateMutationResult<()> {
+) -> StateMutationResult<usize> {
     // Get the ops from the authored database.
     let mut ops = Vec::with_capacity(hashes.len());
     let ops = authored_db
@@ -71,7 +71,7 @@ pub async fn authored_ops_to_dht_db_without_check(
             StateMutationResult::Ok(activity)
         })
         .await?;
-    for op in activity {
+    for op in &activity {
         let deps = op.sys_validation_dependencies();
 
         if deps.is_empty() {
@@ -90,7 +90,7 @@ pub async fn authored_ops_to_dht_db_without_check(
                 .await?;
         }
     }
-    Ok(())
+    Ok(activity.len())
 }
 
 fn insert_locally_validated_op(
