@@ -169,6 +169,7 @@ pub(crate) async fn countersigning_success(
         integrate_dht_ops: integration_trigger,
         ..
     } = trigger;
+    // TODO why can there only be 8? This depends on the list of signers
     // Using iterators is fine in this function as there can only be a maximum of 8 actions.
     let (this_cells_action_hash, entry_hash) = match signed_actions
         .iter()

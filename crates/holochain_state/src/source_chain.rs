@@ -1155,6 +1155,8 @@ pub fn current_countersigning_session(
 ) -> SourceChainResult<Option<(EntryHash, CounterSigningSessionData)>> {
     // The chain must be locked for a session to be active.
     if is_chain_locked(txn, &[], author.as_ref())? {
+        // TODO has the chain head definitely moved at this point? If we started another session
+        //      but haven't committed our countersigned entry yet then it hasn't moved.
         match chain_head_db(txn, author) {
             // We haven't done genesis so no session can be active.
             Err(e) => Err(e),
