@@ -1658,7 +1658,6 @@ mod app_impls {
                             metadata: Default::default(), // TODO: pass in necessary metadata
                         },
                         derivation_details: Some(derivation),
-                        create_only: false,
                     };
 
                     state.register_key(input).await?;

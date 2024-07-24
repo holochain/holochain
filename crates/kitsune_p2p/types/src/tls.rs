@@ -60,9 +60,7 @@ pub fn gen_tls_configs(
         .with_safe_default_kx_groups()
         .with_protocol_versions(&[&rustls::version::TLS13])
         .map_err(KitsuneError::other)?
-        .with_client_cert_verifier(
-            rustls::server::AllowAnyAuthenticatedClient::new(root_store).boxed(),
-        )
+        .with_client_cert_verifier(rustls::server::AllowAnyAuthenticatedClient::new(root_store))
         .with_single_cert(vec![cert.clone()], cert_priv_key.clone())
         .map_err(KitsuneError::other)?;
 
@@ -83,13 +81,13 @@ pub fn gen_tls_configs(
         .with_protocol_versions(&[&rustls::version::TLS13])
         .map_err(KitsuneError::other)?
         .with_custom_certificate_verifier(TlsServerVerifier::new())
-        .with_client_auth_cert(vec![cert], cert_priv_key)
+        .with_single_cert(vec![cert], cert_priv_key)
         .map_err(KitsuneError::other)?;
 
     if tuning_params.use_env_tls_keylog() {
         tls_client_config.key_log = KEY_LOG.clone();
     }
-    tls_client_config.resumption = rustls::client::Resumption::in_memory_sessions(
+    tls_client_config.session_storage = rustls::client::ClientSessionMemoryCache::new(
         tuning_params.tls_in_mem_session_storage as usize,
     );
     tls_client_config.alpn_protocols.push(alpn.to_vec());

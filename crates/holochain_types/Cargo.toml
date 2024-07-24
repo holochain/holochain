@@ -33,6 +33,7 @@ one_err = "0.0.8"
 holo_hash = { version = "^0.4.0-dev.9", path = "../holo_hash", features = [
   "encoding",
 ] }
+holochain_deepkey_dna = "0.0.5"
 holochain_keystore = { version = "^0.4.0-dev.7", path = "../holochain_keystore" }
 holochain_nonce = { version = "^0.4.0-dev.3", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.54"
