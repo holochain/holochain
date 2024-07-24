@@ -26,13 +26,13 @@ teardown() {
   setup_and_build_hello_world() {
     print_version
 
-    hc-scaffold example hello-world
+    hc-scaffold example -p=yarn hello-world
     cd hello-world
 
     nix develop --command bash -c "
       set -e
-      npm install
-      npm test
+      yarn install
+      yarn test
       "
   }
 
