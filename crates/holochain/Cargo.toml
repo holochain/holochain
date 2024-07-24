@@ -136,6 +136,7 @@ holochain = { path = ".", default-features = false, features = [
   "tx2",
   "tx5",
   "metrics_influxive",
+  "deepkey-wasm-cache",
 ] }
 
 anyhow = "1.0"
@@ -282,3 +283,5 @@ chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_types/chc"]
 dpki = []
 
 sweettest = ["test_utils", "sqlite"]
+
+deepkey-wasm-cache = []
