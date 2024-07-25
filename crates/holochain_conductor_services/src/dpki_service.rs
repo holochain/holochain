@@ -104,12 +104,19 @@ pub trait DpkiState: Send + Sync {
         input: RevokeKeyInput,
     ) -> DpkiServiceResult<(ActionHash, KeyRegistration)>;
 
-    /// Check if the key is valid (properly created and not revoked) as-at the given Timestamp
+    /// Check if the key is valid (properly created and not revoked) as-at the given Timestamp.
     async fn key_state(
         &self,
         key: AgentPubKey,
         timestamp: Timestamp,
     ) -> DpkiServiceResult<KeyState>;
+
+    /// Check if the two provided agent keys belong to the same agent.
+    async fn is_same_agent(
+        &self,
+        key_1: AgentPubKey,
+        key_2: AgentPubKey,
+    ) -> DpkiServiceResult<bool>;
 }
 
 /// The errors which can be produced by DPKI

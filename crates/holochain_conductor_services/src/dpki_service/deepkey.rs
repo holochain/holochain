@@ -101,4 +101,12 @@ impl DpkiState for DeepkeyState {
         let payload = (agent_anchor, timestamp);
         self.call_deepkey_zome("key_state", payload).await
     }
+
+    async fn is_same_agent(
+        &self,
+        key_1: AgentPubKey,
+        key_2: AgentPubKey,
+    ) -> DpkiServiceResult<bool> {
+        self.call_deepkey_zome("same_lineage", (key_1, key_2)).await
+    }
 }
