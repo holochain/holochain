@@ -26,6 +26,8 @@ teardown() {
   setup_and_build_hello_world() {
     version=$(print_version)
 
+    echo version
+
     if [[ "$version" = 0.2* ]] || [[ "$version" = 0.1* ]]
     then
       hc-scaffold example hello-world
