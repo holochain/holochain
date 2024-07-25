@@ -271,16 +271,16 @@ pub(crate) async fn countersigning_success(
                                 ":action_hash": this_cells_action_hash,
                                 }
                             ).map_err(holochain_state::prelude::StateMutationError::from)?;
-                            return Ok(true);
+                            return Ok(Some(cs));
                         }
                     }
                 }
             }
-            SourceChainResult::Ok(false)
+            SourceChainResult::Ok(None)
         }})
         .await?;
 
-    if result {
+    if let Some(session_data) = result {
         // If all signatures are valid (above) and i signed then i must have
         // validated it previously so i now agree that i authored it.
         // TODO: perhaps this should be `authored_ops_to_dht_db`, i.e. the arc check should
@@ -314,9 +314,10 @@ pub(crate) async fn countersigning_success(
 
         // Signal to the UI.
         // If there are no active connections this won't emit anything.
+        let app_entry_hash = session_data.preflight_request.app_entry_hash.clone();
         signal
             .send(Signal::System(SystemSignal::SuccessfulCountersigning(
-                entry_hash,
+                app_entry_hash,
             )))
             .ok();
 
