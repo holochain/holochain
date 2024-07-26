@@ -33,8 +33,8 @@ async fn demo() {
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn demo_multi_sig() {
     run_test(|| async {
-        use std::sync::Arc;
         use holochain::sweettest::*;
+        use std::sync::Arc;
 
         let vous1 = SweetLocalRendezvous::new().await;
         let vous2 = SweetLocalRendezvous::new().await;
