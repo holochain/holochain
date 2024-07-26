@@ -1,6 +1,6 @@
 //! Types needed for all validation
 use std::convert::TryFrom;
-
+use holochain_state::prelude::IncompleteCommitReason;
 use super::workflow::WorkflowResult;
 use super::SourceChainError;
 use super::SysValidationError;
@@ -48,8 +48,20 @@ macro_rules! from_sub_error {
 
 impl OutcomeOrError<ValidationOutcome, SysValidationError> {
     /// Convert an OutcomeOrError<ValidationOutcome, SysValidationError> into
-    /// a InvalidCommit and exit the call zome workflow early
-    pub fn invalid_call_zome_commit<T>(self) -> WorkflowResult<T> {
-        Err(SourceChainError::InvalidCommit(ValidationOutcome::try_from(self)?.to_string()).into())
+    /// a [crate::core::workflow::error::WorkflowError].
+    ///
+    /// The inner error will be a [SourceChainError] if sys validation ran successfully but produced
+    /// an unsuccessful validation outcome. Otherwise, the error will be [SysValidationError] to
+    /// explain why sys validation was not able to complete the validation request.
+    pub fn to_workflow_error<T>(self) -> WorkflowResult<T> {
+        let outcome = ValidationOutcome::try_from(self)?;
+        match outcome {
+            ValidationOutcome::DepMissingFromDht(deps) => {
+                Err(SourceChainError::IncompleteCommit(IncompleteCommitReason::DepMissingFromDht(vec![deps])).into())
+            }
+            outcome => {
+                Err(SourceChainError::InvalidCommit(outcome.to_string()).into())
+            }
+        }
     }
 }

@@ -12,12 +12,14 @@
 //! users in a testing environment.
 //!
 //! ```rust, no_run
-//! async fn async_main () {
+//!  async fn async_main () {
 //! use holochain_state::test_utils::test_db_dir;
 //! use holochain::conductor::{Conductor, ConductorBuilder};
+//! use holochain::conductor::ConductorHandle;
+//!
 //! let env_dir = test_db_dir();
-//! let conductor: Conductor = ConductorBuilder::new()
-//!    .test(env_dir.path(), &[])
+//! let conductor: ConductorHandle = ConductorBuilder::new()
+//!    .test(&[])
 //!    .await
 //!    .unwrap();
 //!

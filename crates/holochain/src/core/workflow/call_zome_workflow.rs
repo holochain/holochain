@@ -24,6 +24,7 @@ use parking_lot::Mutex;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tracing::instrument;
+use holochain_state::prelude::IncompleteCommitReason;
 
 #[cfg(test)]
 mod validation_test;
@@ -164,6 +165,8 @@ where
 
     // If the validation failed remove any active chain lock that matches the
     // entry that failed validation.
+    // Note that missing dependencies will not produce an `InvalidCommit` but an `IncompleteCommit`
+    // so that the commit can be retried later without terminating the countersigning session.
     if matches!(
         validation_result,
         Err(WorkflowError::SourceChainError(
@@ -250,8 +253,9 @@ where
                 .await
                 // If the was en error exit
                 // If the validation failed, exit with an InvalidCommit
+                // If the validation failed with a retryable error, exit with an IncompleteCommit
                 // If it was ok continue
-                .or_else(|outcome_or_err| outcome_or_err.invalid_call_zome_commit())?;
+                .or_else(|outcome_or_err| outcome_or_err.to_workflow_error())?;
             to_app_validate.push(record);
         }
 
@@ -260,10 +264,10 @@ where
 
     for mut chain_record in to_app_validate {
         for op_type in action_to_op_types(chain_record.action()) {
-            let op =
+            let outcome =
                 app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;
 
-            let (op, dht_op_hash, omitted_entry) = match op {
+            let (op, dht_op_hash, omitted_entry) = match outcome {
                 Ok(op) => op,
                 Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
             };
@@ -326,26 +330,23 @@ fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
 }
 
 fn map_outcome(
-    outcome: Result<app_validation_workflow::Outcome, AppValidationError>,
+    outcome: Result<Outcome, AppValidationError>,
 ) -> WorkflowResult<()> {
     match outcome.map_err(SourceChainError::other)? {
-        app_validation_workflow::Outcome::Accepted => {}
-        app_validation_workflow::Outcome::Rejected(reason) => {
+        Outcome::Accepted => {}
+        Outcome::Rejected(reason) => {
             return Err(SourceChainError::InvalidCommit(reason).into());
         }
-        // when the wasm is being called directly in a zome invocation any
-        // state other than valid is not allowed for new entries
-        // e.g. we require that all dependencies are met when committing an
-        // entry to a local source chain
-        // this is different to the case where we are validating data coming in
-        // from the network where unmet dependencies would need to be
-        // rescheduled to attempt later due to partitions etc.
-        app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
-            return Err(SourceChainError::InvalidCommit(format!(
-                "Awaiting deps {:?} but this is not allowed when committing entries to the source chain",
-                hashes
-            ))
-            .into());
+        // When the wasm is being called directly in a zome invocation, any state other than valid
+        // is not allowed for new entries. E.g. we require that all dependencies are met when
+        // committing an entry to a local source chain.
+        // This is different to the case where we are validating data coming in from the network
+        // where unmet dependencies would be rescheduled to attempt later due to partitions etc.
+        // To allow the client to decide whether to retry later, we return a different error
+        // variant here. This indicates that the validation did not fail because the data is
+        // definitely invalid, but because validation could not make a decision yet.
+        Outcome::AwaitingDeps(hashes) => {
+            return Err(SourceChainError::IncompleteCommit(IncompleteCommitReason::DepMissingFromDht(hashes)).into());
         }
     }
     Ok(())
