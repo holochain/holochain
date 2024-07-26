@@ -53,7 +53,6 @@ pub enum TaskOutcome {
 
 /// Spawn a task which performs some action after each task has completed,
 /// as recieved by the outcome channel produced by the task manager.
-#[tracing::instrument(skip_all)]
 pub fn spawn_task_outcome_handler(
     conductor: ConductorHandle,
     mut outcomes: OutcomeReceiver,

@@ -61,7 +61,7 @@ pub enum DatabaseError {
     GetRandom(getrandom::Error),
 
     #[error(transparent)]
-    Timeout(tokio::time::error::Elapsed),
+    Timeout(#[from] tokio::time::error::Elapsed),
 }
 
 impl From<TimestampError> for DatabaseError {

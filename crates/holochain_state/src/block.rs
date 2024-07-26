@@ -9,7 +9,6 @@ use holochain_types::prelude::Timestamp;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 
-#[tracing::instrument(skip_all)]
 pub async fn block(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
     tracing::warn!(?input, "blocking node!");
 
@@ -17,7 +16,6 @@ pub async fn block(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResul
         .await
 }
 
-#[tracing::instrument(skip_all)]
 pub async fn unblock(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
     db.write_async(move |txn| mutations::insert_unblock(txn, input))
         .await

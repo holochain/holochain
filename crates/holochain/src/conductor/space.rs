@@ -142,7 +142,6 @@ impl Spaces {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
-
         let conductor_db =
             DbWrite::open_with_sync_level(root_db_dir.as_ref(), DbKindConductor, db_sync_level)?;
         let wasm_db =
@@ -256,7 +255,6 @@ impl Spaces {
     }
 
     /// Get the holochain conductor state
-    #[tracing::instrument(skip_all)]
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
         timed!([1, 10, 1000], "get_state", {
             match query_conductor_state(&self.conductor_db).await? {
@@ -270,7 +268,6 @@ impl Spaces {
     }
 
     /// Update the internal state with a pure function mapping old state to new
-    #[tracing::instrument(skip_all)]
     pub async fn update_state<F>(&self, f: F) -> ConductorResult<ConductorState>
     where
         F: Send + FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
@@ -282,7 +279,6 @@ impl Spaces {
     /// Update the internal state with a pure function mapping old state to new,
     /// which may also produce an output value which will be the output of
     /// this function
-    #[tracing::instrument(skip_all)]
     pub async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
     where
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,

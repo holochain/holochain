@@ -141,7 +141,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
                 r
             }).in_current_span()).in_current_span().await.map_err(|e| {
                 tracing::error!("Failed to claim a thread to run the database read transaction. It's likely that the program is out of threads.");
-                DatabaseError::Timeout(e)
+                DatabaseError::from(e)
             })?.map_err(DatabaseError::from)?
     }
 
@@ -170,11 +170,9 @@ impl<Kind: DbKindT> DbRead<Kind> {
                     waiting as f64 / self.max_readers as f64 * 100.0
                 )
             });
-        } else {
-            tracing::trace!("checkout_connection ready to acquire semaphore");
         }
 
-        let permit = acquire_semaphore_permit(semaphore).await?;
+        let permit = Self::acquire_reader_permit(semaphore).await?;
 
         self.num_readers.fetch_sub(1, Ordering::Relaxed);
 
@@ -188,7 +186,6 @@ impl<Kind: DbKindT> DbRead<Kind> {
 
     /// Get a connection from the pool.
     /// TODO: We should eventually swap this for an async solution.
-    #[tracing::instrument]
     fn get_connection_from_pool(&self) -> DatabaseResult<PConn> {
         let now = Instant::now();
         let r = Ok(PConn::new(self.connection_pool.get()?));
@@ -196,10 +193,29 @@ impl<Kind: DbKindT> DbRead<Kind> {
         if el.as_millis() > 20 {
             // TODO Convert to a metric
             tracing::info!("Connection pool took {:?} to be freed", el);
-        } else {
-            tracing::trace!("Got connection");
         }
         r
+    }
+
+    async fn acquire_reader_permit(
+        semaphore: Arc<Semaphore>,
+    ) -> DatabaseResult<OwnedSemaphorePermit> {
+        let id = nanoid::nanoid!(7);
+        tracing::trace!(?id, "acquire semaphore permit");
+        let permit = tokio::time::timeout(
+            std::time::Duration::from_millis(ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)),
+            semaphore.acquire_owned(),
+        )
+        .await;
+        tracing::trace!(?id, ?permit, "semaphore permit obtained");
+        match permit {
+            Ok(Ok(s)) => Ok(s),
+            Ok(Err(e)) => {
+                tracing::error!("Semaphore should not be closed but got an error while acquiring a permit, {:?}", e);
+                Err(DatabaseError::Other(e.into()))
+            }
+            Err(e) => Err(DatabaseError::Timeout(e)),
+        }
     }
 
     #[cfg(all(any(test, feature = "test_utils"), not(loom)))]
@@ -338,14 +354,18 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Ok(DbWrite(db_read))
     }
 
-    #[tracing::instrument(skip_all, fields(kind = ?self.kind))]
     pub async fn write_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
         F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
-        let _permit = acquire_semaphore_permit(self.0.write_semaphore.clone()).await?;
+        let _g = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            self.acquire_writer_permit(),
+        )
+        .await
+        .map_err(DatabaseError::from)?;
 
         let mut conn = self.get_connection_from_pool()?;
 
@@ -362,7 +382,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             r
         }).in_current_span()).in_current_span().await.map_err(|e| {
             tracing::error!("Failed to claim a thread to run the database write transaction. It's likely that the program is out of threads.");
-            DatabaseError::Timeout(e)
+            DatabaseError::from(e)
         })?.map_err(DatabaseError::from)?
     }
 
@@ -372,6 +392,15 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
 
     pub fn available_reader_count(&self) -> usize {
         self.read_semaphore.available_permits()
+    }
+
+    async fn acquire_writer_permit(&self) -> OwnedSemaphorePermit {
+        self.0
+            .write_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("We don't ever close these semaphores")
     }
 
     fn get_write_semaphore(kind: DbKind) -> Arc<Semaphore> {
@@ -497,29 +526,4 @@ pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
 #[cfg(feature = "test_utils")]
 pub fn set_acquire_timeout(timeout_ms: u64) {
     ACQUIRE_TIMEOUT_MS.store(timeout_ms, Ordering::Relaxed);
-}
-
-#[tracing::instrument]
-async fn acquire_semaphore_permit(
-    semaphore: Arc<Semaphore>,
-) -> DatabaseResult<OwnedSemaphorePermit> {
-    let id = nanoid::nanoid!(7);
-    tracing::trace!(?id, "???     acquire semaphore permit");
-    let permit = tokio::time::timeout(
-        std::time::Duration::from_millis(ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)),
-        semaphore.acquire_owned(),
-    )
-    .await;
-    tracing::trace!(?id, ?permit, "    !!! semaphore permit obtained");
-    match permit {
-        Ok(Ok(s)) => Ok(s),
-        Ok(Err(e)) => {
-            tracing::error!(
-                "Semaphore should not be closed but got an error while acquiring a permit, {:?}",
-                e
-            );
-            Err(DatabaseError::Other(e.into()))
-        }
-        Err(e) => Err(DatabaseError::Timeout(e)),
-    }
 }

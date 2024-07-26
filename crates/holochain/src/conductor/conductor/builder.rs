@@ -69,7 +69,6 @@ impl ConductorBuilder {
     }
 
     /// Initialize a "production" Conductor
-    #[tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope))]
     pub async fn build(self) -> ConductorResult<ConductorHandle> {
         tracing::debug!(?self.config);
 
@@ -408,7 +407,6 @@ impl ConductorBuilder {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    #[tracing::instrument(skip_all)]
     pub(crate) async fn update_fake_state(
         state: Option<ConductorState>,
         conductor: Conductor,
@@ -421,7 +419,6 @@ impl ConductorBuilder {
 
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
-    #[tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope))]
     pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
         let keystore = self
             .keystore
