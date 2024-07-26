@@ -16,7 +16,6 @@ mod test;
 /// hash bounded range of actions.
 ///
 /// The full range must exist or this will return [`MustGetAgentActivityResponse::IncompleteChain`].
-#[tracing::instrument(skip_all)]
 pub async fn must_get_agent_activity(
     env: DbRead<DbKindDht>,
     author: AgentPubKey,

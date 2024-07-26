@@ -9,7 +9,6 @@ use std::sync::Arc;
 use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
-#[tracing::instrument(skip(_ribosome, call_context))]
 pub fn must_get_valid_record<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
@@ -29,7 +28,6 @@ pub fn must_get_valid_record<'a>(
                 use crate::core::ribosome::ValidateHostAccess;
                 let (cascade, opt) = match call_context.host_context {
                     HostContext::Validate(ValidateHostAccess { is_inline, .. }) => {
-
                         if is_inline {
                             (
                                 CascadeImpl::from_workspace_and_network(

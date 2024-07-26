@@ -170,8 +170,7 @@ impl MetaLairClient {
     }
 
     /// Generate a new signature for given keypair / data
-    #[tracing::instrument(skip(self, data))]
-    pub fn sign(
+        pub fn sign(
         &self,
         pub_key: holo_hash::AgentPubKey,
         data: Arc<[u8]>,

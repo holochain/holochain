@@ -17,7 +17,6 @@ use std::sync::Arc;
 use tracing::Instrument;
 use wasmer::RuntimeError;
 
-#[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn send_remote_signal(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,

@@ -206,7 +206,6 @@ pub fn spawn_task_outcome_handler(
     }.instrument(span))
 }
 
-#[tracing::instrument(skip(kind))]
 fn produce_task_outcome(kind: &TaskKind, result: ManagedTaskResult, name: String) -> TaskOutcome {
     use TaskOutcome::*;
     match kind {

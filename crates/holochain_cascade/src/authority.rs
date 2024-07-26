@@ -40,7 +40,6 @@ pub async fn handle_get_entry(
 }
 
 /// Handler for get_record query to a Record authority
-#[tracing::instrument(skip(env))]
 pub async fn handle_get_record(
     env: DbRead<DbKindDht>,
     hash: ActionHash,

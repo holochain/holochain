@@ -367,7 +367,6 @@ macro_rules! here {
     };
 }
 
-#[tracing::instrument(skip(txn))]
 pub fn dump_db(txn: &Transaction) {
     let dump = |mut stmt: Statement| {
         let mut rows = stmt.query([]).unwrap();

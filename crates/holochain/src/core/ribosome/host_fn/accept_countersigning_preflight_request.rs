@@ -9,7 +9,6 @@ use tracing::error;
 use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
-#[tracing::instrument(skip(_ribosome, call_context))]
 pub fn accept_countersigning_preflight_request<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,

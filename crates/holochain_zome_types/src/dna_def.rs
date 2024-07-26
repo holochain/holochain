@@ -102,8 +102,7 @@ impl DnaDef {
 
 impl DnaDef {
     /// Get all zomes including the integrity and coordinator zomes.
-    #[tracing::instrument(skip_all)]
-    pub fn all_zomes(&self) -> impl Iterator<Item = (&ZomeName, &ZomeDef)> {
+        pub fn all_zomes(&self) -> impl Iterator<Item = (&ZomeName, &ZomeDef)> {
         self.integrity_zomes
             .iter()
             .map(|(n, def)| (n, def.as_any_zome_def()))
@@ -135,8 +134,7 @@ impl DnaDef {
     }
 
     /// Check if a zome is an integrity zome.
-    #[tracing::instrument(skip_all)]
-    pub fn is_integrity_zome(&self, zome_name: &ZomeName) -> bool {
+        pub fn is_integrity_zome(&self, zome_name: &ZomeName) -> bool {
         self.integrity_zomes
             .iter()
             .any(|(name, _)| name == zome_name)

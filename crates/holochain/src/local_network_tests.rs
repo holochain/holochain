@@ -415,7 +415,6 @@ async fn check_gossip(
     }
 }
 
-#[tracing::instrument(skip(envs))]
 async fn check_peers(envs: Vec<DbWrite<DbKindP2pAgents>>) {
     for (i, a) in envs.iter().enumerate() {
         let peers = all_agent_infos(a.clone().into()).await.unwrap();

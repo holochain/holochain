@@ -807,7 +807,6 @@ fn display_op(op: &DhtOp) -> String {
 }
 
 /// Wait for num_attempts * delay, or until all published ops have been integrated.
-#[tracing::instrument(skip(db))]
 pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     db: &Db,
     num_published: usize,
@@ -835,7 +834,6 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     ))
 }
 
-#[tracing::instrument(skip(envs))]
 /// Show authored data for each cell environment
 pub async fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
     for (i, &db) in envs.iter().enumerate() {

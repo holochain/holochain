@@ -233,8 +233,7 @@ impl SourceChain {
     }
 
     #[async_recursion]
-    #[tracing::instrument(skip(self, network))]
-    pub async fn flush(
+        pub async fn flush(
         &self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
     ) -> SourceChainResult<Vec<SignedActionHashed>> {
@@ -1307,7 +1306,6 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
 }
 
 /// dump the entire source chain as a pretty-printed json string
-#[tracing::instrument(skip_all)]
 pub async fn dump_state(
     vault: DbRead<DbKindAuthored>,
     author: AgentPubKey,

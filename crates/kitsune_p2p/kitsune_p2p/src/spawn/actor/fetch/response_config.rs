@@ -19,8 +19,7 @@ impl kitsune_p2p_fetch::FetchResponseConfig for FetchResponseConfig {
         Option<(dht::prelude::RegionCoords, bool)>,
     );
 
-    #[tracing::instrument(skip_all)]
-    fn respond(
+        fn respond(
         &self,
         space: KSpace,
         user: Self::User,

@@ -360,8 +360,7 @@ impl SpaceInternalHandler for Space {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
-    #[tracing::instrument(skip_all)]
-    fn handle_incoming_delegate_broadcast(
+        fn handle_incoming_delegate_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
         basis: Arc<KitsuneBasis>,
@@ -571,8 +570,7 @@ impl SpaceInternalHandler for Space {
         .into())
     }
 
-    #[tracing::instrument(skip_all)]
-    fn handle_notify(&mut self, to_agent: KAgent, data: wire::Wire) -> InternalHandlerResult<()> {
+        fn handle_notify(&mut self, to_agent: KAgent, data: wire::Wire) -> InternalHandlerResult<()> {
         let ro_inner = self.ro_inner.clone();
         let timeout = ro_inner.config.tuning_params.implicit_timeout();
 
@@ -977,8 +975,7 @@ impl KitsuneP2pHandler for Space {
         Ok(fut.boxed().into())
     }
 
-    #[tracing::instrument(skip_all)]
-    fn handle_broadcast(
+        fn handle_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
         basis: Arc<KitsuneBasis>,
@@ -1134,8 +1131,7 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
 
-    #[tracing::instrument(skip_all)]
-    fn handle_targeted_broadcast(
+        fn handle_targeted_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
         agents: Vec<Arc<KitsuneAgent>>,

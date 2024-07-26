@@ -33,8 +33,7 @@ impl GlobalZomeTypes {
     /// For example [`HashMap`] does not produce
     /// deterministic iterators so should not be used as the source.
 
-    #[tracing::instrument(skip_all)]
-    pub fn from_ordered_iterator<I>(ordered_iterator: I) -> ZomeTypesResult<GlobalZomeTypes>
+        pub fn from_ordered_iterator<I>(ordered_iterator: I) -> ZomeTypesResult<GlobalZomeTypes>
     where
         I: IntoIterator<Item = (EntryDefIndex, LinkType)>,
     {

@@ -99,8 +99,7 @@ impl CellConductorApiT for CellConductorApi {
             .get_ribosome(self.cell_id.dna_hash())?)
     }
 
-    #[tracing::instrument(skip(self))]
-    fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+        fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
         let dna = self
             .get_dna(dna_hash)
             .ok_or_else(|| ConductorApiError::DnaMissing(dna_hash.clone()))?;

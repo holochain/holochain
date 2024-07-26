@@ -316,8 +316,7 @@ impl AgentStoreByPath {
         }
     }
 
-    #[tracing::instrument(skip_all)]
-    async fn get_async(&self, db: &DbRead<DbKindP2pAgents>) -> DatabaseResult<AgentStore> {
+        async fn get_async(&self, db: &DbRead<DbKindP2pAgents>) -> DatabaseResult<AgentStore> {
         let store_key = db.clone().into();
         {
             let map = self.map.lock();
@@ -493,8 +492,7 @@ impl AsP2pStateReadExt for DbRead<DbKindP2pAgents> {
         cache_get_async(self).await?.query_near_basis(basis, limit)
     }
 
-    #[tracing::instrument(skip_all)]
-    async fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
+        async fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
         self.read_async(|txn| txn.p2p_extrapolated_coverage(dht_arc_set))
             .await
     }

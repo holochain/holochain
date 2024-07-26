@@ -99,8 +99,7 @@ impl Producer {
         }
     }
 
-    #[tracing::instrument(skip(self))]
-    async fn fill(&mut self, num_ops: usize) {
+        async fn fill(&mut self, num_ops: usize) {
         let inputs: Vec<_> = (0..num_ops)
             .map(|i| AnchorInput("alice_fill".to_string(), i.to_string()))
             .collect();

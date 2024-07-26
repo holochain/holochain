@@ -188,7 +188,6 @@ where
     Ok(())
 }
 
-#[tracing::instrument(skip_all)]
 async fn pending_receipts(
     vault: &DbRead<DbKindDht>,
     validators: Vec<AgentPubKey>,

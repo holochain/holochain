@@ -1705,7 +1705,6 @@ mod app_impls {
         }
 
         /// Uninstall an app
-        #[tracing::instrument(skip(self))]
         pub async fn uninstall_app(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,
@@ -2210,7 +2209,6 @@ mod app_status_impls {
         /// needed) to match the current reality of all app statuses.
         /// - If a Cell is used by at least one Running app, then ensure it is added
         /// - If a Cell is used by no running apps, then ensure it is removed.
-        #[tracing::instrument(skip(self))]
         pub async fn reconcile_cell_status_with_app_status(
             self: Arc<Self>,
         ) -> ConductorResult<CellStartupErrors> {
@@ -2223,7 +2221,6 @@ mod app_status_impls {
         }
 
         /// Enable an app
-        #[tracing::instrument(skip(self))]
         pub async fn enable_app(
             self: Arc<Self>,
             app_id: InstalledAppId,
@@ -2238,7 +2235,6 @@ mod app_status_impls {
         }
 
         /// Disable an app
-        #[tracing::instrument(skip(self))]
         pub async fn disable_app(
             self: Arc<Self>,
             app_id: InstalledAppId,
@@ -2253,7 +2249,6 @@ mod app_status_impls {
         }
 
         /// Start an app
-        #[tracing::instrument(skip(self))]
         pub async fn start_app(
             self: Arc<Self>,
             app_id: InstalledAppId,
@@ -2281,7 +2276,6 @@ mod app_status_impls {
         }
 
         /// Transition an app's status to a new state.
-        #[tracing::instrument(skip(self))]
         pub(crate) async fn transition_app_status(
             &self,
             app_id: InstalledAppId,
@@ -2298,7 +2292,6 @@ mod app_status_impls {
         }
 
         /// Pause an app
-        #[tracing::instrument(skip(self))]
         #[cfg(any(test, feature = "test_utils"))]
         pub async fn pause_app(
             self: Arc<Self>,
@@ -3592,7 +3585,6 @@ mod test_utils_impls {
     }
 }
 
-#[tracing::instrument(skip_all)]
 fn purge_data(txn: &mut Transaction) -> DatabaseResult<()> {
     txn.execute("DELETE FROM DhtOp", ())?;
     txn.execute("DELETE FROM Action", ())?;

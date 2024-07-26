@@ -665,7 +665,6 @@ impl Cell {
             .map_err(Into::into)
     }
 
-    #[tracing::instrument(skip(self))]
     async fn handle_get_record(
         &self,
         hash: ActionHash,
@@ -743,7 +742,6 @@ impl Cell {
     }
 
     /// A remote agent is sending us a validation receipt bundle.
-    #[tracing::instrument(skip(self, receipts))]
     async fn handle_validation_receipts(
         &self,
         receipts: ValidationReceiptBundle,
@@ -854,7 +852,6 @@ impl Cell {
     }
 
     /// the network module would like this cell/agent to sign some data
-    #[tracing::instrument(skip(self))]
     async fn handle_sign_network_data(&self) -> CellResult<Signature> {
         Ok([0; 64].into())
     }
@@ -957,7 +954,6 @@ impl Cell {
     }
 
     /// Check if each Zome's init callback has been run, and if not, run it.
-    #[tracing::instrument(skip(self))]
     pub(crate) async fn check_or_run_zome_init(&self) -> CellResult<()> {
         // Ensure that only one init check is run at a time
         let _guard = tokio::time::timeout(
@@ -1016,7 +1012,6 @@ impl Cell {
     }
 
     /// Clean up long-running managed tasks.
-    #[tracing::instrument(skip_all, fields(cell_id = ?self.id()))]
     pub async fn cleanup(&self) -> CellResult<()> {
         use holochain_p2p::HolochainP2pDnaT;
         let shutdown = self

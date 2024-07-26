@@ -127,8 +127,7 @@ impl AddRecordPayload {
     /// Create a payload from a list of records.
     /// This performs the necessary signing and encryption the CHC requires.
 
-    #[tracing::instrument(skip(keystore, records))]
-    pub async fn from_records(
+        pub async fn from_records(
         keystore: MetaLairClient,
         agent_pubkey: AgentPubKey,
         records: Vec<Record>,
