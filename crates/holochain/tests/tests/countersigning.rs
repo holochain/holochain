@@ -280,6 +280,9 @@ async fn retry_countersigning_commit_on_missing_deps() {
         .await
         .unwrap();
 
+    // Listen for the session to complete, which it should in spite of the error that
+    // Alice had initially.
+
     let alice_rx = conductors[0].subscribe_to_app_signals("app".into());
     let bob_rx = conductors[1].subscribe_to_app_signals("app".into());
 
