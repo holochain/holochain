@@ -13,7 +13,7 @@ use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::clone::DisableCloneCellInput;
 use wasmer::RuntimeError;
 
-#[tracing::instrument(skip(_ribosome, call_context), fields(? call_context.zome, function = ? call_context.function_name))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context), fields(? call_context.zome, function = ? call_context.function_name)))]
 pub fn disable_clone_cell<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,

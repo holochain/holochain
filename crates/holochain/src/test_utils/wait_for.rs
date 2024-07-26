@@ -130,7 +130,7 @@ impl WaitFor {
 
     /// Wait for some time before trying again.
     /// Will return false when you should stop waiting.
-    #[tracing::instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub async fn wait_any(&mut self) -> bool {
         if self.attempt >= self.num_attempts {
             return false;

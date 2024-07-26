@@ -29,7 +29,7 @@ impl<'e> PConn {
         Self { inner }
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub(super) fn execute_in_read_txn<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
@@ -49,7 +49,7 @@ impl<'e> PConn {
     /// transaction, and commit the transaction after the closure has run.
     /// If there is a SQLite error, recover from it and re-run the closure.
     // FIXME: B-01566: implement write failure detection
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub(super) fn execute_in_exclusive_rw_txn<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,

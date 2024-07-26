@@ -7,10 +7,9 @@ use crate::core::workflow::sys_validation_workflow::{
     get_representative_agent, sys_validation_workflow,
 };
 use holochain_keystore::MetaLairClient;
-use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow
-#[instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub fn spawn_sys_validation_consumer(
     workspace: SysValidationWorkspace,
     space: Space,

@@ -53,7 +53,7 @@ pub enum TaskOutcome {
 
 /// Spawn a task which performs some action after each task has completed,
 /// as recieved by the outcome channel produced by the task manager.
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub fn spawn_task_outcome_handler(
     conductor: ConductorHandle,
     mut outcomes: OutcomeReceiver,
@@ -207,7 +207,7 @@ pub fn spawn_task_outcome_handler(
     }.instrument(span))
 }
 
-#[tracing::instrument(skip(kind))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(kind)))]
 fn produce_task_outcome(kind: &TaskKind, result: ManagedTaskResult, name: String) -> TaskOutcome {
     use TaskOutcome::*;
     match kind {
@@ -299,7 +299,7 @@ impl TaskManagerClient {
     }
 
     /// Stop all tasks for a Cell and await their completion.
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub fn stop_cell_tasks(&self, cell_id: CellId) -> ShutdownHandle {
         if let Some(tm) = self.tm.lock().as_mut() {
             tokio::spawn(tm.stop_group(&TaskGroup::Cell(cell_id)).in_current_span())
