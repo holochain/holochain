@@ -17,6 +17,7 @@ use crate::core::workflow::WorkflowError;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::prelude::IncompleteCommitReason;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use holochain_zome_types::record::Record;
@@ -24,7 +25,6 @@ use parking_lot::Mutex;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tracing::instrument;
-use holochain_state::prelude::IncompleteCommitReason;
 
 #[cfg(test)]
 mod validation_test;
@@ -329,9 +329,7 @@ fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     }
 }
 
-fn map_outcome(
-    outcome: Result<Outcome, AppValidationError>,
-) -> WorkflowResult<()> {
+fn map_outcome(outcome: Result<Outcome, AppValidationError>) -> WorkflowResult<()> {
     match outcome.map_err(SourceChainError::other)? {
         Outcome::Accepted => {}
         Outcome::Rejected(reason) => {
@@ -346,7 +344,10 @@ fn map_outcome(
         // variant here. This indicates that the validation did not fail because the data is
         // definitely invalid, but because validation could not make a decision yet.
         Outcome::AwaitingDeps(hashes) => {
-            return Err(SourceChainError::IncompleteCommit(IncompleteCommitReason::DepMissingFromDht(hashes)).into());
+            return Err(SourceChainError::IncompleteCommit(
+                IncompleteCommitReason::DepMissingFromDht(hashes),
+            )
+            .into());
         }
     }
     Ok(())

@@ -1,10 +1,10 @@
 //! Types needed for all validation
-use std::convert::TryFrom;
-use holochain_state::prelude::IncompleteCommitReason;
 use super::workflow::WorkflowResult;
 use super::SourceChainError;
 use super::SysValidationError;
 use super::ValidationOutcome;
+use holochain_state::prelude::IncompleteCommitReason;
+use std::convert::TryFrom;
 
 /// Exit early with either an outcome or an error
 #[derive(Debug)]
@@ -56,12 +56,11 @@ impl OutcomeOrError<ValidationOutcome, SysValidationError> {
     pub fn to_workflow_error<T>(self) -> WorkflowResult<T> {
         let outcome = ValidationOutcome::try_from(self)?;
         match outcome {
-            ValidationOutcome::DepMissingFromDht(deps) => {
-                Err(SourceChainError::IncompleteCommit(IncompleteCommitReason::DepMissingFromDht(vec![deps])).into())
-            }
-            outcome => {
-                Err(SourceChainError::InvalidCommit(outcome.to_string()).into())
-            }
+            ValidationOutcome::DepMissingFromDht(deps) => Err(SourceChainError::IncompleteCommit(
+                IncompleteCommitReason::DepMissingFromDht(vec![deps]),
+            )
+            .into()),
+            outcome => Err(SourceChainError::InvalidCommit(outcome.to_string()).into()),
         }
     }
 }
