@@ -558,7 +558,8 @@ impl InstalledAppCommon {
             .ok_or_else(|| AppError::RoleNameMissing(role_name.clone()))
     }
 
-    /// Accessor for particular role
+    /// If the role is primary, i.e. of variant [`AppRoleassignment::Primary`], return it
+    /// as [`AppRolePrimary`]. If the role is not primary, return Err.
     pub fn primary_role(&self, role_name: &RoleName) -> AppResult<&AppRolePrimary> {
         let app_id = self.installed_app_id.clone();
         self.role(role_name)?

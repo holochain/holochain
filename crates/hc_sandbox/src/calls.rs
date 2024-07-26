@@ -185,7 +185,11 @@ pub struct UninstallApp {
     pub app_id: String,
 
     /// Force uninstallation of the app even if there are any protections in place.
-    /// Don't use this unless you know what you're doing.
+    ///
+    /// Possible protections:
+    /// - Another app depends on a cell in the app you are trying to uninstall.
+    ///
+    /// Please check that you understand the consequences of forcing the uninstall before using this option.
     #[arg(long, default_value_t = false)]
     pub force: bool,
 }
