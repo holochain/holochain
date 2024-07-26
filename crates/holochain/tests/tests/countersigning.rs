@@ -203,7 +203,7 @@ async fn retry_countersigning_commit_on_missing_deps() {
         unreachable!();
     };
 
-    // Alice shouldn't be able to commit
+    // Alice shouldn't be able to commit yet, because she doesn't have Bob's activity
     let result: ConductorApiResult<()> = conductors[0]
         .call_fallible(
             &alice_zome,
@@ -246,7 +246,7 @@ async fn retry_countersigning_commit_on_missing_deps() {
         .await
         .unwrap();
 
-    // But Bob can commit, so let's do that.
+    // Now Bob can commit, so let's do that.
     let (_, _): (ActionHash, EntryHash) = conductors[1]
         .call_fallible(
             &bob_zome,
