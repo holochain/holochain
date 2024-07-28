@@ -52,7 +52,7 @@ async fn returns_full_sequence_from_filter(
         .await
         .unwrap();
     let data = match data {
-        MustGetAgentActivityResponse::Activity(activity) => activity
+        MustGetAgentActivityResponse::Activity { activity, .. } => activity
             .into_iter()
             .map(
                 |RegisterAgentActivity {
@@ -81,17 +81,17 @@ async fn returns_full_sequence_from_filter(
     => MustGetAgentActivityResponse::ChainTopNotFound(action_hash(&[15])) ; "Starting chain_top not found")]
 #[test_case(
     vec![(agent_hash(&[0]), forked_chain(&[0..6, 3..8]))], agent_hash(&[0]), ChainFilter::new(action_hash(&[7, 1])).take(7)
-    => matches MustGetAgentActivityResponse::Activity(a) if a.len() == 7 ; "Handles forks")]
+    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 7 ; "Handles forks")]
 #[test_case(
     agent_chain(&[(0, 0..5)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[4])).until(action_hash(&[2, 1]))
-    => matches MustGetAgentActivityResponse::Activity(_) ; "Until hash not found")]
+    => matches MustGetAgentActivityResponse::Activity { .. } ; "Until hash not found")]
 #[test_case(
     vec![(agent_hash(&[0]), forked_chain(&[0..6, 3..8]))], agent_hash(&[0]),
     ChainFilter::new(action_hash(&[5, 0])).until(action_hash(&[4, 1]))
     => MustGetAgentActivityResponse::IncompleteChain ; "Unit hash on fork")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).until(action_hash(&[9]))
-    => matches MustGetAgentActivityResponse::Activity(_); "Until is higher then chain_top")]
+    => matches MustGetAgentActivityResponse::Activity { .. }; "Until is higher then chain_top")]
 #[test_case(
     agent_chain(&[(0, 0..2)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[1])).take(0)
     => MustGetAgentActivityResponse::EmptyRange; "Take nothing produces an empty range")]

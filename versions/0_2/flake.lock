@@ -40,14 +40,14 @@
         "lastModified": 1684183666,
         "narHash": "sha256-rOE/W/BBYyZKOyypKb8X9Vpc4ty1TNRoI/fV5+01JPw=",
         "owner": "holochain",
-        "repo": "launcher",
+        "repo": "hc-launch",
         "rev": "75ecdd0aa191ed830cc209a984a6030e656042ff",
         "type": "github"
       },
       "original": {
         "owner": "holochain",
         "ref": "holochain-0.2",
-        "repo": "launcher",
+        "repo": "hc-launch",
         "type": "github"
       }
     },
