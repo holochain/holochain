@@ -59,6 +59,8 @@ impl DeepkeyState {
     }
 }
 
+// Tests for these calls are located in the Holochain conductor package in the form of
+// full integration tests.
 #[async_trait::async_trait]
 impl DpkiState for DeepkeyState {
     async fn next_derivation_details(

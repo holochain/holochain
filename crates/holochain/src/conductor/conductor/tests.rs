@@ -23,8 +23,12 @@ use holochain_zome_types::op::Op;
 use maplit::hashset;
 use matches::assert_matches;
 
+// Module with tests for agent key revocation. With or without DPKI, an agent can revoke their key,
+// which prevents further modifications of the source chain.
 mod agent_key_revocation;
-mod agent_lineage;
+// Module with tests related to an agent's key lineage. Agents can update their key. Both old and new
+// key belong to the same key lineage, they belong to the same agent.
+pub mod agent_lineage;
 mod test_dpki;
 
 #[tokio::test(flavor = "multi_thread")]
