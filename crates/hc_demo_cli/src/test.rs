@@ -13,6 +13,78 @@ const CONTENT: &[u8] = b"this is a test\n";
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn demo() {
+    run_test(|| async {
+        let (r1s, r1r) = tokio::sync::oneshot::channel();
+        let (r2s, r2r) = tokio::sync::oneshot::channel();
+        let rendezvous = holochain::sweettest::SweetLocalRendezvous::new().await;
+
+        let t1 = tokio::task::spawn(run("one", r1s, rendezvous.clone()));
+        let t2 = tokio::task::spawn(run("two", r2s, rendezvous.clone()));
+
+        let _ = r1r.await;
+        let _ = r2r.await;
+
+        (t1, t2)
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
+async fn demo_multi_sig() {
+    run_test(|| async {
+        use holochain::sweettest::*;
+        use std::sync::Arc;
+
+        let vous1 = SweetLocalRendezvous::new().await;
+        let vous2 = SweetLocalRendezvous::new().await;
+
+        struct VHack {
+            sig: DynSweetRendezvous,
+            boot: DynSweetRendezvous,
+        }
+
+        impl SweetRendezvous for VHack {
+            fn bootstrap_addr(&self) -> &str {
+                self.boot.bootstrap_addr()
+            }
+
+            fn sig_addr(&self) -> &str {
+                self.sig.sig_addr()
+            }
+        }
+
+        let vhack1: DynSweetRendezvous = Arc::new(VHack {
+            sig: vous1.clone(),
+            boot: vous1.clone(),
+        });
+
+        let vhack2: DynSweetRendezvous = Arc::new(VHack {
+            sig: vous2,
+            // Use different signals, but the SAME bootstrap server!
+            boot: vous1,
+        });
+
+        let (r1s, r1r) = tokio::sync::oneshot::channel();
+        let (r2s, r2r) = tokio::sync::oneshot::channel();
+
+        let t1 = tokio::task::spawn(run("one", r1s, vhack1));
+        let t2 = tokio::task::spawn(run("two", r2s, vhack2));
+
+        let _ = r1r.await;
+        let _ = r2r.await;
+
+        (t1, t2)
+    })
+    .await;
+}
+
+async fn run_test<F, C>(spawn: C)
+where
+    F: std::future::Future<Output = (tokio::task::JoinHandle<()>, tokio::task::JoinHandle<()>)>
+        + Send,
+    C: FnOnce() -> F,
+{
     init_tracing();
 
     eprintln!("{NOTICE}");
@@ -29,15 +101,7 @@ async fn demo() {
         .await
         .unwrap();
 
-    let (r1s, r1r) = tokio::sync::oneshot::channel();
-    let (r2s, r2r) = tokio::sync::oneshot::channel();
-    let rendezvous = holochain::sweettest::SweetLocalRendezvous::new().await;
-
-    let t1 = tokio::task::spawn(run("one", r1s, rendezvous.clone()));
-    let t2 = tokio::task::spawn(run("two", r2s, rendezvous.clone()));
-
-    let _ = r1r.await;
-    let _ = r2r.await;
+    let (t1, t2) = spawn().await;
 
     let t3 = tokio::task::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(60)).await;
@@ -62,6 +126,7 @@ async fn demo() {
             };
 
             assert_eq!(content, CONTENT);
+            println!("READ FILE!");
 
             t1.abort();
             t2.abort();
@@ -106,8 +171,8 @@ async fn run(
             dna: std::path::PathBuf::from(DNA),
             outbox: std::path::PathBuf::from(format!("{name}-out")),
             inbox: std::path::PathBuf::from(format!("{name}-in")),
-            signal_url: DEF_SIGNAL_URL.into(),
-            bootstrap_url: DEF_BOOTSTRAP_URL.into(),
+            signal_url: "not-used".into(),
+            bootstrap_url: "not-used".into(),
         },
     };
 
