@@ -7,7 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the 
+- *BREAKING* Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. 
+  I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. 
+  The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are
+  fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies.
+- *BREAKING* CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the 
   `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry.
   This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded.
 
