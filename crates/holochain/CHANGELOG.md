@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Adds DPKI support. This is not fully hooked up, so the main implication for this particular implementation is that you must be using the same DPKI implementation as all other nodes on the network that you wish to talk to. If the DPKI version mismatches, you cannot establish connections, and will see so as an error in the logs. This work is in preparation for future work which will make it possible to restore your keys if you lose your device, and to revoke and replace your keys if your device is stolen or compromised.
 - Add feature to revoke agent keys. A new call `AdminRequest::RevokeAgentKey` is exposed on the Admin API. Revoking a key for an app will render the key invalid from that moment on and make the source chain of all cells of the app read-only. The key is revoked in the Deepkey service if installed and deleted on all cells' source chains. No more actions can be written to any of these source chains. Further it will fail to clone a cell of the app.
 - Add HDI call to check if two agent keys are of the same key lineage. It will be possible for an agent to update their key. This new key as well as the old key are part of the same lineage, they belong to the same agent. With the new HDI call `is_same_agent`, app validation can check if two agent keys belong to the same agent. Key updates are exclusive to conductors with a DPKI service installed. If DPKI is not installed. `is_same_agent` compares the two provided keys for equality.
+- CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry. This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded.
+
+## 0.4.0-dev.14
 
 ## 0.4.0-dev.13
 
@@ -20,7 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Adds a new app interface method `AppRequest::EnableAfterMemproofsProvided`, which allows enabling an app only if the app is in the `AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs)` state. Attempting to enable the app from other states (other than Running) will fail.
 - Warrants are used under-the-hood in more places now:
   - When gossiping amongst authorities, if an authority has a warrant for some data being requested, they will send the warrant instead of the data to indicate the invalid status of that data
-  - When requesting data through must_get calls, warrants will be returned with the data. The data returned to the client remains the same, but under the hood any warrants will be cached for later use.
+  - When requesting data through must\_get calls, warrants will be returned with the data. The data returned to the client remains the same, but under the hood any warrants will be cached for later use.
 - Adds a `lineage` field to the DNA manifest, which declares forward compatibility for any hash in that list with this DNA
 - Adds a `AdminRequest::GetCompatibleCells` method which returns CellId for all installed cells which use a DNA that is forward-compatible with a given DNA hash. This can be used to find a compatible cell for use with the `UseExisting` cell provisioning method (still to be implemented)
 
