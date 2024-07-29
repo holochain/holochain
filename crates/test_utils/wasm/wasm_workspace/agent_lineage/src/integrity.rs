@@ -20,15 +20,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             app_entry: EntryTypes::SomeEntry(some_entry),
             action,
         }) => {
-            tracing::error!(
-                "here the action author key is {:?} and the entry author key is {:?}",
-                action.author,
-                some_entry.author
-            );
-            let isa = is_same_agent(action.author.clone(), some_entry.author);
-            tracing::error!("is same agent is {isa:?}");
-            let isa = isa?;
-            if let true = isa {
+            if is_same_agent(action.author.clone(), some_entry.author)? {
                 Ok(ValidateCallbackResult::Valid)
             } else {
                 Ok(ValidateCallbackResult::Invalid(
