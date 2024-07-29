@@ -3,10 +3,9 @@
 use super::*;
 
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
-use tracing::*;
 
 /// Spawn the QueueConsumer for Publish workflow
-#[instrument(skip(env, conductor, network))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(env, conductor, network)))]
 pub fn spawn_publish_dht_ops_consumer(
     cell_id: CellId,
     env: DbWrite<DbKindAuthored>,

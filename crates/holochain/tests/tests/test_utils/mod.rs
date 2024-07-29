@@ -38,7 +38,6 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::Child;
 use tokio::process::Command;
-use tracing::instrument;
 
 use hdk::prelude::*;
 use holochain::{
@@ -361,7 +360,7 @@ pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
     path
 }
 
-#[instrument(skip(response))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(response)))]
 pub async fn check_timeout<T>(
     response: impl Future<Output = std::io::Result<T>>,
     timeout_ms: u64,
@@ -369,7 +368,7 @@ pub async fn check_timeout<T>(
     check_timeout_named("<unnamed>", response, timeout_ms).await
 }
 
-#[instrument(skip(response))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(response)))]
 async fn check_timeout_named<T>(
     name: &'static str,
     response: impl Future<Output = std::io::Result<T>>,

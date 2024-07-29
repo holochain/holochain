@@ -50,7 +50,6 @@ use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
 use std::path::PathBuf;
-use tracing::instrument;
 
 #[cfg(test)]
 mod tests;
@@ -256,7 +255,7 @@ impl Spaces {
     }
 
     /// Get the holochain conductor state
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
         timed!([1, 10, 1000], "get_state", {
             match query_conductor_state(&self.conductor_db).await? {
@@ -270,7 +269,7 @@ impl Spaces {
     }
 
     /// Update the internal state with a pure function mapping old state to new
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn update_state<F>(&self, f: F) -> ConductorResult<ConductorState>
     where
         F: Send + FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
@@ -282,7 +281,7 @@ impl Spaces {
     /// Update the internal state with a pure function mapping old state to new,
     /// which may also produce an output value which will be the output of
     /// this function
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
     where
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
@@ -391,7 +390,7 @@ impl Spaces {
         self.get_or_create_space_ref(dna_hash, |space| space.p2p_batch_sender.clone())
     }
 
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     /// the network module is requesting a list of dht op hashes
     /// Get the [`DhtOpHash`]es and authored timestamps for a given time window.
     pub async fn handle_query_op_hashes(
@@ -488,7 +487,7 @@ impl Spaces {
         Ok(results)
     }
 
-    #[instrument(skip(self, query))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, query)))]
     /// The network module is requesting the content for dht ops
     pub async fn handle_fetch_op_data(
         &self,
@@ -510,7 +509,7 @@ impl Spaces {
         }
     }
 
-    #[instrument(skip(self, regions))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, regions)))]
     /// The network module is requesting the content for dht ops
     pub async fn handle_fetch_op_data_by_regions(
         &self,
@@ -554,7 +553,7 @@ impl Spaces {
             .await?)
     }
 
-    #[instrument(skip(self, op_hashes))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, op_hashes)))]
     /// The network module is requesting the content for dht ops
     pub async fn handle_fetch_op_data_by_hashes(
         &self,
@@ -607,7 +606,7 @@ impl Spaces {
         Ok(results)
     }
 
-    #[instrument(skip(self, request_validation_receipt, ops))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, request_validation_receipt, ops)))]
     /// we are receiving a "publish" event from the network
     pub async fn handle_publish(
         &self,
@@ -803,7 +802,7 @@ impl Space {
 }
 
 /// Get the holochain conductor state
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn query_conductor_state(
     db: &DbRead<DbKindConductor>,
 ) -> ConductorResult<Option<ConductorState>> {

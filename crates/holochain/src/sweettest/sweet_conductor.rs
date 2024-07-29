@@ -288,7 +288,7 @@ impl SweetConductor {
     /// Install the dna first.
     /// This allows a big speed up when
     /// installing many apps with the same dna
-    #[instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn setup_app_1_register_dna(
         &mut self,
         dna_files: impl IntoIterator<Item = &DnaFile>,
@@ -303,7 +303,7 @@ impl SweetConductor {
     /// Install the app and enable it
     // TODO: make this take a more flexible config for specifying things like
     // membrane proofs
-    #[instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn setup_app_2_install_and_enable(
         &mut self,
         installed_app_id: &str,
@@ -336,7 +336,7 @@ impl SweetConductor {
     /// are not available until after `setup_cells` has run, and it is
     /// better to do that once for all apps in the case of multiple apps being
     /// set up at once.
-    #[instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn setup_app_3_create_sweet_app(
         &self,
         installed_app_id: &str,
@@ -387,7 +387,7 @@ impl SweetConductor {
     /// Opinionated app setup.
     /// Creates an app for the given agent, if specified, using the given DnaFiles,
     /// with no extra configuration.
-    #[instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn setup_app_for_optional_agent<'a>(
         &mut self,
         installed_app_id: &str,
@@ -436,7 +436,7 @@ impl SweetConductor {
     /// Opinionated app setup.
     /// Creates an app using the given DnaFiles, with no extra configuration.
     /// An AgentPubKey will be generated, and is accessible via the returned SweetApp.
-    #[instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn setup_app<'a>(
         &mut self,
         installed_app_id: &str,
