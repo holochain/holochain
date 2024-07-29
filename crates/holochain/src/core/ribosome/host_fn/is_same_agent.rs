@@ -1,4 +1,3 @@
-use crate::conductor::api::DpkiApiT;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostContext;
@@ -23,12 +22,12 @@ pub fn is_same_agent<'a>(
                 None => Ok(input.0 == input.1),
                 // DPKI is installed, call Deepkey function.
                 Some(dpki) => tokio_helper::block_forever_on(async move {
-                        let state = dpki.state().await;
-                        state
-                            .is_same_agent(input.0, input.1)
-                            .await
-                            .map_err(|error| RuntimeError::new(error.to_string()))
-                            .into()
+                    let state = dpki.state().await;
+                    state
+                        .is_same_agent(input.0, input.1)
+                        .await
+                        .map_err(|error| RuntimeError::new(error.to_string()))
+                        .into()
                 }),
             }
         }
@@ -43,4 +42,3 @@ pub fn is_same_agent<'a>(
         .into()),
     }
 }
-
