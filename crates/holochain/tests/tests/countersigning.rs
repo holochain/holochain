@@ -7,6 +7,7 @@ use holochain::sweettest::{
     await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
 };
 use holochain_state::prelude::{IncompleteCommitReason, SourceChainError};
+use holochain_types::app::DisabledAppReason;
 use holochain_types::prelude::Signal;
 use holochain_types::signal::SystemSignal;
 use holochain_wasm_test_utils::TestWasm;
@@ -14,6 +15,7 @@ use holochain_zome_types::countersigning::Role;
 use holochain_zome_types::prelude::{
     ActivityRequest, AgentActivity, ChainQueryFilter, GetAgentActivityInput,
 };
+use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -163,6 +165,21 @@ async fn retry_countersigning_commit_on_missing_deps() {
         .await
         .unwrap();
 
+    // Make sure both peers can see each other so that we know get requests should succeed when
+    // fetching agent activity
+    conductors[0]
+        .wait_for_peer_visible([bob.agent_pubkey().clone()], None, Duration::from_secs(30))
+        .await
+        .unwrap();
+    conductors[1]
+        .wait_for_peer_visible(
+            [alice.agent_pubkey().clone()],
+            None,
+            Duration::from_secs(30),
+        )
+        .await
+        .unwrap();
+
     // Set up the session and accept it for both agents
     let preflight_request: PreflightRequest = conductors[0]
         .call_fallible(
@@ -203,8 +220,14 @@ async fn retry_countersigning_commit_on_missing_deps() {
         unreachable!();
     };
 
+    // Take Bob's app offline so that Alice can't get his activity
+    conductors[1]
+        .disable_app("app".into(), DisabledAppReason::User)
+        .await
+        .unwrap();
+
     // Alice shouldn't be able to commit yet, because she doesn't have Bob's activity
-    let result: ConductorApiResult<()> = conductors[0]
+    let result: ConductorApiResult<(ActionHash, EntryHash)> = conductors[0]
         .call_fallible(
             &alice_zome,
             "create_a_countersigned_thing_with_entry_hash",
@@ -231,6 +254,9 @@ async fn retry_countersigning_commit_on_missing_deps() {
             panic!("Expected CellError::WorkflowError, got: {:?}", result);
         }
     }
+
+    // Bring Bob's app back online
+    conductors[1].enable_app("app".into()).await.unwrap();
 
     // Let's make sure Bob will have Alice's activity before committing his countersigning entry
     let _: AgentActivity = conductors[1]

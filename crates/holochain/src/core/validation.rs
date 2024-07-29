@@ -53,7 +53,7 @@ impl OutcomeOrError<ValidationOutcome, SysValidationError> {
     /// The inner error will be a [SourceChainError] if sys validation ran successfully but produced
     /// an unsuccessful validation outcome. Otherwise, the error will be [SysValidationError] to
     /// explain why sys validation was not able to complete the validation request.
-    pub fn to_workflow_error<T>(self) -> WorkflowResult<T> {
+    pub fn into_workflow_error<T>(self) -> WorkflowResult<T> {
         let outcome = ValidationOutcome::try_from(self)?;
         match outcome {
             ValidationOutcome::DepMissingFromDht(deps) => Err(SourceChainError::IncompleteCommit(

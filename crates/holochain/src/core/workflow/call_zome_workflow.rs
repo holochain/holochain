@@ -255,7 +255,7 @@ where
                 // If the validation failed, exit with an InvalidCommit
                 // If the validation failed with a retryable error, exit with an IncompleteCommit
                 // If it was ok continue
-                .or_else(|outcome_or_err| outcome_or_err.to_workflow_error())?;
+                .or_else(|outcome_or_err| outcome_or_err.into_workflow_error())?;
             to_app_validate.push(record);
         }
 
