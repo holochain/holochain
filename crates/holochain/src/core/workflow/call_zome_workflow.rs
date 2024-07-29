@@ -282,6 +282,8 @@ where
         to_app_validate
     };
 
+    let dpki = conductor_handle.running_services().dpki;
+
     for mut chain_record in records {
         for op_type in action_to_op_types(chain_record.action()) {
             let op =
@@ -301,6 +303,7 @@ where
                 &ribosome,
                 &conductor_handle,
                 validation_dependencies.clone(),
+                dpki.clone(),
                 true, // is_inline
             )
             .await;

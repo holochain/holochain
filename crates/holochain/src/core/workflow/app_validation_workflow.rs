@@ -113,6 +113,7 @@ use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
 
 pub use error::*;
+use holochain_conductor_services::DpkiService;
 pub use types::Outcome;
 pub use validation_dependencies::ValidationDependencies;
 
@@ -569,6 +570,8 @@ async fn validate_op_outer(
         .get_ribosome(dna_hash.as_ref())
         .map_err(|_| AppValidationError::DnaMissing((*dna_hash).clone()))?;
 
+    let dpki = conductor_handle.running_services().dpki;
+
     validate_op(
         op,
         dht_op_hash,
@@ -577,6 +580,7 @@ async fn validate_op_outer(
         &ribosome,
         conductor_handle,
         validation_dependencies,
+        dpki,
         false, // is_inline
     )
     .await
@@ -591,6 +595,7 @@ pub async fn validate_op(
     ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    dpki: Option<Arc<DpkiService>>,
     is_inline: bool,
 ) -> AppValidationOutcome<Outcome> {
     check_entry_def(op, &network.dna_hash(), conductor_handle)
@@ -614,6 +619,7 @@ pub async fn validate_op(
         workspace,
         network,
         validation_dependencies,
+        dpki,
         is_inline,
     )
     .await?;
@@ -804,10 +810,11 @@ async fn run_validation_callback(
     workspace: HostFnWorkspaceRead,
     network: GenericNetwork,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    dpki: Option<Arc<DpkiService>>,
     is_inline: bool,
 ) -> AppValidationResult<Outcome> {
     let validate_result = ribosome.run_validate(
-        ValidateHostAccess::new(workspace.clone(), network.clone(), is_inline),
+        ValidateHostAccess::new(workspace.clone(), network.clone(), dpki, is_inline),
         invocation.clone(),
     )?;
     match validate_result {

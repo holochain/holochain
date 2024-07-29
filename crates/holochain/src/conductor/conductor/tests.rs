@@ -24,6 +24,7 @@ use maplit::hashset;
 use matches::assert_matches;
 
 mod agent_key_revocation;
+mod agent_lineage;
 mod test_dpki;
 
 #[tokio::test(flavor = "multi_thread")]

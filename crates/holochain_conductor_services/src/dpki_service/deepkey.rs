@@ -107,6 +107,7 @@ impl DpkiState for DeepkeyState {
         key_1: AgentPubKey,
         key_2: AgentPubKey,
     ) -> DpkiServiceResult<bool> {
-        self.call_deepkey_zome("same_lineage", (key_1, key_2)).await
+        self.call_deepkey_zome("same_lineage", (key_1.get_raw_32(), key_2.get_raw_32()))
+            .await
     }
 }
