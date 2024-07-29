@@ -115,18 +115,6 @@ impl AppBundle {
                                 AppRolePrimary::new(cell_id, false, clone_limit).into(),
                             ));
                         }
-
-                        other @ (CellProvisioningOp::HashMismatch(_, _)
-                        | CellProvisioningOp::Unresolvable(_)) => {
-                            tracing::error!(
-                                "Encountered unexpected CellProvisioningOp: {:?}",
-                                other
-                            );
-                            return Err(AppBundleError::CellResolutionFailure(
-                                role_name,
-                                format!("{other:?}"),
-                            ));
-                        }
                     }
 
                     Ok(resolution)
@@ -141,7 +129,7 @@ impl AppBundle {
         role: AppRoleManifestValidated,
         existing_cells: &ExistingCellsMap,
     ) -> AppBundleResult<CellProvisioningOp> {
-        Ok(match role {
+        match role {
             AppRoleManifestValidated::Create {
                 location,
                 installed_hash,
@@ -158,7 +146,7 @@ impl AppBundle {
                         modifiers,
                     )
                     .await?;
-                CellProvisioningOp::CreateFromDnaFile(dna, clone_limit)
+                Ok(CellProvisioningOp::CreateFromDnaFile(dna, clone_limit))
             }
 
             AppRoleManifestValidated::UseExisting {
@@ -166,11 +154,12 @@ impl AppBundle {
                 protected,
             } => {
                 if let Some(cell_id) = existing_cells.get(&role_name) {
-                    CellProvisioningOp::Existing(cell_id.clone(), protected)
+                    Ok(CellProvisioningOp::Existing(cell_id.clone(), protected))
                 } else {
-                    CellProvisioningOp::Unresolvable(format!(
-                        "No existing cell was specified for the role with DNA {compatible_hash}"
-                    ))
+                    return Err(AppBundleError::CellResolutionFailure(
+                        role_name,
+                        format!("No existing cell was specified for the role with DNA {compatible_hash}"),
+                    ));
                 }
             }
 
@@ -189,9 +178,9 @@ impl AppBundle {
                         modifiers,
                     )
                     .await?;
-                CellProvisioningOp::ProvisionOnly(dna, clone_limit)
+                Ok(CellProvisioningOp::ProvisionOnly(dna, clone_limit))
             }
-        })
+        }
     }
 
     async fn resolve_dna(
@@ -300,8 +289,4 @@ pub enum CellProvisioningOp {
     /// No creation needed, but there might be a clone_limit, and so we need
     /// to know which DNA to use for making clones
     ProvisionOnly(DnaFile, u32),
-    /// The specified installed_hash does not match the actual hash of the DNA selected for provisioning. Expected: {0}, Actual: {1}
-    HashMismatch(DnaHash, DnaHash),
-    /// Ambiguous result, needs more information; can't provision (should this be an Err?)
-    Unresolvable(String),
 }

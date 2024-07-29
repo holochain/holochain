@@ -444,29 +444,8 @@ async fn use_existing_integration() {
     let conductor = SweetConductor::from_standard_config().await;
     let (alice, bob) = SweetAgents::two(conductor.keystore()).await;
 
-    let calls = std::sync::atomic::AtomicUsize::new(0);
-    let zome = SweetInlineZomes::new(vec![], 0)
-        .function("call_me", move |_, ()| {
-            Ok(calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
-        })
-        .function("call_you", |api, cell_id: CellId| {
-            let call = Call::new(
-                CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id)),
-                "test".into(),
-                "call_me".into(),
-                None,
-                ExternIO::encode(()).unwrap(),
-            );
-            let r: usize =
-                ExternIO::decode(&api.call(vec![call]).unwrap().pop().unwrap().unwrap()).unwrap();
-            Ok(r)
-        });
-
     let (dna1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
     let (dna2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
-
-    // let (dna1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.clone()).await;
-    // let (dna2, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.clone()).await;
 
     let bundle1 = {
         let path = PathBuf::from(format!("{}", dna1.dna_hash()));
