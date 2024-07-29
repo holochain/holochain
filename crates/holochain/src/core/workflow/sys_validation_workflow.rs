@@ -137,6 +137,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
         workspace.clone(),
         current_validation_dependencies.clone(),
         config,
+        &network,
         keystore,
         representative_agent,
     )
@@ -230,6 +231,7 @@ async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     config: Arc<ConductorConfig>,
+    network: &impl HolochainP2pDnaT,
     keystore: MetaLairClient,
     representative_agent: AgentPubKey,
 ) -> WorkflowResult<OutcomeSummary> {
@@ -375,6 +377,11 @@ async fn sys_validation_workflow_inner(
         warrants.push(warrant_op);
     }
 
+    let warrant_op_hashes = warrants
+        .iter()
+        .map(|w| (w.as_hash().clone(), w.dht_basis()))
+        .collect::<Vec<_>>();
+
     workspace
         .authored_db
         .write_async(move |txn| {
@@ -385,6 +392,18 @@ async fn sys_validation_workflow_inner(
             StateMutationResult::Ok(())
         })
         .await?;
+
+    if let Some(cache) = workspace.dht_query_cache.as_ref() {
+        // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
+        holochain_state::integrate::authored_ops_to_dht_db(
+            network,
+            warrant_op_hashes,
+            workspace.authored_db.clone().into(),
+            workspace.dht_db.clone(),
+            cache,
+        )
+        .await?;
+    }
 
     tracing::debug!(
         ?summary,
@@ -1436,22 +1455,36 @@ pub fn detect_fork(
     action: &Action,
 ) -> StateQueryResult<Option<(ActionHash, Signature)>> {
     let mut statement = txn.prepare(ACTION_HASH_BY_PREV)?;
-    statement
-        .query_row(
+    let items = statement
+        .query_map(
             named_params! {
                 ":prev_hash": action.prev_action(),
                 ":hash": action.to_hash(),
             },
-            |row| {
-                let hash: ActionHash = row.get("hash")?;
-                let action_blob: Vec<u8> = row.get("blob")?;
-                Ok((hash, action_blob))
+            // First, try to deserialize the hash as an ActionHash...
+            |row| match row.get("hash") {
+                Ok(hash) => {
+                    let action_blob: Vec<u8> = row.get("blob")?;
+                    Ok(Some((hash, action_blob)))
+                }
+                // ...if that fails, we can skip it if it deserializes as a WarrantHash
+                //    (checking the row type this way makes it so we don't have to join on the DhtOp table in the query)
+                Err(err) => match row.get::<_, WarrantHash>("hash") {
+                    Ok(_) => Ok(None),
+                    Err(_) => Err(err),
+                },
             },
-        )
-        .optional()?
-        .map(|(hash, action_blob)| {
-            from_blob::<SignedAction>(action_blob).map(|action| (hash, action.signature().clone()))
+        )?
+        .collect::<Result<Vec<_>, _>>()?;
+    items
+        .into_iter()
+        .filter_map(|maybe_tuple| {
+            maybe_tuple.map(|(hash, action_blob)| {
+                from_blob::<SignedAction>(action_blob)
+                    .map(|action| (hash, action.signature().clone()))
+            })
         })
+        .next()
         .transpose()
 }
 

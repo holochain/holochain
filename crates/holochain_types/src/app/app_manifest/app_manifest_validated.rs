@@ -59,9 +59,8 @@ pub enum AppRoleManifestValidated {
     /// Require that a Cell is already installed which has a DNA that's compatible with the
     /// `compatible_hash` specified in the manifest.
     UseExisting {
-        clone_limit: u32,
-        deferred: bool,
         compatible_hash: DnaHashB64,
+        protected: bool,
     },
     /// Install or locate the DNA, but never create a Cell for this DNA.
     /// Only allow clones to be created from the DNA specified.

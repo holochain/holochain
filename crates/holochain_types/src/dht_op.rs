@@ -1236,6 +1236,9 @@ pub enum WireOps {
     Entry(WireEntryOps),
     /// Response for get record.
     Record(WireRecordOps),
+    /// A warrant in place of data in the case that the data is invalid.
+    /// There is no "wire" version because this is about as compact as it gets.
+    Warrant(Box<WarrantOp>),
 }
 
 impl WireOps {
@@ -1244,6 +1247,11 @@ impl WireOps {
         match self {
             WireOps::Entry(o) => o.render(),
             WireOps::Record(o) => o.render(),
+            WireOps::Warrant(warrant) => Ok(RenderedOps {
+                entry: Default::default(),
+                ops: Default::default(),
+                warrant: Some(*warrant),
+            }),
         }
     }
 }
@@ -1295,6 +1303,10 @@ pub struct RenderedOps {
     pub entry: Option<EntryHashed>,
     /// Op data to insert.
     pub ops: Vec<RenderedOp>,
+    /// Warrant, if the data is invalid.
+    /// If this is Some, all other fields should be empty, and vice versa.
+    // TODO: RenderedOps really should be an enum, for the valid and invalid cases.
+    pub warrant: Option<WarrantOp>,
 }
 
 /// Type for deriving ordering of DhtOps

@@ -298,7 +298,7 @@ async fn test_uninstall_app() {
     // - Uninstall the first app
     conductor
         .raw_handle()
-        .uninstall_app(&"app1".to_string())
+        .uninstall_app(&"app1".to_string(), false)
         .await
         .unwrap();
 
@@ -320,7 +320,7 @@ async fn test_uninstall_app() {
     // - Uninstall the remaining app
     conductor
         .raw_handle()
-        .uninstall_app(&"app2".to_string())
+        .uninstall_app(&"app2".to_string(), false)
         .await
         .unwrap();
 
@@ -1323,6 +1323,10 @@ async fn test_deferred_memproof_provisioning_uninstall() {
         .unwrap();
 
     assert_eq!(conductor.list_apps(None).await.unwrap().len(), 1);
-    conductor.clone().uninstall_app(&app_id).await.unwrap();
+    conductor
+        .clone()
+        .uninstall_app(&app_id, false)
+        .await
+        .unwrap();
     assert_eq!(conductor.list_apps(None).await.unwrap().len(), 0);
 }

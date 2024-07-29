@@ -440,12 +440,33 @@ async fn cells_by_dna_lineage() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn use_existing_happy_path() {
+async fn use_existing_integration() {
     let conductor = SweetConductor::from_standard_config().await;
     let (alice, bob) = SweetAgents::two(conductor.keystore()).await;
 
-    let (dna1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let (dna2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let calls = std::sync::atomic::AtomicUsize::new(0);
+    let zome = SweetInlineZomes::new(vec![], 0)
+        .function("call_me", move |_, ()| {
+            Ok(calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
+        })
+        .function("call_you", |api, cell_id: CellId| {
+            let call = Call::new(
+                CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id)),
+                "test".into(),
+                "call_me".into(),
+                None,
+                ExternIO::encode(()).unwrap(),
+            );
+            let r: usize =
+                ExternIO::decode(&api.call(vec![call]).unwrap().pop().unwrap().unwrap()).unwrap();
+            Ok(r)
+        });
+
+    let (dna1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
+    let (dna2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
+
+    // let (dna1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.clone()).await;
+    // let (dna2, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.clone()).await;
 
     let bundle1 = {
         let path = PathBuf::from(format!("{}", dna1.dna_hash()));
@@ -506,7 +527,7 @@ async fn use_existing_happy_path() {
                         installed_hash,
                         clone_limit: 0,
                     },
-                    provisioning: Some(CellProvisioning::UseExisting { deferred: false }),
+                    provisioning: Some(CellProvisioning::UseExisting { protected: true }),
                 },
             ];
 
@@ -528,7 +549,7 @@ async fn use_existing_happy_path() {
     };
 
     // Install the "dependency" app
-    conductor
+    let app_1 = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: alice.clone(),
@@ -596,7 +617,7 @@ async fn use_existing_happy_path() {
     assert_eq!(cells.len(), 1);
     let cell_id = cells.first().unwrap().clone();
 
-    conductor
+    let app_2 = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: bob.clone(),
@@ -612,6 +633,84 @@ async fn use_existing_happy_path() {
         .await
         .unwrap();
 
+    let cell_id_1 = app_1.all_cells().next().unwrap().clone();
+    let cell_id_2 = app_2.all_cells().next().unwrap().clone();
+    // let zome1 = SweetZome::new(cell_id_1.clone(), "whoami".into());
+    let zome2 = SweetZome::new(cell_id_2.clone(), "whoami".into());
+
     conductor.enable_app("app_1".into()).await.unwrap();
     conductor.enable_app("app_2".into()).await.unwrap();
+    {
+        // - Call the existing dependency cell via the dependent cell, which fails
+        // because the proper capability has not been granted
+        let r: Result<AgentInfo, _> = conductor
+            .call_fallible(&zome2, "who_are_they_role", "extant".to_string())
+            .await;
+        assert!(r.is_err());
+    }
+
+    {
+        // - Grant the capability
+        let secret = CapSecret::from([1; 64]);
+        conductor
+            .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
+                cell_id: cell_id_1.clone(),
+                cap_grant: ZomeCallCapGrant {
+                    tag: "tag".into(),
+                    // access: CapAccess::Unrestricted,
+                    access: CapAccess::Transferable {
+                        secret: secret.clone(),
+                    },
+                    functions: GrantedFunctions::All,
+                },
+            })
+            .await
+            .unwrap();
+
+        // - Call the existing dependency cell via the dependent cell
+        let r: AgentInfo = conductor
+            .call_from_fallible(
+                cell_id_2.agent_pubkey(),
+                None,
+                &zome2,
+                "who_are_they_role_secret",
+                ("extant".to_string(), Some(secret)),
+            )
+            .await
+            .unwrap();
+        assert_eq!(r.agent_initial_pubkey, *cell_id_1.agent_pubkey());
+    }
+
+    // Ideally, we shouldn't be able to disable app_1 because it's depended on by enabled app_2.
+    // For now, we are just emitting warnings about this.
+    conductor
+        .disable_app("app_1".into(), DisabledAppReason::User)
+        .await
+        .unwrap();
+    conductor
+        .disable_app("app_2".into(), DisabledAppReason::User)
+        .await
+        .unwrap();
+    conductor
+        .disable_app("app_1".into(), DisabledAppReason::User)
+        .await
+        .unwrap();
+
+    // Can't uninstall app because of dependents
+    let err = conductor
+        .clone()
+        .uninstall_app(&"app_1".to_string(), false)
+        .await
+        .unwrap_err();
+    assert_matches!(
+        err,
+        ConductorError::AppHasDependents(a, b) if a == "app_1".to_string() && b == vec!["app_2".to_string()]
+    );
+
+    // Can still uninstall app with force
+    conductor
+        .clone()
+        .uninstall_app(&"app_1".to_string(), true)
+        .await
+        .unwrap();
 }
