@@ -5,7 +5,6 @@ use crate::conductor::manager::TaskManagerClient;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_dht_ops_workflow;
 use holochain_types::db_cache::DhtDbQueryCache;
 
-
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
 #[cfg_attr(
     feature = "instrument",

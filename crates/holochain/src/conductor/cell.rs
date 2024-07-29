@@ -677,7 +677,10 @@ impl Cell {
             .map_err(Into::into)
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, _dht_hash, _options)))]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self, _dht_hash, _options))
+    )]
     /// a remote node is asking us for metadata
     async fn handle_get_meta(
         &self,
@@ -859,7 +862,10 @@ impl Cell {
         Ok([0; 64].into())
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, from_agent, fn_name, cap_secret, payload)))]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self, from_agent, fn_name, cap_secret, payload))
+    )]
     #[allow(clippy::too_many_arguments)]
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(

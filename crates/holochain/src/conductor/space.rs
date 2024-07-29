@@ -606,7 +606,10 @@ impl Spaces {
         Ok(results)
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, request_validation_receipt, ops)))]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self, request_validation_receipt, ops))
+    )]
     /// we are receiving a "publish" event from the network
     pub async fn handle_publish(
         &self,
