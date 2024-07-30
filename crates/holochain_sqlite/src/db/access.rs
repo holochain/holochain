@@ -41,7 +41,7 @@ pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbRead<Kind>> {
 
 #[async_trait::async_trait]
 impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
-    #[tracing::instrument(skip_all, fields(kind = ?self.kind))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(kind = ?self.kind)))]
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -59,7 +59,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
 
 #[async_trait::async_trait]
 impl<Kind: DbKindT> ReadAccess<Kind> for DbRead<Kind> {
-    #[tracing::instrument(skip_all, fields(kind = ?self.kind))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(kind = ?self.kind)))]
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -117,7 +117,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     ///
     /// Note that it is not enforced that your closure runs read-only operations or that it finishes quickly so it is
     /// up to the caller to use this function as intended.
-    #[tracing::instrument(skip_all, fields(kind = ?self.kind))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(kind = ?self.kind)))]
     pub async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -150,7 +150,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     /// reason.
     ///
     /// A valid reason for this is holding read transactions across multiple databases as part of a cascade query.
-    #[tracing::instrument]
+    #[cfg_attr(feature = "instrument", tracing::instrument)]
     pub async fn get_read_txn(&self) -> DatabaseResult<PTxnGuard> {
         let conn = self
             .checkout_connection(self.long_read_semaphore.clone())
@@ -158,7 +158,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         Ok(conn.into())
     }
 
-    #[tracing::instrument]
+    #[cfg_attr(feature = "instrument", tracing::instrument)]
     async fn checkout_connection(&self, semaphore: Arc<Semaphore>) -> DatabaseResult<PConnGuard> {
         // TODO: use semaphore for this message
         let waiting = self.num_readers.fetch_add(1, Ordering::Relaxed);
@@ -188,7 +188,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
 
     /// Get a connection from the pool.
     /// TODO: We should eventually swap this for an async solution.
-    #[tracing::instrument]
+    #[cfg_attr(feature = "instrument", tracing::instrument)]
     fn get_connection_from_pool(&self) -> DatabaseResult<PConn> {
         let now = Instant::now();
         let r = Ok(PConn::new(self.connection_pool.get()?));
@@ -338,7 +338,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Ok(DbWrite(db_read))
     }
 
-    #[tracing::instrument(skip_all, fields(kind = ?self.kind))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(kind = ?self.kind)))]
     pub async fn write_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -499,7 +499,7 @@ pub fn set_acquire_timeout(timeout_ms: u64) {
     ACQUIRE_TIMEOUT_MS.store(timeout_ms, Ordering::Relaxed);
 }
 
-#[tracing::instrument]
+#[cfg_attr(feature = "instrument", tracing::instrument)]
 async fn acquire_semaphore_permit(
     semaphore: Arc<Semaphore>,
 ) -> DatabaseResult<OwnedSemaphorePermit> {

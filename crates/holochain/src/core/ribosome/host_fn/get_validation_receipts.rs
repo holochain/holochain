@@ -10,7 +10,7 @@ use std::sync::Arc;
 use wasmer::RuntimeError;
 use holochain_sqlite::db::DbKindDht;
 
-#[tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name)))]
 pub fn get_validation_receipts(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,

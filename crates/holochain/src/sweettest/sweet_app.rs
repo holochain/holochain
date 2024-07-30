@@ -13,7 +13,7 @@ pub struct SweetApp {
 
 impl SweetApp {
     /// Constructor
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub(super) fn new(installed_app_id: InstalledAppId, cells: Vec<SweetCell>) -> Self {
         // Ensure that all Agents are the same
         assert!(
