@@ -156,10 +156,10 @@ impl AppBundle {
                 if let Some(cell_id) = existing_cells.get(&role_name) {
                     Ok(CellProvisioningOp::Existing(cell_id.clone(), protected))
                 } else {
-                    return Err(AppBundleError::CellResolutionFailure(
+                    Err(AppBundleError::CellResolutionFailure(
                         role_name,
                         format!("No existing cell was specified for the role with DNA {compatible_hash}"),
-                    ));
+                    ))
                 }
             }
 
