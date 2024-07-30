@@ -546,8 +546,8 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
 
     match &installed_app.manifest {
-        AppManifest::V1(manifest) => match manifest.membrane_proofs_deferred {
-            false => {
+        AppManifest::V1(manifest) => {
+            if !manifest.membrane_proofs_deferred {
                 enable_app(
                     cmd,
                     EnableApp {
@@ -556,8 +556,7 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
                 )
                 .await?
             }
-            true => (),
-        },
+        }
     }
 
     Ok(installed_app)
