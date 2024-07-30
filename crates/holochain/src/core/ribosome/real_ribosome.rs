@@ -117,7 +117,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use std::sync::RwLock;
 #[cfg(feature = "wasmer_sys")]
 use wasmer_middlewares::metering::get_remaining_points;
 #[cfg(feature = "wasmer_sys")]
@@ -166,9 +165,8 @@ struct WasmInstanceContextEnv {
 }
 
 struct HostFnEnv<I, O> {
-    wasm_instance: Arc<RwLock<WasmInstanceContextEnv>>,
+    wasm_instance: Arc<Mutex<WasmInstanceContextEnv>>,
     host_function: fn(Arc<RealRibosome>, Arc<CallContext>, I) -> Result<O, RuntimeError>,
-    host_function_name: String,
 }
 
 struct HostFnBuilder {
@@ -179,7 +177,7 @@ impl HostFnBuilder {
     fn with_host_function<I, O>(
         &self,
         ns: &mut Exports,
-        wasm_instance_context_env: Arc<RwLock<WasmInstanceContextEnv>>,
+        wasm_instance_context_env: Arc<Mutex<WasmInstanceContextEnv>>,
         host_function_name: &str,
         host_function: fn(Arc<RealRibosome>, Arc<CallContext>, I) -> Result<O, RuntimeError>,
     ) -> &Self
@@ -195,8 +193,7 @@ impl HostFnBuilder {
             &mut store_mut, 
             HostFnEnv { 
                 wasm_instance: wasm_instance_context_env.clone(), 
-                host_function,
-                host_function_name: host_function_name.to_string(),
+                host_function
             }
         );
        
@@ -207,8 +204,7 @@ impl HostFnBuilder {
                 &function_env,
                 move |mut function_env_mut: FunctionEnvMut<HostFnEnv<I, O>>, guest_ptr: GuestPtr, len: Len| {
                     let (env, mut store_mut) = function_env_mut.data_and_store_mut();
-                    let wasm_instance_lock = env.wasm_instance.read().unwrap();
-                    tracing::debug!("function callback context_key={} host_function_name={}", wasm_instance_lock.context_key, env.host_function_name);
+                    let wasm_instance_lock = env.wasm_instance.lock();
 
                     // Get the Zome Call Context this host function is being run within
                     let context_arc = {
@@ -451,7 +447,7 @@ impl RealRibosome {
         let ribosome_arc = Arc::new((*self).clone());
 
         // include context data in env
-        let wasm_instance_context_env = Arc::new(RwLock::new(WasmInstanceContextEnv {
+        let wasm_instance_context_env = Arc::new(Mutex::new(WasmInstanceContextEnv {
             host_env: Env::default(),
             context_key,
             ribosome_arc,
@@ -465,13 +461,15 @@ impl RealRibosome {
             instance = Arc::new(Instance::new(&mut store_mut, &module, &imports).map_err(
                 |e| -> RuntimeError { wasm_error!(WasmErrorInner::Compile(e.to_string())).into() },
             )?);
+        }
 
-            let function_env = FunctionEnv::new(&mut store_mut, wasm_instance_context_env.clone());
-            let mut function_env_mut = function_env.into_mut(&mut store_mut);
+        // It is only possible to initialize the function env after the instance is created.
+        {
+            let mut store_lock = store.lock();
+            let function_env = FunctionEnv::new(&mut store_lock.as_store_mut(), wasm_instance_context_env.clone());
+            let mut function_env_mut = function_env.into_mut(&mut store_lock);
             let (data_mut, store_mut) = function_env_mut.data_and_store_mut();
-            let mut data_mut_write = data_mut.write().unwrap();
-
-            data_mut_write.host_env.memory = Some(
+            data_mut.lock().host_env.memory = Some(
                 instance
                     .exports
                     .get_memory("memory")
@@ -480,7 +478,7 @@ impl RealRibosome {
                     })?
                     .clone(),
             );
-            data_mut_write.host_env.deallocate = Some(
+            data_mut.lock().host_env.deallocate = Some(
                 instance
                     .exports
                     .get_typed_function(&store_mut, "__hc__deallocate_1")
@@ -488,7 +486,7 @@ impl RealRibosome {
                         wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
                     })?,
             );
-            data_mut_write.host_env.allocate = Some(
+            data_mut.lock().host_env.allocate = Some(
                 instance
                     .exports
                     .get_typed_function(&store_mut, "__hc__allocate_1")
@@ -531,7 +529,7 @@ impl RealRibosome {
 
         // We just leave this Env uninitialized as default because we never make it
         // to an instance that needs to run on this code path.
-        let wasm_instance_context_env = Arc::new(RwLock::new(WasmInstanceContextEnv {
+        let wasm_instance_context_env = Arc::new(Mutex::new(WasmInstanceContextEnv {
             host_env: Env::default(),
             context_key,
             ribosome_arc: Arc::new(empty_ribosome.clone()),
@@ -547,7 +545,7 @@ impl RealRibosome {
     fn imports(
         &self,
         store: Arc<Mutex<Store>>,
-        wasm_instance_context: Arc<RwLock<WasmInstanceContextEnv>>,
+        wasm_instance_context: Arc<Mutex<WasmInstanceContextEnv>>,
     ) -> Imports {
 
         let mut imports = wasmer::imports! {};
@@ -928,10 +926,10 @@ impl RibosomeT for RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
+                    let instance: Arc<Instance> = instance_with_store.instance.clone();
 
                     #[cfg(feature = "wasmer_sys")]
                     {
-                        let instance: Arc<Instance> = instance_with_store.instance.clone();
                         let mut store_lock = instance_with_store.store.lock();
                         let mut store_mut = store_lock.as_store_mut();
                         set_remaining_points(
@@ -945,20 +943,20 @@ impl RibosomeT for RealRibosome {
                         .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store.clone())
                         .map(Some);
 
-                    
-                    #[cfg(feature = "wasmer_sys")]
                     {
-                        let instance: Arc<Instance> = instance_with_store.instance.clone();
                         let mut store_lock = instance_with_store.store.lock();
-                        let mut store_mut = store_lock.as_store_mut();    
-                        let points_used =
-                            match get_remaining_points(&mut store_mut, instance.as_ref()) {
-                                MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
-                                MeteringPoints::Exhausted => WASM_METERING_LIMIT,
-                            };
-                        self.usage_meter.add(points_used, &otel_info);
+                        let mut store_mut = store_lock.as_store_mut();
+
+                        #[cfg(feature = "wasmer_sys")]
+                        {
+                            let points_used =
+                                match get_remaining_points(&mut store_mut, instance.as_ref()) {
+                                    MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
+                                    MeteringPoints::Exhausted => WASM_METERING_LIMIT,
+                                };
+                            self.usage_meter.add(points_used, &otel_info);
+                        }
                     }
-                    
 
                     // remove context from map after call
                     {
