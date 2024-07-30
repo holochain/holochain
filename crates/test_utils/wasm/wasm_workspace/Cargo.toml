@@ -33,6 +33,7 @@ members = [
   "integrity_zome",
   "link",
   "migrate_new",
+  "migrate_initial",
   "multiple_calls",
   "must_get",
   "must_get_agent_activity",
