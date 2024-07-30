@@ -12,7 +12,7 @@
 //! users in a testing environment.
 //!
 //! ```rust, no_run
-//!  async fn async_main () {
+//! async fn async_main () {
 //! use holochain_state::test_utils::test_db_dir;
 //! use holochain::conductor::{Conductor, ConductorBuilder};
 //! use holochain::conductor::ConductorHandle;
@@ -29,7 +29,7 @@
 //! assert_eq!(conductor.list_dnas(), vec![]);
 //! conductor.shutdown();
 //!
-//! # }
+//! }
 //! ```
 
 /// Name of the wasm cache folder within the data root directory.

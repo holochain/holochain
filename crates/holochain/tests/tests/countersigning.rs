@@ -258,21 +258,8 @@ async fn retry_countersigning_commit_on_missing_deps() {
     // Bring Bob's app back online
     conductors[1].enable_app("app".into()).await.unwrap();
 
-    // Let's make sure Bob will have Alice's activity before committing his countersigning entry
-    let _: AgentActivity = conductors[1]
-        .call_fallible(
-            &bob_zome,
-            "get_agent_activity",
-            GetAgentActivityInput {
-                agent_pubkey: alice.agent_pubkey().clone(),
-                chain_query_filter: ChainQueryFilter::new(),
-                activity_request: ActivityRequest::Full,
-            },
-        )
-        .await
-        .unwrap();
 
-    // Now Bob can commit, so let's do that.
+    // Bob should be able to get Alice's chain head when we commit, so let's do that.
     let (_, _): (ActionHash, EntryHash) = conductors[1]
         .call_fallible(
             &bob_zome,
@@ -282,21 +269,8 @@ async fn retry_countersigning_commit_on_missing_deps() {
         .await
         .unwrap();
 
-    // Now let's sort out Alice's situation, by getting Bob's activity
-    let _: AgentActivity = conductors[0]
-        .call_fallible(
-            &alice_zome,
-            "get_agent_activity",
-            GetAgentActivityInput {
-                agent_pubkey: bob.agent_pubkey().clone(),
-                chain_query_filter: ChainQueryFilter::new(),
-                activity_request: ActivityRequest::Full,
-            },
-        )
-        .await
-        .unwrap();
-
-    // and retrying the commit
+    // Now that Bob is available again, Alice should also be able to get his chain head and complete
+    // her commit
     let (_, _): (ActionHash, EntryHash) = conductors[0]
         .call_fallible(
             &alice_zome,
