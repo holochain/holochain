@@ -7,7 +7,7 @@
       };
 
       lair = {
-        url = "github:holochain/lair/lair_keystore-v0.4.4";
+        url = "github:holochain/lair/lair_keystore-v0.4.5";
         flake = false;
       };
 
