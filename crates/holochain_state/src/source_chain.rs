@@ -2,8 +2,8 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::chain_lock::is_chain_locked;
-use crate::chain_lock::is_lock_expired;
+use crate::chain_lock::is_chain_lock_expired;
+use crate::chain_lock::{get_chain_lock_subject, is_chain_locked};
 use crate::integrate::authored_ops_to_dht_db;
 use crate::integrate::authored_ops_to_dht_db_without_check;
 use crate::query::chain_head::ChainHeadQuery;
@@ -86,10 +86,6 @@ impl SourceChain {
         preflight_request: PreflightRequest,
         agent_index: u8,
     ) -> SourceChainResult<CounterSigningAgentState> {
-        let hashed_preflight_request = holo_hash::encode::blake2b_256(
-            &holochain_serialized_bytes::encode(&preflight_request)?,
-        );
-
         // This all needs to be ensured in a non-panicky way BEFORE calling into the source chain here.
         let author = self.author.clone();
         assert_eq!(
@@ -100,7 +96,7 @@ impl SourceChain {
         let countersigning_agent_state = self
             .vault
             .write_async(move |txn| {
-                if is_chain_locked(txn, &hashed_preflight_request, author.as_ref())? {
+                if is_chain_locked(txn, author.as_ref())? {
                     return Err(SourceChainError::ChainLocked);
                 }
                 let HeadInfo {
@@ -112,8 +108,8 @@ impl SourceChain {
                     CounterSigningAgentState::new(agent_index, persisted_head, persisted_seq);
                 lock_chain(
                     txn,
-                    &hashed_preflight_request,
                     author.as_ref(),
+                    preflight_request.app_entry_hash.get_raw_36(),
                     preflight_request.session_times.end(),
                 )?;
                 SourceChainResult::Ok(countersigning_agent_state)
@@ -286,10 +282,11 @@ impl SourceChain {
         {
             return Err(SourceChainError::DirtyCounterSigningWrite);
         }
-        let lock = lock_for_entry(maybe_countersigned_entry)?;
+
+        let lock_subject = chain_lock_subject_for_entry(maybe_countersigned_entry)?;
 
         // If the lock isn't empty this is a countersigning session.
-        let is_countersigning_session = !lock.is_empty();
+        let is_countersigning_session = !lock_subject.is_empty();
 
         let ops_to_integrate = ops
             .iter()
@@ -329,15 +326,18 @@ impl SourceChain {
                 }
 
                 // TODO: should this be moved to the top of the function?
-                if is_chain_locked(txn, &lock, author.as_ref())? {
-                    return Err(SourceChainError::ChainLocked);
+                if let Some(subject) = get_chain_lock_subject(txn, author.as_ref())? {
+                    // Can't write when the chain is locked, except if the lock is for this entry.
+                    if subject != lock_subject {
+                        return Err(SourceChainError::ChainLocked);
+                    }
                 }
                 // If this is a countersigning session, and the chain is NOT
                 // locked then either the session expired or the countersigning
                 // entry being committed now is the correct one for the lock.
                 else if is_countersigning_session {
                     // If the lock is expired then we can't write this countersigning session.
-                    if is_lock_expired(txn, &lock, author.as_ref())? {
+                    if is_chain_lock_expired(txn, author.as_ref())? {
                         return Err(SourceChainError::LockExpired);
                     }
                 }
@@ -919,11 +919,11 @@ where
         Ok(query.filter_records(records))
     }
 
-    pub async fn is_chain_locked(&self, lock: Vec<u8>) -> SourceChainResult<bool> {
+    pub async fn is_chain_locked(&self) -> SourceChainResult<Option<Vec<u8>>> {
         let author = self.author.clone();
         Ok(self
             .vault
-            .read_async(move |txn| is_chain_locked(&txn, &lock, author.as_ref()))
+            .read_async(move |txn| get_chain_lock_subject(&txn, author.as_ref()))
             .await?)
     }
 
@@ -973,11 +973,13 @@ fn named_param_seq(base_name: &str, repeat: usize) -> String {
     seq
 }
 
-pub fn lock_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
+pub fn chain_lock_subject_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
     Ok(match entry {
-        Some(Entry::CounterSign(session_data, _)) => holo_hash::encode::blake2b_256(
-            &holochain_serialized_bytes::encode(session_data.preflight_request())?,
-        ),
+        Some(Entry::CounterSign(session_data, _)) => session_data
+            .preflight_request
+            .app_entry_hash
+            .get_raw_36()
+            .to_vec(),
         _ => Vec::with_capacity(0),
     })
 }
@@ -1221,7 +1223,7 @@ pub fn current_countersigning_session(
     author: Arc<AgentPubKey>,
 ) -> SourceChainResult<Option<(EntryHash, CounterSigningSessionData)>> {
     // The chain must be locked for a session to be active.
-    if is_chain_locked(txn, &[], author.as_ref())? {
+    if is_chain_locked(txn, author.as_ref())? {
         match chain_head_db(txn, author) {
             // We haven't done genesis so no session can be active.
             Err(e) => Err(e),
