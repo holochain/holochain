@@ -64,8 +64,6 @@ use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCh
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
@@ -74,7 +72,6 @@ use derive_more::Constructor;
 use error::RibosomeResult;
 use guest_callback::entry_defs::EntryDefsHostAccess;
 use guest_callback::init::InitHostAccess;
-use guest_callback::migrate_agent::MigrateAgentHostAccess;
 use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use holo_hash::AgentPubKey;
@@ -148,7 +145,6 @@ pub enum HostContext {
     GenesisSelfCheckV1(GenesisSelfCheckHostAccessV1),
     GenesisSelfCheckV2(GenesisSelfCheckHostAccessV2),
     Init(InitHostAccess),
-    MigrateAgent(MigrateAgentHostAccess),
     PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
     Validate(ValidateHostAccess),
     ZomeCall(ZomeCallHostAccess),
@@ -163,7 +159,6 @@ impl From<&HostContext> for HostFnAccess {
             HostContext::Validate(access) => access.into(),
             HostContext::Init(access) => access.into(),
             HostContext::EntryDefs(access) => access.into(),
-            HostContext::MigrateAgent(access) => access.into(),
             HostContext::PostCommit(access) => access.into(),
         }
     }
@@ -182,7 +177,6 @@ impl HostContext {
         match self.clone() {
             Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
             | Self::Init(InitHostAccess { workspace, .. })
-            | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
             | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => Some(workspace.into()),
             Self::Validate(ValidateHostAccess { workspace, .. }) => Some(workspace),
             _ => None,
@@ -194,7 +188,6 @@ impl HostContext {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
             | Self::Init(InitHostAccess { workspace, .. })
-            | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
             | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace,
             _ => panic!(
                 "Gave access to a host function that writes to the workspace without providing a workspace"
@@ -713,12 +706,6 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         access: InitHostAccess,
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult>;
-
-    fn run_migrate_agent(
-        &self,
-        access: MigrateAgentHostAccess,
-        invocation: MigrateAgentInvocation,
-    ) -> RibosomeResult<MigrateAgentResult>;
 
     fn run_entry_defs(
         &self,

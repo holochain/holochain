@@ -1,6 +1,5 @@
 use super::guest_callback::entry_defs::EntryDefsHostAccess;
 use super::guest_callback::init::InitHostAccess;
-use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
 use super::guest_callback::post_commit::PostCommitHostAccess;
 use super::guest_callback::validate::ValidateHostAccess;
 use super::host_fn::delete_clone_cell::delete_clone_cell;
@@ -22,8 +21,6 @@ use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckI
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
@@ -1046,14 +1043,6 @@ impl RibosomeT for RealRibosome {
         invocation: EntryDefsInvocation,
     ) -> RibosomeResult<EntryDefsResult> {
         do_callback!(self, host_access, invocation, EntryDefsCallbackResult)
-    }
-
-    fn run_migrate_agent(
-        &self,
-        host_access: MigrateAgentHostAccess,
-        invocation: MigrateAgentInvocation,
-    ) -> RibosomeResult<MigrateAgentResult> {
-        do_callback!(self, host_access, invocation, MigrateAgentCallbackResult)
     }
 
     fn zome_types(&self) -> &Arc<GlobalZomeTypes> {
