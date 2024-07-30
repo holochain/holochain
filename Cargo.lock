@@ -3312,6 +3312,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "walkdir",
 ]
 
 [[package]]
