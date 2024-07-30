@@ -88,8 +88,9 @@
             mkdir -p $TX5_CACHE_DIRECTORY
           '';
 
+          CARGO_PROFILE = "ci";
+
           cargoExtraArgs = ''
-            --profile ci \
             --config-file ${../../.config/nextest.toml} \
             ${import ../../.config/test-args.nix} \
             ${import ../../.config/nextest-args.nix}
