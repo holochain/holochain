@@ -629,11 +629,10 @@ impl RealRibosome {
             .ok_or_else(|| ZomeTypesError::MissingDependenciesForZome(zome_name.clone()))?)
     }
 
-    pub fn call_zome_fn<I: Invocation>(
-        &self,
-        invocation: &I,
-        zome: &Zome,
-        fn_name: &FunctionName,
+    pub fn call_zome_fn(
+        input: ExternIO,
+        zome: Zome,
+        fn_name: FunctionName,
         instance_with_store: Arc<InstanceWithStore>,
     ) -> Result<ExternIO, RibosomeError> {
         let fn_name = fn_name.clone();
@@ -641,15 +640,8 @@ impl RealRibosome {
 
         let mut store_lock = instance_with_store.store.lock();
         let mut store_mut = store_lock.as_store_mut();
-        let result = holochain_wasmer_host::guest::call(
-            &mut store_mut,
-            instance,
-            fn_name.as_ref(),
-            // be aware of this clone!
-            // the whole invocation is cloned!
-            // @todo - is this a problem for large payloads like entries?
-            invocation.to_owned().host_input()?,
-        );
+        let result =
+            holochain_wasmer_host::guest::call(&mut store_mut, instance, fn_name.as_ref(), input);
         if let Err(runtime_error) = &result {
             tracing::error!(?runtime_error, ?zome, ?fn_name);
         }
@@ -759,8 +751,8 @@ impl RealRibosome {
         &self,
         host_context: HostContext,
         invocation: &I,
-        zome: &Zome,
-        fn_name: &FunctionName,
+        zome: Zome,
+        fn_name: FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
         let mut otel_info = vec![
             opentelemetry_api::KeyValue::new("dna", self.dna_file.dna().hash.to_string()),
@@ -786,7 +778,7 @@ impl RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
-                let module = self.get_module_for_zome(zome).await?;
+                let module = self.get_module_for_zome(&zome).await?;
                 if module.info().exports.contains_key(fn_name.as_ref()) {
                     // there is a corresponding zome fn
                     let context_key = Self::next_context_key();
@@ -810,9 +802,16 @@ impl RealRibosome {
                         );
                     }
 
-                    let result = self
-                        .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store.clone())
-                        .map(Some);
+                    // be aware of this clone!
+                    // the whole invocation is cloned!
+                    // @todo - is this a problem for large payloads like entries?
+                    let input = invocation.clone().host_input()?;
+                    let instance_with_store_clone = instance_with_store.clone();
+                    let result = tokio::task::spawn_blocking(move || {
+                        Self::call_zome_fn(input, zome, fn_name, instance_with_store_clone)
+                            .map(Some)
+                    })
+                    .await?;
 
                     {
                         let mut store_lock = instance_with_store.store.lock();
@@ -840,7 +839,7 @@ impl RealRibosome {
             } => {
                 let input = invocation.clone().host_input()?;
                 let api = HostFnApi::new(Arc::new(self.clone()), Arc::new(call_context));
-                let result = zome.0.maybe_call(Box::new(api), fn_name, input)?;
+                let result = zome.0.maybe_call(Box::new(api), &fn_name, input)?;
                 Ok(result)
             }
         }
@@ -932,7 +931,7 @@ impl RibosomeT for RealRibosome {
         let zome = zome.clone();
         let fn_name = fn_name.clone();
         let f = tokio::spawn(async move {
-            this.maybe_call(host_context, &invocation, &zome, &fn_name)
+            this.maybe_call(host_context, &invocation, zome, fn_name)
                 .await
         });
         async move { f.await.unwrap() }.boxed().into()
