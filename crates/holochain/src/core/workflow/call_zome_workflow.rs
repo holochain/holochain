@@ -189,22 +189,27 @@ where
     ) {
         let scratch_records = workspace.source_chain().scratch_records()?;
         if scratch_records.len() == 1 {
-            let lock = holochain_state::source_chain::lock_for_entry(
+            let lock_subject = holochain_state::source_chain::chain_lock_subject_for_entry(
                 scratch_records[0].entry().as_option(),
             )?;
-            if !lock.is_empty()
-                && workspace
-                    .source_chain()
-                    .is_chain_locked(Vec::with_capacity(0))
-                    .await?
-                && !workspace.source_chain().is_chain_locked(lock).await?
-            {
-                if let Err(error) = workspace.source_chain().unlock_chain().await {
-                    tracing::error!(?error);
+
+            // If this wasn't a countersigning commit then the lock will be empty.
+            if !lock_subject.is_empty() {
+                // Otherwise, we can check whether the chain was locked with a subject matching
+                // the entry that failed validation.
+                if let Some(subject) = workspace.source_chain().is_chain_locked().await? {
+                    // Here we know the chain is locked, and if the lock subject matches the entry
+                    // that the app was trying to commit then we can unlock the chain.
+                    if subject == lock_subject {
+                        if let Err(error) = workspace.source_chain().unlock_chain().await {
+                            tracing::error!(?error);
+                        }
+                    }
                 }
             }
         }
     }
+
     validation_result?;
     Ok(result)
 }
