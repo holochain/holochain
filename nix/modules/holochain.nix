@@ -88,15 +88,12 @@
             mkdir -p $TX5_CACHE_DIRECTORY
           '';
 
-          CARGO_PROFILE = "ci";
-
-          cargoExtraArgs = ''
+          cargoNextestExtraArgs = ''
+            --profile ci \
             --config-file ${../../.config/nextest.toml} \
             ${import ../../.config/test-args.nix} \
             ${import ../../.config/nextest-args.nix}
           '';
-
-          cargoNextestExtraArgs = builtins.getEnv "NEXTEST_EXTRA_ARGS";
 
           dontPatchELF = true;
           dontFixup = true;
