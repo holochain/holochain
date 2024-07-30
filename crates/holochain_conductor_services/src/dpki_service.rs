@@ -123,7 +123,7 @@ pub trait DpkiState: Send + Sync {
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
 pub enum DpkiServiceError {
-    #[error("DPKI DNA could not be called: {0}")]
+    #[error("DPKI DNA call failed: {0}")]
     ZomeCallFailed(anyhow::Error),
     #[error(transparent)]
     Serialization(#[from] SerializedBytesError),

@@ -4,7 +4,8 @@ use hdk::prelude::*;
 #[hdk_entry_helper]
 pub(crate) struct SomeEntry {
     pub content: String,
-    pub author: AgentPubKey,
+    pub key_1: AgentPubKey,
+    pub key_2: AgentPubKey,
 }
 
 #[hdk_entry_types]
@@ -18,9 +19,9 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, ()>()? {
         hdi::prelude::FlatOp::StoreEntry(OpEntry::CreateEntry {
             app_entry: EntryTypes::SomeEntry(some_entry),
-            action,
+            ..
         }) => {
-            if is_same_agent(action.author.clone(), some_entry.author)? {
+            if is_same_agent(some_entry.key_1, some_entry.key_2)? {
                 Ok(ValidateCallbackResult::Valid)
             } else {
                 Ok(ValidateCallbackResult::Invalid(
