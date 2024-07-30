@@ -143,7 +143,7 @@ pub struct RealRibosome {
     /// File system and in-memory cache for wasm modules.
     pub wasmer_module_cache: Arc<ModuleCacheLock>,
 
-    #[cfg(feature = "test_utils")]
+    #[cfg(test)]
     /// Wasm cache for Deepkey wasm in a temporary directory to be shared across all tests.
     pub shared_test_module_cache: Arc<ModuleCacheLock>,
 }
@@ -249,7 +249,7 @@ impl RealRibosome {
         wasmer_module_cache: Arc<ModuleCacheLock>,
     ) -> RibosomeResult<Self> {
         let mut _shared_test_module_cache: Option<PathBuf> = None;
-        #[cfg(feature = "test_utils")]
+        #[cfg(test)]
         {
             // Create this temporary directory only in tests.
             let shared_test_module_cache_dir = std::env::temp_dir().join("deepkey_wasm_cache");
@@ -262,7 +262,7 @@ impl RealRibosome {
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache,
-            #[cfg(feature = "test_utils")]
+            #[cfg(test)]
             shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
                 _shared_test_module_cache,
             ))),
@@ -361,7 +361,7 @@ impl RealRibosome {
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
-            #[cfg(feature = "test_utils")]
+            #[cfg(test)]
             shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         }
     }
@@ -372,10 +372,10 @@ impl RealRibosome {
         zome_name: &ZomeName,
     ) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
-        #[cfg(feature = "test_utils")]
         // When running tests, use cache folder accessible to all tests.
+        #[cfg(test)]
         let cache_lock = self.shared_test_module_cache.clone();
-        #[cfg(not(feature = "test_utils"))]
+        #[cfg(not(test))]
         let cache_lock = self.wasmer_module_cache.clone();
 
         let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.code();
