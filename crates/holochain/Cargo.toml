@@ -199,6 +199,7 @@ metrics_influxive = ["holochain_metrics/influxive"]
 # This feature should be turned off for production builds.
 test_utils = [
   "contrafact",
+  "deepkey-wasm-cache",
   "diff",
   "ghost_actor/test_utils",
   "hdk/test_utils",
