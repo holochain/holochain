@@ -637,9 +637,7 @@ async fn use_existing_integration() {
                 cap_grant: ZomeCallCapGrant {
                     tag: "tag".into(),
                     // access: CapAccess::Unrestricted,
-                    access: CapAccess::Transferable {
-                        secret: secret.clone(),
-                    },
+                    access: CapAccess::Transferable { secret },
                     functions: GrantedFunctions::All,
                 },
             })
@@ -683,7 +681,7 @@ async fn use_existing_integration() {
         .unwrap_err();
     assert_matches!(
         err,
-        ConductorError::AppHasDependents(a, b) if a == "app_1".to_string() && b == vec!["app_2".to_string()]
+        ConductorError::AppHasDependents(a, b) if a == *"app_1" && b == vec!["app_2".to_string()]
     );
 
     // Can still uninstall app with force

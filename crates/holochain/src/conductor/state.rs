@@ -231,7 +231,7 @@ impl ConductorState {
                                     .iter()
                                     .filter_map(|(id, app)| {
                                         (!app.status().is_running()
-                                            && app.all_cells().find(|id| *id == cell_id).is_some())
+                                            && app.all_cells().any(|id| id == cell_id))
                                         .then_some(id)
                                     })
                                     .collect()
@@ -296,17 +296,15 @@ impl ConductorState {
         Ok(self
             .installed_apps
             .iter()
-            .filter_map(|(app_id, app)| {
-                app.role_assignments
-                    .values()
-                    .any(|r| match r {
-                        AppRoleAssignment::Primary(_) => false,
-                        AppRoleAssignment::Dependency(d) => {
-                            cell_ids.contains(&d.cell_id) && (!protected_only || d.protected)
-                        }
-                    })
-                    .then(|| app_id.clone())
+            .filter(|(_, app)| {
+                app.role_assignments.values().any(|r| match r {
+                    AppRoleAssignment::Primary(_) => false,
+                    AppRoleAssignment::Dependency(d) => {
+                        cell_ids.contains(&d.cell_id) && (!protected_only || d.protected)
+                    }
+                })
             })
+            .map(|(id, _)| id.clone())
             .collect())
     }
 
@@ -331,7 +329,7 @@ impl ConductorState {
                         self.installed_apps
                             .iter()
                             .filter_map(|(id, app)| {
-                                (app.all_cells().find(|id| *id == cell_id).is_some()
+                                (app.all_cells().any(|id| id == cell_id)
                                     && !app.status().is_running())
                                 .then_some(id)
                             })
