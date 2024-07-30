@@ -1,4 +1,4 @@
 ALTER TABLE
-  ChainLock DROP COLUMN author;
+  ChainLock RENAME COLUMN author TO subject;
 ALTER TABLE
   ChainLock RENAME COLUMN lock TO author;
