@@ -554,6 +554,37 @@ pub struct DeleteLink {
     pub link_add_address: ActionHash,
 }
 
+/// Description of how to find the previous or next CellId in a migration.
+/// In a migration, of the two components of the CellId (dna and agent),
+/// always one stays fixed while the other one changes.
+/// This enum represents the component that changed.
+///
+/// When used in CloseChain, this contains the new DNA hash or Agent key.
+/// When used in OpenChain, this contains the previous DNA hash or Agent key.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
+pub enum MigrationTarget {
+    /// Represents a DNA migration, and contains the new or previous DNA hash.
+    Dna(DnaHash),
+    /// Represents an Agent migration, and contains the new or previous Agent key.
+    Agent(AgentPubKey),
+}
+
+impl From<DnaHash> for MigrationTarget {
+    fn from(dna: DnaHash) -> Self {
+        MigrationTarget::Dna(dna)
+    }
+}
+
+impl From<AgentPubKey> for MigrationTarget {
+    fn from(agent: AgentPubKey) -> Self {
+        MigrationTarget::Agent(agent)
+    }
+}
+
 /// When migrating to a new version of a DNA, this action is committed to the
 /// old chain to declare the migration path taken.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
@@ -567,7 +598,7 @@ pub struct CloseChain {
     pub action_seq: u32,
     pub prev_action: ActionHash,
 
-    pub new_dna_hash: DnaHash,
+    pub new_target: MigrationTarget,
 }
 
 /// When migrating to a new version of a DNA, this action is committed to the
@@ -583,7 +614,10 @@ pub struct OpenChain {
     pub action_seq: u32,
     pub prev_action: ActionHash,
 
-    pub prev_dna_hash: DnaHash,
+    pub prev_target: MigrationTarget,
+    /// The hash of the `CloseChain` action on the old chain, to establish chain continuity
+    /// and disallow backlinks to multiple forks on the old chain.
+    pub close_hash: ActionHash,
 }
 
 /// An action which "speaks" Entry content into being. The same content can be
