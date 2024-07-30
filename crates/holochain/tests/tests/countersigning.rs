@@ -258,7 +258,6 @@ async fn retry_countersigning_commit_on_missing_deps() {
     // Bring Bob's app back online
     conductors[1].enable_app("app".into()).await.unwrap();
 
-
     // Bob should be able to get Alice's chain head when we commit, so let's do that.
     let (_, _): (ActionHash, EntryHash) = conductors[1]
         .call_fallible(
