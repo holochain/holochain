@@ -10,8 +10,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Adds DPKI support. This is not fully hooked up, so the main implication for this particular implementation is that you must be using the same DPKI implementation as all other nodes on the network that you wish to talk to. If the DPKI version mismatches, you cannot establish connections, and will see so as an error in the logs. This work is in preparation for future work which will make it possible to restore your keys if you lose your device, and to revoke and replace your keys if your device is stolen or compromised.
 - Add feature to revoke agent keys. A new call `AdminRequest::RevokeAgentKey` is exposed on the Admin API. Revoking a key for an app will render the key invalid from that moment on and make the source chain of all cells of the app read-only. The key is revoked in the Deepkey service if installed and deleted on all cells' source chains. No more actions can be written to any of these source chains. Further it will fail to clone a cell of the app.
 - CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the 
+- *BREAKING* Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. 
+  I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. 
+  The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are
+  fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies. #4129
+- Based on the change above, about adding `IncompleteCommit`, a countersigning session will no longer terminate on missing dependencies.
+  You may retry committing the countersigned entry if you get this error. #4129
+- *BREAKING* CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the 
   `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry.
-  This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded.
+  This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded. #4124
 
 ## 0.4.0-dev.14
 

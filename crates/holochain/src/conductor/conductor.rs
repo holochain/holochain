@@ -15,9 +15,11 @@
 //! async fn async_main () {
 //! use holochain_state::test_utils::test_db_dir;
 //! use holochain::conductor::{Conductor, ConductorBuilder};
+//! use holochain::conductor::ConductorHandle;
+//!
 //! let env_dir = test_db_dir();
-//! let conductor: Conductor = ConductorBuilder::new()
-//!    .test(env_dir.path(), &[])
+//! let conductor: ConductorHandle = ConductorBuilder::new()
+//!    .test(&[])
 //!    .await
 //!    .unwrap();
 //!
@@ -27,7 +29,7 @@
 //! assert_eq!(conductor.list_dnas(), vec![]);
 //! conductor.shutdown();
 //!
-//! # }
+//! }
 //! ```
 
 /// Name of the wasm cache folder within the data root directory.
