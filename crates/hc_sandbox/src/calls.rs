@@ -17,6 +17,7 @@ use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
 use holochain_conductor_api::{AdminRequest, AppInterfaceInfo};
+use holochain_types::app::AppManifest;
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::Timestamp;
@@ -543,13 +544,21 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
     let installed_app = cmd.command(r).await?;
     let installed_app =
         expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
-    enable_app(
-        cmd,
-        EnableApp {
-            app_id: installed_app.installed_app_id.clone(),
-        },
-    )
-    .await?;
+
+    match &installed_app.manifest {
+        AppManifest::V1(manifest) => {
+            if !manifest.membrane_proofs_deferred {
+                enable_app(
+                    cmd,
+                    EnableApp {
+                        app_id: installed_app.installed_app_id.clone(),
+                    },
+                )
+                .await?
+            }
+        }
+    }
+
     Ok(installed_app)
 }
 
