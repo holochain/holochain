@@ -179,47 +179,64 @@ pub(crate) async fn countersigning_success(
         None => return Ok(()),
     };
 
-    // Do a quick check to see if this entry hash matches
-    // the current locked session so we don't check signatures
-    // unless there is an active session.
+    // Do a quick check to see if this entry hash matches the current locked session so we don't
+    // check signatures unless there is an active session.
     let reader_closure = {
         let entry_hash = entry_hash.clone();
         let this_cells_action_hash = this_cells_action_hash.clone();
         let author = author.clone();
         move |txn: Transaction| {
-            if holochain_state::chain_lock::is_chain_locked(&txn, &[], &author)? {
-                let transaction: holochain_state::prelude::Txn = (&txn).into();
-                if transaction.contains_entry(&entry_hash)? {
-                    // If this is a countersigning session we can grab all the ops
-                    // for this cells action so we can check if we need to self publish them.
-                    let r: Result<_, _> = txn
-                        .prepare(
-                            "SELECT basis_hash, hash FROM DhtOp WHERE action_hash = :action_hash",
-                        )?
-                        .query_map(
-                            named_params! {
+            // This chain lock isn't necessarily for the current session, we can't check that until later.
+            if let Some((cs_entry_hash, session_data)) =
+                current_countersigning_session(&txn, Arc::new(author.clone()))?
+            {
+                if let Some(subject) =
+                    holochain_state::chain_lock::get_chain_lock_subject(&txn, &author)?
+                {
+                    // This is the case where we have already locked the chain for another session and are
+                    // receiving another signature bundle from a different session. We don't need this, so
+                    // it's safe to short circuit.
+                    if cs_entry_hash != entry_hash
+                        || subject != session_data.preflight_request.app_entry_hash.get_raw_36()
+                    {
+                        return SourceChainResult::Ok(None);
+                    }
+
+                    let transaction: holochain_state::prelude::Txn = (&txn).into();
+                    if transaction.contains_entry(&entry_hash)? {
+                        // If this is a countersigning session we can grab all the ops for this
+                        // cells action, so we can check if we need to self-publish them.
+                        let r = txn
+                            .prepare(
+                                "SELECT basis_hash, hash FROM DhtOp WHERE action_hash = :action_hash",
+                            ).map_err(DatabaseError::from)?
+                            .query_map(
+                                named_params! {
                                 ":action_hash": this_cells_action_hash
                             },
-                            |row| {
-                                let hash: DhtOpHash = row.get("hash")?;
-                                let basis: OpBasis = row.get("basis_hash")?;
-                                Ok((hash, basis))
-                            },
-                        )?
-                        .collect();
-                    return Ok(r?);
+                                |row| {
+                                    let hash: DhtOpHash = row.get("hash")?;
+                                    let basis: OpBasis = row.get("basis_hash")?;
+                                    Ok((hash, basis))
+                                },
+                            ).map_err(DatabaseError::from)?
+                            .collect::<Result<Vec<_>, _>>().map_err(DatabaseError::from)?;
+                        return Ok(Some((session_data, r)));
+                    }
                 }
             }
-            StateMutationResult::Ok(Vec::with_capacity(0))
+            SourceChainResult::Ok(None)
         }
     };
-    let this_cell_actions_op_basis_hashes: Vec<(DhtOpHash, OpBasis)> =
-        authored_db.read_async(reader_closure).await?;
 
-    // If there is no active session then we can short circuit.
-    if this_cell_actions_op_basis_hashes.is_empty() {
-        return Ok(());
-    }
+    let (session_data, this_cell_actions_op_basis_hashes) =
+        match authored_db.read_async(reader_closure).await? {
+            Some((cs, r)) => (cs, r),
+            None => {
+                // If there is no active session then we can short circuit.
+                return Ok(());
+            }
+        };
 
     // Verify signatures of actions.
     let mut i_am_an_author = false;
@@ -252,31 +269,26 @@ pub(crate) async fn countersigning_success(
             let author = author.clone();
             let entry_hash = entry_hash.clone();
             move |txn| {
-            if let Some((cs_entry_hash, cs)) = current_countersigning_session(txn, Arc::new(author.clone()))? {
-                // Check we have the right session.
-                if cs_entry_hash == entry_hash {
-                    let weight = weigh_placeholder();
-                    let stored_actions = cs.build_action_set(entry_hash, weight)?;
-                    if stored_actions.len() == incoming_actions.len() {
-                        // Check all stored action hashes match an incoming action hash.
-                        if stored_actions.iter().all(|a| {
-                            let a = ActionHash::with_data_sync(a);
-                            incoming_actions.iter().any(|i| *i == a)
-                        }) {
-                            // All checks have passed so unlock the chain.
-                            mutations::unlock_chain(txn, &author)?;
-                            // Update ops to publish.
-                            txn.execute("UPDATE DhtOp SET withhold_publish = NULL WHERE action_hash = :action_hash",
-                            named_params! {
-                                ":action_hash": this_cells_action_hash,
-                                }
-                            ).map_err(holochain_state::prelude::StateMutationError::from)?;
-                            return Ok(Some(cs));
-                        }
+                let weight = weigh_placeholder();
+                let stored_actions = session_data.build_action_set(entry_hash, weight)?;
+                if stored_actions.len() == incoming_actions.len() {
+                    // Check all stored action hashes match an incoming action hash.
+                    if stored_actions.iter().all(|a| {
+                        let a = ActionHash::with_data_sync(a);
+                        incoming_actions.iter().any(|i| *i == a)
+                    }) {
+                        // All checks have passed so unlock the chain.
+                        mutations::unlock_chain(txn, &author)?;
+                        // Update ops to publish.
+                        txn.execute("UPDATE DhtOp SET withhold_publish = NULL WHERE action_hash = :action_hash",
+                        named_params! {
+                            ":action_hash": this_cells_action_hash,
+                            }
+                        ).map_err(holochain_state::prelude::StateMutationError::from)?;
+                        return Ok(Some(session_data));
                     }
                 }
-            }
-            SourceChainResult::Ok(None)
+                SourceChainResult::Ok(None)
         }})
         .await?;
 
