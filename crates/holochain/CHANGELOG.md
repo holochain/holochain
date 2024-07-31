@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Internal rework of chain locking logic. This is used when a countersigning session is in progress, to prevent other
+  actions from being committed during the session. There was a race condition where two countersigning sessions being 
+  run one after another could result in responses relevant to the first session accidentally unlocking the new session.
+  That effectively meant that on a larger network, countersigning sessions would get cancelled when nothing had actually
+  gone wrong. The rework of locking made fixing the bug simpler, but the key to the fix was in the `countersigning_success`
+  function. That now checks that incoming signatures are actually for the current session. #4148
+
 ## 0.4.0-dev.15
 
 - *BREAKING* Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies. \#4129
