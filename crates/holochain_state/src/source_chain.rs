@@ -86,6 +86,10 @@ impl SourceChain {
         preflight_request: PreflightRequest,
         agent_index: u8,
     ) -> SourceChainResult<CounterSigningAgentState> {
+        let hashed_preflight_request = holo_hash::encode::blake2b_256(
+            &holochain_serialized_bytes::encode(&preflight_request)?,
+        );
+
         // This all needs to be ensured in a non-panicky way BEFORE calling into the source chain here.
         let author = self.author.clone();
         assert_eq!(
@@ -109,7 +113,7 @@ impl SourceChain {
                 lock_chain(
                     txn,
                     author.as_ref(),
-                    preflight_request.app_entry_hash.get_raw_36(),
+                    &hashed_preflight_request,
                     preflight_request.session_times.end(),
                 )?;
                 SourceChainResult::Ok(countersigning_agent_state)
@@ -975,11 +979,11 @@ fn named_param_seq(base_name: &str, repeat: usize) -> String {
 
 pub fn chain_lock_subject_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
     Ok(match entry {
-        Some(Entry::CounterSign(session_data, _)) => session_data
-            .preflight_request
-            .app_entry_hash
-            .get_raw_36()
-            .to_vec(),
+        // TODO document that this implies preflight requests must be unique. I.e. if you want to countersign the
+        //      same thing with multiple groups, then you need to use different session times.
+        Some(Entry::CounterSign(session_data, _)) => holo_hash::encode::blake2b_256(
+            &holochain_serialized_bytes::encode(session_data.preflight_request())?
+        ),
         _ => Vec::with_capacity(0),
     })
 }
