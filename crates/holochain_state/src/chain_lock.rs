@@ -169,10 +169,7 @@ mod tests {
         // Now let's unlock the chain
         db.write_async({
             let agent_pub_key = agent_pub_key.clone();
-            move |txn| {
-                let timestamp = Timestamp::now().add(Duration::from_secs(10)).unwrap();
-                unlock_chain(txn, &agent_pub_key)
-            }
+            move |txn| unlock_chain(txn, &agent_pub_key)
         })
         .await
         .unwrap();
