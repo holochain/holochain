@@ -81,14 +81,6 @@ impl SweetConductor {
             .expect("SweetConductor must have a tracing scope set")
     }
 
-    /// Update the config if the conductor is shut down
-    pub fn update_config(&mut self, f: impl FnOnce(ConductorConfig) -> ConductorConfig) {
-        if self.is_running() {
-            panic!("Cannot update config while conductor is running");
-        }
-        self.config = Arc::from(f((*self.config).clone()));
-    }
-
     /// Create a SweetConductor from an already-built ConductorHandle and environments
     /// RibosomeStore
     /// The conductor will be supplied with a single test AppInterface named
