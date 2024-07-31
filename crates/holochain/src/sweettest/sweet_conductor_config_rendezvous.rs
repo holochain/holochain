@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// How conductors should learn about each other / speak to each other.
 /// Signal/TURN + bootstrap in tx5 mode.
@@ -24,7 +24,11 @@ pub struct SweetLocalRendezvous {
     #[cfg(feature = "tx5")]
     sig_addr: String,
     #[cfg(feature = "tx5")]
-    _sig_hnd: sbd_server::SbdServer,
+    sig_hnd: Mutex<Option<sbd_server::SbdServer>>,
+    #[cfg(feature = "tx5")]
+    sig_ip: std::net::IpAddr,
+    #[cfg(feature = "tx5")]
+    sig_port: u16,
 }
 
 impl Drop for SweetLocalRendezvous {
@@ -41,10 +45,34 @@ impl Drop for SweetLocalRendezvous {
     }
 }
 
+#[cfg(feature = "tx5")]
+async fn spawn_sig(ip: std::net::IpAddr, port: u16) -> (String, u16, sbd_server::SbdServer) {
+    let sig_hnd = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
+        bind: vec![format!("{ip}:{port}")],
+        limit_clients: 100,
+        disable_rate_limiting: true,
+        ..Default::default()
+    }))
+    .await
+    .unwrap();
+
+    let sig_addr = *sig_hnd.bind_addrs().first().unwrap();
+    let sig_port = sig_addr.port();
+    let sig_addr = format!("ws://{sig_addr}");
+    tracing::info!("RUNNING SIG: {sig_addr:?}");
+
+    (sig_addr, sig_port, sig_hnd)
+}
+
 impl SweetLocalRendezvous {
     /// Create a new local rendezvous instance.
     #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> DynSweetRendezvous {
+        Self::new_raw().await
+    }
+
+    /// Create a new local rendezvous instance.
+    pub async fn new_raw() -> Arc<Self> {
         let mut addr = None;
 
         for iface in get_if_addrs::get_if_addrs().expect("failed to get_if_addrs") {
@@ -77,27 +105,36 @@ impl SweetLocalRendezvous {
             let (turn_addr, turn_srv) = tx5_go_pion_turn::test_turn_server().await.unwrap();
             tracing::info!("RUNNING TURN: {turn_addr:?}");
 
-            let _sig_hnd = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
-                bind: vec![format!("{addr}:0")],
-                limit_clients: 100,
-                disable_rate_limiting: true,
-                ..Default::default()
-            }))
-            .await
-            .unwrap();
+            let (sig_addr, sig_port, sig_hnd) = spawn_sig(addr, 0).await;
 
-            let sig_addr = *_sig_hnd.bind_addrs().first().unwrap();
-            let sig_addr = format!("ws://{sig_addr}");
-            tracing::info!("RUNNING SIG: {sig_addr:?}");
+            let sig_hnd = Mutex::new(Some(sig_hnd));
 
             Arc::new(Self {
                 bs_addr,
                 bs_shutdown: Some(bs_shutdown),
                 turn_srv: Some(turn_srv),
                 sig_addr,
-                _sig_hnd,
+                sig_hnd,
+                sig_ip: addr,
+                sig_port,
             })
         }
+    }
+
+    /// Drop (shutdown) the signal server.
+    #[cfg(feature = "tx5")]
+    pub fn drop_sig(&self) {
+        self.sig_hnd.lock().unwrap().take();
+    }
+
+    /// Start (or restart) the signal server.
+    #[cfg(feature = "tx5")]
+    pub async fn start_sig(&self) {
+        self.drop_sig();
+
+        let (_, _, sig_hnd) = spawn_sig(self.sig_ip, self.sig_port).await;
+
+        *self.sig_hnd.lock().unwrap() = Some(sig_hnd);
     }
 }
 
