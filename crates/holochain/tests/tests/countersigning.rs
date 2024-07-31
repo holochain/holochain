@@ -144,7 +144,9 @@ async fn retry_countersigning_commit_on_missing_deps() {
 
     // Allow bootstrapping so that peers can find each other, but disable publish and recent gossip.
     // The only way peers can get data is through get requests!
-    let config = SweetConductorConfig::rendezvous(true).historical_only();
+    let config = SweetConductorConfig::rendezvous(true)
+        .historical_only()
+        .no_dpki();
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
