@@ -63,7 +63,7 @@ async fn check_migrations_run<T: DbKindT>(db: DbWrite<T>, path: &str) {
                 .unwrap()
                 .to_str()
                 .unwrap()
-                .split("-")
+                .split('-')
                 .next()
                 .unwrap()
                 .to_string()
