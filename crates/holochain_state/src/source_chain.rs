@@ -919,7 +919,7 @@ pub fn chain_lock_subject_for_entry(entry: Option<&Entry>) -> SourceChainResult<
         // TODO document that this implies preflight requests must be unique. I.e. if you want to countersign the
         //      same thing with multiple groups, then you need to use different session times.
         Some(Entry::CounterSign(session_data, _)) => holo_hash::encode::blake2b_256(
-            &holochain_serialized_bytes::encode(session_data.preflight_request())?
+            &holochain_serialized_bytes::encode(session_data.preflight_request())?,
         ),
         _ => Vec::with_capacity(0),
     })
