@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Internal rework of chain locking logic. This is used when a countersigning session is in progress, to prevent other
+  actions from being committed during the session. There was a race condition where two countersigning sessions being
+  run one after another could result in responses relevant to the first session accidentally unlocking the new session.
+  That effectively meant that on a larger network, countersigning sessions would get cancelled when nothing had actually
+  gone wrong. The rework of locking made fixing the bug simpler, but the key to the fix was in the `countersigning_success`
+  function. That now checks that incoming signatures are actually for the current session. #4148
+- Fixes issue #3679 where websocket connections would be closed if a message was received that failed to deserialize.
+  The new behaviour isn't perfect because you will get a timeout instead, but the websocket will remain open and you
+  can continue to send further valid message. There is another issue to track partial deserialization #4251 so we can
+  respond with an error message instead of a timeout. #4252
+
 ## 0.4.0-dev.23
 
 - Fixes issue \#3679 where websocket connections would be closed if a message was received that failed to deserialize. The new behaviour isn’t perfect because you will get a timeout instead, but the websocket will remain open and you can continue to send further valid message. There is another issue to track partial deserialization \#4251 so we can respond with an error message instead of a timeout. \#4252
