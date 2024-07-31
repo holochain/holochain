@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Internal rework of chain locking logic. This is used when a countersigning session is in progress, to prevent other
+  actions from being committed during the session. There was a race condition where two countersigning sessions being
+  run one after another could result in responses relevant to the first session accidentally unlocking the new session.
+  That effectively meant that on a larger network, countersigning sessions would get cancelled when nothing had actually
+  gone wrong. The rework of locking made fixing the bug simpler, but the key to the fix was in the `countersigning_success`
+  function. That now checks that incoming signatures are actually for the current session. #4148
 - **BREAKING:** Modifies `Action::CloseChain` and `Action::OpenChain` to be able to represent both DNA migrations and Agent migrations:
   - CloseChain can be used on its own, with no forward reference, to make a chain read-only.
   - CloseChain can include a forward reference to either a new AgentPubKey or a new DNA hash, which represent a migration to a new chain. The new chain is expected to begin with a corresponding OpenChain which has a backward reference to the CloseChain action. (This will become a validation rule in future work.)
