@@ -190,15 +190,17 @@ pub(crate) async fn countersigning_success(
             if let Some((cs_entry_hash, session_data)) =
                 current_countersigning_session(&txn, Arc::new(author.clone()))?
             {
+                let lock_subject = holo_hash::encode::blake2b_256(
+                    &holochain_serialized_bytes::encode(&session_data.preflight_request())?,
+                );
+
                 if let Some(subject) =
                     holochain_state::chain_lock::get_chain_lock_subject(&txn, &author)?
                 {
                     // This is the case where we have already locked the chain for another session and are
                     // receiving another signature bundle from a different session. We don't need this, so
                     // it's safe to short circuit.
-                    if cs_entry_hash != entry_hash
-                        || subject != session_data.preflight_request.app_entry_hash.get_raw_36()
-                    {
+                    if cs_entry_hash != entry_hash || subject != lock_subject {
                         return SourceChainResult::Ok(None);
                     }
 
