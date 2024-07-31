@@ -88,7 +88,7 @@ fn is_chain_lock_expired_inner(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::{lock_chain, unlock_chain};
+    use crate::prelude::{lock_chain, unlock_chain, StateMutationError};
     use holochain_sqlite::db::{DbKindAuthored, DbWrite};
     use std::ops::Add;
     use std::sync::Arc;
@@ -203,5 +203,72 @@ mod tests {
             .await
             .unwrap();
         assert!(subject.is_none());
+    }
+
+    #[tokio::test]
+    async fn cannot_hold_multiple_locks() {
+        let agent_pub_key = AgentPubKey::from_raw_36(vec![0; 36]);
+        let db = DbWrite::test_in_mem(DbKindAuthored(Arc::new(CellId::new(
+            DnaHash::from_raw_36(vec![1; 36]),
+            agent_pub_key.clone(),
+        ))))
+        .unwrap();
+
+        // Create an initial lock
+        db.write_async({
+            let agent_pub_key = agent_pub_key.clone();
+            move |txn| {
+                let timestamp = Timestamp::now().add(Duration::from_secs(10)).unwrap();
+                lock_chain(txn, &agent_pub_key, &[1, 2, 3], &timestamp)
+            }
+        })
+        .await
+        .unwrap();
+
+        let check_is_constraint_err = |err: StateMutationError| match err {
+            StateMutationError::Sql(e) => {
+                assert_eq!(
+                    holochain_sqlite::rusqlite::ErrorCode::ConstraintViolation,
+                    e.sqlite_error_code().unwrap()
+                );
+            }
+            _ => panic!("Expected a SQL error"),
+        };
+
+        // Try to create a second lock
+        let err = db
+            .write_async({
+                let agent_pub_key = agent_pub_key.clone();
+                move |txn| {
+                    let timestamp = Timestamp::now().add(Duration::from_secs(10)).unwrap();
+                    lock_chain(txn, &agent_pub_key, &[1, 2, 3], &timestamp)
+                }
+            })
+            .await
+            .unwrap_err();
+        check_is_constraint_err(err);
+
+        // Try to create a second lock with a different subject
+        let err = db
+            .write_async({
+                let agent_pub_key = agent_pub_key.clone();
+                move |txn| {
+                    let timestamp = Timestamp::now().add(Duration::from_secs(10)).unwrap();
+                    lock_chain(txn, &agent_pub_key, &[1, 2, 4], &timestamp)
+                }
+            })
+            .await
+            .unwrap_err();
+        check_is_constraint_err(err);
+
+        // Check that the chain is still locked
+        let locked = db
+            .read_async({
+                let agent_pub_key = agent_pub_key.clone();
+                move |txn| is_chain_locked(&txn, &agent_pub_key)
+            })
+            .await
+            .unwrap();
+        assert!(locked);
     }
 }
