@@ -289,6 +289,115 @@ async fn retry_countersigning_commit_on_missing_deps() {
     wait_for_completion(bob_rx, preflight_request.app_entry_hash).await;
 }
 
+// Checks that when there are multiple authorities returning signature bundles and multiple sessions
+// happening between a pair of agents, the extra signature bundles beyond the first one received
+// are correctly handled. I.e. receiving further signature bundles after a new session has started
+// will not impact the new session.
+// This is trying to check a race condition, so it's probably expected that the test won't always
+// correctly test the problem. However, it is a scenario we've seen fail in Wind Tunnel, so it's
+// worth trying to test here. Seeing flakes from this test is likely a signal that something has
+// regressed.
+#[tokio::test(flavor = "multi_thread")]
+async fn signature_bundle_noise() {
+    holochain_trace::test_run();
+
+    let config = SweetConductorConfig::rendezvous(true);
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(5, config).await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
+    let apps = conductors.setup_app("app", &[dna]).await.unwrap();
+
+    let cells = apps.cells_flattened();
+
+    for i in 0..5 {
+        // Need an initialised source chain for countersigning, so commit anything
+        let zome = cells[i].zome(TestWasm::CounterSigning);
+        let _: ActionHash = conductors[i]
+            .call_fallible(&zome, "create_a_thing", ())
+            .await
+            .unwrap();
+
+        // Also want to make sure everyone can see everyone else
+        conductors[i]
+            .require_initial_gossip_activity_for_cell(
+                &cells[i],
+                4,
+                std::time::Duration::from_secs(10),
+            )
+            .await;
+    }
+
+    let alice_zome = cells[0].zome(TestWasm::CounterSigning);
+    let bob_zome = cells[1].zome(TestWasm::CounterSigning);
+
+    // Run multiple sessions, one after another
+    for _ in 0..5 {
+        let preflight_request: PreflightRequest = conductors[0]
+            .call_fallible(
+                &alice_zome,
+                "generate_countersigning_preflight_request_fast",
+                vec![
+                    (cells[0].agent_pubkey().clone(), vec![Role(0)]),
+                    (cells[1].agent_pubkey().clone(), vec![]),
+                ],
+            )
+            .await
+            .unwrap();
+        let alice_acceptance: PreflightRequestAcceptance = conductors[0]
+            .call_fallible(
+                &cells[0].zome(TestWasm::CounterSigning),
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await
+            .unwrap();
+        let alice_response =
+            if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
+                response
+            } else {
+                unreachable!();
+            };
+        let bob_acceptance: PreflightRequestAcceptance = conductors[1]
+            .call_fallible(
+                &bob_zome,
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await
+            .unwrap();
+        let bob_response =
+            if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
+                response
+            } else {
+                unreachable!();
+            };
+
+        let _: (ActionHash, EntryHash) = conductors[0]
+            .call_fallible(
+                &cells[0].zome(TestWasm::CounterSigning),
+                "create_a_countersigned_thing_with_entry_hash",
+                vec![alice_response.clone(), bob_response.clone()],
+            )
+            .await
+            .unwrap();
+
+        let _: (ActionHash, EntryHash) = conductors[1]
+            .call_fallible(
+                &cells[1].zome(TestWasm::CounterSigning),
+                "create_a_countersigned_thing_with_entry_hash",
+                vec![alice_response.clone(), bob_response.clone()],
+            )
+            .await
+            .unwrap();
+
+        let alice_rx = conductors[0].subscribe_to_app_signals("app".into());
+        let bob_rx = conductors[1].subscribe_to_app_signals("app".into());
+
+        wait_for_completion(alice_rx, preflight_request.app_entry_hash.clone()).await;
+        wait_for_completion(bob_rx, preflight_request.app_entry_hash).await;
+    }
+}
+
 async fn wait_for_completion(mut signal_rx: Receiver<Signal>, expected_hash: EntryHash) {
     let signal = tokio::time::timeout(std::time::Duration::from_secs(30), signal_rx.recv())
         .await
