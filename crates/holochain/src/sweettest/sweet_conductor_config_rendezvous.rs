@@ -123,14 +123,18 @@ impl SweetLocalRendezvous {
 
     /// Drop (shutdown) the signal server.
     #[cfg(feature = "tx5")]
-    pub fn drop_sig(&self) {
+    pub async fn drop_sig(&self) {
         self.sig_hnd.lock().unwrap().take();
+
+        // NOTE: on windows (and slow other systems) we need to wait a moment
+        //       to make sure that the old connection is actually closed.
+        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
     }
 
     /// Start (or restart) the signal server.
     #[cfg(feature = "tx5")]
     pub async fn start_sig(&self) {
-        self.drop_sig();
+        self.drop_sig().await;
 
         let (_, _, sig_hnd) = spawn_sig(self.sig_ip, self.sig_port).await;
 

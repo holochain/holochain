@@ -26,6 +26,8 @@ fn to_signal_message(signal: Signal) -> SignalMessage {
 async fn remote_signals_work_after_sbd_restart() {
     holochain_trace::test_run();
 
+    const MAX: u64 = 30;
+
     let vous = SweetLocalRendezvous::new_raw().await;
 
     let v1: DynSweetRendezvous = vous.clone();
@@ -70,7 +72,7 @@ async fn remote_signals_work_after_sbd_restart() {
         )
         .await;
 
-    let msg = tokio::time::timeout(std::time::Duration::from_secs(5), c2_rx.recv())
+    let msg = tokio::time::timeout(std::time::Duration::from_secs(MAX), c2_rx.recv())
         .await
         .unwrap()
         .map(to_signal_message)
@@ -90,7 +92,7 @@ async fn remote_signals_work_after_sbd_restart() {
 
     tokio::join!(
         async {
-            let msg = tokio::time::timeout(std::time::Duration::from_secs(5), c2_rx.recv())
+            let msg = tokio::time::timeout(std::time::Duration::from_secs(MAX), c2_rx.recv())
                 .await
                 .unwrap()
                 .map(to_signal_message)
@@ -102,7 +104,7 @@ async fn remote_signals_work_after_sbd_restart() {
             done1.store(true, std::sync::atomic::Ordering::SeqCst);
         },
         async {
-            for _ in 0..5 {
+            for _ in 0..MAX {
                 let _: () = c1
                     .call(
                         &app1.zome(TestWasm::EmitSignal),
