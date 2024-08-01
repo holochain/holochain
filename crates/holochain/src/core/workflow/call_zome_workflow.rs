@@ -187,7 +187,7 @@ where
                     // Here we know the chain is locked, and if the lock subject matches the entry
                     // that the app was trying to commit then we can unlock the chain.
                     if subject == lock_subject {
-                        if let Err(error) = workspace.source_chain().unlock_chain().await {
+                        if let Err(error) = workspace.source_chain().force_unlock_chain().await {
                             tracing::error!(?error);
                         }
                     }

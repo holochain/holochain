@@ -88,7 +88,7 @@ fn is_chain_lock_expired_inner(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::{lock_chain, unlock_chain, StateMutationError};
+    use crate::prelude::{force_unlock_chain, lock_chain, StateMutationError};
     use holochain_sqlite::db::{DbKindAuthored, DbWrite};
     use std::ops::Add;
     use std::sync::Arc;
@@ -169,7 +169,7 @@ mod tests {
         // Now let's unlock the chain
         db.write_async({
             let agent_pub_key = agent_pub_key.clone();
-            move |txn| unlock_chain(txn, &agent_pub_key)
+            move |txn| force_unlock_chain(txn, &agent_pub_key)
         })
         .await
         .unwrap();

@@ -68,12 +68,12 @@ pub type SourceChainRead = SourceChain<DbRead<DbKindAuthored>, DbRead<DbKindDht>
 /// Writable functions for a source chain with write access.
 impl SourceChain {
     #[tracing::instrument(skip_all)]
-    pub async fn unlock_chain(&self) -> SourceChainResult<()> {
+    pub async fn force_unlock_chain(&self) -> SourceChainResult<()> {
         self.vault
             .write_async({
                 let author = self.author.clone();
 
-                move |txn| unlock_chain(txn, &author)
+                move |txn| force_unlock_chain(txn, &author)
             })
             .await?;
         Ok(())
@@ -340,6 +340,10 @@ impl SourceChain {
                 else if is_countersigning_session {
                     // If the lock is expired then we can't write this countersigning session.
                     if is_chain_lock_expired(txn, author.as_ref())? {
+                        // If the lock is expired then we want to remove it.
+                        let author = author.clone();
+                        unlock_chain(txn, &author)?;
+
                         return Err(SourceChainError::LockExpired);
                     }
                 }

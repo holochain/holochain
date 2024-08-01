@@ -79,7 +79,7 @@ pub fn accept_countersigning_preflight_request<'a>(
                             .source_chain()
                             .as_ref()
                             .expect("Must have source chain if write_workspace access is given")
-                            .unlock_chain()
+                            .force_unlock_chain()
                             .await
                         {
                             error!(?unlock_result);

@@ -34,7 +34,7 @@ pub struct CountersigningWorkspaceInner {
 
 #[derive(Default)]
 struct Session {
-    /// Map of action hash for a each signers action to the
+    /// Map of action hash for each signers action to the
     /// [`DhtOp`] and other required actions for this session to be
     /// considered complete.
     map: HashMap<ActionHash, (DhtOpHash, ChainOp, Vec<ActionHash>)>,
@@ -201,6 +201,7 @@ pub(crate) async fn countersigning_success(
                     // receiving another signature bundle from a different session. We don't need this, so
                     // it's safe to short circuit.
                     if cs_entry_hash != entry_hash || subject != lock_subject {
+                        tracing::info!("Received a countersigning session that doesn't match the current lock, ignoring");
                         return SourceChainResult::Ok(None);
                     }
 
@@ -281,7 +282,7 @@ pub(crate) async fn countersigning_success(
                     }) {
                         tracing::info!("Valid session data received, unlocking chain and permitting publish");
                         // All checks have passed so unlock the chain.
-                        mutations::unlock_chain(txn, &author)?;
+                        mutations::force_unlock_chain(txn, &author)?;
                         // Update ops to publish.
                         txn.execute("UPDATE DhtOp SET withhold_publish = NULL WHERE action_hash = :action_hash",
                         named_params! {
