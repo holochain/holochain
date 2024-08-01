@@ -1851,6 +1851,14 @@ mod cell_impls {
                 })
                 .collect())
         }
+
+        pub(crate) fn migrate_cell(
+            &self,
+            old_cell_id: CellId,
+            new_cell_id: CellId,
+        ) -> ConductorResult<()> {
+            todo!()
+        }
     }
 }
 
