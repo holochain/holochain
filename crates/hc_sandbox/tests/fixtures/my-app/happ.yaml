@@ -1,5 +1,6 @@
 manifest_version: '1'
 name: my-fixture-app
+membrane_proofs_deferred: false
 roles:
   - name: role-1
     provisioning:

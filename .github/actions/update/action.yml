@@ -34,13 +34,13 @@ runs:
       with:
         ref: ${{ inputs.branch }}
     - name: Install nix
-      uses: cachix/install-nix-action@v26
+      uses: cachix/install-nix-action@v27
       with:
-        install_url: https://releases.nixos.org/nix/nix-2.12.0/install
+        install_url: https://releases.nixos.org/nix/nix-2.23.3/install
         extra_nix_config: |
           access-tokens = github.com=${{ inputs.GITHUB_TOKEN }}
     - name: Setup cachix
-      uses: cachix/cachix-action@v14
+      uses: cachix/cachix-action@v15
       with:
         name: holochain-ci
         signingKey: "${{ inputs.CACHIX_SIGNING_KEY }}"

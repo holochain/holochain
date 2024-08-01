@@ -1,0 +1,17 @@
+manifest_version: '1'
+name: my-fixture-app-deferred
+membrane_proofs_deferred: true
+roles:
+  - name: role-1
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: dna/a dna.dna
+      modifiers:
+        network_seed: 0123456
+        properties: ~
+        origin_time: null
+        quantum_time: null
+      version: null
+      clone_limit: 0

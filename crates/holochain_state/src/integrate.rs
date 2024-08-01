@@ -22,6 +22,7 @@ pub async fn authored_ops_to_dht_db(
 ) -> StateMutationResult<()> {
     // Check if any agents in this space are an authority for these hashes.
     let mut should_hold_hashes = Vec::new();
+
     for (op_hash, basis) in hashes {
         if network.authority_for_hash(basis).await? {
             should_hold_hashes.push(op_hash);
@@ -106,16 +107,15 @@ fn insert_locally_validated_op(
     let hash = op.as_hash();
 
     let deps = op.sys_validation_dependencies();
-    let op_type = op.as_chain_op().map(|op| op.get_type());
+    let op_type = op.get_type();
 
     // Insert the op.
     insert_op(txn, &op)?;
     // Set the status to valid because we authored it.
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
 
-    // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
-    // Set the stage to awaiting integration.
-    if deps.is_empty() {
+    // If this is a `RegisterAgentActivity` or a warrant, we can mark it integrated immediately.
+    if deps.is_empty() || matches!(op_type, DhtOpType::Warrant(_)) {
         // This set the validation stage to pending which is correct when
         // it's integrated.
         set_validation_stage(txn, hash, ValidationStage::Pending)?;
@@ -125,8 +125,10 @@ fn insert_locally_validated_op(
     }
 
     // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
-    // Set the stage to awaiting integration.
-    if matches!(op_type, Some(ChainOpType::RegisterAgentActivity)) {
+    if matches!(
+        op_type,
+        DhtOpType::Chain(ChainOpType::RegisterAgentActivity)
+    ) {
         Ok(Some(op))
     } else {
         Ok(None)
