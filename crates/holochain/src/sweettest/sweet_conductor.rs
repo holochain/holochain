@@ -2,6 +2,7 @@
 // TODO [ B-03669 ] move to own crate
 
 use super::*;
+use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::ConductorHandle;
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, CellError,
@@ -13,6 +14,7 @@ use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, CellInfo, ProvisionedCell,
 };
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::AgentPubKeyExt;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::source_chain::SourceChain;
 use holochain_state::test_utils::TestDir;
@@ -288,7 +290,7 @@ impl SweetConductor {
     /// Install the dna first.
     /// This allows a big speed up when
     /// installing many apps with the same dna
-    #[instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn setup_app_1_register_dna(
         &mut self,
         dna_files: impl IntoIterator<Item = &DnaFile>,
@@ -303,7 +305,7 @@ impl SweetConductor {
     /// Install the app and enable it
     // TODO: make this take a more flexible config for specifying things like
     // membrane proofs
-    #[instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn setup_app_2_install_and_enable(
         &mut self,
         installed_app_id: &str,
@@ -335,7 +337,7 @@ impl SweetConductor {
     /// are not available until after `setup_cells` has run, and it is
     /// better to do that once for all apps in the case of multiple apps being
     /// set up at once.
-    #[instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn setup_app_3_create_sweet_app(
         &self,
         installed_app_id: &str,
@@ -386,7 +388,7 @@ impl SweetConductor {
     /// Opinionated app setup.
     /// Creates an app for the given agent, if specified, using the given DnaFiles,
     /// with no extra configuration.
-    #[instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn setup_app_for_optional_agent<'a>(
         &mut self,
         installed_app_id: &str,
@@ -435,7 +437,7 @@ impl SweetConductor {
     /// Opinionated app setup.
     /// Creates an app using the given DnaFiles, with no extra configuration.
     /// An AgentPubKey will be generated, and is accessible via the returned SweetApp.
-    #[instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn setup_app<'a>(
         &mut self,
         installed_app_id: &str,
@@ -828,6 +830,42 @@ impl SweetConductor {
         )
         .await
         .unwrap()
+    }
+
+    /// Retries getting a list of peers from the conductor until all the given peers are in the response.
+    ///
+    /// You can optionally filter by `cell_id`. That is used in the `get_agent_infos` call to the conductor, so you
+    /// can see how that works in the conductor docs.
+    ///
+    /// If the max_wait is reached then this function will return a "Timeout" error.
+    pub async fn wait_for_peer_visible<P: IntoIterator<Item = AgentPubKey>>(
+        &self,
+        peers: P,
+        cell_id: Option<CellId>,
+        max_wait: Duration,
+    ) -> ConductorApiResult<()> {
+        let handle = self.raw_handle();
+
+        let peers = peers.into_iter().collect::<HashSet<_>>();
+
+        tokio::time::timeout(max_wait, async move {
+            loop {
+                let infos = handle
+                    .get_agent_infos(cell_id.clone())
+                    .await?
+                    .into_iter()
+                    .map(|p| AgentPubKey::from_kitsune(&p.agent))
+                    .collect::<HashSet<_>>();
+                if infos.is_superset(&peers) {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+
+            Ok(())
+        })
+        .await
+        .map_err(|_| ConductorApiError::other("Timeout"))?
     }
 
     /// Getter

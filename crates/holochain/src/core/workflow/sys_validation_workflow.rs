@@ -120,7 +120,7 @@ mod unit_tests;
 mod validate_op_tests;
 
 /// The sys validation worfklow. It is described in the module level documentation.
-#[instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 #[allow(clippy::too_many_arguments)]
 pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     workspace: Arc<SysValidationWorkspace>,
@@ -1256,7 +1256,7 @@ impl SysValidationWorkspace {
         }
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn is_chain_empty(&self, author: &AgentPubKey) -> SourceChainResult<bool> {
         // If we have a query cache then this is an authority node and
         // we can quickly check if the chain is empty from the cache.

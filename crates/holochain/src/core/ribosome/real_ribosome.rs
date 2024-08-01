@@ -143,7 +143,7 @@ pub struct RealRibosome {
     /// File system and in-memory cache for wasm modules.
     pub wasmer_module_cache: Arc<ModuleCacheLock>,
 
-    #[cfg(feature = "deepkey-wasm-cache")]
+    #[cfg(test)]
     /// Wasm cache for Deepkey wasm in a temporary directory to be shared across all tests.
     pub shared_test_module_cache: Arc<ModuleCacheLock>,
 }
@@ -243,13 +243,13 @@ impl RealRibosome {
     }
 
     /// Create a new instance
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn new(
         dna_file: DnaFile,
         wasmer_module_cache: Arc<ModuleCacheLock>,
     ) -> RibosomeResult<Self> {
         let mut _shared_test_module_cache: Option<PathBuf> = None;
-        #[cfg(feature = "deepkey-wasm-cache")]
+        #[cfg(test)]
         {
             // Create this temporary directory only in tests.
             let shared_test_module_cache_dir = std::env::temp_dir().join("deepkey_wasm_cache");
@@ -262,7 +262,7 @@ impl RealRibosome {
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache,
-            #[cfg(feature = "deepkey-wasm-cache")]
+            #[cfg(test)]
             shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
                 _shared_test_module_cache,
             ))),
@@ -361,21 +361,21 @@ impl RealRibosome {
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
-            #[cfg(feature = "deepkey-wasm-cache")]
+            #[cfg(test)]
             shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         }
     }
 
-    #[tracing::instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub async fn runtime_compiled_module(
         &self,
         zome_name: &ZomeName,
     ) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
-        #[cfg(feature = "deepkey-wasm-cache")]
         // When running tests, use cache folder accessible to all tests.
+        #[cfg(test)]
         let cache_lock = self.shared_test_module_cache.clone();
-        #[cfg(not(feature = "deepkey-wasm-cache"))]
+        #[cfg(not(test))]
         let cache_lock = self.wasmer_module_cache.clone();
 
         let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.code();
@@ -389,7 +389,7 @@ impl RealRibosome {
     // Create a key for module cache.
     // Format: [WasmHash] as bytes
     // watch out for cache misses in the tests that make things slooow if you change this!
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub fn get_module_cache_key(&self, zome_name: &ZomeName) -> Result<CacheKey, DnaError> {
         let mut key = [0; 32];
         let wasm_zome_hash = self.dna_file.dna().get_wasm_zome_hash(zome_name)?;
@@ -398,7 +398,7 @@ impl RealRibosome {
         Ok(key)
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn get_module_for_zome(&self, zome: &Zome<ZomeDef>) -> RibosomeResult<Arc<Module>> {
         match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
@@ -415,7 +415,7 @@ impl RealRibosome {
         }
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub fn build_instance_with_store(
         &self,
         module: Arc<Module>,
@@ -471,7 +471,7 @@ impl RealRibosome {
         }))
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn next_context_key() -> u64 {
         CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
@@ -938,7 +938,7 @@ impl RibosomeT for RealRibosome {
         }
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError> {
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {

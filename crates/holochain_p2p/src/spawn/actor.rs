@@ -19,7 +19,6 @@ use crate::types::AgentPubKeyExt;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 
-use holochain_trace::tracing::warn;
 use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
@@ -477,7 +476,10 @@ impl HolochainP2pActor {
     }
 
     /// receiving an incoming get request from a remote node
-    #[tracing::instrument(skip(self, dna_hash, to_agent, dht_hash, options), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self, dna_hash, to_agent, dht_hash, options), level = "trace")
+    )]
     fn handle_incoming_get(
         &mut self,
         dna_hash: DnaHash,
@@ -665,7 +667,10 @@ impl ghost_actor::GhostHandler<kitsune_p2p::event::KitsuneP2pEvent> for Holochai
 
 impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     /// We need to store signed agent info.
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_put_agent_info_signed(
         &mut self,
         input: kitsune_p2p::event::PutAgentInfoSignedEvt,
@@ -708,7 +713,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     /// on the query object to determine which query path to take. The reason for
     /// this is that Holochain is optimized for these three query types, while
     /// kitsune has a more general interface.
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_query_agents(
         &mut self,
         input: kitsune_p2p::event::QueryAgentsEvt,
@@ -773,7 +781,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         .into())
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_query_peer_density(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
@@ -791,7 +802,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     }
 
     /// Handle an incoming call.
-    #[tracing::instrument(skip(self, space, to_agent, payload), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self, space, to_agent, payload), level = "trace")
+    )]
     fn handle_call(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
@@ -878,7 +892,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     }
 
     /// Handle an incoming notify.
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_notify(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
@@ -967,7 +984,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         }
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_receive_ops(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
@@ -1008,7 +1028,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         }
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_query_op_hashes(
         &mut self,
         input: kitsune_p2p::event::QueryOpHashesEvt,
@@ -1036,7 +1059,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     }
 
     #[allow(clippy::needless_collect)]
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_fetch_op_data(
         &mut self,
         input: kitsune_p2p::event::FetchOpDataEvt,
@@ -1065,7 +1091,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         .into())
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_sign_network_data(
         &mut self,
         input: kitsune_p2p::event::SignNetworkDataEvt,
@@ -1121,7 +1150,10 @@ macro_rules! timing_trace_out {
 impl ghost_actor::GhostHandler<HolochainP2p> for HolochainP2pActor {}
 
 impl HolochainP2pHandler for HolochainP2pActor {
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_join(
         &mut self,
         dna_hash: DnaHash,
@@ -1142,7 +1174,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_leave(
         &mut self,
         dna_hash: DnaHash,
@@ -1158,7 +1193,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
     }
 
     /// Dispatch an outgoing remote call.
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_call_remote(
         &mut self,
         dna_hash: DnaHash,
@@ -1197,7 +1235,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
     }
 
     /// Dispatch an outgoing signal.
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_send_remote_signal(
         &mut self,
         dna_hash: DnaHash,
@@ -1244,7 +1285,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
         )
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_publish(
         &mut self,
         dna_hash: DnaHash,
@@ -1320,7 +1364,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
         )
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_publish_countersign(
         &mut self,
         dna_hash: DnaHash,
@@ -1345,7 +1392,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
-    #[tracing::instrument(skip(self, dna_hash, dht_hash, options), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self, dna_hash, dht_hash, options), level = "trace")
+    )]
     fn handle_get(
         &mut self,
         dna_hash: DnaHash,
@@ -1381,7 +1431,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
         )
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_get_meta(
         &mut self,
         dna_hash: DnaHash,
@@ -1414,7 +1467,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
         )
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_get_links(
         &mut self,
         dna_hash: DnaHash,
@@ -1483,7 +1539,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
         )
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_get_agent_activity(
         &mut self,
         dna_hash: DnaHash,
@@ -1525,7 +1584,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
         )
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_must_get_agent_activity(
         &mut self,
         dna_hash: DnaHash,
@@ -1564,7 +1626,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
         )
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_send_validation_receipts(
         &mut self,
         dna_hash: DnaHash,
@@ -1590,7 +1655,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
         )
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_new_integrated_data(&mut self, dna_hash: DnaHash) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
 
@@ -1602,7 +1670,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
         )
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_authority_for_hash(
         &mut self,
         dna_hash: DnaHash,
@@ -1619,7 +1690,10 @@ impl HolochainP2pHandler for HolochainP2pActor {
         )
     }
 
-    #[tracing::instrument(skip(self), level = "trace")]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self), level = "trace")
+    )]
     fn handle_countersigning_session_negotiation(
         &mut self,
         dna_hash: DnaHash,

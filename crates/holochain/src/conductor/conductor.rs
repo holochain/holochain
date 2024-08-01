@@ -15,9 +15,11 @@
 //! async fn async_main () {
 //! use holochain_state::test_utils::test_db_dir;
 //! use holochain::conductor::{Conductor, ConductorBuilder};
+//! use holochain::conductor::ConductorHandle;
+//!
 //! let env_dir = test_db_dir();
-//! let conductor: Conductor = ConductorBuilder::new()
-//!    .test(env_dir.path(), &[])
+//! let conductor: ConductorHandle = ConductorBuilder::new()
+//!    .test(&[])
 //!    .await
 //!    .unwrap();
 //!
@@ -27,7 +29,7 @@
 //! assert_eq!(conductor.list_dnas(), vec![]);
 //! conductor.shutdown();
 //!
-//! # }
+//! }
 //! ```
 
 /// Name of the wasm cache folder within the data root directory.
@@ -366,7 +368,7 @@ mod startup_shutdown_impls {
             })
         }
 
-        #[tracing::instrument(skip_all, fields(scope=self.config.network.tracing_scope))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope=self.config.network.tracing_scope)))]
         pub(crate) async fn initialize_conductor(
             self: Arc<Self>,
             outcome_rx: OutcomeReceiver,
@@ -415,7 +417,7 @@ mod interface_impls {
     impl Conductor {
         /// Spawn all admin interface tasks, register them with the TaskManager,
         /// and modify the conductor accordingly, based on the config passed in
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn add_admin_interfaces(
             self: Arc<Self>,
             configs: Vec<AdminInterfaceConfig>,
@@ -469,7 +471,7 @@ mod interface_impls {
         /// and modify the conductor accordingly, based on the config passed in.
         ///
         /// Returns the given or auto-chosen port number if giving an Ok Result
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn add_app_interface(
             self: Arc<Self>,
             port: either::Either<u16, AppInterfaceId>,
@@ -516,7 +518,7 @@ mod interface_impls {
         }
 
         /// Give a list of networking ports taken up as running app interface tasks
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn list_app_interfaces(&self) -> ConductorResult<Vec<AppInterfaceInfo>> {
             Ok(self
                 .get_state()
@@ -534,7 +536,7 @@ mod interface_impls {
         /// Start all app interfaces currently in state.
         /// This should only be run at conductor initialization.
         #[allow(irrefutable_let_patterns)]
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()> {
             for (id, config) in &self.get_state().await?.app_interfaces {
                 debug!("Starting up app interface: {:?}", id);
@@ -725,7 +727,7 @@ mod dna_impls {
         }
 
         /// Restart every paused app
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn start_paused_apps(&self) -> ConductorResult<AppStatusFx> {
             let (_, delta) = self
                 .update_state_prime(|mut state| {
@@ -760,7 +762,7 @@ mod dna_impls {
             self.put_wasm_code(dna_def, code, zome_defs).await
         }
 
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn put_wasm_code(
             &self,
             dna: DnaDefHashed,
@@ -796,7 +798,7 @@ mod dna_impls {
             Ok(zome_defs)
         }
 
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn load_dnas(&self) -> ConductorResult<()> {
             let (ribosomes, entry_defs) = self.load_wasms_into_dna_files().await?;
             self.ribosome_store().share_mut(|ds| {
@@ -807,7 +809,7 @@ mod dna_impls {
         }
 
         /// Install a [`DnaFile`] in this Conductor
-        #[instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
             if self.get_ribosome(dna.dna_hash()).is_ok() {
                 // ribosome for dna is already registered in store
@@ -1083,7 +1085,7 @@ mod network_impls {
             .collect::<Result<Vec<_>, _>>()
         }
 
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn storage_info(&self) -> ConductorResult<StorageInfo> {
             let state = self.get_state().await?;
 
@@ -1164,7 +1166,7 @@ mod network_impls {
             }))
         }
 
-        #[instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn dispatch_holochain_p2p_event(
             &self,
             event: holochain_p2p::event::HolochainP2pEvent,
@@ -1433,7 +1435,7 @@ mod app_impls {
         /// Install an app from minimal elements, without needing construct a whole AppBundle.
         /// (This function constructs a bundle under the hood.)
         /// This is just a convenience for testing.
-        #[instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
@@ -1466,7 +1468,7 @@ mod app_impls {
             Ok(app.agent_key().clone())
         }
 
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         async fn install_app_common(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
@@ -1655,7 +1657,7 @@ mod app_impls {
         }
 
         /// Install DNAs and set up Cells as specified by an AppBundle
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn install_app_bundle(
             self: Arc<Self>,
             payload: InstallAppPayload,
@@ -1716,7 +1718,7 @@ mod app_impls {
         }
 
         /// Uninstall an app
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn uninstall_app(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,
@@ -1754,7 +1756,7 @@ mod app_impls {
         }
 
         /// List Apps with their information
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn list_apps(
             &self,
             status_filter: Option<AppStatusFilter>,
@@ -1807,7 +1809,7 @@ mod app_impls {
         }
 
         /// Get the IDs of all active installed Apps which use this Cell
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn list_running_apps_for_dependent_cell_id(
             &self,
             cell_id: &CellId,
@@ -1823,7 +1825,7 @@ mod app_impls {
         }
 
         /// Find the ID of the first active installed App which uses this Cell
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn find_cell_with_role_alongside_cell(
             &self,
             cell_id: &CellId,
@@ -1847,7 +1849,7 @@ mod app_impls {
         }
 
         /// Get the IDs of all active installed Apps which use this Dna
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn list_running_apps_for_dependent_dna_hash(
             &self,
             dna_hash: &DnaHash,
@@ -2127,7 +2129,7 @@ mod clone_cell_impls {
         }
 
         /// Disable a clone cell.
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn disable_clone_cell(
             &self,
             installed_app_id: &InstalledAppId,
@@ -2152,7 +2154,7 @@ mod clone_cell_impls {
         }
 
         /// Enable a disabled clone cell.
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn enable_clone_cell(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,
@@ -2192,7 +2194,7 @@ mod clone_cell_impls {
         }
 
         /// Delete a clone cell.
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn delete_clone_cell(
             &self,
             DeleteCloneCellPayload {
@@ -2228,7 +2230,7 @@ mod app_status_impls {
         /// needed) to match the current reality of all app statuses.
         /// - If a Cell is used by at least one Running app, then ensure it is added
         /// - If a Cell is used by no running apps, then ensure it is removed.
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn reconcile_cell_status_with_app_status(
             self: Arc<Self>,
         ) -> ConductorResult<CellStartupErrors> {
@@ -2241,7 +2243,7 @@ mod app_status_impls {
         }
 
         /// Enable an app
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn enable_app(
             self: Arc<Self>,
             app_id: InstalledAppId,
@@ -2256,7 +2258,7 @@ mod app_status_impls {
         }
 
         /// Disable an app
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn disable_app(
             self: Arc<Self>,
             app_id: InstalledAppId,
@@ -2271,7 +2273,7 @@ mod app_status_impls {
         }
 
         /// Start an app
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn start_app(
             self: Arc<Self>,
             app_id: InstalledAppId,
@@ -2285,7 +2287,7 @@ mod app_status_impls {
         }
 
         /// Register an app as disabled in the database
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn add_disabled_app_to_db(
             &self,
             app: InstalledAppCommon,
@@ -2300,7 +2302,7 @@ mod app_status_impls {
         }
 
         /// Transition an app's status to a new state.
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn transition_app_status(
             &self,
             app_id: InstalledAppId,
@@ -2317,7 +2319,7 @@ mod app_status_impls {
         }
 
         /// Pause an app
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         #[cfg(any(test, feature = "test_utils"))]
         pub async fn pause_app(
             self: Arc<Self>,
@@ -2334,7 +2336,7 @@ mod app_status_impls {
 
         /// Create any Cells which are missing for any running apps, then initialize
         /// and join them. (Joining could take a while.)
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn create_and_add_initialized_cells_for_running_apps(
             self: Arc<Self>,
             app_id: Option<&InstalledAppId>,
@@ -2418,7 +2420,7 @@ mod app_status_impls {
         ///     then set it to Running
         /// - If an app is Running but at least one of its (required) Cells are off,
         ///     then set it to Paused
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn reconcile_app_status_with_cell_status(
             &self,
             app_ids: Option<HashSet<InstalledAppId>>,
@@ -2512,13 +2514,13 @@ mod service_impls {
             &self.running_services
         }
 
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn initialize_services(self: Arc<Self>) -> ConductorResult<()> {
             self.initialize_service_dpki().await?;
             Ok(())
         }
 
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn initialize_service_dpki(self: Arc<Self>) -> ConductorResult<()> {
             if let Some(installation) = self.get_state().await?.conductor_services.dpki {
                 self.running_services.share_mut(|s| {
@@ -2535,7 +2537,7 @@ mod service_impls {
         /// Note, this currently is done automatically when the conductor is first initialized,
         /// using the DpkiConfig in the conductor config. We may also provide this as an admin
         /// method some day.
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn install_dpki(
             self: Arc<Self>,
             dna: DnaFile,
@@ -2624,13 +2626,13 @@ mod state_impls {
     use super::*;
 
     impl Conductor {
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn get_state(&self) -> ConductorResult<ConductorState> {
             self.spaces.get_state().await
         }
 
         /// Update the internal state with a pure function mapping old state to new
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn update_state<F>(&self, f: F) -> ConductorResult<ConductorState>
         where
             F: Send + FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
@@ -2641,7 +2643,7 @@ mod state_impls {
         /// Update the internal state with a pure function mapping old state to new,
         /// which may also produce an output value which will be the output of
         /// this function
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn update_state_prime<F, O>(
             &self,
             f: F,
@@ -2674,7 +2676,7 @@ mod scheduler_impls {
         /// - Delete/unschedule all ephemeral scheduled functions GLOBALLY
         /// - Add an interval that runs IN ADDITION to previous invocations
         /// So ideally this would be called ONCE per conductor lifecycle ONLY.
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn start_scheduler(
             self: Arc<Self>,
             interval_period: std::time::Duration,
@@ -2784,7 +2786,7 @@ mod misc_impls {
         }
 
         /// Create a JSON dump of the cell's state
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
             let cell = self.cell_by_id(cell_id).await?;
             let authored_db = cell.get_or_create_authored_db()?;
@@ -3078,7 +3080,7 @@ mod accessor_impls {
         }
 
         /// Find the app which contains the given cell by its [CellId].
-        #[tracing::instrument(skip_all)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn find_app_containing_cell(
             &self,
             cell_id: &CellId,
@@ -3190,7 +3192,7 @@ impl Conductor {
 
     /// Add fully constructed cells to the cell map in the Conductor
     #[allow(deprecated)]
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn add_and_initialize_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
         let (new_cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
         self.running_cells.share_mut(|cells| {
@@ -3216,7 +3218,7 @@ impl Conductor {
     ///
     /// Additionally, if the cell is being removed because the last app referencing it was uninstalled,
     /// all data used by that cell (across Authored, DHT, and Cache databases) will also be removed.
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn remove_dangling_cells(&self) -> ConductorResult<()> {
         let state = self.get_state().await?;
 
@@ -3336,7 +3338,7 @@ impl Conductor {
     ///
     /// Returns a Result for each attempt so that successful creations can be
     /// handled alongside the failures.
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     #[allow(clippy::complexity)]
     async fn create_cells_for_running_apps(
         self: Arc<Self>,
@@ -3410,7 +3412,7 @@ impl Conductor {
     }
 
     /// Deal with the side effects of an app status state transition
-    #[tracing::instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     async fn process_app_status_fx(
         self: Arc<Self>,
         delta: AppStatusFx,
@@ -3456,7 +3458,7 @@ impl Conductor {
     }
 
     /// Entirely remove an app from the database, returning the removed app.
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn remove_app_from_db(&self, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
         let (_state, app) = self
             .update_state_prime({
@@ -3471,7 +3473,7 @@ impl Conductor {
     }
 
     /// Associate a new clone cell with an existing app.
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn add_clone_cell_to_app(
         &self,
         app_id: InstalledAppId,
@@ -3628,7 +3630,7 @@ mod test_utils_impls {
     }
 }
 
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 fn purge_data(txn: &mut Transaction) -> DatabaseResult<()> {
     txn.execute("DELETE FROM DhtOp", ())?;
     txn.execute("DELETE FROM Action", ())?;
@@ -3837,7 +3839,7 @@ fn query_dht_ops_from_statement(
     Ok(r)
 }
 
-#[instrument(skip(p2p_evt, handle))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(p2p_evt, handle)))]
 async fn p2p_event_task(
     p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,

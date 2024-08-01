@@ -38,7 +38,7 @@ where
     chc: Option<ChcImpl>,
 }
 
-// #[instrument(skip(workspace, api, args))]
+// #[cfg_attr(feature = "instrument", tracing::instrument(skip(workspace, api, args)))]
 pub async fn genesis_workflow<'env, Api: CellConductorApiT, Ribosome>(
     mut workspace: GenesisWorkspace,
     api: Api,
