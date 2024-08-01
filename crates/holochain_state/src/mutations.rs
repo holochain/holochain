@@ -148,7 +148,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
 /// can be used in queries with other databases.
 /// Because we are sharing queries across databases
 /// we need the data in the same shape.
-#[tracing::instrument(skip(txn))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn)))]
 pub fn insert_op_lite_into_authored(
     txn: &mut Transaction,
     op_lite: &DhtOpLite,
@@ -583,7 +583,7 @@ pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMut
 }
 
 /// Insert a [`Action`] into the database.
-#[tracing::instrument(skip(txn))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn)))]
 pub fn insert_action(
     txn: &mut Transaction,
     action: &SignedActionHashed,
@@ -689,7 +689,7 @@ pub fn insert_action(
 }
 
 /// Insert an [`Entry`] into the database.
-#[tracing::instrument(skip(txn, entry))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, entry)))]
 pub fn insert_entry(
     txn: &mut Transaction,
     hash: &EntryHash,

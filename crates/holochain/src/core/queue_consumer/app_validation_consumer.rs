@@ -10,14 +10,17 @@ use parking_lot::lock_api::Mutex;
 use tracing::*;
 
 /// Spawn the QueueConsumer for AppValidation workflow
-#[instrument(skip(
-    workspace,
-    conductor,
-    trigger_integration,
-    trigger_publish,
-    network,
-    dht_query_cache
-))]
+#[cfg_attr(
+    feature = "instrument",
+    instrument(skip(
+        workspace,
+        conductor,
+        trigger_integration,
+        trigger_publish,
+        network,
+        dht_query_cache
+    ))
+)]
 pub fn spawn_app_validation_consumer(
     dna_hash: Arc<DnaHash>,
     workspace: AppValidationWorkspace,

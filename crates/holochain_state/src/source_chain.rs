@@ -68,7 +68,7 @@ pub type SourceChainRead = SourceChain<DbRead<DbKindAuthored>, DbRead<DbKindDht>
 //       not the entire source chain!
 /// Writable functions for a source chain with write access.
 impl SourceChain {
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn unlock_chain(&self) -> SourceChainResult<()> {
         self.vault
             .write_async({
@@ -80,7 +80,7 @@ impl SourceChain {
         Ok(())
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn accept_countersigning_preflight_request(
         &self,
         preflight_request: PreflightRequest,
@@ -235,7 +235,7 @@ impl SourceChain {
     }
 
     #[async_recursion]
-    #[tracing::instrument(skip(self, network))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, network)))]
     pub async fn flush(
         &self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
@@ -1052,7 +1052,7 @@ async fn rebase_actions_on(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn genesis(
     authored: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
@@ -1310,7 +1310,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
 }
 
 /// dump the entire source chain as a pretty-printed json string
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn dump_state(
     vault: DbRead<DbKindAuthored>,
     author: AgentPubKey,

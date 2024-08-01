@@ -79,7 +79,7 @@ impl DhtDbQueryCache {
     }
 
     /// Lazily initiate the activity cache.
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn get_or_try_init(&self) -> DatabaseResult<&ActivityCache> {
         self.activity
             .get_or_try_init(|| {

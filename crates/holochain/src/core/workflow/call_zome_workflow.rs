@@ -42,14 +42,17 @@ pub struct CallZomeWorkflowArgs<RibosomeT> {
     pub cell_id: CellId,
 }
 
-#[instrument(skip(
-    workspace,
-    network,
-    keystore,
-    args,
-    trigger_publish_dht_ops,
-    trigger_integrate_dht_ops
-))]
+#[cfg_attr(
+    feature = "instrument",
+    instrument(skip(
+        workspace,
+        network,
+        keystore,
+        args,
+        trigger_publish_dht_ops,
+        trigger_integrate_dht_ops
+    ))
+)]
 pub async fn call_zome_workflow<Ribosome>(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
