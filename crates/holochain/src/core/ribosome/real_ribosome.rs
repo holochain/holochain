@@ -650,7 +650,6 @@ impl RealRibosome {
     }
 
     pub fn call_const_fn(
-        &self,
         instance_with_store: Arc<InstanceWithStore>,
         name: &str,
     ) -> Result<Option<i32>, RibosomeError> {
@@ -969,7 +968,11 @@ impl RibosomeT for RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
-                    let result = self.call_const_fn(instance_with_store, name);
+                    let name = name.to_string();
+                    let result = tokio::task::spawn_blocking(move || {
+                        Self::call_const_fn(instance_with_store, &name)
+                    })
+                    .await?;
                     // remove the blank context.
                     {
                         CONTEXT_MAP.lock().remove(&context_key);
