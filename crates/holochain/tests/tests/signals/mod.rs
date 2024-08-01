@@ -29,16 +29,12 @@ async fn remote_signals_work_after_sbd_restart() {
     let vous = SweetLocalRendezvous::new_raw().await;
 
     let v1: DynSweetRendezvous = vous.clone();
-    let mut c1 = SweetConductor::from_config_rendezvous(
-        SweetConductorConfig::rendezvous(true),
-        v1,
-    ).await;
+    let mut c1 =
+        SweetConductor::from_config_rendezvous(SweetConductorConfig::rendezvous(true), v1).await;
 
     let v2: DynSweetRendezvous = vous.clone();
-    let mut c2 = SweetConductor::from_config_rendezvous(
-        SweetConductorConfig::rendezvous(true),
-        v2,
-    ).await;
+    let mut c2 =
+        SweetConductor::from_config_rendezvous(SweetConductorConfig::rendezvous(true), v2).await;
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
@@ -47,8 +43,16 @@ async fn remote_signals_work_after_sbd_restart() {
     let a1 = SweetAgents::one(c1.keystore()).await;
     let a2 = SweetAgents::one(c2.keystore()).await;
 
-    let (app1,) = c1.setup_app_for_agent("app", a1.clone(), &[dna_file.clone()]).await.unwrap().into_tuple();
-    let (_app2,) = c2.setup_app_for_agent("app", a2.clone(), &[dna_file]).await.unwrap().into_tuple();
+    let (app1,) = c1
+        .setup_app_for_agent("app", a1.clone(), &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+    let (_app2,) = c2
+        .setup_app_for_agent("app", a2.clone(), &[dna_file])
+        .await
+        .unwrap()
+        .into_tuple();
 
     let mut c2_rx = c2.subscribe_to_app_signals("app".to_string());
 
@@ -66,10 +70,7 @@ async fn remote_signals_work_after_sbd_restart() {
         )
         .await;
 
-    let msg = tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            c2_rx.recv(),
-        )
+    let msg = tokio::time::timeout(std::time::Duration::from_secs(5), c2_rx.recv())
         .await
         .unwrap()
         .map(to_signal_message)
@@ -84,31 +85,46 @@ async fn remote_signals_work_after_sbd_restart() {
     // wait for that to propagate in holochain
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-    let _: () = c1
-        .call(
-            &app1.zome(TestWasm::EmitSignal),
-            "signal_others",
-            RemoteSignal {
-                agents: vec![a2.clone()],
-                signal: ExternIO::encode(SignalMessage {
-                    value: "world".to_string(),
-                })
-                .unwrap(),
-            },
-        )
-        .await;
+    let done1 = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let done2 = done1.clone();
 
-    let msg = tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            c2_rx.recv(),
-        )
-        .await
-        .unwrap()
-        .map(to_signal_message)
-        .unwrap()
-        .value;
+    tokio::join!(
+        async {
+            let msg = tokio::time::timeout(std::time::Duration::from_secs(5), c2_rx.recv())
+                .await
+                .unwrap()
+                .map(to_signal_message)
+                .unwrap()
+                .value;
 
-    assert_eq!("world", &msg);
+            assert_eq!("world", &msg);
+
+            done1.store(true, std::sync::atomic::Ordering::SeqCst);
+        },
+        async {
+            for _ in 0..5 {
+                let _: () = c1
+                    .call(
+                        &app1.zome(TestWasm::EmitSignal),
+                        "signal_others",
+                        RemoteSignal {
+                            agents: vec![a2.clone()],
+                            signal: ExternIO::encode(SignalMessage {
+                                value: "world".to_string(),
+                            })
+                            .unwrap(),
+                        },
+                    )
+                    .await;
+
+                if done2.load(std::sync::atomic::Ordering::SeqCst) {
+                    break;
+                }
+
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+        },
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
