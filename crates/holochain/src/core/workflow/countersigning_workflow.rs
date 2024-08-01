@@ -279,6 +279,7 @@ pub(crate) async fn countersigning_success(
                         let a = ActionHash::with_data_sync(a);
                         incoming_actions.iter().any(|i| *i == a)
                     }) {
+                        tracing::info!("Valid session data received, unlocking chain and permitting publish");
                         // All checks have passed so unlock the chain.
                         mutations::unlock_chain(txn, &author)?;
                         // Update ops to publish.
