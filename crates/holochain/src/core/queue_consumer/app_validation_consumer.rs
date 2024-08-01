@@ -7,7 +7,6 @@ use crate::core::workflow::app_validation_workflow::ValidationDependencies;
 use holochain_p2p::*;
 use holochain_types::db_cache::DhtDbQueryCache;
 use parking_lot::lock_api::Mutex;
-use tracing::*;
 
 /// Spawn the QueueConsumer for AppValidation workflow
 #[cfg_attr(

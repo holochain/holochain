@@ -83,7 +83,7 @@ pub type TraversalMap<T> = HashMap<Dep<T>, Option<TraversalStep<T>>>;
 /// If a path ends in a failing check, or if it forms a loop without encountering
 /// a passing check, we don't add that path to the graph.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(ctx)))]
-pub fn traverse<'c, F: Fact>(fact: F, ctx: &'c F::Context) -> TraversalResult<'c, F> {
+pub fn traverse<F: Fact>(fact: F, ctx: &F::Context) -> TraversalResult<F> {
     let mut table = TraversalMap::default();
 
     let root_check_passed = fact.check(ctx);

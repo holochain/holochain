@@ -17,7 +17,6 @@ use holochain_state::query::Txn;
 use holochain_state::query::{Query, Store};
 use holochain_types::prelude::*;
 use holochain_zome_types::agent_activity::DeterministicGetAgentActivityFilter;
-use tracing::*;
 
 #[cfg(test)]
 mod test;

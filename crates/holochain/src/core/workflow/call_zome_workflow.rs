@@ -25,7 +25,6 @@ use holochain_zome_types::record::Record;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use tracing::instrument;
 
 #[cfg(test)]
 mod validation_test;
@@ -44,7 +43,7 @@ pub struct CallZomeWorkflowArgs<RibosomeT> {
 
 #[cfg_attr(
     feature = "instrument",
-    instrument(skip(
+    tracing::instrument(skip(
         workspace,
         network,
         keystore,
