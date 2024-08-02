@@ -1,9 +1,9 @@
-use std::ops::Add;
 use hdk::prelude::{PreflightRequest, PreflightRequestAcceptance};
 use holo_hash::{ActionHash, EntryHash};
 use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};
 use holochain::conductor::CellError;
 use holochain::core::workflow::WorkflowError;
+use holochain::prelude::Timestamp;
 use holochain::sweettest::{
     await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
 };
@@ -16,9 +16,9 @@ use holochain_zome_types::countersigning::Role;
 use holochain_zome_types::prelude::{
     ActivityRequest, AgentActivity, ChainQueryFilter, GetAgentActivityInput,
 };
+use std::ops::Add;
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast::Receiver;
-use holochain::prelude::Timestamp;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn listen_for_countersigning_completion() {
@@ -317,7 +317,9 @@ async fn ruin_the_day_of_a_peer() {
         .await
         .unwrap();
 
-    await_consistency(30, vec![alice, bob, carol]).await.unwrap();
+    await_consistency(30, vec![alice, bob, carol])
+        .await
+        .unwrap();
 
     // Need chain head for each other, so get agent activity before starting a session
     let _: AgentActivity = conductors[0]
@@ -398,7 +400,12 @@ async fn ruin_the_day_of_a_peer() {
     // Bob proceeds to laugh maniacally and not commit
 
     // Let's wait for the session to time out and see how badly this ends for Alice
-    let end = Instant::now().add((preflight_request.session_times.end - Timestamp::now()).unwrap().to_std().unwrap());
+    let end = Instant::now().add(
+        (preflight_request.session_times.end - Timestamp::now())
+            .unwrap()
+            .to_std()
+            .unwrap(),
+    );
     tokio::time::sleep_until(end.into()).await;
 
     // Okay, so the chain lock has timed out and Alice should be able to commit now
@@ -411,7 +418,9 @@ async fn ruin_the_day_of_a_peer() {
     // because the session didn't complete. So now validation won't be able to proceed for AAAs.
     // The thing we just created is the next action sequence along from the countersigning entry
     // so... goodnight Alice. Bob's evil plan has succeeded.
-    await_consistency(30, vec![alice, bob, carol]).await.unwrap();
+    await_consistency(30, vec![alice, bob, carol])
+        .await
+        .unwrap();
 
     // Alice continues to exist on the network and see other people's data. Sadly her future actions
     // effectively go into limbo because they can't be validated.
