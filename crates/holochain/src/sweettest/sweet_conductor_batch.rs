@@ -50,43 +50,20 @@ impl SweetConductorBatch {
         conductors
     }
 
-    /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
+    /// Create SweetConductors from the given ConductorConfigs, each with its own new TestEnvironments,
+    /// using a "rendezvous" bootstrap server for peer discovery.
+    ///
+    /// Also await consistency for DPKI cells, if DPKI is enabled.
     pub async fn from_configs_rendezvous<C, I>(configs: I) -> SweetConductorBatch
     where
         C: Into<SweetConductorConfig>,
         I: IntoIterator<Item = C>,
     {
         let rendezvous = SweetLocalRendezvous::new().await;
-        Self::new(
+        let conductors = Self::new(
             future::join_all(
                 configs
                     .into_iter()
-                    .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
-            )
-            .await,
-        )
-    }
-
-    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
-    pub async fn from_config<C: Clone + Into<SweetConductorConfig>>(
-        num: usize,
-        config: C,
-    ) -> SweetConductorBatch {
-        let config = config.into();
-        Self::from_configs(std::iter::repeat(config).take(num)).await
-    }
-
-    /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
-    pub async fn from_config_rendezvous<C>(num: usize, config: C) -> SweetConductorBatch
-    where
-        C: Into<SweetConductorConfig> + Clone,
-    {
-        let rendezvous = crate::sweettest::SweetLocalRendezvous::new().await;
-        let config = config.into();
-        let conductors = Self::new(
-            future::join_all(
-                std::iter::repeat(config)
-                    .take(num)
                     .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
             )
             .await,
@@ -99,6 +76,26 @@ impl SweetConductorBatch {
         }
 
         conductors
+    }
+
+    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
+    pub async fn from_config<C: Clone + Into<SweetConductorConfig>>(
+        num: usize,
+        config: C,
+    ) -> SweetConductorBatch {
+        let config = config.into();
+        Self::from_configs(std::iter::repeat(config).take(num)).await
+    }
+
+    /// Create a number of SweetConductors from the given ConductorConfig, each with its own new TestEnvironments.
+    /// using a "rendezvous" bootstrap server for peer discovery.
+    ///
+    /// Also await consistency for DPKI cells, if DPKI is enabled.
+    pub async fn from_config_rendezvous<C>(num: usize, config: C) -> SweetConductorBatch
+    where
+        C: Into<SweetConductorConfig> + Clone,
+    {
+        Self::from_configs_rendezvous(std::iter::repeat(config).take(num)).await
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
