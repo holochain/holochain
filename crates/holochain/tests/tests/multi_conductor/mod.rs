@@ -130,6 +130,13 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let stats = conductors[1].dump_network_stats().await?;
     tracing::info!(target: "TEST", "@!@! - stats: {stats}");
 
+    let stats: tx5::stats::Stats = serde_json::from_str(&stats).unwrap();
+
+    // make sure that, by this point, we have upgraded connections to webrtc
+    for con in stats.connection_list {
+        assert!(con.is_webrtc);
+    }
+
     Ok(())
 }
 
