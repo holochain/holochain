@@ -63,21 +63,30 @@ Games have these properties:
 
 1.  A Game consists of an Integrity specification with these parts:
 
-    a.  A deterministic description of the structure of any data that is
+    a.  A deterministic description of the types of data that are
   used to record some "play" in the game. Such data is called an
   Entry, where the act of generating such data is called an
   Action, which is also recorded. Note: both types of data,
   the content of the play (Entry) and the meta-data about the play
-  (Action), when taken together are called a Record.
+  (Action), when taken together, are called a Record.
 
-    b.  A deterministic description of the validity of the contents of
-  an Entry along with the validity of an Agent taking any
-  Action; e.g., some Actions may be taken in some contexts but
-  not in others, as in making a move out-of-turn, or an Agent
-  not being allowed to play a certain role.
+    b. A deterministic description of of the types of relations between Entries
+  or Actions. Such a relation is called a Link.
 
-    c.  A deterministic description of how Entries or Actions may be related or
-  linked to other Entries or Actions.
+    c. A deterministic description of a properly formed Membrane Proof, a
+  credential that grants an Agent permission to join a Game. This description
+  may not be able to fully validate a Membrane Proof if its validity depends on
+  data elsewhere on the Game Board, as the Agent's Membrane Proof is checked
+  against this description before they join.
+
+    d.  A deterministic description of the validity of an Action and any Entry,
+  Link, or Membrane Proof data it contains, in the context in which it is
+  produced. This may include rules about the contents of data fields, the
+  author's current state (for instance, whether a game move is allowed given
+  their history), presence of dependencies (such as moves by their opponent
+  or certificates permitting them to play a certain role), and any other
+  rules that may be expressed deterministically given the context available
+  to the Action.
 
 2.  Along with the Integrity specification, a Game also consists of a
   Coordination specification. This specification contains
@@ -105,10 +114,13 @@ Games have these properties:
 In keeping with the metaphor of Game, we also refer to the Integrity
 specification as the Validation Rules of the Game.
 
-We also refer to both the Integrity and Coordination specifications of a
+We also refer to Integrity specification of a
 Game as its DNA because this evokes the pattern of all the "cells" in
 the social "body" as being built out of the same instruction set, thus
-being the ground of self for that social body. We also call these specifications generically by the name Zomes (short for chromosomes) as they also function as composable units for building larger DNAs.
+being the ground of self for that social body. We also call an Integrity or Coordination specification
+generically by the name Zomes (short
+for chromosomes) as they also function as composable units for building larger
+bodies of "genetic code" for said body.
 
 ### Actions (and Entries and Records)
 
@@ -129,26 +141,44 @@ Actions have these properties:
 ```{=html}
 <!-- -->
 ```
-1.  Create: An Action for adding new Game-specific content. We call
-  such content an Entry. The Entry may be declared as public, and
-  will thus be published by the Agent to the network, or declared as
-  private, in which case publishing is limited to just the Action data and
-  not the content. Entries are addressed by their hash, and thus for
-  Create Actions, this Entry hash is included in the Action. Thus
-  sometimes the Action may be understood as "meta-data" where the Entry is
-  understood as "data"[^headers].  Note that Actions and Entries are thus independently addressable and retreivable.  This is a valuable property
-  of the system. Note also that many actions (for example ones taken by different agents) may create the exact same Entry; e.g., a hash-tag may be its own entry but be created by different people.
+    1.  Dna: An action which contains the hash of the DNA's code, demonstrating
+      that the Agent possesses a copy of the rules of the Game and agrees to
+      abide by them.
 
-2.  Update: An Action which adds new Game-specific content onto the
-  chain that is intended to update an existing entry creation Action (either a Create or an Update).
+    2.  AgentValidationPkg: An action which presents an Agent's Membrane Proof,
+      the data that proves that they have permission to join a Game.
 
-3.  Delete: An Action which indicates a previous entry creation Action
-  should be considered deleted.
+    3.  Create: An Action for adding new Game-specific content. We call
+      such content an Entry. The Entry may be declared as public, and
+      will thus be published by the Agent to the network, or declared as
+      private, in which case publishing is limited to just the Action data and
+      not the content. Entries are addressed by their hash, and thus for
+      Create Actions, this Entry hash is included in the Action. Thus
+      sometimes the Action may be understood as "meta-data" where the Entry is
+      understood as "data"[^headers]. Note that Actions and Entries are thus independently addressable and retreivable. This is a valuable property
+      of the system. Note also that many actions (for example ones taken by different agents) may create the exact same Entry; e.g., a hash-tag may be its own entry but be created by different people.
 
-4.  CreateLink: An Action that unidirectionally links one hash to another.
+    4.  Update: An Action which adds new Game-specific content onto the
+      chain that is intended to update an existing entry creation Action (either a Create or an Update).
 
-5.  DeleteLink: An Action that indicates a previous link Action should
-  be considered deleted.
+    5.  Delete: An Action which indicates a previous entry creation Action
+      should be considered deleted.
+
+    6.  CreateLink: An Action that unidirectionally links one hash to another.
+
+    7.  DeleteLink: An Action that indicates a previous link Action should
+      be considered deleted.
+
+    8.  InitZomesComplete: An action which announces that the Agent has
+      completed any necessary preparations and is ready to play the Game.
+
+    9.  OpenChain: An action which indicates that an Agent is continuing their
+      participation in this Game from another Source Chain or an entirely
+      different Game.
+
+    10. CloseChain: An action which indicates that an Agent is ending their
+      participation in this Game on this Source Chain, and may be continuing
+      their participation in another Source Chain or an entirely different Game.
 
 1.  A Record is just a name for both an Action and, when applicable,
   its Entry, taken together. As an implementation detail, note that for
@@ -196,7 +226,7 @@ Note, there is never a point or place where a canonical copy of the entire state
 ledger exists. It is always
 distributed, either as the Source Chain of Actions taken by a single
 agent, or broken into parts and stored after validation by other
-participating Agents in the system.
+participating Agents in the system. An Agent may elect to take responsibility for validating and storing the entire contents of the Ledger, but as Holochain is an eventually consistent system, their copy can never be said to be canonical.
 
 #### The Ledger as Local State: Source Chain
 
@@ -206,9 +236,17 @@ that Game.
 
 A Record consists of an Action which holds context and points to an
 Entry which is the content of the Action. The context information held
-by the Action includes the Action type (e.g. create/update/delete/link,
-etc), a time-stamp, the hash of the previous Action (to create the
-chain), and the hash of the Entry.
+by the Action includes:
+
+1. The Action type (e.g. create/update/delete/link, etc)
+
+2. A time-stamp
+
+3. The hash of the previous Action (to create the chain)
+
+4. The sequence index of the Action in the chain
+
+5. The hash of the Entry
 
 The first few Records of every Source Chain - called Genesis Records - create a "common ground" for
 all the agents "playing" a Game to be able to verify the Game and its

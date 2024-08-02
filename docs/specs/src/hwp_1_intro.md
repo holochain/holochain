@@ -151,38 +151,16 @@ initiated by agents, and *authority*, which is about distributing the
 responsibility of validating and making visible those state changes
 across the participants in the network. This approach requires that we:
 
-1.  Ensure that all agents know the "ground-rules"; i.e., offer a
-  framework for composing lots of small units of social agreement in
-  which players can add elements of deterministic certainty into
-  their interactions.
-
 1.  Ensure that all agents can *reliably* see what's going on; i.e.,
   offer a framework for adding to and querying a collectively held
-  database in which there is a predictable level of confidence in its
-  reliability and integrity that can also be graduated to fit the
-  circumstances, ranging from an arbitrarily low level of confidence
-  to a level that approaches an asymptote of absolute certainty.
+  database in which there is a minimum or "floor" of certainty regarding the contents and authorship of data even in the presence of an unbounded number of adversaries.
 
-The first point we deliver through various types of **Validation
-Rules**. Validation rules create certainty in the following dimensions,
-with examples:
+1.  Ensure that all agents know the "ground-rules"; i.e., offer a
+  framework for composing many small units of social agreement in
+  which players can add elements of deterministic certainty into
+  their interactions, yielding an appropriate level of certainty ranging from arbitrarily low to arbitrarily high.
 
--   Content: a string does not exceed a maximum length
-
--   Structure: an entry consists of a certain set of types of data
-
--   Sequence: someone can not spend credits they have not already
-  received
-
--   Process: a transaction must be approved and signed by a notary
-
--   Behavior: one does not take an action more frequently than a certain
-  rate
-
--   Dependency: an editor can only make changes if another agent has given them
-  prior authorization
-
-The second point we deliver through various types of **Intrinsic Data
+The first point we deliver through various types of **Intrinsic Data
 Integrity**. We use a number of cryptographic methods to create
 self-proving data of various types:
 
@@ -213,7 +191,28 @@ self-proving data of various types:
   the source and thus have high confidence that they have actually
   committed to play by the same rules.
 
-The two domains of Validation Rules and Intrinsic Data Integrity, and
+Building upon this floor, we deliver the second point through the ability to compose various types of **Validation
+Rules**. Validation rules create certainty in the following dimensions,
+with examples:
+
+-   Content: a string does not exceed a maximum length
+
+-   Structure: an entry consists of a certain set of types of data[^content-structure]
+
+-   Sequence: someone can not spend credits they have not already
+  received
+
+-   Process: a transaction must be approved and signed by a notary
+
+-   Behavior: one does not take an action more frequently than a certain
+  rate
+
+-   Dependency: an editor can only make changes if another agent has given them
+  prior authorization
+
+[^content-structure]: While Per Martin-Löf [demonstrated](https://en.wikipedia.org/wiki/Intuitionistic_type_theory) that values can be unified with classical types into a single [dependent type theory](https://en.wikipedia.org/wiki/Dependent_type), thus showing that content and structure can be equivalent and share a single calculus, here we distinguish the two in order to speak a language that is more familiar to programmers.
+
+The two domains of Intrinsic Data Integrity and Validation Rules, and
 their component dimensionality, amounts to what we might call a
 "Geometry of Certainty". Inside the clarity of such a geometry, the
 gradients of certainty become both much more visible, and much easier to

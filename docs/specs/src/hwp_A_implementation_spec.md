@@ -1,41 +1,83 @@
 \onecolumngrid
 # Appendix A: Holochain Implementation Spec v0.3.0 Beta
 
-So far we have described the necessary components of a scalable
-coordination and collaboration system. We have built an "industrial
-strength" implementation of this pattern suitable for real-world
-deployment, under the name Holochain. Here we describe the technical
-implementation details that achieve the various requirements described
-above.
+So far we have described the necessary components of a scalable coordination and collaboration system. We have built an "industrial strength" implementation of this pattern suitable for real-world deployment, under the name Holochain. Here we describe the technical implementation details that achieve the various requirements described above.
 
+This specification assumes that the reader has understood context and background provided in the [Holochain Formalization](hwp_4_formal.md).
 
+Given the formal description from that document of our local state model (Source Chain) and shared data model (Graph DHT) we can now present a high-level implementation specification of the different components of the Holochain architecture:
 
-This specification assumes that the reader has understood context and background provided in the the [Holochain Formalization](https://hackmd.io/2E2Wx_8FT0iTXk4Eyp12wA)
+* App Virtual Machine (Ribosome)
+* State Manager
+* P2P Networking (Kitsune)
+* The Conductor
+* Secure Private Key Management (lair-keystore)
 
-Given the formal description from that document of our local state model (Source Chain) and shared data model (graph DHT) we can now present a high-level implementation specification of the different components of the Holochain architecture:
+**Note on code fidelity**: The code in this appendix may diverge somewhat from the actual implementation, partially because the implementation may change and partially to make the intent of the following code clearer and simpler. For instance, specialized types that are merely wrappers around a vector of bytes are replaced with `Vec<u8>`.
 
-- App Virtual Machine (Ribosome)
-- State Manager
-- P2P Networking (Kitsune)
-- The Conductor
-- Secure Private Key Management (lair-keystore)
+## Ribosome: The Application "Virtual Machine"
 
-## Ribosome: the Application "virtual machine"
+We use the term **Ribosome** to the name of part of the Holochain system that runs the DNA's application code. Abstractly, a Ribosome could be built for any programming language as long as it's possible to deterministically hash and run the code of the DNA's Integrity Zome such that all agents who possess the same hash can rely on the validation routines and structure desribed by that Integrity Zome operating identically for all. (In our implementation we use WebAssembly (WASM) for DNA code, and [Wasmer](https://wasmer.io/) as the runtime that executes it.)
 
-We use the term Ribosome to the name of part of the Holochain system that runs the DNA's application code.  Abstractly, a Ribosome could be built for any programming language as long as it's possible to deterministically hash and run the code of the DNA's Integrity Zome such that all agents can rely on the validation routines and structure desribed by that Integrity Zome. (In our implementation we use WASM for DNA code, and [Wasmer](https://wasmer.io/) as the runtime that executes it.)
+The Ribosome, as an application host, must expose a minimal set of functions to guest applications to allow them to access Holochain functionality, and it should expect that guest applications implement a minimal set of callbacks that allow the guest to define its entry types, link types, validation functions, and lifecycle hooks for both Integrity and Coordinator Zomes. We will call this set of provisions and expectations the Ribosome Host API.
 
-There is a set of minimal functions, callbacks and code structuring patterns for defining entry and link types that necessary to make available to hApp developer. We call this set the Holochain Deterministic Integrity component, and in our implementaion we provide it as a [rust crate](https://docs.rs/hdi/) for developers to use when building their Integrity Zomes.  
+[WP-TODO: Is there an actually official name for this rather than 'Ribosome Host API?]
 
-Additionally there is also a minimal set of functions and callbacks necessary to build out the coordinator zomes that commit source chain entries, and communicate with other nodes in the application network.  We call this set the Holochain Development Kit (HDK) and it is also provided as a [rust crate](https://docs.rs/hdk).  Below is a high level specification of what is needed in an HDI and an HDK.
+Additionally, it is advantageous to provide software development kits (SDKs) to facilitate the rapid development of Integrity and Coordinator Zomes that consume the Ribosome's host functions and provide the callbacks it expects.
+
+In our implementaion we provide SDKs for Integrity and Coordinator Zomes written in the [Rust programming language](https://rust-lang.org) as Rust crates: the [Holochain Deterministic Integrity (HDI) crate](https://docs.rs/hdi/) facilitates the development of Integrity Zomes, while the [Holochain Development Kit (HDK) crate](https://docs.rs/hdk/) facilitates the development of Coordinator Zomes.
+
+### Ribosome/Zome Interop ABI
+
+Because WebAssembly code can only interface with its host system via function calls that pass simple numeric scalars, an application binary interface (ABI) must be defined to pass rich data between the Ribosome host and the zome guest.
+
+The host and guest expose their functionality via named functions, and the input and output data of these functions (a single argument and a return value) are passed as a tuple of a shared memory pointer and a length. This tuple is a reference to the serialized data that makes up the actual input or output data.
+
+The caller is responsible for serializing the expected function argument and storing it in a shared memory location in the WebAssembly virtual machine instance, then passing the location and length to the callee.
+
+The callee then accesses the data at the given location, attempts to deserialize it, and operates on the deserialized result.
+
+The same procedure is followed for the function's return value, with the role of the caller and callee reversed.
+
+Because errors may occur when the callee attempts to access and deserialize its argument data, the callee MUST return (or rather, serialize, store, and return the address and length of) a Rust `Result<T, WasmError>` value, where `WasmError` is a struct of this type:
+
+```rust
+struct WasmError {
+    file: String,
+    line: u32,
+    error: WasmErrorInner,
+}
+
+enum WasmErrorInner {
+    PointerMap,
+    Deserialize(Vec<u8>),
+    Serialize(SerializedBytesError),
+    ErrorWhileError,
+    Memory,
+    Guest(String),
+    Host(String),
+    HostShortCircuit(Vec<u8>),
+    Compile(String),
+    CallError(String),
+    UninitializedSerializedModuleCache,
+}
+```
+
+The type `Result<T, WasmError>` is aliased to `ExternResult<T>` for convenience, and will be referred to as such in examples below.
+
+Our implmementation provides a `wasm_error!` macro for the guest that simplifies the construction of an error result with the correct file and line number, along with a `WasmErrorInner::Guest` containing an application-defined error string. It also provides various macros to 'shadow' host functions and guest callbacks, automatically performing the work of retrieving/deserializing and serializing/storing input and output data and presenting more ergonomic function signatures.
+
+Hereafter, our examples of host and guest functions will assume the use of the ergonomic function signatures provided by the HDI and HDK.
 
 ### HDI
-The Holochain Deterministic Integrity (HDI) component of the Holochain architecture comprises the functions and capacities that are made available to app Developers for building their Integrity Zomes. 
+
+The Holochain Deterministic Integrity (HDI) component of the Holochain architecture comprises the functions and capacities that are made available to app aevelopers for building their Integrity Zomes.
 
 **Integrity Zomes** provide the immutable portion of the app's code that:
 
-  - identifies the types of entries and links able to be committed in the app, 
-  - defines the structure of data entries, and 
-  - defines the validation code each node runs for each type of entry or link. 
+* identifies the types of entries and links able to be committed in the app,
+* defines the structure of data entries, and
+* defines the validation code each node runs for DHT operations produced by actions to create, update, and delete the aforementioned entry types, as well as for a small number of system types.
 
 The following data structures, functions and callbacks are necessary and sufficient to implement an HDI:
 
@@ -43,596 +85,1247 @@ The following data structures, functions and callbacks are necessary and suffici
 
 ##### The `Action` Data Type
 
-All actions must contain the following data elements with the exception of the `Dna` action which, because it indicates the creation of the first chain entry, does not include the `action_seq` nor `prev_action` data elements:
-``` rust
+All actions must contain the following data elements (with the exception of the `Dna` action which, because it indicates the creation of the first chain entry, does not include the `action_seq` nor `prev_action` data elements):
+
+[WP-TODO: These two structs don't exist anywhere. We've got an `ActionBuilderCommon` that matches the following `Action`...]
+
+```rust
 struct Action {
     author: AgentHash,
     timestamp: Timestamp,
     action_seq: u32,
     prev_action: ActionHash,
-  ...
-}
-```
-Additionally the HDI MUST provide a signed `Action` data structure that allows integrity checking in validation:
-``` rust
-struct SignedActionEnvelope {
-  signature: Signature,
-  action: Action,
+    ...
 }
 ```
 
-Implementation Detail: theoretically all actions could point to entry type via a hash that would contain the "content" of that action.  Because many of the different actions entries are system defined, and they thus have a known structure, we can reduce unnecessary data elements and gossip by embedding the entry data for system-defined entry types right in the action itself. However, for application-defined entry types, because the structure of the entry is not known at compile time for Holochain, the entry data must be in a separate data structure. Additionally there are a few system entry types (see below) that must be independantly retrieveable from the DHT, which thus have their own separate `Entry` data type variant. 
+Additionally, the HDI MUST provide a signed `Action` data structure that allows integrity checking in validation:
+
+[WP-TODO: And the closest to this is `Signed<Action>`.]
+
+```rust
+struct SignedActionEnvelope {
+    signature: Signature,
+    action: Action,
+}
+```
+
+Implementation detail: Theoretically all actions could point via a hash to an entry that would contain the "content" of that action. But because many of the different actions entries are system-defined, and they thus have a known structure, we can reduce unnecessary data elements and gossip by embedding the entry data for system-defined entry types right in the action itself. However, for application-defined entry types, because the structure of the entry is not known at compile time for Holochain, the entry data must be in a separate data structure. Additionally there are a few system entry types (see below) that must be independantly retrieveable from the DHT, and thus have their own separate system-defined variant of the `Entry` enum type.
 
 The action types and their additional data fields necessary are:
 
-- `Dna`: indicates the creation of the genesis chain entry holding the DNA
-``` rust
-struct DnaAction {
-  ...
-   hash: DnaHash,
-}
-```
-- `AgentValidation`: indicates the creation of the genesis chain entry holding the information used necessary for nodes to confirm whether an agent is allowed to participate in this DNA
-``` rust
-struct AgentValidationAction {
-  ...
-  membrane_proof: Option<SerializedBytes>
-}
-```
-- `InitZomesComplete`: indicates the creation of the final genesis chain entry that marks that all zome init functions have successfully completed, and the chain is ready for commits.  Requires no additional data.
+* `Dna`: indicates the DNA hash of the validation rules by which the data in this source chain agrees to abide.
 
-- `Create`: indicates the creation of an application defined entry
-``` rust
-struct CreateAction {
-  ...
-    entry_type: EntryType,
-    entry_hash: EntryHash,
+    ```rust
+    struct Dna {
+        ...
+        hash: DNAHash,
+    }
+    ```
+
+* `AgentValidationPkg`: indicates the creation of an entry holding the information necessary for nodes to confirm whether an agent is allowed to participate in this DNA. This entry is contained in the action struct.
+
+    ```rust
+    struct AgentValidationPkg {
+        ...
+        membrane_proof: Option<SerializedBytes>
+    }
+    ```
+
+* `InitZomesComplete`: indicates the creation of the final genesis entry that marks that all zome init functions have successfully completed, and the chain is ready for commits. Requires no additional data.
+
+* `Create`: indicates the creation of an application-defined entry, or a system-defined entry that needs to exist as content-addressed data.
+
+    ```rust
+    struct Create {
+        ...
+        entry_type: EntryType,
+        entry_hash: EntryHash,
+    }
+
+    // See the section on Entries for the defintion of `EntryType`.
+    ```
+
+* `Update`: Indicates a change to a previously existing entry creation action. In addition to specifying the new entry type and pointing to the new entry hash, the action data points to the old action and its entry. As this is an entry creation action like `Create`, it shares many of the same fields.
+
+    [WP-TODO: I'm focusing here on CRUD operating on _entry creation actions_, not entries. Is this the correct frame for something formal?]
+
+    ```rust
+    struct Update {
+        ...
+        original_action_address: ActionHash,
+        original_entry_address: EntryHash,
+        entry_type: EntryType,
+        entry_hash: EntryHash,
+    }
+    ```
+
+* `Delete`: indicates a deletion of a previously existing entry creation action. The entry containing the hashes of the action and entry to be deleted are contained in the action struct.
+
+    ```rust
+    struct Delete {
+        ...
+        deletes_address: ActionHash,
+        deletes_entry_address: EntryHash,
+    }
+    ```
+
+* `CreateLink`: indicates the creation of a link.
+
+    ```rust
+    struct CreateLink {
+        ...
+        base_address: AnyLinkableHash,
+        target_address: AnyLinkableHash,
+        zome_index: u8,
+        link_type: u8,
+        tag: Vec<u8>,
+    }
+    ```
+
+* `DeleteLink`: indicates the creation of a deletion record for a previously created link.
+
+    ```rust
+    struct DeleteLink {
+        ...
+        base_address: AnyLinkableHash,
+        link_add_address: ActionHash,
+    }
+    ```
+
+* `CloseChain`: indicates the creation of a final chain entry with data about a new DNA version to migrate to.
+
+    ```rust
+    struct CloseChain {
+        ...
+        new_dna_hash: DnaHash,
+    }
+    ```
+
+* `OpenChain`: indicates the creation of an entry with data for migrating from a previous DNA version.
+
+    ```rust
+    struct OpenChain {
+        ...
+        prev_dna_hash: DnaHash,
+    }
+    ```
+
+All of the CRUD actions SHOULD include data to implement rate-limiting so as to prevent malicious network actions. In our implementation, all CRUD actions have a `weight` field of the following type:
+
+```rust
+struct RateWeight {
+    bucket_id: u8,
+    units: u8,
 }
 ```
 
-- `Update`: indicates the creation of a change record for an application defined entry.  Action data points to old action and entry as well as new entry and type
-``` rust
-struct UpdateAction {
-  ...
-    original_action_address: ActionHash,
-    original_entry_address: EntryHash,
-    entry_type: EntryType,
-    entry_hash: EntryHash,
+An application may specify an arbitrary number of rate limiting 'buckets', which can be 'filled' by CRUD actions until they reach their capacity, after which point any further attempts to record an action to the Source Chain will fail until the bucket has drained sufficiently. Each bucket has a specified capacity and drain rate, which the Integrity Zome may specify using a `rate_limits` callback.
+
+The Integrity Zome may also weigh a given CRUD action using a `weigh` callback, which allows both the author and the validating authority to deterministically assign a weight to an action.
+
+**Note:** This feature is not completed in the current implementation.
+
+##### The `Entry` Data Type
+
+There are four main entry types, defined in an `EntryType` enum:
+
+```rust
+enum EntryType {
+    AgentPubKey,
+    App(AppEntryDef),
+    CapClaim,
+    CapGrant,
 }
 ```
-- `Delete`: indicates the creation of a application defined entry deletion
-``` rust
-struct DeleteAction {
-  ...
-    deletes_address: ActionHash,
-    deletes_entry_address: EntryHash,
+
+There is also an `Entry` enum that holds the entry data itself, with five variants that correspond to the four entry types:
+
+```rust
+enum Entry {
+    Agent(AgentHash),
+    App(SerializedBytes),
+    CounterSign(CounterSigningSessionData, SerializedBytes),
+    CapClaim(CapClaim),
+    CapGrant(ZomeCallCapGrant),
 }
 ```
-- `CreateLink`: indicates the creation of a link
-``` rust
-struct CreateLinkAction {
-  ...
+
+(Note that the `App` and `CounterSign` variants are both intended for application-defined entries.)
+
+* `AgentPubKey` is used in the second genesis record of the source chain, a `Create` action that publishes the source chain author's public key to the DHT for identification and verification of authorship.
+
+* `App` indicates that the entry data contains arbitrary application data of a given entry type belonging to a given integrity zome:
+
+    ```rust
+    struct AppEntryDef {
+        entry_index: u8,
+        zome_index: u8,
+        visibility: EntryVisibility,
+    }
+
+    struct EntryVisibility {
+        Public,
+        Private,
+    }
+    ```
+
+    Its entry data can be of either `Entry::App` or `Entry::CounterSign`, where the inner data is an aribtrary vector of bytes (typically a serialized data structure). If the data is `Entry::CounterSign`, the bytes are accompanied by a struct that gives the details of the countersigning session (this struct will be dealt with in the section on countersigning).
+
+    Note that in both these cases the data is stored using a serialization that is declared by the `entry_defs()` function of the HDI.
+
+* `CapClaim` indicates that the entry data contains the details of a granted capability that are necessary to exercise such capability:
+
+    ```rust
+    struct CapClaim {
+        tag: String,
+        grantor: AgentHash,
+        secret: CapSecret,
+    }
+    ```
+
+* `CapGrant` indicates that the entry data contains the details of a capability grant in the following enum and the types upon which it depends:
+
+    ```rust
+    struct ZomeCallCapGrant {
+        tag: String,
+        access: CapAccess,
+        functions: GrantedFunctions,
+    }
+
+    enum CapAccess {
+        Unrestricted,
+        Transferable {
+            secret: [u8; 64],
+        },
+        Assigned {
+            secret: [u8; 64],
+            assignees: BTreeSet<AgentHash>,
+        },
+    }
+
+    enum GrantedFunctions {
+        All,
+        Listed(BTreeSet<(ZomeName, FunctionName), Global>),
+    }
+
+    struct ZomeName(str);
+
+    struct FunctionName(str);
+    ```
+
+##### The `Record` Data Type
+
+A record is just a wrapper for an `Action` and an `Entry`. Because an entry may not be present in all contexts or for all action types, the `RecordEntry` enum wraps the possible entry data in an appropriate status.
+
+```rust
+struct Record {
+    action: SignedHashed<Action>,
+    entry: RecordEntry,
+}
+
+enum RecordEntry {
+    Present(Entry),
+    Hidden,
+    NA,
+    NotStored,
+}
+```
+
+##### Links
+
+A `CreateLink` action completely contains the relational graph information, which would be considered the link's entry data if it were to have a separate entry. Note that links are typed for performance purposes, such that when requesting links they can be retrieved by type. Additionally links have tags that can be used as arbitrary labels on-graph as per the application's needs. The `zome_index` is necessary so that the system can find and dispatch the correct validation routines for that link, as a DNA may have multiple integrity zomes.
+
+```rust
+struct Link {
     base_address: AnyLinkableHash,
     target_address: AnyLinkableHash,
     zome_index: ZomeIndex,
     link_type: LinkType,
     tag: LinkTag,
 }
-```
-- `DeleteLink`: indicates the creation of a link deletion
-``` rust
-struct DeleteLinkAction {
-  ...
-    base_address: AnyLinkableHash,
-    link_add_address: ActionHash,
-}
-```
-- `CloseChain`: indicates the creation of final chain entry with data about a new DNA version to migrate to
-``` rust
-struct CloseChainAction {
-  ...
-    new_dna_hash: DnaHash,
-}
-```
-- `OpenChain`: indicates the creation of entry with data for migrating from a previous DNA version
-``` rust
-struct OpenChainAction {
-  ...
-    prev_dna_hash: DnaHash,
-}
+
+struct LinkTag(Vec<u8>);
 ```
 
-All of the CRUD actions SHOULD include data to implement rate-limiting so as to prevent malicious network actions.  In our implementation we provide [WP-TODO: ACB]:
+Comparing this structure to a Resource Description Framework (RDF) triple:
 
-##### The `Entry` Data Type
-
-There are three system `Entry` types:
-
-Agent entries which are the second entry committed during genesis:
-``` rust
-struct AgentEntry {
-  agent: AgentHash
-}
-```
-
-Capability Grant entries which record in a chain the granting of an access token by access type and function name(s) (see above for a discussion on the Capability security model):
-``` rust
-pub enum GrantedFunctions {
-    All,
-    Listed(BTreeSet<(ZomeName, FunctionName), Global>),
-}
-
-struct CapGrantEntry {
-  tag: String,
-  access: CapAccess,
-  functions: GrantedFunctions,
-}
-
-enum CapAccess {
-    Unrestricted,
-    Transferable {
-        secret: CapSecret,
-    },
-    Assigned {
-        secret: CapSecret,
-        assignees: BTreeSet<AgentHash>,
-    },
-}
-```
-
-Capability Claim entries which are used by grantees to store grants:
-``` rust
-struct CapClaimEntry {
-  tag: String,
-  grantor: AgentHash,
-  secret: CapSecret,
-}
-```
-
-Additionally there are two application defined entry types, the first for storing plain application entries:
-``` rust
-struct AppEntry {
-  entry: SerializedBytes,
-}
-```
-and one for storing countersigned application entries (see above for a discussion on countersigning):
-``` rust
-struct CoutnersignedAppEntry {
-  session: CounterSigningSessionData,
-  entry: SerializedBytes,
-}
-
-struct CounterSigningSessionData {
-    preflight_request: PreflightRequest,
-    responses: Vec<(CounterSigningAgentState, Signature)>,
-    optional_responses: Vec<(CounterSigningAgentState, Signature)>,
-}
-```
-Note that in both these cases the data is stored using a serialization that is declared by the `entry_defs()` function of the HDI.
-
-##### The `Record` Data Type
-
-A record is just a wrapper for a ActionEnvelope and an Entry:
-``` rust
-struct Record {
-  action: SignedActionEnvelope,
-  entry: Entry,
-}
-```
-
-##### The `Link` Data Type
-
-A link entry holds the relational graph information.  Note that links are typed for performance purposes such that when requesting links they can be retrieved by type.  Additionally links have tags that can be used as arbitrary labels on graph as per the application's needs. The `zome_index` is necessary so that the system can find and run the correct validation routines for that link as a DNA may have multiple integrity zomes.
-``` rust
-struct Link {
-  base_address: AnyLinkableHash,
-  target_address: AnyLinkableHash,
-  zome_index: ZomeIndex,
-  link_type: LinkType,
-  tag: LinkTag,
-}
-```
+* The `base_address` is the subject.
+* The `target_address` is the object.
+* The `zome_index`, `link_type`, and `tag` as a tuple are the predicate.
 
 ##### The `Op` Data Type
 
-The `Op` types that hold the chain entry transform data that is published to different portions of the DHT (formally described above) are listed below.  The validation callback is called with an `Op` as its single paramater which indicates the DHT perspective from which to validate the data:
+The `Op` types that hold the chain entry transform data that is published to different portions of the DHT (formally described in [section four](hwp_4_formal.md#graph-transformation)) are listed below. The integrity zome defines a validation callback for the entry and link types it defines, and is called with an `Op` enum variant as its single paramater, which indicates the DHT perspective from which to validate the data. Each variant holds a struct containing the DHT operation payload:
 
-- `StoreRecord`: called for each entry authority to store data
-- `StoreEntry`: called for each entry authority to store data 
-- `RegisterUpdate`: called for each entry authority to store meta data
-- `RegisterDelete`: called for each entry authority to store meta data
-- `RegisterAgentActivity`: called for agent authorities to confirm action
-- `RegisterCreateLink``: called for each entry authority to store link data
-- `RegisterDeleteLink`: called for each entry authority to store link meta data
+* `StoreRecord`: executed by the record (action) authorities to store data. It contains the record to be validated, including the entry if it is public.
+
+    ```rust
+    struct StoreRecord {
+        record: Record,
+    }
+    ```
+
+* `StoreEntry`: executed by the entry authorities to store data for any entry creation action, if the entry is public. It contains both the entry and the action in a struct similar to `Record`, with the exception that the `entry` field is always populated.
+
+    ```rust
+    struct StoreEntry {
+        action: SignedHashed<EntryCreationAction>,
+        entry: Entry,
+    }
+
+    // The following variants hold the corresponding Action struct.
+    enum EntryCreationAction {
+        Create(Create),
+        Update(Update),
+    }
+    ```
+
+* `RegisterUpdate`: executed by both the entry and record authorities for the _old_ data to store metadata pointing to the _new_ data. This op collapses both the `RegisterUpdatedRecord` and `RegisterUpdatedContent` transforms into one for simplicity. It contains the update action as well as the entry, if it is public.
+
+    ```rust
+    struct RegisterUpdate {
+        update: SignedHashed<Update>,
+        new_entry: Option<Entry>,
+    }
+    ```
+
+* `RegisterDelete`: executed by the entry authorities for the _old_ entry creation and its entry to store metadata that tombstones the data. This opp collapses both the `RegisterDeletedEntryAction` and `RegisterDeletedBy` transforms into one. It contains only the delete action.
+
+    ```rust
+    struct RegisterDelete {
+        delete: SignedHashed<Delete>,
+    }
+    ```
+
+* `RegisterAgentActivity`: executed by agent activity authorities (the peers responsible for the author's AgentID entry) to validate the action in context of the author's entire source chain. At the application developer's discretion, this operation can also contain the entry data.
+
+    ```rust
+    struct RegisterAgentActivity {
+        action: SignedHashed<Action>,
+        cached_entry: Option<Entry>,
+    }
+    ```
+
+* `RegisterCreateLink`: executed by the authorities for the link's base address to store link metadata.
+
+    ```rust
+    struct RegisterCreateLink {
+        create_link: SignedHashed<CreateLink>,
+    }
+    ```
+
+* `RegisterDeleteLink`: executed by the authorities for the link's base address to store metadata that tombstones the link.
+
+    ```rust
+    struct RegisterDeleteLink {
+        delete_link: SignedHashed<DeleteLink>,
+        create_link: CreateLink,
+    }
+    ```
 
 #### Hash Data Structures
 
-Holochain relies on being able to distinguish and use hashes of the various Holochain fundamental data types.  The following hash types must exist:
+Holochain relies on being able to distinguish and use hashes of the various Holochain fundamental data types. The following hash types must exist:
 
-- `EntryHash`: the hash of an application defined entry
-- `ActionHash`: the hash of the `Action` that created a chain entry
-- `AgentHash`: the "hash" of an `Agent` which is just the value of the Agent's public key
-- `DnaHash`: this type refers to the hash of DNA code
-- `ExternalHash`: this type is used for creating links in the graphing DHT to entities that are not actually stored in the DHT.
+* `ActionHash`: The Blake2b-256 hash of a serialized `Action` variant, used for DHT addressing.
+* `AgentHash`: The Ed25519 public key of an agent, used for referencing the agent.
+* `DhtOpHash`: The Blake2b-256 hash of a serialized `DhtOp` variant, used for comparing lists of held operations during syncing between authorities.
+* `DnaHash`: The hash of all the integrity zomes and associated modifiers, when serialized in a consistent manner.
+* `EntryHash`: The hash of the bytes of a `Entry` variant, according to the hashing rules of that variant (the Blake2b-256 hash of the serialized variant in all cases except `Entry::Agent`, which is the public key). Used for DHT addressing.
+* `ExternalHash`: This type is used for creating links in the graph DHT to entities that are not actually stored in the DHT. It is simply an arbitrary 32 bytes.
+* `WasmHash`: The Blake2b-256 hash of the WebAssembly bytecode of a zome, used by the Ribosome to look up and call zomes.
 
-#### Application Type Definition Functions
+Furthermore, there are two composite hash types, which are unions of two or more of the preceding hash types:
 
-- `entry_defs()`: called to declare the type and structure of the application's entry types.
-- `link_types()`: called to declare the link types that will be used by the application.
+* `AnyDhtHash`, the enum of `EntryHash` and `ActionHash`, is the union of all 'real' addressable content on the DHT; that is, content that can actually be written.
+* `AnyLinkableHash`, the enum of `EntryHash`, `ActionHash`, and `ExternalHash`, is the union of all real and imaginary addressable content on the DHT; that is, it includes external hashes.
 
-Note: In our implementation these functions are defined as Rust macros and structures created by them are automaticlly enforced by the system because of the properties rust's strong typing being built into serialization and deserialization.  Thus it's very easy to assure that any application entry that is being stored adheres to the entry and link type declarations.  
+All of these hash types are derived from a generic struct, `HoloHash<T>`, which holds the three-byte hash type signifier and the 32 bytes of the hash (the 'core' of the hash), along with the 4-byte network location. For those hash types that are the basis of addressable content (`AnyDhtHash`), the hash alone is sufficient to uniquely identify a DHT basis from which a network location can be computed, while the type signifier ensures type safety in all struct fields and enum variant values that reference the hash. The four-byte network location is computed from the hash core and stored along with the preceding 36 bytes as a matter of convenience.
 
-#### Functions necessary for application Validation
+The three-byte type signifiers are as follows:
 
-The HDI MUST allow for happ developers to specify a `validate(Op) -> ValidateCallbackResult` callback function for each integrity zome.  This callback gets called by the Holochain system in the correct context for the Op as described above in the graphing DHT formalization so that the data associated with the `Op` will only be stored if it meets the validation criteria.
+| Type           | Hexadecimal | Base64 |
+|----------------|-------------|--------|
+| `ActionHash`   | `0x842924`  | `hCkk` |
+| `AgentHash`    | `0x842024`  | `hCAk` |
+| `DhtOpHash`    | `0x842424`  | `hCQk` |
+| `DnaHash`      | `0x842d24`  | `hC0k` |
+| `EntryHash`    | `0x842124`  | `hCEk` |
+| `ExternalHash` | `0x842f24`  | `hC8k` |
+| `WasmHash`     | `0x842a24`  | `hCok` |
+
+#### Application Type Definition Callbacks
+
+In order for the Ribosome to successfully dispatch validation to the correct integrity zome, each integrity zome in a DNA should register the entry and link types it is responsible for validating. The HDI MUST allow the integrity zome to implement the following functions:
+
+* `entry_defs(()) -> ExternResult<EntryDefsCallbackResult>`: Called to declare the type and structure of the application's entry types. The return value is:
+
+    ```rust
+    enum EntryDefsCallbackResult {
+        Defs(EntryDefs),
+    }
+
+    struct EntryDefs(Vec<EntryDef>);
+
+    struct EntryDef {
+        id: EntryDefId,
+        visibility: EntryVisibility,
+        required_validations: u8,
+        cache_at_agent_activity: bool,
+    }
+
+    enum EntryDefId {
+        App(str),
+        CapClaim,
+        CapGrant,
+    }
+    ```
+
+    This function can be automatically generated using the `#[hdk_entry_types]` procedural macro on an enum of variants that each hold a type that can be serialized and deserialized.
+
+* `link_types(()) -> ExternResult<Vec<u8>>`: called to declare the link types that will be used by the application. This function can be automatically generated using the `#[hdk_link_types]` procedural macro on an enum of all link types.
+
+Note: In our implementation these functions are automatically generated by Rust macros. This gives us the benefit of consistent, strongly typed entry and link types from the point of definition to the point of use. Thus it's very easy to assure that any application data that is being stored adheres to the entry and link type declarations.
+
+#### Functions Necessary for Application Validation
+
+The HDI MUST allow for happ developers to specify a `validate(Op) -> ExternResult<ValidateCallbackResult>` callback function for each integrity zome. This callback is called by the Ribosome in the correct context for the Op as described above in the graph DHT formalization, so that the data associated with the `Op` will only be stored if it meets the validation criteria.
 
 The HDI MUST provide the following functions for application authors to retrieve dependencies in validation:
 
-- `must_get_agent_activity(hash_bounds)`: This function allows for deterministic validation of chain activity by making a hash bounded range of an agent's chain into a dependency for something that is being validated.
-- `must_get_action(ActionHash)`: get a `SignedActionHashed` at a given hash
-- `must_get_entry(EntryHash)`: get an `Entry` at a given hash.
-- `must_get_valid_record(ActionHash)`: get a VALID `Record` at a given hash.
+* `must_get_agent_activity(AgentPubKey, ChainFilter) -> ExternResult<Vec<RegisterAgentActivity>>`: This function allows for deterministic validation of chain activity by making a hash-bounded range of an agent's chain into a dependency for something that is being validated. The second parameter is defined as:
 
-The HDI MUST implement two hashing functions that calculate the hashes of `Actions` and `Entries` so that hash values can be confirmed in validation routines.
+    ```rust
+    struct ChainFilter {
+        chain_top: ActionHash,
+        filters: ChainFilters,
+        include_cached_entries: bool
+    }
 
-- `hash_action(Action) -> ActionHash`
-- `hash_entry(Action) -> EntryHash`
+    enum ChainFilters {
+        ToGenesis,
+        Take(u32),
+        Until(HashSet<ActionHash>),
+        Both(u32, HashSet<ActionHash>),
+    }
+    ```
+
+    The vector element type in the return value is defined as:
+
+    ```rust
+    struct RegisterAgentActivity {
+        action: SignedHashed<Action>,
+        cached_entry: Option<Entry>,
+    }
+    ```
+
+* `must_get_action(ActionHash) -> ExternResult<SignedHashed<Action>`: Get the `Action` at a given action hash, along with its author's signature.
+
+* `must_get_entry(EntryHash) -> ExternResult<HoloHashed<Entry>>`: Get the `Entry` at a given hash.
+
+* `must_get_valid_record(ActionHash) -> ExternResult<Record>`: Attempt to get a _valid_ `Record` at a given action hash; if the record is marked as invalid by any contacted authorities, the function will fail.
+
+The HDI MUST implement two hashing functions that calculate the hashes of `Action`s and `Entry`s so that hash values can be confirmed in validation routines.
+
+* `hash_action(Action) -> ActionHash`
+* `hash_entry(Entry) -> EntryHash`
 
 The HDI MUST implement two introspection functions that return data about the DNA's definition and context that may be necessary for validation:
 
-- `dna_info() -> DnaInfo`: returns information about the DNA:
-``` rust
-struct DnaInfo {
-    name: String,
-    hash: DnaHash,
-    properties: SerializedBytes,
-    zome_names: Vec<ZomeName>,
-}
-```
-- `zome_info() -> ZomeInfo`: returns information about the zome:
-``` rust
-struct ZomeInfo {
-    name: ZomeName,
-    id: ZomeIndex,
-    properties: SerializedBytes,
-    entry_defs: EntryDefs,
-    extern_fns: Vec<FunctionName>,
-    zome_types: ScopedZomeTypesSet,
-}
-```
-Note: `properties` consists of known application specified data that is specified at install time (both at the DNA and zome levels) that may be necessary for validation or any other application defined purpose.  Properties are included when hashing the DNA source code, thus allowing parametarized DNAs and zomes.  
+* `dna_info() -> ExternResult<DnaInfo>`: returns information about the DNA:
 
+    ```rust
+    struct DnaInfo {
+        name: String,
+        hash: DnaHash,
+        modifiers: DnaModifiers,
+        zome_names: Vec<ZomeName>,
+    }
+
+    struct DnaModifiers {
+        network_seed: String,
+        properties: SerializedBytes,
+        origin_time: Timestamp,
+        quantum_time: Duration,
+    }
+    ```
+
+* `zome_info() -> ExternResult<ZomeInfo>`: returns information about the integrity zome:
+
+    ```rust
+    struct ZomeInfo {
+        name: ZomeName,
+        id: ZomeIndex,
+        properties: SerializedBytes,
+        entry_defs: EntryDefs,
+        extern_fns: Vec<FunctionName>,
+        zome_types: ScopedZomeTypesSet,
+    }
+
+    struct ZomeIndex(u8);
+
+    struct ScopedZomeTypesSet {
+        entries: Vec<(ZomeIndex, Vec<EntryDefIndex>)>,
+        links: Vec<(ZomeIndex, Vec<LinkType>)>,
+    }
+
+    struct EntryDefIndex(u8);
+
+    struct LinkType(u8);
+    ```
+
+Note: `properties` consists of known application-specified data that is specified at install time (both at the DNA and zome levels) that may be necessary for validation or any other application-defined purpose. Properties are included when hashing the DNA source code, thus allowing parametrized DNAs and zomes.
 
 The HDI MUST implement a function that validation code can use to verify cryptographic signatures:
 
-- `verify_signature(key, signature, data) -> bool`
+* `verify_signature<I>(AgentPubKey, Signature, I) -> ExternResult<bool> where I: Serialize`: Checks the validity of a signature (a `Vec<u8>` of bytes) upon the data it signs (any type that implements the `Serialize` trait, allowing it to be reproducibly converted into a vector of bytesa, gainst the public key of the agent that is claimed to have signed it.
 
 ### HDK
 
-The HDK contains all the functions and callbacks need for Holochain application developers to build their Coordination Zomes.  Note that the HDK is a superset of the HDI. Thus all of the functions and data types available in the HDI are also available in the HDK.
+The HDK contains all the functions and callbacks needed for Holochain application developers to build their Coordination Zomes. Note that the HDK is a superset of the HDI. Thus all of the functions and data types available in the HDI are also available in the HDK.
 
 #### Chain Operations
 
 The HDK MUST implement the following functions that create source chain entries:
 
-- `create_entry(Entry, EntryVisibility, ChainTopOrdering) -> ActionHash`: records a new application entry.  The `EntryVisibility` parameter specifies whether the entry is private or should be published to the DHT, and the `ChainTopOrdering` parameter specifies whether the call should fail if some other zome call with chain creation actions completes before this one, or whether it's ok to automatically replay the re-write the action on top of any such chain entries. 
-- `update_entry(ActionHash, Entry, EntryVisibility, ChainTopOrdering) -> ActionHash`: records updating of a chain entry.  Requires the ActionHash that created the entry to be provided.  Also takes the same parameters as `create_entry`
-- `delete_entry(ActionHash, ChainTopOrdering) -> ActionHash`: records the deletion of an entry specified by the ActionHash.
-- `create_link(Link, ChainTopOrdering) -> ActionHash`: records a link.
-- `delete_link(ActionHash, ChainTopOrdering) -> ActionHash`:  records the deletion of a link
-- `query(ChainQueryFilter) -> Vec<Record>`: search the source chain according a query filter returning the Records that match. 
+[WP-TODO: This language centres CRUD on _entries_ rather than a choice to interpret CRUD as applying to entries vs actions. There's also a growing opinion that, in 90% of cases, treating actions as the object of CRUD operations is the most appropriate.]
+
+* `create(CreateInput) -> ExternResult<ActionHash>`: Records a new application entry. The `CreateInput` parameter is defined as:
+
+    ```rust
+    struct CreateInput {
+        entry_location: EntryDefLocation,
+        entry_visibility: EntryVisibility,
+        entry: Entry,
+        chain_top_ordering: ChainTopOrdering,
+    }
+
+    enum EntryDefLocation {
+        App(AppEntryDefLocation),
+        CapClaim,
+        CapGrant,
+    }
+
+    struct AppEntryDefLocation {
+        zome_index: ZomeIndex,
+        entry_def_index: EntryDefIndex,
+    }
+
+    enum ChainTopOrdering {
+        Relaxed,
+        Strict,
+    }
+    ```
+
+    The `EntryVisibility` parameter specifies whether the entry is private or should be published to the DHT, and the `ChainTopOrdering` parameter specifies whether the call should fail if some other zome call with chain creation actions completes before this one, or whether it's ok to automatically replay the re-write the action on top of any such chain entries.
+
+    In our implementation, the `create` function accepts any value that can be converted to a `CreateInput`, allowing most of these fields to be populated by data that was generated by the `#[hdk_entry_types]` amcro and other helpers. This is accompanied by convenience functions for `create` that accept app entries, capability grants, or capability claims.
+
+* `update(UpdateInput) -> ExternResult<ActionHash>`: Records the updating of a chain entry. Requires the `ActionHash` that created the original entry to be provided. The `UpdateInput` parameter is defined as:
+
+    ```rust
+    struct UpdateInput {
+        original_action_address: ActionHash,
+        entry: Entry,
+        chain_top_ordering: ChainTopOrdering,
+    }
+    ```
+
+    Many fields necessary for `create` are unnecessary for `update`, as the new entry is expected to match the entry type and visibility of the original. Similar to `create`, in our implementation there are convenience functions to help with constructing `UpdateInputs` for app entries and capability grants.
+
+* `delete(DeleteInput) -> ExternResult<ActionHash>`: Records the deletion of an entry specified by the `ActionHash`. The `DeleteInput` parameter is defined as:
+
+    ```rust
+    struct DeleteInput {
+        deletes_action_hash: ActionHash,
+        chain_top_ordering: ChainTopOrdering,
+    }
+    ```
+
+* `create_link(AnyLinkableHash, AnyLinkableHash, ScopedLinkType, LinkTag) -> ExternResult<ActionHash>`: Records the creation of a link of the given `ScopedLinkType` between the hashes supplied in the first and second arguments, treating the first hash as the base and the second as the target. The fourth `LinkTag` parameter is a struct containing a `Vec<u8>` of arbitrary application bytes.
+
+* `delete_link(ActionHash) -> ExternResult<ActionHash>`: Records the deletion of a link, taking the original link creation action's hash as its input.
+
+* `query(ChainQueryFilter) -> ExternResult<Vec<Record>>`: search the agent's local source chain according to a query filter returning the `Record`s that match. The `ChainQueryFilter` parameter is defined as:
+
+    ```rust
+    struct ChainQueryFilter {
+        sequence_range: ChainQueryFilterRange,
+        entry_type: Option<Vec<EntryType>>,
+        entry_hashes: Option<HashSet<EntryHash>>,
+        action_type: Option<Vec<ActionType>>,
+        include_entries: bool,
+        order_descending: bool,
+    }
+
+    enum ChainQueryFilterRange {
+        // Retrieve all chain actions.
+        Unbounded,
+        // Retrieve all chain actions between two indexes, inclusive.
+        ActionSeqRange(u32, u32),
+        // Retrieve all chain actions between two hashes, inclusive.
+        ActionHashRange(ActionHash, ActionHash),
+        // Retrieve the n chain actions up to and including the given hash.
+        ActionHashTerminated(ActionHash, u32),
+    }
+    ```
 
 #### Capabilites Management
 
-- `create_cap_grant(CapGrantEntry) -> ActionHash`: records a capability claim
-- `create_cap_claim(CapClaimEntry) -> ActionHash`: records a capability grant
-- `update_cap_grant(ActionHash, CapGrantEntry) -> ActionHash`: records updating of a capability grant given its creation ActionHash
-- `delete_cap_grant(ActionHash -> ActionHash`: records deltion of a capability grant given its creation ActionHash
-- `generate_cap_secret() -> CapSecret`: generates a capability secret for use in creating a grant
+The HDK includes convenience functions over `create`, `update`, and `delete` for operating on capability grants and claims:
+
+* `create_cap_grant(ZomeCallCapGrant) -> ExternResult<ActionHash>`
+* `create_cap_claim(CapClaim) -> ExternResult<ActionHash>`
+* `update_cap_grant(ActionHash, ZomeCallCapGrant) -> ExternResult<ActionHash>`
+* `delete_cap_grant(ActionHash) -> ExternResult<ActionHash>`
+
+In addition to these, a function is provided for securely generating capability secrets:
+
+* `generate_cap_secret() -> ExternResult<[u8; 64]>`
+
+It is the application's responsibility to retrieve a stored capability claim using a host function such as `query` and supply it along with a remote call to another agent. As the Conductor at the receiver agent automatically checks and enforces capability claims supplied with remote call payloads, there is no need to retrieve and check a grant against a claim.
 
 #### DHT Data Retrieval
-- `get(Hash) -> Option<Record>`: retrieves a Record from the DHT by specifying its Hash
-- `get_links(AnyLinkableHash, LinkTypeFilter, Option<LinkTag>) -> Vec<Link>`: retrieve a list of links that have been placed on any hash on the DHT, optionally filtering by the links type or tag.
-- `get_agent_activity(AgentHash, ChainQueryFilter, ActivityRequest) -> AgentActivity`: retrieves the activity of an agent from the agent's neighbors on the DHT, where `ActivityResult` is:
-``` rust
-struct AgentActivity {
-    valid_activity: Vec<(u32, ActionHash)>,
-    rejected_activity: Vec<(u32, ActionHash)>,
-    status: ChainStatus,
-    highest_observed: Option<(u32, ActionHash)>,
-    warrants: Vec<Warrant>,
-}
-enum ChainStatus {
-    Empty,
-    Valid(ChainHead),
-    Forked(ChainFork),
-    Invalid(ChainHead),
-}
-```
 
-Note on Performance and ergonomics: In our implementation we have separate `get_details` functions that return not just the content being searched for, but also the actions, and meta-data about entries & links, i.e. deleted/update status as well.
+* `get(AnyDhtHash, GetOptions) -> ExternResult<Option<Record>>`: Retrieve a `Record` from the DHT by its `EntryHash` or `ActionHash`. The content of the record return is dependent on the type of hash supplied:
+    * If the hash is an `Entry` hash, the authority will return the `entry` content paired with its oldest-timestamped `Action`.
+    * If the hash is an `Action` hash, the authority will return the specified action.
+
+    The `GetOptions` parameter is defined as:
+
+    ```rust
+    struct GetOptions {
+        strategy: GetStrategy,
+    }
+
+    enum GetStrategy {
+        Network,
+        Local,
+    }
+    ```
+
+    If `strategy` is `GetStrategy::Network`, the request will always go to other DHT authorities, unless the the requestor is an authority for that basis hash themselves. If `strategy` is `GetStrategy::Local`, the request will always favor the requestor's local cache and will return nothing if the data is not cached.
+
+* `get_details(AnyDhtHash, GetOptions) -> ExternResult<Option<Details>>`: Retrieve all of the addressable data and metadata at a basis hash. The return value is a variant of the following enum, depending on the data stored at the hash:
+
+    ```rust
+    enum Details {
+        Record(RecordDetails),
+        Entry(EntryDetails),
+    }
+
+    struct RecordDetails {
+        record: Record,
+        validation_status: ValidationStatus,
+        deletes: Vec<SignedHashed<Action>>,
+        updates: Vec<SignedHashed<Action>>,
+    }
+
+    enum ValidationStatus {
+        Valid,
+        Rejected,
+        // Could not validate due to missing data or dependencies,
+        // or an exhausted WASM execution budget.
+        Abandoned
+    }
+
+    struct EntryDetails {
+        entry: Entry,
+        actions: Vec<SignedHashed<Action>>,
+        rejected_actions: Vec<SignedHashed<Action>>,
+        deletes: Vec<SignedHashed<Action>>,
+        updates: Vec<SignedHashed<Action>>,
+        entry_dht_status: EntryDhtStatus,
+    }
+
+    enum EntryDhtStatus {
+        Live,
+        // All entry creation actions associated with the entry have been marked as deleted.
+        Dead,
+        // Awaiting validation.
+        Pending,
+        Rejected,
+        Abandoned,
+        // The following are placeholders for unimplemented DHT operations.
+        Conflict,
+        Withdrawn,
+        Purged,
+    }
+    ```
+
+* `get_links(GetLinksInput) -> ExternResult<Vec<Link>>`: Retrieve a list of links that have been placed on any base hash on the DHT, optionally filtering by the links' types and/or tags. The returned list contains only live links; that is, it excludes the links that have `DeleteLink` actions associated with them. The `GetLinksInput` parameter is defined as:
+
+    ```rust
+    struct GetLinksInput {
+        base_address: AnyLinkableHash,
+        link_type: LinkTypeFilter,
+        get_options: GetOptions,
+        tag_prefix: Option<Vec<u8>>,
+        after: Option<Timestamp>,
+        before: Option<Timestamp>,
+        author: Option<AgentHash>,
+    }
+
+    enum LinkTypeFilter {
+        // One link type
+        Types(Vec<(ZomeIndex, Vec<LinkType>)>),
+        // All link types from the given integrity zome
+        Dependencies(Vec<ZomeIndex>),
+    }
+    ```
+
+* `get_link_details(AnyLinkableHash, LinkTypeFilter, Option<LinkTag>, GetOptions) -> ExternResult<LinkDetails>`: Retrieve the link creation _and_ deletion actions at a base. The return value is defined as:
+
+    ```rust
+    struct LinkDetails(Vec<(SignedActionHashed, Vec<SignedActionHashed>)>);
+    ```
+
+    where each element in the vector is a `CreateLink` action paired with a vector of any `DeleteLink` actions that apply to it.
+
+* `count_links(LinkQuery) -> ExternResult<usize>`: Retrieve only the count of live links matching the link query.
+
+* `get_agent_activity(AgentPubKey, ChainQueryFilter, ActivityRequest) -> ExternResult<AgentActivity>`: Retrieve the activity of an agent from the agent's neighbors on the DHT. This functions similar to `query`, but operates on the source chain of an agent _other_ than the requestor. The `ActivityRequest` parameter is defined as:
+
+    ```rust
+    enum ActivityRequest {
+        Status,
+        Full,
+    }
+    ```
+
+    The `AgentActivity` return value is defined as:
+
+    ```rust
+    struct AgentActivity {
+        valid_activity: Vec<(u32, ActionHash)>,
+        rejected_activity: Vec<(u32, ActionHash)>,
+        status: ChainStatus,
+        highest_observed: Option<(u32, ActionHash)>,
+        warrants: Vec<Warrant>,
+    }
+
+    enum ChainStatus {
+        Empty,
+        Valid(ChainHead),
+        Forked(ChainFork),
+        Invalid(ChainHead),
+    }
+
+    struct ChainHead {
+        action_seq: u32,
+        hash: ActionHash,
+    }
+
+    struct ChainFork {
+        fork_seq: u32,
+        first_action: ActionHash,
+        second_action: ActionHash,
+    }
+    ```
+
+    Depending on the value of the `ActivityRequest` argument, `status` may be the only populated field.
+
+[WP-TODO: should I include https://docs.rs/hdk/latest/hdk/validation_receipt/fn.get_validation_receipts.html ?]
 
 #### Introspection
 
-- `agent_info() -> AgentInfo`: returns information about current agent and source chain:
-``` rust
-struct AgentInfo {
-    agent_initial_pubkey: AgentHash,
-    agent_latest_pubkey: AgentHash,
-    chain_head: (ActionHash, u32, Timestamp),
-}
-```
-- `call_info()->CallInfo`: returns contextual information about the current zome call:
-``` rust
-struct CallInfo {
-    provenance: AgentHash,
-    function_name: FunctionName,
-    as_at: (ActionHash, u32, Timestamp),
-    cap_grant: CapGrant,
-}
-```
-- `dna_info() -> DnaInfo` (see HDI)
-- `zome_info() -> ZomeInfo` (see HDI)
+* `agent_info() -> ExternResult<AgentInfo>`: Get information about oneself (that is, the agent currently executing the zome function) and one's source chain, where the return value is defined as:
+
+    ```rust
+    struct AgentInfo {
+        agent_initial_pubkey: AgentHash,
+        agent_latest_pubkey: AgentHash,
+        chain_head: (ActionHash, u32, Timestamp),
+    }
+    ```
+
+* `call_info() -> ExternResult<CallInfo>`: Get contextual information about the current zome call, where the return value is defined as:
+
+    ```rust
+    struct CallInfo {
+        provenance: AgentHash,
+        function_name: FunctionName,
+        // A snapshot of the source chain state at zome call time.
+        as_at: (ActionHash, u32, Timestamp),
+        // The capability grant under which the call is permitted.
+        cap_grant: CapGrant,
+    }
+    ```
+
+* `dna_info() -> ExternResult<DnaInfo>` (see HDI)
+* `zome_info() -> ExternResult<ZomeInfo>` (see HDI)
 
 #### Modularization and Composition
 
-Zomes are intended to be units of composition for application developers.  Thus zome functions MUST be able to make calls to other zome functions, either in the same zome or in other zomes or even DNAs:
+Zomes are intended to be units of composition for application developers. Thus zome functions MUST be able to make calls to other zome functions, either in the same zome or in other zomes or even DNAs:
 
-- `call(TargetDna, ZomeName, FunctionsName, Option<CapSecret>, Payload) -> ZomeCallResponse`: calls a zome function in a target Dna and zome, supplying a CapSecret and a parameter payload.
+* `call<I>(CallTargetCell, ZomeName, FunctionName, Option<CapSecret>, I) -> ZomeCallResponse where I: Serialize`: Call a zome function in a target DNA and zome, supplying a capability and a payload containing the argument to the receiver. The `CallTargetCell` parameter is defined as:
+
+    ```rust
+    enum CallTargetCell {
+        OtherCell(CellId),
+        OtherRole(String),
+        Local,
+    }
+
+    struct CellId(DnaHash, AgentPubKey);
+    ```
 
 #### Scheduling
 
-The HDK SHOULD implement the ability for zome calls tbe scheduled for calling in the future which allows for important application functionality like retries:
+The HDK SHOULD implement the ability for zome calls to be scheduled for calling in the future, which allows for important application functionality like automatic retries.
 
-- `schedule(fn_name: String)`: schedules a zome call for calling at a future time:
-zome calls which are schedulable must take a single `Schedule` parameter which indicates the schedule at which the call was made, and they must also return an `Option<Schedule>` that alows re-scheduling of the same call.
-The `Schedule` type defines either a persisted or ephemeral schedule for a schedule function. Persisted schedules survive a conductor reboot, ephemeral will not. Persisted schedules continue beyond irrecoverable errors, ephemeral do not:
-``` rust
-enum Schedule {
-    Persisted(String),  // a crontab syntax string
-    Ephemeral(Duration),
-}
-```
+* `schedule(str) -> ExternResult<()>`: Schedule a function for calling on the next iteration of the conductor's scheduler loop, and thereafter on a schedule defined by the called function. To be schedulable, a function must have the signature `(Schedule) -> Option<Schedule>`, receiving the schedule on which it was called and returning the schedule (if any) on which it wishes to continue to be called. A `Schedule` is defined as:
+
+    ```rust
+    enum Schedule {
+        Persisted(String),
+        Ephemeral(Duration),
+    }
+    ```
+
+    Where the value of `Persisted` is a UNIX crontab entry and the value of `Ephemeral` is a duration until the next time. Persisted schedules survive conductor restarts and unrecoverable errors, while ephemeral schedules will not. If `None` is returned instead of `Some(Schedule)`, the function will be unscheduled.
+
+    A scheduled function MUST also be **infallible**; that is, it must be marked with the macro `#[hdk_extern(infallible)]` and return an `Option<Schedule>` rather than an `ExternResult<Option<Schedule>>`. This is because there is no opportunity for user interaction with the result of a scheduled function.
 
 #### P2P Interaction
-Agents MUST be able to communicate directly with other agents.  They do so simply by making zome calls to them.  Holochain systems MUST make this possible by sending a call requests over the network and awaiting a response.  For performance reasons the HDK SHOULD also make possible sending of best-effort in parallel signals for which no return result is awaited.
 
-- `call_remote(AgentPubKey, ZomeName, FunctionName, Option<CapSecret>, Payload)->ZomeCallResponse`: calls a zome function on a target agent and zome, supplying a CapSecret and a parameter payload.
-- `remote_signal(Vec<AgentHash>, Payload)`: sends a best-effort signal to a list of agents.  Signals are received by implementing the `recv_remote_signal(Payload)` callback which the Holochain system MUST attempt to call when signals are received.
+Agents MUST be able to communicate directly with other agents. They do so simply by making zome calls to them. Holochain systems MUST make this possible by sending a call requests over the network and awaiting a response. For performance reasons the HDK SHOULD also make possible sending of best-effort in parallel signals for which no return result is awaited.
+
+* `call_remote<I>(AgentPubKey, ZomeName, FunctionName, Option<CapSecret>, I) -> ExternResult<ZomeCallResponse> where I: Serialize`: Call a zome function on a target agent and zome, supplying a capability secret and an arguments payload. The return value is defined as:
+
+    ```rust
+    enum ZomeCallResponse {
+        Ok(ExternIO),
+        Unauthorized(ZomeCallAuthorization, CellId, ZomeName, FunctionName, AgentHash),
+        NetworkError(String),
+        CountersigningSession(String),
+    }
+
+    enum ZomeCallAuthorization {
+        Authorized,
+        BadSignature,
+        BadCapGrant,
+        BadNonce(String),
+        BlockedProvenance,
+    }
+    ```
+
+* `send_remote_signal<I>(Vec<AgentPubKey>, I) -> ExternResult<()> where I: Serialize`: Send a best-effort signal to a list of agents. Signals are received by implementing the `recv_remote_signal(SerializedBytes) -> ExternResult<()>` callback which the Holochain system MUST attempt to call when signals are received.
 
 #### Countersigning
 
-- `accept_countersigning_preflight_request(PreflightRequest)`: Locks the local chain to commence a countersigning session. The `PreflightRequestAcceptance` MUST be sent back to the session initiator so that the corresponding entry can be built for everyone to sign. This function MUST be called by every signer in the signing session. It doesn’t matter how, although concurrent remote calls are probably the simplest mechanism to distribute and accept preflight requests before the session times out.  The preflight request requires the following data (see discussion above on countersigning):
-``` rust
-struct PreflightRequest {
-    // The hash of the app entry, as if it were not countersigned. The final entry hash will include the countersigning session.
-    app_entry_hash: EntryHash,
-    // The agents that are participating in this countersignature session.
-    signing_agents: Vec<(AgentHash, Vec<Role>)>,
-    // The optional additional M of N signers. If there are additional signers then M MUST be the majority of N. If there are additional signers then the enzyme MUST be used and is the first signer in BOTH signing_agents and optional_signing_agents.
-    optional_signing_agents: Vec<(AgentHash, Vec<Role>)>, 
-    // The M in the M of N signers. M MUST be strictly greater than than N / 2 and NOT larger than N.
-    minimum_optional_signing_agents: u8,
-    // The first signing agent (index 0) is acting as an enzyme. If true AND optional_signing_agents are set then the first agent MUST be the same in both signing_agents and optional_signing_agents.
-    enzymatic: bool, 
-    // The session times. Session actions must all have the same timestamp, which is the session offset.
-    session_times: CounterSigningSessionTimes,
-    // The action information that is shared by all agents. Contents depend on the action type, create, update, etc.
-    action_base: ActionBase,
-    // optional arbitrary bytes that can be agreed to.
-    preflight_bytes: PreflightBytes, 
-}
-struct CounterSigningSessionTimes {
-    start: Timestamp,
-    end: Timestamp,
-}
-enum ActionBase {
-    Create(CreateBase),
-    Update(UpdateBase),
-}
-struct Role(u8);
-enum PreflightRequestAcceptance {
-    Accepted(PreflightResponse),
-    UnacceptableFutureStart,
-    UnacceptableAgentNotFound,
-    Invalid(String),
-}
-struct PreflightResponse {
-    request: PreflightRequest,
-    agent_state: CounterSigningAgentState,
-    signature: Signature,
-}
-struct CounterSigningAgentState {
-    /// The index of the agent in the preflight request agent vector.
-    agent_index: u8,
-    /// The current (frozen) top of the agent's local chain.
-    chain_top: ActionHash,
-    /// The action sequence of the agent's chain top.
-    action_seq: u32,
-}
-```
-- `session_times_from_millis(ms: u64)->CountersigningSessionTimes`: a function to create the session times that are included in the `PreflightRequest` and bound the countersigning session temporally. This function starts the session “now” in the opinion of the session initiator and ends it after ms milliseconds relative to “now”. The countersigning parties will check these times as part of accepting the preflight request so all system clocks need to be roughly aligned and the ambient network latency must fit comfortably within the session duration.
+In order to safely facilitate the peer interaction necessary to complete a countersigning among multiple agents, the Ribosome and HDK MUST implement the following functions:
+
+* `accept_countersigning_preflight_request(PreflightRequest) -> ExternResult<PreflightRequestAcceptance>`: Lock the local chain to commence a countersigning session. The `PreflightRequestAcceptance` MUST be sent back to the session initiator so that the corresponding entry can be built for everyone to sign. This function MUST be called by every signer in the signing session. The details of how are left to the application developer (although concurrent remote calls are probably the simplest mechanism to distribute and accept preflight requests before the session times out). The preflight request is defined as (see discussion above on countersigning):
+
+    ```rust
+    struct PreflightRequest {
+        // The hash of the app entry, as if it were not countersigned. The final entry hash will include the countersigning session data.
+        app_entry_hash: EntryHash,
+        // The agents that are participating in this countersignature session.
+        signing_agents: Vec<(AgentHash, Vec<Role>)>,
+        // The optional additional M of N signers. If there are additional signers then M MUST be the majority of N. If there are additional signers then the enzyme MUST be used and is the first signer in BOTH signing_agents and optional_signing_agents.
+        optional_signing_agents: Vec<(AgentHash, Vec<Role>)>,
+        // The M in the M of N signers. M MUST be strictly greater than than N / 2 and NOT larger than N.
+        minimum_optional_signing_agents: u8,
+        // The first signing agent (index 0) is acting as an enzyme. If true AND optional_signing_agents are set then the first agent MUST be the same in both signing_agents and optional_signing_agents.
+        enzymatic: bool,
+        // The window in which countersigning must complete. Session actions must all have the same timestamp, which is the session offset.
+        session_times: CounterSigningSessionTimes,
+        // The action information that is shared by all agents. Contents depend on the action type, create, update, etc.
+        action_base: ActionBase,
+        // Optional arbitrary bytes that can be agreed to.
+        preflight_bytes: PreflightBytes,
+    }
+
+    struct CounterSigningSessionTimes {
+        start: Timestamp,
+        end: Timestamp,
+    }
+
+    enum ActionBase {
+        Create(CreateBase),
+        Update(UpdateBase),
+    }
+
+    // An arbitrary application-defined role in a session.
+    struct Role(u8);
+    ```
+
+    The return value is defined as:
+
+    ```rust
+    enum PreflightRequestAcceptance {
+        Accepted(PreflightResponse),
+        UnacceptableFutureStart,
+        UnacceptableAgentNotFound,
+        Invalid(String),
+    }
+
+    struct PreflightResponse {
+        request: PreflightRequest,
+        agent_state: CounterSigningAgentState,
+        signature: Signature,
+    }
+
+    struct CounterSigningAgentState {
+        // The index of the agent in the preflight request agent vector.
+        agent_index: u8,
+        // The current (frozen) top of the agent's local chain.
+        chain_top: ActionHash,
+        // The action sequence of the agent's chain top.
+        action_seq: u32,
+    }
+    ```
+
+* `session_times_from_millis(u64) -> ExternResult<CounterSigningSessionTimes>`: Create the session times that are included in the `PreflightRequest` and bound the countersigning session temporally. This function returns a session start timestamp is "now" from the perspective of the system clock of the session initiator calling this function, and a session end timestamp that is "now" plus the given number of milliseconds. The countersigning parties will check these times against their own perspectives of "now" as part of accepting the preflight request, so all system clocks need to be roughly aligned, and the ambient network latency must fit comfortably within the session duration.
 
 #### Cryptography
 
-The HDK MUST provide mechanisms for agents to sign data.  It SHOULD provide mechanisms to encrypt and decrypt data and return pseudo-random data:
+The HDK MUST provide mechanisms for agents to sign and check the signatures of data. It SHOULD provide mechanisms to encrypt and decrypt data and return pseudo-random data:
 
-- `sign(Key, Data) -> Signature`: give a public key, request from the key-management system the signing of the given data by the private key.
--`verify_signature()` (see HDI)
-- `encrypt(Key, Data) -> EncryptedData` : give a public key, request from the key-management system the encryption of the given data by the private key.
-- `decrypt(Key, EncryptedData) -> Data` : given a public key and data encrypted with that key's private key, return the decrypted data
-- `random_bytes(number_of_bytes: u32) -> Bytes`: Get N cryptographically strong random bytes.
+* `sign<D>(AgentPubKey, D) -> ExternResult<Signature> where D: Serialize`: Given a public key, request from the key-management system a signature for the given data by the corresponding private key.
+
+* `verify_signature<I>(AgentPubKey, Signature, I) -> ExternResult<bool> where I: Serialize`: (see HDI)
+
+* `x_salsa20_poly1305_shared_secret_create_random(Option<XSalsa20Poly1305KeyRef>) -> ExternResult<XSalsa20Poly1305KeyRef>`: Generate a secure random shared secret suitable for encrypting and decrypting messages using NaCl's [secretbox](https://nacl.cr.yp.to/secretbox.html) encryption algorithm, and store it in the key-management system. An optional key reference ID may be given; if this ID already exists in the key-management system, an error will be returned. If no ID is given, one will be generated and returned. The key reference is defined as:
+
+    ```rust
+    struct XSalsa20Poly1305KeyRef(u8);
+    ```
+
+* `x_salsa20_poly1305_encrypt(XSalsa20Poly1305KeyRef, Vec<u8>) -> ExternResult<XSalsa20Poly1305EncryptedData>`: Given a reference to a symmetric encryption key stored in the key-management service, request the encryption of the given bytes with the key. The return value is defined as:
+
+    ```rust
+    struct XSalsa20Poly1305EncryptedData {
+        nonce: [u8; 24],
+        encrypted_data: Vec<u8>,
+    }
+    ```
+
+* `x_salsa20_poly1305_decrypt(XSalsa20Poly1305KeyRef, XSalsa20Poly1305EncryptedData) -> ExternResult<Option<Vec<u8>>`: Given a reference to a symmetric encryption key, request the decryption of the given bytes with the key.
+
+* `create_x25519_keypair() -> ExternResult<X25519PubKey>`: Create an X25519 keypair suitable for encrypting and decryptiong messages using NaCl's [box](https://nacl.cr.yp.to/box.html) algorithm, and store it in the key-management service. The return value is defined as:
+
+    ```rust
+    struct X25519PubKey([u8; 32]);
+    ```
+
+* `x_25519_x_salsa20_poly1305_encrypt(X25519PubKey, X25519PubKey, Vec<u8>) -> ExternResult<XSalsa20Poly1305EncryptedData>`: Given X25519 public keys for the sender and recipient, attempt to encrypt the given bytes via the box algorithm using the sender's private key stored in the key-management service and the receiver's public key.
+
+* `x_25519_x_salsa20_poly1305_decrypt(X25519PubKey, X25519PubKey, Vec<u8>) -> ExternResult<XSalsa20Poly1305EncryptedData>`: Given X25519 public keys for the recipient and sender, attempt to decrypt the given bytes via the box algorithm using the sender's public key and the receiver's private key stored in the key-management service.
+
+* `ed_25519_x_salsa20_poly1305_encrypt(AgentPubKey, AgentPubKey, XSalsa20Poly1305Data) -> ExternResult<XSalsa20Poly1305EncryptedData>`: Attempt to encrypt a message using the box algorithm, converting the Ed25519 signing keys of the sender and recipient agents into X25519 encryption keys. This procedure is [not recommended](https://doc.libsodium.org/quickstart#how-can-i-sign-and-encrypt-using-the-same-key-pair) by the developers of libsodium, the NaCl implementation used by Holochain.
+
+* `ed_25519_x_salsa20_poly1305_decrypt(AgentHash, AgentHash, XSalsa20Poly1305EncryptedData) -> ExternResult<XSalsa20Poly1305Data>`: Attempt to decrypt a message using the box algorithm, converting the Ed25519 signing keys of the receipient and sender agents into X22519 encryption keys. This procedure is [not recommended](https://doc.libsodium.org/quickstart#how-can-i-sign-and-encrypt-using-the-same-key-pair) by the developers of libsodium, the NaCl implementation used by Holochain.
 
 #### User Notification
 
-The HDK SHOULD provide a way for zome code to notify the application user of events.  To start with we have implemented a system where:
+The HDK SHOULD provide a way for zome code to notify the application user of events. To start with we have implemented a system where signals can be emitted from a zome:
 
-- `emit_signal(Signal)` : emits the SIGNAL
+* `emit_signal<I>(I) -> ExternResult<()> where I: Serialize`: Emit the bytes as a signal to listening clients.
 
 #### Anchors and Paths
 
-A content addressable store accessible only by the hash of stored items is difficult to search beacuse of the sparse nature of the hashes.  Holochain's graphing DHT makes it much easier to retrieve related information via the affordance of links that can be retrieved from a give hash address.  A powerful pattern that can be built on top of links, is what we call anchors and, more genrally, paths.  These patterns rely on the idea of starting from a known hash value that all parties can compute, and placing links from that hash to relevant entries.  So, for example, one could take the hash of the string `#funnycats` and add links on that hash to all entries in a social media app that are posts containing that hashtag.  The anchor pattern uses the idea of anchor types and anchors and affords search for registered types and anchors of those types. The path pattern simply generalizes this to creating an aribrary hierarchical tree of known values off of which to create links in the DHT.
+A content-addressable store, accessible only by the hashes of stored items, is difficult to search beacuse of the sparse nature of the hashes. Holochain's graph DHT makes it much easier to retrieve related information via the affordance of links that can be retrieved from a given hash address. A powerful pattern that can be built on top of links is what we call anchors and, more generally, paths. These patterns rely on the idea of starting from a known hash value that all parties can compute, and placing links from that hash to relevant entries. So, for example, one could take the hash of the string `#funnycats` and add links on that hash to all posts in a social media app that contain that hashtag. This pattern, the anchor pattern, affords the discovery of arbitray collections or indexes of content-addressed data. The path pattern simply generalizes this to creating an aribrary hierarchical tree of known values off of which to create links in the DHT.
+
+A note about efficiency: Because every attempt to create an entry or link results in another record that needs to be validated and stored, implementations of this pattern SHOULD attempt to be idempotent when creating anchors or tags; that is, they should check for the prior existence of the links and entries that would be created before attempting to create them. It is both semantically and practically appropriate to hash the anchor or path string in-memory and wrap it in an `ExternalHash` for link bases and targets, as this avoids the the overhead of creating an entry, and the hash, which exists only in memory, can truly be said to be external to the DHT.
 
 ##### Anchors
 
-The HDK MAY provide functions to compute hashes from know strings using the anchor pattern, which creates a two level hierarchy of anchor types and anchors off of which to link entries:
+The HDK MAY provide functions to compute hashes from, and attach links to, known strings using the anchor pattern, which creates a two-level hierarchy of anchor types and anchors from which to link entries:
 
-- `anchor(link_type: LinkType, anchor_type: String, anchor_text: String) -> EntryHash`: Returns an anchor's hash.
-- `list_anchor_type_addresses(
-    link_type: LinkType,
-    anchor_type: String,
-    anchor_text: String
-) -> Vec<AnyLinkableHash>` : Returns every entry hash in a vector from the root of an anchor.
-- `list_anchor_addresses (
-    link_type: LinkType,
-    anchor_type: String
-) -> Vec<AnyLinkableHash>`: Returns every entry hash in a vector from the second level of an anchor.
+* `anchor(ScopedLinkType, String, String) -> ExternResult<EntryHash>`: Create an anchor type and/or anchor, linking from the 'root' anchor to the anchor type, and from the type to the anchor (if given). Return the anchor's hash.
+
+* `list_anchor_type_addresses(ScopedLinkType) -> ExternResult<Vec<AnyLinkableHash>>`: Retrieve the hashes of all anchor types created in the DHT. This permits ad-hoc runtime creation and discovery of anchor types.
+
+* `list_anchor_addresses(LinkType, String) -> ExternResult<Vec<AnyLinkableHash>>`: Retrieve the hashes of all anchors for a given type.
 
 ##### Paths
 
-The HDK MAY provide functions to compute hashes from know strings using the paths pattern, which affords an arbitrary hierarchy of known hashes off of which to link entries:  
-``` rust
-struct struct Path(Vec<Component>)
+The HDK MAY provide functions to compute hashes from, and attach links to, known strings using the path pattern, which affords an arbitrary hierarchy of known hashes off of which to link entries:
+
+```rust
+struct Path(Vec<Component>);
+
+struct Component(Vec<u8>);
+
+struct TypedPath {
+    link_type: ScopedLinkType,
+    path: Path,
+}
 ```
-- `path_root() -> AnyLinkableHash`: returns the root hash of the path hierarchy off of which one can search for any previously registered paths, e.g. `path_children(path_root())` will find all top-level paths.
-- `path_create(Path)`: creates path entries and links for every component of the path
-- `path_entry_hash(Path) -> EntryHash`: returns the entry hash of a given path which can then be used to search for items linked off of that part of the path tree
-- `path_exists(Path) -> bool`: returns whether a path entry exists at the Path hash
-- `path_links(Path) -> Vec<Link>`: returns all the non-path links on a given path
-- `path_children(Path) -> Vec<Path>`: returns the path of all the children below this given path
+
+* `root_hash() -> ExternResult<AnyLinkableHash>`: Compute and return the root hash of the path hierarchy, from which one can search for any previously registered paths; e.g. `path_children(path_root())` will find all top-level paths. The bytes that make up the root node SHOULD be reasonably unique and well-known in order to avoid clashes with application data; our implementation uses the bytes `[0x00, 0x01]`.
+* `Path::path_entry_hash() -> ExternResult<EntryHash>`: Return the hash of a given path, which can then be used to search for items linked from that part of the path tree. Note that, in our implementation, entries are not created, so the underlying links forming the path hierarchy will use `ExternalHash` in their bases and targets. Practically, though, this does not matter, as `get_links` does not need a correctly typed basis hash in order to retrieve links. [WP-TODO: Is this actually true?]
+* `TypedPath::ensure() -> ExternResult<()>`: Create links for every component of the path, if they do not already exist. This method SHOULD attempt to be idempotent, and, if it uses `ExernalHash` for nodes rather than creating entries, MAY create a link from the root hash to itself in order to mark the root component as created. [WP-TODO: Is this true? Also, is it necessary? ideally `ensure` should be a no-op for the root hash, because it implicitly always exists]
+* `TypedPath::exists() -> ExternResult<bool>`: Look for the existence in the DHT of all the path's components, and return true if all components exist.
+* `TypedPath::children() -> ExternResult<Vec<Link>>`: Retrieve the links to the path's direct descendants. Note that these are _not_ links to app-defined data but to nodes in the path hierarchy. App-defined data is expected to be linked to and retrieved from the path node's hash via the HDK's `create_link` and `get_links` functions.
+* `TypedPath::children_details() -> ExternResult<Vec<LinkDetails>>`: Retrieve details about the links to the path's direct descendants. This is equivalent to the HDK's `get_link_details` function.
+* `TypedPath::children_paths() -> ExternResult<Vec<TypedPath>>`: Retrieve the path's direct descendant nodes in the hierarchy as `TypedPath` values.
 
 ## Holochain State Manager
 
-The previous section describes the functions exposed callable from DNA code such that developers can implement the integrity of a DNA (it's structure and validation rules) and the functions that can be called on that integrity for authoring source chain entries and coherently retrieving that information from the application's DHT.  This section describes in the implementation requirements for recording and storing all aspects of Holochain's state.  This includes agent's source-chain entries, the portion of the DHT data an node is holding, configuration data, caches, etc. 
+The previous section describes the functions exposed to, and callable from, DNA code, such that developers can implement the integrity of a DNA (its structure and validation rules) and the functions that can be called on that integrity for authoring source chain entries and coherently retrieving that information from the application's DHT. This section describes the implementation requirements for recording and storing all aspects of Holochain's state. This includes agents' source-chain entries, the portion of the DHT data a node is holding, configuration data, caches, etc.
 
 ### Requirements
 
-1. The State Manager MUST store the entries created during zomes calls to a local database using ACID transactions such that all entries created in the zome call are committed to the databse at once, or none are in the case of failures.  Failures may include the usual failures of power-loss, or error conditions returned in the code itself, but more importantly include the condition in which a different zome call running in parallel has completed it's commits before the given zome call completes advancing the head of the local source chain.
-1. The State Manager MUST be able to retrieve queries on the source chain from the point of view of the calling context.  For example, assume a zome call in progress in which some entries have been added to the chain.  Calling `query()` or `get()` should return those commited entries despite the fact that they many not yet have actually been committed to the "real" chain as the zome call has not finished and all of those entries may yet be discarded if another zome call compeletes first.  
+1. The State Manager MUST store the entries created during coordinator zome calls to a local database using ACID transactions such that all entries created in the zome call are committed to the database at once, or none are committed in the case of failures. Failures may include the usual failures of power-loss, or error conditions returned in the code itself (including validation errors discovered once the zome call has completed and passed control to the validation functions for the written data), but more importantly the condition in which a different zome call running in parallel has completed its commits before the given zome call completes, advancing the head of the local source chain.
+1. The State Manager MUST be able to retrieve queries on the source chain from the point of view of the calling context. For example, assume a zome call is in progress in which some entries have been added to the chain. Calling `query()` or `get()` should return those commited entries despite the fact that they many not yet have actually been committed to the "real" chain, as the zome call has not finished and all of those entries may yet be discarded if another zome call compeletes first.
 1. The State Manager MUST be able to manage the state of many DNAs simultaneously.
 
 ### Storage Types
 
 The State Manager MUST be able to manage the peristence of the following data elements:
 
-- `DhTOp` : a DhTOp and it's hash, dependencies (Entry/Action Hashes), validation status and stage, integration and last_publish timestamps
-- `Record`: an Action and Entry pair
-- `SignedValidationReceipt`: a proof-of-validation receipt from another node regarding a Record
-- `DnaWasm` : the WASM code of a DNA
-- `DnaDef` : the modifiers that get hashed along with a DNA to create the hash of a specific application instance
-- `Schedule`: a scheduled function request such that scheduled zome-calls can be implemented.
-- `ConductorState`: the state of all installed DNAs and their status
+* `DhtOp` : a DhtOp and its hash, dependencies (entries, actions, and contiguous source chain records referenced by hash), validation status and stage, integration, and last published timestamps
+* `Record`: an Action and Entry pair
+* `SignedValidationReceipt`: a proof-of-validation receipt from another node regarding a Record
+* `DnaWasm` : the WASM code of a DNA
+* `DnaDef` : the modifiers that get hashed along with a DNA to create the hash of a specific application instance
+* `Schedule`: a scheduled function request such that scheduled zome-calls can be implemented.
+* `ConductorState`: the state of all installed DNAs and their status
+
 ![](workflows.png)
 
 ### State Manager Subsystems [WP-TODO: ACB (name and sketch out missing subsystems)]
 
 #### Validation Queue [WP-TODO: ACB]
-####  [WP-TODO: ACB]
+#### [WP-TODO: ACB]
 
 ## Shared Data (rrDHT)
 
-In this section we detail some important implementation details of Holochain's graphing DHT.
+In this section we detail some important implementation details of Holochain's graph DHT.
 
 ### DHT Op Transforms
 
-#### Structure of DHTOps
+#### Structure of DhtOps
 
-You can think of an topological transform operation as having this sort of grammar:
-$BaseHash, ActionType, Predicate, Payload$ 
+You can think of a topological transform operation as having this sort of grammar:
 
-Where: 
- - $BaseHash$ is the address to which an action is being applied. 
- - $ActionType$ is the type of action a node is responsible for performing
- - $Predicate$ is the additional data fields needed to determine action, such as link_to action (e.g. $+ \scriptsize \xrightarrow{\text{header}} h_E$)
- - $Payload$ is the self-proving structure of entry_with_action. 
+$BasisHash, TransformType, Payload$
 
+Where:
 
-The technical implementation below of the human-friendly grammar above compresses and drops unnecessary items where possible. There are a couple of ActionTypes where we can drop the entry (but never the action), we can crunch all the data down to Action + an ActionType enum struct which usually contains the entry.
+* $BasisHash$ is the address to which a transform is being applied.
+* $TransformType$ is the type of transform a node is responsible for performing.
+* $Payload$ is the self-proving structure which contains the data needed to perform the transform. In all cases this includes the `Action`; it may also include the `Entry` if such a thing exists for the action type and is required to validate and perform the transform.
 
-The BaseHash (or hash neighborhood we're sending to) can be derived from the payload using the hash_hood function outlined below. And Predicates just kind of disappear because we can pull the required data from either the entry or action.
+The technical implementation below of the human-friendly grammar above compresses and drops unnecessary items where possible. There are a couple of $TransformType$ where we can drop the entry (but never the action); in these cases we can reduce all the data down to `Action` + an $TransformType$ enum struct which usually contains the entry.
+
+The basis hash (or hash neighborhood we're sending the transform to) can be derived from the payload using the `dht_basis` function outlined below.
 
 ```rust
-
-// Ops that start with Store, store new base data
-//Ops starting with Register, attach metadata to existing base data     
-enum DHTOp {
-    #[cfg(strict)] // if there is a strict mode where nodes that hold headers also validate entries
-    StoreElement(Signature, Header, Option<Entry>),
-    StoreEntry(Signature, NewEntryHeader, Entry),
-    RegisterAgentActivity(Signature, Header),
-    RegisterUpdatedBy(Signature, header::Update, Option<Entry>),
-    RegisterUpdatedEntryHeader(Signature, header::Update),
-    RegisterDeletedBy(Signature, header::Delete),
-    RegisterDeletedEntryHeader(Signature, header::Delete),
-    RegisterAddLink(Signature, header::CreateLink),
-    RegisterRemoveLink(Signature, header::DeleteLink),
+enum DhtOp {
+    ChainOp(ChainOp),
+    WarrantOp(WarrantOp),
 }
 
-impl DHTOp {
-    fn neighborhood(self) -> AnyDhtHash {
+impl DhtOp {
+    fn dht_basis(self) -> AnyLinkableHash {
+    match self {
+        Self::ChainOp(op) => op.dht_basis(),
+        Self::WarrantOp(op) => op.dht_basis(),
+    }
+  }
+}
+
+// Ops that start with `Store` store new addressable content at the basis hash.
+// Ops starting with `Register` attach metadata to the basis hash.
+enum ChainOp {
+    StoreRecord(Signature, Record, RecordEntry),
+    StoreEntry(Signature, NewEntryAction, Entry),
+    RegisterAgentActivity(Signature, Action),
+    RegisterUpdatedContent(Signature, action::Update, RecordEntry),
+    RegisterUpdatedRecord(Signature, action::Update, RecordEntry),
+    RegisterDeletedBy(Signature, action::Delete),
+    RegisterDeletedEntryAction(Signature, action::Delete),
+    RegisterAddLink(Signature, action::CreateLink),
+    RegisterRemoveLink(Signature, action::DeleteLink),
+}
+
+impl ChainOp {
+    fn dht_basis(self) -> AnyLinkableHash {
         match self {
-            StoreElement(header) => hash(header),
-            StoreEntry(entry) => hash(entry),
-            RegisterAgentActivity(header) => header.author(),
-            RegisterUpdatedBy(header) => header.original_header_address,
-            RegisterUpdatedEntryHeader(Signature, header::Update) => header.original_entry_address,
-            RegisterDeletedBy(header) => header.deletes_address,
-            RegisterDeletedEntryHeader(header) => header.deletes_entry_address,
-            RegisterAddLink(header) => header.base_address,
-            RegisterRemoveLink(header) => header.base_address,
+            StoreRecord(_, action, _) => hash(action),
+            StoreEntry(_, action, _) => hash(action.entry),
+            RegisterAgentActivity(_, action) => header.author(),
+            RegisterUpdatedContent(_, action, _) => action.original_entry_address,
+            RegisterUpdatedRecord(_, action, _) => action.original_action_address,
+            RegisterDeletedBy(_, action) => action.deletes_address,
+            RegisterDeletedEntryAction(_, action) => action.deletes_entry_address,
+            RegisterAddLink(_, action) => action.base_address,
+            RegisterRemoveLink(_, action) => action.base_address,
         }
     }
-    
-    from(commit) {
-        ... construct DHT Op Transform
+}
+
+struct WarrantOp(Signed<Warrant>);
+
+struct Warrant {
+    proof: WarrantProof,
+    // The author of the warrant.
+    author: AgentHash,
+    timestamp: Timestamp,
+}
+
+enum WarrantProof {
+    ChainIntegrity(ChainIntegrityWarrant),
+}
+
+impl WarrantProof {
+    fn dht_basis(self) -> AnyLinkableHash {
+        self.action_author()
     }
+
+    fn action_author(self) -> AgentPubKey {
+        match self {
+            Self::ChainIntegrity(w) => match w {
+                ChainIntegrityWarrant::InvalidChainOp { action_author, .. } => action_author,
+                ChainIntegrityWarrant::ChainFork { chain_author, .. } => chain_author,
+            },
+        }
+    }
+}
+
+enum ChainIntegrityWarrant {
+    InvalidChainOp {
+        action_author: AgentHash,
+        action: (ActionHash, Signature),
+        validation_type: ValidationType,
+    },
+    ChainFork {
+        chain_author: AgentHash,
+        action_pair: ((ActionHash, Signature), (ActionHash, Signature)),
+    },
 }
 ```
 
-#### Uniquely hashing transform ops when they are redundant [WP-TODO: ACB (convert to MAY or SHOULD)]
+#### Uniquely Hashing Transform Ops [WP-TODO: ACB (convert to MAY or SHOULD)]
 
-We then use a carefully crafted hash to uniquely identify the DHT transform. There are a few important requirements in producing this hash. These hashes are keys in the Integrated DHT Ops database, which includes all authored or held entries that have gone through validation and are stored in the CAS. (Note: We don't need to store the entires/headers in this DB since it contains the addresses for pulling them from the CAS.)
+We then use a carefully crafted hash to uniquely identify the DHT transform itself, so peers can avoid exchanging redundant transforms for a given basis hash. There are a few important requirements in producing this hash. These hashes are keys in the Integrated DHT Ops database, which includes all authored or held entries that have gone through validation and are stored in the Content-Addressable Store (CAS) database. (Note: We don't need to store the entries/headers in this DB since it contains the addresses for pulling them from the CAS.)
 
-When items are gossiped/published to us, we can quickly check 1. Is the BaseHash in our hold range? 2. Have we integrated it yet? and quickly take appropriate action. 
+When items are gossiped/published to us, we can quickly check:
 
-The content hashed into each of these identifiers is designed to include only the necessary and sufficient inputs to produce unique hashes for performing a NEW transform -- only when there's a new hash. It is intentionally possible for new actions from different agents to produce an Op_transform_hash that has already been integrated. This would indicate there are no changes for that the node to perform. (e.g. RegisterDeletedBy uses only hashes the deletion entry, because if Agent A holds the entry being deleted, it only needs to register a link to "Deleted by" that deletion entry hash. If Agents B and C come along and also delete that same entry, no new data needs to be integrated for this transform on Agent A, because they produce the same deletion entry hash and there's already a pointer to it. However, Agents holding the deletion entry itself will need to store all three headers as provenances of the deletion action, so StoreEntry hashes the header to identify if you need to perform the transform.)
+1. Do we consider ourselves an authority for this basis hash?
+2. Have we integrated it yet?
 
-The following code outlines the minimal necessary contents to create the correct transform hash. 
+and quickly take appropriate action.
 
+[WP-TODO: I'm pretty sure the following paragraph is incorrect now that some entries are squished into headers, and I don't think it could even be made correct because it talks about how various basis hashes are transformed, and certain transforms (e.g., for deletes) no longer exist.]
+
+The content hashed into each of these identifiers is designed to include only the necessary and sufficient inputs to produce unique hashes for performing a _new_ transform -- only when there's a new hash. It is intentionally possible for new actions from different agents to produce an Op_transform_hash that has already been integrated. This would indicate there are no changes for that the node to perform. (e.g. RegisterDeletedBy uses only hashes the deletion entry, because if Agent A holds the entry being deleted, it only needs to register a link to "Deleted by" that deletion entry hash. If Agents B and C come along and also delete that same entry, no new data needs to be integrated for this transform on Agent A, because they produce the same deletion entry hash and there's already a pointer to it. However, Agents holding the deletion entry itself will need to store all three headers as provenances of the deletion action, so StoreEntry hashes the header to identify if you need to perform the transform.)
+
+The following code outlines the minimal necessary contents to create the correct transform hash. The basic procedure for all transforms is:
+
+1. Drop all data from the transform except the action.
+2. Wrap the action in a variant of a simplified enum representing the minimal data needed to uniquely identify the transform, thus allowing it to be distinguished from other transforms derived from the same action.
+3. Serialize and hash the simplified value.
 
 ```rust
-#[derive(Hash)]
-enum HashReadyForm<'a> {
-    // optimization: don't hash signature. it is redundant with header and therefore wastes hash time to include
-    StoredHeader { header_content: &'a HeaderContent },
-    StoredEntry { header_content: &'a HeaderContent },
-    RegisteredAgentActivity { header_content: &'a HeaderContent },
-    RegisteredUpdatedTo { entry: &'a EntryContent, replaces: &'a Address },
-    RegisteredDeletedBy { entry: &'a DeleteEntry },
-    RegisteredAddLink { header_content: &'a HeaderContent },
-    // ^ future work: encode idempotency in LinkAdd entries themselves
-    RegisteredRemoveLink { header_content: &'a HeaderContent },
-    // ^ if LinkAdds were idempotent then this could just be entry.
+enum ChainOpUniqueForm {
+    StoreRecord(Action),
+    StoreEntry(NewEntryAction),
+    RegisterAgentActivity(Action),
+    RegisterUpdatedContent(action::Update),
+    RegisterUpdatedRecord(action::Update),
+    RegisterDeletedBy(action::Delete),
+    RegisterDeletedEntryAction(action::Delete),
+    RegisterAddLink(action::CreateLink),
+    RegisterRemoveLink(action::DeleteLink),
 }
 
-fn unique_hash(op: &DHTOp) -> HashReadyForm<'_> {
-   let DHTOp {Header(header_content, ..), data} = op;
-   match data {
-        use OpData::*;
-        StoreHeader { .. } => HashReadyForm::StoredHeader { header_content },
-        StoreEntry { .. } => HashReadyForm::StoredEntry { header_content },
-        RegisterAgentActivity => HashReadyForm::RegisteredAgentActivity { header_content },
-        RegisterUpdatedTo { entry } => HashReadyForm::RegisteredUpdatedTo { entry, header.replaces()},
-        RegisterDeletedBy { entry } => HashReadyForm::RegisteredDeletedBy { entry },
-        RegisterAddLink { .. } => HashReadyForm::RegisteredAddLink { header_content },
-        RegisterRemoveLink { .. } => HashReadyForm::RegisteredRemoveLink { header_content },
+impl ChainOp {
+    fn as_unique_form(self) -> ChainOpUniqueForm {
+        match self {
+        Self::StoreRecord(_, action, _) => ChainOpUniqueForm::StoreRecord(action),
+        Self::StoreEntry(_, action, _) => ChainOpUniqueForm::StoreEntry(action),
+        Self::RegisterAgentActivity(_, action) => {
+            ChainOpUniqueForm::RegisterAgentActivity(action)
+        }
+        Self::RegisterUpdatedContent(_, action, _) => {
+            ChainOpUniqueForm::RegisterUpdatedContent(action)
+        }
+        Self::RegisterUpdatedRecord(_, action, _) => {
+            ChainOpUniqueForm::RegisterUpdatedRecord(action)
+        }
+        Self::RegisterDeletedBy(_, action) => ChainOpUniqueForm::RegisterDeletedBy(action),
+        Self::RegisterDeletedEntryAction(_, action) => {
+            ChainOpUniqueForm::RegisterDeletedEntryAction(action)
+        }
+        Self::RegisterAddLink(_, action) => ChainOpUniqueForm::RegisterAddLink(action),
+        Self::RegisterRemoveLink(_, action) => ChainOpUniqueForm::RegisterRemoveLink(action),
+        }
+    }
+}
+
+trait HashableContent {
+    type HashType: HashType;
+
+    fn hash_type(self) -> Self::HashType;
+
+    fn hashable_content(self) -> HashableContentBytes;
+}
+
+impl HashableContent for DhtOp {
+    type HashType = hash_type::DhtOp;
+
+    fn hash_type(self) -> Self::HashType {
+        hash_type::DhtOp
+    }
+
+    fn hashable_content(self) -> HashableContentBytes {
+        match self {
+            DhtOp::ChainOp(op) => op.hashable_content(),
+            DhtOp::WarrantOp(op) => op.hashable_content(),
+        }
+    }
+}
+
+impl HashableContent for ChainOp {
+    type HashType = hash_type::DhtOp;
+
+    fn hash_type(self) -> Self::HashType {
+        hash_type::DhtOp
+    }
+
+    fn hashable_content(self) -> HashableContentBytes {
+        HashableContentBytes::Content(
+            self.as_unique_form().try_into()
+        )
+    }
+}
+
+impl HashableContent for WarrantOp {
+    type HashType = hash_type::DhtOp;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::DhtOp
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        self.warrant().hashable_content()
+    }
+}
+
+impl HashableContent for Warrant {
+    type HashType = holo_hash::hash_type::Warrant;
+
+    fn hash_type(&self) -> Self::HashType {
+        Self::HashType::new()
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        HashableContentBytes::Content(self.try_into())
     }
 }
 ```
 
-
 ### Fast Push vs. Slow Heal
-[WP-TODO: ACB  any implementation details here?  The main idea was described above]
+
+[WP-TODO: ACB any implementation details here? The main idea was described above]
 Publish(multicast) --> author collects validation receipts
 Gossip(direct) --> ongoing aliveness & resilience based on uptime data
 
@@ -644,340 +1337,489 @@ See workflows with state data across multiple LMDB tables. [WP-TODO: ACB fixme n
 
 ```graphviz
 digraph {
-node [fontname=Courier] //All nodes 
-edge [color=Blue] //All the line
+    node [fontname=Courier] //All nodes
+    edge [color=Blue] //All the line
 
-Committed->Transformed->Pushing->Published
-Transformed [label="Locally Transformed to DHTOps & Metadata"]
-Committed [label="Committed to Local Source Chain"]
-Pushing [label="Collecting Validation Receipts (Fast Push Phase)"]
-Published [label="Published to Network (Received R Receipts)"]
-{rank=same; Published} // Same level
+    Committed->Transformed->Pushing->Published
+    Transformed [label="Locally Transformed to DHTOps & Metadata"]
+    Committed [label="Committed to Local Source Chain"]
+    Pushing [label="Collecting Validation Receipts (Fast Push Phase)"]
+    Published [label="Published to Network (Received R Receipts)"]
+    {rank=same; Published} // Same level
 }
 ```
-### Validation queue state graph
+
+### Validation Queue State Graph
+
 These are the state changes in the validation workflow.
 
 **"Subconscious" Validation Rules:** Certain types of validation must be universally enforced by Holochain core rather than application logic. For example, valid state transitions from the graph above...
 
 #### Validation State Diagram
-Elements whose provenance cannot be validated (in other words, their headers don't have valid signatures or authors) are dropped early in the validation process as counterfeit/garbage/spam data.
+
+Transforms whose provenance cannot be validated (in other words, they don't have valid signatures or authors) are dropped early in the validation process as counterfeit/garbage/spam data.
+
+[WP-TODO: I don't know what sorts of things this graph is supposed to represent. Most of these identifiers don't appear in the codebase.]
 
 ```graphviz
 digraph {
-node [fontname=Courier] //All nodes 
-edge [color=Blue] //All the lines
-//Queued, SysValidated, AwaitingDeps, SendingReceipts, SendingWarrants, ResourceOverflow
+    node [fontname=Courier] //All nodes
+    edge [color=Blue] //All the lines
+    //Queued, SysValidated, AwaitingDeps, SendingReceipts, SendingWarrants, ResourceOverflow
 
-ValidationStatus[shape=none color=Blue]
-Pending->{SysValidated Rejected Abandoned}
-SysValidated->{AwaitingDeps Rejected Abandoned}
-AwaitingDeps->{Valid Rejected Abandoned}
+    ValidationStatus[shape=none color=Blue]
+    Pending->{SysValidated Rejected Abandoned}
+    SysValidated->{AwaitingDeps Rejected Abandoned}
+    AwaitingDeps->{Valid Rejected Abandoned}
 
-{rank=same; ValidationStatus Valid Rejected Abandoned}
+    {rank=same; ValidationStatus Valid Rejected Abandoned}
 }
 ```
-**Abandoned Status:** DHT transforms whose validation process has been abandoned, are not gossiped. There are TWO reasons to abandon validation. Both have to do with consuming too much resources.
- 1. It has stayed in our validation queue too long without being able to resolve dependencies. That means we've been creating network traffic every few minutes for some long period of time (week? month?) trying to resolve dependencies, and we are no longer going to waste our compute time and generate network noise for this.
+
+**Abandoned Status:** DHT transforms whose validation process has been abandoned are not gossiped. There are two reasons to abandon validation. Both have to do with consuming too much resources.
+
+ 1. It has stayed in our validation queue too long without being able to resolve dependencies. That means we've been creating network traffic every few minutes for some long period of time trying to resolve dependencies, and we are no longer going to waste our compute time and generate network noise for this.
  2. The app validation code used more resources (CPU, memory, bandwidth) than we allocate for validation. This lets us address the halting problem of validation with infinite loops.
 
 #### Integration State Diagram [WP-TODO: ACB ( here in implementation or up in formalization?)]
+
 All elements that complete the validation process need to be integrated into the data store with their associated validation result. Note: We do not store or gossip the Entries** which were Abandoned (only the Actions).
+
+[WP-TODO: This enum doesn't exist anywhere in the codebase. That, or the values `Integrating`, `SendingReceipts`, and `SendingWarrants` don't appear, and it's not clear what `ValidationStatus` is doing there.]
+
 ```graphviz
 digraph {
-node [fontname=Courier] //All nodes 
-edge [color=Blue] //All the lines
+    node [fontname=Courier] //All nodes
+    edge [color=Blue] //All the lines
 
+    ValidationStatus->Integrating
+    Integrating->{Live Rejected Abandoned} [color=Green label="EntryDhtStatus"]
+    Abandoned -> SendingReceipts
+    Live->SendingReceipts
+    Rejected->SendingWarrants
 
-ValidationStatus->Integrating
-Integrating->{Live Rejected Abandoned} [color=Green label="EntryDhtStatus"]
-Abandoned -> SendingReceipts
-Live->SendingReceipts
-Rejected->SendingWarrants
-
-{rank=same;SendingWarrants SendingReceipts}
+    {rank=same;SendingWarrants SendingReceipts}
 }
 ```
 
-#### Using EntryDhtStatus to Track Liveness of Data [WP-TODO: ACB ( here in implementation or up in formalization?)]
-You can see these EntryDhtStatuses generated from the validation states above. The later states happen when an entry is updated/deleted or when a partition conflict is detected.
+#### Tracking Liveness of Data
 
-Once a header/element has been deleted...
+You can see these `EntryDhtStatus`es generated from the validation states above.
 
-An Entry is considered deleted/not live when ALL of the headers which created the entry have been deleted.
+An Entry is considered deleted/not live when ALL of the Actions which created the Entry have been deleted.
+
+[WP-TODO: Is this what `Conflict` is for? I'm guessing it actually has something to do with an as-yet non-existent `Redirect` action. I'm also not clear what's going on in this diagram -- it looks like a state diagram; is it customary to include the things that trigger state changes in diagrams like this? looking at examples online; it does seem like graph edges are labelled with trigger conditions]
+
 ```graphviz
 digraph {
-node [fontname=Courier] //All nodes 
-edge [] //All the lines
+    node [fontname=Courier] //All nodes
+    edge [] //All the lines
 
+    Pending->{Live Rejected Abandoned} [color=Green]
+    Live->{Dead}->Conflict
+    Live->Conflict
+    Conflict->{Live Dead Rejected} [color=Blue]
 
-Pending->{Live Rejected Abandoned} [color=Green]
-Live->{Dead}->Conflict
-Live->Conflict
-Conflict->{Live Dead Rejected} [color=Blue]
+    Withdrawn [shape="box"]
+    Purged [shape="box"]
 
-Withdrawn [shape="box"]
-Purged [shape="box"]
-
-{rank=same;Live Rejected Abandoned}
-{rank=same; Dead}
-{rank=same;Conflict Withdrawn Purged}
+    {rank=same;Live Rejected Abandoned}
+    {rank=same; Dead}
+    {rank=same;Conflict Withdrawn Purged}
 }
 ```
-Withdrawn and Purged are placeholders for possible future features. Withdrawn is for an author to void an action or correcting an error (such as accidental forking of their chain, where they withdraw actions down a fork). Purged could be an action by collective agreement to drop entry/content -- e.g. for things that may be illegal to hold (e.g. child pornography). The process of changing data to these states is TBD.
 
+`Conflict`, `Withdrawn`, and `Purged` are placeholders for possible future features:
+
+* `Conflict`: Two operations that expected to transform state in an exclusive way (such as a theoretical `RegisterRedirect` operation which unambiguously points an old entry to a new one) conflicted with each other when attempting to apply their transform.
+* `Withdrawn`: The record has been marked by its author as such, usually to correct an error (such as accidental forking of their chain after an incomplete restoration from a backup).
+* `Purged`: The adressable content has been erased from the CAS database, possibly by collective agreement to drop it -- e.g., for things that may be illegal or unacceptable to hold (e.g., child pornography).
+
+The process of changing data to these states is TBD.
 
 ## P2P Networking
-A robust networking implementation for Holochain involves two layers: the Holochain P2P networking layer which is designed around the p2p communication needs of agents in a DNA and the building of the DNA's grpahing DHT, as well as an underlying P2P layer that handles the fact that a Holochain node will be managing communication with other nodes all of which will be running non-overalpping sets of DNAs.  Thus, from a networking perspective, there is the view of a single DNA (which is it's own network), but there is the view of a user running Holochain and belonging to many DNAs at the same time.  
 
-Because the same DHT patterns that work at the level of a Holochain DNA sharing storage of application data, also work to solve the problem of a shared database holding updates to a routing table of peer addresses, we have implemented a generalized p2p DHT solution and built the higher level Holochain P2P networking needs on top of that lower level.  Below we describe the high level requirements and network messages for Holochain, and then the lower level requirements and network messages that carry the higher level ones.
+[WP-TODO: Transplant the formal spec section here?]
 
-### High Level Networking (HolochainP2P)
+A robust networking implementation for Holochain involves two layers:
 
-There are a number of network messages that are sent and handled as a direct result of HDK functions or callbacks being executed in a zome call.  These calls are all directed at specific agents in a DNA either because they explicitly are targeted in the call (i.e. `remote_signal`) or because the agent has been determined to be responsible for holding data on the DHT. Note that the `ValidationReceipt` message is sent back to an authoring agent as a result of a node validatihg a `DhtOp` during a `validate()` callback, and `Pulblish` messageses are sent to all the various nodes as a result of taking any chain action and transforming it into `DhTOp`s.
+1. The Holochain P2P networking layer, which is designed around the peer-to-peer communication needs of agents in a DNA and the building of the DNA's graph DHT
+2. An underlying P2P layer that handles the fact that a Holochain node will be managing communication on behalf of potentially multiple agents in multiple networks, and will be connecting with other nodes, any of which may be running non-overlapping sets of DNAs.
+
+Thus, from a networking perspective, there is the view of a single DNA (which is its own network), in which more than one local agent may be participating, but there is also the view of an agent belonging to many DNAs at the same time.
+
+Because the same DHT patterns that work at the level of a Holochain DNA sharing storage of application data also work to solve the problem of a shared database holding updates to a routing table of peer addresses, we have implemented a generalized P2P DHT solution and built the higher-level Holochain P2P networking needs on top of that lower level. Below we describe the high-level requirements and network messages for Holochain, followed by the lower-level requirements and network messages that carry the higher-level ones.
+
+### High-Level Networking (Holochain P2P)
+
+There are a number of network messages that are sent and handled as a direct result of HDK functions or callbacks being executed in a zome call. These calls are all directed at specific agents in a DNA, either because they are explicitly targeted in the call (e.g., `send_remote_signal`) or because the agent has been determined to be responsible for holding data on the DHT.
+
+Note that the `ValidationReceipt` message is sent back to an authoring agent as a result of a node validating a `DhtOp`, and `Publish` messages are sent by the author authority nodes as a result of taking any chain action and transforming it into `DhtOp`s.
 
 The following messages types MUST be implemented:
 
-``` rust
+[WP-TODO: Make this into a nice bullet list like some of the sections above, with each bullet introducing the types it deals in]
+
+```rust
 enum WireMessage {
     CallRemote {
         zome_name: ZomeName,
         fn_name: FunctionName,
         from_agent: AgentPubKey,
+        signature: Signature,
+        to_agent: AgentPubKey,
         cap_secret: Option<CapSecret>,
         data: Vec<u8>,
+        nonce: [u8; 32],
+        expires_at: Timestamp,
+    },
+    CallRemoteMulti {
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        from_agent: AgentPubKey,
+        to_agents: Vec<(Signature, AgentPubKey)>,
+        cap_secret: Option<CapSecret>,
+        data: Vec<u8>,
+        nonce: [u8; 32],
+        expires_at: Timestamp,
+    },
+    ValidationReceipts {
+        receipts: Vec<SignedValidationReceipt>,
     },
     Get {
         dht_hash: AnyDhtHash,
         options: GetOptions,
     },
+    GetMeta {
+        dht_hash: AnyDhtHash,
+        options: GetMetaOptions,
+    },
     GetLinks {
         link_key: WireLinkKey,
         options: GetLinksOptions,
+    },
+    CountLinks {
+        query: WireLinkQuery,
     },
     GetAgentActivity {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
     },
-    MustGetAgentActivity {  //  deterministic get_agent_activity for use during validation
+    MustGetAgentActivity {
         agent: AgentPubKey,
         filter: ChainFilter,
     },
     CountersigningSessionNegotiation {
         message: CountersigningSessionNegotiationMessage,
     },
-    ValidationReceipt {
-        receipt: Vec<u8>,
-    },
-    Publish {
-        request_validation_receipt: bool,
-        countersigning_session: bool,
-        basis_hash: OpBasis,
-        ops: Vec<DhtOp>,
+    PublishCountersign {
+        flag: bool,
+        op: DhtOp,
     },
 }
-```
 
-The options data structures for these messages are as follows:
-
-``` rust
-/// Get options help control how the get is processed at various levels.
-/// Fields tagged with ```[Network]``` are network-level controls.
-/// Fields tagged with ```[Remote]``` are controls that will be forwarded to the
-/// remote agent processing this `Get` request.
 struct GetOptions {
-    /// ```[Network]```
-    /// How many remote nodes should we make requests of / aggregate.
-    /// Set to `None` for a default "best-effort".
-    remote_agent_count: Option<u8>,
-
-    /// ```[Network]```
-    /// Timeout to await responses for aggregation.
-    /// Set to `None` for a default "best-effort".
-    /// Note - if all requests time-out you will receive an empty result,
-    /// not a timeout error.
-    timeout_ms: Option<u64>,
-
-    /// ```[Network]```
-    /// We are interested in speed. If `true` and we have any results
-    /// when `race_timeout_ms` is expired, those results will be returned.
-    /// After `race_timeout_ms` and before `timeout_ms` the first result
-    /// received will be returned.
-    as_race: bool,
-
-    /// ```[Network]```
-    /// See `as_race` for details.
-    /// Set to `None` for a default "best-effort" race.
-    race_timeout_ms: Option<u64>,
-
-    /// ```[Remote]```
-    /// Whether the remote-end should follow redirects or just return the
-    /// requested entry.
+    // Unimplemented
     follow_redirects: bool,
-
-    /// ```[Remote]```
-    /// Return all live actions even if there are deletes.
-    /// Useful for metadata calls.
+    // Unimplemented
     all_live_actions_with_metadata: bool,
-
-    /// ```[Remote]```
-    /// The type of data this get request requires.
     request_type: GetRequest,
 }
 
-/// Get links from the DHT.
-/// Fields tagged with ```[Network]``` are network-level controls.
-/// Fields tagged with ```[Remote]``` are controls that will be forwarded to the
-/// remote agent processing this `GetLinks` request.
-struct GetLinksOptions {
-    /// ```[Network]```
-    /// Timeout to await responses for aggregation.
-    /// Set to `None` for a default "best-effort".
-    /// Note - if all requests time-out you will receive an empty result,
-    /// not a timeout error.
-    timeout_ms: Option<u64>,
+enum GetRequest {
+    // Get integrated content and metadata
+    All,
+    Content,
+    Metadata,
+    // Get content even if it hasn't been integrated
+    Pending,
 }
 
-/// Get agent activity from the DHT.
-/// Fields tagged with ```[Network]``` are network-level controls.
-/// Fields tagged with ```[Remote]``` are controls that will be forwarded to the
-/// remote agent processing this `GetLinks` request.
-struct GetActivityOptions {
-    /// ```[Network]```
-    /// Timeout to await responses for aggregation.
-    /// Set to `None` for a default "best-effort".
-    /// Note - if all requests time-out you will receive an empty result,
-    /// not a timeout error.
-    timeout_ms: Option<u64>,
-    /// Number of times to retry getting records in parallel.
-    /// For a small dht a large parallel get can overwhelm a single
-    /// agent and it can be worth retrying the records that didn't
-    /// get found.
-    retry_gets: u8,
-    /// ```[Remote]```
-    /// Include the all valid activity actions in the response.
-    /// If this is false the call becomes a lightweight response with
-    /// just the chain status and highest observed action.
-    /// This is useful when you want to ask an authority about the
-    /// status of a chain but do not need all the actions.
-    include_valid_activity: bool,
-    /// Include any rejected actions in the response.
-    include_rejected_activity: bool,
-    /// Include the full signed actions and hashes in the response
-    /// instead of just the hashes.
-    include_full_actions: bool,
+struct GetMetaOptions {}
+
+// [WP-TODO: One of the following structs obviously shouldn't exist. Can we simplify to the spec that _should_ be?]
+
+// Query terms for GetLinks.
+struct WireLinkKey {
+    base: AnyLinkableHash,
+    type_query: LinkTypeFilter,
+    tag: Option<LinkTag>,
+    after: Option<Timestamp>,
+    before: Option<Timestamp>,
+    author: Option<AgentPubKey>,
+}
+
+struct WireLinkQuery {
+    base: AnyLinkableHash,
+    link_type: LinkTypeFilter,
+    tag_prefix: Option<LinkTag>,
+    before: Option<Timestamp>,
+    after: Option<Timestamp>,
+    author: Option<AgentPubKey>,
+}
+
+enum LinkTypeFilter {
+    Types(Vec<(ZomeIndex, Vec<LinkType>)>),
+    Dependencies(Vec<ZomeIndex>),
+}
+
+struct GetLinksOptions {}
+
+enum CountersigningSessionNegotiationMessage {
+    AuthorityResponse(Vec<SignedAction>),
+    EnzymePush(DhtOp),
 }
 ```
 
-### Low Level Networking (KitsuneP2P)
+### Low Level Networking (Kitsune P2P)
 
-Kitsune is a P2P library for implementing distributed application messaging needs that delivers dynamic peer address discovery and message routing.  It also delivers the necessary affordances for distributed applications to implement sharded DHTs as a content addressible store as it natively groups its messages into `KitsuneSpaces` (which correspond to Holochain's DNA addresses) and `KitsuneAgents` which are, as in Holochain, the public key of the agents participating in the space.  Kitsune handles the mapping of the `KitsuneAgent` address space to network transport addresses.  
+Kitsune is a P2P library for implementing distributed application messaging needs that delivers dynamic peer address discovery and message routing. It also delivers the necessary affordances for distributed applications to implement sharded DHTs as a content-addressible store, as it natively [WP-TODO: Should this be naively?] groups its messages into `KitsuneSpace`s (which correspond to Holochain's DNA addresses) and `KitsuneAgent`s which are, as in Holochain, the public keys of the agents participating in the space. Kitsune handles the mapping of the `KitsuneAgent` address space to network transport addresses.
 
-Kitsune assumes an "implementor" with it's own higher level custom message types, and which also manages persistent storage and handles key management and message signing.  Kitsune sends events to the implementor to retrieve data, as well as receives messages from the implementor to be delivered to other kitsune nodes.  
+Kitsune assumes an "implementor" that defines its own higher-level custom message types, and manages persistent storage, and handles key management and message signing. Kitsune sends events to the implementor to retrieve data, and receives messages from the implementor to be delivered to other kitsune nodes.
 
-Thus, Holochain implements its both it's node-to-node messaging and it's graphing DHT on top of the capabilities provided by Kitsune.   
+Thus, Holochain implements both its node-to-node messaging and its graph DHT on top of the capabilities provided by Kitsune.
 
 #### Architecture
-Kitsune runs as a set of actor chanels that receive network events and delegates them to local handlers or "implementor" handlers.  Additionally Kitusune provides the implementor with an Api for sending messages and getting information about agents that exist in a given space.
+
+Kitsune runs as a set of actor channels that receive network events and delegate them to local handlers or "implementor" handlers. Additionally Kitusune provides the implementor with an API for sending messages and getting information about agents that exist in a given space.
 
 [WP-TODO:? some sort of Kitsune high level system diagram?]
 
+#### Message Classes and Types
 
-#### Message Types
+Kitsune has two message classes:
+
+* **Notify**: Optimistically send a message without listening for a response.
+* **Request**: Send a message with a nonce, and expect a response with a matching nonce.
+
+Messages of both of these classes are sent asynchronously; Request is simply a pattern of pairing two messages by means of a nonce.
 
 These are the message types that Kitsune uses:
-``` rust
+
+[WP-TODO: Make this into a nice bullet list like some of the sections above, with each bullet introducing the types it deals in]
+
+```rust
 enum Wire {
-        /// Failure
-        Failure {
-            reason: String,
-        },
+    // Notify a peer of failure, as a response to a received message that couldn't be handled.
+    Failure {
+        reason: String,
+    },
 
-        /// "Call" to the remote. This message encapsulates
-        /// the implementors wire-types, i.e. all of the
-        /// Holochain network messages are sent using this message type.
-        Call {
-            space: KitsuneSpace,
-            to_agent: KitsuneAgent,
-            data: WireData,
-        },
+    // Call a function on a remote peer.
+    Call {
+        space: KitsuneSpace,
+        to_agent: KitsuneAgent,
+        data: Vec<u8>,
+    },
 
-        /// "Call" response from the remote implementor level.
-        CallResp {
-            data: WireData,
-        },
+    // Respond to a `Call` message.
+    CallResp {
+        data: Vec<u8>,
+    },
 
+    // Broadcast a message using Notify.
+    Broadcast {
+        space: KitsuneSpace,
+        to_agent: KitsuneAgent,
+        data: BroadcastData,
+    },
 
-        /// Fire-and-forget broadcast message.
-        /// uses low-level notify, not request
-        Broadcast {
-            space: KitsuneSpace,
-            to_agent: KitsuneAgent,
-            destination: BroadcastTo,
-            data: WireData,
-        },
+    // Broadcast a message to peers covering a basis hash,
+    // requesting receivers broadcast to peers in the same neighborhood.
+    DelegateBroadcast {
+        space: KitsuneSpace,
+        basis: KitsuneBasis,
+        to_agent: KitsuneAgent,
+        // The following fields define the scope of the broadcast.
+        // Receivers modulo the network locations of candidate
+        // authorities in their peer tables by `mod_cnt`, only
+        // re-broadcasting if the modulo matches `mod_idx`.
+        // This avoids two nodes sending the same broadcast message
+        // to the same authority.
+        mod_idx: u32,
+        mod_cnt: u32,
+        data: BroadcastData,
+    }
 
-        /// Gossip op with opaque data section,
-        /// to be forwarded to gossip module.
-        /// uses low-level notify, not request
-        Gossip {
-            space: KitsuneSpace,
-            data: WireData,
-            module: GossipModuleType,
-        },
+    // Negotiate gossip, with an opaque data block to be interpreted
+    // by a gossip implementation. Uses Notify.
+    Gossip {
+        space: KitsuneSpace,
+        data: Vec<u8>,
+        module: GossipModuleType,
+    },
 
-        /// Ask a remote node if they know about a specific agent
-        PeerGet {
-            space: KitsuneSpace,
-            agent: KitsuneAgent,
-        },
+    // Ask a remote node if they know about a specific agent.
+    PeerGet {
+        space: KitsuneSpace,
+        agent: KitsuneAgent,
+    },
 
-        /// Response to a peer get
-        PeerGetResp {
-            agent_info_signed: AgentInfoSigned,
-        },
+    // Respond to a `PeerGet` with information about the agent.
+    PeerGetResp {
+        agent_info_signed: AgentInfoSigned,
+    },
 
-        /// Query a remote node for peers holding
-        /// or nearest to holding a u32 location.
-        PeerQuery {
-            space: KitsuneSpace,
-            basis_loc: DhtLocation,
-        },
+    // Query a remote node for peers holding
+    // or nearest to holding a u32 network location.
+    PeerQuery {
+        space: KitsuneSpace,
+        basis_loc: DhtLocation,
+    },
 
-        /// Response to a peer query
-        PeerQueryResp {
-            peer_list: Vec<AgentInfoSigned>,
-        },
+    // Respond to a `PeerQuery`.
+    PeerQueryResp {
+        peer_list: Vec<AgentInfoSigned>,
+    },
 
-        /// MetricsExchangeMessage
-        MetricExchange) {
-            space: KitsuneSpace,
-            msgs: Vec<MetricExchangeMsg>,
-        },
+    // Nodes can just send peer info without prompting.
+    // Notably, they may want to send their own peer info to prevent being
+    // inadvertantly blocked.
+    PeerUnsolicited {
+        peer_list.0: Vec<AgentInfoSigned>,
+    },
+
+    // Request the data for one or more DHT operations for one or
+    // more network spaces.
+    // While a response in the form of `PushOpData` is expected,
+    // this uses Notify rather than Request.
+    FetchOp {
+        fetch_list: Vec<(KitsuneSpace, Vec<FetchKey>)>,
+    },
+
+    // Send requested DHT operation data in response to `FetchOp`.
+    PushOpData {
+        op_data_list: Vec<(KitsuneSpace, Vec<PushOpItem>)>,
+    },
+
+    // Exchange availability information about one or more peers.
+    MetricExchange {
+        space: KitsuneSpace,
+        msgs: Vec<MetricExchangeMsg>,
+    },
+}
+
+// Represents a space ID.
+struct KitsuneSpace(Vec<u8>);
+
+// Represents an agent public key.
+struct KitsuneAgent(Vec<u8>);
+
+enum BroadcastData {
+    // Broadcast arbitrary data.
+    User(Vec<u8>),
+    AgentInfo(AgentInfoSigned),
+    Publish {
+        source: KitsuneAgent,
+        op_hash_list: Vec<RoughSized<KitsuneOpHash>>,
+        context: FetchContext,
+    },
+}
+
+struct AgentInfoSigned {
+    space: KitsuneSpace,
+    agent: KitsuneAgent,
+    storage_arq: Arq,
+    url_list: Vec<url2::Url2>,
+    signed_at_ms: u64,
+    expires_at_ms: u64,
+    signature: KitsuneSignature,
+    encoded_bytes: [u8],
+}
+
+// Description of a network location arc over which an agent claims authority.
+struct Arq {
+    start: DhtLocation,
+    // The size of chunks for this arc, as 2^power * 4096.
+    power: u8,
+    // The number of chunks in this arc.
+    // Hence, the arc size in terms of is power * count.
+    count: u32,
+}
+
+// Network locations wrap at the bounds of u32.
+struct DhtLocation(Wrapping<u32>);
+
+// Represents a public key signature.
+struct KitsuneSignature(Vec<u8>);
+
+// Represents a DHT operation hash.
+struct KitsuneOpHash(Vec<u8>);
+
+// Arbitrary context identifier.
+struct FetchContext(u32);
+
+// Convey the rough size of the data behind a hash.
+struct RoughSized<T> {
+    // The hash of the data to be rough-sized.
+    data: T,
+    // The approximate size of the data.
+    size: Option<RoughInt>,
+}
+
+// Positive numbers are an exact size; negative numbers represent a
+// size of roughly -x * 4096.
+struct RoughInt(i16);
+
+// Represents a basis hash.
+struct KitsuneBasis(Vec<u8>);
+
+enum GossipModuleType {
+    // Recent gossip deals with DHT data with a recent timestamp.
+    ShardedRecent,
+    // Historical gossip deals with data whose timestamp is older than the recent gossip threshold.
+    ShardedHistorical,
+}
+
+enum FetchKey {
+    Op(KitsuneOpHash),
+}
+
+struct PushOpItem {
+    op_data: Vec<u8>,
+    region: Option<(RegionCoords, bool)>,
+}
+
+struct RegionCoords {
+    space: Segment,
+    time: Segment,
+}
+
+struct Segment {
+    power: u8,
+    offset: u32,
+}
+
+enum MetricExchangeMsg {
+    V1UniBlast {
+        extrap_cov_f32_le: Vec<u8>,
+    },
+    UnknownMessage,
+}
 ```
 
 #### Gossip
 
-Kitsune MUST provide a way for the DHT data to be gossiped among peers in a space.  We assume that there will be many gossip implementations that are added over time.  We have implemented full-sync gossip protocol and and a novel "quantized gossip" algorithm that effeciently shards and redistributes data as nodes come and go from the network.  The full description that gossip algorithm is beyond the scope of this document and details on this algorithim can be found here: [WP-TODO: ACB link?]. 
+Kitsune MUST provide a way for the DHT data to be gossiped among peers in a space. We assume that there will be many gossip implementations that are added over time. We have implemented a novel "quantized gossip" algorithm that effeciently shards and redistributes data as nodes come and go on the network. The full description of that gossip algorithm is beyond the scope of this document and details on this algorithim can be found here: [WP-TODO: ACB link?].
 
 Any gossip algorithm to be used in the Holochain context MUST be able to handle the following constraints:
 
-1. A new node coming on to the network, or one returning to the network after a significant changes have occured on the DHT, SHOULD be able synchronize to it's state of holding the correct data that it is deemed to be an authority for, quickly while balancing bandwidth limitations of the network it's part of.  This requires that the system be resilient to asymetric upload and download realities that will vary accross peers.
+1. A new node coming on to the network, or one returning to the network after a significant changes have occured on the DHT, SHOULD be able synchronize to it's state of holding the correct data that it is deemed to be an authority for, quickly while balancing bandwidth limitations of the network it's part of. This requires that the system be resilient to asymetric upload and download realities that will vary accross peers.
 2. Gossiping SHOULD minimize total consumed bandwith, i.e. by not re-transmitting data as much as possible.
 3. ...
 
 
 ## The Conductor
 
-A Holochain Conductor manages runing Holochain applications, which consist of logically related DNAs operating under a single agency.  Thus a conductor MUST be able to interpret an application bundle format and instantiate Cells from that format.  Additionally a Conductor SHOULD cache DNA definitions and WASMs provided so as to decrease installation time of other instances of the same DNA as well as not store multiple copies of the same DNA.
+A Holochain Conductor manages runing Holochain applications, which consist of logically related DNAs operating under a single agency. Thus a conductor MUST be able to interpret an application bundle format and instantiate Cells from that format. Additionally a Conductor SHOULD cache DNA definitions and WASMs provided so as to decrease installation time of other instances of the same DNA as well as not store multiple copies of the same DNA.
 
 ### Bundle Formats
 
-Holochain implementations must be able to load Holochain applications that have be serialized either to disk or for transmission over a network.  Holochain uses a bundling format that allows for specification of properties along with other resources in a manifest that can include recursively bundled elements of the same general bundling format but using a different manifest. Any of the sub-bundles can be specificed by "location" which may be specified to be in the same bundle, in a separate file, or at a network address. Thus we have Zomes, Dnas, Apps, and WebApps that can all be wrapped up in a single bundle, or where parts are referred to as existing elsewhere.  The "meta bundle" format can be seen here: https://github.com/holochain/holochain/tree/develop/crates/mr_bundle.  The manifests for each of the type of bundles that MUST be implemented are specified as follows: 
+Holochain implementations must be able to load Holochain applications that have be serialized either to disk or for transmission over a network. Holochain uses a bundling format that allows for specification of properties along with other resources in a manifest that can include recursively bundled elements of the same general bundling format but using a different manifest. Any of the sub-bundles can be specificed by "location" which may be specified to be in the same bundle, in a separate file, or at a network address. Thus we have Zomes, Dnas, Apps, and WebApps that can all be wrapped up in a single bundle, or where parts are referred to as existing elsewhere. The "meta bundle" format can be seen here: https://github.com/holochain/holochain/tree/develop/crates/mr_bundle. The manifests for each of the type of bundles that MUST be implemented are specified as follows:
 
 #### DNA Bundle
-``` rust
+```rust
 struct DnaManifestV1 {
     name: String,
     integrity: IntegrityManifest,
@@ -1020,12 +1862,12 @@ struct ZomeManifest {
 ```
 #### App Bundle
 
-An `AppBundle`  combines together a set of DNAs paired with "Role" identifiers and instructions for how/when the Conductor should install DNAs to make cells in the bundle.  The "role" of DNA is useful for application developers to be able to specify a DNA by semantically accisible name rather than just its hash.  This also allows for "late-binding" as DNAs can be used in different ways in applications, and thus we can think of the DNAs name by the role it plays in a given application.
+An `AppBundle` combines together a set of DNAs paired with "Role" identifiers and instructions for how/when the Conductor should install DNAs to make cells in the bundle. The "role" of DNA is useful for application developers to be able to specify a DNA by semantically accisible name rather than just its hash. This also allows for "late-binding" as DNAs can be used in different ways in applications, and thus we can think of the DNAs name by the role it plays in a given application.
 
-A note on Cell "provisioning".  There are a number of ways that Application developers MUST be able to specify conditions under which DNAs are instantiated into Cells in the Conductor.  The baseline usecase is simply that all DNAs are expected to be installed from the bundle.  There are a number of use-cases where a Holochain application will expect a Cell of a given DNA to already have installed and relies on this behavior.  Thus, there MUST be a provisioning option to specify this usecase.  Also Holochain Conductors MUST implement a cloning mechanism to allow applications to create new Cells dynamically via the App interface (see Conductor API below).  DNAs that are expected to be cloned MUST be specified in the DNA Bundle so that the Conductor can have cached and readied the WASM code for that DNA. 
+A note on Cell "provisioning". There are a number of ways that Application developers MUST be able to specify conditions under which DNAs are instantiated into Cells in the Conductor. The baseline usecase is simply that all DNAs are expected to be installed from the bundle. There are a number of use-cases where a Holochain application will expect a Cell of a given DNA to already have installed and relies on this behavior. Thus, there MUST be a provisioning option to specify this usecase. Also Holochain Conductors MUST implement a cloning mechanism to allow applications to create new Cells dynamically via the App interface (see Conductor API below). DNAs that are expected to be cloned MUST be specified in the DNA Bundle so that the Conductor can have cached and readied the WASM code for that DNA.
 
 
-``` rust
+```rust
 struct AppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.
     name: String,
@@ -1045,7 +1887,7 @@ struct AppRoleManifest {
 
     /// Determines if, how, and when a Cell will be provisioned.
     provisioning: Option<CellProvisioning>,
-  
+
     /// Specifies where membrane-proofs must be requested from
     membraneProofService: Option<MembraneProofService>
 
@@ -1055,7 +1897,7 @@ struct AppRoleManifest {
 enum MembraneProofService {
     /// The membrane proof is expected to have recevied the proof out-of-ban (i.e. by an e-mail)
     ManualText,
-    
+
     /// The membrane proof is self-signing by an ETH/Bitcoin/etc wallet
     /// according to the MembraneProofService API
     UserSECP256K1SignedV1(KeySource),
@@ -1067,11 +1909,11 @@ enum MembraneProofService {
     /// The service lives behind an arbitrary web-service that will return a result
     /// according to the MembraneProofService API
     IframeV1(Url),
-  
+
     /// The membrane proof is self-signing by the user's holochain agency in a given DNA.
     CrossDnaAgentV1(DnaHash),
 
-    /// The membrane proof is self-signing by an arbitrary key in Lair (UI must present a list of 
+    /// The membrane proof is self-signing by an arbitrary key in Lair (UI must present a list of
     /// keys)
     CrossDnaAgentV1(DnaHash),
 
@@ -1119,9 +1961,9 @@ Note that the API that is used to comunicate with different types of MembranePro
 
 #### WebApp Bundle
 
-A `WebAppBundle`  combines together a specific user interface together with an `AppBundle` as follows:
+A `WebAppBundle` combines together a specific user interface together with an `AppBundle` as follows:
 
-``` rust
+```rust
 struct WebAppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.
     name: String,
@@ -1137,19 +1979,19 @@ struct WebAppManifestV1 {
 
 ### API
 
-A Holochain conductor MUST provide access for user action through an Admin API to manage DNAs (install/uninstall, enable/disable, etc) and through an App API to make zome calls to specific happs to specific DNAs, as well as to create cloned DNAs.  In our implementation this API is defined as a library so that these calls can be made in-process, but are also implemented over a Websocket interface so they can be made by external processes.
+A Holochain conductor MUST provide access for user action through an Admin API to manage DNAs (install/uninstall, enable/disable, etc) and through an App API to make zome calls to specific happs to specific DNAs, as well as to create cloned DNAs. In our implementation this API is defined as a library so that these calls can be made in-process, but are also implemented over a Websocket interface so they can be made by external processes.
 
 #### Admin API
 
 Below is a list of the Admin API functions that MUST be implemented along with any details of function arguments and return values, as well as any contextual notes on functional constraints or other necessary implementation details:
-- `AddAdminInterfaces(Vec<AdminInterfaceConfig>)->u16`: Set up and register one or more new admin interfaces as specified by a list of configurations. 
-  **Arguments**: The `AdminInterfaceConfig` SHOULD be a generalized data structure to allow creation of an interface of what ever types are contextually appropriate for the system on which the conductor runs.  In our implementation the only option is a `u16` port number on which to establish a websocket listener.
-  **Return Value**: SHOULD be a generalized data structure regarding information of the added interface.  In our implementation this is just the Websocket port that was created.
-     
-- `RegisterDna(modifiers: DnaModifiersOpt<YamlProperties>, source: DnaSource>)->DnaHash` : Register a DNA for later app installation. 
-    **Notes**: This call MUST store the given DNA into the Holochain DNA database.  This call exists separately from `InstallApp` to support the use case of adding a DNA into a conductor's DNA database once such that wasmer's transpiling of WASM to machine code happens only once and gets cached in the conductor's WASM store.
+* `AddAdminInterfaces(Vec<AdminInterfaceConfig>)->u16`: Set up and register one or more new admin interfaces as specified by a list of configurations.
+  **Arguments**: The `AdminInterfaceConfig` SHOULD be a generalized data structure to allow creation of an interface of what ever types are contextually appropriate for the system on which the conductor runs. In our implementation the only option is a `u16` port number on which to establish a websocket listener.
+  **Return Value**: SHOULD be a generalized data structure regarding information of the added interface. In our implementation this is just the Websocket port that was created.
+
+* `RegisterDna(modifiers: DnaModifiersOpt<YamlProperties>, source: DnaSource>)->DnaHash` : Register a DNA for later app installation.
+    **Notes**: This call MUST store the given DNA into the Holochain DNA database. This call exists separately from `InstallApp` to support the use case of adding a DNA into a conductor's DNA database once such that wasmer's transpiling of WASM to machine code happens only once and gets cached in the conductor's WASM store.
     **Arguments**: The `modifiers` argument to this call MUST accept a YAML encoded version of the `DnaModifiers` data structure defined below where each of the properties may be specified optionally:
-``` rust
+```rust
 struct DnaModifiers {
     /// The network seed of a DNA is included in the computation of the DNA hash.
     /// The DNA hash in turn determines the network peers and the DHT, meaning
@@ -1169,11 +2011,11 @@ struct DnaModifiers {
     quantum_time: Duration,
 }
 ```
-- `GetDnaDefinition(DnaHash) -> DnaDef`: Get the definition of a DNA.
+* `GetDnaDefinition(DnaHash) -> DnaDef`: Get the definition of a DNA.
 
     **Return Value**: This function MUST return all of the data that specifies a DNA as installed as follows:
 
-``` rust
+```rust
 struct DnaDef {
     /// The friendly "name" of a Holochain DNA (MUST not affect the `DnaHash`)
     name: String,
@@ -1191,16 +2033,16 @@ struct DnaDef {
 }
 
 ```
-- `UpdateCoordinators(dna_hash: DnaHash, source: CoordinatorSource)`: Update coordinator zomes for an already installed DNA.
-    
+* `UpdateCoordinators(dna_hash: DnaHash, source: CoordinatorSource)`: Update coordinator zomes for an already installed DNA.
+
   **Notes**: This call MUST replace any installed coordinator zomes with the same zome name. If the zome name doesn't exist then the coordinator zome MUST be appended to the current list of coordinator zomes.
 
   - `InstallApp(InstallAppPayload)->AppInfo`: Install an app using an `AppBundle`.
-    
+
   **Notes**: An app is intended for use by one and only one Agent and for that reason it takes an `AgentPubKey` and installs all the DNAs bound to that `AgentPubKey` as new Cells. The new app should not be enabled automatically after installation and instead must explicitly be enabled by calling `EnableApp`.
   **Arguments**: `InstallAppPayload` is defined as:
 
-``` rust
+```rust
 struct InstallAppPayload {
     /// The unique identifier for an installed app in this conductor.
     source: AppBundleSource,
@@ -1223,16 +2065,16 @@ struct InstallAppPayload {
 }
 ```
   **Return Value**: The returned value MUST be the `AppInfo` data structure (which is also retreivable after installation via the `GetAppInfo` API), and is defined as:
-``` rust
+```rust
 struct AppInfo {
     /// The unique identifier for an installed app in this conductor
     installed_app_id: InstalledAppId,
     /// Info about the cells installed in this app
-    pub cell_info: HashMap<RoleName, Vec<CellInfo>>,
+    cell_info: HashMap<RoleName, Vec<CellInfo>>,
     /// The app's current status, in an API-friendly format
     status: AppInfoStatus,
 }
-pub enum CellInfo {
+enum CellInfo {
     // cells provisioned at app installation as defined in the bundle
     Provisioned(Cell),
     // cells created by cloning
@@ -1240,25 +2082,25 @@ pub enum CellInfo {
     // potential cells with deferred installation as defined in the bundle
     Stem(StemCell),
 }
-pub struct Cell {
+struct Cell {
     /// The cell's identifying data
-    pub cell_id: CellId,
+    cell_id: CellId,
     /// If this is a cloned cell, a conductor-local identifier for that clone
-    pub clone_id: Option<CloneId>,
+    clone_id: Option<CloneId>,
     /// The Dna modifiers that were used to instantiate the cell
-    pub dna_modifiers: DnaModifiers,
+    dna_modifiers: DnaModifiers,
     /// The name the cell was instantiated with
-    pub name: String,
+    name: String,
     /// Whether or not the cell is running
-    pub enabled: bool,
+    enabled: bool,
 }
-pub struct StemCell {
+struct StemCell {
     /// The Dna that this cell would be instantiated from
-    pub dna: DnaHash,
+    dna: DnaHash,
     /// An optional name to override the cell's bundle name when instantiating
-    pub name: Option<String>,
+    name: Option<String>,
     /// The Dna modifiers that will be used when instantiate the cell
-    pub dna_modifiers: DnaModifiers,
+    dna_modifiers: DnaModifiers,
 }
 
 enum AppInfoStatus {
@@ -1266,92 +2108,92 @@ enum AppInfoStatus {
     Disabled { reason: DisabledAppReason },
     Running,
 }
-```   
- 
-- `UninstallApp(installed_app_id: InstalledAppId)` :  Uninstalls the app specified by argument `installed_app_id` from the conductor.
-    
+```
+
+* `UninstallApp(installed_app_id: InstalledAppId)` : Uninstalls the app specified by argument `installed_app_id` from the conductor.
+
   **Notes**: The app MUST be removed from the list of installed apps, and any cells which were referenced only by this app MUST be disabled and removed, clearing up any persisted data.
      Cells which are still referenced by other installed apps MUST not be removed.
 
-- `GenerateAgentPubKey()-> AgentPubKey` : Generate a new `AgentPubKey`.
-  **Notes**: This call MUST cause a new key-pair to be added to the key store and return the public part of that key to the caller.  This public key is intended to be used later when installing a DNA to create a Cell, as the conductor in expected to request all signing of data from the key-store.
+* `GenerateAgentPubKey()-> AgentPubKey` : Generate a new `AgentPubKey`.
+  **Notes**: This call MUST cause a new key-pair to be added to the key store and return the public part of that key to the caller. This public key is intended to be used later when installing a DNA to create a Cell, as the conductor in expected to request all signing of data from the key-store.
 
-- `ListDnas()-> Vec<DnaHash>` : List the hashes of all installed DNAs.
-  
-- `ListCellIds()->Vec<CellId>`: List all the cell IDs in the conductor.
+* `ListDnas()-> Vec<DnaHash>` : List the hashes of all installed DNAs.
 
-- `ListEnabledApps()-> Vec<InstalledAppId>`: List the IDs of all enabled apps in the conductor.
+* `ListCellIds()->Vec<CellId>`: List all the cell IDs in the conductor.
 
-- `ListApps(status_filter: Option<AppStatusFilter>)-> Vec<AppInfo>`: List the apps and their information that are installed in the conductor.
+* `ListEnabledApps()-> Vec<InstalledAppId>`: List the IDs of all enabled apps in the conductor.
+
+* `ListApps(status_filter: Option<AppStatusFilter>)-> Vec<AppInfo>`: List the apps and their information that are installed in the conductor.
   **Notes**: If `status_filter` is `Some(_)`, it MUST return only the apps with the specified status.
 
-- `EnableApp(installed_app_id: InstalledAppId) -> {app: AppInfo, errors: Vec<(CellId, String)>}`: Changes the specified app from a disabled to an enabled state in the conductor.
-  **Notes**: Once an app is enabled, zome functions of all the Cells associated with the App MUST immediately be callable.  Applications MUST also be loaded and enabled automatically on any reboot of the conductor.
-    
-- `DisableApp(installed_app_id: InstalledAppId)`: Changes the specified app from an enabled to a disabled state in the conductor.
-  **Notes**: When an app is disabled, calls to zome functions of all the Cells associated with the App MUST fail, and the app MUST not be loaded on a reboot of the conductor.  Note if cells are associated with more than one app, they MUST not be disabled unless all of the other apps using the same cells have also been disabled.
+* `EnableApp(installed_app_id: InstalledAppId) -> {app: AppInfo, errors: Vec<(CellId, String)>}`: Changes the specified app from a disabled to an enabled state in the conductor.
+  **Notes**: Once an app is enabled, zome functions of all the Cells associated with the App MUST immediately be callable. Applications MUST also be loaded and enabled automatically on any reboot of the conductor.
 
-- `StartApp(installed_app_id: InstalledAppId) -> bool` : Starts an app that has been stopped by an error.  The return value indicates whether the app was successfully started.
+* `DisableApp(installed_app_id: InstalledAppId)`: Changes the specified app from an enabled to a disabled state in the conductor.
+  **Notes**: When an app is disabled, calls to zome functions of all the Cells associated with the App MUST fail, and the app MUST not be loaded on a reboot of the conductor. Note if cells are associated with more than one app, they MUST not be disabled unless all of the other apps using the same cells have also been disabled.
 
-- `AttachAppInterface(port: Option<u16>) -> u16`: Open up a new websocket for processing `AppRequest`s.
+* `StartApp(installed_app_id: InstalledAppId) -> bool` : Starts an app that has been stopped by an error. The return value indicates whether the app was successfully started.
+
+* `AttachAppInterface(port: Option<u16>) -> u16`: Open up a new websocket for processing `AppRequest`s.
   **Notes**: Any active app MUST be callable via the attached app interface.
      Optionally a `port` parameter MAY be passed to this request. If it is `None`, a free port SHOULD be chosen by the conductor.
      The response MUST contain the port chosen by the conductor if `None` was passed.
-     
-- `ListAppInterfaces()->Vec<u16>`: List all the app interfaces currently attached with `AttachAppInterface` which is a list of websocket ports that can process `AppRequest()`s.
+
+* `ListAppInterfaces()->Vec<u16>`: List all the app interfaces currently attached with `AttachAppInterface` which is a list of websocket ports that can process `AppRequest()`s.
 
 
-- `DumpState (cell_id: CellId) -> String`: Dump the state of the cell specified by argument `cell_id`, including its chain, as a string containing JSON.
+* `DumpState (cell_id: CellId) -> String`: Dump the state of the cell specified by argument `cell_id`, including its chain, as a string containing JSON.
 
   **Notes**: Implementations MAY implement this function, it is meant for debuging and introspections tooling and there is no standard for what it returns other that it SHOULD be JSON blob of the state.
-        
-- `DumpNetworkMetrics(dna_hash: Option<DnaHash>) -> String` : Dump the network metrics tracked by kitsune.
-    
-  **Notes**: Implementations MAY implement this function, it is meant for debuging and introspections tooling and there is no standard for what it returns other that it SHOULD be JSON.  If the `DnaHash` parameter is set, the call MUST limit the metrics dumped to a single DNA hash space.  The result SHOULD be a JSON blob of metrics results.
 
-- `AddAgentInfo(agent_infos: Vec<AgentInfoSigned>)`: Add a list of agents to this conductor's peer store.
-    
-  **Notes**: Implementations MAY implement this function. It is intended as a way of shortcutting peer discovery and is useful for testing.    
-  It is also intended for use-cases in which it is important for agent existence to be transmitted out-of-band.
-    
-- `RequestAgentInfo(cell_id: Option<CellId>) -> Vec<AgentInfoSigned>`: Request the [`AgentInfoSigned`] stored in this conductor's peer store.
-  **Notes**: Implementations MAY implement this function. It useful for testing across networks. 
-  It is also intended for use-cases in which it is important for agent existence to be transmitted out-of-band.
-    
-- `GraftRecords(
+* `DumpNetworkMetrics(dna_hash: Option<DnaHash>) -> String` : Dump the network metrics tracked by kitsune.
+
+  **Notes**: Implementations MAY implement this function, it is meant for debuging and introspections tooling and there is no standard for what it returns other that it SHOULD be JSON. If the `DnaHash` parameter is set, the call MUST limit the metrics dumped to a single DNA hash space. The result SHOULD be a JSON blob of metrics results.
+
+* `AddAgentInfo(agent_infos: Vec<AgentInfoSigned>)`: Add a list of agents to this conductor's peer store.
+
+  **Notes**: Implementations MAY implement this function. It is intended as a way of shortcutting peer discovery and is useful for testing.
+    It is also intended for use-cases in which it is important for agent existence to be transmitted out-of-band.
+
+* `RequestAgentInfo(cell_id: Option<CellId>) -> Vec<AgentInfoSigned>`: Request the [`AgentInfoSigned`] stored in this conductor's peer store.
+  **Notes**: Implementations MAY implement this function. It useful for testing across networks.
+    It is also intended for use-cases in which it is important for agent existence to be transmitted out-of-band.
+
+* `GraftRecords(
         cell_id: CellId,
         validate: bool,
         records: Vec<Record>,
     )->RecordsGrafted`: "Graft" `Record`s onto the source chain of the specified `CellId`.
- 
-  **Notes**: This admin call is provided for the purposes of restoring chains from backup. 
+
+  **Notes**: This admin call is provided for the purposes of restoring chains from backup.
   If `validate` is `true`, then the records MUST be validated before insertion.
   If `validate` is `false`, then records MUST be inserted as is.
 
   Records provided are expected to form a valid chain segment (ascending sequence numbers, and valid `prev_action` references). If the first record contains a `prev_action` which matches the existing records, then the new records MUST be "grafted" onto the existing chain at that point, and any other records following that point which do not match the new records MUST be ignored.
-        
+
      All records must be authored and signed by the same agent, if they are not, the call MUST fail.
-     
+
      If the `DnaFile` (but not necessarily the cell) is not already be installed on this conductor, the call MUST fail.
-    
+
      If `truncate` is true, the chain head MUST not checked and any new records should be deleted.
 
-- `GrantZomeCallCapability(cell_id: CellId, cap_grant: CapGrantEntry)`: Request capability grant for making zome calls.
+* `GrantZomeCallCapability(cell_id: CellId, cap_grant: CapGrantEntry)`: Request capability grant for making zome calls.
 
-- `DeleteCloneCells(app_id: InstalledAppId, clone_cell_id: CloneCellId)`: Delete a disabled cloned cell
+* `DeleteCloneCells(app_id: InstalledAppId, clone_cell_id: CloneCellId)`: Delete a disabled cloned cell
 
   **Notes**: The conductor MUST return an error if the specified cell is not disabled
 
 #### App API
 The App API MUST implement the following commands:
-  - `GetAppInfo(installed_app_id: InstalledAppId)->Option<AppInfo>`: Get info about the app identified by the given `installed_app_id` argument, including info about each cell installed by this app.  See above for the defintion of `AppInfo`
- 
-- `CallZome(ZomeCall) -> ExternIO`: Call a zome function.  
+  - `GetAppInfo(installed_app_id: InstalledAppId)->Option<AppInfo>`: Get info about the app identified by the given `installed_app_id` argument, including info about each cell installed by this app. See above for the defintion of `AppInfo`
+
+* `CallZome(ZomeCall) -> ExternIO`: Call a zome function.
 
   **Return Value**: The returned value MUST be a MsgPack serialization of the zome function's return value.
-    
+
   **Arguments**: The `ZomeCall` paramater is defined as:
-``` rust
+```rust
 struct ZomeCall {
     /// The ID of the cell containing the zome to be called
     cell_id: CellId,
@@ -1369,19 +2211,19 @@ struct ZomeCall {
     cap_secret: Option<CapSecret>,
 }
 ```
-Note: `payload` is a MsgPack encoded data structure provided to the zome function.  This structure MUST be matched against the parameter defined by the zome function and a serialization error MUST be returned if the matching fails.
-    
-- `CreateCloneCell(CreateCloneCellPayload) -> InstalledCell`: Clone a DNA thus creating a new `Cell`.
+Note: `payload` is a MsgPack encoded data structure provided to the zome function. This structure MUST be matched against the parameter defined by the zome function and a serialization error MUST be returned if the matching fails.
+
+* `CreateCloneCell(CreateCloneCellPayload) -> InstalledCell`: Clone a DNA thus creating a new `Cell`.
   **Notes:** This call specifies a DNA to clone by it's `role_id` as specified in the AppBundle. The function MUST register a new DNA with a unique ID and the specified properties, create a new cell from this cloned DNA, and add the cell to the specified app.
-  Cloned cells are inteded to be used for such use-cases as adding private channels to chat apps where only a specific set of agents are allowed to join the DHT of that DNA; or for creating DHTs that have temporary life-spans in app, like logs that get rotated. 
+  Cloned cells are inteded to be used for such use-cases as adding private channels to chat apps where only a specific set of agents are allowed to join the DHT of that DNA; or for creating DHTs that have temporary life-spans in app, like logs that get rotated.
 
   **Arguments**: The `CreateCloneCellPayload` is defined as:
-``` rust
+```rust
 struct CreateCloneCellPayload {
     /// The app id that the DNA to clone belongs to
     app_id: InstalledAppId,
     /// The DNA's role name to clone
-    pub role_name: RoleName,
+    role_name: RoleName,
     /// Modifiers to set for the new cell.
     /// At least one of the modifiers must be set to obtain a distinct hash for
     /// the clone cell's DNA.
@@ -1392,13 +2234,13 @@ struct CreateCloneCellPayload {
     name: Option<String>,
 }
 ```
-        
-- `DisableCloneCell(app_id: InstalledAppId, clone_cell_id: CloneCellId)`: Disable a clone cell.
-  **Notes:** When the clone cell exists, it is disabled after which any zome calls made to the cell MUST fail.  Additionally any API calls that return `AppInfo` should show a disabled status for the given cell.  If the cell doesn't exist, the call MUST be treated a no-op.
+
+* `DisableCloneCell(app_id: InstalledAppId, clone_cell_id: CloneCellId)`: Disable a clone cell.
+  **Notes:** When the clone cell exists, it is disabled after which any zome calls made to the cell MUST fail. Additionally any API calls that return `AppInfo` should show a disabled status for the given cell. If the cell doesn't exist, the call MUST be treated a no-op.
   Deleting a cloned cell can only be done from the Admin API, and cells MUST be disabled before they can be deleted.
-    
+
   **Arguments:** The `CloneCellId` argument MUST allow spacifying the cell either by `CloneId` or `CellId`:
-``` rust
+```rust
 enum CloneCellId {
     /// Clone id consisting of role id and clone index.
     CloneId(CloneId),
@@ -1407,21 +2249,21 @@ enum CloneCellId {
 }
 ```
 
-- `EnableCloneCell(app_id: InstalledAppId, clone_cell_id: CloneCellId) -> InstalledCell`: Enabled a clone cell that was previously disabled.
-  **Notes:** When the clone cell exists, it MUST be enable, after which any zome calls made to the cell MUST be attempted.  Additionally any API functions that return `AppInfo` should show a disabled status for the given cell.  If the cell doesn't exist, the call MUST be treated as a no-op.
+* `EnableCloneCell(app_id: InstalledAppId, clone_cell_id: CloneCellId) -> InstalledCell`: Enabled a clone cell that was previously disabled.
+  **Notes:** When the clone cell exists, it MUST be enable, after which any zome calls made to the cell MUST be attempted. Additionally any API functions that return `AppInfo` should show a disabled status for the given cell. If the cell doesn't exist, the call MUST be treated as a no-op.
 
   **Arguments:** The `CloneCellId` argument MUST allow spacifying the cell either by `CloneId` or `CellId`:
 
 
 ## Secure Private Key Management (lair-keystore)
 
-Holochain implementations MUST provide a secure way to create, manage and use public/private key pairs, as well as store them encrypted at rest.  Implementations MAY vary how the Conductor connects to the keystore (i.e. including in the same process or over a secure channel).  The full specification of key the key-store API is beyond the scope of this document, see https://github.com/holochain/lair for our full implementation.  However we note that the API MUST be sufficient to service the following calls via the HDK and Conductor API:
+Holochain implementations MUST provide a secure way to create, manage and use public/private key pairs, as well as store them encrypted at rest. Implementations MAY vary how the Conductor connects to the keystore (i.e. including in the same process or over a secure channel). The full specification of key the key-store API is beyond the scope of this document, see https://github.com/holochain/lair for our full implementation. However we note that the API MUST be sufficient to service the following calls via the HDK and Conductor API:
 
-- `CreateKeyPair() -> PubKey`
-- `RegisterKeyPair(PrivKey, PubKey)`
-- `Sign(Vec<u8>, PubKey) -> Vec<u8>`
-- `VerifySignature(Vec<u8>, PubKey) -> bool`
-- `Encrypt(Vec<u8>, PubKey) -> Vec<u8>`
-- `Decrypt(Vec<u8>, PubKey) -> Vec<u8>`
+* `CreateKeyPair() -> PubKey`
+* `RegisterKeyPair(PrivKey, PubKey)`
+* `Sign(Vec<u8>, PubKey) -> Vec<u8>`
+* `VerifySignature(Vec<u8>, PubKey) -> bool`
+* `Encrypt(Vec<u8>, PubKey) -> Vec<u8>`
+* `Decrypt(Vec<u8>, PubKey) -> Vec<u8>`
 
 [WP-TODO: ACB]
