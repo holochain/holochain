@@ -547,7 +547,7 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
 
     match &installed_app.manifest {
         AppManifest::V1(manifest) => {
-            if !manifest.membrane_proofs_deferred {
+            if !manifest.allow_deferred_memproofs {
                 enable_app(
                     cmd,
                     EnableApp {
