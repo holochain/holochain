@@ -154,3 +154,8 @@ fn must_get_valid_record(action_hash: ActionHash) -> ExternResult<Record> {
 fn get_agent_activity(input: GetAgentActivityInput) -> ExternResult<AgentActivity> {
     HDK.with(|h| h.borrow().get_agent_activity(input))
 }
+
+#[hdk_extern]
+fn must_get_agent_activity(input: (AgentPubKey, hdi::prelude::ChainFilter)) -> ExternResult<Vec<RegisterAgentActivity>> {
+    hdi::prelude::must_get_agent_activity(input.0, input.1)
+}

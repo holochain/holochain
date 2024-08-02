@@ -1,4 +1,4 @@
-use hdk::prelude::{PreflightRequest, PreflightRequestAcceptance, Timestamp};
+use hdk::prelude::{ChainFilter, PreflightRequest, PreflightRequestAcceptance, RegisterAgentActivity, Timestamp};
 use holo_hash::{ActionHash, EntryHash};
 use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};
 use holochain::conductor::CellError;
@@ -291,7 +291,7 @@ async fn retry_countersigning_commit_on_missing_deps() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn ruin_somebody_elses_day_without_realising() {
+async fn alice_cannot_ruin_carols_day_as_long_as_validation_protects_carol() {
     holochain_trace::test_run();
 
     let config = SweetConductorConfig::rendezvous(true);
@@ -325,33 +325,7 @@ async fn ruin_somebody_elses_day_without_realising() {
         .await
         .unwrap();
 
-    // Need chain head for each other, so get agent activity before starting a session
-    let _: AgentActivity = conductors[0]
-        .call_fallible(
-            &alice_zome,
-            "get_agent_activity",
-            GetAgentActivityInput {
-                agent_pubkey: bob.agent_pubkey().clone(),
-                chain_query_filter: ChainQueryFilter::new(),
-                activity_request: ActivityRequest::Full,
-            },
-        )
-        .await
-        .unwrap();
-    let _: AgentActivity = conductors[1]
-        .call_fallible(
-            &bob_zome,
-            "get_agent_activity",
-            GetAgentActivityInput {
-                agent_pubkey: alice.agent_pubkey().clone(),
-                chain_query_filter: ChainQueryFilter::new(),
-                activity_request: ActivityRequest::Full,
-            },
-        )
-        .await
-        .unwrap();
-
-    // Set up the session and accept it for both agents
+    // Set up the session and accept it for Alice and Carol
     let preflight_request: PreflightRequest = conductors[0]
         .call_fallible(
             &alice_zome,
@@ -391,7 +365,7 @@ async fn ruin_somebody_elses_day_without_realising() {
         unreachable!();
     };
 
-    // Alice doesn't realise that Bob is a very bad man, and goes ahead and commits
+    // Alice commits the session, believing Bob will do the same
     let (_, _): (ActionHash, EntryHash) = conductors[0]
         .call_fallible(
             &alice_zome,
@@ -401,9 +375,9 @@ async fn ruin_somebody_elses_day_without_realising() {
         .await
         .unwrap();
 
-    // Bob proceeds to laugh maniacally and not commit
+    // Bob does not commit!
 
-    // Let's wait for the session to time out and see how badly this ends for Alice
+    // Let's wait for the session to time out and see what happens next.
     let end = Instant::now().add(
         (preflight_request.session_times.end - Timestamp::now())
             .unwrap()
@@ -413,27 +387,17 @@ async fn ruin_somebody_elses_day_without_realising() {
     tokio::time::sleep_until(end.into()).await;
 
     // Okay, so the chain lock has timed out and Alice should be able to commit now
-    let _: ActionHash = conductors[0]
+    let alice_mid_commit: ActionHash = conductors[0]
         .call_fallible(&alice_zome, "create_a_thing", ())
         .await
         .unwrap();
 
+    println!("Alice mid commit: {:?}", alice_mid_commit);
+
     // Alice continues to exist on the network and see other people's data. Sadly her future actions
     // effectively go into limbo because they can't be validated.
 
-    // Let's wait for the session to time out so that the chain lock is released. Then Alice can
-    // get on with her important task of ruining Carol's day.
-    let end = Instant::now().add(
-        (preflight_request.session_times.end - Timestamp::now())
-            .unwrap()
-            .to_std()
-            .unwrap_or(Duration::from_secs(2)),
-    );
-    tokio::time::sleep_until(end.into()).await;
-
-    // Poor innocent Carol, not realising what Bob has done to Alice, tries to transact with her.
-
-    // Set up the session and accept it for both agents
+    // Carol, not realising what Bob has done to Alice, tries to carry out a transaction with her.
     let preflight_request: PreflightRequest = conductors[2]
         .call_fallible(
             &carol_zome,
@@ -453,7 +417,7 @@ async fn ruin_somebody_elses_day_without_realising() {
         )
         .await
         .unwrap();
-    let carol_response =
+    let _carol_response =
         if let PreflightRequestAcceptance::Accepted(ref response) = carol_acceptance {
             response
         } else {
@@ -467,54 +431,72 @@ async fn ruin_somebody_elses_day_without_realising() {
         )
         .await
         .unwrap();
-    let alice_response =
+    let _alice_response =
         if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
             response
         } else {
             unreachable!();
         };
 
-    // Carol, with a strange feeling that something is wrong that she can't explain, tries to commit anyway
-    let (_, _): (ActionHash, EntryHash) = conductors[2]
+    // Bob, having had his fill of chaos, shuts down his conductor
+    conductors[1].shutdown().await;
+
+    let alice_agent_activity= tokio::time::timeout(Duration::from_secs(30), async {
+        let mut alice_agent_activity: AgentActivity;
+        loop {
+            alice_agent_activity = conductors[2]
+                .call_fallible(
+                    &carol_zome,
+                    "get_agent_activity",
+                    GetAgentActivityInput {
+                        agent_pubkey: alice.agent_pubkey().clone(),
+                        chain_query_filter: ChainQueryFilter::new(),
+                        activity_request: ActivityRequest::Full,
+                    }
+                )
+                .await
+                .unwrap();
+
+            if let Some(ref highest) = alice_agent_activity.highest_observed {
+                if highest.action_seq == 6 {
+                    break;
+                }
+            }
+
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+
+        alice_agent_activity
+    }).await.unwrap();
+
+    println!("Alice agent activity: {:?}", alice_agent_activity);
+    assert!(alice_agent_activity.rejected_activity.is_empty());
+    assert_eq!(6, alice_agent_activity.highest_observed.unwrap().action_seq);
+    assert!(alice_agent_activity.warrants.is_empty());
+
+    // Require that the commit which was never published, has not been served by Alice!
+    // Bob shouldn't have it either, but he's offline now.
+    assert!(alice_agent_activity.valid_activity.iter().all(|(seq, _)| *seq != 5));
+
+    let alice_must_get_agent_activity_result: ConductorApiResult<Vec<RegisterAgentActivity>> = conductors[2]
         .call_fallible(
             &carol_zome,
-            "create_a_countersigned_thing_with_entry_hash",
-            vec![carol_response.clone(), alice_response.clone()],
+            "must_get_agent_activity",
+            (alice.agent_pubkey().clone(), ChainFilter::new(alice_mid_commit.clone())),
         )
-        .await
-        .unwrap();
+        .await;
 
-    // Alice, still unaware of Bob's treachery, tries to commit again
-    let (_, _): (ActionHash, EntryHash) = conductors[0]
-        .call_fallible(
-            &alice_zome,
-            "create_a_countersigned_thing_with_entry_hash",
-            vec![carol_response.clone(), alice_response.clone()],
-        )
-        .await
-        .unwrap();
-
-    // The session should complete because Alice's chain head is fine, that's published. There's just
-    // some junk on her chain that means her state isn't really valid.
-    let carol_rx = conductors[2].subscribe_to_app_signals("app".into());
-    let alice_rx = conductors[0].subscribe_to_app_signals("app".into());
-
-    wait_for_completion(carol_rx, preflight_request.app_entry_hash.clone()).await;
-    wait_for_completion(alice_rx, preflight_request.app_entry_hash).await;
-
-    // So what now? Well say Alice was supposed to have been transferred some resource by Bob. Bob
-    // never actually agreed to send that but Alice has a record of it. It's only on her authored
-    // chain and not the DHT so, it's not something that the network is aware of. But Alice isn't
-    // really aware either. She has no way to detect that her chain is in an invalid state. She
-    // knows her countersigning session timed out, but she doesn't necessarily know that the transaction
-    // still sitting on her chain is failed.
-    // By continuing to participate in the network, Alice has actually become a bad actor now.
-    // Even that though, will only be discovered by full validation of her state against other peers.
-    // Until somebody notices that Alice has using a transaction that only has, that doesn't appear on
-    // Bob's chain - she will go on in her ethereal state, hurting everyone she touches.
-
-    // There's no need to stop here though. Carol is one step further away from the original mistake,
-    // but she will now go on to hurt others.
+    match alice_must_get_agent_activity_result {
+        Ok(_) => {
+            panic!("Expected must_get_agent_activity to fail");
+        }
+        Err(ConductorApiError::Other(other)) => {
+            assert!(other.to_string().contains("chain is incomplete"));
+        }
+        _ => {
+            panic!("Expected InvalidCommit error, got: {:?}", alice_must_get_agent_activity_result);
+        }
+    }
 }
 
 async fn wait_for_completion(mut signal_rx: Receiver<Signal>, expected_hash: EntryHash) {
