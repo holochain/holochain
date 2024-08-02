@@ -1,5 +1,7 @@
 target/
+**/target/
 .cargo/*
+**/.cargo/
 *.log
 *~
 .wasm_cache
