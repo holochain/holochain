@@ -126,9 +126,15 @@ impl SweetLocalRendezvous {
     pub async fn drop_sig(&self) {
         self.sig_hnd.lock().unwrap().take();
 
-        // NOTE: on windows (and slow other systems) we need to wait a moment
-        //       to make sure that the old connection is actually closed.
-        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+        // wait up to 1 second until the socket is actually closed
+        for _ in 0..100 {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
+            match tokio::net::TcpStream::connect((self.sig_ip, self.sig_port)).await {
+                Ok(_) => (),
+                Err(_) => break,
+            }
+        }
     }
 
     /// Start (or restart) the signal server.
