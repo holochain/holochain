@@ -1,4 +1,6 @@
-use hdk::prelude::{ChainFilter, PreflightRequest, PreflightRequestAcceptance, RegisterAgentActivity, Timestamp};
+use hdk::prelude::{
+    ChainFilter, PreflightRequest, PreflightRequestAcceptance, RegisterAgentActivity, Timestamp,
+};
 use holo_hash::{ActionHash, EntryHash};
 use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};
 use holochain::conductor::CellError;
@@ -441,7 +443,7 @@ async fn alice_cannot_ruin_carols_day_as_long_as_validation_protects_carol() {
     // Bob, having had his fill of chaos, shuts down his conductor
     conductors[1].shutdown().await;
 
-    let alice_agent_activity= tokio::time::timeout(Duration::from_secs(30), async {
+    let alice_agent_activity = tokio::time::timeout(Duration::from_secs(30), async {
         let mut alice_agent_activity: AgentActivity;
         loop {
             alice_agent_activity = conductors[2]
@@ -452,7 +454,7 @@ async fn alice_cannot_ruin_carols_day_as_long_as_validation_protects_carol() {
                         agent_pubkey: alice.agent_pubkey().clone(),
                         chain_query_filter: ChainQueryFilter::new(),
                         activity_request: ActivityRequest::Full,
-                    }
+                    },
                 )
                 .await
                 .unwrap();
@@ -467,7 +469,9 @@ async fn alice_cannot_ruin_carols_day_as_long_as_validation_protects_carol() {
         }
 
         alice_agent_activity
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     println!("Alice agent activity: {:?}", alice_agent_activity);
     assert!(alice_agent_activity.rejected_activity.is_empty());
@@ -476,15 +480,22 @@ async fn alice_cannot_ruin_carols_day_as_long_as_validation_protects_carol() {
 
     // Require that the commit which was never published, has not been served by Alice!
     // Bob shouldn't have it either, but he's offline now.
-    assert!(alice_agent_activity.valid_activity.iter().all(|(seq, _)| *seq != 5));
+    assert!(alice_agent_activity
+        .valid_activity
+        .iter()
+        .all(|(seq, _)| *seq != 5));
 
-    let alice_must_get_agent_activity_result: ConductorApiResult<Vec<RegisterAgentActivity>> = conductors[2]
-        .call_fallible(
-            &carol_zome,
-            "must_get_agent_activity",
-            (alice.agent_pubkey().clone(), ChainFilter::new(alice_mid_commit.clone())),
-        )
-        .await;
+    let alice_must_get_agent_activity_result: ConductorApiResult<Vec<RegisterAgentActivity>> =
+        conductors[2]
+            .call_fallible(
+                &carol_zome,
+                "must_get_agent_activity",
+                (
+                    alice.agent_pubkey().clone(),
+                    ChainFilter::new(alice_mid_commit.clone()),
+                ),
+            )
+            .await;
 
     match alice_must_get_agent_activity_result {
         Ok(_) => {
@@ -494,7 +505,10 @@ async fn alice_cannot_ruin_carols_day_as_long_as_validation_protects_carol() {
             assert!(other.to_string().contains("chain is incomplete"));
         }
         _ => {
-            panic!("Expected InvalidCommit error, got: {:?}", alice_must_get_agent_activity_result);
+            panic!(
+                "Expected InvalidCommit error, got: {:?}",
+                alice_must_get_agent_activity_result
+            );
         }
     }
 }
