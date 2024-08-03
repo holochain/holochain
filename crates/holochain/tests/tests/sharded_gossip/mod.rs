@@ -267,7 +267,7 @@ async fn test_zero_arc_no_gossip_2way() {
 
     // Standard config
 
-    let config_0 = TestConfig {
+    let config_0: SweetConductorConfig = TestConfig {
         publish: true,
         recent: true,
         historical: true,
@@ -280,7 +280,13 @@ async fn test_zero_arc_no_gossip_2way() {
     // This should result in no publishing or gossip
     let mut tuning_1 = make_tuning(false, true, true, None);
     tuning_1.gossip_arc_clamping = "empty".into();
-    let config_1 = SweetConductorConfig::rendezvous(false).set_tuning_params(tuning_1);
+    let config_0 = config_0.no_dpki_mustfix();
+    let config_1 = SweetConductorConfig::rendezvous(false)
+        // Zero-arc nodes can't use DPKI in this test,
+        // since they can't learn about other peers' keys,
+        // since publishing was turned off.
+        .no_dpki_mustfix()
+        .set_tuning_params(tuning_1);
 
     let mut conductors = SweetConductorBatch::from_configs_rendezvous([config_0, config_1]).await;
 
