@@ -564,6 +564,7 @@ pub mod test {
             agent_key: agent_key.clone(),
             installed_app_id: None,
             membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
         }));

@@ -284,6 +284,7 @@ pub async fn register_and_install_dna_named(
         installed_app_id: Some(name),
         network_seed: None,
         membrane_proofs: Default::default(),
+        existing_cells: Default::default(),
         ignore_genesis_failure: false,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));

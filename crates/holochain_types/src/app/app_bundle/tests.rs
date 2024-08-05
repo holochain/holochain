@@ -61,13 +61,14 @@ async fn provisioning_1_create() {
             &std::collections::HashMap::new(),
             agent.clone(),
             Default::default(),
+            Default::default(),
         )
         .await
         .unwrap();
 
     // Build the expected output.
     // NB: this relies heavily on the particulars of the `app_manifest_fixture`
-    let role = AppRoleAssignment::new(cell_id, true, 50);
+    let role = AppRolePrimary::new(cell_id, true, 50).into();
 
     let expected = AppRoleResolution {
         agent,

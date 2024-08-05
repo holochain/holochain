@@ -155,18 +155,18 @@ pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
     Create { deferred: bool },
 
-    /*
-        TODO: implement
+    /// Require that a Cell is already installed which has a DNA that's compatible with the
+    /// `installed_hash` specified in the manifest.
+    ///
+    /// `protected` refers to the dependency. If the dependency is "protected", then the App
+    /// which owns the Cell which is shared by this role cannot be uninstalled as long as
+    /// this dependency exists. The dependency can be marked unprotected if this app is
+    /// written such that it can still function with the dependency being unavailable.
+    ///
+    /// If the dependency is protected, the depended-upon App can still be uninstalled
+    /// with the `AdminRequest::UninstallApp::force` flag
+    UseExisting { protected: bool },
 
-        /// Require that a Cell is already installed which matches the DNA installed_hash
-        /// spec, and which has an Agent that's associated with this App's agent
-        /// via DPKI. If no such Cell exists, *app installation fails*.
-        UseExisting { deferred: bool },
-
-        /// Try `UseExisting`, and if that fails, fallback to `Create`
-        CreateIfNotExists { deferred: bool },
-
-    */
     /// Install or locate the DNA, but never create a Cell for this DNA.
     /// Only allow clones to be created from the DNA specified.
     /// This case requires `clone_limit > 0`, otherwise no Cells will ever be created.
@@ -182,11 +182,6 @@ impl Default for CellProvisioning {
 impl AppManifestV1 {
     /// Update the network seed for all DNAs used in Create-provisioned Cells.
     /// Cells with other provisioning strategies are not affected.
-    ///
-    // TODO: it probably makes sense to do this for CreateIfNotExists cells
-    // too, in the Create case, but we would have to do that during installation
-    // rather than simply updating the manifest. Let's hold off on that until
-    // we know we need it, since this way is substantially simpler.
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         for role in self.roles.iter_mut() {
             // Only update the network seed for roles for which it makes sense to do so
@@ -194,6 +189,7 @@ impl AppManifestV1 {
                 CellProvisioning::Create { .. } | CellProvisioning::CloneOnly => {
                     role.dna.modifiers.network_seed = Some(network_seed.clone());
                 }
+                _ => {}
             }
         }
     }
@@ -231,28 +227,15 @@ impl AppManifestV1 {
                             modifiers,
                             installed_hash,
                         },
-                        // CellProvisioning::UseExisting { deferred } => {
-                        //     AppRoleManifestValidated::UseExisting {
-                        //         deferred,
-                        //         clone_limit,
-                        //         installed_hash: Self::require(
-                        //             installed_hash,
-                        //             "roles.dna.installed_hash",
-                        //         )?,
-                        //     }
-                        // }
-                        // CellProvisioning::CreateIfNotExists { deferred } => {
-                        //     AppRoleManifestValidated::CreateIfNotExists {
-                        //         deferred,
-                        //         clone_limit,
-                        //         location: Self::require(location, "roles.dna.(path|url)")?,
-                        //         installed_hash: Self::require(
-                        //             installed_hash,
-                        //             "roles.dna.installed_hash",
-                        //         )?,
-                        //         modifiers,
-                        //     }
-                        // }
+                        CellProvisioning::UseExisting { protected } => {
+                            AppRoleManifestValidated::UseExisting {
+                                protected,
+                                compatible_hash: Self::require(
+                                    installed_hash,
+                                    "roles.dna.installed_hash",
+                                )?,
+                            }
+                        }
                         CellProvisioning::CloneOnly => AppRoleManifestValidated::CloneOnly {
                             clone_limit,
                             location: Self::require(location, "roles.dna.(path|url)")?,
