@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - *BREAKING* CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the 
   `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry.
   This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded. #4124
+- Possible performance improvement: better async handling of wasm function calls which should allow more concurrent throughput system during long-running zome calls #4111
 
 ## 0.4.0-dev.15
 
