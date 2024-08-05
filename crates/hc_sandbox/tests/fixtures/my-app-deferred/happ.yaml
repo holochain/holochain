@@ -1,6 +1,6 @@
 manifest_version: '1'
-name: my-fixture-app
-membrane_proofs_deferred: false
+name: my-fixture-app-deferred
+membrane_proofs_deferred: true
 roles:
   - name: role-1
     provisioning:

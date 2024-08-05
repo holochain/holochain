@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_sandbox"
-version = "0.4.0-dev.14"
+version = "0.4.0-dev.15"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_sandbox"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
@@ -30,14 +30,14 @@ chrono = { version = "0.4.22", default-features = false, features = [
 ] }
 clap = { version = "4.0", features = ["derive", "env"] }
 futures = "0.3"
-holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.4.0-dev.14", features = [
+holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.4.0-dev.15", features = [
   "sqlite",
 ] }
-holochain_types = { path = "../holochain_types", version = "^0.4.0-dev.14", features = [
+holochain_types = { path = "../holochain_types", version = "^0.4.0-dev.15", features = [
   "sqlite",
 ] }
-holochain_websocket = { path = "../holochain_websocket", version = "^0.4.0-dev.14" }
-holochain_p2p = { path = "../holochain_p2p", version = "^0.4.0-dev.14", features = [
+holochain_websocket = { path = "../holochain_websocket", version = "^0.4.0-dev.15" }
+holochain_p2p = { path = "../holochain_p2p", version = "^0.4.0-dev.15", features = [
   "sqlite",
 ] }
 holochain_util = { version = "^0.4.0-dev.2", path = "../holochain_util", features = [
