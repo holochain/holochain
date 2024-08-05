@@ -742,34 +742,55 @@ pub fn insert_entry(
     Ok(())
 }
 
-/// Lock the chain with the given lock id until the given end time.
-/// During this time only the lock id will be unlocked according to `is_chain_locked`.
-/// The chain can be unlocked for all lock ids at any time by calling `unlock_chain`.
-/// In theory there can be multiple locks active at once.
-/// If there are multiple locks active at once effectively all locks are locked
-/// because the chain is locked if there are ANY locks that don't match the
-/// current id being queried.
-/// In practise this is useless so don't do that. One lock at a time please.
+/// Lock the author's chain until the given end time.
+///
+/// The lock must have a `subject` which may have some meaning to the creator of the lock.
+/// For example, it may be the hash for a countersigning session. Multiple subjects cannot be
+/// used to create multiple locks though. The chain is either locked or unlocked for the author.
+/// The `subject` just allows information to be stored with the lock.
+///
+/// Check whether the chain is locked using [crate::chain_lock::is_chain_locked]. Or check whether
+/// the lock has expired using [crate::chain_lock::is_chain_lock_expired].
 pub fn lock_chain(
     txn: &mut Transaction,
-    lock: &[u8],
     author: &AgentPubKey,
+    subject: &[u8],
     expires_at: &Timestamp,
 ) -> StateMutationResult<()> {
-    let mut lock = lock.to_vec();
-    lock.extend(author.get_raw_39());
+    // Only removes expired locks, so if the chain is already locked with a valid lock then
+    // this won't remove it and the next operation will fail.
+    unlock_chain(txn, author)?;
+
     sql_insert!(txn, ChainLock, {
-        "lock": lock,
         "author": author,
+        "subject": subject,
         "expires_at_timestamp": expires_at,
     })?;
     Ok(())
 }
 
+/// Unlock the chain by removing expired locks.
+///
+/// This function is safe to call as a cleanup when there might be expired locks. This can easily
+/// happen when the `chain_lock` module treats expired locks as not present. Ideally we would always
+/// clean up expired locks but this can be used as a safety net to avoid an expired lock preventing
+/// further operations on the chain.
+pub(crate) fn unlock_chain(txn: &mut Transaction, author: &AgentPubKey) -> StateMutationResult<()> {
+    txn.execute(
+        "DELETE FROM ChainLock WHERE author = :author AND expires_at_timestamp < :now",
+        named_params! {
+            ":author": author,
+            ":now": Timestamp::now(),
+        },
+    )?;
+    Ok(())
+}
+
 /// Unlock the chain by dropping all records in the lock table.
+///
 /// This should be done very carefully as it can e.g. invalidate a shared
 /// countersigning session that is inflight.
-pub fn unlock_chain(txn: &mut Transaction, author: &AgentPubKey) -> StateMutationResult<()> {
+pub fn force_unlock_chain(txn: &mut Transaction, author: &AgentPubKey) -> StateMutationResult<()> {
     txn.execute("DELETE FROM ChainLock WHERE author = ?", [author])?;
     Ok(())
 }
