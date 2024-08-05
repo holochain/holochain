@@ -41,7 +41,7 @@ pub async fn app_bundle_from_dnas(
         .name("[generated]".into())
         .description(None)
         .roles(roles)
-        .membrane_proofs_deferred(memproofs_deferred)
+        .allow_deferred_memproofs(memproofs_deferred)
         .build()
         .unwrap()
         .into();
@@ -65,10 +65,11 @@ pub async fn get_install_app_payload_from_dnas(
 ) -> InstallAppPayload {
     let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
     let bundle = app_bundle_from_dnas(&dnas_with_roles, false).await;
-    let membrane_proofs = data
-        .iter()
-        .map(|(dr, memproof)| (dr.role(), memproof.clone().unwrap_or_default()))
-        .collect();
+    let membrane_proofs = Some(
+        data.iter()
+            .map(|(dr, memproof)| (dr.role(), memproof.clone().unwrap_or_default()))
+            .collect(),
+    );
 
     InstallAppPayload {
         agent_key,

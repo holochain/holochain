@@ -1463,7 +1463,7 @@ mod app_impls {
             };
 
             let app = self
-                .install_app_common(installed_app_id, manifest, agent.clone(), ops, false)
+                .install_app_common(installed_app_id, manifest, agent.clone(), false, ops, false)
                 .await?;
 
             Ok(app.agent_key().clone())
@@ -1475,6 +1475,7 @@ mod app_impls {
             installed_app_id: InstalledAppId,
             manifest: AppManifest,
             agent_key: Option<AgentPubKey>,
+            defer_memproofs: bool,
             ops: AppRoleResolution,
             ignore_genesis_failure: bool,
         ) -> ConductorResult<InstalledApp> {
@@ -1565,10 +1566,6 @@ mod app_impls {
                 .iter()
                 .map(|(cell_id, _)| cell_id.clone())
                 .collect();
-
-            let defer_memproofs = match &manifest {
-                AppManifest::V1(m) => m.membrane_proofs_deferred,
-            };
 
             let app_result = if defer_memproofs {
                 let roles = ops.role_assignments;
@@ -1687,6 +1684,15 @@ mod app_impls {
             };
             let manifest = bundle.manifest().clone();
 
+            // Use deferred memproofs only if no memproofs are provided.
+            // If a memproof map is provided, it will override the allow_deferred_memproofs setting,
+            // and the provided memproofs will be used immediately.
+            let defer_memproofs = match &manifest {
+                AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.is_none(),
+            };
+
+            let membrane_proofs = membrane_proofs.unwrap_or_default();
+
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
 
@@ -1715,6 +1721,7 @@ mod app_impls {
                     installed_app_id,
                     manifest,
                     agent_key,
+                    defer_memproofs,
                     ops,
                     ignore_genesis_failure,
                 )
@@ -1898,8 +1905,7 @@ mod app_impls {
             Ok(maybe_app_info)
         }
 
-        /// Run genesis for cells of an app which was installed using
-        /// [`MemproofProvisioning::Deferred`]
+        /// Run genesis for cells of an app which was installed using `allow_deferred_memproofs`
         pub async fn provide_memproofs(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,
@@ -3764,7 +3770,7 @@ pub fn app_manifest_from_dnas(
         .name("[generated]".into())
         .description(None)
         .roles(roles)
-        .membrane_proofs_deferred(memproofs_deferred)
+        .allow_deferred_memproofs(memproofs_deferred)
         .build()
         .unwrap()
         .into()
