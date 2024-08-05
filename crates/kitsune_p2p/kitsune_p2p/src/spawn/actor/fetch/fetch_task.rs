@@ -20,12 +20,15 @@ impl FetchTask {
     ) -> Arc<RwLock<Self>> {
         let this = Arc::new(RwLock::new(FetchTask { is_finished: false }));
 
-        let span = tracing::error_span!("FetchTask::spawn", scope = config.tracing_scope);
+        let span = tracing::info_span!("FetchTask::spawn", scope = config.tracing_scope);
 
         tokio::spawn({
             let this = this.clone();
             async move {
                 'task_loop: loop {
+                    // Drop sources that aren't responding to fetch requests, and any items that have no remaining sources to fetch from.
+                    fetch_pool.check_sources();
+
                     let list = fetch_pool.get_items_to_fetch();
 
                     for (key, space, source, context) in list {
@@ -255,14 +258,13 @@ mod tests {
             }
         })
         .await
-        .expect(
-            format!(
+        .unwrap_or_else(|_| {
+            panic!(
                 "Timeout while waiting for fetch pool to contain {} items, has {}",
                 n,
                 fetch_pool.len()
             )
-            .as_str(),
-        )
+        })
     }
 
     async fn wait_for_fetch_n(

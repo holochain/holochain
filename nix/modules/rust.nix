@@ -23,7 +23,7 @@
 
       config.rustHelper = {
         defaultTrack = "stable";
-        defaultVersion = "1.71.1";
+        defaultVersion = "1.77.2";
 
         defaultExtensions = [
           "rust-src"
@@ -64,7 +64,6 @@
                 rustc = final.rustToolchain;
                 cargo = final.rustToolchain;
               })
-
             ];
           };
 
@@ -75,10 +74,6 @@
           , targets ? config.rustHelper.defaultTargets
           }: (config.rustHelper.mkRustPkgs { inherit track version extensions targets; }).rustToolchain;
 
-        crate2nixTools = { pkgs }: import "${inputs.crate2nix}/tools.nix" {
-          inherit pkgs;
-        };
-
         customBuildRustCrateForPkgs = pkgs: pkgs.buildRustCrate.override {
           stdenv = config.rustHelper.defaultStdenv pkgs;
 
@@ -88,18 +83,6 @@
               tx5-go-pion-turn = _: { nativeBuildInputs = with pkgs; [ go ]; };
             });
         };
-
-
-        mkCargoNix = { name, src, pkgs, buildRustCrateForPkgs ? config.rustHelper.customBuildRustCrateForPkgs }:
-          let
-            generated = (config.rustHelper.crate2nixTools {
-              inherit pkgs;
-            }).generatedCargoNix {
-              inherit name src;
-            };
-          in
-          pkgs.callPackage "${generated}/default.nix" { inherit buildRustCrateForPkgs; };
-
 
         # `nix flake show` is incompatible with IFD by default
         # This works around the issue by making the name of the package

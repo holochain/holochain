@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 fn insert_action_and_op(txn: &mut Transaction, u: &mut Unstructured, action: &Action) -> DhtOpHash {
     let timestamp = Timestamp::arbitrary(u).unwrap();
-    let op_order = OpOrder::new(DhtOpType::RegisterAgentActivity, timestamp);
+    let op_order = OpOrder::new(ChainOpType::RegisterAgentActivity, timestamp);
     let basis_hash: OpBasis = EntryHash::arbitrary(u).unwrap().into();
     let action = SignedActionHashed::with_presigned(
         ActionHashed::from_content_sync(action.clone()),
@@ -22,7 +22,7 @@ fn insert_action_and_op(txn: &mut Transaction, u: &mut Unstructured, action: &Ac
     mutations::insert_action(txn, &action).unwrap();
     mutations::insert_op_lite(
         txn,
-        &DhtOpLite::RegisterAgentActivity(hash, basis_hash.clone()),
+        &ChainOpLite::RegisterAgentActivity(hash, basis_hash.clone()).into(),
         &op_hash,
         &op_order,
         &timestamp,
@@ -41,7 +41,7 @@ fn set_integrated(
         let u = u.clone();
         let op_hash = op_hash.clone();
         move |txn| {
-            mutations::set_validation_stage(txn, &op_hash, ValidationLimboStatus::Pending).unwrap();
+            mutations::set_validation_stage(txn, &op_hash, ValidationStage::Pending).unwrap();
             mutations::set_when_integrated(
                 txn,
                 &op_hash,
@@ -54,7 +54,7 @@ fn set_integrated(
 
 fn set_ready_to_integrate(db: &DbWrite<DbKindDht>, op_hash: DhtOpHash) {
     db.test_write(move |txn| {
-        mutations::set_validation_stage(txn, &op_hash, ValidationLimboStatus::AwaitingIntegration)
+        mutations::set_validation_stage(txn, &op_hash, ValidationStage::AwaitingIntegration)
             .unwrap();
         mutations::set_validation_status(txn, &op_hash, ValidationStatus::Valid).unwrap();
     });
@@ -275,7 +275,7 @@ async fn cache_set_integrated() {
     let cache = DhtDbQueryCache::new(db.clone().into());
 
     cache
-        .set_activity_ready_to_integrate(&author, 0)
+        .set_activity_ready_to_integrate(&author, Some(0))
         .await
         .unwrap();
 
@@ -290,7 +290,10 @@ async fn cache_set_integrated() {
         dbg!(activity);
     })
     .await;
-    cache.set_activity_to_integrated(&author, 0).await.unwrap();
+    cache
+        .set_activity_to_integrated(&author, Some(0))
+        .await
+        .unwrap();
 
     check_state(&cache, |activity| {
         dbg!(activity);
@@ -301,11 +304,11 @@ async fn cache_set_integrated() {
     .await;
 
     cache
-        .set_activity_ready_to_integrate(&author, 1)
+        .set_activity_ready_to_integrate(&author, Some(1))
         .await
         .unwrap();
     cache
-        .set_activity_ready_to_integrate(&author, 2)
+        .set_activity_ready_to_integrate(&author, Some(2))
         .await
         .unwrap();
 
@@ -321,7 +324,10 @@ async fn cache_set_integrated() {
     assert_eq!(*to_integrate[0].0, author);
     assert_eq!(to_integrate[0].1, 1..=2);
 
-    cache.set_activity_to_integrated(&author, 1).await.unwrap();
+    cache
+        .set_activity_to_integrated(&author, Some(1))
+        .await
+        .unwrap();
 
     check_state(&cache, |activity| {
         let b = activity.get(&author).unwrap();
@@ -335,7 +341,10 @@ async fn cache_set_integrated() {
     assert_eq!(*to_integrate[0].0, author);
     assert_eq!(to_integrate[0].1, 2..=2);
 
-    cache.set_activity_to_integrated(&author, 2).await.unwrap();
+    cache
+        .set_activity_to_integrated(&author, Some(2))
+        .await
+        .unwrap();
 
     check_state(&cache, |activity| {
         let b = activity.get(&author).unwrap();
@@ -385,7 +394,7 @@ async fn check_none_integrated_with_awaiting_deps() {
     let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
     let cache = DhtDbQueryCache::new(db.clone().into());
     cache
-        .set_activity_ready_to_integrate(author.as_ref(), 3)
+        .set_activity_ready_to_integrate(author.as_ref(), Some(3))
         .await
         .unwrap();
     check_state(&cache, |activity| {

@@ -3,7 +3,6 @@
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::api::CellConductorReadHandle;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::host_fn;
 use crate::core::ribosome::real_ribosome::RealRibosome;
@@ -22,11 +21,12 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::HolochainP2pDna;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasmPair;
 use std::sync::Arc;
+use tokio::sync::broadcast;
 use unwrap_to::unwrap_to;
 
 // Commit entry types //
@@ -93,7 +93,7 @@ pub struct HostFnCaller {
     pub zome_path: ZomePath,
     pub network: HolochainP2pDna,
     pub keystore: MetaLairClient,
-    pub signal_tx: SignalBroadcaster,
+    pub signal_tx: broadcast::Sender<Signal>,
     pub call_zome_handle: CellConductorReadHandle,
 }
 
@@ -115,7 +115,9 @@ impl HostFnCaller {
         dna_file: &DnaFile,
         zome_index: usize,
     ) -> HostFnCaller {
-        let authored_db = handle.get_authored_db(cell_id.dna_hash()).unwrap();
+        let authored_db = handle
+            .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
+            .unwrap();
         let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
         let dht_db_cache = handle.get_dht_db_cache(cell_id.dna_hash()).unwrap();
         let cache = handle.get_cache_db(cell_id).await.unwrap();
@@ -136,7 +138,7 @@ impl HostFnCaller {
         )
             .into();
         let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
-        let signal_tx = handle.signal_broadcaster();
+        let signal_tx = handle.get_signal_tx(cell_id).await.unwrap();
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
         HostFnCaller {
@@ -161,7 +163,7 @@ impl HostFnCaller {
         self.dht_db.clone()
     }
 
-    pub async fn unpack(&self) -> (Arc<RealRibosome>, Arc<CallContext>, HostFnWorkspace) {
+    pub async fn unpack(&self) -> (Arc<RealRibosome>, Arc<CallContext>, SourceChainWorkspace) {
         let HostFnCaller {
             authored_db,
             dht_db,
@@ -177,19 +179,19 @@ impl HostFnCaller {
 
         let (cell_id, zome_name) = zome_path.into();
 
-        let workspace_lock = HostFnWorkspace::new(
+        let workspace = SourceChainWorkspace::new(
             authored_db,
             dht_db,
             dht_db_cache,
             cache,
             keystore.clone(),
-            Some(cell_id.agent_pubkey().clone()),
+            cell_id.agent_pubkey().clone(),
             Arc::new(ribosome.dna_def().as_content().clone()),
         )
         .await
         .unwrap();
         let host_access = ZomeCallHostAccess::new(
-            workspace_lock.clone(),
+            workspace.clone().into(),
             keystore,
             network,
             signal_tx,
@@ -204,7 +206,7 @@ impl HostFnCaller {
             // Auth as the author.
             InvocationAuth::Cap(cell_id.agent_pubkey().clone(), None),
         ));
-        (ribosome, call_context, workspace_lock)
+        (ribosome, call_context, workspace)
     }
 }
 
@@ -265,7 +267,7 @@ impl HostFnCaller {
         entry_def_id: E,
         visibility: EntryVisibility,
     ) -> ActionHash {
-        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let (ribosome, call_context, workspace) = self.unpack().await;
         let input = CreateInput::new(
             entry_def_id.into(),
             visibility,
@@ -275,13 +277,13 @@ impl HostFnCaller {
         let output = host_fn::create::create(ribosome, call_context, input).unwrap();
 
         // Write
-        workspace_lock.flush(&self.network).await.unwrap();
+        workspace.source_chain().flush(&self.network).await.unwrap();
 
         output
     }
 
     pub async fn delete_entry<'env>(&self, input: DeleteInput) -> ActionHash {
-        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let (ribosome, call_context, workspace) = self.unpack().await;
         let output = {
             let r = host_fn::delete::delete(ribosome, call_context, input);
             let r = r.map_err(|e| {
@@ -292,7 +294,7 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush(&self.network).await.unwrap();
+        workspace.source_chain().flush(&self.network).await.unwrap();
 
         output
     }
@@ -302,7 +304,7 @@ impl HostFnCaller {
         entry: Entry,
         original_action_address: ActionHash,
     ) -> ActionHash {
-        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let (ribosome, call_context, workspace) = self.unpack().await;
         let input = UpdateInput {
             original_action_address,
             entry,
@@ -312,7 +314,7 @@ impl HostFnCaller {
         let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
 
         // Write
-        workspace_lock.flush(&self.network).await.unwrap();
+        workspace.source_chain().flush(&self.network).await.unwrap();
 
         output
     }
@@ -341,7 +343,7 @@ impl HostFnCaller {
         link_type: impl Into<LinkType>,
         link_tag: LinkTag,
     ) -> ActionHash {
-        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let (ribosome, call_context, workspace) = self.unpack().await;
         let input = CreateLinkInput::new(
             base,
             target,
@@ -353,13 +355,13 @@ impl HostFnCaller {
         let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
 
         // Write
-        workspace_lock.flush(&self.network).await.unwrap();
+        workspace.source_chain().flush(&self.network).await.unwrap();
 
         output
     }
 
     pub async fn delete_link<'env>(&self, link_add_hash: ActionHash) -> ActionHash {
-        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let (ribosome, call_context, workspace) = self.unpack().await;
         let output = {
             host_fn::delete_link::delete_link(
                 ribosome,
@@ -370,7 +372,7 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush(&self.network).await.unwrap();
+        workspace.source_chain().flush(&self.network).await.unwrap();
 
         output
     }
@@ -382,7 +384,7 @@ impl HostFnCaller {
         link_tag: Option<LinkTag>,
         _options: GetLinksOptions,
     ) -> Vec<Link> {
-        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let (ribosome, call_context, workspace) = self.unpack().await;
         let mut input = GetLinksInputBuilder::try_new(base, type_query).unwrap();
         if let Some(link_tag) = link_tag {
             input = input.tag_prefix(link_tag);
@@ -396,7 +398,7 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush(&self.network).await.unwrap();
+        workspace.source_chain().flush(&self.network).await.unwrap();
 
         output
     }
@@ -408,7 +410,7 @@ impl HostFnCaller {
         tag: LinkTag,
         _options: GetLinksOptions,
     ) -> Vec<(SignedActionHashed, Vec<SignedActionHashed>)> {
-        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let (ribosome, call_context, workspace) = self.unpack().await;
         let input = GetLinksInputBuilder::try_new(base, type_query)
             .unwrap()
             .tag_prefix(tag)
@@ -422,7 +424,7 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush(&self.network).await.unwrap();
+        workspace.source_chain().flush(&self.network).await.unwrap();
 
         output.into()
     }
@@ -439,7 +441,7 @@ impl HostFnCaller {
     }
 
     pub async fn call_zome_direct(&self, invocation: ZomeCallInvocation) -> ExternIO {
-        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let (ribosome, call_context, workspace) = self.unpack().await;
 
         let (_, output) = {
             let host_access = call_context.host_context();
@@ -450,7 +452,7 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush(&self.network).await.unwrap();
+        workspace.source_chain().flush(&self.network).await.unwrap();
         unwrap_to!(output.unwrap() => ZomeCallResponse::Ok).to_owned()
     }
 }

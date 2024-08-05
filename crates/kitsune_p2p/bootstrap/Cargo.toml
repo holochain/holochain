@@ -1,24 +1,25 @@
 [package]
 name = "kitsune_p2p_bootstrap"
-version = "0.2.0-beta-dev.16"
+version = "0.3.0-dev.11"
 description = "Bootstrap server written in rust for kitsune nodes to find each other"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/kitsune_p2p_bootstrap"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
-categories = [ "network-programming" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "p2p", "dht", "networking"]
+categories = ["network-programming"]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-clap = { version = "4.3.21", features = [ "derive" ] }
-futures = "0.3.15"
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.16", path = "../types" }
-kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.11", path = "../bin_data" }
+clap = { version = "4.3.21", features = ["derive"] }
+futures = "0.3"
+kitsune_p2p_types = { version = "^0.4.0-dev.10", path = "../types" }
+kitsune_p2p_bin_data = { version = "^0.4.0-dev.9", path = "../bin_data" }
 parking_lot = "0.12.1"
 rand = "0.8.5"
-reqwest = "0.11.2"
-serde = { version = "1", features = [ "derive", "rc" ] }
+reqwest = { version = "0.12", features = ["native-tls-vendored"] }
+serde = { version = "1", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 thiserror = "1"
 tokio = { version = "1", features = ["full"] }
@@ -26,10 +27,11 @@ warp = "0.3"
 
 [dev-dependencies]
 kitsune_p2p_bootstrap = { path = ".", features = ["test_utils"] }
-kitsune_p2p = { path = "../kitsune_p2p", features = ["sqlite"] }
-fixt = { path = "../../fixt" ,version = "^0.3.0-beta-dev.0"}
+kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
+kitsune_p2p = { path = "../kitsune_p2p", features = ["sqlite", "test_utils"] }
+fixt = { path = "../../fixt", version = "^0.4.0-dev.3"}
 criterion = "0.5.1"
-reqwest = "0.11.2"
+reqwest = { version = "0.12", features = ["native-tls-vendored"] }
 
 [[bench]]
 name = "bench"
@@ -43,14 +45,10 @@ path = "src/lib.rs"
 name = "kitsune-bootstrap"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [features]
-sqlite-encrypted = [
-    "kitsune_p2p_types/sqlite-encrypted",
-]
-sqlite = [
-    "kitsune_p2p_types/sqlite",
-]
-test_utils = [
-    "kitsune_p2p_types/fixt",
-    "kitsune_p2p_bin_data/fixt",
-]
+sqlite-encrypted = ["kitsune_p2p_types/sqlite-encrypted"]
+sqlite = ["kitsune_p2p_types/sqlite"]
+test_utils = ["kitsune_p2p_types/fixt", "kitsune_p2p_bin_data/fixt"]

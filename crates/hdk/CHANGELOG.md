@@ -1,11 +1,78 @@
 ---
-default_semver_increment_mode: !pre_minor beta-dev
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## 0.4.0-dev.11
+
+- Added a new HDK function `get_validation_receipts` which can be used to look up validation receipts for an action that you have authored.
+
+## 0.4.0-dev.10
+
+## 0.4.0-dev.9
+
+## 0.4.0-dev.8
+
+## 0.4.0-dev.7
+
+## 0.4.0-dev.6
+
+## 0.4.0-dev.5
+
+## 0.4.0-dev.4
+
+## 0.4.0-dev.3
+
+## 0.4.0-dev.2
+
+- Adds two new HDK functions `close_chain` and `open_chain` that allow `Action::CloseChain` and `Action::OpenChain` respectively, to be created. These are intended to be used for DNA migrations. There is an example in the Holochain functions tests in ‘migration.rs’ \#3804
+
+## 0.4.0-dev.1
+
+## 0.4.0-dev.0
+
+## 0.3.0
+
+## 0.3.0-beta-dev.41
+
+## 0.3.0-beta-dev.40
+
+## 0.3.0-beta-dev.39
+
+## 0.3.0-beta-dev.38
+
+## 0.3.0-beta-dev.37
+
+## 0.3.0-beta-dev.36
+
+## 0.3.0-beta-dev.35
+
+## 0.3.0-beta-dev.34
+
+## 0.3.0-beta-dev.33
+
+## 0.3.0-beta-dev.32
+
+- Added `create_clone_cell`, `disable_clone_cell`, `enable_clone_cell` and `delete_clone_cell` functionality to the HDK. This was previously only available on the admin interface of Holochain which shouldn’t be used by apps. Exposing this functionality through the HDK allows happ developers to manage clones from their backend code without having to worry about their apps breaking when more security is added to the admin interface. The only restriction on the use of these methods is that they will not permit you to create clones in another app. You can create clones of any cell within the app you make the host function calls from.
+- **BREAKING**: Added parameter `GetOptions` to calls `get_links` and `get_link_details`, to allow for fetching only local data. With the default setting of this option - `Latest`, links and link details are fetched from the network. When specifically set to `Content`, the network call is skipped and the calls only consider locally available data.
+
+## 0.3.0-beta-dev.31
+
+## 0.3.0-beta-dev.30
+
+## 0.3.0-beta-dev.29
+
+## 0.3.0-beta-dev.28
+
+## 0.3.0-beta-dev.27
+
+## 0.3.0-beta-dev.26
+
+## 0.3.0-beta-dev.25
 
 ## 0.3.0-beta-dev.24
 

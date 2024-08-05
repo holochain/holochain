@@ -48,7 +48,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_verify_signature_raw_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -161,7 +161,7 @@ pub mod wasm_test {
                     .call(
                         &alice,
                         "verify_signature_raw",
-                        VerifySignature::new_raw(k.clone(), sig.clone().into(), data.clone()),
+                        VerifySignature::new_raw(k.clone(), sig.into(), data.clone()),
                     )
                     .await;
 
@@ -172,7 +172,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_verify_signature_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,

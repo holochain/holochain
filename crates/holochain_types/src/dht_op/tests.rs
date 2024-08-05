@@ -81,7 +81,7 @@ impl RecordTest {
     fn update_record(&mut self) -> (Update, Record) {
         let entry_update = builder::Update::new(
             self.original_entry_hash.clone(),
-            self.action_hash.clone().into(),
+            self.action_hash.clone(),
             self.entry_type.clone(),
             self.entry_hash.clone(),
         )
@@ -91,45 +91,49 @@ impl RecordTest {
         (entry_update, record)
     }
 
-    fn entry_create(&mut self) -> (Record, Vec<DhtOp>) {
+    fn entry_create(&mut self) -> (Record, Vec<ChainOp>) {
         let (entry_create, record) = self.create_record();
         let action: Action = entry_create.clone().into();
 
         let ops = vec![
-            DhtOp::StoreRecord(self.sig.clone(), action.clone(), self.entry.clone().into()),
-            DhtOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
-            DhtOp::StoreEntry(
+            ChainOp::StoreRecord(self.sig.clone(), action.clone(), self.entry.clone().into()),
+            ChainOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
+            ChainOp::StoreEntry(
                 self.sig.clone(),
                 NewEntryAction::Create(entry_create),
-                self.entry.clone().into(),
+                self.entry.clone(),
             ),
         ];
         (record, ops)
     }
 
-    fn entry_update(&mut self) -> (Record, Vec<DhtOp>) {
+    fn entry_update(&mut self) -> (Record, Vec<ChainOp>) {
         let (entry_update, record) = self.update_record();
         let action: Action = entry_update.clone().into();
 
         let ops = vec![
-            DhtOp::StoreRecord(self.sig.clone(), action.clone(), self.entry.clone().into()),
-            DhtOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
-            DhtOp::StoreEntry(
+            ChainOp::StoreRecord(self.sig.clone(), action.clone(), self.entry.clone().into()),
+            ChainOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
+            ChainOp::StoreEntry(
                 self.sig.clone(),
                 NewEntryAction::Update(entry_update.clone()),
                 self.entry.clone(),
             ),
-            DhtOp::RegisterUpdatedContent(
+            ChainOp::RegisterUpdatedContent(
                 self.sig.clone(),
                 entry_update.clone(),
                 self.entry.clone().into(),
             ),
-            DhtOp::RegisterUpdatedRecord(self.sig.clone(), entry_update, self.entry.clone().into()),
+            ChainOp::RegisterUpdatedRecord(
+                self.sig.clone(),
+                entry_update,
+                self.entry.clone().into(),
+            ),
         ];
         (record, ops)
     }
 
-    fn entry_delete(&mut self) -> (Record, Vec<DhtOp>) {
+    fn entry_delete(&mut self) -> (Record, Vec<ChainOp>) {
         let entry_delete = builder::Delete::new(self.action_hash.clone(), self.entry_hash.clone())
             .build(self.commons.next().unwrap())
             .weightless();
@@ -137,52 +141,53 @@ impl RecordTest {
         let action: Action = entry_delete.clone().into();
 
         let ops = vec![
-            DhtOp::StoreRecord(self.sig.clone(), action.clone(), record.entry().clone()),
-            DhtOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
-            DhtOp::RegisterDeletedBy(self.sig.clone(), entry_delete.clone()),
-            DhtOp::RegisterDeletedEntryAction(self.sig.clone(), entry_delete),
+            ChainOp::StoreRecord(self.sig.clone(), action.clone(), record.entry().clone()),
+            ChainOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
+            ChainOp::RegisterDeletedBy(self.sig.clone(), entry_delete.clone()),
+            ChainOp::RegisterDeletedEntryAction(self.sig.clone(), entry_delete),
         ];
         (record, ops)
     }
 
-    fn link_add(&mut self) -> (Record, Vec<DhtOp>) {
+    fn link_add(&mut self) -> (Record, Vec<ChainOp>) {
         let record = self.to_record(self.link_add.clone().into(), None);
         let action: Action = self.link_add.clone().into();
 
         let ops = vec![
-            DhtOp::StoreRecord(self.sig.clone(), action.clone(), RecordEntry::NA),
-            DhtOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
-            DhtOp::RegisterAddLink(self.sig.clone(), self.link_add.clone()),
+            ChainOp::StoreRecord(self.sig.clone(), action.clone(), RecordEntry::NA),
+            ChainOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
+            ChainOp::RegisterAddLink(self.sig.clone(), self.link_add.clone()),
         ];
         (record, ops)
     }
 
-    fn link_remove(&mut self) -> (Record, Vec<DhtOp>) {
+    fn link_remove(&mut self) -> (Record, Vec<ChainOp>) {
         let record = self.to_record(self.link_remove.clone().into(), None);
         let action: Action = self.link_remove.clone().into();
 
         let ops = vec![
-            DhtOp::StoreRecord(self.sig.clone(), action.clone(), RecordEntry::NA),
-            DhtOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
-            DhtOp::RegisterRemoveLink(self.sig.clone(), self.link_remove.clone()),
+            ChainOp::StoreRecord(self.sig.clone(), action.clone(), RecordEntry::NA),
+            ChainOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
+            ChainOp::RegisterRemoveLink(self.sig.clone(), self.link_remove.clone()),
         ];
         (record, ops)
     }
 
-    fn others(&self) -> Vec<(Record, Vec<DhtOp>)> {
-        let mut records = Vec::new();
-        records.push(self.to_record(self.dna.clone().into(), None));
-        records.push(self.to_record(self.chain_open.clone().into(), None));
-        records.push(self.to_record(self.chain_close.clone().into(), None));
-        records.push(self.to_record(self.agent_validation_pkg.clone().into(), None));
-        records.push(self.to_record(self.init_zomes_complete.clone().into(), None));
+    fn others(&self) -> Vec<(Record, Vec<ChainOp>)> {
+        let records = vec![
+            self.to_record(self.dna.clone().into(), None),
+            self.to_record(self.chain_open.clone().into(), None),
+            self.to_record(self.chain_close.clone().into(), None),
+            self.to_record(self.agent_validation_pkg.clone().into(), None),
+            self.to_record(self.init_zomes_complete.clone().into(), None),
+        ];
         let mut chain_records = Vec::new();
         for record in records {
             let action: Action = record.action().clone();
 
             let ops = vec![
-                DhtOp::StoreRecord(self.sig.clone(), action.clone(), RecordEntry::NA),
-                DhtOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
+                ChainOp::StoreRecord(self.sig.clone(), action.clone(), RecordEntry::NA),
+                ChainOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
             ];
             chain_records.push((record, ops));
         }
@@ -198,7 +203,7 @@ impl RecordTest {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_all_ops() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut builder = RecordTest::new();
     let (record, expected) = builder.entry_create();
     let result = produce_ops_from_record(&record).unwrap();
@@ -240,7 +245,8 @@ async fn test_dht_basis() {
     entry_update.original_action_address = original_action_hash;
 
     // Create the op
-    let op = DhtOp::RegisterUpdatedContent(fixt!(Signature), entry_update, update_new_entry.into());
+    let op =
+        ChainOp::RegisterUpdatedContent(fixt!(Signature), entry_update, update_new_entry.into());
 
     // Get the basis
     let result = op.dht_basis();
@@ -269,28 +275,30 @@ fn all_records() -> Vec<Record> {
 fn get_type_op() {
     let check_all_ops = |record| {
         let ops = produce_ops_from_record(&record).unwrap();
-        let check_type = |op: DhtOp| {
+        let check_type = |op: ChainOp| {
             let op_type = op.get_type();
             assert_eq!(op.to_lite().get_type(), op_type);
             match op {
-                DhtOp::StoreRecord(_, _, _) => assert_eq!(op_type, DhtOpType::StoreRecord),
-                DhtOp::StoreEntry(_, _, _) => assert_eq!(op_type, DhtOpType::StoreEntry),
-                DhtOp::RegisterAgentActivity(_, _) => {
-                    assert_eq!(op_type, DhtOpType::RegisterAgentActivity)
+                ChainOp::StoreRecord(_, _, _) => assert_eq!(op_type, ChainOpType::StoreRecord),
+                ChainOp::StoreEntry(_, _, _) => assert_eq!(op_type, ChainOpType::StoreEntry),
+                ChainOp::RegisterAgentActivity(_, _) => {
+                    assert_eq!(op_type, ChainOpType::RegisterAgentActivity)
                 }
-                DhtOp::RegisterUpdatedContent(_, _, _) => {
-                    assert_eq!(op_type, DhtOpType::RegisterUpdatedContent)
+                ChainOp::RegisterUpdatedContent(_, _, _) => {
+                    assert_eq!(op_type, ChainOpType::RegisterUpdatedContent)
                 }
-                DhtOp::RegisterUpdatedRecord(_, _, _) => {
-                    assert_eq!(op_type, DhtOpType::RegisterUpdatedRecord)
+                ChainOp::RegisterUpdatedRecord(_, _, _) => {
+                    assert_eq!(op_type, ChainOpType::RegisterUpdatedRecord)
                 }
-                DhtOp::RegisterDeletedBy(_, _) => assert_eq!(op_type, DhtOpType::RegisterDeletedBy),
-                DhtOp::RegisterDeletedEntryAction(_, _) => {
-                    assert_eq!(op_type, DhtOpType::RegisterDeletedEntryAction)
+                ChainOp::RegisterDeletedBy(_, _) => {
+                    assert_eq!(op_type, ChainOpType::RegisterDeletedBy)
                 }
-                DhtOp::RegisterAddLink(_, _) => assert_eq!(op_type, DhtOpType::RegisterAddLink),
-                DhtOp::RegisterRemoveLink(_, _) => {
-                    assert_eq!(op_type, DhtOpType::RegisterRemoveLink)
+                ChainOp::RegisterDeletedEntryAction(_, _) => {
+                    assert_eq!(op_type, ChainOpType::RegisterDeletedEntryAction)
+                }
+                ChainOp::RegisterAddLink(_, _) => assert_eq!(op_type, ChainOpType::RegisterAddLink),
+                ChainOp::RegisterRemoveLink(_, _) => {
+                    assert_eq!(op_type, ChainOpType::RegisterRemoveLink)
                 }
             }
         };
@@ -308,8 +316,11 @@ fn get_type_op() {
 fn from_type_op() {
     let check_all_ops = |record| {
         let ops = produce_ops_from_record(&record).unwrap();
-        let check_identity = |op: DhtOp, action, entry| {
-            assert_eq!(DhtOp::from_type(op.get_type(), action, entry).unwrap(), op)
+        let check_identity = |op: ChainOp, action, entry| {
+            assert_eq!(
+                ChainOp::from_type(op.get_type(), action, entry).unwrap(),
+                op
+            )
         };
         for op in ops {
             check_identity(
@@ -329,10 +340,10 @@ fn from_type_op() {
 fn from_type_op_light() {
     let check_all_ops = |record| {
         let ops = produce_op_lites_from_records(vec![&record]).unwrap();
-        let check_identity = |lite: DhtOpLite, action| {
+        let check_identity = |lite: ChainOpLite, action| {
             let action_hash = ActionHash::with_data_sync(action);
             assert_eq!(
-                DhtOpLite::from_type(lite.get_type(), action_hash, action).unwrap(),
+                ChainOpLite::from_type(lite.get_type(), action_hash, action).unwrap(),
                 lite
             )
         };
@@ -349,26 +360,26 @@ fn from_type_op_light() {
 fn test_all_ops_basis() {
     let check_all_ops = |record| {
         let ops = produce_ops_from_record(&record).unwrap();
-        let check_basis = |op: DhtOp| match (op.get_type(), op.dht_basis()) {
-            (DhtOpType::StoreRecord, basis) => {
+        let check_basis = |op: ChainOp| match (op.get_type(), op.dht_basis()) {
+            (ChainOpType::StoreRecord, basis) => {
                 assert_eq!(
                     basis,
                     AnyLinkableHash::from(record.action_address().clone())
                 )
             }
-            (DhtOpType::StoreEntry, basis) => {
+            (ChainOpType::StoreEntry, basis) => {
                 assert_eq!(
                     basis,
                     AnyLinkableHash::from(record.action().entry_hash().unwrap().clone())
                 )
             }
-            (DhtOpType::RegisterAgentActivity, basis) => {
+            (ChainOpType::RegisterAgentActivity, basis) => {
                 assert_eq!(
                     basis,
                     AnyLinkableHash::from(record.action().author().clone())
                 )
             }
-            (DhtOpType::RegisterUpdatedContent, basis) => {
+            (ChainOpType::RegisterUpdatedContent, basis) => {
                 assert_eq!(
                     basis,
                     AnyLinkableHash::from(
@@ -379,7 +390,7 @@ fn test_all_ops_basis() {
                     )
                 )
             }
-            (DhtOpType::RegisterUpdatedRecord, basis) => {
+            (ChainOpType::RegisterUpdatedRecord, basis) => {
                 assert_eq!(
                     basis,
                     AnyLinkableHash::from(
@@ -390,7 +401,7 @@ fn test_all_ops_basis() {
                     )
                 )
             }
-            (DhtOpType::RegisterDeletedBy, basis) => {
+            (ChainOpType::RegisterDeletedBy, basis) => {
                 assert_eq!(
                     basis,
                     AnyLinkableHash::from(
@@ -401,7 +412,7 @@ fn test_all_ops_basis() {
                     )
                 )
             }
-            (DhtOpType::RegisterDeletedEntryAction, basis) => {
+            (ChainOpType::RegisterDeletedEntryAction, basis) => {
                 assert_eq!(
                     basis,
                     AnyLinkableHash::from(
@@ -412,7 +423,7 @@ fn test_all_ops_basis() {
                     )
                 )
             }
-            (DhtOpType::RegisterAddLink, basis) => {
+            (ChainOpType::RegisterAddLink, basis) => {
                 assert_eq!(
                     basis,
                     AnyLinkableHash::from(
@@ -423,7 +434,7 @@ fn test_all_ops_basis() {
                     )
                 )
             }
-            (DhtOpType::RegisterRemoveLink, basis) => {
+            (ChainOpType::RegisterRemoveLink, basis) => {
                 assert_eq!(
                     basis,
                     AnyLinkableHash::from(

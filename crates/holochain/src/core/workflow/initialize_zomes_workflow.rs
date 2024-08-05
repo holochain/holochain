@@ -1,7 +1,6 @@
 use super::error::WorkflowResult;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
@@ -12,10 +11,10 @@ use crate::core::ribosome::RibosomeT;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
 use holochain_zome_types::action::builder;
+use tokio::sync::broadcast;
 
 #[derive(Constructor)]
 pub struct InitializeZomesWorkflowArgs<Ribosome>
@@ -24,7 +23,7 @@ where
 {
     pub ribosome: Ribosome,
     pub conductor_handle: ConductorHandle,
-    pub signal_tx: SignalBroadcaster,
+    pub signal_tx: broadcast::Sender<Signal>,
     pub cell_id: CellId,
     pub integrate_dht_ops_trigger: TriggerSender,
 }
@@ -51,6 +50,7 @@ where
     let conductor_handle = args.conductor_handle.clone();
     let coordinators = args.ribosome.dna_def().get_all_coordinators();
     let integrate_dht_ops_trigger = args.integrate_dht_ops_trigger.clone();
+    let signal_tx = args.signal_tx.clone();
     let result =
         initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
@@ -59,9 +59,7 @@ where
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        let flushed_actions = HostFnWorkspace::from(workspace.clone())
-            .flush(&network)
-            .await?;
+        let flushed_actions = workspace.source_chain().flush(&network).await?;
 
         send_post_commit(
             conductor_handle,
@@ -70,6 +68,7 @@ where
             keystore,
             flushed_actions,
             coordinators,
+            signal_tx,
         )
         .await?;
 
@@ -219,7 +218,7 @@ mod tests {
         let args = InitializeZomesWorkflowArgs {
             ribosome,
             conductor_handle,
-            signal_tx: SignalBroadcaster::noop(),
+            signal_tx: broadcast::channel(1).0,
             cell_id: CellId::new(dna_def_hashed.to_hash(), author.clone()),
             integrate_dht_ops_trigger: integrate_dht_ops_trigger.0.clone(),
         };
@@ -243,7 +242,7 @@ mod tests {
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();
-        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("app", [&dna]).await.unwrap();
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 
@@ -275,7 +274,7 @@ mod tests {
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::InitFail]).await;
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();
-        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("app", [&dna]).await.unwrap();
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 
@@ -321,7 +320,7 @@ mod tests {
 
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();
-        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("app", [&dna]).await.unwrap();
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 

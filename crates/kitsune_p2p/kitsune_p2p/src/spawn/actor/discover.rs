@@ -158,7 +158,6 @@ pub(crate) fn search_and_discover_peer_connect(
                                     .host_api
                                     .legacy
                                     .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                        space: inner.space.clone(),
                                         peer_data: vec![agent_info_signed.clone()],
                                     })
                                     .await
@@ -209,7 +208,7 @@ pub(crate) fn peer_connect(
     let agent = agent_info_signed.agent.clone();
     let url = agent_info_signed
         .url_list
-        .get(0)
+        .first()
         .cloned()
         .ok_or_else(|| KitsuneP2pError::from("no url - agent is likely offline"));
 
@@ -239,6 +238,7 @@ pub(crate) fn peer_connect(
     })
 }
 
+#[derive(Debug)]
 pub(crate) enum SearchRemotesCoveringBasisLogicResult {
     Success(Vec<AgentInfoSigned>),
     Error(KitsuneP2pError),
@@ -289,12 +289,17 @@ impl SearchRemotesCoveringBasisLogic {
                 continue;
             }
 
-            // skip nodes that can't tell us about any peers
-            if node.storage_arc.range().is_empty() {
+            // skip nodes that aren't willing to store data
+            if node.storage_arc().range().is_empty() {
                 continue;
             }
 
-            if node.storage_arc.contains(self.basis_loc) {
+            if node.storage_arc().contains(self.basis_loc) {
+                tracing::info!(
+                    "found node covering basis_loc {:?} {:?}",
+                    node,
+                    self.basis_loc
+                );
                 cover_nodes.push(node);
             } else {
                 near_nodes.push(node);
@@ -386,7 +391,6 @@ pub(crate) fn search_remotes_covering_basis(
                                 .host_api
                                 .legacy
                                 .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                    space: inner.space.clone(),
                                     peer_data: peer_list,
                                 })
                                 .await

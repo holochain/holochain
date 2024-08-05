@@ -35,8 +35,7 @@ use holo_hash::EntryHash;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
-use holochain_p2p::HolochainP2pDna;
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::GenericNetwork;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -104,20 +103,17 @@ pub enum CascadeSource {
 ///
 /// See the module-level docs for more info.
 #[derive(Clone)]
-pub struct CascadeImpl<Network: Send + Sync = HolochainP2pDna> {
+pub struct CascadeImpl {
     authored: Option<DbRead<DbKindAuthored>>,
     dht: Option<DbRead<DbKindDht>>,
     cache: Option<DbWrite<DbKindCache>>,
     scratch: Option<SyncScratch>,
-    network: Option<Network>,
+    network: Option<GenericNetwork>,
     private_data: Option<Arc<AgentPubKey>>,
     duration_metric: &'static CascadeDurationMetric,
 }
 
-impl<Network> CascadeImpl<Network>
-where
-    Network: HolochainP2pDnaT + Clone + 'static + Send + Sync,
-{
+impl CascadeImpl {
     /// Add the authored env to the cascade.
     pub fn with_authored(self, authored: DbRead<DbKindAuthored>) -> Self {
         Self {
@@ -159,11 +155,11 @@ where
     }
 
     /// Add the network and cache to the cascade.
-    pub fn with_network<N: HolochainP2pDnaT>(
+    pub fn with_network(
         self,
-        network: N,
+        network: GenericNetwork,
         cache_db: DbWrite<DbKindCache>,
-    ) -> CascadeImpl<N> {
+    ) -> CascadeImpl {
         CascadeImpl {
             authored: self.authored,
             dht: self.dht,
@@ -174,9 +170,7 @@ where
             duration_metric: create_cascade_duration_metric(),
         }
     }
-}
 
-impl CascadeImpl<HolochainP2pDna> {
     /// Constructs an empty [Cascade].
     pub fn empty() -> Self {
         Self {
@@ -191,12 +185,11 @@ impl CascadeImpl<HolochainP2pDna> {
     }
 
     /// Construct a [Cascade] with network access
-    pub fn from_workspace_and_network<N, AuthorDb, DhtDb>(
+    pub fn from_workspace_and_network<AuthorDb, DhtDb>(
         workspace: &HostFnWorkspace<AuthorDb, DhtDb>,
-        network: N,
-    ) -> CascadeImpl<N>
+        network: GenericNetwork,
+    ) -> CascadeImpl
     where
-        N: HolochainP2pDnaT + Clone,
         AuthorDb: ReadAccess<DbKindAuthored>,
         DhtDb: ReadAccess<DbKindDht>,
     {
@@ -207,7 +200,7 @@ impl CascadeImpl<HolochainP2pDna> {
             scratch,
         } = workspace.stores();
         let private_data = workspace.author();
-        CascadeImpl::<N> {
+        CascadeImpl {
             authored: Some(authored),
             dht: Some(dht),
             cache: Some(cache),
@@ -235,6 +228,11 @@ impl CascadeImpl<HolochainP2pDna> {
             private_data: author,
             duration_metric: create_cascade_duration_metric(),
         }
+    }
+
+    /// Getter
+    pub fn cache(&self) -> Option<&DbWrite<DbKindCache>> {
+        self.cache.as_ref()
     }
 }
 
@@ -268,10 +266,7 @@ pub trait Cascade {
 }
 
 #[async_trait::async_trait]
-impl<Network> Cascade for CascadeImpl<Network>
-where
-    Network: HolochainP2pDnaT + Clone + 'static + Send,
-{
+impl Cascade for CascadeImpl {
     async fn retrieve_entry(
         &self,
         hash: EntryHash,
@@ -376,10 +371,7 @@ where
     }
 }
 
-impl<Network> CascadeImpl<Network>
-where
-    Network: HolochainP2pDnaT + Clone + 'static + Send,
-{
+impl CascadeImpl {
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_rendered_op(txn: &mut Transaction, op: &RenderedOp) -> CascadeResult<()> {
         let RenderedOp {
@@ -403,7 +395,16 @@ where
 
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_rendered_ops(txn: &mut Transaction, ops: &RenderedOps) -> CascadeResult<()> {
-        let RenderedOps { ops, entry } = ops;
+        let RenderedOps {
+            ops,
+            entry,
+            warrant,
+        } = ops;
+
+        if let Some(warrant) = warrant {
+            let op = DhtOpHashed::from_content_sync(warrant.clone());
+            insert_op(txn, &op)?;
+        }
         if let Some(entry) = entry {
             insert_entry(txn, entry.as_hash(), entry.as_content())?;
         }
@@ -429,7 +430,7 @@ where
                 ..
             } = op;
             let op =
-                DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(signature, content));
+                DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(signature, content));
             insert_op(txn, &op)?;
             // We set the integrated to for the cache so it can match the
             // same query as the vault. This can also be used for garbage collection.
@@ -438,6 +439,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip_all)]
     async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
         cache
@@ -452,6 +454,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip_all)]
     async fn merge_link_ops_into_cache(
         &self,
         responses: Vec<WireLinkOps>,
@@ -471,6 +474,7 @@ where
     }
 
     /// Add new activity to the Cache.
+    #[tracing::instrument(skip_all)]
     async fn add_activity_into_cache(
         &self,
         responses: Vec<MustGetAgentActivityResponse>,
@@ -488,10 +492,11 @@ where
                 "Got different must_get_agent_activity responses from different authorities"
             );
             // TODO: Handle conflict.
-            // For now try to find one that has got the activity.
+            // For now try to find one that has got the activity
             responses
-                .into_iter()
-                .find(|a| matches!(a, MustGetAgentActivityResponse::Activity(_)))
+                .iter()
+                .find(|a| matches!(a, MustGetAgentActivityResponse::Activity { .. }))
+                .cloned()
         };
 
         let cache = some_or_return!(
@@ -501,18 +506,24 @@ where
 
         // Commit the activity to the chain.
         match response {
-            Some(MustGetAgentActivityResponse::Activity(activity)) => {
+            Some(MustGetAgentActivityResponse::Activity { activity, warrants }) => {
                 // TODO: Avoid this clone by committing the ops as references to the db.
                 cache
                     .write_async({
                         let activity = activity.clone();
+                        let warrants = warrants.clone();
                         move |txn| {
                             Self::insert_activity(txn, activity)?;
+                            for warrant in warrants {
+                                let op = DhtOpHashed::from_content_sync(warrant);
+                                insert_op(txn, &op)?;
+                            }
+
                             CascadeResult::Ok(())
                         }
                     })
                     .await?;
-                Ok(MustGetAgentActivityResponse::Activity(activity))
+                Ok(MustGetAgentActivityResponse::Activity { activity, warrants })
             }
             Some(response) => Ok(response),
             // Got no responses so the chain is incomplete.
@@ -693,33 +704,22 @@ where
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<EntryDetails>> {
-        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
-        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         let query: GetEntryDetailsQuery = self.construct_query_with_data_access(entry_hash.clone());
-
-        // We don't need metadata and only need the content
-        // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone()).await?;
-            // We got a result so can short circuit.
-            if results.is_some() {
-                return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
-            } else if authoring || authority {
-                return Ok(None);
-            }
+        if let GetStrategy::Local = options.strategy {
+            // Only return what is in the database.
+            return self.cascading(query.clone()).await;
         }
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
+        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
+        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         if !(authoring || authority) {
             self.fetch_record(entry_hash.into(), options.into()).await?;
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     /// Get the specified Record along with all Updates and Deletes associated with it.
@@ -731,8 +731,6 @@ where
         action_hash: ActionHash,
         options: GetOptions,
     ) -> CascadeResult<Option<RecordDetails>> {
-        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
-        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
         let query: GetRecordDetailsQuery =
             self.construct_query_with_data_access(action_hash.clone());
 
@@ -740,30 +738,22 @@ where
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
-        // We don't need metadata and only need the content
-        // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone()).await?;
-            // We got a result so can short circuit.
-            if results.is_some() {
-                return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
-            } else if authoring || authority {
-                return Ok(None);
-            }
+        if let GetStrategy::Local = options.strategy {
+            // Only return what is in the database.
+            return self.cascading(query.clone()).await;
         }
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
+        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
+        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
         if !(authoring || authority) {
             self.fetch_record(action_hash.into(), options.into())
                 .await?;
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     #[instrument(skip(self, options))]
@@ -776,38 +766,28 @@ where
         action_hash: ActionHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
-        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
-        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
         let query: GetLiveRecordQuery = self.construct_query_with_data_access(action_hash.clone());
 
         // DESIGN: we can short circuit if we have any local deletes on an action.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
-        // We don't need metadata and only need the content
-        // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone()).await?;
-            // We got a result so can short circuit.
-            if results.is_some() {
-                return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
-            } else if authoring || authority {
-                return Ok(None);
-            }
+        if let GetStrategy::Local = options.strategy {
+            // Only return what is in the database.
+            return self.cascading(query.clone()).await;
         }
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
+        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
+        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
         if !(authoring || authority) {
             self.fetch_record(action_hash.into(), options.into())
                 .await?;
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     #[instrument(skip(self, options))]
@@ -818,33 +798,23 @@ where
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
-        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
-        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         let query: GetLiveEntryQuery = self.construct_query_with_data_access(entry_hash.clone());
 
-        // We don't need metadata and only need the content
-        // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone()).await?;
-            // We got a result so can short circuit.
-            if results.is_some() {
-                return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
-            } else if authoring || authority {
-                return Ok(None);
-            }
+        if let GetStrategy::Local = options.strategy {
+            // Only return what is in the database.
+            return self.cascading(query.clone()).await;
         }
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
+        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
+        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         if !(authoring || authority) {
             self.fetch_record(entry_hash.into(), options.into()).await?;
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     /// Perform a concurrent `get` on multiple hashes simultaneously, returning
@@ -913,10 +883,15 @@ where
         key: WireLinkKey,
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<Link>> {
-        let authority = self.am_i_an_authority(key.base.clone()).await?;
-        if !authority {
-            self.fetch_links(key.clone(), options).await?;
+        // only fetch links from network if i am not an authority and
+        // GetStrategy is Latest
+        if let GetStrategy::Network = options.get_options.strategy {
+            let authority = self.am_i_an_authority(key.base.clone()).await?;
+            if !authority {
+                self.fetch_links(key.clone(), options).await?;
+            }
         }
+
         let query = GetLinksQuery::new(
             key.base,
             key.type_query,
@@ -928,8 +903,7 @@ where
             },
         );
 
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     #[instrument(skip(self, key, options))]
@@ -940,13 +914,16 @@ where
         key: WireLinkKey,
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<(SignedActionHashed, Vec<SignedActionHashed>)>> {
-        let authority = self.am_i_an_authority(key.base.clone()).await?;
-        if !authority {
-            self.fetch_links(key.clone(), options).await?;
+        // only fetch link details from network if i am not an authority and
+        // GetStrategy is Network
+        if let GetStrategy::Network = options.get_options.strategy {
+            let authority = self.am_i_an_authority(key.base.clone()).await?;
+            if !authority {
+                self.fetch_links(key.clone(), options).await?;
+            }
         }
         let query = GetLinkDetailsQuery::new(key.base, key.type_query, key.tag);
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     /// Count the number of links matching the `query`.
@@ -998,14 +975,14 @@ where
             move || {
                 let mut results = Vec::with_capacity(txn_guards.len() + 1);
                 for txn_guard in &mut txn_guards {
-                    let mut txn = txn_guard.transaction()?;
+                    let txn = txn_guard.transaction()?;
                     let r = match &scratch {
                         Some(scratch) => {
                             scratch.apply_and_then(|scratch| {
-                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, Some(scratch), &author, filter.clone())
+                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&txn, Some(scratch), &author, filter.clone())
                             })?
                         }
-                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, None, &author, filter.clone())?
+                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&txn, None, &author, filter.clone())?
                     };
                     results.push(r);
                 }
@@ -1027,7 +1004,7 @@ where
             );
 
         // Short circuit if we have a result.
-        if matches!(result, MustGetAgentActivityResponse::Activity(_)) {
+        if matches!(result, MustGetAgentActivityResponse::Activity { .. }) {
             return Ok(result);
         }
 
@@ -1038,8 +1015,9 @@ where
             // this point then the chain is incomplete for this request.
             Ok(MustGetAgentActivityResponse::IncompleteChain)
         } else {
-            self.fetch_must_get_agent_activity(author.clone(), filter)
-                .await
+            Ok(self
+                .fetch_must_get_agent_activity(author.clone(), filter)
+                .await?)
         }
     }
 
@@ -1111,6 +1089,7 @@ where
             rejected_activity,
             status,
             highest_observed,
+            warrants,
         } = merged_response;
         let valid_activity = match valid_activity {
             ChainItems::Hashes(hashes) => {
@@ -1119,7 +1098,7 @@ where
                 let maybe_chain: Option<Vec<_>> = self
                     .get_concurrent(
                         hashes.into_iter().map(|(_, h)| h.into()),
-                        GetOptions::content(),
+                        GetOptions::local(),
                     )
                     .await?
                     .into_iter()
@@ -1142,7 +1121,7 @@ where
                 let maybe_chain: Option<Vec<_>> = self
                     .get_concurrent(
                         hashes.into_iter().map(|(_, h)| h.into()),
-                        GetOptions::content(),
+                        GetOptions::local(),
                     )
                     .await?
                     .into_iter()
@@ -1165,6 +1144,7 @@ where
             rejected_activity,
             status,
             highest_observed,
+            warrants,
         };
         Ok(r)
     }
@@ -1177,7 +1157,6 @@ where
 
     async fn am_i_an_authority(&self, hash: OpBasis) -> CascadeResult<bool> {
         let network = some_or_return!(self.network.as_ref(), false);
-
         Ok(network.authority_for_hash(hash).await?)
     }
 

@@ -31,7 +31,16 @@ where
     C: HashableContent<HashType = T>,
 {
     /// Compute the hash of this content and store it alongside
-    pub fn from_content_sync(content: C) -> Self {
+    pub fn from_content_sync(content: impl Into<C>) -> Self {
+        let content: C = content.into();
+        let hash: HoloHashOf<C> = HoloHash::<T>::with_data_sync(&content);
+        Self { content, hash }
+    }
+
+    /// Compute the hash of this content and store it alongside.
+    /// Only accepts the actual content type, does not respect
+    /// From impls of the content type like `from_content_sync` does.
+    pub fn from_content_sync_exact(content: C) -> Self {
         let hash: HoloHashOf<C> = HoloHash::<T>::with_data_sync(&content);
         Self { content, hash }
     }

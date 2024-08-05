@@ -62,7 +62,7 @@ impl AppBundle {
         self,
         dna_store: &impl DnaStore,
         agent: AgentPubKey,
-        membrane_proofs: HashMap<RoleName, MembraneProof>,
+        membrane_proofs: MemproofMap,
     ) -> AppBundleResult<AppRoleResolution> {
         let AppManifestValidated { name: _, roles } = self.manifest().clone().validate()?;
         let bundle = Arc::new(self);
@@ -79,53 +79,50 @@ impl AppBundle {
             .collect::<AppBundleResult<Vec<_>>>()?
             .into_iter()
             .fold(
-                Ok(AppRoleResolution::new(agent.clone())),
-                |acc: AppBundleResult<AppRoleResolution>, (role_name, op)| {
-                    if let Ok(mut resolution) = acc {
-                        match op {
-                            CellProvisioningOp::CreateFromDnaFile(dna, clone_limit) => {
-                                let agent = resolution.agent.clone();
-                                let dna_hash = dna.dna_hash().clone();
-                                let cell_id = CellId::new(dna_hash, agent);
-                                let role = AppRoleAssignment::new(cell_id, true, clone_limit);
-                                // TODO: could sequentialize this to remove the clone
-                                let proof = membrane_proofs.get(&role_name).cloned();
-                                resolution.dnas_to_register.push((dna, proof));
-                                resolution.role_assignments.push((role_name, role));
-                            }
-
-                            CellProvisioningOp::Existing(cell_id, clone_limit) => {
-                                let role = AppRoleAssignment::new(cell_id, true, clone_limit);
-                                resolution.role_assignments.push((role_name, role));
-                            }
-                            CellProvisioningOp::ProvisionOnly(dna, clone_limit) => {
-                                let agent = resolution.agent.clone();
-                                let dna_hash = dna.dna_hash().clone();
-                                let cell_id = CellId::new(dna_hash, agent);
-
-                                // TODO: could sequentialize this to remove the clone
-                                let proof = membrane_proofs.get(&role_name).cloned();
-                                resolution.dnas_to_register.push((dna, proof));
-                                resolution.role_assignments.push((
-                                    role_name,
-                                    AppRoleAssignment::new(cell_id, false, clone_limit),
-                                ));
-                            }
-                            other @ (CellProvisioningOp::HashMismatch(_, _)
-                            | CellProvisioningOp::Conflict(_)) => {
-                                tracing::error!(
-                                    "Encountered unexpected CellProvisioningOp: {:?}",
-                                    other
-                                );
-                                unimplemented!()
-                            }
+                AppRoleResolution::new(agent.clone()),
+                |mut resolution: AppRoleResolution, (role_name, op)| {
+                    match op {
+                        CellProvisioningOp::CreateFromDnaFile(dna, clone_limit) => {
+                            let agent = resolution.agent.clone();
+                            let dna_hash = dna.dna_hash().clone();
+                            let cell_id = CellId::new(dna_hash, agent);
+                            let role = AppRoleAssignment::new(cell_id, true, clone_limit);
+                            // TODO: could sequentialize this to remove the clone
+                            let proof = membrane_proofs.get(&role_name).cloned();
+                            resolution.dnas_to_register.push((dna, proof));
+                            resolution.role_assignments.push((role_name, role));
                         }
-                        Ok(resolution)
-                    } else {
-                        acc
+
+                        CellProvisioningOp::Existing(cell_id, clone_limit) => {
+                            let role = AppRoleAssignment::new(cell_id, true, clone_limit);
+                            resolution.role_assignments.push((role_name, role));
+                        }
+                        CellProvisioningOp::ProvisionOnly(dna, clone_limit) => {
+                            let agent = resolution.agent.clone();
+                            let dna_hash = dna.dna_hash().clone();
+                            let cell_id = CellId::new(dna_hash, agent);
+
+                            // TODO: could sequentialize this to remove the clone
+                            let proof = membrane_proofs.get(&role_name).cloned();
+                            resolution.dnas_to_register.push((dna, proof));
+                            resolution.role_assignments.push((
+                                role_name,
+                                AppRoleAssignment::new(cell_id, false, clone_limit),
+                            ));
+                        }
+                        other @ (CellProvisioningOp::HashMismatch(_, _)
+                        | CellProvisioningOp::Conflict(_)) => {
+                            tracing::error!(
+                                "Encountered unexpected CellProvisioningOp: {:?}",
+                                other
+                            );
+                            unimplemented!()
+                        }
                     }
+
+                    resolution
                 },
-            )?;
+            );
 
         // let resolution = cells.into_iter();
         Ok(resolution)
@@ -217,23 +214,23 @@ impl AppBundle {
         role_name: RoleName,
         dna_store: &impl DnaStore,
         location: &mr_bundle::Location,
-        installed_hash: Option<&DnaHashB64>,
+        expected_hash: Option<&DnaHashB64>,
         modifiers: DnaModifiersOpt,
     ) -> AppBundleResult<DnaFile> {
-        let dna_file = if let Some(hash) = installed_hash {
+        let dna_file = if let Some(expected_hash) = expected_hash {
             let (dna_file, original_hash) =
-                if let Some(mut dna_file) = dna_store.get_dna(&hash.clone().into()) {
+                if let Some(mut dna_file) = dna_store.get_dna(&expected_hash.clone().into()) {
                     let original_hash = dna_file.dna_hash().clone();
                     dna_file = dna_file.update_modifiers(modifiers);
                     (dna_file, original_hash)
                 } else {
                     self.resolve_location(location, modifiers).await?
                 };
-            let expected_hash: DnaHash = hash.clone().into();
+            let expected_hash: DnaHash = expected_hash.clone().into();
             if expected_hash != original_hash {
                 return Err(AppBundleError::CellResolutionFailure(
                     role_name,
-                    format!("Hash mismatch: {} {}", expected_hash, original_hash),
+                    format!("Hash mismatch: {} != {}", expected_hash, original_hash),
                 ));
             }
             dna_file

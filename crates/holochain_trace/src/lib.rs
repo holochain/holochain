@@ -76,14 +76,19 @@
 use tracing::Subscriber;
 use tracing_subscriber::{
     filter::EnvFilter,
-    fmt::{format::FmtSpan, time::UtcTime},
+    fmt::{
+        format::{DefaultFields, FmtSpan, Format},
+        time::UtcTime,
+    },
+    layer::SubscriberExt,
     registry::LookupSpan,
-    FmtSubscriber,
+    util::SubscriberInitExt,
+    Layer, Registry,
 };
 
 use derive_more::Display;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use std::{str::FromStr, sync::Once};
 
 use flames::FlameTimed;
 use fmt::*;
@@ -92,15 +97,14 @@ mod flames;
 mod fmt;
 pub mod metrics;
 mod writer;
-// mod open;
 
-// #[cfg(all(feature = "opentelemetry-on", feature = "channels"))]
-// pub use open::channel;
-// #[cfg(feature = "opentelemetry-on")]
-// pub use open::should_run;
-// pub use open::{Config, Context, MsgWrap, OpenSpanExt};
+mod open;
+#[cfg(all(feature = "opentelemetry-on", feature = "channels"))]
+pub use open::channel;
+#[cfg(feature = "opentelemetry-on")]
+pub use open::should_run;
+pub use open::{Config, Context, MsgWrap, OpenSpanExt};
 
-use crate::flames::{toml_path, FlameTimedConsole};
 use crate::writer::InMemoryWriter;
 pub use tracing;
 use tracing_subscriber::fmt::MakeWriter;
@@ -122,16 +126,14 @@ pub enum Output {
     FlameTimed,
     /// Creates a flamegraph from timed spans using idle time
     IceTimed,
-    // /// Opentelemetry tracing
-    // OpenTel,
+    /// Opentelemetry tracing
+    OpenTel,
     /// No logging to console
     None,
 }
 
 /// ParseError is a String
 pub type ParseError = String;
-
-static INIT: Once = Once::new();
 
 impl FromStr for Output {
     type Err = ParseError;
@@ -154,22 +156,26 @@ impl FromStr for Output {
 /// Run logging in a unit test.
 ///
 /// RUST_LOG must be set or this is a no-op.
-pub fn test_run() -> Result<(), errors::TracingError> {
+pub fn test_run() {
+    if std::env::var_os("RUST_LOG").is_none() {
+        return;
+    }
+
+    static INIT_ONCE: std::sync::Once = std::sync::Once::new();
+
+    INIT_ONCE.call_once(|| {
+        init_fmt(Output::Log).unwrap();
+    });
+}
+
+/// Run tracing in a test that uses open telemetry to
+/// send span contexts across process and thread boundaries.
+pub fn test_run_open() -> Result<(), errors::TracingError> {
     if std::env::var_os("RUST_LOG").is_none() {
         return Ok(());
     }
-
-    init_fmt(Output::Log)
+    init_fmt(Output::OpenTel)
 }
-
-// /// Run tracing in a test that uses open telemetry to
-// /// send span contexts across process and thread boundaries.
-// pub fn test_run_open() -> Result<(), errors::TracingError> {
-//     if std::env::var_os("RUST_LOG").is_none() {
-//         return Ok(());
-//     }
-//     init_fmt(Output::OpenTel)
-// }
 
 /// Same as test_run but with timed spans
 pub fn test_run_timed() -> Result<(), errors::TracingError> {
@@ -202,29 +208,6 @@ pub fn test_run_timed_flame() -> Result<Option<Box<impl Drop>>, errors::TracingE
     Ok(Some(Box::new(FlameTimed::new(writer_handle))))
 }
 
-/// Generate a flamegraph from timed spans "busy time".
-/// Takes a path where you are piping the output into.
-/// If the path is provided a flamegraph will automatically be generated.
-/// TODO: Get auto inferno to work
-/// for now use (fish, or the bash equiv):
-/// `2>| inferno-flamegraph > flamegraph_test_ice_(date +'%d-%m-%y-%X').svg`
-/// And run with `cargo test --quiet`
-#[deprecated]
-pub fn test_run_timed_flame_console(
-    path: Option<&str>,
-) -> Result<Option<impl Drop>, errors::TracingError> {
-    if std::env::var_os("RUST_LOG").is_none() {
-        return Ok(None);
-    }
-    init_fmt(Output::FlameTimed)?;
-    Ok(path.and_then(|p| {
-        toml_path().map(|mut t| {
-            t.push(p);
-            FlameTimedConsole::new(t)
-        })
-    }))
-}
-
 /// Generate a flamegraph from timed spans of "idle time".
 pub fn test_run_timed_ice() -> Result<Option<Box<impl Drop>>, errors::TracingError> {
     if std::env::var_os("RUST_LOG").is_none() {
@@ -240,27 +223,52 @@ pub fn test_run_timed_ice() -> Result<Option<Box<impl Drop>>, errors::TracingErr
     Ok(Some(Box::new(FlameTimed::new(writer_handle))))
 }
 
-/// Generate a flamegraph from timed spans "idle time".
-/// Takes a path where you are piping the output into.
-/// If the path is provided a flamegraph will automatically be generated.
-/// TODO: Get auto inferno to work
-/// for now use (fish, or the bash equiv):
-/// `2>| inferno-flamegraph -c blue > flamegraph_test_ice_(date +'%d-%m-%y-%X').svg`
-/// And run with `cargo test --quiet`
-#[deprecated]
-pub fn test_run_timed_ice_console(
-    path: Option<&str>,
-) -> Result<Option<impl Drop>, errors::TracingError> {
-    if std::env::var_os("RUST_LOG").is_none() {
-        return Ok(None);
+/// Build the canonical filter based on env
+pub fn standard_filter() -> Result<EnvFilter, errors::TracingError> {
+    let mut filter = match std::env::var("RUST_LOG") {
+        Ok(_) => EnvFilter::from_default_env().add_directive("[{aitia}]=debug".parse()?),
+        Err(_) => EnvFilter::from_default_env()
+            .add_directive("[wasm_debug]=debug".parse()?)
+            .add_directive("[{aitia}]=off".parse()?),
+    };
+    if std::env::var("CUSTOM_FILTER").is_ok() {
+        EnvFilter::try_from_env("CUSTOM_FILTER")
+            .map_err(|e| eprintln!("Failed to parse CUSTOM_FILTER {:?}", e))
+            .map(|f| {
+                filter = f;
+            })
+            .ok();
     }
-    init_fmt(Output::IceTimed)?;
-    Ok(path.and_then(|p| {
-        toml_path().map(|mut t| {
-            t.push(p);
-            FlameTimedConsole::new(t)
-        })
-    }))
+    Ok(filter)
+}
+
+/// Return a subscriber builder directly, for times when you need more control over the
+/// produced subscriber
+pub fn standard_layer_unfiltered<W, S>(
+    writer: W,
+) -> Result<tracing_subscriber::fmt::Layer<S, DefaultFields, Format, W>, errors::TracingError>
+where
+    W: for<'w> MakeWriter<'w> + Send + Sync + 'static,
+    S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
+{
+    Ok(tracing_subscriber::fmt::Layer::default()
+        .with_test_writer()
+        .with_writer(writer)
+        .with_file(true)
+        .with_line_number(true)
+        .with_target(true))
+}
+
+/// Return a subscriber builder directly, for times when you need more control over the
+/// produced subscriber
+pub fn standard_layer<W, S>(writer: W) -> Result<impl Layer<S>, errors::TracingError>
+where
+    W: for<'w> MakeWriter<'w> + Send + Sync + 'static,
+    S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
+{
+    let filter = standard_filter()?;
+
+    Ok(standard_layer_unfiltered(writer)?.with_filter(filter))
 }
 
 /// This checks RUST_LOG for a filter but doesn't complain if there is none or it doesn't parse.
@@ -273,105 +281,99 @@ fn init_fmt_with_opts<W>(output: Output, writer: W) -> Result<(), errors::Tracin
 where
     W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
 {
-    let mut filter = match std::env::var("RUST_LOG") {
-        Ok(_) => EnvFilter::from_default_env(),
-        Err(_) => EnvFilter::from_default_env().add_directive("[wasm_debug]=debug".parse()?),
-    };
-    if std::env::var("CUSTOM_FILTER").is_ok() {
-        EnvFilter::try_from_env("CUSTOM_FILTER")
-            .map_err(|e| eprintln!("Failed to parse CUSTOM_FILTER {:?}", e))
-            .map(|f| {
-                filter = f;
-            })
-            .ok();
-    }
+    let filter = standard_filter()?;
 
-    let subscriber = FmtSubscriber::builder()
-        .with_test_writer()
-        .with_writer(writer)
-        .with_file(true)
-        .with_line_number(true)
-        .with_target(true);
+    println!(
+        "Initialising log output formatting with option {:?}",
+        output
+    );
 
     match output {
-        Output::Json => {
-            let subscriber = subscriber
-                .with_env_filter(filter)
-                .with_timer(UtcTime::rfc_3339())
-                .json()
-                .event_format(FormatEvent);
-            finish(subscriber.finish())
-        }
-        Output::JsonTimed => {
-            let subscriber = subscriber
-                .with_span_events(FmtSpan::CLOSE)
-                .with_env_filter(filter)
-                .with_timer(UtcTime::rfc_3339())
-                .json()
-                .event_format(FormatEvent);
-            finish(subscriber.finish())
-        }
-        Output::Log => finish(subscriber.with_env_filter(filter).finish()),
-        Output::LogTimed => {
-            let subscriber = subscriber.with_span_events(FmtSpan::CLOSE);
-            finish(subscriber.with_env_filter(filter).finish())
-        }
-        Output::FlameTimed => {
-            let subscriber = subscriber
-                .with_span_events(FmtSpan::CLOSE)
-                .with_env_filter(filter)
-                .with_timer(UtcTime::rfc_3339())
-                .event_format(FormatEventFlame);
-            finish(subscriber.finish())
-        }
-        Output::IceTimed => {
-            let subscriber = subscriber
-                .with_span_events(FmtSpan::CLOSE)
-                .with_env_filter(filter)
-                .with_timer(UtcTime::rfc_3339())
-                .event_format(FormatEventIce);
-            finish(subscriber.finish())
-        }
-        Output::Compact => {
-            let subscriber = subscriber.compact();
-            finish(subscriber.with_env_filter(filter).finish())
-        }
-        // Output::OpenTel => {
-        //     #[cfg(feature = "opentelemetry-on")]
-        //     {
-        //         use open::OPEN_ON;
-        //         use opentelemetry::api::Provider;
-        //         OPEN_ON.store(true, std::sync::atomic::Ordering::SeqCst);
-        //         use tracing_subscriber::prelude::*;
-        //         open::init();
-        //         let tracer = opentelemetry::sdk::Provider::default().get_tracer("component_name");
-        //         let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-        //         finish(
-        //             subscriber
-        //                 .with_env_filter(filter)
-        //                 .finish()
-        //                 .with(telemetry)
-        //                 .with(open::OpenLayer),
-        //         )
-        //     }
-        //     #[cfg(not(feature = "opentelemetry-on"))]
-        //     {
-        //         Ok(())
-        //     }
-        // }
-        Output::None => Ok(()),
-    }
-}
+        Output::Json => Registry::default()
+            .with(
+                standard_layer_unfiltered(writer)?
+                    .with_timer(UtcTime::rfc_3339())
+                    .json()
+                    .event_format(FormatEvent)
+                    .with_filter(filter),
+            )
+            .init(),
 
-fn finish<S>(subscriber: S) -> Result<(), errors::TracingError>
-where
-    S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
-{
-    let mut result = Ok(());
-    INIT.call_once(|| {
-        result = tracing::subscriber::set_global_default(subscriber).map_err(Into::into);
-    });
-    result
+        Output::JsonTimed => Registry::default()
+            .with(
+                standard_layer_unfiltered(writer)?
+                    .with_span_events(FmtSpan::CLOSE)
+                    .with_timer(UtcTime::rfc_3339())
+                    .json()
+                    .event_format(FormatEvent)
+                    .with_filter(filter),
+            )
+            .init(),
+
+        Output::Log => Registry::default().with(standard_layer(writer)?).init(),
+
+        Output::LogTimed => Registry::default()
+            .with(
+                standard_layer_unfiltered(writer)?
+                    .with_span_events(FmtSpan::FULL)
+                    .with_filter(filter),
+            )
+            .init(),
+
+        Output::FlameTimed => Registry::default()
+            .with(
+                standard_layer_unfiltered(writer)?
+                    .with_span_events(FmtSpan::CLOSE)
+                    .with_timer(UtcTime::rfc_3339())
+                    .event_format(FormatEventFlame)
+                    .with_filter(filter),
+            )
+            .init(),
+
+        Output::IceTimed => Registry::default()
+            .with(
+                standard_layer_unfiltered(writer)?
+                    .with_span_events(FmtSpan::CLOSE)
+                    .with_timer(UtcTime::rfc_3339())
+                    .event_format(FormatEventIce)
+                    .with_filter(filter),
+            )
+            .init(),
+
+        Output::Compact => Registry::default()
+            .with(
+                standard_layer_unfiltered(writer)?
+                    .compact()
+                    .with_filter(filter),
+            )
+            .init(),
+
+        Output::OpenTel => {
+            #[cfg(feature = "opentelemetry-on")]
+            {
+                use open::OPEN_ON;
+                use opentelemetry::api::Provider;
+                OPEN_ON.store(true, std::sync::atomic::Ordering::SeqCst);
+                use tracing_subscriber::prelude::*;
+                open::init();
+                let tracer = opentelemetry::sdk::Provider::default().get_tracer("component_name");
+                let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+                finish(
+                    Registry::default()
+                        .with(standard_layer(writer)?)
+                        .with(telemetry)
+                        .with(open::OpenLayer)
+                        .init(),
+                )
+            }
+            #[cfg(not(feature = "opentelemetry-on"))]
+            {
+                init_fmt_with_opts(Output::Log, writer)?
+            }
+        }
+        Output::None => (),
+    };
+    Ok(())
 }
 
 pub mod errors {

@@ -1,17 +1,21 @@
 [package]
 name = "holochain_secure_primitive"
 description = "Crate for the secure primitive macros"
-version = "0.3.0-beta-dev.21"
+version = "0.4.0-dev.1"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_secure_primitive"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-serde = { version = "1.0", features = [ "derive" ] }
+serde = { version = "1.0", features = ["derive"] }
 paste = "1.0"
 
 # TODO: Figure out if we can keep this dependency behind a feature flag,
 #       or limit it to test-only code, to reduce Wasm code bloat
 subtle = "2"
+
+[lints]
+workspace = true

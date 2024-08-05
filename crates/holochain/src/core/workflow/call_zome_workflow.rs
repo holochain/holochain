@@ -1,13 +1,11 @@
-use std::sync::Arc;
-
 use super::app_validation_workflow;
 use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
+use super::app_validation_workflow::ValidationDependencies;
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeResult;
@@ -18,12 +16,13 @@ use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::WorkflowError;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::source_chain::SourceChainError;
-use holochain_zome_types::record::Record;
-
 use holochain_types::prelude::*;
+use holochain_zome_types::record::Record;
+use parking_lot::Mutex;
+use std::sync::Arc;
+use tokio::sync::broadcast;
 use tracing::instrument;
 
 #[cfg(test)]
@@ -35,7 +34,7 @@ pub type ZomeCallResult = RibosomeResult<ZomeCallResponse>;
 pub struct CallZomeWorkflowArgs<RibosomeT> {
     pub ribosome: RibosomeT,
     pub invocation: ZomeCallInvocation,
-    pub signal_tx: SignalBroadcaster,
+    pub signal_tx: broadcast::Sender<Signal>,
     pub conductor_handle: ConductorHandle,
     pub is_root_zome_call: bool,
     pub cell_id: CellId,
@@ -67,6 +66,7 @@ where
         .ok();
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
+    let signal_tx = args.signal_tx.clone();
     let result =
         call_zome_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
@@ -75,16 +75,11 @@ where
 
     // commit the workspace
     if should_write {
-        let is_empty = workspace.source_chain().is_empty()?;
         let countersigning_op = workspace.source_chain().countersigning_op()?;
-        match HostFnWorkspace::from(workspace.clone())
-            .flush(&network)
-            .await
-        {
+        match workspace.source_chain().flush(&network).await {
             Ok(flushed_actions) => {
-                // Q: what is the purpose of checking for an empty chain? When would this ever happen? The chain should
-                //    be genesis'd by now, right?
-                if !is_empty {
+                // Skip if nothing was written
+                if !flushed_actions.is_empty() {
                     match countersigning_op {
                         Some(op) => {
                             if let Err(error_response) =
@@ -106,19 +101,20 @@ where
                             trigger_integrate_dht_ops.trigger(&"call_zome_workflow");
                         }
                     }
-                }
 
-                // Only send post commit if this is a coordinator zome.
-                if let Some(coordinator_zome) = coordinator_zome {
-                    send_post_commit(
-                        conductor_handle,
-                        workspace,
-                        network,
-                        keystore,
-                        flushed_actions,
-                        vec![coordinator_zome],
-                    )
-                    .await?;
+                    // Only send post commit if this is a coordinator zome.
+                    if let Some(coordinator_zome) = coordinator_zome {
+                        send_post_commit(
+                            conductor_handle,
+                            workspace,
+                            network,
+                            keystore,
+                            flushed_actions,
+                            vec![coordinator_zome],
+                            signal_tx,
+                        )
+                        .await?;
+                    }
                 }
             }
             err => {
@@ -241,7 +237,7 @@ where
 {
     let cascade = Arc::new(holochain_cascade::CascadeImpl::from_workspace_and_network(
         &workspace,
-        network.clone(),
+        Arc::new(network.clone()),
     ));
 
     let to_app_validate = {
@@ -267,26 +263,66 @@ where
             let op =
                 app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;
 
-            let (op, omitted_entry) = match op {
+            let (op, dht_op_hash, omitted_entry) = match op {
                 Ok(op) => op,
                 Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
             };
+            let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
             let outcome = app_validation_workflow::validate_op(
                 &op,
+                &dht_op_hash,
                 workspace.clone().into(),
                 &network,
                 &ribosome,
                 &conductor_handle,
+                validation_dependencies.clone(),
+                true, // is_inline
             )
             .await;
             let outcome = outcome.or_else(Outcome::try_from);
             map_outcome(outcome)?;
-            chain_record = app_validation_workflow::op_to_record(op, omitted_entry);
+            chain_record = op_to_record(op, omitted_entry);
         }
     }
 
     Ok(())
+}
+
+fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
+    match op {
+        Op::StoreRecord(StoreRecord { mut record }) => {
+            if let Some(e) = omitted_entry {
+                // NOTE: this is only possible in this situation because we already removed
+                // this exact entry from this Record earlier. DON'T set entries on records
+                // anywhere else without recomputing hashes and signatures!
+                record.entry = RecordEntry::Present(e);
+            }
+            record
+        }
+        Op::StoreEntry(StoreEntry { action, entry }) => {
+            Record::new(SignedActionHashed::raw_from_same_hash(action), Some(entry))
+        }
+        Op::RegisterUpdate(RegisterUpdate {
+            update, new_entry, ..
+        }) => Record::new(SignedActionHashed::raw_from_same_hash(update), new_entry),
+        Op::RegisterDelete(RegisterDelete { delete, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(delete),
+            omitted_entry,
+        ),
+        Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(action),
+            omitted_entry,
+        ),
+        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(create_link),
+            omitted_entry,
+        ),
+        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(delete_link),
+            omitted_entry,
+        ),
+    }
 }
 
 fn map_outcome(

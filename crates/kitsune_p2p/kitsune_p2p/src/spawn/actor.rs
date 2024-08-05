@@ -16,11 +16,21 @@ use kitsune_p2p_fetch::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
+use kitsune_p2p_types::dht::Arq;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+/// Default webrtc config if set to `None`.
+/// TODO - set this to holochain stun servers once they exist!
+const DEFAULT_WEBRTC_CONFIG: &str = r#"{
+  "iceServers": [
+    { "urls": "stun:stun-0.main.infra.holo.host:443" },
+    { "urls": "stun:stun-1.main.infra.holo.host:443" }
+  ]
+}"#;
 
 /// The bootstrap service is much more thoroughly documented in the default service implementation.
 /// See <https://github.com/holochain/bootstrap>
@@ -52,6 +62,9 @@ const UNAUTHORIZED_DISCONNECT_REASON: &str = "unauthorized";
 ghost_actor::ghost_chan! {
     #[allow(clippy::too_many_arguments)]
     pub chan Internal<crate::KitsuneP2pError> {
+        /// Notification that we have a new address to be identified at
+        fn new_address(local_url: String) -> ();
+
         /// Register space event handler
         fn register_space_event_handler(recv: EvtRcv) -> ();
 
@@ -124,18 +137,87 @@ pub(crate) struct KitsuneP2pActor {
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     fetch_pool: FetchPool,
+    local_url: Arc<std::sync::Mutex<Option<String>>>,
 }
 
 impl KitsuneP2pActor {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         config: KitsuneP2pConfig,
-        tls_config: kitsune_p2p_types::tls::TlsConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
-        host_api: HostApiLegacy,
+        direct_host_api: HostApiLegacy,
+        self_host_api: HostApiLegacy,
+        ep_hnd: MetaNet,
+        ep_evt: MetaNetEvtRecv,
+        bootstrap_net: BootstrapNet,
+        maybe_peer_url: Option<String>,
     ) -> KitsuneP2pResult<Self> {
+        let local_url = Arc::new(std::sync::Mutex::new(maybe_peer_url));
+
         crate::types::metrics::init();
 
+        let fetch_response_queue =
+            FetchResponseQueue::new(FetchResponseConfig::new(config.tuning_params.clone()));
+
+        // TODO - use a real config
+        let fetch_pool = FetchPool::new_bitwise_or();
+
+        // Start a loop to handle our fetch queue fetch items.
+        FetchTask::spawn(
+            config.clone(),
+            fetch_pool.clone(),
+            self_host_api.clone(),
+            internal_sender.clone(),
+        );
+
+        let i_s = internal_sender.clone();
+
+        let bandwidth_throttles = BandwidthThrottles::new(&config.tuning_params);
+        let parallel_notify_permit = Arc::new(tokio::sync::Semaphore::new(
+            config.tuning_params.concurrent_limit_per_thread,
+        ));
+
+        MetaNetTask::new(
+            self_host_api.clone(),
+            config.clone(),
+            fetch_pool.clone(),
+            fetch_response_queue,
+            ep_evt,
+            i_s,
+        )
+        .spawn();
+
+        Ok(Self {
+            channel_factory,
+            internal_sender,
+            ep_hnd,
+            host_api: direct_host_api,
+            spaces: HashMap::new(),
+            config: Arc::new(config),
+            bootstrap_net,
+            bandwidth_throttles,
+            parallel_notify_permit,
+            fetch_pool,
+            local_url,
+        })
+    }
+}
+
+pub(super) async fn create_meta_net(
+    config: &KitsuneP2pConfig,
+    tls_config: tls::TlsConfig,
+    internal_sender: ghost_actor::GhostSender<Internal>,
+    host: HostApiLegacy,
+    preflight_user_data: PreflightUserData,
+) -> KitsuneP2pResult<(MetaNet, MetaNetEvtRecv, BootstrapNet, Option<String>)> {
+    let mut ep_hnd = None;
+    let mut ep_evt = None;
+    let mut bootstrap_net = None;
+    let mut maybe_peer_url = None;
+
+    #[cfg(feature = "tx2")]
+    if ep_hnd.is_none() && config.is_tx2() {
         let metrics = Tx2ApiMetrics::default().set_write_len(|d, l| {
             let t = match d {
                 "Wire::Failure" => KitsuneMetrics::Failure,
@@ -153,102 +235,47 @@ impl KitsuneP2pActor {
             KitsuneMetrics::count(t, l);
         });
 
-        let (ep_hnd, ep_evt, bootstrap_net) = create_meta_net(
-            &config,
-            tls_config,
-            internal_sender.clone(),
-            host_api.clone(),
-            metrics,
-        )
-        .await?;
-
-        let fetch_response_queue =
-            FetchResponseQueue::new(FetchResponseConfig::new(config.tuning_params.clone()));
-
-        // TODO - use a real config
-        let fetch_pool = FetchPool::new_bitwise_or();
-
-        // Start a loop to handle our fetch queue fetch items.
-        FetchTask::spawn(
-            config.clone(),
-            fetch_pool.clone(),
-            host_api.clone(),
-            internal_sender.clone(),
-        );
-
-        let i_s = internal_sender.clone();
-
-        let bandwidth_throttles = BandwidthThrottles::new(&config.tuning_params);
-        let parallel_notify_permit = Arc::new(tokio::sync::Semaphore::new(
-            config.tuning_params.concurrent_limit_per_thread,
-        ));
-
-        MetaNetTask::new(
-            host_api.clone(),
-            config.clone(),
-            fetch_pool.clone(),
-            fetch_response_queue,
-            ep_evt,
-            i_s,
-        )
-        .spawn();
-
-        Ok(Self {
-            channel_factory,
-            internal_sender,
-            ep_hnd,
-            host_api,
-            spaces: HashMap::new(),
-            config: Arc::new(config),
-            bootstrap_net,
-            bandwidth_throttles,
-            parallel_notify_permit,
-            fetch_pool,
-        })
-    }
-}
-
-async fn create_meta_net(
-    config: &KitsuneP2pConfig,
-    tls_config: tls::TlsConfig,
-    internal_sender: ghost_actor::GhostSender<Internal>,
-    host: HostApiLegacy,
-    metrics: Tx2ApiMetrics,
-) -> KitsuneP2pResult<(MetaNet, MetaNetEvtRecv, BootstrapNet)> {
-    let mut ep_hnd = None;
-    let mut ep_evt = None;
-    let mut bootstrap_net = None;
-
-    #[cfg(feature = "tx2")]
-    if ep_hnd.is_none() && config.is_tx2() {
         tracing::trace!("tx2");
-        let (h, e) = MetaNet::new_tx2(host.clone(), config.clone(), tls_config, metrics).await?;
+        let (h, e, p) = MetaNet::new_tx2(host.clone(), config.clone(), tls_config, metrics).await?;
         ep_hnd = Some(h);
         ep_evt = Some(e);
         bootstrap_net = Some(BootstrapNet::Tx2);
+        maybe_peer_url = p;
     }
 
     #[cfg(feature = "tx5")]
     if ep_hnd.is_none() && config.is_tx5() {
         tracing::trace!("tx5");
-        let signal_url = match config.transport_pool.get(0).unwrap() {
-            TransportConfig::WebRTC { signal_url } => signal_url.clone(),
+        let (signal_url, webrtc_config) = match config.transport_pool.first().unwrap() {
+            TransportConfig::WebRTC {
+                signal_url,
+                webrtc_config,
+            } => {
+                let webrtc_config = webrtc_config
+                    .as_ref()
+                    .map(|c| serde_json::to_string(&c).expect("Can Serialize JSON"))
+                    .unwrap_or_else(|| DEFAULT_WEBRTC_CONFIG.to_string());
+                (signal_url.clone(), webrtc_config)
+            }
             _ => unreachable!(),
         };
-        let (h, e) = MetaNet::new_tx5(
+        let (h, e, p) = MetaNet::new_tx5(
             config.tuning_params.clone(),
             host.clone(),
             internal_sender.clone(),
             signal_url,
+            webrtc_config,
+            preflight_user_data,
         )
         .await?;
         ep_hnd = Some(h);
         ep_evt = Some(e);
         bootstrap_net = Some(BootstrapNet::Tx5);
+        maybe_peer_url = p;
     }
 
     match (ep_hnd, ep_evt, bootstrap_net) {
-        (Some(h), Some(e), Some(n)) => Ok((h, e, n)),
+        (Some(h), Some(e), Some(n)) => Ok((h, e, n, maybe_peer_url)),
         _ => Err("tx2 or tx5 feature must be enabled".into()),
     }
 }
@@ -256,6 +283,7 @@ async fn create_meta_net(
 use crate::spawn::actor::fetch::{FetchResponseConfig, FetchTask};
 use crate::spawn::actor::meta_net_task::MetaNetTask;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 
 impl ghost_actor::GhostControlHandler for KitsuneP2pActor {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
@@ -281,6 +309,20 @@ impl ghost_actor::GhostControlHandler for KitsuneP2pActor {
 impl ghost_actor::GhostHandler<Internal> for KitsuneP2pActor {}
 
 impl InternalHandler for KitsuneP2pActor {
+    fn handle_new_address(&mut self, local_url: String) -> InternalHandlerResult<()> {
+        let spaces = self.spaces.values().map(|s| s.get()).collect::<Vec<_>>();
+        Ok(async move {
+            let mut all = Vec::new();
+            for (_, space) in futures::future::join_all(spaces).await {
+                all.push(space.new_address(local_url.clone()));
+            }
+            let _ = futures::future::join_all(all).await;
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
     fn handle_register_space_event_handler(
         &mut self,
         recv: futures::channel::mpsc::Receiver<KitsuneP2pEvent>,
@@ -509,8 +551,24 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_put_agent_info_signed(
         &mut self,
         input: crate::event::PutAgentInfoSignedEvt,
-    ) -> KitsuneP2pEventHandlerResult<()> {
-        Ok(self.host_api.legacy.put_agent_info_signed(input))
+    ) -> KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>> {
+        let legacy_host = self.host_api.legacy.clone();
+        let ep_hnd = self.ep_hnd.clone();
+
+        Ok(async move {
+            let puts = legacy_host.put_agent_info_signed(input).await?;
+
+            for removed_url in puts.iter().flat_map(|r| r.removed_urls.clone()) {
+                tracing::debug!(?removed_url, "peer URL changed, closing connection");
+                if let Err(e) = ep_hnd.close_peer_con(removed_url.clone()) {
+                    tracing::debug!(?e, ?removed_url, "could not close peer connection");
+                }
+            }
+
+            Ok(puts)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_query_agents(
@@ -523,9 +581,9 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_query_peer_density(
         &mut self,
         space: Arc<KitsuneSpace>,
-        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+        arq: kitsune_p2p_types::dht_arc::DhtArc,
     ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
-        Ok(self.host_api.legacy.query_peer_density(space, dht_arc))
+        Ok(self.host_api.legacy.query_peer_density(space, arq))
     }
 
     fn handle_call(
@@ -555,18 +613,18 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         Ok(self.host_api.legacy.receive_ops(space, ops, context))
     }
 
-    fn handle_fetch_op_data(
-        &mut self,
-        input: FetchOpDataEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
-        Ok(self.host_api.legacy.fetch_op_data(input))
-    }
-
     fn handle_query_op_hashes(
         &mut self,
         input: QueryOpHashesEvt,
     ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
         Ok(self.host_api.legacy.query_op_hashes(input))
+    }
+
+    fn handle_fetch_op_data(
+        &mut self,
+        input: FetchOpDataEvt,
+    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
+        Ok(self.host_api.legacy.fetch_op_data(input))
     }
 
     fn handle_sign_network_data(
@@ -580,19 +638,12 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
 impl ghost_actor::GhostHandler<KitsuneP2p> for KitsuneP2pActor {}
 
 impl KitsuneP2pHandler for KitsuneP2pActor {
-    fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
-        let this_addr = self.ep_hnd.local_addr()?;
-        let url = url2::Url2::try_parse(&this_addr)
-            .map_err(|e| KitsuneError::bad_input(e, format!("{:?}", this_addr)))?;
-        Ok(async move { Ok(vec![url]) }.boxed().into())
-    }
-
     fn handle_join(
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arc: Option<crate::dht_arc::DhtArc>,
+        initial_arq: Option<Arq>,
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
         let space2 = space.clone();
@@ -603,6 +654,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let bandwidth_throttles = self.bandwidth_throttles.clone();
         let parallel_notify_permit = self.parallel_notify_permit.clone();
         let fetch_pool = self.fetch_pool.clone();
+        let local_url = self.local_url.clone();
 
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
@@ -616,6 +668,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
                     bandwidth_throttles,
                     parallel_notify_permit,
                     fetch_pool,
+                    local_url,
                 )
                 .await
                 .expect("cannot fail to create space");
@@ -630,7 +683,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender
-                .join(space, agent, maybe_agent_info, initial_arc)
+                .join(space, agent, maybe_agent_info, initial_arq)
                 .await
         }
         .boxed()
@@ -832,7 +885,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
 
             for peer in all_peers {
                 for peer in peer? {
-                    if let Some(net_key) = peer.url_list.get(0).map(|u| {
+                    if let Some(net_key) = peer.url_list.first().map(|u| {
                         kitsune_p2p_proxy::ProxyUrl::from(u.as_url2())
                             .digest()
                             .to_string()
@@ -916,7 +969,7 @@ mockall::mock! {
         fn handle_put_agent_info_signed(
             &mut self,
             input: crate::event::PutAgentInfoSignedEvt,
-        ) -> KitsuneP2pEventHandlerResult<()>;
+        ) -> KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>>;
 
         fn handle_query_agents(
             &mut self,
@@ -926,7 +979,7 @@ mockall::mock! {
         fn handle_query_peer_density(
             &mut self,
             space: Arc<KitsuneSpace>,
-            dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+            arq: kitsune_p2p_types::dht_arc::DhtArc,
         ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView>;
 
         fn handle_call(
@@ -975,6 +1028,7 @@ impl ghost_actor::GhostControlHandler for MockKitsuneP2pEventHandler {}
 
 #[cfg(test)]
 mod tests {
+    use crate::meta_net::PreflightUserData;
     use crate::spawn::actor::create_meta_net;
     use crate::spawn::actor::MetaNet;
     use crate::spawn::actor::MetaNetEvtRecv;
@@ -986,9 +1040,8 @@ mod tests {
     use kitsune_p2p_bootstrap_client::BootstrapNet;
     use kitsune_p2p_types::config::{KitsuneP2pConfig, NetworkType, TransportConfig};
     use kitsune_p2p_types::tls::TlsConfig;
-    use kitsune_p2p_types::tx2::tx2_api::Tx2ApiMetrics;
     use std::net::SocketAddr;
-    use tokio::task::AbortHandle;
+    use std::sync::Arc;
     use url2::url2;
 
     #[cfg(feature = "tx2")]
@@ -1009,11 +1062,12 @@ mod tests {
     #[cfg(feature = "tx5")]
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_mdns_meta_net() {
-        let (signal_addr, abort_handle) = start_signal_srv();
+        let (signal_addr, _sig_hnd) = start_signal_srv().await;
 
         let mut config = KitsuneP2pConfig::default();
         config.transport_pool = vec![TransportConfig::WebRTC {
             signal_url: format!("ws://{:?}", signal_addr),
+            webrtc_config: None,
         }];
         config.bootstrap_service = None;
         config.network_type = NetworkType::QuicMdns;
@@ -1024,16 +1078,16 @@ mod tests {
         assert_eq!(BootstrapNet::Tx5, bootstrap_net);
 
         meta_net.close(0, "test").await;
-        abort_handle.abort();
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_bootstrap_meta_net() {
-        let (signal_addr, abort_handle) = start_signal_srv();
+        let (signal_addr, _sig_hnd) = start_signal_srv().await;
 
         let mut config = KitsuneP2pConfig::default();
         config.transport_pool = vec![TransportConfig::WebRTC {
             signal_url: format!("ws://{:?}", signal_addr),
+            webrtc_config: None,
         }];
         config.bootstrap_service = Some(url2!("ws://not-a-bootstrap.test"));
         config.network_type = NetworkType::QuicBootstrap;
@@ -1044,7 +1098,6 @@ mod tests {
         assert_eq!(BootstrapNet::Tx5, bootstrap_net);
 
         meta_net.close(0, "test").await;
-        abort_handle.abort();
     }
 
     async fn test_create_meta_net(
@@ -1067,27 +1120,21 @@ mod tests {
             TlsConfig::new_ephemeral().await.unwrap(),
             internal_sender,
             HostStub::new().legacy(sender),
-            Tx2ApiMetrics::new(),
+            PreflightUserData::default(),
         )
         .await
+        .map(|(n, r, b, _)| (n, r, b))
     }
 
-    fn start_signal_srv() -> (SocketAddr, AbortHandle) {
-        let mut config = tx5_signal_srv::Config::default();
-        config.interfaces = "127.0.0.1".to_string();
-        config.port = 0;
-        config.demo = false;
-        let (sig_driver, addr_list, err_list) =
-            tx5_signal_srv::exec_tx5_signal_srv(config).unwrap();
+    async fn start_signal_srv() -> (SocketAddr, sbd_server::SbdServer) {
+        let server = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
+            bind: vec!["127.0.0.1:0".to_string(), "[::1]:0".to_string()],
+            limit_clients: 100,
+            ..Default::default()
+        }))
+        .await
+        .unwrap();
 
-        assert!(err_list.is_empty());
-        assert_eq!(1, addr_list.len());
-
-        let abort_handle = tokio::spawn(async move {
-            sig_driver.await;
-        })
-        .abort_handle();
-
-        (*addr_list.first().unwrap(), abort_handle)
+        (*server.bind_addrs().first().unwrap(), server)
     }
 }

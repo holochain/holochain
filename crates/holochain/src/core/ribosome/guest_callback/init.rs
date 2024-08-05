@@ -1,5 +1,4 @@
 use crate::conductor::api::CellConductorReadHandle;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
@@ -11,6 +10,7 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
+use tokio::sync::broadcast;
 
 #[derive(Debug, Clone)]
 pub struct InitInvocation {
@@ -28,7 +28,7 @@ pub struct InitHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
     pub network: HolochainP2pDna,
-    pub signal_tx: SignalBroadcaster,
+    pub signal_tx: broadcast::Sender<Signal>,
     pub call_zome_handle: CellConductorReadHandle,
 }
 
@@ -170,10 +170,9 @@ mod test {
             let number_of_extras = rng.gen_range(0..5);
             for _ in 0..number_of_extras {
                 let maybe_extra = results.choose(&mut rng).cloned();
-                match maybe_extra {
-                    Some(extra) => results.push(extra),
-                    _ => {}
-                };
+                if let Some(extra) = maybe_extra {
+                    results.push(extra);
+                }
             }
 
             assert_eq!(expected, results.into(),);
@@ -225,7 +224,6 @@ mod test {
 mod slow_tests {
     use super::InitResult;
     use crate::conductor::api::error::ConductorApiResult;
-    use crate::conductor::conductor::CellStatus;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::InitHostAccessFixturator;
@@ -237,9 +235,10 @@ mod slow_tests {
     use crate::test_utils::host_fn_caller::Post;
     use ::fixt::prelude::*;
     use holo_hash::ActionHash;
-    use holochain_types::app::{CloneCellId, DisableCloneCellPayload};
+    use holochain_types::app::DisableCloneCellPayload;
     use holochain_types::prelude::CreateCloneCellPayload;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::clone::CloneCellId;
     use holochain_zome_types::prelude::*;
     use std::time::Duration;
 
@@ -316,22 +315,24 @@ mod slow_tests {
         let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
 
         let cloned = conductor
-            .create_clone_cell(CreateCloneCellPayload {
-                app_id: app.installed_app_id().clone(),
-                role_name: dna_file.dna_hash().to_string().clone(),
-                modifiers: DnaModifiersOpt::none().with_network_seed("anything else".to_string()),
-                membrane_proof: None,
-                name: Some("cloned".to_string()),
-            })
+            .create_clone_cell(
+                app.installed_app_id(),
+                CreateCloneCellPayload {
+                    role_name: dna_file.dna_hash().to_string().clone(),
+                    modifiers: DnaModifiersOpt::none()
+                        .with_network_seed("anything else".to_string()),
+                    membrane_proof: None,
+                    name: Some("cloned".to_string()),
+                },
+            )
             .await
             .unwrap();
 
         let enable_or_disable_payload = DisableCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
             clone_cell_id: CloneCellId::CloneId(cloned.clone_id.clone()),
         };
         conductor
-            .disable_clone_cell(&enable_or_disable_payload)
+            .disable_clone_cell(app.installed_app_id(), &enable_or_disable_payload)
             .await
             .unwrap();
 
@@ -344,27 +345,23 @@ mod slow_tests {
         let conductor_handle = conductor.raw_handle().clone();
         let payload = enable_or_disable_payload.clone();
         tokio::spawn(async move {
-            conductor_handle.enable_clone_cell(&payload).await.unwrap();
+            conductor_handle
+                .enable_clone_cell(app.installed_app_id(), &payload)
+                .await
+                .unwrap();
         });
 
         let mut had_successful_zome_call = false;
         for _ in 0..30 {
             let create_post_result: ConductorApiResult<ActionHash> = conductor
-                .call_fallible(
-                    &zome,
-                    "create_post",
-                    Post(format!("clone message").to_string()),
-                )
+                .call_fallible(&zome, "create_post", Post("clone message".to_string()))
                 .await;
 
             match create_post_result {
                 Err(crate::conductor::api::error::ConductorApiError::ConductorError(
-                    crate::conductor::error::ConductorError::CellNetworkNotReady(
-                        CellStatus::Joining,
-                    )
-                    | crate::conductor::error::ConductorError::CellDisabled(_),
+                    crate::conductor::error::ConductorError::CellDisabled(_),
                 )) => {
-                    // Expected errors, but CellNetworkNotReady won't always be seen depending on system performance
+                    // Expected errors
                 }
                 Ok(_) => {
                     had_successful_zome_call = true;

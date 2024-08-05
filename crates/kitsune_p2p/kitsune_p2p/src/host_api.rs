@@ -1,4 +1,5 @@
-use kitsune_p2p_fetch::OpHashSized;
+use crate::dht::prelude::ArqSet;
+use kitsune_p2p_fetch::{OpHashSized, RoughSized, TransferMethod};
 use kitsune_p2p_timestamp::Timestamp;
 use must_future::MustBoxFuture;
 use std::sync::Arc;
@@ -57,7 +58,7 @@ pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,
-        dht_arc_set: Arc<DhtArcSet>,
+        arq_set: ArqSet,
     ) -> KitsuneHostResult<RegionSetLtcs>;
 
     /// Given an input list of regions, return a list of equal or greater length
@@ -102,6 +103,28 @@ pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
             async move { Ok(op_hash_list.into_iter().map(|_| false).collect()) },
         )
         .into()
+    }
+
+    /// Do something whenever a batch of op hashes was received and stored in the FetchPool
+    // NOTE: currently only needed for aitia, could be removed and the aitia log could be created
+    // directly in kitsune.
+    fn handle_op_hash_received(
+        &self,
+        _space: &KitsuneSpace,
+        _op_hash: &RoughSized<KOpHash>,
+        _transfer_method: TransferMethod,
+    ) {
+    }
+
+    /// Do something whenever a batch of op hashes was sent to another node
+    // NOTE: currently only needed for aitia, could be removed and the aitia log could be created
+    // directly in kitsune.
+    fn handle_op_hash_transmitted(
+        &self,
+        _space: &KitsuneSpace,
+        _op_hash: &RoughSized<KOpHash>,
+        _transfer_method: TransferMethod,
+    ) {
     }
 
     /// Get the lair "tag" identifying the id seed to use for crypto signing.

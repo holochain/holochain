@@ -50,6 +50,10 @@ pub trait HdiT: Send + Sync {
         &self,
         x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+    fn ed_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<XSalsa20Poly1305Data>;
 }
 
 /// Used as a placeholder before any other Hdi is registered.
@@ -109,6 +113,12 @@ impl HdiT for ErrHdi {
     ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
         Self::err("x_25519_x_salsa20_poly1305_decrypt")
     }
+    fn ed_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        _: Ed25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<XSalsa20Poly1305Data> {
+        Self::err("ed_25519_x_salsa20_poly1305_decrypt")
+    }
 }
 
 /// The HDI implemented as externs provided by the host.
@@ -117,6 +127,12 @@ pub struct HostHdi;
 impl HostHdi {
     pub const fn new() -> Self {
         Self {}
+    }
+}
+
+impl Default for HostHdi {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -195,14 +211,23 @@ impl HdiT for HostHdi {
             x_25519_x_salsa20_poly1305_decrypt,
         )
     }
+    fn ed_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<XSalsa20Poly1305Data> {
+        host_call::<Ed25519XSalsa20Poly1305Decrypt, XSalsa20Poly1305Data>(
+            __hc__ed_25519_x_salsa20_poly1305_decrypt_1,
+            ed_25519_x_salsa20_poly1305_decrypt,
+        )
+    }
 }
 
 /// At any time the global HDI can be set to a different HDI.
 /// Generally this is only useful during rust unit testing.
 /// When executing wasm without the `mock` feature, the host will be assumed.
-pub fn set_hdi<H: 'static>(hdi: H) -> Rc<dyn HdiT>
+pub fn set_hdi<H>(hdi: H) -> Rc<dyn HdiT>
 where
-    H: HdiT,
+    H: HdiT + 'static,
 {
     HDI.with(|h| std::mem::replace(&mut *h.borrow_mut(), Rc::new(hdi)))
 }

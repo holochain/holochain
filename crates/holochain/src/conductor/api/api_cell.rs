@@ -6,7 +6,6 @@ use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
 use crate::conductor::conductor::ConductorServices;
 use crate::conductor::error::ConductorResult;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::real_ribosome::RealRibosome;
@@ -84,10 +83,6 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.keystore()
     }
 
-    fn signal_broadcaster(&self) -> SignalBroadcaster {
-        self.conductor_handle.signal_broadcaster()
-    }
-
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
         self.conductor_handle.get_dna_file(dna_hash)
     }
@@ -146,10 +141,6 @@ pub trait CellConductorApiT: Send + Sync {
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &MetaLairClient;
 
-    /// Access the broadcast Sender which will send a Signal across every
-    /// attached app interface
-    fn signal_broadcaster(&self) -> SignalBroadcaster;
-
     /// Get a [`Dna`](holochain_types::prelude::Dna) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
 
@@ -162,7 +153,7 @@ pub trait CellConductorApiT: Send + Sync {
     /// Get a [`Zome`](holochain_types::prelude::Zome) from this cell's Dna
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 
-    /// Get a [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
+    /// Get a [`EntryDef`] from the [`EntryDefBufferKey`]
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Turn this into a call zome handle
@@ -190,7 +181,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Get a zome from this cell's Dna
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 
-    /// Get a [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
+    /// Get a [`EntryDef`] from the [`EntryDefBufferKey`]
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Try to put the nonce from a calling agent in the db. Fails with a stale result if a newer nonce exists.
@@ -217,6 +208,36 @@ pub trait CellConductorReadHandleT: Send + Sync {
 
     /// Expose is_blocked functionality to zomes.
     async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool>;
+
+    /// Find an installed app by one of its [CellId]s.
+    async fn find_app_containing_cell(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorResult<Option<InstalledApp>>;
+
+    /// Expose create_clone_cell functionality to zomes.
+    async fn create_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: CreateCloneCellPayload,
+    ) -> ConductorResult<ClonedCell>;
+
+    /// Expose disable_clone_cell functionality to zomes.
+    async fn disable_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: DisableCloneCellPayload,
+    ) -> ConductorResult<()>;
+
+    /// Expose enable_clone_cell functionality to zomes.
+    async fn enable_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: EnableCloneCellPayload,
+    ) -> ConductorResult<ClonedCell>;
+
+    /// Expose delete_clone_cell functionality to zomes.
+    async fn delete_clone_cell(&self, payload: DeleteCloneCellPayload) -> ConductorResult<()>;
 }
 
 #[async_trait]
@@ -279,5 +300,54 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool> {
         self.conductor_handle.is_blocked(input, timestamp).await
+    }
+
+    async fn find_app_containing_cell(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorResult<Option<InstalledApp>> {
+        self.conductor_handle
+            .find_app_containing_cell(cell_id)
+            .await
+    }
+
+    async fn create_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: CreateCloneCellPayload,
+    ) -> ConductorResult<ClonedCell> {
+        self.conductor_handle
+            .clone()
+            .create_clone_cell(installed_app_id, payload)
+            .await
+    }
+
+    async fn disable_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: DisableCloneCellPayload,
+    ) -> ConductorResult<()> {
+        self.conductor_handle
+            .clone()
+            .disable_clone_cell(installed_app_id, &payload)
+            .await
+    }
+
+    async fn enable_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: EnableCloneCellPayload,
+    ) -> ConductorResult<ClonedCell> {
+        self.conductor_handle
+            .clone()
+            .enable_clone_cell(installed_app_id, &payload)
+            .await
+    }
+
+    async fn delete_clone_cell(&self, payload: DeleteCloneCellPayload) -> ConductorResult<()> {
+        self.conductor_handle
+            .clone()
+            .delete_clone_cell(&payload)
+            .await
     }
 }

@@ -138,7 +138,7 @@ pub enum SerializationError {
 
     /// Denotes inability to parse a UUID
     #[error(transparent)]
-    Uuid(#[from] uuid::parser::ParseError),
+    Uuid(#[from] uuid::Error),
 }
 
 /// Type alias

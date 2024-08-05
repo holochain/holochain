@@ -1,13 +1,12 @@
 { self, lib, ... }: {
-  perSystem = { config, self', inputs', pkgs, ... }:
+  perSystem = { config, self', inputs', pkgs, system, ... }:
     let
       holonixPackages = { holochainOverrides ? { } }:
         with self'.packages; [
           (holochain.override holochainOverrides)
           lair-keystore
-          hc-launch
           hc-scaffold
-        ];
+        ] ++ (lib.optionals (system != "x86_64-darwin") [ hc-launch ]);
       versionsFileText = builtins.concatStringsSep "\n"
         (
           builtins.map
@@ -129,28 +128,12 @@
             )
             ;
 
-
             packages = with pkgs; [
               cargo-nextest
               graph-easy
 
-              (pkgs.writeShellScriptBin "script-cargo-regen-lockfiles" ''
-                cargo fetch --locked
-                cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
-                cargo generate-lockfile --offline
-                cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
-              '')
-
-              (pkgs.writeShellScriptBin "scripts-cargo-update" ''
-                set -xeu -o pipefail
-
-                # Update the Holochain project Cargo.lock
-                cargo update --manifest-path Cargo.toml
-                # Update the release-automation crate's Cargo.lock
-                cargo update --manifest-path crates/release-automation/Cargo.toml
-                # Update the WASM workspace Cargo.lock
-                cargo update --manifest-path crates/test_utils/wasm/wasm_workspace/Cargo.toml
-              '')
+              self'.packages.scripts-cargo-regen-lockfiles
+              self'.packages.scripts-cargo-update
             ]
 
             # generate one script for each of the "holochain-tests-" prefixed derivations by reusing their checkPhase
@@ -209,7 +192,6 @@
               ];
 
               packages = [
-                (pkgs.callPackage self.inputs.crate2nix.outPath { })
                 pkgs.llvmPackages.bintools
               ];
             };

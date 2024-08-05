@@ -12,14 +12,14 @@ Get `rustup` from [here](https://www.rust-lang.org/tools/install). This will set
 preferable to use the same version that Holochain is using. You can optionally install a specific version of rust using
 
 ```shell
-rustup toolchain install 1.71.1
+rustup toolchain install 1.75.0
 ```
 
 Find the installed toolchain with `rustup toolchain list`, then select it using a command like this, with your toolchain 
 in place of the example given here.
 
 ```shell
-rustup default 1.71.1-x86_64-pc-windows-msvc
+rustup default 1.75.0-x86_64-pc-windows-msvc
 ```
 
 You can find the current version used by Holochain [here](https://github.com/holochain/holochain/blob/develop/nix/modules/holochain.nix#L8).

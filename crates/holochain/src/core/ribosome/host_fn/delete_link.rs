@@ -39,7 +39,7 @@ pub fn delete_link<'a>(
                     let workspace = call_context_2.host_context.workspace();
                     CascadeResult::Ok(
                         CascadeImpl::from_workspace_and_network(&workspace, network)
-                            .dht_get(address_2.into(), GetOptions::content())
+                            .dht_get(address_2.into(), GetOptions::local())
                             .await?
                             .map(|el| el.into_inner().0),
                     )
@@ -116,7 +116,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_link_add_remove() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
@@ -124,7 +124,7 @@ pub mod slow_tests {
         // links should start empty
         let links: Vec<Vec<Link>> = conductor.call(&alice, "get_links", ()).await;
 
-        assert!(links.len() == 0);
+        assert!(links.is_empty());
 
         // add a couple of links
         let mut link_actions: Vec<ActionHash> = Vec::new();
@@ -152,7 +152,7 @@ pub mod slow_tests {
 
         let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
 
-        assert!(links.len() == 0);
+        assert!(links.is_empty());
 
         // Add some links then delete them all
         let _h: ActionHash = conductor.call(&alice, "create_link", ()).await;
@@ -167,6 +167,6 @@ pub mod slow_tests {
         // Should be no links left
         let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
 
-        assert!(links.len() == 0);
+        assert!(links.is_empty());
     }
 }

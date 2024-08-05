@@ -76,9 +76,7 @@ pub mod wasm_test {
             msg: "ribosome trace works".to_string(),
         };
 
-        let output: () = trace(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
-
-        assert_eq!((), output);
+        let _: () = trace(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -86,7 +84,7 @@ pub mod wasm_test {
     async fn wasm_trace_test() {
         use holochain_types::prelude::Level::*;
         CAPTURE.store(true, std::sync::atomic::Ordering::SeqCst);
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Debug).await;

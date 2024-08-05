@@ -15,7 +15,7 @@ pub enum StateQueryError {
     #[error(transparent)]
     DhtOpError(#[from] holochain_types::dht_op::DhtOpError),
     #[error("Unexpected op {0:?} for query")]
-    UnexpectedOp(DhtOpType),
+    UnexpectedOp(ChainOpType),
     #[error("Unexpected action {0:?} for query")]
     UnexpectedAction(ActionType),
     #[error(transparent)]
@@ -24,6 +24,8 @@ pub enum StateQueryError {
     ActionError(#[from] holochain_zome_types::prelude::ActionError),
     #[error(transparent)]
     SyncScratchError(#[from] SyncScratchError),
+    #[error("{0}")]
+    Other(String),
 }
 
 pub type StateQueryResult<T> = Result<T, StateQueryError>;

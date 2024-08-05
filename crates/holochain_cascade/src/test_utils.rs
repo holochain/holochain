@@ -8,15 +8,12 @@ use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::AnyDhtHashPrimitive;
 use holo_hash::EntryHash;
-use holo_hash::HasHash;
 use holochain_nonce::Nonce256Bits;
 use holochain_p2p::actor;
-use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
-use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::prelude::*;
 use holochain_types::test_utils::chain::chain_to_ops;
@@ -24,7 +21,9 @@ use holochain_types::test_utils::chain::entry_hash;
 use holochain_types::test_utils::chain::TestChainItem;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
+use kitsune_p2p::dht::Arq;
 use std::collections::HashSet;
+use std::sync::Arc;
 use QueryFilter;
 use Signature;
 use ValidationStatus;
@@ -48,30 +47,19 @@ pub struct PassThroughNetwork {
 
 impl PassThroughNetwork {
     /// Declare that this node has full coverage
-    pub fn authority_for_all(envs: Vec<DbRead<DbKindDht>>) -> Self {
-        Self {
+    pub fn authority_for_all(envs: Vec<DbRead<DbKindDht>>) -> Arc<Self> {
+        Arc::new(Self {
             envs,
             authority: true,
-        }
+        })
     }
 
     /// Declare that this node has zero coverage
-    pub fn authority_for_nothing(envs: Vec<DbRead<DbKindDht>>) -> Self {
-        Self {
+    pub fn authority_for_nothing(envs: Vec<DbRead<DbKindDht>>) -> Arc<Self> {
+        Arc::new(Self {
             envs,
             authority: false,
-        }
-    }
-}
-
-/// A mutex-guarded [`MockHolochainP2pDnaT`]
-#[derive(Clone)]
-pub struct MockNetwork(std::sync::Arc<tokio::sync::Mutex<MockHolochainP2pDnaT>>);
-
-impl MockNetwork {
-    /// Constructor
-    pub fn new(mock: MockHolochainP2pDnaT) -> Self {
-        Self(std::sync::Arc::new(tokio::sync::Mutex::new(mock)))
+        })
     }
 }
 
@@ -85,18 +73,18 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         let mut out = Vec::new();
         match dht_hash.into_primitive() {
             AnyDhtHashPrimitive::Entry(hash) => {
-                for env in &self.envs {
+                for db in &self.envs {
                     let r =
-                        authority::handle_get_entry(env.clone(), hash.clone(), (&options).into())
+                        authority::handle_get_entry(db.clone(), hash.clone(), (&options).into())
                             .await
                             .map_err(|e| HolochainP2pError::Other(e.into()))?;
                     out.push(WireOps::Entry(r));
                 }
             }
             AnyDhtHashPrimitive::Action(hash) => {
-                for env in &self.envs {
+                for db in &self.envs {
                     let r =
-                        authority::handle_get_record(env.clone(), hash.clone(), (&options).into())
+                        authority::handle_get_record(db.clone(), hash.clone(), (&options).into())
                             .await
                             .map_err(|e| HolochainP2pError::Other(e.into()))?;
                     out.push(WireOps::Record(r));
@@ -120,8 +108,8 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         options: actor::GetLinksOptions,
     ) -> actor::HolochainP2pResult<Vec<WireLinkOps>> {
         let mut out = Vec::new();
-        for env in &self.envs {
-            let r = authority::handle_get_links(env.clone(), link_key.clone(), (&options).into())
+        for db in &self.envs {
+            let r = authority::handle_get_links(db.clone(), link_key.clone(), (&options).into())
                 .await
                 .map_err(|e| HolochainP2pError::Other(e.into()))?;
             out.push(r);
@@ -135,8 +123,8 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     ) -> actor::HolochainP2pResult<CountLinksResponse> {
         let mut out = HashSet::new();
 
-        for env in &self.envs {
-            let r = authority::handle_get_links_query(env.clone(), query.clone())
+        for db in &self.envs {
+            let r = authority::handle_get_links_query(db.clone(), query.clone())
                 .await
                 .map_err(|e| HolochainP2pError::Other(e.into()))?;
             out.extend(r);
@@ -156,9 +144,9 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         options: actor::GetActivityOptions,
     ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>> {
         let mut out = Vec::new();
-        for env in &self.envs {
+        for db in &self.envs {
             let r = authority::handle_get_agent_activity(
-                env.clone(),
+                db.clone(),
                 agent.clone(),
                 query.clone(),
                 (&options).into(),
@@ -176,9 +164,9 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         filter: ChainFilter,
     ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
         let mut out = Vec::new();
-        for env in &self.envs {
+        for db in &self.envs {
             let r = authority::handle_must_get_agent_activity(
-                env.clone(),
+                db.clone(),
                 agent.clone(),
                 filter.clone(),
             )
@@ -260,7 +248,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         &self,
         _agent: AgentPubKey,
         _maybe_agent_info: Option<AgentInfoSigned>,
-        _initial_arc: Option<DhtArc>,
+        _initial_arq: Option<Arq>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -290,12 +278,12 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 }
 
 /// Insert ops directly into the database and mark integrated as valid
-pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
-    env.write_async(move |txn| -> DatabaseResult<()> {
-        let hash = op.as_hash();
-        insert_op(txn, &op).unwrap();
-        set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
-        set_when_integrated(txn, hash, Timestamp::now()).unwrap();
+pub async fn fill_db<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed) {
+    db.write_async(move |txn| -> DatabaseResult<()> {
+        let hash = op.to_hash();
+        insert_op(txn, &op.downcast()).unwrap();
+        set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
+        set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
         Ok(())
     })
     .await
@@ -303,12 +291,12 @@ pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed)
 }
 
 /// Insert ops directly into the database and mark integrated as rejected
-pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
-    env.write_async(move |txn| -> DatabaseResult<()> {
-        let hash = op.as_hash();
-        insert_op(txn, &op).unwrap();
-        set_validation_status(txn, hash, ValidationStatus::Rejected).unwrap();
-        set_when_integrated(txn, hash, Timestamp::now()).unwrap();
+pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed) {
+    db.write_async(move |txn| -> DatabaseResult<()> {
+        let hash = op.to_hash();
+        insert_op(txn, &op.downcast()).unwrap();
+        set_validation_status(txn, &hash, ValidationStatus::Rejected).unwrap();
+        set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
         Ok(())
     })
     .await
@@ -316,11 +304,11 @@ pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: Dht
 }
 
 /// Insert ops directly into the database and mark valid and pending integration
-pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
-    env.write_async(move |txn| -> DatabaseResult<()> {
-        let hash = op.as_hash();
-        insert_op(txn, &op).unwrap();
-        set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
+pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed) {
+    db.write_async(move |txn| -> DatabaseResult<()> {
+        let hash = op.to_hash();
+        insert_op(txn, &op.downcast()).unwrap();
+        set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
         Ok(())
     })
     .await
@@ -328,171 +316,13 @@ pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtO
 }
 
 /// Insert ops into the authored database
-pub async fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
-    env.write_async(move |txn| -> DatabaseResult<()> {
-        insert_op(txn, &op).unwrap();
+pub async fn fill_db_as_author(db: &DbWrite<DbKindAuthored>, op: ChainOpHashed) {
+    db.write_async(move |txn| -> DatabaseResult<()> {
+        insert_op(txn, &op.downcast()).unwrap();
         Ok(())
     })
     .await
     .unwrap();
-}
-
-#[async_trait::async_trait]
-impl HolochainP2pDnaT for MockNetwork {
-    async fn get(
-        &self,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: actor::GetOptions,
-    ) -> actor::HolochainP2pResult<Vec<WireOps>> {
-        self.0.lock().await.get(dht_hash, options).await
-    }
-
-    async fn get_meta(
-        &self,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: actor::GetMetaOptions,
-    ) -> actor::HolochainP2pResult<Vec<MetadataSet>> {
-        self.0.lock().await.get_meta(dht_hash, options).await
-    }
-
-    async fn get_links(
-        &self,
-        link_key: WireLinkKey,
-        options: actor::GetLinksOptions,
-    ) -> actor::HolochainP2pResult<Vec<WireLinkOps>> {
-        self.0.lock().await.get_links(link_key, options).await
-    }
-
-    async fn count_links(
-        &self,
-        query: WireLinkQuery,
-    ) -> actor::HolochainP2pResult<CountLinksResponse> {
-        self.0.lock().await.count_links(query).await
-    }
-
-    async fn get_agent_activity(
-        &self,
-        agent: AgentPubKey,
-        query: QueryFilter,
-        options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>> {
-        self.0
-            .lock()
-            .await
-            .get_agent_activity(agent, query, options)
-            .await
-    }
-
-    async fn must_get_agent_activity(
-        &self,
-        agent: AgentPubKey,
-        filter: ChainFilter,
-    ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
-        self.0
-            .lock()
-            .await
-            .must_get_agent_activity(agent, filter)
-            .await
-    }
-
-    async fn authority_for_hash(
-        &self,
-        dht_hash: holo_hash::OpBasis,
-    ) -> actor::HolochainP2pResult<bool> {
-        self.0.lock().await.authority_for_hash(dht_hash).await
-    }
-
-    fn dna_hash(&self) -> holo_hash::DnaHash {
-        todo!()
-    }
-
-    async fn send_remote_signal(
-        &self,
-        _from_agent: AgentPubKey,
-        _to_agent_list: Vec<(Signature, AgentPubKey)>,
-        _zome_name: ZomeName,
-        _fn_name: FunctionName,
-        _cap: Option<CapSecret>,
-        _payload: ExternIO,
-        _nonce: Nonce256Bits,
-        _expires_at: Timestamp,
-    ) -> actor::HolochainP2pResult<()> {
-        todo!()
-    }
-
-    async fn publish(
-        &self,
-        _request_validation_receipt: bool,
-        _countersigning_session: bool,
-        _basis_hash: holo_hash::OpBasis,
-        _source: AgentPubKey,
-        _op_hash_list: Vec<OpHashSized>,
-        _timeout_ms: Option<u64>,
-        _reflect_ops: Option<Vec<crate::DhtOp>>,
-    ) -> actor::HolochainP2pResult<()> {
-        todo!()
-    }
-
-    async fn publish_countersign(
-        &self,
-        _flag: bool,
-        _basis_hash: holo_hash::OpBasis,
-        _op: crate::DhtOp,
-    ) -> actor::HolochainP2pResult<()> {
-        todo!()
-    }
-
-    async fn send_validation_receipts(
-        &self,
-        _to_agent: AgentPubKey,
-        _receipts: ValidationReceiptBundle,
-    ) -> actor::HolochainP2pResult<()> {
-        todo!()
-    }
-
-    async fn countersigning_session_negotiation(
-        &self,
-        _agents: Vec<AgentPubKey>,
-        _message: CountersigningSessionNegotiationMessage,
-    ) -> actor::HolochainP2pResult<()> {
-        todo!()
-    }
-
-    async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()> {
-        todo!()
-    }
-
-    async fn join(
-        &self,
-        _agent: AgentPubKey,
-        _agent_info: Option<AgentInfoSigned>,
-        _initial_arc: Option<DhtArc>,
-    ) -> actor::HolochainP2pResult<()> {
-        todo!()
-    }
-
-    async fn leave(&self, _agent: AgentPubKey) -> actor::HolochainP2pResult<()> {
-        todo!()
-    }
-
-    async fn call_remote(
-        &self,
-        _from_agent: AgentPubKey,
-        _from_signature: Signature,
-        _to_agent: AgentPubKey,
-        _zome_name: ZomeName,
-        _fn_name: FunctionName,
-        _cap: Option<CapSecret>,
-        _payload: ExternIO,
-        _nonce: Nonce256Bits,
-        _expires_at: Timestamp,
-    ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
-        todo!()
-    }
-
-    fn chc(&self) -> Option<ChcImpl> {
-        None
-    }
 }
 
 /// Utility for network simulation response to get entry.
@@ -553,7 +383,7 @@ pub fn commit_chain<Kind: DbKindT>(
     db.test_write(move |txn| {
         for data in &data {
             for op in data {
-                let op_light = DhtOpLite::RegisterAgentActivity(
+                let op_lite = ChainOpLite::RegisterAgentActivity(
                     op.action.action_address().clone(),
                     op.action
                         .hashed
@@ -564,15 +394,15 @@ pub fn commit_chain<Kind: DbKindT>(
                 );
 
                 let timestamp = Timestamp::now();
+                let op_type = op_lite.get_type();
                 let (_, hash) =
-                    UniqueForm::op_hash(op_light.get_type(), op.action.hashed.content.clone())
-                        .unwrap();
+                    ChainOpUniqueForm::op_hash(op_type, op.action.hashed.content.clone()).unwrap();
                 insert_action(txn, &op.action).unwrap();
                 insert_op_lite(
                     txn,
-                    &op_light,
+                    &op_lite.into(),
                     &hash,
-                    &OpOrder::new(op_light.get_type(), timestamp),
+                    &OpOrder::new(op_type, timestamp),
                     &timestamp,
                 )
                 .unwrap();

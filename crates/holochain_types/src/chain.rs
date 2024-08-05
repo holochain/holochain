@@ -4,6 +4,7 @@ use std::ops::RangeInclusive;
 
 use crate::activity::AgentActivityResponse;
 use crate::activity::ChainItems;
+use crate::warrant::WarrantOp;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::HasHash;
@@ -24,6 +25,7 @@ pub trait AgentActivityExt {
             status: ChainStatus::Empty,
             // TODO: Add the actual highest observed in a follow up PR
             highest_observed: None,
+            warrants: vec![],
         }
     }
 }
@@ -108,7 +110,7 @@ impl ChainItem for SignedActionHashed {
 /// - Ignore any ops that are not a direct ancestor to the starting position.
 /// - Stop at the first gap in the chain.
 /// - Take no **more** then the [`take`]. It may return less.
-/// - Stop at (including) the [`ActionHash`](holo_hash::ActionHash) in [`until`]. But not if this hash is not in the chain.
+/// - Stop at (including) the [`ActionHash`] in [`until`]. But not if this hash is not in the chain.
 ///
 /// [`take`]: ChainFilter::take
 /// [`until`]: ChainFilter::until
@@ -158,10 +160,16 @@ pub enum Sequences {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, SerializedBytes, Serialize, Deserialize)]
-/// Response to a `must_get_agent_activity` call.
+/// Intermediate data structure used during a `must_get_agent_activity` call.
+/// Note that this is not the final return value of `must_get_agent_activity`.
 pub enum MustGetAgentActivityResponse {
     /// The activity was found.
-    Activity(Vec<RegisterAgentActivity>),
+    Activity {
+        /// The actions performed by the agent.
+        activity: Vec<RegisterAgentActivity>,
+        /// Any warrants issued to the agent for this activity.
+        warrants: Vec<WarrantOp>,
+    },
     /// The requested chain range was incomplete.
     IncompleteChain,
     /// The requested chain top was not found in the chain.
@@ -170,13 +178,32 @@ pub enum MustGetAgentActivityResponse {
     EmptyRange,
 }
 
+impl MustGetAgentActivityResponse {
+    /// Constructor
+    #[cfg(feature = "test_utils")]
+    pub fn activity(activity: Vec<RegisterAgentActivity>) -> Self {
+        Self::Activity {
+            activity,
+            warrants: vec![],
+        }
+    }
+}
+
 /// Identical structure to [`MustGetAgentActivityResponse`] except it includes
 /// the [`ChainFilterRange`] that was used to produce the response. Doesn't need
 /// to be serialized because it is only used internally.
+/// Note that this is not the final return value of `must_get_agent_activity`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BoundedMustGetAgentActivityResponse {
     /// The activity was found.
-    Activity(Vec<RegisterAgentActivity>, ChainFilterRange),
+    Activity {
+        /// The actions performed by the agent.
+        activity: Vec<RegisterAgentActivity>,
+        /// Any warrants issued to the agent for this activity.
+        warrants: Vec<WarrantOp>,
+        /// The filter used to produce this response.
+        filter: ChainFilterRange,
+    },
     /// The requested chain range was incomplete.
     IncompleteChain,
     /// The requested chain top was not found in the chain.
@@ -189,9 +216,19 @@ impl BoundedMustGetAgentActivityResponse {
     /// Sort by the chain seq.
     /// Dedupe by action hash.
     pub fn normalize(&mut self) {
-        if let Self::Activity(activity, _) = self {
+        if let Self::Activity { activity, .. } = self {
             activity.sort_unstable_by_key(|a| a.action.action().action_seq());
             activity.dedup_by_key(|a| a.action.as_hash().clone());
+        }
+    }
+
+    /// Constructor
+    #[cfg(feature = "test_utils")]
+    pub fn activity(actions: Vec<RegisterAgentActivity>, filter: ChainFilterRange) -> Self {
+        Self::Activity {
+            activity: actions,
+            filter,
+            warrants: vec![],
         }
     }
 }
@@ -210,16 +247,27 @@ pub fn merge_bounded_agent_activity_responses(
         // If both sides of the merge have activity then merge them or bail
         // if the chain filters don't match.
         (
-            BoundedMustGetAgentActivityResponse::Activity(responses, chain_filter),
-            BoundedMustGetAgentActivityResponse::Activity(more_responses, other_chain_filter),
+            BoundedMustGetAgentActivityResponse::Activity {
+                activity: responses,
+                filter: chain_filter,
+                warrants,
+            },
+            BoundedMustGetAgentActivityResponse::Activity {
+                activity: more_responses,
+                filter: other_chain_filter,
+                warrants: more_warrants,
+            },
         ) => {
             if chain_filter == other_chain_filter {
                 let mut merged_responses = responses.clone();
                 merged_responses.extend(more_responses.to_owned());
-                let mut merged_activity = BoundedMustGetAgentActivityResponse::Activity(
-                    merged_responses,
-                    chain_filter.clone(),
-                );
+                let mut merged_warrants = warrants.clone();
+                merged_warrants.extend(more_warrants.to_owned());
+                let mut merged_activity = BoundedMustGetAgentActivityResponse::Activity {
+                    activity: merged_responses,
+                    filter: chain_filter.clone(),
+                    warrants: merged_warrants,
+                };
                 merged_activity.normalize();
                 merged_activity
             }
@@ -231,10 +279,10 @@ pub fn merge_bounded_agent_activity_responses(
         }
         // The acc has activity but the next doesn't so we can just return
         // the acc.
-        (BoundedMustGetAgentActivityResponse::Activity(_, _), _) => acc,
+        (BoundedMustGetAgentActivityResponse::Activity { .. }, _) => acc,
         // The next has activity but the acc doesn't so we can just return
         // the next.
-        (_, BoundedMustGetAgentActivityResponse::Activity(_, _)) => next.clone(),
+        (_, BoundedMustGetAgentActivityResponse::Activity { .. }) => next.clone(),
         // Neither have activity so we can just return the acc.
         _ => acc,
     }
@@ -457,14 +505,15 @@ impl ChainFilterRange {
     pub fn filter_then_check(
         self,
         chain: Vec<RegisterAgentActivity>,
+        warrants: Vec<WarrantOp>,
     ) -> MustGetAgentActivityResponse {
         let until_hashes = self.filter.get_until().cloned();
 
         // Create the filter iterator and collect the filtered actions.
-        let out: Vec<_> = ChainFilterIter::new(self.filter, chain).collect();
+        let actions: Vec<_> = ChainFilterIter::new(self.filter, chain).collect();
 
         // Check the invariants hold.
-        match out.last().zip(out.first()) {
+        match actions.last().zip(actions.first()) {
             // The actual results after the filter must match the range.
             Some((lowest, highest))
                 if (lowest.action.action().action_seq()..=highest.action.action().action_seq())
@@ -481,7 +530,10 @@ impl ChainFilterRange {
                 }
 
                 // The constraints are met the activity can be returned.
-                MustGetAgentActivityResponse::Activity(out)
+                MustGetAgentActivityResponse::Activity {
+                    activity: actions,
+                    warrants,
+                }
             }
             // The constraints are not met so the chain is not complete.
             _ => MustGetAgentActivityResponse::IncompleteChain,
@@ -551,39 +603,39 @@ mod tests {
     )]
     /// If one side is activity and the other is not then the activity should be returned.
     #[test_case(
-        BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
         }),
         BoundedMustGetAgentActivityResponse::EmptyRange
-        => BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        => BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
         })
     )]
     #[test_case(
-        BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
         }),
         BoundedMustGetAgentActivityResponse::IncompleteChain
-        => BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        => BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
         })
     )]
     #[test_case(
-        BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
         }),
         BoundedMustGetAgentActivityResponse::ChainTopNotFound(ActionHash::from_raw_36(vec![0; 36]))
-        => BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        => BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
@@ -591,12 +643,12 @@ mod tests {
     )]
     #[test_case(
         BoundedMustGetAgentActivityResponse::EmptyRange,
-        BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
         })
-        => BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        => BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
@@ -604,12 +656,12 @@ mod tests {
     )]
     #[test_case(
         BoundedMustGetAgentActivityResponse::IncompleteChain,
-        BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
         })
-        => BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        => BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
@@ -617,12 +669,12 @@ mod tests {
     )]
     #[test_case(
         BoundedMustGetAgentActivityResponse::ChainTopNotFound(ActionHash::from_raw_36(vec![0; 36])),
-        BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
         })
-        => BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        => BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
@@ -630,29 +682,29 @@ mod tests {
     )]
     /// If both sides are activity then the activity should be merged.
     #[test_case(
-        BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
         }),
-        BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
         })
-        => BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        => BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
         })
     )]
     #[test_case(
-        BoundedMustGetAgentActivityResponse::Activity(vec![], ChainFilterRange {
+        BoundedMustGetAgentActivityResponse::activity(vec![], ChainFilterRange {
             filter: ChainFilter::new(ActionHash::from_raw_36(vec![0; 36])),
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
         }),
-        BoundedMustGetAgentActivityResponse::Activity(vec![RegisterAgentActivity{
+        BoundedMustGetAgentActivityResponse::activity(vec![RegisterAgentActivity{
             action: SignedActionHashed::with_presigned(
                 ActionHashed::from_content_sync(Action::Dna(Dna {
                     author: AgentPubKey::from_raw_36(vec![0; 36]),
@@ -667,7 +719,7 @@ mod tests {
             range: 0..=0,
             chain_bottom_type: ChainBottomType::Genesis,
         })
-        => BoundedMustGetAgentActivityResponse::Activity(vec![RegisterAgentActivity{
+        => BoundedMustGetAgentActivityResponse::activity(vec![RegisterAgentActivity{
             action: SignedActionHashed::with_presigned(
                 ActionHashed::from_content_sync(Action::Dna(Dna {
                     author: AgentPubKey::from_raw_36(vec![0; 36]),

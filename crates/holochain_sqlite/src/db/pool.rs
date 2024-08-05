@@ -11,6 +11,9 @@ static CONNECTION_TIMEOUT_MS: AtomicU64 = AtomicU64::new(3_000);
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
+#[cfg(feature = "sqlite-encrypted")]
+pub(super) const FAKE_KEY: &str = "x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C483648101010101010101010101010101010101'";
+
 static R2D2_THREADPOOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
     let t = ScheduledThreadPool::new(1);
     Arc::new(t)
@@ -40,12 +43,12 @@ pub enum DbSyncStrategy {
     /// Allows databases that can be wiped and rebuilt to
     /// use the faster [`DbSyncLevel::Off`].
     /// This is the default.
-    #[default]
     Fast,
     /// Makes all databases use at least [`DbSyncLevel::Normal`].
     /// This is probably not needed unless you have an SSD and
     /// would prefer to lower the chances of databases needing to
     /// be rebuilt.
+    #[default]
     Resilient,
 }
 
@@ -114,9 +117,8 @@ pub(super) fn initialize_connection(
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
         }
         let _keyval = std::str::from_utf8(&hex).unwrap();
-        const FAKE_KEY: &str = "x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C483648101010101010101010101010101010101'";
         // conn.pragma_update(None, "key", &keyval)?;
-        conn.pragma_update(None, "key", &FAKE_KEY)?;
+        conn.pragma_update(None, "key", FAKE_KEY)?;
     }
 
     // this is recommended to always be off:

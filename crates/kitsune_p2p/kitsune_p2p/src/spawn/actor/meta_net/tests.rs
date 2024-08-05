@@ -1,3 +1,4 @@
+#![allow(clippy::field_reassign_with_default)] // just easier to read/wriet
 use super::*;
 
 use kitsune_p2p_fetch::OpHashSized;
@@ -9,6 +10,7 @@ use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
     dependencies::lair_keystore_api,
     dht::{
+        arq::ArqSet,
         region::{Region, RegionCoords},
         region_set::RegionSetLtcs,
         spacetime::Topology,
@@ -135,7 +137,7 @@ write_test_struct! {
         fn query_region_set(
             &Self,
             _space: Arc<KitsuneSpace>,
-            _dht_arc_set: Arc<DhtArcSet>,
+            _arq_set: ArqSet,
         ) -> KitsuneHostResult<RegionSetLtcs>, HostRet<RegionSetLtcs> {
             Box::pin(async move {
                 Ok(RegionSetLtcs::empty())
@@ -198,10 +200,18 @@ write_test_struct! {
         }
     }
     InternalHandler {
+        fn handle_new_address(
+            &mut Self,
+            _local_url: String,
+        ) -> InternalHandlerResult<()>, InternalHandlerResult<()> {
+            Ok(futures::future::FutureExt::boxed(async move {
+                Ok(())
+            }).into())
+        }
         fn handle_register_space_event_handler(
             &mut Self,
             _recv: futures::channel::mpsc::Receiver<KitsuneP2pEvent>,
-        ) -> InternalHandlerResult<()>, InternalHandlerResult<()>{
+        ) -> InternalHandlerResult<()>, InternalHandlerResult<()> {
             Ok(futures::future::FutureExt::boxed(async move {
                 Ok(())
             }).into())
@@ -291,9 +301,9 @@ write_test_struct! {
         }
     }
     KitsuneP2pEventHandler {
-        fn handle_put_agent_info_signed(&mut Self, input: PutAgentInfoSignedEvt,) -> KitsuneP2pEventHandlerResult<()>, KitsuneP2pEventHandlerResult<()> {
+        fn handle_put_agent_info_signed(&mut Self, input: PutAgentInfoSignedEvt,) -> KitsuneP2pEventHandlerResult<Vec<kitsune_p2p_types::bootstrap::AgentInfoPut>>, KitsuneP2pEventHandlerResult<Vec<kitsune_p2p_types::bootstrap::AgentInfoPut>> {
             Ok(futures::future::FutureExt::boxed(async move {
-                Ok(())
+                Ok(vec![])
             }).into())
         }
         fn handle_query_agents(&mut Self, input: QueryAgentsEvt,) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>>, KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
@@ -389,27 +399,21 @@ impl Test {
     }
 }
 
-fn start_signal_srv() -> (std::net::SocketAddr, tokio::task::AbortHandle) {
-    let mut config = tx5_signal_srv::Config::default();
-    config.interfaces = "127.0.0.1".to_string();
-    config.port = 0;
-    config.demo = false;
-    let (sig_driver, addr_list, err_list) = tx5_signal_srv::exec_tx5_signal_srv(config).unwrap();
+async fn start_signal_srv() -> (std::net::SocketAddr, sbd_server::SbdServer) {
+    let server = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
+        bind: vec!["127.0.0.1:0".to_string(), "[::1]:0".to_string()],
+        limit_clients: 100,
+        ..Default::default()
+    }))
+    .await
+    .unwrap();
 
-    assert!(err_list.is_empty());
-    assert_eq!(1, addr_list.len());
-
-    let abort_handle = tokio::spawn(async move {
-        sig_driver.await;
-    })
-    .abort_handle();
-
-    (addr_list.first().unwrap().clone(), abort_handle)
+    (*server.bind_addrs().first().unwrap(), server)
 }
 
 struct Setup2Nodes {
     tuning_params: KitsuneP2pTuningParams,
-    sig_abort: tokio::task::AbortHandle,
+    _sig_hnd: sbd_server::SbdServer,
     pub addr1: String,
     pub send1: MetaNet,
     pub addr2: String,
@@ -418,25 +422,30 @@ struct Setup2Nodes {
 
 impl Setup2Nodes {
     pub async fn new(test: Test) -> Self {
-        let tuning_params = KitsuneP2pTuningParams::default();
-        let (sig_addr, sig_abort) = start_signal_srv();
+        Self::new_with_user_data(
+            test,
+            PreflightUserData::default(),
+            PreflightUserData::default(),
+        )
+        .await
+    }
+
+    pub async fn new_with_user_data(
+        test: Test,
+        user_data_a: PreflightUserData,
+        user_data_b: PreflightUserData,
+    ) -> Self {
+        let mut tuning_params = config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        tuning_params.tx2_implicit_timeout_ms = 500;
+        tuning_params.tx5_timeout_s = 4;
+        let tuning_params = Arc::new(tuning_params);
+
+        let (sig_addr, _sig_hnd) = start_signal_srv().await;
         let (test, i_s, evt_sender) = test.spawn().await;
 
-        let (send1, recv1) = MetaNet::new_tx5(
-            tuning_params.clone(),
-            HostApiLegacy {
-                api: Arc::new(test.clone()),
-                legacy: evt_sender.clone(),
-            },
-            i_s.clone(),
-            format!("ws://{sig_addr}"),
-        )
-        .await
-        .unwrap();
-        test.spawn_receiver(recv1);
-        let addr1 = send1.local_addr().unwrap();
+        tracing::warn!("-- test -- init node 1");
 
-        let (send2, recv2) = MetaNet::new_tx5(
+        let (send1, recv1, addr1) = MetaNet::new_tx5(
             tuning_params.clone(),
             HostApiLegacy {
                 api: Arc::new(test.clone()),
@@ -444,15 +453,39 @@ impl Setup2Nodes {
             },
             i_s.clone(),
             format!("ws://{sig_addr}"),
+            "{}".to_string(),
+            user_data_a,
         )
         .await
         .unwrap();
+
+        let addr1 = addr1.unwrap();
+
+        test.spawn_receiver(recv1);
+
+        tracing::warn!("-- test -- init node 2");
+
+        let (send2, recv2, addr2) = MetaNet::new_tx5(
+            tuning_params.clone(),
+            HostApiLegacy {
+                api: Arc::new(test.clone()),
+                legacy: evt_sender.clone(),
+            },
+            i_s.clone(),
+            format!("ws://{sig_addr}"),
+            "{}".to_string(),
+            user_data_b,
+        )
+        .await
+        .unwrap();
+
+        let addr2 = addr2.unwrap();
+
         test.spawn_receiver(recv2);
-        let addr2 = send2.local_addr().unwrap();
 
         Self {
             tuning_params,
-            sig_abort,
+            _sig_hnd,
             addr1,
             send1,
             addr2,
@@ -461,15 +494,9 @@ impl Setup2Nodes {
     }
 
     pub async fn shutdown(self) {
-        let Self {
-            sig_abort,
-            send1,
-            send2,
-            ..
-        } = self;
+        let Self { send1, send2, .. } = self;
         send1.close(0, "").await;
         send2.close(0, "").await;
-        sig_abort.abort();
     }
 }
 
@@ -617,6 +644,8 @@ async fn basic_notify() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn basic_broadcast() {
+    holochain_trace::test_run();
+
     let recv_done = Arc::new(atomic::AtomicUsize::new(0));
 
     let mut test = Test::default();
@@ -734,7 +763,7 @@ async fn preflight() {
         });
         test.handle_put_agent_info_signed = Arc::new(move |_| {
             recv_not.notify();
-            Ok(futures::future::FutureExt::boxed(async move { Ok(()) }).into())
+            Ok(futures::future::FutureExt::boxed(async move { Ok(vec![]) }).into())
         });
     }
 
@@ -756,6 +785,76 @@ async fn preflight() {
     tokio::time::timeout(std::time::Duration::from_secs(10), recv_wait)
         .await
         .unwrap();
+
+    nodes.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn preflight_user_data_mismatch() {
+    let (recv_not, recv_wait) = notify_pair();
+
+    let mut test = Test::default();
+
+    {
+        let agent_info = crate::test_util::data::mk_agent_info(1).await;
+        test.handle_get_all_local_joined_agent_infos = Arc::new(move || {
+            let agent_info = agent_info.clone();
+            Ok(futures::future::FutureExt::boxed(async move { Ok(vec![agent_info]) }).into())
+        });
+        test.handle_put_agent_info_signed = Arc::new(move |_| {
+            recv_not.notify();
+            Ok(futures::future::FutureExt::boxed(async move { Ok(vec![]) }).into())
+        });
+    }
+
+    let ud1 = PreflightUserData {
+        bytes: vec![1, 2, 3],
+        comparator: Box::new(|_, r| {
+            println!("want 1, 2, 3, got {r:?}");
+            (r == [1, 2, 3])
+                .then_some(())
+                .ok_or("preflight mismatch".into())
+        }),
+    };
+    let ud2 = PreflightUserData {
+        bytes: vec![9, 8, 7, 6, 5],
+        comparator: Box::new(|_, r| {
+            println!("want 9, 8, 7, 6, 5, got {r:?}");
+            (r == [9, 8, 7, 6, 5])
+                .then_some(())
+                .ok_or("preflight mismatch".into())
+        }),
+    };
+
+    let nodes = Setup2Nodes::new_with_user_data(test, ud1, ud2).await;
+
+    println!("get con");
+    let con = nodes
+        .send1
+        .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
+        .await
+        .unwrap();
+
+    println!("notify");
+    // This should error out because preflight failed due to user data mismatch
+    if con
+        .notify(
+            &wire::Wire::failure("Hello World!".into()),
+            nodes.tuning_params.implicit_timeout(),
+        )
+        .await
+        .is_ok()
+    {
+        println!("WARN! notify was OKAY");
+        // ...but if it *doesn't* error, the request should at least timeout because
+        // preflight user data doesn't match
+        //
+        // FIXME: this may indicate a bug in tx5. We expect that the notify should
+        //        always fail, but it doesn't.
+        tokio::time::timeout(std::time::Duration::from_millis(500), recv_wait)
+            .await
+            .unwrap_err();
+    }
 
     nodes.shutdown().await;
 }

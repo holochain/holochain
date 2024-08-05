@@ -1,6 +1,6 @@
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
-use holochain_types::dht_op::DhtOpType;
+use holochain_types::dht_op::ChainOpType;
 use holochain_types::sql::ToSqlStatement;
 use holochain_zome_types::prelude::*;
 use std::fmt::Debug;
@@ -175,8 +175,8 @@ impl LinksQuery {
     pub fn params(&self) -> Vec<Params> {
         {
             named_params! {
-                ":create": DhtOpType::RegisterAddLink,
-                ":delete": DhtOpType::RegisterRemoveLink,
+                ":create": ChainOpType::RegisterAddLink,
+                ":delete": ChainOpType::RegisterRemoveLink,
                 ":status": ValidationStatus::Valid,
                 ":base_hash": self.base,
                 ":after": self.filter.after,

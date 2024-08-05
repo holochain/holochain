@@ -3,8 +3,8 @@
 //! Defines the CLI commands for packing/unpacking DNA, hApp, and web-hApp bundles.
 
 use crate::error::{HcBundleError, HcBundleResult};
-use holochain_types::wasmer_types::build_ios_module;
 use holochain_util::ffs;
+use holochain_wasmer_host::module::build_ios_module;
 use mr_bundle::RawBundle;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
@@ -150,6 +150,7 @@ mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg_attr(target_os = "windows", ignore = "unc path mismatch - use dunce")]
     async fn test_roundtrip() {
         let tmpdir = tempfile::Builder::new()
             .prefix("hc-bundle-test")

@@ -17,7 +17,7 @@ use holochain_diagnostics::*;
 
 #[tokio::main]
 async fn main() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let start = Instant::now();
 
     // let config = config_no_networking();
@@ -26,7 +26,7 @@ async fn main() {
     conductors.exchange_peer_info().await;
     let conductor = &mut conductors[0];
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+    let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let (cell,) = app.into_tuple();
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
 

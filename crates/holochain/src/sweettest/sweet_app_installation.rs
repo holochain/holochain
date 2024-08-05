@@ -2,17 +2,24 @@ use std::path::PathBuf;
 
 use holochain_types::prelude::*;
 
+use super::DnaWithRole;
+
 /// Get a "standard" AppBundle from a single DNA, with Create provisioning,
 /// with no modifiers, clone limit of 255, and arbitrary role names
-pub async fn app_bundle_from_dnas(dnas: impl IntoIterator<Item = &DnaFile>) -> AppBundle {
-    let (roles, resources): (Vec<_>, Vec<_>) = dnas
+pub async fn app_bundle_from_dnas<'a>(
+    dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)>,
+    memproofs_deferred: bool,
+) -> AppBundle {
+    let (roles, resources): (Vec<_>, Vec<_>) = dnas_with_roles
         .into_iter()
-        .map(|dna| {
+        .map(|dr| {
+            let dna = dr.dna();
+
             let path = PathBuf::from(format!("{}", dna.dna_hash()));
             let modifiers = DnaModifiersOpt::none();
             let installed_dna_hash = DnaHash::with_data_sync(dna.dna_def());
             let manifest = AppRoleManifest {
-                name: dna.dna_hash().to_string(),
+                name: dr.role(),
                 dna: AppRoleDnaManifest {
                     location: Some(DnaLocation::Bundled(path.clone())),
                     modifiers,
@@ -30,6 +37,7 @@ pub async fn app_bundle_from_dnas(dnas: impl IntoIterator<Item = &DnaFile>) -> A
         .name("[generated]".into())
         .description(None)
         .roles(roles)
+        .membrane_proofs_deferred(memproofs_deferred)
         .build()
         .unwrap();
 
@@ -42,16 +50,21 @@ pub async fn app_bundle_from_dnas(dnas: impl IntoIterator<Item = &DnaFile>) -> A
 pub async fn get_install_app_payload_from_dnas(
     installed_app_id: impl Into<InstalledAppId>,
     agent_key: AgentPubKey,
-    dnas: impl IntoIterator<Item = &DnaFile>,
+    data: &[(impl DnaWithRole, Option<MembraneProof>)],
 ) -> InstallAppPayload {
-    let bundle = app_bundle_from_dnas(dnas).await;
+    let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).collect();
+    let bundle = app_bundle_from_dnas(dnas_with_roles, false).await;
+    let membrane_proofs = data
+        .iter()
+        .map(|(dr, memproof)| (dr.role(), memproof.clone().unwrap_or_default()))
+        .collect();
+
     InstallAppPayload {
         agent_key,
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(installed_app_id.into()),
         network_seed: None,
-        membrane_proofs: Default::default(),
-        #[cfg(feature = "chc")]
+        membrane_proofs,
         ignore_genesis_failure: false,
     }
 }

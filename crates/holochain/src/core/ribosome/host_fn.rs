@@ -124,6 +124,12 @@ host_fn_api_impls! {
     // Recipient, Sender, Encrypted data.
     fn x_25519_x_salsa20_poly1305_decrypt (holochain_zome_types::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
+    // Sender, Recipient, Data.
+    fn ed_25519_x_salsa20_poly1305_encrypt (holochain_zome_types::x_salsa20_poly1305::Ed25519XSalsa20Poly1305Encrypt) -> holochain_zome_types::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    // Recipient, Sender, Encrypted data.
+    fn ed_25519_x_salsa20_poly1305_decrypt (holochain_zome_types::x_salsa20_poly1305::Ed25519XSalsa20Poly1305Decrypt) -> holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data;
+
     // Create a link between two entries.
     fn create_link (zt::link::CreateLinkInput) -> holo_hash::ActionHash;
 
@@ -213,4 +219,24 @@ host_fn_api_impls! {
     // These are constant for the lifetime of a zome call.
     fn zome_info (()) -> zt::info::ZomeInfo;
 
+    // Create a clone of an existing cell.
+    fn create_clone_cell(zt::clone::CreateCloneCellInput) -> zt::clone::ClonedCell;
+
+    // Disable a clone cell.
+    fn disable_clone_cell(zt::clone::DisableCloneCellInput) -> ();
+
+    // Enable a clone cell.
+    fn enable_clone_cell(zt::clone::EnableCloneCellInput) -> zt::clone::ClonedCell;
+
+    // Delete a clone cell.
+    fn delete_clone_cell(zt::clone::DeleteCloneCellInput) -> ();
+
+    // Close your source chain, indicating that you are migrating to a new DNA
+    fn close_chain(zt::chain::CloseChainInput) -> holo_hash::ActionHash;
+
+    // Open your chain, pointing to the previous DNA
+    fn open_chain(zt::chain::OpenChainInput) -> holo_hash::ActionHash;
+
+    // Get validation receipts for an action
+    fn get_validation_receipts(zt::validate::GetValidationReceiptsInput) -> Vec<zt::validate::ValidationReceiptSet>;
 }

@@ -18,7 +18,6 @@ members = [
   "crates/holochain_conductor_api",
   "crates/holochain_p2p",
   "crates/holochain_keystore",
-  "crates/holochain_sqlite",
   "crates/holochain_state",
   "crates/holochain_state_types",
   "crates/holochain_sqlite",
@@ -28,13 +27,15 @@ members = [
   "crates/holochain_metrics",
   "crates/holochain_nonce",
   "crates/holochain_secure_primitive",
-  "crates/holochain_services",
+  "crates/holochain_conductor_services",
 
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
+  "crates/hc_sleuth",
   "crates/hc_run_local_services",
   "crates/hc_demo_cli",
+  "crates/hc_service_check",
   "crates/holochain_terminal",
 
   "crates/kitsune_p2p/bootstrap",
@@ -46,7 +47,6 @@ members = [
   "crates/kitsune_p2p/mdns",
   "crates/kitsune_p2p/proxy",
   "crates/kitsune_p2p/timestamp",
-  "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
 
   "crates/test_utils/wasm",
@@ -56,31 +56,35 @@ members = [
   "crates/diagnostic_tests",
 ]
 
-resolver = "2"
-
 exclude = ["crates/release-automation"]
 
+resolver = "2"
+
 [workspace.dependencies]
-anyhow = "1.0"
-async-trait = "0.1"
-derive_more = "0.99"
-futures = "0.3"
-mockall = "0.11"
-must_future = "0.1"
-serde = "1.0"
-thiserror = "1.0"
+# !!!
+# WARNING - PUT NOTHING HERE
+# !!!
+#
+# release automation currently cannot handle workspace.dependencies
+# it will publish unbuildable releases to crates.io
 
-holochain_keystore = { version = "^0.3.0-beta-dev.18", path = "crates/holochain_keystore", default-features = false }
-holochain_types = { version = "^0.3.0-beta-dev.17", path = "crates/holochain_types" }
+[workspace.lints.clippy]
+nursery = "allow"
+cargo = "allow"
+pedantic = "allow"
+restriction = "allow"
+style = "deny"
+complexity = "deny"
+perf = "deny"
+correctness = "deny"
+dbg_macro = "deny"
 
-
-[profile.fast-test]
-inherits = "dev"
+[profile.dev]
 debug = 1
 
-[profile.fast-test.package."*"]
-opt-level = 3
-debug = 1
+[profile.dev.package."*"]
+opt-level = 2
+debug = 0
 debug-assertions = false
 overflow-checks = false
 incremental = false
@@ -89,7 +93,6 @@ codegen-units = 16
 [profile.release]
 opt-level = "z"
 lto = true
-
 
 [patch.crates-io]
 # task-motel = { path = "../task-motel" }
@@ -100,12 +103,15 @@ lto = true
 # influxive-otel = { path = "../influxive/crates/influxive-otel" }
 # contrafact = { git = "https://github.com/maackle/contrafact-rs.git", branch = "lambda" }
 # tx5 = { path = "../tx5/crates/tx5" }
+# tx5-core = { path = "../tx5/crates/tx5-core" }
+# tx5-go-pion = { path = "../tx5/crates/tx5-go-pion" }
+# tx5-go-pion-sys = { path = "../tx5/crates/tx5-go-pion-sys" }
 # tx5-go-pion-turn = { path = "../tx5/crates/tx5-go-pion-turn" }
 # tx5-signal = { path = "../tx5/crates/tx5-signal" }
-# tx5-signal-srv = { path = "../tx5/crates/tx5-signal-srv" }
+# sbd-e2e-crypto-client = { path = "../sbd/rust/sbd-e2e-crypto-client" }
+# sbd-server = { path = "../sbd/rust/sbd-server" }
 # tx5 = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # tx5-signal = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
-# tx5-signal-srv = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }

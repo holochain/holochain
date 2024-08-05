@@ -12,7 +12,6 @@ use matches::assert_matches;
 
 use crate::conductor::ConductorHandle;
 use crate::test_utils::conductor_setup::CellHostFnCaller;
-use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::host_fn_caller::Post;
 use crate::test_utils::new_zome_call_unsigned;
 use crate::test_utils::wait_for_integration;
@@ -35,7 +34,7 @@ const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let zomes = vec![TestWasm::Create];
     let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
@@ -128,7 +127,8 @@ async fn get_agent_activity_test() {
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
     )
-    .await;
+    .await
+    .unwrap();
 
     let agent_activity = alice_call_data
         .network
@@ -230,7 +230,8 @@ async fn get_agent_activity_test() {
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
     )
-    .await;
+    .await
+    .unwrap();
 
     let mut agent_activity = alice_call_data
         .network
@@ -276,7 +277,8 @@ async fn get_agent_activity_test() {
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
     )
-    .await;
+    .await
+    .unwrap();
 
     // Call alice and get the activity
     let agent_activity = cascade
@@ -316,7 +318,7 @@ async fn get_agent_activity_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_host_fn_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let zomes = vec![TestWasm::Create];
     let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
@@ -367,7 +369,8 @@ async fn get_agent_activity_host_fn_test() {
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
     )
-    .await;
+    .await
+    .unwrap();
 
     let agent_activity = alice_call_data
         .get_api(TestWasm::Create)

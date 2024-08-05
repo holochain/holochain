@@ -7,6 +7,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::fixt::ActionFixturator;
+use kitsune_p2p::dht::Arq;
 struct StubNetwork;
 
 impl ghost_actor::GhostHandler<HolochainP2p> for StubNetwork {}
@@ -19,7 +20,7 @@ impl HolochainP2pHandler for StubNetwork {
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arc: Option<crate::dht_arc::DhtArc>,
+        initial_arq: Option<Arq>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
@@ -254,7 +255,7 @@ mod tests {
         holo_hash::AgentPubKey,
         holo_hash::AgentPubKey,
     ) {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         (
             newhash!(DnaHash, 's'),
             fixt!(AgentPubKey, Predictable, 0),
@@ -272,6 +273,7 @@ mod tests {
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
             kitsune_p2p::HostStub::new(),
+            NetworkCompatParams::default(),
         )
         .await
         .unwrap();
@@ -292,7 +294,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
                         let view = test_peer_view();
@@ -308,7 +310,7 @@ mod tests {
 
         let zome_name: ZomeName = "".into();
         let fn_name: FunctionName = "".into();
-        let nonce = Nonce256Bits::try_from([0; 32]).unwrap();
+        let nonce = Nonce256Bits::from([0; 32]);
         let cap_secret = None;
         let payload = ExternIO::encode(b"yippo").unwrap();
         let expires_at = (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap();
@@ -354,6 +356,7 @@ mod tests {
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
             kitsune_p2p::HostStub::new(),
+            NetworkCompatParams::default(),
         )
         .await
         .unwrap();
@@ -373,7 +376,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
                         let view = test_peer_view();
@@ -430,10 +433,14 @@ mod tests {
         };
         //let test_host = TestHost::default();
 
-        let (p2p, mut evt) =
-            spawn_holochain_p2p(config, TlsConfig::new_ephemeral().await.unwrap(), test_host)
-                .await
-                .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            config,
+            TlsConfig::new_ephemeral().await.unwrap(),
+            test_host,
+            NetworkCompatParams::default(),
+        )
+        .await
+        .unwrap();
 
         let r_task = tokio::task::spawn(async move {
             use tokio_stream::StreamExt;
@@ -447,7 +454,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
@@ -501,7 +508,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_workflow() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let (dna, a1, a2, _a3) = test_setup();
 
@@ -513,18 +520,29 @@ mod tests {
         params.default_rpc_multi_remote_request_grace_ms = 100;
         let mut config = KitsuneP2pConfig::default();
         config.tuning_params = Arc::new(params);
-        let (p2p, mut evt) = spawn_holochain_p2p(config, cert, kitsune_p2p::HostStub::new())
-            .await
-            .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            config,
+            cert,
+            kitsune_p2p::HostStub::new(),
+            NetworkCompatParams::default(),
+        )
+        .await
+        .unwrap();
 
         let test_1 = WireOps::Record(WireRecordOps {
-            action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
+            action: Some(Judged::valid(SignedAction::new(
+                fixt!(Action),
+                fixt!(Signature),
+            ))),
             deletes: vec![],
             updates: vec![],
             entry: None,
         });
         let test_2 = WireOps::Record(WireRecordOps {
-            action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
+            action: Some(Judged::valid(SignedAction::new(
+                fixt!(Action),
+                fixt!(Signature),
+            ))),
             deletes: vec![],
             updates: vec![],
             entry: None,
@@ -549,7 +567,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
@@ -611,6 +629,7 @@ mod tests {
             config,
             TlsConfig::new_ephemeral().await.unwrap(),
             kitsune_p2p::HostStub::new(),
+            NetworkCompatParams::default(),
         )
         .await
         .unwrap();
@@ -642,7 +661,7 @@ mod tests {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
                     }
                     PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
                     QueryPeerDensity { respond, .. } => {
                         let view = test_peer_view();

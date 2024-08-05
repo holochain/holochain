@@ -9,8 +9,8 @@ use holochain_state::mutations;
 use holochain_state::prelude::*;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use rusqlite::{named_params, Transaction};
+use tokio::sync::broadcast;
 
-use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
 use crate::core::ribosome::weigh_placeholder;
@@ -37,7 +37,7 @@ struct Session {
     /// Map of action hash for a each signers action to the
     /// [`DhtOp`] and other required actions for this session to be
     /// considered complete.
-    map: HashMap<ActionHash, (DhtOpHash, DhtOp, Vec<ActionHash>)>,
+    map: HashMap<ActionHash, (DhtOpHash, ChainOp, Vec<ActionHash>)>,
     /// When this session expires.
     /// If this is none the session is empty.
     expires: Option<Timestamp>,
@@ -48,7 +48,7 @@ struct Session {
 // block other incoming DhtOps if there are many active sessions.
 // We could create an incoming buffer if this actually becomes an issue.
 pub(crate) fn incoming_countersigning(
-    ops: Vec<(DhtOpHash, DhtOp)>,
+    ops: Vec<(DhtOpHash, ChainOp)>,
     workspace: &CountersigningWorkspace,
     trigger: TriggerSender,
 ) -> WorkflowResult<()> {
@@ -58,7 +58,7 @@ pub(crate) fn incoming_countersigning(
     // entry hash, required actions and expires time.
     for (hash, op) in ops {
         // Must be a store entry op.
-        if let DhtOp::StoreEntry(_, _, entry) = &op {
+        if let ChainOp::StoreEntry(_, _, entry) = &op {
             // Must have a counter sign entry type.
             if let Entry::CounterSign(session_data, _) = entry {
                 let entry_hash = EntryHash::with_data_sync(entry);
@@ -71,11 +71,11 @@ pub(crate) fn incoming_countersigning(
 
                 // Get the entry hash from an action.
                 // If the actions have different entry hashes they will fail validation.
-                if let Some(entry_hash) = action_set.first().and_then(|h| h.entry_hash().cloned()) {
+                if let Some(entry_hash) = action_set.first().and_then(|a| a.entry_hash().cloned()) {
                     // Hash the required actions.
                     let required_actions: Vec<_> = action_set
                         .into_iter()
-                        .map(|h| ActionHash::with_data_sync(&h))
+                        .map(|a| ActionHash::with_data_sync(&a))
                         .collect();
 
                     // Check if already timed out.
@@ -101,7 +101,7 @@ pub(crate) fn incoming_countersigning(
 /// pushes the complete ops to validation then messages the signers.
 pub(crate) async fn countersigning_workflow(
     space: Space,
-    network: impl HolochainP2pDnaT + Send + Sync,
+    network: impl HolochainP2pDnaT,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // Get any complete sessions.
@@ -118,7 +118,10 @@ pub(crate) async fn countersigning_workflow(
             incoming_dht_ops_workflow(
                 space.clone(),
                 sys_validation_trigger.clone(),
-                non_enzymatic_ops.into_iter().map(|(_h, o)| o).collect(),
+                non_enzymatic_ops
+                    .into_iter()
+                    .map(|(_h, o)| o.into())
+                    .collect(),
                 false,
             )
             .await?;
@@ -146,15 +149,16 @@ pub(crate) async fn countersigning_workflow(
 }
 
 /// An incoming countersigning session success.
+#[tracing::instrument(skip_all)]
 pub(crate) async fn countersigning_success(
     space: Space,
     network: &HolochainP2pDna,
     author: AgentPubKey,
     signed_actions: Vec<SignedAction>,
     trigger: QueueTriggers,
-    mut signal: SignalBroadcaster,
+    signal: broadcast::Sender<Signal>,
 ) -> WorkflowResult<()> {
-    let authored_db = space.authored_db;
+    let authored_db = space.get_or_create_authored_db(author.clone())?;
     let dht_db = space.dht_db;
     let dht_db_cache = space.dht_query_cache;
     let QueueTriggers {
@@ -165,13 +169,13 @@ pub(crate) async fn countersigning_success(
     // Using iterators is fine in this function as there can only be a maximum of 8 actions.
     let (this_cells_action_hash, entry_hash) = match signed_actions
         .iter()
-        .find(|h| *h.0.author() == author)
-        .and_then(|sh| {
-            sh.0.entry_hash()
+        .find(|a| *a.author() == author)
+        .and_then(|sa| {
+            sa.entry_hash()
                 .cloned()
-                .map(|eh| (ActionHash::with_data_sync(&sh.0), eh))
+                .map(|eh| (ActionHash::with_data_sync(sa), eh))
         }) {
-        Some(h) => h,
+        Some(a) => a,
         None => return Ok(()),
     };
 
@@ -219,11 +223,16 @@ pub(crate) async fn countersigning_success(
 
     // Verify signatures of actions.
     let mut i_am_an_author = false;
-    for SignedAction(action, signature) in &signed_actions {
-        if !action.author().verify_signature(signature, action).await? {
+    for sa in &signed_actions {
+        if !sa
+            .action()
+            .author()
+            .verify_signature(sa.signature(), sa.action())
+            .await?
+        {
             return Ok(());
         }
-        if action.author() == &author {
+        if sa.action().author() == &author {
             i_am_an_author = true;
         }
     }
@@ -235,7 +244,7 @@ pub(crate) async fn countersigning_success(
     // Hash actions.
     let incoming_actions: Vec<_> = signed_actions
         .iter()
-        .map(|SignedAction(h, _)| ActionHash::with_data_sync(h))
+        .map(ActionHash::with_data_sync)
         .collect();
 
     let result = authored_db
@@ -250,9 +259,9 @@ pub(crate) async fn countersigning_success(
                     let stored_actions = cs.build_action_set(entry_hash, weight)?;
                     if stored_actions.len() == incoming_actions.len() {
                         // Check all stored action hashes match an incoming action hash.
-                        if stored_actions.iter().all(|h| {
-                            let h = ActionHash::with_data_sync(h);
-                            incoming_actions.iter().any(|i| *i == h)
+                        if stored_actions.iter().all(|a| {
+                            let a = ActionHash::with_data_sync(a);
+                            incoming_actions.iter().any(|i| *i == a)
                         }) {
                             // All checks have passed so unlock the chain.
                             mutations::unlock_chain(txn, &author)?;
@@ -274,35 +283,42 @@ pub(crate) async fn countersigning_success(
     if result {
         // If all signatures are valid (above) and i signed then i must have
         // validated it previously so i now agree that i authored it.
+        // TODO: perhaps this should be `authored_ops_to_dht_db`, i.e. the arc check should
+        //       be performed, because we may not be an authority for these ops
         authored_ops_to_dht_db_without_check(
             this_cell_actions_op_basis_hashes
                 .into_iter()
                 .map(|(op_hash, _)| op_hash)
                 .collect(),
-            &(authored_db.into()),
-            &dht_db,
+            authored_db.into(),
+            dht_db,
             &dht_db_cache,
         )
         .await?;
         integration_trigger.trigger(&"countersigning_success");
         // Publish other signers agent activity ops to their agent activity authorities.
-        for SignedAction(action, signature) in signed_actions {
+        for sa in signed_actions {
+            let (action, signature) = sa.into();
             if *action.author() == author {
                 continue;
             }
-            let op = DhtOp::RegisterAgentActivity(signature, action);
+            let op = ChainOp::RegisterAgentActivity(signature, action);
             let basis = op.dht_basis();
-            if let Err(e) = network.publish_countersign(false, basis, op).await {
+            if let Err(e) = network.publish_countersign(false, basis, op.into()).await {
                 tracing::error!(
                     "Failed to publish to other countersigners agent authorities because of: {:?}",
                     e
                 );
             }
         }
+
         // Signal to the UI.
-        signal.send(Signal::System(SystemSignal::SuccessfulCountersigning(
-            entry_hash,
-        )))?;
+        // If there are no active connections this won't emit anything.
+        signal
+            .send(Signal::System(SystemSignal::SuccessfulCountersigning(
+                entry_hash,
+            )))
+            .ok();
 
         publish_trigger.trigger(&"publish countersigning_success");
     }
@@ -313,7 +329,7 @@ pub(crate) async fn countersigning_success(
 /// actions for this session and respond with a session complete.
 pub async fn countersigning_publish(
     network: &HolochainP2pDna,
-    op: DhtOp,
+    op: ChainOp,
     _author: AgentPubKey,
 ) -> Result<(), ZomeCallResponse> {
     if let Some(enzyme) = op.enzymatic_countersigning_enzyme() {
@@ -332,7 +348,7 @@ pub async fn countersigning_publish(
         }
     } else {
         let basis = op.dht_basis();
-        if let Err(e) = network.publish_countersign(true, basis, op).await {
+        if let Err(e) = network.publish_countersign(true, basis, op.into()).await {
             tracing::error!(
                 "Failed to publish to entry authorities for countersigning session because of: {:?}",
                 e
@@ -344,7 +360,7 @@ pub async fn countersigning_publish(
 }
 
 type AgentsToNotify = Vec<AgentPubKey>;
-type Ops = Vec<(DhtOpHash, DhtOp)>;
+type Ops = Vec<(DhtOpHash, ChainOp)>;
 type SignedActions = Vec<SignedAction>;
 
 impl CountersigningWorkspace {
@@ -360,7 +376,7 @@ impl CountersigningWorkspace {
         &self,
         entry_hash: EntryHash,
         op_hash: DhtOpHash,
-        op: DhtOp,
+        op: ChainOp,
         required_actions: Vec<ActionHash>,
         expires: Timestamp,
     ) {
@@ -428,7 +444,7 @@ impl CountersigningWorkspace {
                                 // Agents to notify.
                                 agents.push(action.author().clone());
                                 // Signed actions to notify them with.
-                                actions.push(SignedAction(action, signature));
+                                actions.push(SignedAction::new(action, signature));
                                 // Ops to validate.
                                 ops.push((op_hash, op));
                                 (agents, ops, actions)
@@ -466,7 +482,7 @@ mod tests {
         // - Create the ops.
         let data = |u: &mut arbitrary::Unstructured| {
             let op_hash = DhtOpHash::arbitrary(u).unwrap();
-            let op = DhtOp::arbitrary(u).unwrap();
+            let op = ChainOp::arbitrary(u).unwrap();
             let action = op.action();
             (op_hash, op, action)
         };
@@ -517,7 +533,7 @@ mod tests {
 
         // - Create an op for a session that has expired in the past.
         let op_hash = DhtOpHash::arbitrary(&mut u).unwrap();
-        let op = DhtOp::arbitrary(&mut u).unwrap();
+        let op = ChainOp::arbitrary(&mut u).unwrap();
         let action = op.action();
         let entry_hash = EntryHash::arbitrary(&mut u).unwrap();
         let action_hash = ActionHash::with_data_sync(&action);

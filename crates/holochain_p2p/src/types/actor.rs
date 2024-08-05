@@ -198,6 +198,9 @@ pub struct GetLinksOptions {
     /// Note - if all requests time-out you will receive an empty result,
     /// not a timeout error.
     pub timeout_ms: Option<u64>,
+    /// Whether to fetch links from the network or return only
+    /// locally available links. Defaults to fetching links from network.
+    pub get_options: holochain_zome_types::entry::GetOptions,
 }
 
 #[derive(Debug, Clone)]
@@ -226,6 +229,8 @@ pub struct GetActivityOptions {
     pub include_valid_activity: bool,
     /// Include any rejected actions in the response.
     pub include_rejected_activity: bool,
+    /// Include warrants for this agent
+    pub include_warrants: bool,
     /// Include the full signed actions and hashes in the response
     /// instead of just the hashes.
     pub include_full_actions: bool,
@@ -238,6 +243,7 @@ impl Default for GetActivityOptions {
             retry_gets: 0,
             include_valid_activity: true,
             include_rejected_activity: false,
+            include_warrants: true,
             include_full_actions: false,
         }
     }
@@ -250,7 +256,7 @@ ghost_actor::ghost_chan! {
     /// actor instance.
     pub chan HolochainP2p<HolochainP2pError> {
         /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-        fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey, maybe_agent_info: Option<AgentInfoSigned>, initial_arc: Option<crate::dht_arc::DhtArc>) -> ();
+        fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey, maybe_agent_info: Option<AgentInfoSigned>, initial_arq: Option<crate::dht::Arq>) -> ();
 
         /// If a cell is disabled, we'll need to \"leave\" the network module as well.
         fn leave(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();

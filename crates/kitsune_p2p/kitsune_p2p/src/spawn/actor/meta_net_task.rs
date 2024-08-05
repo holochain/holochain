@@ -82,8 +82,7 @@ impl MetaNetTask {
 
         tokio::task::spawn({
             let tuning_params = self.config.tuning_params.clone();
-            let span =
-                tracing::error_span!("MetaNetTask::spawn", scope = self.config.tracing_scope);
+            let span = tracing::info_span!("MetaNetTask::spawn", scope = self.config.tracing_scope);
             let span_outer = span.clone();
             async move {
                 let ep_evt = self
@@ -102,6 +101,9 @@ impl MetaNetTask {
                         let span = span.clone();
                         async move {
                             if let Err(MetaNetTaskError::RequiredChannelClosed) = match event {
+                                MetaNetEvt::NewAddress { local_url } => {
+                                    this.handle_new_address(local_url).await
+                                }
                                 MetaNetEvt::Connected { remote_url, con } => {
                                     this.handle_connect(remote_url, con).await
                                 }
@@ -145,6 +147,13 @@ impl MetaNetTask {
             }
             .instrument(span_outer)
         });
+    }
+
+    async fn handle_new_address(&self, local_url: String) -> MetaNetTaskResult<()> {
+        match self.i_s.new_address(local_url).await {
+            Err(e) => Err(e.into()),
+            Ok(_) => Ok(()),
+        }
     }
 
     async fn handle_connect(&self, remote_url: String, con: MetaNetCon) -> MetaNetTaskResult<()> {
@@ -372,7 +381,6 @@ impl MetaNetTask {
                         .host
                         .legacy
                         .put_agent_info_signed(PutAgentInfoSignedEvt {
-                            space,
                             peer_data: vec![agent_info],
                         })
                         .await
@@ -477,7 +485,16 @@ impl MetaNetTask {
                         };
 
                         let key = FetchKey::Op(op_hash.clone());
-                        let fetch_context = self.fetch_pool.remove(&key).and_then(|i| i.context);
+                        let fetch_context = match self.fetch_pool.check_item(&key) {
+                            (true, maybe_fetch_context) => maybe_fetch_context,
+                            (false, _) => {
+                                tracing::warn!(
+                                    "Dropping incoming op because the fetch pool did not contain it, this may indicate a hashing mismatch or unsolicited pushes {:?}",
+                                    op
+                                );
+                                continue;
+                            }
+                        };
 
                         // forward the received op
                         if let Err(err) = self
@@ -498,6 +515,11 @@ impl MetaNetTask {
                             // In the case of an error we don't want to attempt to `resolve_publish_pending_delegates`
                             continue;
                         }
+
+                        // Now that the host is holding the op, remove it from the fetch pool. Any sooner and we might queue the op for fetching again.
+                        // We don't need to wait for validation to complete, at least with respect to gossip, because we don't ask for unvalidated
+                        // ops during gossip. (See crates/holochain/src/conductor/kitsune_host_impl/query_region_set.rs)
+                        self.fetch_pool.remove(&key);
 
                         // trigger any delegation that is pending on having this data
                         if let Err(err) = self
@@ -531,27 +553,24 @@ impl MetaNetTask {
                 }
             }
             wire::Wire::PeerUnsolicited(wire::PeerUnsolicited { peer_list }) => {
-                for peer in peer_list {
-                    if let Err(err) = self
-                        .host
-                        .legacy
-                        .put_agent_info_signed(PutAgentInfoSignedEvt {
-                            space: peer.space.clone(),
-                            peer_data: vec![peer.clone()],
-                        })
-                        .await
-                    {
-                        tracing::warn!(?err, "error processing incoming agent info unsolicited");
+                if let Err(err) = self
+                    .host
+                    .legacy
+                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                        peer_data: peer_list,
+                    })
+                    .await
+                {
+                    tracing::warn!(?err, "error processing incoming agent info unsolicited");
 
-                        match err {
-                            KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                return Err(MetaNetTaskError::RequiredChannelClosed)
-                            }
-                            e => {
-                                tracing::error!("Failed to put agent info: {:?}", e);
-                            }
-                        };
-                    }
+                    match err {
+                        KitsuneP2pError::GhostError(GhostError::Disconnected) => {
+                            return Err(MetaNetTaskError::RequiredChannelClosed)
+                        }
+                        e => {
+                            tracing::error!("Failed to put agent info: {:?}", e);
+                        }
+                    };
                 }
 
                 Ok(())
@@ -728,13 +747,13 @@ mod tests {
         ep_evt_send
             .send(MetaNetEvt::Request {
                 remote_url: "".to_string(),
-                con: con,
+                con,
                 data: wire::Wire::Call(wire::Call {
                     space: test_space(1),
                     to_agent: test_agent(2),
                     data: wire::WireData(vec![]),
                 }),
-                respond: Box::new(|_| async move { () }.boxed().into()),
+                respond: Box::new(|_| async move {}.boxed()),
             })
             .await
             .unwrap();
@@ -940,7 +959,7 @@ mod tests {
                     to_agent: test_agent(1),
                     data: BroadcastData::User(test_agent(2).to_vec()),
                 }),
-                respond: Box::new(|_| async move { () }.boxed().into()),
+                respond: Box::new(|_| async move {}.boxed()),
             })
             .await
             .unwrap();
@@ -974,7 +993,7 @@ mod tests {
         ep_evt_send
             .send(MetaNetEvt::Notify {
                 remote_url: "".to_string(),
-                con: con,
+                con,
                 data: wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
                     space: test_space(1),
                     basis: Arc::new(KitsuneBasis::new(vec![0; 36])),
@@ -1633,7 +1652,6 @@ mod tests {
                 .incoming_gossip_calls
                 .read()
                 .first()
-                .clone()
                 .unwrap()
                 .3
                 .to_vec()
@@ -1796,7 +1814,7 @@ mod tests {
     async fn send_notify_push_op_data() {
         let (mut ep_evt_send, _, _, host_receiver_stub, _, _, fetch_pool, _) = setup().await;
 
-        fetch_pool.push(test_req_op(0, None, test_source(2)));
+        fetch_pool.push(test_req_op(1, None, test_source(2)));
         assert_eq!(1, fetch_pool.len());
 
         ep_evt_send
@@ -1843,14 +1861,14 @@ mod tests {
                         (
                             test_space(1),
                             vec![PushOpItem {
-                                op_data: KitsuneOpData::new(vec![1, 4, 10]),
+                                op_data: KitsuneOpData::new(vec![0, 4, 10]),
                                 region: None,
                             }],
                         ),
                         (
                             test_space(1),
                             vec![PushOpItem {
-                                op_data: KitsuneOpData::new(vec![1, 3, 90]),
+                                op_data: KitsuneOpData::new(vec![0, 3, 90]),
                                 region: None,
                             }],
                         ),
@@ -1880,6 +1898,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_push_op_data_fails_independently_on_receive_ops_error() {
+        holochain_trace::test_run();
+
         let (mut ep_evt_send, _, _, host_receiver_stub, _, _, fetch_pool, _) = setup().await;
 
         host_receiver_stub
@@ -1887,7 +1907,8 @@ mod tests {
             .store(true, Ordering::SeqCst);
 
         fetch_pool.push(test_req_op(0, None, test_source(2)));
-        assert_eq!(1, fetch_pool.len());
+        fetch_pool.push(test_req_op(1, None, test_source(3)));
+        assert_eq!(2, fetch_pool.len());
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1898,7 +1919,7 @@ mod tests {
                         (
                             test_space(1),
                             vec![PushOpItem {
-                                op_data: KitsuneOpData::new(vec![1, 4, 10]),
+                                op_data: KitsuneOpData::new(vec![0, 4, 10]),
                                 region: None,
                             }],
                         ),
@@ -1932,6 +1953,9 @@ mod tests {
                 .load(Ordering::Acquire)
         );
 
+        // Manually drop the item from the pool that we failed to receive
+        fetch_pool.remove(&test_key_op(0));
+
         // and also a successful op push
         wait_for_condition(|| {
             fetch_pool.is_empty() && !host_receiver_stub.receive_ops_calls.read().is_empty()
@@ -1961,7 +1985,7 @@ mod tests {
                     op_data_list: vec![(
                         test_space(1),
                         vec![PushOpItem {
-                            op_data: KitsuneOpData::new(vec![1, 4, 10]),
+                            op_data: KitsuneOpData::new(vec![0, 4, 10]),
                             region: None,
                         }],
                     )],
@@ -1994,7 +2018,7 @@ mod tests {
                     op_data_list: vec![(
                         test_space(1),
                         vec![PushOpItem {
-                            op_data: KitsuneOpData::new(vec![1, 4, 10]),
+                            op_data: KitsuneOpData::new(vec![0, 4, 10]),
                             region: None,
                         }],
                     )],
@@ -2021,56 +2045,14 @@ mod tests {
             .await
             .unwrap();
 
-        // Wait for both agent infos to be received
-        for i in 1..3 {
-            assert_eq!(
-                mk_agent_info(i).await,
-                host_receiver_stub
-                    .next_event(Duration::from_secs(1))
-                    .await
-                    .peer_data
-                    .first()
-                    .unwrap()
-                    .clone()
-            );
-        }
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn send_notify_peer_unsolicited_fails_independently() {
-        let (mut ep_evt_send, _, _, mut host_receiver_stub, _, _, _, meta_net_task_finished) =
-            setup().await;
-
-        // Set up an error for the first call
-        host_receiver_stub
-            .respond_with_error
-            .store(true, Ordering::SeqCst);
-
-        ep_evt_send
-            .send(MetaNetEvt::Notify {
-                remote_url: "".to_string(),
-                con: mk_test_con(),
-                data: wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
-                    // Send two agent infos
-                    peer_list: vec![mk_agent_info(1).await, mk_agent_info(2).await],
-                }),
-            })
+        // Wait for the agent infos to be received
+        let peers = host_receiver_stub
+            .next_event(Duration::from_secs(1))
             .await
-            .unwrap();
+            .peer_data;
 
-        // Expect only the second agent info
-        assert_eq!(
-            mk_agent_info(2).await,
-            host_receiver_stub
-                .next_event(Duration::from_secs(1))
-                .await
-                .peer_data
-                .first()
-                .unwrap()
-                .clone()
-        );
-
-        verify_task_live(ep_evt_send, meta_net_task_finished).await;
+        assert_eq!(mk_agent_info(1).await, peers[0]);
+        assert_eq!(mk_agent_info(2).await, peers[1]);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -2204,10 +2186,8 @@ mod tests {
                 respond: Box::new(|r| {
                     async move {
                         send_res.send(r).unwrap();
-                        ()
                     }
                     .boxed()
-                    .into()
                 }),
             })
             .await

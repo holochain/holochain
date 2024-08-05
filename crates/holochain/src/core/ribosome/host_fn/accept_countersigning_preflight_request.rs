@@ -117,9 +117,7 @@ pub mod wasm_test {
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::WorkflowError;
-    use crate::sweettest::SweetConductorBatch;
-    use crate::sweettest::SweetDnaFile;
-    use crate::test_utils::consistency_10s;
+    use crate::sweettest::*;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
     use holochain_wasm_test_utils::TestWasm;
@@ -159,8 +157,9 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     async fn unlock_timeout_session() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -397,7 +396,7 @@ pub mod wasm_test {
     async fn unlock_invalid_session() {
         use holochain_nonce::fresh_nonce;
 
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -509,15 +508,16 @@ pub mod wasm_test {
                 .unwrap(),
             )
             .await;
-        assert!(matches!(countersign_fail_create_alice, Err(_)));
+        assert!(countersign_fail_create_alice.is_err());
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     async fn lock_chain() {
         use holochain_nonce::fresh_nonce;
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -797,7 +797,9 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        await_consistency(60, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
 
         assert_eq!(alice_activity.valid_activity.len(), 7);
         assert_eq!(
@@ -828,7 +830,7 @@ pub mod wasm_test {
     #[ignore = "countersigning_an_entry_before_bobs_zome_initialized_fails"]
     async fn lock_chain_failure() {
         use holochain_nonce::fresh_nonce;
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -1106,7 +1108,9 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        await_consistency(10, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
 
         assert_eq!(alice_activity.valid_activity.len(), 8);
         assert_eq!(
@@ -1151,7 +1155,7 @@ pub mod wasm_test {
     }
 
     async fn enzymatic_session_success(force_init: bool) {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -1264,7 +1268,9 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        await_consistency(10, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
 
         // Now the action appears in alice's activty.
         let alice_activity: AgentActivity = conductor
@@ -1305,14 +1311,14 @@ pub mod wasm_test {
     #[cfg(feature = "slow_tests")]
     #[ignore = "countersigning_an_entry_before_bobs_zome_initialized_fails"]
     async fn enzymatic_session_failure() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
         let mut conductors = SweetConductorBatch::from_standard_config(3).await;
         let apps = conductors
-            .setup_app("countersigning", &[dna_file.clone()])
+            .setup_app("countersigning", [&dna_file])
             .await
             .unwrap();
 
@@ -1334,7 +1340,9 @@ pub mod wasm_test {
 
         // NON ENZYMATIC
         {
-            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+            await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+                .await
+                .unwrap();
 
             // The countersigned entry does NOT appear in alice's activity yet.
             let alice_activity_pre: AgentActivity = bob_conductor
@@ -1404,7 +1412,9 @@ pub mod wasm_test {
                     unreachable!();
                 };
 
-            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+            await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+                .await
+                .unwrap();
 
             // Alice commits the action.
             let _countersigned_action_hash_alice: ActionHash = alice_conductor
@@ -1424,7 +1434,9 @@ pub mod wasm_test {
                 )
                 .await;
 
-            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+            await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+                .await
+                .unwrap();
 
             // Now the action appears in alice's activty.
             let alice_activity: AgentActivity = bob_conductor

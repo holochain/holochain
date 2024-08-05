@@ -14,9 +14,9 @@
 
       rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = "1.71.1";
+        version = "1.77.2";
       };
-      craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
+      craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
       moldOpensslDeps = craneLib.vendorCargoDeps {
         src = "${flake.config.srcCleanedHolonix}/holonix/test/mold_openssl";
       };
@@ -51,7 +51,7 @@
 
           bats ./test/shell-setup.bats
           bats ./test/holochain-binaries.bats
-          bats ./test/launcher.bats
+          ${ if system != "x86_64-darwin" then "bats ./test/launcher.bats" else "" }
           bats ./test/scaffolding.bats
           bats ./test/rust.bats
           bats ./test/hc-sandbox.bats

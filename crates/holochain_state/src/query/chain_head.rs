@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn test_chain_head_query() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let mut conn = Connection::open_in_memory().unwrap();
         SCHEMA_CELL.initialize(&mut conn, None).unwrap();
 
@@ -135,7 +135,7 @@ mod tests {
                 // A chain made entirely of InitZomesComplete actions is totally invalid,
                 // but we don't need a valid chain for this test,
                 // we just need an ordered sequence of actions
-                ActionHashed::from_content_sync(InitZomesComplete::from_builder(b).into()),
+                ActionHashed::from_content_sync(InitZomesComplete::from_builder(b)),
                 fixt!(Signature),
             )
         })
@@ -148,7 +148,11 @@ mod tests {
 
         for action in &actions[..6] {
             let hash = action.action_address();
-            let op = DhtOpLite::StoreRecord(hash.clone(), None, hash.clone().into());
+            let op = DhtOpLite::from(ChainOpLite::StoreRecord(
+                hash.clone(),
+                None,
+                hash.clone().into(),
+            ));
             let op_order = OpOrder::new(op.get_type(), action.action().timestamp());
             insert_action(&mut txn, action).unwrap();
             insert_op_lite(

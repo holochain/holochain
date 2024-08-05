@@ -1,3 +1,5 @@
+use kitsune_p2p_types::dht::{spacetime::SpaceDimension, ArqBounds};
+
 use super::*;
 
 impl ShardedGossipLocal {
@@ -7,8 +9,9 @@ impl ShardedGossipLocal {
     pub(super) async fn incoming_accept(
         &self,
         peer_cert: NodeCert,
-        remote_arc_set: Vec<DhtArcRange>,
+        remote_arq_set: Vec<ArqBounds>,
         remote_agent_list: Vec<AgentInfoSigned>,
+        agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, when_initiated, accept_is_from_target) =
             self.inner.share_mut(|i, _| {
@@ -47,12 +50,17 @@ impl ShardedGossipLocal {
         }
 
         // Get the local intervals.
-        let local_agent_arcs: Vec<_> =
-            store::local_agent_arcs(&self.host_api, &self.space, &local_agents)
-                .await?
-                .into_iter()
-                .map(|(_, a)| a.into())
-                .collect();
+        let local_agent_arqs: Vec<_> = agent_info_session
+            .local_agent_arqs()
+            .into_iter()
+            .filter_map(|(agent, arq)| {
+                if local_agents.contains(&agent) {
+                    Some(arq.to_bounds(SpaceDimension::standard()))
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let mut gossip = Vec::new();
 
@@ -60,9 +68,10 @@ impl ShardedGossipLocal {
         let state = self
             .generate_blooms_or_regions(
                 remote_agent_list.clone(),
-                local_agent_arcs,
-                remote_arc_set,
+                local_agent_arqs,
+                remote_arq_set,
                 &mut gossip,
+                agent_info_session,
             )
             .await?;
 

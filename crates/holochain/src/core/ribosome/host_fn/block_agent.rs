@@ -41,11 +41,7 @@ pub fn block_agent(
 mod test {
     use crate::conductor::api::error::ConductorApiResult;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use crate::sweettest::consistency_60s;
-    use crate::sweettest::SweetConductorBatch;
-    use crate::sweettest::SweetConductorConfig;
-    use crate::sweettest::SweetDnaFile;
-    use crate::test_utils::consistency_10s;
+    use crate::sweettest::*;
     use holo_hash::ActionHash;
     use holo_hash::AgentPubKey;
     use holochain_types::prelude::CapSecret;
@@ -58,7 +54,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn zome_call_verify_block() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -69,9 +65,7 @@ mod test {
         } = RibosomeTestFixture::new(TestWasm::Capability).await;
 
         let secret: CapSecret = conductor.call(&bob, "cap_secret", ()).await;
-        let _action_hash: ActionHash = conductor
-            .call(&bob, "transferable_cap_grant", secret.clone())
-            .await;
+        let _action_hash: ActionHash = conductor.call(&bob, "transferable_cap_grant", secret).await;
         let cap_for = CapFor(secret, bob_pubkey);
         let _response0: ZomeCallResponse = conductor
             .call(&alice, "try_cap_claim", cap_for.clone())
@@ -97,7 +91,8 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn zome_call_get_block() {
-        holochain_trace::test_run().ok();
+        // hc_sleuth::init_subscriber();
+        holochain_trace::test_run();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
@@ -111,10 +106,7 @@ mod test {
                 c.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
             });
         let mut conductors = SweetConductorBatch::from_config(3, config).await;
-        let apps = conductors
-            .setup_app("create", &[dna_file.clone()])
-            .await
-            .unwrap();
+        let apps = conductors.setup_app("create", [&dna_file]).await.unwrap();
 
         let ((alice_cell,), (bob_cell,), (carol_cell,)) = apps.into_tuples();
 
@@ -131,12 +123,16 @@ mod test {
 
         let action0: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        await_consistency(10, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
 
         // Before bob is blocked he can get posts just fine.
         let bob_get0: Option<Record> = bob_conductor.call(&bob, "get_post", action0).await;
         // Await bob's init to propagate to alice.
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        await_consistency(10, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
         assert!(bob_get0.is_some());
 
         // Bob gets blocked by alice.
@@ -147,7 +143,9 @@ mod test {
         let action1: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
         // Now that bob is blocked by alice he cannot get data from alice.
-        consistency_10s([&alice_cell]).await;
+        await_consistency_advanced(10, vec![], [(&alice_cell, true), (&bob_cell, false)])
+            .await
+            .unwrap();
         let bob_get1: Option<Record> = bob_conductor.call(&bob, "get_post", action1.clone()).await;
 
         assert!(bob_get1.is_none());
@@ -157,7 +155,9 @@ mod test {
 
         conductors.exchange_peer_info().await;
 
-        consistency_60s([&alice_cell, &bob_cell, &carol_cell]).await;
+        await_consistency(60, [&alice_cell, &bob_cell, &carol_cell])
+            .await
+            .unwrap();
 
         // Bob can get data from alice via. carol.
         let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;

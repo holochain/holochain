@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state_types"
-version = "0.3.0-beta-dev.26"
+version = "0.4.0-dev.10"
 description = "Types for the holochain_state crate"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -8,7 +8,11 @@ documentation = "https://docs.rs/holochain_state_types"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-serde = { version = "1.0", features = [ "derive" ] }
-holochain_integrity_types = { version = "^0.3.0-beta-dev.19", path = "../holochain_integrity_types", default-features = false }
-holo_hash = { version = "^0.3.0-beta-dev.16", path = "../holo_hash" }
+serde = { version = "1.0", features = ["derive"] }
+holochain_integrity_types = { version = "^0.4.0-dev.10", path = "../holochain_integrity_types", default-features = false }
+holo_hash = { version = "^0.4.0-dev.9", path = "../holo_hash" }
+
+[lints]
+workspace = true

@@ -1,5 +1,6 @@
 //! Definitions for events emited from the KitsuneP2p actor.
 
+use crate::dht::prelude::ArqSet;
 use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
@@ -13,7 +14,7 @@ use std::{collections::HashSet, sync::Arc};
 /// Gather a list of op-hashes from our implementor that meet criteria.
 /// Also get the start and end times for ops within a time window
 /// up to a maximum number.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QueryOpHashesEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -28,7 +29,7 @@ pub struct QueryOpHashesEvt {
 }
 
 /// Gather all op-hash data for a list of op-hashes from our implementor.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FetchOpDataEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -37,7 +38,7 @@ pub struct FetchOpDataEvt {
 }
 
 /// Multiple ways to fetch op data
-#[derive(Debug, derive_more::From)]
+#[derive(Debug, derive_more::From, Clone)]
 pub enum FetchOpDataEvtQuery {
     /// Fetch all ops with the hashes specified
     Hashes {
@@ -53,7 +54,7 @@ pub enum FetchOpDataEvtQuery {
 }
 
 /// Request that our implementor sign some data on behalf of an agent.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SignNetworkDataEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -67,9 +68,8 @@ pub struct SignNetworkDataEvt {
 /// Store the AgentInfo as signed by the agent themselves.
 #[derive(Debug, Clone)]
 pub struct PutAgentInfoSignedEvt {
-    /// The "space" context.
-    pub space: KSpace,
-    /// A batch of signed agent info for this space.
+    /// A batch of signed agent info. Possibly from multiple spaces, see the space included
+    /// on each agent.
     pub peer_data: Vec<AgentInfoSigned>,
 }
 
@@ -83,7 +83,7 @@ pub struct GetAgentInfoSignedEvt {
 }
 
 /// Get agent info which satisfies a query.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QueryAgentsEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -92,7 +92,7 @@ pub struct QueryAgentsEvt {
     /// Optional time range to filter by.
     pub window: Option<TimeWindow>,
     /// Optional arcset to intersect by.
-    pub arc_set: Option<Arc<DhtArcSet>>,
+    pub arq_set: Option<ArqSet>,
     /// If set, results are ordered by proximity to the specified location
     pub near_basis: Option<DhtLocation>,
     /// Limit to the number of results returned
@@ -110,7 +110,7 @@ impl QueryAgentsEvt {
             space,
             agents: None,
             window: None,
-            arc_set: None,
+            arq_set: None,
             near_basis: None,
             limit: None,
         }
@@ -129,8 +129,8 @@ impl QueryAgentsEvt {
     }
 
     /// Add in an an arcset query
-    pub fn by_arc_set(mut self, arc_set: Arc<DhtArcSet>) -> Self {
-        self.arc_set = Some(arc_set);
+    pub fn by_arq_set(mut self, arq_set: ArqSet) -> Self {
+        self.arq_set = Some(arq_set);
         self
     }
 
@@ -175,7 +175,7 @@ ghost_actor::ghost_chan! {
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
 
         /// We need to store signed agent info.
-        fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
+        fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> Vec<kitsune_p2p_types::bootstrap::AgentInfoPut>;
 
         /// We need to get previously stored agent info.
         fn query_agents(input: QueryAgentsEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;

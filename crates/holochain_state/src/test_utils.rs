@@ -1,5 +1,7 @@
 //! Helpers for unit tests
 
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::Statement;
@@ -79,11 +81,10 @@ pub fn test_authored_db() -> TestDb<DbKindAuthored> {
 }
 
 pub fn test_authored_db_with_id(id: u8) -> TestDb<DbKindAuthored> {
-    test_db(DbKindAuthored(Arc::new(fake_dna_hash(id))))
-}
-
-pub fn test_authored_db_with_dna_hash(hash: DnaHash) -> TestDb<DbKindAuthored> {
-    test_db(DbKindAuthored(Arc::new(hash)))
+    test_db(DbKindAuthored(Arc::new(CellId::new(
+        fake_dna_hash(id),
+        fake_agent_pub_key(id),
+    ))))
 }
 
 /// Create a [`TestDb`] of [`DbKindDht`], backed by a temp directory.
@@ -140,7 +141,7 @@ fn test_db<Kind: DbKindT>(kind: Kind) -> TestDb<Kind> {
         .unwrap();
     TestDb {
         db: DbWrite::test(tmpdir.path(), kind).expect("Couldn't create test database"),
-        tmpdir,
+        dir: tmpdir.into(),
     }
 }
 
@@ -175,7 +176,7 @@ pub struct TestDb<Kind: DbKindT> {
     /// sqlite database
     db: DbWrite<Kind>,
     /// temp directory for this environment
-    tmpdir: TempDir,
+    dir: TestDir,
 }
 
 impl<Kind: DbKindT> TestDb<Kind> {
@@ -185,14 +186,14 @@ impl<Kind: DbKindT> TestDb<Kind> {
     }
 
     /// Accessor
-    pub fn into_tempdir(self) -> TempDir {
-        self.tmpdir
+    pub fn persist(&mut self) {
+        self.dir.persist()
     }
 
     /// Dump db to a location.
     pub fn dump(&self, out: &Path) -> std::io::Result<()> {
         std::fs::create_dir(out).ok();
-        for entry in std::fs::read_dir(self.tmpdir.path())? {
+        for entry in std::fs::read_dir(&self.dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.is_file() {
@@ -214,7 +215,8 @@ impl<Kind: DbKindT> TestDb<Kind> {
 
     pub fn dna_hash(&self) -> Option<Arc<DnaHash>> {
         match self.db.kind().kind() {
-            DbKind::Authored(hash) | DbKind::Cache(hash) | DbKind::Dht(hash) => Some(hash),
+            DbKind::Cache(hash) | DbKind::Dht(hash) => Some(hash),
+            DbKind::Authored(cell_id) => Some(Arc::new(cell_id.dna_hash().clone())),
             _ => None,
         }
     }
@@ -295,6 +297,7 @@ impl TestDir {
         let old = std::mem::replace(self, Self::Blank);
         match old {
             Self::Temp(d) => {
+                println!("Made temp dir permanent at {:?}", d);
                 tracing::info!("Made temp dir permanent at {:?}", d);
                 *self = Self::Perm(d.into_path());
             }
@@ -346,12 +349,6 @@ impl TestDbs {
         self.p2p_metrics.clone()
     }
 
-    /// Consume the TempDir so that it will not be cleaned up after the test is over.
-    #[deprecated = "persist() should only be used during debugging"]
-    pub fn persist(&mut self) {
-        self.dir.persist();
-    }
-
     /// Get the root path for these environments
     pub fn path(&self) -> &Path {
         &self.dir
@@ -387,7 +384,7 @@ pub fn dump_db(txn: &Transaction) {
                         tracing::debug!(?column, row = ?String::from_utf8_lossy(text));
                     }
                     holochain_sqlite::rusqlite::types::ValueRef::Blob(blob) => {
-                        let blob = base64::encode_config(blob, base64::URL_SAFE_NO_PAD);
+                        let blob = URL_SAFE_NO_PAD.encode(blob);
                         tracing::debug!("column: {:?} row:{}", column, blob);
                     }
                 }

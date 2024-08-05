@@ -102,7 +102,11 @@ impl<E> TryFrom<OutcomeOrError<ValidationOutcome, E>> for ValidationOutcome {
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ValidationOutcome {
     #[error("The record with signature {0:?} and action {1:?} was found to be counterfeit")]
-    Counterfeit(Signature, Action),
+    CounterfeitAction(Signature, Action),
+    #[error("A warrant op was found to be counterfeit. Warrant: {0:?}")]
+    CounterfeitWarrant(Warrant),
+    #[error("A warrant op was found to be invalid. Reason: {1}, Warrant: {0:?}")]
+    InvalidWarrant(Warrant, String),
     #[error("The action {1:?} is not found in the countersigning session data {0:?}")]
     ActionNotInCounterSigningSession(CounterSigningSessionData, NewEntryAction),
     #[error(transparent)]
@@ -128,7 +132,7 @@ pub enum ValidationOutcome {
     )]
     TagTooLarge(usize),
     #[error("An op with non-private entry type is missing its entry data. Action: {0:?}, Op type: {1:?} Reason: {2}")]
-    MalformedDhtOp(Box<Action>, DhtOpType, String),
+    MalformedDhtOp(Box<Action>, ChainOpType, String),
     #[error("The action with {0:?} was expected to be a link add action")]
     NotCreateLink(ActionHash),
     #[error("The action was expected to be a new entry action but was {0:?}")]
@@ -210,6 +214,8 @@ pub enum PrevActionErrorKind {
     InvalidRoot,
     #[error("Root of source chain must have a timestamp greater than the Dna's origin_time")]
     InvalidRootOriginTime,
+    #[error("No more actions are allowed after a chain close")]
+    ActionAfterChainClose,
     #[error("Previous action sequence number {1} != ({0} - 1)")]
     InvalidSeq(u32, u32),
     #[error("Action is not the first, so needs previous action")]

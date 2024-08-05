@@ -4,7 +4,7 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
-use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::GenericNetwork;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::prelude::*;
@@ -33,7 +33,8 @@ impl ValidateInvocation {
 #[derive(Clone, Constructor)]
 pub struct ValidateHostAccess {
     pub workspace: HostFnWorkspaceRead,
-    pub network: HolochainP2pDna,
+    pub network: GenericNetwork,
+    pub is_inline: bool,
 }
 
 impl std::fmt::Debug for ValidateHostAccess {
@@ -169,9 +170,8 @@ mod test {
             let number_of_extras = rng.gen_range(0..5);
             for _ in 0..number_of_extras {
                 let maybe_extra = results.choose(&mut rng).cloned();
-                match maybe_extra {
-                    Some(extra) => results.push(extra),
-                    _ => {}
+                if let Some(extra) = maybe_extra {
+                    results.push(extra);
                 };
             }
 
@@ -289,7 +289,7 @@ mod slow_tests {
         let op = Op::StoreRecord(StoreRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(
-                    ActionHashed::from_content_sync(action.into()),
+                    ActionHashed::from_content_sync(action),
                     Signature::arbitrary(&mut u).unwrap(),
                 ),
                 Some(entry),
@@ -308,7 +308,7 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn pass_validate_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Validate).await;

@@ -35,24 +35,28 @@
         set -xeuo pipefail
         trap "cd $PWD" EXIT
 
-        export VERSIONS_DIR="./versions/''${1}"
-        export DEFAULT_VERSIONS_DIR="$(nix flake metadata --no-write-lock-file --json | jq --raw-output '.locks.nodes.versions.locked.path')"
+        export VERSIONS_DIR="versions/''${1}"
 
         (
           cd "$VERSIONS_DIR"
-          nix flake update --tarball-ttl 0
+          nix flake update --refresh
         )
 
         if [[ $(git diff -- "$VERSIONS_DIR"/flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
           echo got no actual source changes, reverting modifications..
           git checkout $VERSIONS_DIR/flake.lock
-          exit 0
         else
           git add "$VERSIONS_DIR"/flake.lock
         fi
 
-        if [[ "$VERSIONS_DIR" == "$DEFAULT_VERSIONS_DIR" ]]; then
-          nix flake lock --tarball-ttl 0 --update-input versions --override-input versions "path:$VERSIONS_DIR"
+        # Want to update the root flake.lock if we're updating the version that is currently the default.
+        if grep -qE "versions\.url = \".+\?dir=''${VERSIONS_DIR}\"" flake.nix; then
+          nix flake update --refresh versions
+
+          nix flake update --refresh versions/holochain
+          nix flake update --refresh versions/lair
+          nix flake update --refresh versions/launcher
+          nix flake update --refresh versions/scaffolding
         fi
 
         if [[ $(git diff -- flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
@@ -62,7 +66,14 @@
           git add flake.lock
         fi
 
-        git commit -m "chore(flakes): update $VERSIONS_DIR"
+        set +e
+        git diff --staged --quiet
+        ANY_CHANGED=$?
+        set -e
+        if [[ "$ANY_CHANGED" -eq 1 ]]; then
+          echo committing changes..
+          git commit -m "chore(flakes): update $VERSIONS_DIR"
+        fi
       '';
 
       scripts-release-automation-check-and-bump = pkgs.writeShellScriptBin "scripts-release-automation-check-and-bump" ''
@@ -78,13 +89,12 @@
         ${self'.packages.release-automation}/bin/release-automation \
           --workspace-path=''${WORKSPACE_PATH} \
           --log-level=debug \
-          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy|hcterm)$" \
+          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy|hcterm|hc_service_check)$" \
           release \
-            --no-verify \
             --force-tag-creation \
             --force-branch-creation \
             --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
-            --allowed-semver-increment-modes="!pre_minor beta-dev" \
+            --allowed-semver-increment-modes="!pre_minor dev" \
             --steps=CreateReleaseBranch,BumpReleaseVersions
 
         ${self'.packages.release-automation}/bin/release-automation \
@@ -92,7 +102,6 @@
             --log-level=debug \
             release \
               --dry-run \
-              --no-verify \
               --steps=PublishToCratesIo
       '';
 
@@ -132,6 +141,40 @@
             git commit -m "docs(crate-level): generate readmes from doc comments" $changed_readmes
           fi
         '';
+
+      scripts-cargo-regen-lockfiles = pkgs.writeShellApplication {
+        name = "scripts-cargo-regen-lockfiles";
+        runtimeInputs = [
+          pkgs.cargo
+        ];
+        text = ''
+          set -xeu -o pipefail
+
+          cargo fetch --locked
+          cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
+          cargo generate-lockfile --offline
+          cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
+        '';
+      };
+
+
+      scripts-cargo-update =
+        pkgs.writeShellApplication {
+          name = "scripts-cargo-update";
+          runtimeInputs = [
+            pkgs.cargo
+          ];
+          text = ''
+            set -xeu -o pipefail
+
+            # Update the Holochain project Cargo.lock
+            cargo update --manifest-path Cargo.toml
+            # Update the release-automation crate's Cargo.lock
+            cargo update --manifest-path crates/release-automation/Cargo.toml
+            # Update the WASM workspace Cargo.lock
+            cargo update --manifest-path crates/test_utils/wasm/wasm_workspace/Cargo.toml
+          '';
+        };
     };
 
   };

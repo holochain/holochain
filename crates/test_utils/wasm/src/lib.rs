@@ -23,8 +23,10 @@ pub enum TestCoordinatorWasm {
 pub enum TestWasm {
     AgentInfo,
     Anchor,
+    AppValidation,
     Bench,
     Capability,
+    Clone,
     CounterSigning,
     Create,
     Crd,
@@ -33,6 +35,7 @@ pub enum TestWasm {
     DnaProperties,
     EntryDefs,
     EmitSignal,
+    PostCommitSignal,
     HashEntry,
     Foo,
     GenesisSelfCheckValidLegacy,
@@ -47,8 +50,11 @@ pub enum TestWasm {
     Link,
     MigrateAgentFail,
     MigrateAgentPass,
+    MigrateInitial,
+    MigrateNew,
     MultipleCalls,
     MustGet,
+    MustGetAgentActivity,
     PostCommitSuccess,
     PostCommitVolley,
     Query,
@@ -126,8 +132,10 @@ impl From<TestWasm> for ZomeName {
         ZomeName::from(match test_wasm {
             TestWasm::AgentInfo => "agent_info",
             TestWasm::Anchor => "anchor",
+            TestWasm::AppValidation => "app_validation",
             TestWasm::Bench => "bench",
             TestWasm::Capability => "capability",
+            TestWasm::Clone => "clone",
             TestWasm::CounterSigning => "countersigning",
             TestWasm::Create => "create_entry",
             TestWasm::Crd => "crd",
@@ -136,6 +144,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::DnaProperties => "dna_properties",
             TestWasm::EntryDefs => "entry_defs",
             TestWasm::EmitSignal => "emit_signal",
+            TestWasm::PostCommitSignal => "post_commit_signal",
             TestWasm::HashEntry => "hash_entry",
             TestWasm::Foo => "foo",
             TestWasm::GenesisSelfCheckValidLegacy => "genesis_self_check_legacy",
@@ -152,8 +161,11 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Link => "link",
             TestWasm::MigrateAgentFail => "migrate_agent_fail",
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
+            TestWasm::MigrateInitial => "migrate_initial",
+            TestWasm::MigrateNew => "migrate_new",
             TestWasm::MultipleCalls => "multiple_calls",
             TestWasm::MustGet => "must_get",
+            TestWasm::MustGetAgentActivity => "must_get_agent_activity",
             TestWasm::PostCommitSuccess => "post_commit_success",
             TestWasm::PostCommitVolley => "post_commit_volley",
             TestWasm::Query => "query",
@@ -194,8 +206,10 @@ impl From<TestWasm> for PathBuf {
         PathBuf::from(match test_wasm {
             TestWasm::AgentInfo => "wasm32-unknown-unknown/release/test_wasm_agent_info.wasm",
             TestWasm::Anchor => "wasm32-unknown-unknown/release/test_wasm_anchor.wasm",
+            TestWasm::AppValidation => "wasm32-unknown-unknown/release/test_wasm_app_validation.wasm",
             TestWasm::Bench => "wasm32-unknown-unknown/release/test_wasm_bench.wasm",
             TestWasm::Capability => "wasm32-unknown-unknown/release/test_wasm_capability.wasm",
+            TestWasm::Clone => "wasm32-unknown-unknown/release/test_wasm_clone.wasm",
             TestWasm::CounterSigning => {
                 "wasm32-unknown-unknown/release/test_wasm_countersigning.wasm"
             }
@@ -208,6 +222,7 @@ impl From<TestWasm> for PathBuf {
             }
             TestWasm::EntryDefs => "wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm",
             TestWasm::EmitSignal => "wasm32-unknown-unknown/release/test_wasm_emit_signal.wasm",
+            TestWasm::PostCommitSignal => "wasm32-unknown-unknown/release/test_wasm_post_commit_signal.wasm",
             TestWasm::HashEntry => "wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm",
             TestWasm::Foo => "wasm32-unknown-unknown/release/test_wasm_foo.wasm",
             TestWasm::GenesisSelfCheckValidLegacy => {
@@ -236,10 +251,17 @@ impl From<TestWasm> for PathBuf {
             TestWasm::MigrateAgentPass => {
                 "wasm32-unknown-unknown/release/test_wasm_migrate_agent_pass.wasm"
             }
+            TestWasm::MigrateInitial => {
+                "wasm32-unknown-unknown/release/test_wasm_migrate_initial.wasm"
+            }
+            TestWasm::MigrateNew => {
+                "wasm32-unknown-unknown/release/test_wasm_migrate_new.wasm"
+            },
             TestWasm::MultipleCalls => {
                 "wasm32-unknown-unknown/release/test_wasm_multiple_calls.wasm"
             }
             TestWasm::MustGet => "wasm32-unknown-unknown/release/test_wasm_must_get.wasm",
+            TestWasm::MustGetAgentActivity => "wasm32-unknown-unknown/release/test_wasm_must_get_agent_activity.wasm",
             TestWasm::PostCommitSuccess => {
                 "wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm"
             }

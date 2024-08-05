@@ -1,11 +1,87 @@
 ---
-default_semver_increment_mode: !pre_minor beta-dev
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+## 0.4.0-dev.12
+
+## 0.4.0-dev.11
+
+## 0.4.0-dev.10
+
+## 0.4.0-dev.9
+
+- Change the default `DbSyncStrategy` from `Fast` to `Resilient` which should reduce database corruptions. You can override this setting in your conductor config if you wish to go faster and are willing to rebuild your database if it gets corrupted. \#4010
+
+## 0.4.0-dev.8
+
+- **BREAKING** Bumped KITSUNE\_PROTOCOL\_VERSION. This *should* have been bumped with https://github.com/holochain/holochain/pull/3842, but better late than never. [\#3984](https://github.com/holochain/holochain/pull/3984)
+
+## 0.4.0-dev.7
+
+## 0.4.0-dev.6
+
+## 0.4.0-dev.5
+
+## 0.4.0-dev.4
+
+- Fix an issue with delegated publish where delegates were publishing to nodes near the target basis, rather than nodes covering the basis.
+
+## 0.4.0-dev.3
+
+## 0.4.0-dev.2
+
+## 0.4.0-dev.1
+
+## 0.4.0-dev.0
+
+## 0.3.0
+
+## 0.3.0-beta-dev.40
+
+- **BREAKING** - AgentInfo uses a quantized arc instead of an arc half-length to represent DHT coverage. This is a breaking protocol change, nodes on different versions will not be able to gossip with each other.
+
+## 0.3.0-beta-dev.39
+
+## 0.3.0-beta-dev.38
+
+- Kitsune will now close connections in two cases. Firstly, when receiving an updated agent info that indicates that the peer URL for an agent has changed. If there is an open connection to the old peer URL then it will be closed. Secondly, when if a message from a peer fails to decode. This is likely sign that communication between two conductors is not going to work so the connection is closed.
+
+## 0.3.0-beta-dev.37
+
+## 0.3.0-beta-dev.36
+
+## 0.3.0-beta-dev.35
+
+## 0.3.0-beta-dev.34
+
+## 0.3.0-beta-dev.33
+
+- *BREAKING* Adds a preflight check in tx5 which requires the equality of two things: a `KITSUNE_PROTOCOL_VERSION`, which is incremented every time there is a breaking protocol change in Kitsune, and an opaque `user_data` passed in by the host, which allows the host to specify its own compatibility requirements. This allows protocol incompatibilities to be explicitly handled and logged, rather than letting things silently and unpredictably fail in case of a mismatch in protocol datatypes.
+
+## 0.3.0-beta-dev.32
+
+## 0.3.0-beta-dev.31
+
+- *BREAKING* Updates tx5 to a version using new endpoint state logic and a new incompatible protocol. [\#3287](https://github.com/holochain/holochain/pull/3287)
+
+## 0.3.0-beta-dev.30
+
+- Performance improvement by reducing the number of `query_agents` calls used by Kitsune. The host (Holochain conductor) responds to these queries using an in-memory store which is fast but all the queries go through the `ghost_actor` so making an excessive number of calls for the same information reduces the availability of the host for other calls. For a test which sets up 10 spaces (equivalent to a happ running on the host) this change takes the number of host queries for agent info from ~13k to ~1.4k. The removed calls were largely redundant since Kitsune refreshes agent info every 1s anyway so it shouldn’t need to make many further calls between refreshes.
+
+- Minor optimisation when delegate broadcasting ops, the delegated broadcasts will now avoid connecting back to the source. There is currently no way to prevent other agents that were delegated to from connecting to each other but this change takes care of one case.
+
+## 0.3.0-beta-dev.29
+
+## 0.3.0-beta-dev.28
+
+## 0.3.0-beta-dev.27
+
+## 0.3.0-beta-dev.26
 
 ## 0.3.0-beta-dev.25
 

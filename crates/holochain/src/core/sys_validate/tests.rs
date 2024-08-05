@@ -62,7 +62,7 @@ use std::time::Duration;
 fn matching_record(g: &mut Unstructured, f: impl Fn(&Record) -> bool) -> Record {
     // get anything but a Dna
     let mut dep = Record::arbitrary(g).unwrap();
-    while !f(&dep) {
+    while !f(&dep) || matches!(dep.action(), Action::Update(_)) {
         dep = Record::arbitrary(g).unwrap();
     }
     dep
@@ -106,21 +106,27 @@ async fn record_with_deps_fixup(
         *action.author_mut() = fake_agent_pubkey_1();
     }
 
-    let (entry, deps) = match &mut action {
+    let (entry, mut deps) = match &mut action {
         Action::Dna(_) => (None, vec![]),
         action => {
             let mut deps = vec![];
             let prev_seq = action.action_seq() - 1;
 
             let entry = action.entry_data_mut().map(|(entry_hash, entry_type)| {
-                let entry = contrafact::brute("Not countersigning entry", |e: &Entry| {
-                    !matches!(e, Entry::CounterSign(_, _))
+                let et = entry_type.clone();
+                let entry = contrafact::brute("matching entry", move |e: &Entry| {
+                    matches!(
+                        (&et, e),
+                        (EntryType::AgentPubKey, Entry::Agent(_))
+                            | (EntryType::App(_), Entry::App(_))
+                            | (EntryType::CapClaim, Entry::CapClaim(_))
+                            | (EntryType::CapGrant, Entry::CapGrant(_))
+                    )
                 })
                 .build(&mut g);
+
                 *entry_hash = EntryHash::with_data_sync(&entry);
-                *entry_type = entry
-                    .entry_type(Some(AppEntryDef::arbitrary(&mut g).unwrap()))
-                    .unwrap();
+
                 entry
             });
 
@@ -153,7 +159,11 @@ async fn record_with_deps_fixup(
             match action {
                 Action::Create(_create) => {}
                 Action::Update(update) => {
-                    let mut create = matching_record(&mut g, is_entry_record);
+                    let mut create = matching_record(&mut g, |r| {
+                        // Updates to agent pub key can get tricky
+                        r.action().entry_type() != Some(&EntryType::AgentPubKey)
+                            && is_entry_record(r)
+                    });
                     update.original_action_address = create.action_address().clone();
                     update.original_entry_address =
                         create.entry().as_option().unwrap().to_hash().clone();
@@ -183,7 +193,7 @@ async fn record_with_deps_fixup(
                     let create =
                         matching_record(&mut g, |r| matches!(r.action(), Action::CreateLink(_)));
                     delete.base_address = base.action_address().clone().into();
-                    delete.link_add_address = create.action_address().clone().into();
+                    delete.link_add_address = create.action_address().clone();
                     deps.push(base);
                     deps.push(create);
                 }
@@ -195,9 +205,14 @@ async fn record_with_deps_fixup(
                 }
                 Action::Dna(_) => unreachable!(),
             };
+
             (entry, deps)
         }
     };
+
+    for d in deps.iter_mut() {
+        *d.as_action_mut().author_mut() = fake_agent_pubkey_1();
+    }
 
     assert_eq!(*action.author(), fake_agent_pubkey_1());
 
@@ -232,7 +247,7 @@ async fn test_record_with_cascade() {
     let keystore = holochain_keystore::test_keystore();
     for _ in 0..100 {
         let op =
-            holochain_types::facts::valid_dht_op(keystore.clone(), fake_agent_pubkey_1(), false)
+            holochain_types::facts::valid_chain_op(keystore.clone(), fake_agent_pubkey_1(), false)
                 .build(&mut g);
         let action = op.action().clone();
         assert_valid_action(&keystore, action).await;
@@ -319,7 +334,7 @@ async fn check_valid_if_dna_test() {
     let keystore = test_keystore();
     let db = tmp.to_db();
     // Test data
-    let _activity_return = vec![ActionHash::arbitrary(&mut g).unwrap()];
+    let _activity_return = [ActionHash::arbitrary(&mut g).unwrap()];
 
     let mut dna_def = DnaDef::arbitrary(&mut g).unwrap();
     dna_def.modifiers.origin_time = Timestamp::MIN;
@@ -328,8 +343,8 @@ async fn check_valid_if_dna_test() {
     let action = CreateLink::arbitrary(&mut g).unwrap();
     let cache: DhtDbQueryCache = tmp_dht.to_db().into();
     let mut workspace = SysValidationWorkspace::new(
-        db.clone().into(),
-        tmp_dht.to_db().into(),
+        db.clone(),
+        tmp_dht.to_db(),
         cache.clone(),
         tmp_cache.to_db(),
         Arc::new(dna_def.clone()),
@@ -373,14 +388,9 @@ async fn check_valid_if_dna_test() {
 
     check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()).unwrap();
 
-    fake_genesis_for_agent(
-        db.clone().into(),
-        tmp_dht.to_db(),
-        action.author.clone(),
-        keystore,
-    )
-    .await
-    .unwrap();
+    fake_genesis_for_agent(db.clone(), tmp_dht.to_db(), action.author.clone(), keystore)
+        .await
+        .unwrap();
 
     tmp_dht
         .to_db()
@@ -401,8 +411,8 @@ async fn check_valid_if_dna_test() {
 async fn check_previous_timestamp() {
     let mut g = random_generator();
 
-    let before = Timestamp::from(chrono::Utc::now() - chrono::Duration::weeks(1));
-    let after = Timestamp::from(chrono::Utc::now() + chrono::Duration::weeks(1));
+    let before = Timestamp::from(chrono::Utc::now() - chrono::Duration::try_weeks(1).unwrap());
+    let after = Timestamp::from(chrono::Utc::now() + chrono::Duration::try_weeks(1).unwrap());
 
     let keystore = test_keystore();
     let mut action: Action = CreateLink::arbitrary(&mut g).unwrap().into();
@@ -527,7 +537,7 @@ fn check_entry_hash_test() {
     // Safe to unwrap if new entry
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(
-        check_entry_hash(&eh, &entry),
+        check_entry_hash(eh, &entry),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryHash
         ))
@@ -537,7 +547,7 @@ fn check_entry_hash_test() {
     let action: Action = ec.clone().into();
 
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
-    assert_matches!(check_entry_hash(&eh, &entry), Ok(()));
+    assert_matches!(check_entry_hash(eh, &entry), Ok(()));
     assert_matches!(
         check_new_entry_action(&CreateLink::arbitrary(&mut g).unwrap().into()),
         Err(SysValidationError::ValidationOutcome(
@@ -553,11 +563,15 @@ async fn check_entry_size_test() {
 
     let keystore = test_keystore();
 
-    let (mut record, cascade) =
-        record_with_cascade(&keystore, Create::arbitrary(&mut g).unwrap().into()).await;
+    let action = contrafact::brute("app entry create", |a: &Create| {
+        matches!(a.entry_type, EntryType::App(_))
+    })
+    .build(&mut g);
+
+    let (mut record, cascade) = record_with_cascade(&keystore, action.into()).await;
 
     let tiny_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
-        (0..5).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
+        (0..5).map(|_| 0u8).collect::<Vec<_>>(),
     ))));
     *record.as_action_mut().entry_data_mut().unwrap().1 =
         EntryType::App(AppEntryDef::arbitrary(&mut g).unwrap());
@@ -566,7 +580,7 @@ async fn check_entry_size_test() {
     sys_validate_record(&record, cascade.clone()).await.unwrap();
 
     let huge_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
-        (0..5_000_000).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
+        (0..5_000_000).map(|_| 0u8).collect::<Vec<_>>(),
     ))));
     *record.as_entry_mut() = RecordEntry::Present(huge_entry);
     let record = rebuild_record(record, &keystore).await;
@@ -588,13 +602,19 @@ async fn check_update_reference_test() {
     let keystore = test_keystore();
 
     let action = contrafact::brute("non agent entry type", move |a: &Action| {
-        matches!(a, Action::Update(..))
+        matches!(
+            a,
+            Action::Update(Update {
+                entry_type: EntryType::App(_),
+                ..
+            })
+        ) && !matches!(a, Action::AgentValidationPkg(..))
             && a.entry_type()
                 .map(|et| *et != EntryType::AgentPubKey)
                 .unwrap_or(false)
     })
     .build(&mut g);
-    let (mut record, cascade) = record_with_cascade(&keystore, action.into()).await;
+    let (mut record, cascade) = record_with_cascade(&keystore, action).await;
 
     let entry_type = record.action().entry_type().unwrap().clone();
     let et2 = entry_type.clone();
@@ -634,7 +654,6 @@ async fn check_link_tag_size_test() {
 
     let bytes = (0..super::MAX_TAG_SIZE + 1)
         .map(|_| 0u8)
-        .into_iter()
         .collect::<Vec<_>>();
     let huge = LinkTag(bytes);
 
@@ -768,6 +787,8 @@ fn valid_chain_test() {
 
         // Test without dna at root gets rejected.
         let mut dna_not_at_root = actions.clone();
+        // This is a wrong detection I think, because it's having some trouble understanding the types.
+        #[allow(clippy::clone_on_copy)]
         dna_not_at_root.push(actions[0].clone());
         let err = validate_chain(dna_not_at_root.iter(), &None).expect_err("Dna not at root");
         assert_matches!(

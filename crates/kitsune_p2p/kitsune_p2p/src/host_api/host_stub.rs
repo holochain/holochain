@@ -7,6 +7,7 @@ use kitsune_p2p_block::{Block, BlockTarget, BlockTargetId};
 use kitsune_p2p_fetch::*;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::bin_types::KitsuneOpHash;
+use kitsune_p2p_types::dht::arq::ArqSet;
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -169,9 +170,9 @@ impl KitsuneHost for HostStub {
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,
-        dht_arc_set: Arc<DhtArcSet>,
+        arq_set: ArqSet,
     ) -> KitsuneHostResult<RegionSetLtcs> {
-        KitsuneHostDefaultError::query_region_set(&self.err, space, dht_arc_set)
+        KitsuneHostDefaultError::query_region_set(&self.err, space, arq_set)
     }
 
     fn query_size_limited_regions(
@@ -214,7 +215,8 @@ impl KitsuneHost for HostStub {
 
         async move {
             // Probably not important but we could compute a real hash here if a test needs it
-            Ok(Arc::new(KitsuneOpHash::new(vec![0; 36])))
+            let hash_byte = op_data.0.first().cloned().unwrap_or(0);
+            Ok(Arc::new(KitsuneOpHash::new(vec![hash_byte; 36])))
         }
         .boxed()
         .into()

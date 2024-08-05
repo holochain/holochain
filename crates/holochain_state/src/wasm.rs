@@ -57,7 +57,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn wasm_store_round_trip() -> DatabaseResult<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         // all the stuff needed to have a WasmBuf
         let db = crate::test_utils::test_wasm_db();
@@ -76,9 +76,9 @@ mod tests {
         .await
         .unwrap();
         db.read_async(move |txn| -> DatabaseResult<()> {
-            assert!(contains(&txn, &wasm.as_hash()).unwrap());
+            assert!(contains(&txn, wasm.as_hash()).unwrap());
             // a wasm from the WasmBuf
-            let ret = get(&txn, &wasm.as_hash()).unwrap().unwrap();
+            let ret = get(&txn, wasm.as_hash()).unwrap().unwrap();
 
             // assert the round trip
             assert_eq!(ret, wasm);

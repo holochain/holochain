@@ -1,12 +1,10 @@
-use super::{SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
+use super::{DnaWithRole, SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::api::error::ConductorApiResult;
-use crate::sweettest::{SweetCell, SweetLocalRendezvous};
+use crate::sweettest::SweetLocalRendezvous;
 use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
-use holochain_types::prelude::*;
 use std::path::PathBuf;
-use std::time::Duration;
 
 /// A collection of SweetConductors, with methods for operating on the entire collection
 #[derive(derive_more::Into, derive_more::IntoIterator, derive_more::Deref)]
@@ -66,7 +64,7 @@ impl SweetConductorBatch {
         config: C,
     ) -> SweetConductorBatch {
         let config = config.into();
-        Self::from_configs(std::iter::repeat_with(|| config.random_scope()).take(num)).await
+        Self::from_configs(std::iter::repeat(config).take(num)).await
     }
 
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
@@ -78,7 +76,7 @@ impl SweetConductorBatch {
         let config = config.into();
         Self::new(
             future::join_all(
-                std::iter::repeat_with(|| config.random_scope())
+                std::iter::repeat(config)
                     .take(num)
                     .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
             )
@@ -134,19 +132,22 @@ impl SweetConductorBatch {
     /// Opinionated app setup.
     /// Creates one app on each Conductor in this batch, creating a new AgentPubKey for each.
     /// The created AgentPubKeys can be retrieved via each SweetApp.
-    pub async fn setup_app(
+    pub async fn setup_app<'a>(
         &mut self,
         installed_app_id: &str,
-        dna_files: &[DnaFile],
+        dna_files: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetAppBatch> {
         let apps = self
             .0
             .iter_mut()
-            .map(|conductor| async move {
-                let agent = SweetAgents::one(conductor.keystore()).await;
-                conductor
-                    .setup_app_for_agent(installed_app_id, agent, dna_files)
-                    .await
+            .map(|conductor| {
+                let dna_files = dna_files.clone();
+                async move {
+                    let agent = SweetAgents::one(conductor.keystore()).await;
+                    conductor
+                        .setup_app_for_agent(installed_app_id, agent, dna_files)
+                        .await
+                }
             })
             .collect::<Vec<_>>();
 
@@ -166,13 +167,13 @@ impl SweetConductorBatch {
     ///
     /// Returns a batch of SweetApps, sorted in the same order as the Conductors in
     /// this batch.
-    pub async fn setup_app_for_zipped_agents(
+    pub async fn setup_app_for_zipped_agents<'a>(
         &mut self,
         installed_app_id: &str,
-        agents: &[AgentPubKey],
-        dna_files: &[DnaFile],
+        agents: impl IntoIterator<Item = &AgentPubKey> + Clone,
+        dna_files: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetAppBatch> {
-        if agents.len() != self.0.len() {
+        if agents.clone().into_iter().count() != self.0.len() {
             panic!(
                 "setup_app_for_zipped_agents must take as many Agents as there are Conductors in this batch."
             )
@@ -181,9 +182,9 @@ impl SweetConductorBatch {
         let apps = self
             .0
             .iter_mut()
-            .zip(agents.iter())
+            .zip(agents.into_iter())
             .map(|(conductor, agent)| {
-                conductor.setup_app_for_agent(installed_app_id, agent.clone(), dna_files)
+                conductor.setup_app_for_agent(installed_app_id, agent.clone(), dna_files.clone())
             })
             .collect::<Vec<_>>();
 
@@ -240,21 +241,11 @@ impl SweetConductorBatch {
         }
     }
 
-    /// Wait for the first conductor to have started gossipping. If all conductors in this batch were
-    /// started at the same time, this should be enough to ensure that all conductors have started gossipping.
-    /// If other conductors are added later, separately check that they have started gossipping as required.
-    pub async fn require_initial_gossip_activity_for_cell(
-        &self,
-        cell: &SweetCell,
-        timeout: Duration,
-    ) {
-        SweetConductor::require_initial_gossip_activity_for_cell(
-            &self.0[0],
-            cell,
-            self.0.len() as u32,
-            timeout,
-        )
-        .await;
+    /// Make the temp db dir persistent
+    pub fn persist_dbs(&mut self) {
+        for c in self.0.iter_mut() {
+            let _ = c.persist_dbs();
+        }
     }
 }
 

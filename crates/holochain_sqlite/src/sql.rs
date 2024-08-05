@@ -3,6 +3,7 @@ pub mod sql_cell {
         include_str!("sql/cell/update_dep_activity.sql");
     pub const ACTIVITY_INTEGRATED_UPPER_BOUND: &str =
         include_str!("sql/cell/activity_integrated_upper_bound.sql");
+    pub const ACTION_HASH_BY_PREV: &str = include_str!("sql/cell/action_hash_by_prev.sql");
     pub const ALL_ACTIVITY_AUTHORS: &str = include_str!("sql/cell/all_activity_authors.sql");
     pub const ALL_READY_ACTIVITY: &str = include_str!("sql/cell/all_ready_activity.sql");
     pub const DELETE_ACTIONS_AFTER_SEQ: &str =

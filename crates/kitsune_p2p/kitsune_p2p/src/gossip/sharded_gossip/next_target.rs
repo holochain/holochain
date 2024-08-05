@@ -16,23 +16,30 @@ impl ShardedGossipLocal {
     /// Find a remote endpoint from agents within arc set.
     pub(super) async fn find_remote_agent_within_arcset(
         &self,
-        arc_set: Arc<DhtArcSet>,
-        local_agents: &HashSet<Arc<KitsuneAgent>>,
-        all_agents: &[AgentInfoSigned],
+        arc_set: ArqSet,
+        agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Option<Node>> {
         let mut remote_nodes: HashMap<NodeCert, Node> = HashMap::new();
 
+        let local_agents = agent_info_session.get_local_kitsune_agents();
+
         // Get all the remote nodes in this arc set.
-        let remote_agents_within_arc_set: HashSet<_> =
-            store::agents_within_arcset(&self.host_api, &self.space, arc_set.clone())
-                .await?
-                .into_iter()
-                .filter(|(a, _)| !local_agents.contains(a))
-                .map(|(a, _)| a)
-                .collect();
+        let remote_agents_within_arc_set: HashSet<_> = agent_info_session
+            .agent_info_within_arc_set(&self.host_api, &self.space, arc_set.clone())
+            .await?
+            .into_iter()
+            .filter_map(|a| {
+                if !local_agents.contains(&a.agent) {
+                    Some(a.agent.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         // Get all the agent info for these remote nodes.
-        for info in all_agents
+        for info in agent_info_session
+            .get_agents()
             .iter()
             .filter(|a| {
                 std::time::Duration::from_millis(a.expires_at_ms)
@@ -41,7 +48,7 @@ impl ShardedGossipLocal {
                         .expect("Your system clock is set before UNIX epoch")
             })
             .filter(|a| remote_agents_within_arc_set.contains(&a.agent))
-            .filter(|a| !a.storage_arc.is_empty())
+            .filter(|a| !a.storage_arc().is_empty())
         {
             // Get an address if there is one.
             let info = info
@@ -147,6 +154,7 @@ fn next_remote_node(
 #[cfg(test)]
 mod tests {
     use ::fixt::prelude::*;
+    use kitsune_p2p_types::dht::arq::ArqSize;
     use rand::distributions::Alphanumeric;
     use test_case::test_case;
 
@@ -178,7 +186,7 @@ mod tests {
         futures::executor::block_on(AgentInfoSigned::sign(
             space,
             agent,
-            42,
+            ArqSize::from_half_len(42),
             vec![random_url(rng).into()],
             42,
             69,
@@ -208,7 +216,7 @@ mod tests {
         (0..n)
             .map(|_| {
                 let info = random_agent_info(&mut rng);
-                let url = info.url_list.get(0).unwrap().clone();
+                let url = info.url_list.first().unwrap().clone();
                 let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
                 Node {
                     agent_info_list: vec![info],

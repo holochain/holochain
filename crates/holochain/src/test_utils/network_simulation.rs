@@ -9,16 +9,20 @@ use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_p2p::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
+use holochain_p2p::dht_arc::{DhtArcRange, DhtLocation};
 use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::store::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
-use holochain_types::dht_op::{DhtOp, DhtOpHashed, DhtOpType};
+use holochain_types::dht_op::{ChainOp, ChainOpHashed, ChainOpType};
 use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::dht::arq::ArqSize;
+use kitsune_p2p::dht::spacetime::SpaceDimension;
+use kitsune_p2p::dht::Arq;
 use kitsune_p2p::{fixt::*, KitsuneAgent, KitsuneOpHash};
+use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneSpace};
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use rand::distributions::Alphanumeric;
 use rand::distributions::Standard;
@@ -41,7 +45,7 @@ pub struct MockNetworkData {
     /// KitsuneAgent -> AgentPubKey
     pub agent_kit_to_hash: HashMap<Arc<KitsuneAgent>, Arc<AgentPubKey>>,
     /// Agent storage arcs.
-    pub agent_to_arc: HashMap<Arc<AgentPubKey>, DhtArc>,
+    pub agent_to_arq: HashMap<Arc<AgentPubKey>, Arq>,
     /// Agents peer info.
     pub agent_to_info: HashMap<Arc<AgentPubKey>, AgentInfoSigned>,
     /// Hashes ordered by their basis location.
@@ -49,7 +53,7 @@ pub struct MockNetworkData {
     /// Hash to basis location.
     pub op_to_loc: HashMap<Arc<DhtOpHash>, DhtLocation>,
     /// The DhtOps
-    pub ops: HashMap<Arc<DhtOpHash>, DhtOpHashed>,
+    pub ops: HashMap<Arc<DhtOpHash>, ChainOpHashed>,
     /// The uuid for the integrity zome (also for the dna).
     pub integrity_uuid: String,
     /// The uuid for the coordinator zome.
@@ -61,7 +65,7 @@ struct GeneratedData {
     coordinator_uuid: String,
     peer_data: Vec<AgentInfoSigned>,
     authored: HashMap<Arc<AgentPubKey>, Vec<Arc<DhtOpHash>>>,
-    ops: HashMap<Arc<DhtOpHash>, DhtOpHashed>,
+    ops: HashMap<Arc<DhtOpHash>, ChainOpHashed>,
 }
 
 impl MockNetworkData {
@@ -101,9 +105,9 @@ impl MockNetworkData {
             .into_iter()
             .map(|info| (agent_kit_to_hash[&info.agent].clone(), info))
             .collect();
-        let agent_to_arc = agent_to_info
+        let agent_to_arq = agent_to_info
             .iter()
-            .map(|(k, v)| (k.clone(), v.storage_arc))
+            .map(|(k, v)| (k.clone(), v.storage_arq))
             .collect();
         Self {
             authored,
@@ -111,7 +115,7 @@ impl MockNetworkData {
             op_kit_to_hash,
             agent_hash_to_kit,
             agent_kit_to_hash,
-            agent_to_arc,
+            agent_to_arq,
             agent_to_info,
             ops_by_loc,
             op_to_loc,
@@ -144,25 +148,26 @@ impl MockNetworkData {
 
     /// Hashes that an agent is an authority for.
     pub fn hashes_authority_for(&self, agent: &AgentPubKey) -> Vec<Arc<DhtOpHash>> {
-        let arc = self.agent_to_arc[agent].inner();
-        match arc {
-            DhtArcRange::Empty => Vec::with_capacity(0),
-            DhtArcRange::Full => self.ops_by_loc.values().flatten().cloned().collect(),
-            DhtArcRange::Bounded(start, end) => {
-                if start <= end {
-                    self.ops_by_loc
-                        .range(start..=end)
-                        .flat_map(|(_, hash)| hash)
-                        .cloned()
-                        .collect()
-                } else {
-                    self.ops_by_loc
-                        .range(..=end)
-                        .flat_map(|(_, hash)| hash)
-                        .chain(self.ops_by_loc.range(start..).flat_map(|(_, hash)| hash))
-                        .cloned()
-                        .collect()
-                }
+        let arq = self.agent_to_arq[agent];
+        if arq.is_empty() {
+            Vec::with_capacity(0)
+        } else if arq.is_full(SpaceDimension::standard()) {
+            self.ops_by_loc.values().flatten().cloned().collect()
+        } else {
+            let (start, end) = arq.to_dht_arc_range_std().to_bounds_grouped().unwrap();
+            if start <= end {
+                self.ops_by_loc
+                    .range(start..=end)
+                    .flat_map(|(_, hash)| hash)
+                    .cloned()
+                    .collect()
+            } else {
+                self.ops_by_loc
+                    .range(..=end)
+                    .flat_map(|(_, hash)| hash)
+                    .chain(self.ops_by_loc.range(start..).flat_map(|(_, hash)| hash))
+                    .cloned()
+                    .collect()
             }
         }
     }
@@ -272,8 +277,11 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
     )
     .unwrap();
     for op in data.ops.values() {
-        holochain_state::test_utils::mutations_helpers::insert_valid_integrated_op(&mut txn, op)
-            .unwrap();
+        holochain_state::test_utils::mutations_helpers::insert_valid_integrated_op(
+            &mut txn,
+            &op.downcast(),
+        )
+        .unwrap();
     }
     for (author, ops) in &data.authored {
         for op in ops {
@@ -288,7 +296,7 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
         }
     }
     for agent in data.agent_to_info.values() {
-        p2p_put_single(&mut txn, agent).unwrap();
+        p2p_put_single(agent.space.clone(), &mut txn, agent).unwrap();
     }
     txn.commit().unwrap();
     conn
@@ -314,16 +322,18 @@ fn get_cached() -> Option<GeneratedData> {
             .optional()
             .ok()
             .flatten()?;
-        let ops = get_ops(&mut txn);
-        let peer_data = txn.p2p_list_agents().unwrap();
+        let ops = get_chain_ops(&mut txn);
+        let peer_data = txn
+            .p2p_list_agents(Arc::new(KitsuneSpace::new(vec![0; 36])))
+            .unwrap();
         let authored = txn
             .prepare("SELECT agent, dht_op_hash FROM Authored")
             .unwrap()
             .query_map([], |row| Ok((Arc::new(row.get(0)?), Arc::new(row.get(1)?))))
             .unwrap()
             .map(Result::unwrap)
-            .fold(HashMap::new(), |mut map, (agent, hash)| {
-                map.entry(agent).or_insert_with(Vec::new).push(hash);
+            .fold(HashMap::<_, Vec<_>>::new(), |mut map, (agent, hash)| {
+                map.entry(agent).or_default().push(hash);
                 map
             });
 
@@ -359,7 +369,7 @@ async fn create_test_data(
     loop {
         let d: Vec<u8> = rand_entry.take(10).collect();
         let d = UnsafeBytes::from(d);
-        let entry = Entry::app(d.try_into().unwrap()).unwrap();
+        let entry = Entry::app(d.into()).unwrap();
         let hash = EntryHash::with_data_sync(&entry);
         let loc = hash.get_loc();
         if let Some(index) = buckets.iter().position(|b| b.contains(loc)) {
@@ -386,7 +396,7 @@ async fn create_test_data(
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
-        network: Some(network),
+        network,
         data_root_path: Some(tmpdir.path().to_path_buf().into()),
         ..Default::default()
     };
@@ -405,7 +415,7 @@ async fn create_test_data(
     }
 
     let apps = conductor
-        .setup_app_for_agents("app", &agents, &[dna_file.clone()])
+        .setup_app_for_agents("app", &agents, [&dna_file])
         .await
         .unwrap();
 
@@ -427,8 +437,8 @@ async fn create_test_data(
         let data = db
             .read_async({
                 let agent_pk = cell.agent_pubkey().clone();
-                move |txn| -> DatabaseResult<HashMap<Arc<DhtOpHash>, DhtOpHashed>> {
-                    Ok(get_authored_ops(&txn, &agent_pk))
+                move |txn| -> DatabaseResult<HashMap<Arc<DhtOpHash>, ChainOpHashed>> {
+                    Ok(get_authored_chain_ops(&txn, &agent_pk))
                 }
             })
             .await
@@ -462,7 +472,7 @@ async fn reset_peer_data(peers: Vec<AgentInfoSigned>, dna_hash: &DnaHash) -> Vec
         let info = AgentInfoSigned::sign(
             space_hash.clone(),
             peer.agent.clone(),
-            ((u32::MAX / 2) as f64 * coverage) as u32,
+            ArqSize::from_half_len(((u32::MAX / 2) as f64 * coverage) as u32),
             vec![url2::url2!(
                 "kitsune-proxy://CIW6PxKxs{}MSmB7kLD8xyyj4mqcw/kitsune-quic/h/localhost/p/5778/-",
                 rand_string
@@ -480,26 +490,26 @@ async fn reset_peer_data(peers: Vec<AgentInfoSigned>, dna_hash: &DnaHash) -> Vec
     peer_data
 }
 
-fn get_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
+fn get_chain_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, ChainOpHashed> {
     txn.prepare(
         "
                 SELECT DhtOp.hash, DhtOp.type AS dht_type,
                 Action.blob AS action_blob, Entry.blob AS entry_blob
-                FROM DHtOp
+                FROM DhtOp
                 JOIN Action ON DhtOp.action_hash = Action.hash
                 LEFT JOIN Entry ON Action.entry_hash = Entry.hash
             ",
     )
     .unwrap()
     .query_map([], |row| {
+        let op_type: ChainOpType = row.get("dht_type")?;
         let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
-        let op_type: DhtOpType = row.get("dht_type")?;
         let hash: DhtOpHash = row.get("hash")?;
         // Check the entry isn't private before gossiping it.
         let e: Option<Vec<u8>> = row.get("entry_blob")?;
         let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
-        let op = DhtOp::from_type(op_type, action, entry).unwrap();
-        let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
+        let op = ChainOp::from_type(op_type, action, entry).unwrap();
+        let op = ChainOpHashed::with_pre_hashed(op, hash.clone());
         Ok((Arc::new(hash), op))
     })
     .unwrap()
@@ -507,10 +517,10 @@ fn get_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
     .unwrap()
 }
 
-fn get_authored_ops(
+fn get_authored_chain_ops(
     txn: &Transaction<'_>,
     author: &AgentPubKey,
-) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
+) -> HashMap<Arc<DhtOpHash>, ChainOpHashed> {
     txn.prepare(
         "
                 SELECT DhtOp.hash, DhtOp.type AS dht_type,
@@ -524,14 +534,14 @@ fn get_authored_ops(
     )
     .unwrap()
     .query_map([author], |row| {
+        let op_type: ChainOpType = row.get("dht_type")?;
         let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
-        let op_type: DhtOpType = row.get("dht_type")?;
         let hash: DhtOpHash = row.get("hash")?;
         // Check the entry isn't private before gossiping it.
         let e: Option<Vec<u8>> = row.get("entry_blob")?;
         let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
-        let op = DhtOp::from_type(op_type, action, entry).unwrap();
-        let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
+        let op = ChainOp::from_type(op_type, action, entry).unwrap();
+        let op = ChainOpHashed::with_pre_hashed(op, hash.clone());
         Ok((Arc::new(hash), op))
     })
     .unwrap()

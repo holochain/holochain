@@ -3,6 +3,8 @@
 mod query_region_op_hashes;
 mod query_region_set;
 mod query_size_limited_regions;
+use holochain_conductor_api::conductor::ConductorConfig;
+use kitsune_p2p_bin_data::KitsuneSpace;
 pub use query_region_op_hashes::query_region_op_hashes;
 pub use query_region_set::query_region_set;
 pub use query_size_limited_regions::query_size_limited_regions;
@@ -14,29 +16,31 @@ use futures::FutureExt;
 use holo_hash::DnaHash;
 use holochain_p2p::{
     dht::{spacetime::Topology, ArqStrat},
-    DnaHashExt,
+    DhtOpHashExt, DnaHashExt, FetchContextExt,
 };
-use holochain_sqlite::prelude::{AsP2pMetricStoreTxExt, AsP2pStateTxExt};
+use holochain_sqlite::prelude::{AsP2pMetricStoreTxExt, AsP2pStateReadExt, AsP2pStateWriteExt};
 use holochain_types::{
     prelude::{DhtOpHash, DnaError},
     share::RwShare,
 };
 use holochain_zome_types::prelude::Timestamp;
 use kitsune_p2p::{
-    agent_store::AgentInfoSigned, dependencies::kitsune_p2p_fetch::OpHashSized,
-    event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
+    agent_store::AgentInfoSigned,
+    dependencies::kitsune_p2p_fetch::{OpHashSized, RoughSized, TransferMethod},
+    dht::arq::ArqSet,
+    event::GetAgentInfoSignedEvt,
+    KitsuneHost, KitsuneHostResult,
 };
 use kitsune_p2p_types::metrics::MetricRecord;
-use kitsune_p2p_types::{
-    config::KitsuneP2pTuningParams, dependencies::lair_keystore_api, KOpData, KOpHash,
-};
+use kitsune_p2p_types::{dependencies::lair_keystore_api, KOpData, KOpHash};
+use rusqlite::ToSql;
 
 /// Implementation of the Kitsune Host API.
 /// Lets Kitsune make requests of Holochain
 pub struct KitsuneHostImpl {
     spaces: Spaces,
+    config: Arc<ConductorConfig>,
     ribosome_store: RwShare<RibosomeStore>,
-    tuning_params: KitsuneP2pTuningParams,
     strat: ArqStrat,
     lair_tag: Option<Arc<str>>,
     lair_client: Option<lair_keystore_api::LairClient>,
@@ -46,7 +50,7 @@ pub struct KitsuneHostImpl {
 impl std::fmt::Debug for KitsuneHostImpl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("KitsuneHostImpl")
-            .field("tuning_params", &self.tuning_params)
+            .field("config", &self.config)
             .field("strat", &self.strat)
             .finish()
     }
@@ -56,16 +60,16 @@ impl KitsuneHostImpl {
     /// Constructor
     pub fn new(
         spaces: Spaces,
+        config: Arc<ConductorConfig>,
         ribosome_store: RwShare<RibosomeStore>,
-        tuning_params: KitsuneP2pTuningParams,
         strat: ArqStrat,
         lair_tag: Option<Arc<str>>,
         lair_client: Option<lair_keystore_api::LairClient>,
     ) -> Arc<Self> {
         Arc::new(Self {
             spaces,
+            config,
             ribosome_store,
-            tuning_params,
             strat,
             lair_tag,
             lair_client,
@@ -112,15 +116,14 @@ impl KitsuneHost for KitsuneHostImpl {
     ) -> KitsuneHostResult<Vec<f64>> {
         async move {
             let db = self.spaces.p2p_agents_db(&DnaHash::from_kitsune(&space))?;
-            let coverage = db
-                .read_async(move |txn| txn.p2p_extrapolated_coverage(dht_arc_set))
-                .await?;
+            let coverage = db.p2p_extrapolated_coverage(dht_arc_set).await?;
             Ok(coverage)
         }
         .boxed()
         .into()
     }
 
+    #[tracing::instrument(skip_all)]
     fn record_metrics(
         &self,
         space: std::sync::Arc<kitsune_p2p::KitsuneSpace>,
@@ -155,26 +158,22 @@ impl KitsuneHost for KitsuneHostImpl {
     ) -> KitsuneHostResult<bool> {
         let dna_hash = DnaHash::from_kitsune(&space);
         let db = self.spaces.p2p_agents_db(&dna_hash);
-        async move {
-            Ok(db?
-                .write_async(move |txn| txn.p2p_remove_agent(&agent))
-                .await?)
-        }
-        .boxed()
-        .into()
+        async move { Ok(db?.p2p_remove_agent(&agent).await?) }
+            .boxed()
+            .into()
     }
 
     fn query_region_set(
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
-        dht_arc_set: Arc<holochain_p2p::dht_arc::DhtArcSet>,
+        arq_set: ArqSet,
     ) -> KitsuneHostResult<holochain_p2p::dht::region_set::RegionSetLtcs> {
         let dna_hash = DnaHash::from_kitsune(&space);
         async move {
             let topology = self.get_topology(space.clone()).await?;
             let db = self.spaces.dht_db(&dna_hash)?;
             let region_set =
-                query_region_set(db, topology.clone(), &self.strat, dht_arc_set).await?;
+                query_region_set(db, topology.clone(), &self.strat, arq_set.into()).await?;
             Ok(region_set)
         }
         .boxed()
@@ -222,13 +221,15 @@ impl KitsuneHost for KitsuneHostImpl {
             .ribosome_store
             .share_mut(|ds| ds.get_dna_def(&dna_hash))
             .ok_or(DnaError::DnaMissing(dna_hash));
-        let cutoff = self.tuning_params.danger_gossip_recent_threshold();
+        let cutoff = self
+            .config
+            .network
+            .tuning_params
+            .danger_gossip_recent_threshold();
         async move { Ok(dna_def?.topology(cutoff)) }.boxed().into()
     }
 
     fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash> {
-        use holochain_p2p::DhtOpHashExt;
-
         async move {
             let op = holochain_p2p::WireDhtOpData::decode(op_data.0.clone())?;
 
@@ -240,15 +241,13 @@ impl KitsuneHost for KitsuneHostImpl {
         .into()
     }
 
+    #[tracing::instrument(skip_all)]
     fn check_op_data(
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
         op_hash_list: Vec<KOpHash>,
         context: Option<kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext>,
     ) -> KitsuneHostResult<Vec<bool>> {
-        use holochain_p2p::{DhtOpHashExt, FetchContextExt};
-        use rusqlite::ToSql;
-
         async move {
             let db = self.spaces.dht_db(&DnaHash::from_kitsune(&space))?;
             let results = db
@@ -287,6 +286,34 @@ impl KitsuneHost for KitsuneHostImpl {
         }
         .boxed()
         .into()
+    }
+
+    fn handle_op_hash_received(
+        &self,
+        _space: &KitsuneSpace,
+        op_hash: &RoughSized<KOpHash>,
+        transfer_method: TransferMethod,
+    ) {
+        let hash = DhtOpHash::from_kitsune(&op_hash.data());
+        aitia::trace!(&hc_sleuth::Event::ReceivedHash {
+            by: self.config.sleuth_id(),
+            op: hash,
+            method: transfer_method,
+        });
+    }
+
+    fn handle_op_hash_transmitted(
+        &self,
+        _space: &KitsuneSpace,
+        op_hash: &RoughSized<KOpHash>,
+        transfer_method: TransferMethod,
+    ) {
+        let hash = DhtOpHash::from_kitsune(&op_hash.data());
+        aitia::trace!(&hc_sleuth::Event::SentHash {
+            by: self.config.sleuth_id(),
+            op: hash,
+            method: transfer_method,
+        });
     }
 
     fn lair_tag(&self) -> Option<Arc<str>> {

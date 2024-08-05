@@ -117,7 +117,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_store_entry_defs() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         // all the stuff needed to have a WasmBuf
         let db_dir = test_db_dir();

@@ -4,11 +4,11 @@ use std::collections::HashMap;
 use holochain_zome_types::prelude::*;
 use serde::de::DeserializeOwned;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 /// A set of inline integrity and coordinator zomes.
 pub struct InlineZomeSet {
     /// The set of inline zomes that will be installed as the integrity zomes.
-    /// Only these affect the [`DnaHash`](holo_hash::DnaHash).
+    /// Only these affect the [`DnaHash`].
     pub integrity_zomes: HashMap<&'static str, InlineIntegrityZome>,
     /// The order of the integrity zomes.
     pub integrity_order: Vec<&'static str>,
@@ -159,17 +159,6 @@ impl InlineZomeSet {
             coordinator_zomes,
             dependencies,
         }
-    }
-
-    /// Alias for `function`
-    #[deprecated = "Alias for `function`"]
-    pub fn callback<F, I, O>(self, zome_name: &'static str, name: &str, f: F) -> Self
-    where
-        F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
-        I: DeserializeOwned + std::fmt::Debug,
-        O: Serialize + std::fmt::Debug,
-    {
-        self.function(zome_name, name, f)
     }
 
     /// Merge two inline zome sets together.

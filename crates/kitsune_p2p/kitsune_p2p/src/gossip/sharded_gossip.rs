@@ -12,13 +12,15 @@ use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
-use kitsune_p2p_fetch::{FetchPool, FetchPoolReader, FetchSource, OpHashSized};
+use kitsune_p2p_fetch::{FetchPool, FetchPoolReader, FetchSource, OpHashSized, TransferMethod};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
+use kitsune_p2p_types::dht::arq::ArqSet;
 use kitsune_p2p_types::dht::region::{Region, RegionData};
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
-use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
+use kitsune_p2p_types::dht::ArqBounds;
+use kitsune_p2p_types::dht_arc::DhtArcSet;
 use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
@@ -32,6 +34,7 @@ use tokio::time::Instant;
 pub use self::bandwidth::BandwidthThrottle;
 use self::ops::OpsBatchQueue;
 use self::state_map::RoundStateMap;
+use self::store::AgentInfoSession;
 use crate::metrics::MetricsSync;
 
 use super::{HowToConnect, MetaOpKey};
@@ -194,57 +197,56 @@ impl ShardedGossip {
             bandwidth,
         });
 
-        let mut agent_list_by_local_agents = vec![];
-        let mut all_agents = vec![];
         let mut refresh_agent_list_timer = std::time::Instant::now();
 
         metric_task_instrumented(config.tracing_scope.clone(), {
             let this = this.clone();
 
             async move {
+                let mut agent_info_session = this.create_agent_info_session().await?;
+
                 let mut stats = Stats::reset();
                 while !this
                     .gossip
                     .closing
                     .load(std::sync::atomic::Ordering::Relaxed)
                 {
-                    tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
-                    this.run_one_iteration(
-                        agent_list_by_local_agents.clone(),
-                        all_agents.as_slice(),
-                    )
-                    .await;
-                    this.stats(&mut stats);
-
                     if refresh_agent_list_timer.elapsed() > AGENT_LIST_FETCH_INTERVAL {
-                        agent_list_by_local_agents =
-                            match this.gossip.query_agents_by_local_agents().await {
-                                Ok(a) => a,
-                                Err(e) => {
-                                    tracing::error!(
-                                        "Failed to query for agents by local agents - {:?}",
-                                        e
-                                    );
-                                    vec![]
-                                }
-                            };
-                        all_agents =
-                            match store::all_agent_info(&this.gossip.host_api, &this.gossip.space)
-                                .await
-                            {
-                                Ok(a) => a,
-                                Err(e) => {
-                                    tracing::error!("Failed to query for all agents - {:?}", e);
-                                    vec![]
-                                }
-                            };
+                        agent_info_session = this.create_agent_info_session().await?;
                         refresh_agent_list_timer = std::time::Instant::now();
                     }
+
+                    this.run_one_iteration(&mut agent_info_session).await;
+                    this.stats(&mut stats);
+
+                    tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
                 }
                 KitsuneResult::Ok(())
             }
         });
         this
+    }
+
+    async fn create_agent_info_session(&self) -> KitsuneResult<AgentInfoSession> {
+        let all_agents =
+            match store::all_agent_info(&self.gossip.host_api, &self.gossip.space).await {
+                Ok(a) => a,
+                Err(e) => {
+                    tracing::error!("Failed to query for all agents - {:?}", e);
+                    vec![]
+                }
+            };
+
+        // Find local agents by filtering the complete list of known agents against the agents which have joined Kitsune.
+        let local_agents = self.gossip.inner.share_ref(|s| {
+            Ok(all_agents
+                .iter()
+                .filter(|a| s.local_agents.contains(&a.agent))
+                .cloned()
+                .collect())
+        })?;
+
+        Ok(AgentInfoSession::new(local_agents, all_agents))
     }
 
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
@@ -273,11 +275,11 @@ impl ShardedGossip {
             }
         };
 
-        let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
-        let bytes = gossip.len();
-        let gossip = wire::Wire::gossip(
+        let encoded = gossip.encode_vec().map_err(KitsuneError::other)?;
+        let bytes = encoded.len();
+        let wire = wire::Wire::gossip(
             self.gossip.space.clone(),
-            gossip.into(),
+            encoded.into(),
             self.gossip.gossip_type.into(),
         );
 
@@ -295,13 +297,28 @@ impl ShardedGossip {
             }
             HowToConnect::Url(url) => self.ep_hnd.get_connection(url, timeout).await?,
         };
+
         // Wait for enough available outgoing bandwidth here before
         // actually sending the gossip.
-        con.notify(&gossip, timeout).await?;
+        con.notify(&wire, timeout).await?;
+
+        if let ShardedGossipWire::MissingOpHashes(MissingOpHashes { ops, finished: _ }) = gossip {
+            for hash in ops.iter() {
+                self.gossip.host_api.handle_op_hash_transmitted(
+                    &self.gossip.space,
+                    hash,
+                    TransferMethod::Gossip,
+                );
+            }
+        }
+
         Ok(())
     }
 
-    async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
+    async fn process_incoming_outgoing(
+        &self,
+        agent_info_session: &mut AgentInfoSession,
+    ) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
         let gossip_type_char = match self.gossip.gossip_type {
             GossipType::Recent => 'R',
@@ -309,16 +326,20 @@ impl ShardedGossip {
         };
 
         if let Some(msg) = outgoing.as_ref() {
-            tracing::debug!(
-                "OUTGOING GOSSIP [{}]  => {:17} ({:10}) : {:?} -> {:?} [{}]",
+            let remote_url = match &msg.1 {
+                HowToConnect::Con(_, url) => url.clone(),
+                HowToConnect::Url(url) => url.clone(),
+            };
+            tracing::trace!(
+                target: "NETAUDIT",
+                "OUTGOING GOSSIP [{}]  => {:17} ({:10}) : this -> {:?} [{}]",
                 gossip_type_char,
                 msg.2
                     .variant_type()
                     .to_string()
                     .replace("ShardedGossipWire::", ""),
                 msg.2.encode_vec().expect("can't encode msg").len(),
-                self.ep_hnd.local_id(),
-                &msg.0,
+                remote_url,
                 self.gossip
                     .inner
                     .share_mut(|s, _| Ok(s.round_map.current_rounds().len()))
@@ -333,15 +354,19 @@ impl ShardedGossip {
                 .to_string()
                 .replace("ShardedGossipWire::", "");
             let len = msg.encode_vec().expect("can't encode msg").len();
-            let outgoing = match self.gossip.process_incoming(con.peer_id(), msg).await {
+            let outgoing = match self
+                .gossip
+                .process_incoming(con.peer_id(), msg, agent_info_session)
+                .await
+            {
                 Ok(r) => {
-                    tracing::debug!(
-                        "INCOMING GOSSIP [{}] <=  {:17} ({:10}) : {:?} -> {:?} [{}]",
+                    tracing::trace!(
+                        target: "NETAUDIT",
+                        "INCOMING GOSSIP [{}] <=  {:17} ({:10}) : {:?} -> this [{}]",
                         gossip_type_char,
                         variant_type,
                         len,
-                        con.peer_id(),
-                        self.ep_hnd.local_id(),
+                        remote_url,
                         self.gossip
                             .inner
                             .share_mut(|s, _| Ok(s.round_map.current_rounds().len()))
@@ -382,16 +407,8 @@ impl ShardedGossip {
         Ok(())
     }
 
-    async fn run_one_iteration(
-        &self,
-        agent_list_by_local_agents: Vec<AgentInfoSigned>,
-        all_agents: &[AgentInfoSigned],
-    ) {
-        match self
-            .gossip
-            .try_initiate(agent_list_by_local_agents, all_agents)
-            .await
-        {
+    async fn run_one_iteration(&self, agent_info_session: &mut AgentInfoSession) {
+        match self.gossip.try_initiate(agent_info_session).await {
             Ok(Some(outgoing)) => {
                 if let Err(err) = self.state.share_mut(|i, _| {
                     i.push_outgoing([outgoing]);
@@ -406,7 +423,7 @@ impl ShardedGossip {
             Ok(None) => (),
             Err(err) => tracing::error!("Gossip failed when trying to initiate with {:?}", err),
         }
-        if let Err(err) = self.process_incoming_outgoing().await {
+        if let Err(err) = self.process_incoming_outgoing(agent_info_session).await {
             tracing::error!("Gossip failed to process a message because of: {:?}", err);
         }
         self.gossip.record_timeouts();
@@ -638,16 +655,16 @@ impl ShardedGossipState {
 
     pub fn push_incoming<I: Clone + IntoIterator<Item = Incoming>>(&mut self, incoming: I) {
         if let Some(history) = &mut self.history {
-            history.incoming.extend(incoming.clone().into_iter());
+            history.incoming.extend(incoming.clone());
         }
-        self.queues.incoming.extend(incoming.into_iter());
+        self.queues.incoming.extend(incoming);
     }
 
     pub fn push_outgoing<I: Clone + IntoIterator<Item = Outgoing>>(&mut self, outgoing: I) {
         if let Some(history) = &mut self.history {
-            history.outgoing.extend(outgoing.clone().into_iter());
+            history.outgoing.extend(outgoing.clone());
         }
-        self.queues.outgoing.extend(outgoing.into_iter());
+        self.queues.outgoing.extend(outgoing);
     }
 
     pub fn pop(&mut self) -> (Option<Incoming>, Option<Outgoing>) {
@@ -665,7 +682,7 @@ pub struct RoundState {
     /// The remote agents hosted by the remote node, used for metrics tracking
     pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
     /// The common ground with our gossip partner for the purposes of this round
-    common_arc_set: Arc<DhtArcSet>,
+    common_arq_set: Arc<ArqSet>,
     /// We've received the last op bloom filter from our partner
     /// (the one with `finished` == true)
     received_all_incoming_op_blooms: bool,
@@ -703,13 +720,13 @@ impl RoundState {
     /// Constructor
     pub fn new(
         remote_agent_list: Vec<AgentInfoSigned>,
-        common_arc_set: Arc<DhtArcSet>,
+        common_arq_set: Arc<ArqSet>,
         region_set_sent: Option<Arc<RegionSetLtcs<RegionData>>>,
         round_timeout: Duration,
     ) -> Self {
         RoundState {
             remote_agent_list,
-            common_arc_set,
+            common_arq_set,
             received_all_incoming_op_blooms: false,
             has_pending_historical_op_data: false,
             regions_are_queued: false,
@@ -722,6 +739,11 @@ impl RoundState {
             region_set_sent,
             region_diffs: Default::default(),
         }
+    }
+
+    /// Get the common arcs as continuous arcs
+    pub fn common_arc_set(&self) -> Arc<DhtArcSet> {
+        Arc::new(self.common_arq_set.to_dht_arc_set_std())
     }
 }
 
@@ -770,13 +792,13 @@ impl ShardedGossipLocal {
     fn new_state(
         &self,
         remote_agent_list: Vec<AgentInfoSigned>,
-        common_arc_set: Arc<DhtArcSet>,
+        common_arq_set: Arc<ArqSet>,
         region_set_sent: Option<RegionSetLtcs>,
         round_timeout: Duration,
     ) -> KitsuneResult<RoundState> {
         Ok(RoundState::new(
             remote_agent_list,
-            common_arc_set,
+            common_arq_set,
             region_set_sent.map(Arc::new),
             round_timeout,
         ))
@@ -870,6 +892,7 @@ impl ShardedGossipLocal {
         &self,
         peer_cert: NodeCert,
         msg: ShardedGossipWire,
+        agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let s = match self.gossip_type {
             GossipType::Recent => {
@@ -898,20 +921,21 @@ impl ShardedGossipLocal {
                 id,
                 agent_list,
             }) => {
-                self.incoming_initiate(peer_cert, intervals, id, agent_list)
+                self.incoming_initiate(peer_cert, intervals, id, agent_list, agent_info_session)
                     .await?
             }
             ShardedGossipWire::Accept(Accept {
                 intervals,
                 agent_list,
             }) => {
-                self.incoming_accept(peer_cert, intervals, agent_list)
+                self.incoming_accept(peer_cert, intervals, agent_list, agent_info_session)
                     .await?
             }
             ShardedGossipWire::Agents(Agents { filter }) => {
                 if let Some(state) = self.get_state(&peer_cert)? {
                     let filter = decode_bloom_filter(&filter);
-                    self.incoming_agents(state, filter).await?
+                    self.incoming_agents(state, filter, agent_info_session)
+                        .await?
                 } else {
                     Vec::with_capacity(0)
                 }
@@ -1007,11 +1031,12 @@ impl ShardedGossipLocal {
                     && !ops.is_empty()
                 {
                     if let Some(state) = state.as_ref() {
-                        if let Some(agent) = state.remote_agent_list.get(0) {
+                        if let Some(agent) = state.remote_agent_list.first() {
                             // there is at least 1 agent
                             let agent = agent.agent.clone();
                             let source = FetchSource::Agent(agent);
-                            self.incoming_missing_op_hashes(source, ops).await?;
+                            self.incoming_missing_op_hashes(source, ops, TransferMethod::Gossip)
+                                .await?;
                         } else {
                             tracing::warn!(
                                 "Op hashes were received for a round with no remote agent(s). {} ops dropped!",
@@ -1209,7 +1234,7 @@ kitsune_p2p_types::write_codec_enum! {
         Initiate(0x10) {
             /// The list of arc intervals (equivalent to a [`DhtArcSet`])
             /// for all local agents
-            intervals.0: Vec<DhtArcRange>,
+            intervals.0: Vec<ArqBounds>,
             /// A random number to resolve concurrent initiates.
             id.1: u32,
             /// List of active local agents represented by this node.
@@ -1220,7 +1245,7 @@ kitsune_p2p_types::write_codec_enum! {
         Accept(0x20) {
             /// The list of arc intervals (equivalent to a [`DhtArcSet`])
             /// for all local agents
-            intervals.0: Vec<DhtArcRange>,
+            intervals.0: Vec<ArqBounds>,
             /// List of active local agents represented by this node.
             agent_list.1: Vec<AgentInfoSigned>,
         },

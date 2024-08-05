@@ -4,7 +4,6 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::access::Permission;
 use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::CellId;
@@ -112,7 +111,6 @@ mod tests {
     use crate::sweettest::*;
     use futures::future;
     use hdk::prelude::*;
-    use tokio_stream::StreamExt;
 
     fn test_zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineIntegrityZome {
         let entry_def = EntryDef::default_from_id("entrydef");
@@ -158,7 +156,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
     async fn remote_signal_test() -> anyhow::Result<()> {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         const NUM_CONDUCTORS: usize = 5;
 
         let num_signals = Arc::new(AtomicUsize::new(0));
@@ -172,7 +170,7 @@ mod tests {
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome)).await;
 
         let apps = conductors
-            .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])
+            .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone()])
             .await
             .unwrap();
 
@@ -182,7 +180,7 @@ mod tests {
 
         let mut signals = Vec::new();
         for h in conductors.iter() {
-            signals.push(h.signal_broadcaster().subscribe_merged())
+            signals.push(h.subscribe_to_app_signals("app".to_string()))
         }
 
         let _: () = conductors[0]
@@ -192,7 +190,7 @@ mod tests {
         crate::assert_eq_retry_10s!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);
 
         for mut signal in signals {
-            signal.next().await.expect("Failed to recv signal");
+            signal.recv().await.expect("Failed to recv signal");
         }
 
         Ok(())

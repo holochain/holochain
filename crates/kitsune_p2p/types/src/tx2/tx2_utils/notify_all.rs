@@ -1,5 +1,3 @@
-#![allow(clippy::blocks_in_if_conditions)]
-
 use crate::tx2::tx2_utils::*;
 use crate::*;
 
@@ -23,20 +21,17 @@ impl std::future::Future for WaitFut {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let mut index = self.1.take();
-        if self
-            .0
-            .share_mut(|i, _| {
-                if let Some(idx) = index {
-                    i.wakers[idx] = cx.waker().clone();
-                    index = Some(idx);
-                } else {
-                    index = Some(i.wakers.len());
-                    i.wakers.push(cx.waker().clone());
-                }
-                Ok(())
-            })
-            .is_err()
-        {
+        let waker_update_result = self.0.share_mut(|i, _| {
+            if let Some(idx) = index {
+                i.wakers[idx].clone_from(cx.waker());
+                index = Some(idx);
+            } else {
+                index = Some(i.wakers.len());
+                i.wakers.push(cx.waker().clone());
+            }
+            Ok(())
+        });
+        if waker_update_result.is_err() {
             return std::task::Poll::Ready(());
         }
         self.1 = index;
@@ -73,7 +68,7 @@ impl Drop for NotifyOnDrop {
 /// Many tasks can await on this notify struct.
 /// They will all be notified once notify is called.
 #[derive(Clone)]
-pub struct NotifyAll(InnerWrap, Arc<NotifyOnDrop>);
+pub struct NotifyAll(InnerWrap, #[allow(dead_code)] Arc<NotifyOnDrop>);
 
 impl Default for NotifyAll {
     fn default() -> Self {

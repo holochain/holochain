@@ -84,7 +84,7 @@ fn to_local_types_test_nested() {
 
     #[hdk_to_coordinates]
     enum NoNesting {
-        A(Nested1),
+        A,
         #[allow(dead_code)]
         B {
             nested: Nested2,
@@ -92,9 +92,9 @@ fn to_local_types_test_nested() {
         C,
     }
 
-    assert_eq!(to_coords(NoNesting::A(Nested1::A)), (0, 0));
-    assert_eq!(to_coords(NoNesting::A(Nested1::B)), (0, 0));
-    assert_eq!(to_coords(&NoNesting::A(Nested1::B)), (0, 0));
+    assert_eq!(to_coords(NoNesting::A), (0, 0));
+    assert_eq!(to_coords(NoNesting::A), (0, 0));
+    assert_eq!(to_coords(&NoNesting::A), (0, 0));
     assert_eq!(to_coords(NoNesting::B { nested: Nested2::X }), (0, 1));
     assert_eq!(to_coords(NoNesting::B { nested: Nested2::Y }), (0, 1));
     assert_eq!(to_coords(NoNesting::B { nested: Nested2::Z }), (0, 1));
@@ -178,7 +178,7 @@ mod entry_defs_to_entry_type_index_test {
     pub mod integrity_a {
         use super::*;
 
-        #[hdk_entry_defs(skip_hdk_extern = true)]
+        #[hdk_entry_types(skip_hdk_extern = true)]
         #[unit_enum(UnitFoo)]
         #[derive(PartialEq, Eq)]
         pub enum EntryTypes {
@@ -191,7 +191,7 @@ mod entry_defs_to_entry_type_index_test {
     pub mod integrity_b {
         use super::*;
 
-        #[hdk_entry_defs(skip_hdk_extern = true)]
+        #[hdk_entry_types(skip_hdk_extern = true)]
         #[unit_enum(UnitFoo)]
         pub enum EntryTypes {
             A(A),
@@ -204,14 +204,14 @@ mod entry_defs_overrides_mod {
     use super::*;
     #[hdk_entry_helper]
     pub struct A;
-    #[hdk_entry_defs(skip_hdk_extern = true)]
+    #[hdk_entry_types(skip_hdk_extern = true)]
     #[unit_enum(UnitFoo)]
     pub enum EntryTypes {
-        #[entry_def(name = "hey")]
+        #[entry_type(name = "hey")]
         A(A),
-        #[entry_def(visibility = "private")]
+        #[entry_type(visibility = "private")]
         B(A),
-        #[entry_def(required_validations = 10, cache_at_agent_activity = true)]
+        #[entry_type(required_validations = 10, cache_at_agent_activity = true)]
         C(A),
     }
 }
@@ -247,7 +247,7 @@ mod entry_defs_default_mod {
     use super::*;
     #[hdk_entry_helper]
     pub struct A;
-    #[hdk_entry_defs(skip_hdk_extern = true)]
+    #[hdk_entry_types(skip_hdk_extern = true)]
     #[unit_enum(UnitFoo2)]
     pub enum EntryTypes {
         A(A),
@@ -320,10 +320,10 @@ fn entry_defs_to_entry_type_index() {
         Ok(Some(integrity_a::EntryTypes::C(C {})))
     );
 
-    assert!(matches!(
-        integrity_a::EntryTypes::deserialize_from_type(1, 20, &Entry::try_from(A {}).unwrap()),
-        Err(_)
-    ));
+    assert!(
+        integrity_a::EntryTypes::deserialize_from_type(1, 20, &Entry::try_from(A {}).unwrap())
+            .is_err()
+    );
     assert_eq!(
         integrity_a::EntryTypes::deserialize_from_type(0, 0, &Entry::try_from(A {}).unwrap()),
         Ok(None)
@@ -393,14 +393,8 @@ fn link_types_from_action() {
         LinkTypes::try_from(scoped_link_type(1, 2)),
         Ok(LinkTypes::C)
     );
-    assert!(matches!(
-        LinkTypes::try_from(scoped_link_type(1, 50)),
-        Err(_)
-    ));
-    assert!(matches!(
-        LinkTypes::try_from(scoped_link_type(0, 1)),
-        Err(_)
-    ));
+    assert!(LinkTypes::try_from(scoped_link_type(1, 50)).is_err());
+    assert!(LinkTypes::try_from(scoped_link_type(0, 1)).is_err());
 }
 
 #[test]

@@ -15,7 +15,7 @@ use std::convert::TryFrom;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn direct_validation_test() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
 
     let TestWasmPair::<DnaWasm> {
         integrity,
@@ -32,6 +32,7 @@ async fn direct_validation_test() {
             },
             integrity_zomes: vec![TestZomes::from(TestWasm::Update).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::Update).coordinator.into_inner()],
+            lineage: Default::default(),
         },
         [integrity, coordinator],
     )
@@ -39,13 +40,9 @@ async fn direct_validation_test() {
 
     let alice_agent_id = fake_agent_pubkey_1();
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
-    let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
 
-    let (_tmpdir, _app_api, handle) = setup_app_with_names(
-        vec![("test_app", vec![(alice_installed_cell, None)])],
-        vec![dna_file.clone()],
-    )
-    .await;
+    let (_tmpdir, _app_api, handle) =
+        setup_app_with_names(alice_agent_id, vec![("test_app", vec![(dna_file, None)])]).await;
 
     run_test(alice_cell_id, handle.clone()).await;
 

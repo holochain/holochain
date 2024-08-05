@@ -53,13 +53,14 @@ pub enum TaskOutcome {
 
 /// Spawn a task which performs some action after each task has completed,
 /// as recieved by the outcome channel produced by the task manager.
+#[tracing::instrument(skip_all)]
 pub fn spawn_task_outcome_handler(
     conductor: ConductorHandle,
     mut outcomes: OutcomeReceiver,
 ) -> JoinHandle<TaskManagerResult> {
-    let span = tracing::error_span!(
+    let span = tracing::info_span!(
         "spawn_task_outcome_handler",
-        scope = conductor.get_config().tracing_scope
+        scope = conductor.get_config().tracing_scope()
     );
     tokio::spawn(async move {
         while let Some((_group, result)) = outcomes.next().await {
@@ -152,7 +153,7 @@ pub fn spawn_task_outcome_handler(
                         .map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {
                         let cells_with_same_dna: Vec<_> = conductor
-                            .running_cell_ids(None)
+                            .running_cell_ids()
                             .into_iter()
                             .filter(|id| id.dna_hash() == dna_hash.as_ref())
                             .collect();
@@ -276,7 +277,7 @@ pub struct TaskManagerClient {
 impl TaskManagerClient {
     /// Construct the TaskManager and the outcome channel receiver
     pub fn new(tx: OutcomeSender, scope: String) -> Self {
-        let span = tracing::error_span!("managed task", scope = scope);
+        let span = tracing::info_span!("managed task", scope = scope);
         let tm = task_motel::TaskManager::new_instrumented(span, tx, |g| match g {
             TaskGroup::Conductor => None,
             TaskGroup::Dna(_) => Some(TaskGroup::Conductor),
@@ -322,9 +323,15 @@ impl TaskManagerClient {
     pub fn add_conductor_task_ignored<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
         &self,
         name: &str,
-        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+        f: impl FnOnce() -> Fut + Send + 'static,
     ) {
-        self.add_conductor_task(name, TaskKind::Ignore, f)
+        self.add_conductor_task(name, TaskKind::Ignore, move |stop| async move {
+            tokio::select! {
+                _ = stop => (),
+                _ = f() => (),
+            }
+            Ok(())
+        })
     }
 
     /// Add a conductor-level task which will cause the conductor to shut down if it fails
@@ -429,7 +436,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn unrecoverable_error() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db_dir = test_db_dir();
         let handle = Conductor::builder()
             .with_data_root_path(db_dir.path().to_path_buf().into())
@@ -462,7 +469,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "panics in tokio break other tests, this test is here to confirm behavior but cannot be run on ci"]
     async fn unrecoverable_panic() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db_dir = test_db_dir();
         let handle = Conductor::builder()
             .with_data_root_path(db_dir.as_ref().to_path_buf().into())

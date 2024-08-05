@@ -3,6 +3,7 @@ use holochain_types::prelude::ChainItem;
 
 use super::*;
 
+#[tracing::instrument(skip_all)]
 pub(crate) async fn graft_records_onto_source_chain(
     conductor: ConductorHandle,
     cell_id: CellId,
@@ -10,7 +11,7 @@ pub(crate) async fn graft_records_onto_source_chain(
     records: Vec<Record>,
 ) -> ConductorApiResult<()> {
     // Require that the cell is installed.
-    if let err @ Err(ConductorError::CellMissing(_)) = conductor.cell_by_id(&cell_id, false).await {
+    if let err @ Err(ConductorError::CellMissing(_)) = conductor.cell_by_id(&cell_id).await {
         let _ = err?;
     }
 
@@ -57,7 +58,7 @@ pub(crate) async fn graft_records_onto_source_chain(
 
     // Commit the records to the source chain.
     let ops_to_integrate = space
-        .authored_db
+        .get_or_create_authored_db(cell_id.agent_pubkey().clone())?
         .write_async({
             let cell_id = cell_id.clone();
             move |txn| {
@@ -104,22 +105,21 @@ pub(crate) async fn graft_records_onto_source_chain(
 
     // Check which ops need to be integrated.
     // Only integrated if a cell is installed.
-    if conductor
-        .running_cell_ids(Some(CellStatus::Joined))
-        .contains(&cell_id)
-    {
+    if conductor.running_cell_ids().contains(&cell_id) {
         holochain_state::integrate::authored_ops_to_dht_db(
             &network,
             ops_to_integrate,
-            &space.authored_db,
-            &space.dht_db,
+            space
+                .get_or_create_authored_db(cell_id.agent_pubkey().clone())?
+                .into(),
+            space.dht_db.clone(),
             &space.dht_query_cache,
         )
         .await?;
 
         // Any ops that were moved to the dht_db but had dependencies will need to be integrated.
         conductor
-            .cell_by_id(&cell_id, false)
+            .cell_by_id(&cell_id)
             .await?
             .notify_authored_ops_moved_to_limbo();
     }
@@ -142,7 +142,7 @@ async fn validate_records(
     // Create a raw source chain to validate against because
     // genesis may not have been run yet.
     let workspace = SourceChainWorkspace::raw_empty(
-        space.authored_db.clone(),
+        space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?,
         space.dht_db.clone(),
         space.dht_query_cache.clone(),
         space.cache_db.clone(),

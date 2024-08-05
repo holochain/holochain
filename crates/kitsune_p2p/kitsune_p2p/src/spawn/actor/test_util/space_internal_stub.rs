@@ -1,5 +1,4 @@
 use crate::actor::BroadcastData;
-use crate::dht_arc::DhtArc;
 use crate::event::PutAgentInfoSignedEvt;
 use crate::spawn::actor::space::WireConHnd;
 use crate::spawn::actor::space::{SpaceInternal, SpaceInternalHandler, SpaceInternalHandlerResult};
@@ -14,6 +13,7 @@ use futures::FutureExt;
 use ghost_actor::{GhostControlHandler, GhostHandler};
 use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
+use kitsune_p2p_types::dht::Arq;
 use kitsune_p2p_types::{KAgent, KBasis, KOpHash, KSpace};
 use std::collections::HashSet;
 
@@ -36,6 +36,10 @@ impl SpaceInternalStub {
 impl GhostControlHandler for SpaceInternalStub {}
 impl GhostHandler<SpaceInternal> for SpaceInternalStub {}
 impl SpaceInternalHandler for SpaceInternalStub {
+    fn handle_new_address(&mut self, _: String) -> SpaceInternalHandlerResult<()> {
+        unreachable!()
+    }
+
     fn handle_list_online_agents_for_basis_hash(
         &mut self,
         _space: KSpace,
@@ -86,7 +90,7 @@ impl SpaceInternalHandler for SpaceInternalStub {
     fn handle_update_agent_arc(
         &mut self,
         _agent: KAgent,
-        _arc: DhtArc,
+        _arq: Arq,
     ) -> SpaceInternalHandlerResult<()> {
         unreachable!()
     }

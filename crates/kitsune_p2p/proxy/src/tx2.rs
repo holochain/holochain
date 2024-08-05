@@ -1,5 +1,4 @@
 #![allow(clippy::new_ret_no_self)]
-#![allow(clippy::blocks_in_if_conditions)]
 //! Next-gen performance kitsune transport proxy
 
 use crate::*;
@@ -308,7 +307,7 @@ impl ProxyEpInner {
         let inner_map = self
             .direct_to_final_peer_con_map
             .entry(direct_peer)
-            .or_insert_with(HashMap::new);
+            .or_default();
         let mut did_insert = false;
         let con = {
             let did_insert = &mut did_insert;
@@ -380,27 +379,28 @@ impl ProxyEpHnd {
 impl AsEpHnd for ProxyEpHnd {
     fn debug(&self) -> serde_json::Value {
         let addr = self.local_addr();
-        match self.inner.share_mut(|i, _| {
-            let proxy_list = i
-                .digest_to_sub_con_map
-                .keys()
-                .map(|k| format!("{:?}", k))
-                .collect::<Vec<_>>();
-            Ok(serde_json::json!({
-                "type": "tx2_proxy",
-                "state": "open",
-                "addr": addr?,
-                "proxy_count": i.digest_to_sub_con_map.len(),
-                "proxy_list": proxy_list,
-                "sub": self.sub_ep_hnd.debug(),
-            }))
-        }) {
-            Ok(j) => j,
-            Err(_) => serde_json::json!({
-                "type": "tx2_proxy",
-                "state": "closed",
-            }),
-        }
+        self.inner
+            .share_mut(|i, _| {
+                let proxy_list = i
+                    .digest_to_sub_con_map
+                    .keys()
+                    .map(|k| format!("{:?}", k))
+                    .collect::<Vec<_>>();
+                Ok(serde_json::json!({
+                    "type": "tx2_proxy",
+                    "state": "open",
+                    "addr": addr?,
+                    "proxy_count": i.digest_to_sub_con_map.len(),
+                    "proxy_list": proxy_list,
+                    "sub": self.sub_ep_hnd.debug(),
+                }))
+            })
+            .unwrap_or_else(|_| {
+                serde_json::json!({
+                    "type": "tx2_proxy",
+                    "state": "closed",
+                })
+            })
     }
 
     fn uniq(&self) -> Uniq {
@@ -1014,8 +1014,10 @@ mod tests {
         let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
         let f = tx2_pool_promote(f, Default::default());
 
-        let mut conf = super::ProxyConfig::default();
-        conf.allow_proxy_fwd = true;
+        let conf = ProxyConfig {
+            allow_proxy_fwd: true,
+            ..Default::default()
+        };
         let f = tx2_proxy(f, conf).unwrap();
 
         let mut ep = f.bind("none:".try_into().unwrap(), t).await.unwrap();
@@ -1076,7 +1078,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_route_err() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let t = KitsuneTimeout::from_millis(5000);
         let mut all_tasks = Vec::new();
 
@@ -1109,7 +1111,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_proxy() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let t = KitsuneTimeout::from_millis(5000);
 

@@ -81,11 +81,6 @@ impl SweetConductorHandle {
             .await
     }
 
-    /// Get a stream of all Signals emitted since the time of this function call.
-    pub async fn signal_stream(&self) -> impl tokio_stream::Stream<Item = Signal> {
-        self.0.signal_broadcaster().subscribe_merged()
-    }
-
     /// Intentionally private clone function, only to be used internally
     pub(super) fn clone_privately(&self) -> Self {
         Self(self.0.clone())

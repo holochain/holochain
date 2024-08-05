@@ -1,11 +1,184 @@
 ---
-default_semver_increment_mode: !pre_minor beta-dev
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## 0.4.0-dev.13
+
+## 0.4.0-dev.12
+
+- When uninstalling an app or removing a clone cell, only some of the data used by that cell was deleted. Now all data is deleted, freeing up disk space.
+- Adds a new `DisabledAppReason::NotStartedAfterProvidingMemproofs` variant which effectively allows a new app status, corresponding to the specific state where a UI has just called `AppRequest::ProvideMemproofs`, but the app has not yet been Enabled for the first time.
+- Adds a new app interface method `AppRequest::EnableAfterMemproofsProvided`, which allows enabling an app only if the app is in the `AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs)` state. Attempting to enable the app from other states (other than Running) will fail.
+- Warrants are used under-the-hood in more places now:
+  - When gossiping amongst authorities, if an authority has a warrant for some data being requested, they will send the warrant instead of the data to indicate the invalid status of that data
+  - When requesting data through must_get calls, warrants will be returned with the data. The data returned to the client remains the same, but under the hood any warrants will be cached for later use.
+- Adds a `lineage` field to the DNA manifest, which declares forward compatibility for any hash in that list with this DNA
+- Adds a `AdminRequest::GetCompatibleCells` method which returns CellId for all installed cells which use a DNA that is forward-compatible with a given DNA hash. This can be used to find a compatible cell for use with the `UseExisting` cell provisioning method (still to be implemented)
+
+## 0.4.0-dev.11
+
+## 0.4.0-dev.10
+
+## 0.4.0-dev.9
+
+- Warrants: When an authority rejects another agent’s authored data, that authority creates a Warrant which is gossiped to the offending agent’s Agent Activity Authority, who then serves that warrant along with any `get_agent_activity` request.
+- The `warrants` field of `AgentActivity` is now populated with warrants for that agent.
+- Authorities author ChainFork warrants when detecting two actions by the same author with the same `prev_action`
+
+## 0.4.0-dev.8
+
+## 0.4.0-dev.7
+
+- App manifest now includes a new `membrane_proofs_deferred: bool` field, which allows the membrane proofs for the app’s cells to be provided at a time after installation, allowing the app’s UI to guide the process of creating membrane proofs.
+- Adds new `AppStatus::AwaitingMemproofs` to indicate an app which was installed with `MemproofProvisioning::Deferred`
+- Adds new app websocket method `ProvideMemproofs` for use with `MemproofProvisioning::Deferred`
+
+## 0.4.0-dev.6
+
+## 0.4.0-dev.5
+
+- Moved the WASM cache from the data directory to a subdirectory of the data directory named `wasm-cache`. Old content won’t be removed and WASMs will have to be recompiled into the new cache. \#3920
+- Remove deprecated functions `consistency_10s` and `consistency_60s`. Use `await_consistency` instead.
+- Remove deprecated type `SweetEasyInline`. Use `SweetInlineZomes` instead.
+- Remove deprecated methods `SweetInlineZomes::callback` and `SweetInlineZomes::integrity_callback`. Use `SweetInlineZomes::function` and `SweetInlineZomes::integrity_function` instead.
+
+## 0.4.0-dev.4
+
+- Rename feature `sweetest` in Holochain crate to `sweettest` to match the crate name.
+- App validation workflow: Reduce interval to re-trigger when dependencies are missing from 10 seconds to 100-1000 ms, according to number of missing dependencies.
+
+## 0.4.0-dev.3
+
+- App validation workflow: Fix bug where ops were stuck in app validation when multiple ops were requiring the same action or entry hash. Such ops were erroneously filtered out from validation for being marked as ops awaiting hashes and not unmarked as awaiting once the hashes had arrived.
+
+## 0.4.0-dev.2
+
+- System validation: Added a new rule that no new actions are allowed following a chain close action.
+- App validation workflow: Add module-level documentation.
+- Validation: Remove unused type `DhtOpOrder`. This type is superseded by `OpOrder`.
+
+## 0.4.0-dev.1
+
+- **BREAKING** - Serialization: Update of serialization packages `holochain-serialization` and `holochain-wasmer-*` leads to general message format change for enums. Previously an enum value like
+
+<!-- end list -->
+
+``` rust
+enum Enum {
+  Variant1,
+  Variant2,
+}
+let value = Enum::Variant1;
+```
+
+was serialized as (JSON representation)
+
+``` json
+{
+  "value": {
+    "variant1": null
+  }
+}
+```
+
+Now it serializes to
+
+``` json
+{
+  "value": "variant1"
+}
+```
+
+- Adds a new admin interface call `RevokeAppAuthenticationToken` to revoke issued app authentication tokens. \#3765
+- App validation workflow: Validate ops in sequence instead of in parallel. Ops validated one after the other have a higher chance of being validated if they depend on earlier ops. When validated in parallel, they potentially needed to await a next workflow run when the dependent op would have been validated.
+
+## 0.4.0-dev.0
+
+## 0.3.0
+
+## 0.3.0-beta-dev.48
+
+## 0.3.0-beta-dev.47
+
+- Connections to Holochain app interfaces are now app specific, so anywhere that you used to have to provide an `installed_app_id` or `app_id` in requests, that is no longer required and has been removed. For example, `AppRequest::AppInfo` no longer takes any parameters and will return information about the app the connection is authenticated with. \#3643
+- Signals are now only sent to clients that are connected to the app emitting the signal. When a cell is created by the conductor, it gets the ability to broadcast signals to any clients that are connected to the app that the cell is part of. When a client authenticates a connection to an app interface, the broadcaster for that app is found and attached to the connection. Previously all connected clients saw all signals, and there was no requirement to authenticate before receiving them. This is important to be aware of - if you connect to an app interface for signals only, you will still have to authenticate before receiving signals. \#3643
+- App websocket connections now require authentication. There is a new admin operation `AdminRequest::IssueAppAuthenticationToken` which must be used to issue a connection token for a specific app. That token can be used with any app interface that will permit a connection to that app. After establishing a client connection, the first message must be an Authenticate message (rather than Request or Signal) and contain an `AppAuthenticationRequest` as its payload. \#3622
+- When creating an app interface with `AdminRequest::AttachAppInterface` it is possible to specify an `installed_app_id` which will require that connections to that app interface are for the specified app. \#3622
+- `AdminRequest::ListAppInterfaces` has been changed from returning a list of ports to return a list of `AppInterfaceInfo` which includes the port as well as the `installed_app_id` and `allowed_origins` for that interface. \#3622
+
+## 0.3.0-beta-dev.46
+
+## 0.3.0-beta-dev.45
+
+- App validation workflow: Mock network in unit tests using new type `GenericNetwork` to properly test `must_get_agent_activity`. Previously that was not possible, as all peers in a test case were authorities for each other and `must_get_agent_activity` would therefore not send requests to the network.
+- App validation workflow: Skip ops that have missing dependencies. If an op is awaiting dependencies to be fetched, it will be excluded from app validation.
+- App validation workflow: Integration workflow is only triggered when some ops have been validated (either accepted or rejected).
+- App validation workflow: While op dependencies are missing and being fetched, the workflow is re-triggering itself periodically. It’ll terminate this re-triggering after an interval in which no more missing dependencies could be fetched.
+
+## 0.3.0-beta-dev.44
+
+- App validation workflow: Refactored to not wait for ops that the op being validated depends on, that are being fetched and thus keep the workflow occupied. The workflow no longer awaits the dependencies and instead sends off fetch requests in the background.
+- `consistency_10s` and `consistency_60s` from `holochain::sweettest` are deprecated. Use `await_consistency` instead.
+
+## 0.3.0-beta-dev.43
+
+- BREAKING: Holochain websockets now require an `allowed_origins` configuration to be provided. When connecting to the websocket a matching origin must be specified in the connection request `Origin` header. [\#3460](https://github.com/holochain/holochain/pull/3460)
+  - The `ConductorConfiguration` has been changed so that specifying an admin interface requires an `allowed_origins` as well as the port it already required.
+  - `AdminRequest::AddAdminInterfaces` has been updated as per the previous point.
+  - `AdminRequest::AttachAppInterface` has also been updated so that attaching app ports requires an `allowed_origins` as well as the port it already required.
+- BREAKING: Split the authored database by author. It was previous partitioned by DNA only and each agent that shared a DB because they were running the same DNA would have to share the write lock. This is a pretty serious bottleneck when the same app is being run for multiple agents on the same conductor. They are now separate files on disk and writes can proceed independently. There is no migration path for this change, if you have existing databases they will not be found. [\#3450](https://github.com/holochain/holochain/pull/3450)
+
+## 0.3.0-beta-dev.42
+
+## 0.3.0-beta-dev.41
+
+## 0.3.0-beta-dev.40
+
+## 0.3.0-beta-dev.39
+
+## 0.3.0-beta-dev.38
+
+- Some of the function signatures around SweetConductor app installation have changed slightly. You may need to use a slice (`&[x]`) instead of a collection of references (`[&x]`), or vice versa, in some places. If this is cumbersome please open an issue. [\#3310](https://github.com/holochain/holochain/pull/3310)
+- Start refactoring app validation workflow by simplifying main validation loop. All op validations are awaited at once now instead of creating a stream of tasks and processing it in the background.
+
+## 0.3.0-beta-dev.37
+
+## 0.3.0-beta-dev.36
+
+- Added `lair_keystore_version_req` to the output of `--build-info` for Holochain.
+- BREAKING: Changed `post_commit` behavior so that it only gets called after a commit to the source chain. Previously, it would get called after every zome call, regardless of if a commit happened. [\#3302](https://github.com/holochain/holochain/pull/3302)
+- Fixed a performance bug: various extra tasks were being triggered after every zome call which are only necessary if the zome call resulted in commits to the source chain. The fix should improve performance for read-only zome calls. [\#3302](https://github.com/holochain/holochain/pull/3302)
+- Fixed a bug during the admin call `GrantZomeCallCapability`, where if the source chain had not yet been initialized, it was possible to create a capability grant before the `init()` callback runs. Now, `init()` is guaranteed to run before any cap grants are created.
+- Updates sys validation to allow the timestamps of two actions on the same chain to be equal, rather than requiring them to strictly increasing.
+
+## 0.3.0-beta-dev.35
+
+- There is no longer a notion of “joining the network”. Previously, apps could fail to be enabled, accompanied by an error “Timed out trying to join the network” or “Error while trying to join the network”. Now, apps never fail to start for this reason. If the network cannot be reached, the app starts anyway. It is up to the UI to determine whether the node is in an “online” state via `AppRequest::NetworkInfo` (soon-to-be improved with richer information).
+- CellStatus is deprecated and only remains in areas where deserialization would break if it were removed. The only valid CellStatus now is `CellStatus::Joined`.
+
+## 0.3.0-beta-dev.34
+
+- Fix: Wasmer cache was deserializing modules for every zome call which slowed them down. Additionally the instance cache that was supposed to store callable instances of modules was not doing that correctly. A cache for deserialized modules has been re-introduced and the instance cache was removed, following recommendation from the wasmer team regarding caching.
+- Fix: Call contexts of internal callbacks like `validate` were not cleaned up from an in-memory map. Now external as well as internal callbacks remove the call contexts from memory. This is covered by a test.
+- **BREAKING CHANGE:** Wasmer-related items from `holochain_types` have been moved to crate `holochain_wasmer_host::module`.
+- Refactor: Every ribosome used to create a separate wasmer module cache. During app installation of multiple agents on the same conductor, the caches weren’t used, regardless of whether that DNA is already registered or not. The module cache is now moved to the conductor and kept there as a single instance.
+
+## 0.3.0-beta-dev.33
+
+- Make sqlite-encrypted a default feature
+
+- Sys validation will no longer check the integrity with the previous action for StoreRecord or StoreEntry ops. These ‘store record’ checks are now only done for RegisterAgentActivity ops which we are sent when we are responsible for validating an agents whole chain. This avoids fetching and caching ops that we don’t actually need.
+
+## 0.3.0-beta-dev.32
+
+## 0.3.0-beta-dev.31
+
+## 0.3.0-beta-dev.30
 
 ## 0.3.0-beta-dev.29
 

@@ -40,7 +40,7 @@ struct Opt {
     config_path: Option<PathBuf>,
 
     /// Instead of the normal "interactive" method of passphrase
-    /// retreival, read the passphrase from stdin. Be careful
+    /// retrieval, read the passphrase from stdin. Be careful
     /// how you make use of this, as it could be less secure,
     /// for example, make sure it is not saved in your
     /// `~/.bash_history`.
@@ -90,6 +90,8 @@ async fn async_main() {
         .await;
 
     kitsune_p2p_types::metrics::init_sys_info_poll();
+
+    info!("Conductor startup: metrics loop spawned.");
 
     let conductor = conductor_handle_from_config(&opt, config).await;
 

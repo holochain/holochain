@@ -1,17 +1,25 @@
 [package]
 name = "diagnostic_tests"
 version = "0.1.0"
-edition = "2021"
+description = "Collection of human-runnable, human-interpretable diagnostic situations for Holochain"
 license = "Apache-2.0"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo"]
+edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
+anyhow = "1.0"
 chashmap = "2.2"
-colored = "2"
-futures = "*"
+colored = "2.1"
+futures = "0.3"
 holochain_diagnostics = { path = "../holochain_diagnostics" }
-holochain_trace = { version = "^0.3.0-beta-dev.3", path = "../holochain_trace" }
-tokio = { version = "1.27", features = ["full"] }
-tokio-stream = "*"
+holochain_trace = { version = "^0.4.0-dev.3", path = "../holochain_trace" }
+tokio = { version = "1.36.0", features = ["full"] }
+tokio-stream = "0.1"
 
-crossterm = "*"
-tui = "*"
+crossterm = "0.27"
+tui = "0.19"
+
+[lints]
+workspace = true

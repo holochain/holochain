@@ -3,7 +3,9 @@
 
 use holochain_conductor_api::config::InterfaceDriver;
 use holochain_conductor_api::signal_subscription::SignalSubscription;
+use holochain_p2p::NetworkCompatParams;
 use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -162,7 +164,7 @@ impl ConductorState {
             .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))
     }
 
-    /// Add an app in the Deactivated state. Returns an error if an app is already
+    /// Add an app in the Disabled state. Returns an error if an app is already
     /// present at the given ID.
     pub fn add_app(&mut self, app: InstalledAppCommon) -> ConductorResult<StoppedApp> {
         if self.installed_apps.contains_key(app.id()) {
@@ -171,6 +173,20 @@ impl ConductorState {
         let stopped_app = StoppedApp::new_fresh(app);
         self.installed_apps.insert(stopped_app.clone().into());
         Ok(stopped_app)
+    }
+
+    /// Add an app in the AwaitingMemproofs state. Returns an error if an app is already
+    /// present at the given ID.
+    pub fn add_app_awaiting_memproofs(
+        &mut self,
+        app: InstalledAppCommon,
+    ) -> ConductorResult<InstalledApp> {
+        if self.installed_apps.contains_key(app.id()) {
+            return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
+        }
+        let app = InstalledApp::new(app, AppStatus::AwaitingMemproofs);
+        self.installed_apps.insert(app.clone());
+        Ok(app)
     }
 
     /// Update the status of an installed app in-place.
@@ -193,6 +209,25 @@ impl ConductorState {
     pub fn interface_by_id(&self, id: &AppInterfaceId) -> Option<AppInterfaceConfig> {
         self.app_interfaces.get(id).cloned()
     }
+
+    /// Find the app which contains the given cell by its [CellId].
+    pub fn find_app_containing_cell(&self, cell_id: &CellId) -> Option<&InstalledApp> {
+        self.installed_apps
+            .values()
+            .find(|app| app.all_cells().any(|id| id == cell_id))
+    }
+
+    /// Get network compability params
+    /// (but this can't actually be on the Conductor since it must be retrieved before
+    /// conductor initialization)
+    pub fn get_network_compat(&self) -> NetworkCompatParams {
+        NetworkCompatParams {
+            dpki_hash: {
+                tracing::warn!("Using default NetworkCompatParams");
+                None
+            },
+        }
+    }
 }
 
 /// Here, interfaces are user facing and make available zome functions to
@@ -210,16 +245,29 @@ pub struct AppInterfaceConfig {
     /// The signal subscription settings for each App
     pub signal_subscriptions: HashMap<InstalledAppId, SignalSubscription>,
 
+    /// The application that this interface is for. If `Some`, then this interface will only allow
+    /// connections which use a token that has been issued for the same app id. Otherwise, any app
+    /// is allowed to connect.
+    pub installed_app_id: Option<InstalledAppId>,
+
     /// The driver for the interface, e.g. Websocket
     pub driver: InterfaceDriver,
 }
 
 impl AppInterfaceConfig {
     /// Create config for a websocket interface
-    pub fn websocket(port: u16) -> Self {
+    pub fn websocket(
+        port: u16,
+        allowed_origins: AllowedOrigins,
+        installed_app_id: Option<InstalledAppId>,
+    ) -> Self {
         Self {
             signal_subscriptions: HashMap::new(),
-            driver: InterfaceDriver::Websocket { port },
+            installed_app_id,
+            driver: InterfaceDriver::Websocket {
+                port,
+                allowed_origins,
+            },
         }
     }
 }

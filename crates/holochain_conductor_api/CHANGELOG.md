@@ -1,11 +1,81 @@
 ---
-default_semver_increment_mode: !pre_minor beta-dev
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+## 0.4.0-dev.13
+
+## 0.4.0-dev.12
+
+## 0.4.0-dev.11
+
+## 0.4.0-dev.10
+
+## 0.4.0-dev.9
+
+## 0.4.0-dev.8
+
+## 0.4.0-dev.7
+
+## 0.4.0-dev.6
+
+- *BREAKING* Updates holochain to use the new SBD server architecture for WebRTC signaling. If you were previously running your own tx5-signal-srv server for signaling, you will need to switch to [sbd-server](https://crates.io/crates/sbd-server). If you were using the holo-provided `wss://signal.holo.host`, you must switch to `wss://sbd-0.main.infra.holo.host`. See the module level documentation at [/crates/holochain\_conductor\_api/src/config/conductor.rs](/crates/holochain_conductor_api/src/config/conductor.rs) for a commented example holochain conductor configuration file. [\#3842](https://github.com/holochain/holochain/pull/3842)
+
+## 0.4.0-dev.5
+
+## 0.4.0-dev.4
+
+## 0.4.0-dev.3
+
+## 0.4.0-dev.2
+
+## 0.4.0-dev.1
+
+## 0.4.0-dev.0
+
+## 0.3.0
+
+## 0.3.0-beta-dev.47
+
+## 0.3.0-beta-dev.46
+
+## 0.3.0-beta-dev.45
+
+## 0.3.0-beta-dev.44
+
+## 0.3.0-beta-dev.43
+
+## 0.3.0-beta-dev.42
+
+## 0.3.0-beta-dev.41
+
+## 0.3.0-beta-dev.40
+
+## 0.3.0-beta-dev.39
+
+## 0.3.0-beta-dev.38
+
+## 0.3.0-beta-dev.37
+
+## 0.3.0-beta-dev.36
+
+## 0.3.0-beta-dev.35
+
+## 0.3.0-beta-dev.34
+
+- Added `DumpConductorState` admin method
+
+## 0.3.0-beta-dev.33
+
+## 0.3.0-beta-dev.32
+
+## 0.3.0-beta-dev.31
+
+## 0.3.0-beta-dev.30
 
 ## 0.3.0-beta-dev.29
 
