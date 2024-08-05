@@ -172,6 +172,12 @@ impl ghost_actor::GhostHandler<SpaceInternal> for Space {}
 
 impl SpaceInternalHandler for Space {
     fn handle_new_address(&mut self, local_url: String) -> SpaceInternalHandlerResult<()> {
+        for agent in self.local_joined_agents.keys() {
+            for module in self.gossip_mod.values() {
+                module.local_agent_leave(agent.clone());
+                module.local_agent_join(agent.clone());
+            }
+        }
         *self.ro_inner.local_url.lock().unwrap() = Some(local_url);
         self.handle_update_agent_info()
     }
