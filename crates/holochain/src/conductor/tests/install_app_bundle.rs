@@ -348,6 +348,85 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn network_seed_regression() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let tmp = tempfile::tempdir().unwrap();
+    let (dna, _, _) = SweetDnaFile::from_test_wasms(
+        "".into(),
+        vec![TestWasm::Create],
+        holochain_serialized_bytes::SerializedBytes::default(),
+    )
+    .await;
+
+    let dna_path = tmp.as_ref().join("the.dna");
+    DnaBundle::from_dna_file(dna)
+        .unwrap()
+        .write_to_file(&dna_path)
+        .await
+        .unwrap();
+
+    let manifest = {
+        let roles = vec![AppRoleManifest {
+            name: "rolename".into(),
+            dna: AppRoleDnaManifest {
+                location: Some(DnaLocation::Path(dna_path)),
+                modifiers: DnaModifiersOpt::default(),
+                installed_hash: None,
+                clone_limit: 0,
+            },
+            provisioning: None,
+        }];
+
+        AppManifestCurrentBuilder::default()
+            .name("app".into())
+            .description(None)
+            .roles(roles)
+            .build()
+            .unwrap()
+    };
+
+    let bundle1 = AppBundle::new(manifest.clone().into(), vec![], PathBuf::from("."))
+        .await
+        .unwrap();
+    let bundle2 = AppBundle::new(manifest.into(), vec![], PathBuf::from("."))
+        .await
+        .unwrap();
+
+    // if both of these apps can be installed under the same agent, the
+    // network seed change was successful -- otherwise there will be a
+    // CellAlreadyInstalled error.
+
+    let _app1 = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: agent.clone(),
+            source: AppBundleSource::Bundle(bundle1),
+            installed_app_id: Some("no-seed".into()),
+            network_seed: None,
+            membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
+            ignore_genesis_failure: false,
+        })
+        .await
+        .unwrap();
+
+    let _app2 = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: agent.clone(),
+            source: AppBundleSource::Bundle(bundle2),
+            installed_app_id: Some("yes-seed".into()),
+            network_seed: Some("seed".into()),
+            membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
+            ignore_genesis_failure: false,
+        })
+        .await
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn cells_by_dna_lineage() {
     let mut conductor = SweetConductor::from_standard_config().await;
 
