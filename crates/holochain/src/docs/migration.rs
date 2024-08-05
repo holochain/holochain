@@ -35,3 +35,7 @@
 //! The app id of the new app needs to be provided by the client that is requesting the key update.
 //! After creating the new cells, an `Open` action is written to them. It contains the action hash of the
 //! old chains' `Close` action.
+//! Once app creation has completed successfully, the update call returns the app information.
+//!
+//! Should any of the above steps fail, the key update can be repeated until the new app is successfully
+//! created.
