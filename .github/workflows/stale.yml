@@ -13,8 +13,8 @@ jobs:
     steps:
       - uses: actions/stale@v9
         with:
-          days-before-issue-stale: 30
-          days-before-issue-close: 14
+          days-before-issue-stale: -1 # Disabled
+          days-before-issue-close: -1 # Disabled
           stale-issue-label: "stale"
           stale-issue-message: "This item has been open for 30 days with no activity."
           close-issue-message: "This item has been inactive for 14 days since being marked as stale."

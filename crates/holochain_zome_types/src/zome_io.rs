@@ -265,6 +265,16 @@ impl std::fmt::Display for ZomeCallResponse {
     }
 }
 
+#[cfg(feature = "test_utils")]
+impl ZomeCallResponse {
+    pub fn unwrap(self) -> ExternIO {
+        match self {
+            ZomeCallResponse::Ok(output) => output,
+            _ => panic!("Attempted to unwrap a non-Ok ZomeCallResponse"),
+        }
+    }
+}
+
 /// Zome calls need to be signed regardless of how they are called.
 /// This defines exactly what needs to be signed.
 #[derive(Serialize, Deserialize, Debug, Clone)]

@@ -30,7 +30,6 @@ async fn hc_stress_test_check_zome_functions() {
 #[tokio::test(flavor = "multi_thread")]
 // NOTE: this test doesn't run correctly on one particular mac CI runner
 #[cfg(not(target_os = "macos"))]
-#[ignore = "this is a long-running test that slows down ci - execute this manually"]
 async fn hc_stress_test_3_min_behavior_1() {
     let test = LocalBehavior1::new();
 
@@ -45,7 +44,6 @@ async fn hc_stress_test_3_min_behavior_1() {
 #[tokio::test(flavor = "multi_thread")]
 // NOTE: this test doesn't run correctly on one particular mac CI runner
 #[cfg(not(target_os = "macos"))]
-#[ignore = "this is a long-running test that slows down ci - execute this manually"]
 async fn hc_stress_test_3_min_behavior_2() {
     let test = LocalBehavior2::new(4, 4);
 

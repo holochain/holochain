@@ -560,6 +560,7 @@ pub mod test {
             agent_key: None,
             installed_app_id: None,
             membrane_proofs: HashMap::new(),
+            existing_cells: HashMap::new(),
             network_seed: None,
             ignore_genesis_failure: false,
         }));

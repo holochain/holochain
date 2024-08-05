@@ -152,10 +152,13 @@ impl AdminInterfaceApi {
                     &dna_definitions,
                 )))
             }
-            UninstallApp { installed_app_id } => {
+            UninstallApp {
+                installed_app_id,
+                force,
+            } => {
                 self.conductor_handle
                     .clone()
-                    .uninstall_app(&installed_app_id)
+                    .uninstall_app(&installed_app_id, force)
                     .await?;
                 Ok(AdminResponse::AppUninstalled)
             }
