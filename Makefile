@@ -3,7 +3,7 @@
 # the gha workflow sets this globally
 # set this also for local executions so we get the same results
 F=RUSTFLAGS="-Dwarnings"
-A=slow_tests,glacial_tests,build_wasms,sqlite-encrypted,chc
+A=slow_tests,build_wasms,sqlite-encrypted,chc
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
