@@ -228,18 +228,6 @@ async fn common_genesis_test_app(
 ) -> ConductorApiResult<SweetApp> {
     let hardcoded_zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
 
-    // Just a strong reminder that we need to be careful once we start using existing Cells:
-    // When a Cell panics or fails validation in general, we want to disable all Apps touching that Cell.
-    // However, if the panic/failure happens during Genesis, we want to completely
-    // destroy the app which is attempting to Create that Cell, but *NOT* any other apps
-    // which might be touching that Cell.
-    //
-    // It probably works out to be the same either way, since if we are creating a Cell,
-    // no other app could be possibly referencing it, but just in case we have some kind of complex
-    // behavior like installing two apps which reference each others' Cells at the same time,
-    // we need to be aware of this distinction.
-    holochain_types::app::we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution();
-
     // Create one DNA which always works, and another from a zome that gets passed in
     let (dna_hardcoded, _, _) = mk_dna(("hardcoded", hardcoded_zome)).await;
     let (dna_custom, _, _) = mk_dna(custom_zomes).await;
@@ -310,7 +298,7 @@ async fn test_uninstall_app() {
     // - Uninstall the first app
     conductor
         .raw_handle()
-        .uninstall_app(&"app1".to_string())
+        .uninstall_app(&"app1".to_string(), false)
         .await
         .unwrap();
 
@@ -332,7 +320,7 @@ async fn test_uninstall_app() {
     // - Uninstall the remaining app
     conductor
         .raw_handle()
-        .uninstall_app(&"app2".to_string())
+        .uninstall_app(&"app2".to_string(), false)
         .await
         .unwrap();
 
@@ -1216,6 +1204,7 @@ async fn test_deferred_memproof_provisioning() {
             agent_key: agent_key.clone(),
             installed_app_id: Some(app_id.clone()),
             membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
         })
@@ -1326,6 +1315,7 @@ async fn test_deferred_memproof_provisioning_uninstall() {
             agent_key: agent_key.clone(),
             installed_app_id: Some(app_id.clone()),
             membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
         })
@@ -1333,6 +1323,10 @@ async fn test_deferred_memproof_provisioning_uninstall() {
         .unwrap();
 
     assert_eq!(conductor.list_apps(None).await.unwrap().len(), 1);
-    conductor.clone().uninstall_app(&app_id).await.unwrap();
+    conductor
+        .clone()
+        .uninstall_app(&app_id, false)
+        .await
+        .unwrap();
     assert_eq!(conductor.list_apps(None).await.unwrap().len(), 0);
 }

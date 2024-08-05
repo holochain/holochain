@@ -8,6 +8,10 @@ documentation = "https://docs.rs/holochain_terminal"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
+[[bin]]
+name = "hcterm"
+path = "src/main.rs"
+
 # reminder - do not use workspace deps
 [dependencies]
 anyhow = "1.0"
