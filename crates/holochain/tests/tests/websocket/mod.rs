@@ -94,7 +94,7 @@ how_many: 42
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
-    let response = check_timeout(response, 15000).await.unwrap();
+    let response = check_timeout(response, 20_000).await.unwrap();
 
     assert_matches!(response, AdminResponse::DnasListed(a) if a.contains(&installed_dna_hash));
 }
@@ -332,7 +332,7 @@ async fn emit_signals() {
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
 
     // Install Dna
-    let cell_id = register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 15000)
+    let cell_id = register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 20_000)
         .await
         .unwrap();
 

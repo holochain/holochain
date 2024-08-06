@@ -877,7 +877,7 @@ impl SweetConductor {
     }
 
     /// Getter
-    pub fn rendezvous(&self) -> Option<&Arc<dyn SweetRendezvous + Send + Sync>> {
+    pub fn rendezvous(&self) -> Option<&DynSweetRendezvous> {
         self.rendezvous.as_ref()
     }
 }
