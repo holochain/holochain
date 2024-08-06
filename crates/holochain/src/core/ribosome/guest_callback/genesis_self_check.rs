@@ -100,6 +100,7 @@ mod slow_tests {
                 },
                 invocation,
             )
+            .await
             .unwrap();
         assert_eq!(result, GenesisSelfCheckResult::Valid,);
     }
@@ -120,6 +121,7 @@ mod slow_tests {
                 },
                 invocation,
             )
+            .await
             .unwrap();
         assert_eq!(
             result,
@@ -143,6 +145,7 @@ mod slow_tests {
                 },
                 invocation,
             )
+            .await
             .unwrap();
         assert_eq!(result, GenesisSelfCheckResult::Valid,);
     }
@@ -164,6 +167,7 @@ mod slow_tests {
                 },
                 invocation,
             )
+            .await
             .unwrap();
         assert_eq!(result, GenesisSelfCheckResult::Valid,);
     }

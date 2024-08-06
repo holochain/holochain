@@ -199,6 +199,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_entry_defs(EntryDefsHostAccess, entry_defs_invocation)
+            .await
             .unwrap();
         assert_eq!(result, EntryDefsResult::Defs(BTreeMap::new()),);
     }
@@ -224,6 +225,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_entry_defs(EntryDefsHostAccess, entry_defs_invocation)
+            .await
             .unwrap();
         assert_eq!(
             result,
