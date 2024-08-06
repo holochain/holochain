@@ -88,6 +88,13 @@ pub enum AdminRequest {
     UninstallApp {
         /// The app ID to uninstall
         installed_app_id: InstalledAppId,
+
+        /// If anything would prevent this app from being uninstalled, such as the existence
+        /// of protected dependency to one of its cells, this flag will force the uninstallation.
+        /// This will generally lead to bad outcomes, and should not be used unless you're
+        /// aware of the consequences.
+        #[serde(default)]
+        force: bool,
     },
 
     /// List the hashes of all installed DNAs.
