@@ -332,7 +332,7 @@ async fn emit_signals() {
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
 
     // Install Dna
-    let cell_id = register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000)
+    let cell_id = register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 20_000)
         .await
         .unwrap();
 
