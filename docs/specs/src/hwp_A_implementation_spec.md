@@ -860,16 +860,52 @@ It is the application's responsibility to retrieve a stored capability claim usi
 
 Zomes are intended to be units of composition for application developers. Thus zome functions MUST be able to make calls to other zome functions, either in the same zome or in other zomes or even DNAs:
 
-* `call<I>(CallTargetCell, ZomeName, FunctionName, Option<CapSecret>, I) -> ZomeCallResponse where I: Serialize`: Call a zome function in a target DNA and zome, supplying a capability and a payload containing the argument to the receiver. The `CallTargetCell` parameter is defined as:
+* `call<I>(CallTargetCell, ZomeName, FunctionName, Option<CapSecret>, I) -> ZomeCallResponse where I: Serialize`: Call a zome function in a local cell, supplying a capability and a payload containing the argument to the receiver. The `CallTargetCell` parameter is defined as:
 
     ```rust
     enum CallTargetCell {
+        // Call a function in another cell by its unique conductor-local ID,
+        // a tuple of DNA hash and agent public key.
         OtherCell(CellId),
+        // Call a function in another cell by the role name specified in the app manifest.
         OtherRole(String),
+        // Call a function in the same cell.
         Local,
     }
 
     struct CellId(DnaHash, AgentPubKey);
+    ```
+
+#### Clone Management
+
+The HDK SHOULD implement the ability for cells to modify the running App by adding, enabling, and disabling clones of existing DNA.
+
+* `create_clone_cell(CreateCloneCellInput) -> ExternResult<ClonedCell>`: Create a clone of an existing DNA installed with the App, specifying new modifiers and optionally a membrane proof. The input parameter is defined as:
+
+    ```rust
+    struct CreateCloneCellInput {
+        // The ID of the cell to clone.
+        pub cell_id: CellId,
+
+        // Modifiers to set for the new cell.
+        // At least one of the modifiers must be set to obtain a distinct hash for
+        // the clone cell's DNA.
+        pub modifiers: DnaModifiersOpt<YamlProperties>,
+        // Optionally set a proof of membership for the clone cell.
+        pub membrane_proof: Option<MembraneProof>,
+        // Optionally a name for the DNA clone
+        pub name: Option<String>,
+    }
+
+    struct DnaModifiersOpt<P> {
+        network_seed: Option<String>,
+        properties: Option<P>,
+        origin_time: Option<Timestamp>,
+        // The smallest size of time regions for historical gossip.
+        quantum_time: Option<Duration>,
+    }
+
+    type MembraneProof = SerializedBytes;
     ```
 
 #### Scheduling
@@ -1431,7 +1467,7 @@ digraph {
 
 `Conflict`, `Withdrawn`, and `Purged` are placeholders for possible future features:
 
-* `Conflict`: Two operations that expected to transform state in an exclusive way (such as a theoretical `RegisterRedirect` operation which unambiguously points an old entry to a new one) conflicted with each other when attempting to apply their transform.
+* `Conflict`: Two operations that expected to transform state in an exclusive way (such as a theoretical `RegisterRedirect` operation which unambiguously points an old entry to a single new one, as opposed to `Update` which may create a branched history) conflicted with each other when attempting to apply their transform.
 * `Withdrawn`: The record has been marked by its author as such, usually to correct an error (such as accidental forking of their chain after an incomplete restoration from a backup).
 * `Purged`: The adressable content has been erased from the CAS database, possibly by collective agreement to drop it -- e.g., for things that may be illegal or unacceptable to hold (e.g., child pornography).
 
@@ -1441,10 +1477,11 @@ The process of changing data to these states is TBD.
 
 [WP-TODO: Transplant the formal spec section here?]
 
-A robust networking implementation for Holochain involves two layers:
+A robust networking implementation for Holochain involves three layers:
 
 1. The Holochain P2P networking layer, which is designed around the peer-to-peer communication needs of agents in a DNA and the building of the DNA's graph DHT
 2. An underlying P2P layer that handles the fact that a Holochain node will be managing communication on behalf of potentially multiple agents in multiple networks, and will be connecting with other nodes, any of which may be running non-overlapping sets of DNAs.
+3. A transport-level layer that supplies and interprets transport
 
 Thus, from a networking perspective, there is the view of a single DNA (which is its own network), in which more than one local agent may be participating, but there is also the view of an agent belonging to many DNAs at the same time.
 
@@ -1805,159 +1842,172 @@ Kitsune MUST provide a way for the DHT data to be gossiped among peers in a spac
 
 Any gossip algorithm to be used in the Holochain context MUST be able to handle the following constraints:
 
-1. A new node coming on to the network, or one returning to the network after a significant changes have occured on the DHT, SHOULD be able synchronize to it's state of holding the correct data that it is deemed to be an authority for, quickly while balancing bandwidth limitations of the network it's part of. This requires that the system be resilient to asymetric upload and download realities that will vary accross peers.
-2. Gossiping SHOULD minimize total consumed bandwith, i.e. by not re-transmitting data as much as possible.
-3. ...
-
+1. A new node coming on to the network, or one returning to the network after a significant changes have occured on the DHT, SHOULD be able to quickly synchronize to a state of holding the correct data that it is deemed to be an authority for, while balancing bandwidth limitations of the network it is part of. This requires that the system be resilient to asymmetric upload and download speeds that will vary accross peers.
+2. Gossiping SHOULD minimize total consumed bandwith, i.e., by re-transmitting as little data as possible.
+3. Gossip SHOULD prioritize the synchronization of data that is more likely to be in demand; for many common application scenarios, this means that more recently published data should be synchronized sooner and more frequently.
+4. ... [WP-TODO what should go here?]
 
 ## The Conductor
 
-A Holochain Conductor manages runing Holochain applications, which consist of logically related DNAs operating under a single agency. Thus a conductor MUST be able to interpret an application bundle format and instantiate Cells from that format. Additionally a Conductor SHOULD cache DNA definitions and WASMs provided so as to decrease installation time of other instances of the same DNA as well as not store multiple copies of the same DNA.
+A Holochain Conductor manages runing Holochain applications, which consist of logically related DNAs operating under a single agency. Thus a conductor MUST be able to interpret an application bundle format and instantiate Cells from that format. The bundle format SHOULD store its manifests in a readable format such as YAML, and SHOULD be capable of storing arbitrary resources as streams of bytes. [WP-TODO: Chec for correctness of SHOULDs] Additionally a Conductor SHOULD cache DNA definitions and WASMs provided so as to decrease installation time of other instances of the same DNA and not store multiple copies of the same DNA.
 
 ### Bundle Formats
 
-Holochain implementations must be able to load Holochain applications that have be serialized either to disk or for transmission over a network. Holochain uses a bundling format that allows for specification of properties along with other resources in a manifest that can include recursively bundled elements of the same general bundling format but using a different manifest. Any of the sub-bundles can be specificed by "location" which may be specified to be in the same bundle, in a separate file, or at a network address. Thus we have Zomes, Dnas, Apps, and WebApps that can all be wrapped up in a single bundle, or where parts are referred to as existing elsewhere. The "meta bundle" format can be seen here: https://github.com/holochain/holochain/tree/develop/crates/mr_bundle. The manifests for each of the type of bundles that MUST be implemented are specified as follows:
+Holochain implementations must be able to load Holochain applications that have been serialized, either to disk or for transmission over a network. Holochain uses a bundling format that allows for specification of properties along with other resources in a manifest that can include recursively bundled elements of the same general bundling format but adapted for different component types. The bundling format can also store the resources themselves within the same file; any of the sub-bundles can be specified by "location", which may be specified to be in the same bundle, in a separate file, or at a network address. Thus we have Zomes, DNAs, Apps, UIs, and WebApps that can all be wrapped up in a single bundle, or can reference components stored elsewhere. The "meta bundle" format can be seen here: https://github.com/holochain/holochain/tree/develop/crates/mr_bundle. The manifests for each of the type of bundles that MUST be implemented are specified as follows:
 
-#### DNA Bundle
+#### DNA Bundle Manifest
+
+[WP-TODO: check code for changes]
+
+A DNA bundle manifest specifies the components that are critical to the operation of the DNA and affect its hash (the `IntegrityManifest` property) as well as the components that are supplied to facilitate the operation of a cell (the `CoordinatorManifest` property).
+
 ```rust
 struct DnaManifestV1 {
+    // A user-facing label for the DNA.
     name: String,
     integrity: IntegrityManifest,
     coordinator: CoordinatorManifest,
+    // A list of ancestors of this DNA, used for satisfying
+    // dependencies on prior versions of this DNA.
+    // The application's Coordinator interface is expected to be
+    // compatible across the list of ancestors.
+    lineage: Vec<DnaHashB64>,
 }
+
 struct IntegrityManifest {
-    /// A network seed for uniquifying this DNA. See [`DnaDef`].
+    // A network seed for uniquifying this DNA.
     network_seed: Option<Vec<u8>>,
 
-    /// Any arbitrary application properties can be included in this object.
+    // Any arbitrary application properties can be included in this object.
+    // They may be accessed by DNA code to affect runtime behavior.
     properties: Option<YamlProperties>,
 
-    /// The time used to denote the origin of the network, used to calculate time windows during gossip.
-    /// All Action timestamps must come after this time.
+    // The time used to denote the origin of the network, used to calculate time windows during gossip.
+    // All Action timestamps must come after this time.
     origin_time: HumanTimestamp,
 
-    /// An array of zomes associated with your DNA.
-    /// The order is significant: it determines initialization order.
-    /// The integrity zome manifests.
+    // An array of integrity zome manifests associated with the DNA.
+    // The order is significant: it determines initialization order
+    // and affects the DNA hash.
     zomes: Vec<ZomeManifest>,
 }
+
 struct CoordinatorManifest {
-    /// Coordinator zomes to install with this dna.
+    // Coordinator zomes to install with this DNA.
     zomes: Vec<ZomeManifest>,
 }
+
 struct ZomeManifest {
-    /// Just a friendly name, no semantic meaning.
+    // A user-facing label for the zome.
     name: ZomeName,
 
-    /// The hash of the wasm which defines this zome
+    // The hash of the WebAssembly bytecode which defines this zome.
     hash: Option<WasmHashB64>,
 
-    /// The location of the wasm for this zome
-    location: mr_bundle::Location,
+    // The location of the wasm for this zome.
+    location: Location,
 
-    /// The integrity zomes this zome depends on.
-    /// The order of these must match the order the types are used in the zome.
+    // The integrity zomes this zome depends on.
+    // The order of these must match the order the types are used in the zome.
     dependencies: Option<Vec<ZomeName>>,
 }
+
+enum Location {
+    // The file is a part of this bundle.
+    Bundled(PathBuf),
+
+    // Get the file from the local filesystem (not bundled).
+    Path(PathBuf),
+
+    // Get the file from a URL.
+    Url(String),
+}
 ```
-#### App Bundle
 
-An `AppBundle` combines together a set of DNAs paired with "Role" identifiers and instructions for how/when the Conductor should install DNAs to make cells in the bundle. The "role" of DNA is useful for application developers to be able to specify a DNA by semantically accisible name rather than just its hash. This also allows for "late-binding" as DNAs can be used in different ways in applications, and thus we can think of the DNAs name by the role it plays in a given application.
+#### App Bundle Manifest
 
-A note on Cell "provisioning". There are a number of ways that Application developers MUST be able to specify conditions under which DNAs are instantiated into Cells in the Conductor. The baseline usecase is simply that all DNAs are expected to be installed from the bundle. There are a number of use-cases where a Holochain application will expect a Cell of a given DNA to already have installed and relies on this behavior. Thus, there MUST be a provisioning option to specify this usecase. Also Holochain Conductors MUST implement a cloning mechanism to allow applications to create new Cells dynamically via the App interface (see Conductor API below). DNAs that are expected to be cloned MUST be specified in the DNA Bundle so that the Conductor can have cached and readied the WASM code for that DNA.
+An `AppBundle` combines together a set of DNAs paired with "Role" identifiers and instructions for how/when the Conductor should instantiate DNAs to make cells in the bundle. The "role" of DNA is useful for application developers to be able to specify a DNA by a semantically accessible name rather than just its hash. This also allows for "late-binding" as DNAs may be used in different ways in applications, and thus we can think of the DNA's name by the role it plays in a given application.
 
+There is a number of ways that application developers MUST be able to specify conditions under which DNAs are instantiated into Cells in the Conductor:
+
+* The basic use case is simply that all DNAs are expected to be instantiated as from the bundle as Cells.
+* There is a number of use cases where a Holochain application will also expect a Cell of a given DNA to already have instantiated and relies on this behavior, and fail otherwise. Thus, there MUST be a provisioning option to specify this use case.
+* To facilitate a comfortable user interface, there MUST be a hybrid of the two preceding strategies, in which the DNA will be installed and instantiated into a Cell if it does not yet exist.
+* In the three preceding cases, there MUST be an option to defer instantiation of the installed DNA until a later time, thus implementing a "lazy loading" strategy. [WP-TODO: I don't think that deferred instantiation for UseExisting makes sense logically]
+* Holochain Conductors MUST also implement a "cloning" mechanism to allow applications to dynamically create new Cells from an existing DNA via the App interface (see Conductor API below).   Cloned cells are intended to be used for such use cases as adding private workspaces to apps where only a specific set of agents are allowed to join the DHT of that DNA, such as private channels; or for creating DHTs that have temporary life-spans in app, like logs that get rotated. DNAs that are expected to be cloned MUST be specified as such in the DNA Bundle so that the Conductor can have cached and readied the WASM code for that DNA.
+* Finally, Conductors MUST provide a way for an App to be installed without supplying membrane proofs and instantiating Cells, in cases where membrane proof values are dependent on the agent's public key which is generated at application installation time. This MUST be accompanied by a method of supplying those membrane proofs when they become available. (Note that this method of deferred instantiation is distinct from the deferred option for the preceding strategies in two ways: first, its purpose is to enable an instantiation process which requires information that isn't available until after installation rather than to enable lazy loading, and second, the Cells are instantiated but not active.)
 
 ```rust
 struct AppManifestV1 {
-    /// Name of the App. This may be used as the installed_app_id.
+    // User-facing name of the App. This may be used as the installed_app_id
+    // in the Admin API.
     name: String,
 
-    /// Description of the app, just for context.
+    // User-facing description of the app.
     description: Option<String>,
 
-    /// The roles that need to be filled (by DNAs) for this app.
+    // The roles that need to be filled (by DNAs) for this app.
     roles: Vec<AppRoleManifest>,
-}
-struct AppRoleManifest {
-    /// The name which will be used to refer to:
-    /// - this role,
-    /// - the DNA which fills it,
-    /// - and the cell(s) created from that DNA
-    name: AppRoleName,
 
-    /// Determines if, how, and when a Cell will be provisioned.
+    // If true, the app should be installed without needing to specify
+    // membrane proofs. The app's cells will be in an incompletely
+    // instantiated state until membrane proofs are supplied for each.
+    membrane_proofs_deferred: bool,
+}
+
+struct AppRoleManifest {
+    // The ID which will be used to refer to:
+    // - this role,
+    // - the DNA which fills it,
+    // - and the cell(s) created from that DNA
+    name: Rolename,
+
+    // Determines if, how, and when a Cell will be provisioned.
     provisioning: Option<CellProvisioning>,
 
-    /// Specifies where membrane-proofs must be requested from
-    membraneProofService: Option<MembraneProofService>
-
-    /// the DnaBundle
-    dna: mr_bundle::Location,
+    // The location of the DNA bundle resource, and options to modify it
+    // before instantiating in a Cell.
+    dna: AppRoleDnaManifest,
 }
-enum MembraneProofService {
-    /// The membrane proof is expected to have recevied the proof out-of-ban (i.e. by an e-mail)
-    ManualText,
 
-    /// The membrane proof is self-signing by an ETH/Bitcoin/etc wallet
-    /// according to the MembraneProofService API
-    UserSECP256K1SignedV1(KeySource),
+type RoleName = String;
 
-    /// The service lives at an http(s) URL and the proof will be returned by the http Get
-    /// according to the MembraneProofService API
-    HttpGetV1(Url),
-
-    /// The service lives behind an arbitrary web-service that will return a result
-    /// according to the MembraneProofService API
-    IframeV1(Url),
-
-    /// The membrane proof is self-signing by the user's holochain agency in a given DNA.
-    CrossDnaAgentV1(DnaHash),
-
-    /// The membrane proof is self-signing by an arbitrary key in Lair (UI must present a list of
-    /// keys)
-    CrossDnaAgentV1(DnaHash),
-
-}
 enum CellProvisioning {
-    /// Always create a new Cell when installing this App
+    // Always create a new Cell when installing this App.
     Create { deferred: bool },
-    /// Always create a new Cell when installing the App,
-    /// and use a unique network seed to ensure a distinct DHT network
-    CreateClone { deferred: bool },
-    /// Require that a Cell is already installed which matches the DNA version
-    /// spec, and which has an Agent that's associated with this App's agent
-    /// via DPKI. If no such Cell exists, *app installation MUST fail*.
-    UseExisting { deferred: bool },
-    /// Try `UseExisting`, and if that fails, fallback to `Create`
-    CreateIfNotExists { deferred: bool },
-    /// Disallow provisioning altogether. In this case, we expect
-    /// `clone_limit > 0`: otherwise, no Cells will ever be created.
-    Disabled,
-}
-struct AppRoleDnaManifest {
-    /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
-    /// use a local relative path that corresponds with the bundle structure.
-    ///
-    /// Note that since this is flattened,
-    /// there is no actual "location" key in the manifest.
-    location: Option<mr_bundle::Location>,
 
-    /// Optional default modifier values. May be overridden during installation.
+    // Require that a Cell is already installed which matches the DNA
+    // installed_hash spec, and which has an Agent that's associated with
+    // this App's agent via DPKI. If no such Cell exists, *app installation MUST fail*.
+    UseExisting { deferred: bool },
+
+    // Try `UseExisting`, and if that fails, fall back to `Create`.
+    CreateIfNotExists { deferred: bool },
+
+    // Install or locate the DNA, but do not instantiate a Cell for it.
+    // Clones may be instantiated later. This requires that
+    // clone_limit > 0.
+    CloneOnly,
+}
+
+struct AppRoleDnaManifest {
+    // Where to find this DNA.
+    location: Option<Location>,
+
+    // Optional default modifier values, which override those found
+    // in the DNA manifest and may be overridden during installation.
     modifiers: DnaModifiersOpt<YamlProperties>,
 
-    /// The versioning constraints for the DNA. Ensures that only a DNA that matches the version spec will be used.
-    version: Option<Vec<DnaHashB64>>,
+    // The expected hash of the DNA's integrity manifest. If specified,
+    // installation MUST fail if the hash does not match this.
+    // Also allows this DNA to be targeted as a dependency in AppRoleManifests
+    // that specify `UseExisting` or `CreateIfNotExists` provisioning strategies.
+    installed_hash: Option<DnaHashB64>,
 
-    /// Allow up to this many "clones" to be created at runtime.
-    /// Each runtime clone is created by the `CreateClone` strategy,
-    /// regardless of the provisioning strategy set in the manifest.
-    /// Default: 0
+    // Allow up to this many "clones" to be created at runtime.
     clone_limit: u32,
 }
 ```
-
-Note that the API that is used to comunicate with different types of MembraneProofServices MUST be able to pass in the agent key for the Cell that is being installed to be signed by the service, additionally it should provide a "user payload" that may be aribtrary data.
-
 
 #### WebApp Bundle
 
@@ -1965,289 +2015,620 @@ A `WebAppBundle` combines together a specific user interface together with an `A
 
 ```rust
 struct WebAppManifestV1 {
-    /// Name of the App. This may be used as the installed_app_id.
+    // Name of the App. This may be used as the installed_app_id.
     name: String,
 
-    /// Web UI used for this app, packaged in a .zip file
-    ui: mr_bundle::Location,
+    // Web UI used for this app, packaged in a .zip file.
+    ui: Location,
 
-    /// The AppBundles
-    happ_manifest: mr_bundle::Location,
+    // The AppBundle location.
+    happ_manifest: Location,
 }
 ```
-
 
 ### API
 
-A Holochain conductor MUST provide access for user action through an Admin API to manage DNAs (install/uninstall, enable/disable, etc) and through an App API to make zome calls to specific happs to specific DNAs, as well as to create cloned DNAs. In our implementation this API is defined as a library so that these calls can be made in-process, but are also implemented over a Websocket interface so they can be made by external processes.
+A Holochain Conductor MUST provide access for user action through an Admin API to manage Apps and DNAs (install/uninstall, enable/disable, etc) and through an App API to make zome calls to specific DNAs in specific Apps, create cloned DNAs, supply deferred membrane proofs, and introspect the App. In our implementation, these API is defined as a library so that these calls can be made in-process, but they are also implemented over a WebSocket interface so they can be called by external processes.
+
+In the WebSocket implementation of this API, requests and responses are wrapped in an "envelope" format that contains a nonce to match requests with response, then serialized and sent as WebSocket packets. [WP-TODO: is packet the right term?] The request message types are defined as variants of an `AdminRequest` or `AppRequest` enum, as are their corresponding responses (`AdminResponse` and `AppResponse` respectively). Hence, in the API definitions below, the enum name of the function name or return value type is implied.
+
+Both response enums MUST define an `Error(e)` variant to communicate error conditions, where `e` is a variant of the enum:
+
+```rust
+enum ExternalApiWireError {
+    // Any internal error.
+    InternalError(String),
+    // The input to the API failed to deseralize.
+    Deserialization(String),
+    // The DNA path provided was invalid.
+    DnaReadError(String),
+    // There was an error in the ribosome.
+    RibosomeError(String),
+    // Error activating app.
+    ActivateApp(String),
+    // The zome call is unauthorized.
+    ZomeCallUnauthorized(String),
+    // A countersigning session has failed.
+    CountersigningSessionError(String),
+}
+```
 
 #### Admin API
 
-Below is a list of the Admin API functions that MUST be implemented along with any details of function arguments and return values, as well as any contextual notes on functional constraints or other necessary implementation details:
-* `AddAdminInterfaces(Vec<AdminInterfaceConfig>)->u16`: Set up and register one or more new admin interfaces as specified by a list of configurations.
-  **Arguments**: The `AdminInterfaceConfig` SHOULD be a generalized data structure to allow creation of an interface of what ever types are contextually appropriate for the system on which the conductor runs. In our implementation the only option is a `u16` port number on which to establish a websocket listener.
-  **Return Value**: SHOULD be a generalized data structure regarding information of the added interface. In our implementation this is just the Websocket port that was created.
+Below is a list of the Admin API functions that MUST be implemented along with any details of function arguments and return values, as well as any contextual notes on functional constraints or other necessary implementation details.
 
-* `RegisterDna(modifiers: DnaModifiersOpt<YamlProperties>, source: DnaSource>)->DnaHash` : Register a DNA for later app installation.
-    **Notes**: This call MUST store the given DNA into the Holochain DNA database. This call exists separately from `InstallApp` to support the use case of adding a DNA into a conductor's DNA database once such that wasmer's transpiling of WASM to machine code happens only once and gets cached in the conductor's WASM store.
-    **Arguments**: The `modifiers` argument to this call MUST accept a YAML encoded version of the `DnaModifiers` data structure defined below where each of the properties may be specified optionally:
-```rust
-struct DnaModifiers {
-    /// The network seed of a DNA is included in the computation of the DNA hash.
-    /// The DNA hash in turn determines the network peers and the DHT, meaning
-    /// that only peers with the same DNA hash of a shared DNA participate in the
-    /// same network and co-create the DHT. To create a separate DHT for the DNA,
-    /// a unique network seed can be specified.
-    network_seed: Vec<u8>,
+For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e` is a variant of the `ExternalApiWireError` enum.
 
-    /// Any arbitrary application properties can be included in this object.
-    properties: SerializedBytes,
+* `AddAdminInterfaces(Vec<AdminInterfaceConfig>) -> AdminInterfacesAdded`: Set up and register one or more new admin interfaces as specified by a list of configurations.
+    * **Arguments**: The `AdminInterfaceConfig` SHOULD be a generalized data structure to allow creation of an interface of whatever types are contextually appropriate for the system on which the conductor runs:
 
-    /// The time used to denote the origin of the network, used to calculate time windows during gossip.
-    /// The Conductor MUST treat any Action timestamps as invalid if they are before this time.
-    origin_time: Timestamp,
+        ```rust
+        struct AdminInterfaceConfig {
+            driver: InterfaceDriver,
+        }
 
-    /// The smallest unit of time used for gossip time windows.
-    quantum_time: Duration,
-}
-```
-* `GetDnaDefinition(DnaHash) -> DnaDef`: Get the definition of a DNA.
+        enum InterfaceDriver {
+            Websocket {
+                port: u16,
+                // The allowed values of the `Origin` HTTP header.
+                allowed_origins: AllowedOrigins,
+            }
+        }
 
-    **Return Value**: This function MUST return all of the data that specifies a DNA as installed as follows:
+        enum AllowedOrigins {
+            Any,
+            Origins(HashSet<String>),
+        }
+        ```
 
-```rust
-struct DnaDef {
-    /// The friendly "name" of a Holochain DNA (MUST not affect the `DnaHash`)
-    name: String,
+* `RegisterDna(RegisterDnaPayload) -> DnaRegistered(DnaHash)` : Install a DNA for later use in an App.
+    * **Notes**: This call MUST store the given DNA into the Holochain DNA database. This call exists separately from `InstallApp` to support the use case of adding a DNA into a conductor's DNA database once, such that the transpilation of WASM to machine code happens only once and gets cached in the conductor's WASM store.
+    * **Arguments**: A struct of the following type:
 
-    /// Modifiers of this DNA - the network seed, properties and origin time - as
-    /// opposed to the actual DNA code. The modifiers are included in the DNA hash
-    /// computation.
-    modifiers: DnaModifiers,
+        ```rust
+        struct RegisterDnaPayload {
+            // Override the DNA modifiers specified in the app and/or
+            // DNA bundle manifest(s).
+            modifiers: DnaModifiersOpt<YamlProperties>,
+            source: DnaSource,
+        }
 
-    /// A vector of integrity zomes associated with the DNA.
-    integrity_zomes: IntegrityZomes,
+        enum DnaSource {
+            Path(PathBuf),
+            Bundle(DnaBundle),
+            // Register the DNA from an existing DNA registered via
+            // a prior `RegisterDna` call or an `InstallApp` call.
+            Hash(DnaHash),
+        }
+        ```
+    * **Return value**: If the DNA cannot be located at the specified path, `AdminResponse::Error(ExternalApiWireError::DnaReadError(s))` MUST be returned, where `s` is an error message to be used for troubleshooting.
 
-    /// A vector of zomes that do not affect the `DnaHash`.
-    coordinator_zomes: CoordinatorZomes,
-}
+* `GetDnaDefinition(DnaHash) -> DnaDefinitionReturned(DnaHash)`: Get the definition of a DNA.
+    * **Return Value**: This function MUST return all of the data that specifies a DNA as installed as follows:
 
-```
-* `UpdateCoordinators(dna_hash: DnaHash, source: CoordinatorSource)`: Update coordinator zomes for an already installed DNA.
+        ```rust
+        struct DnaDef {
+            name: String,
+            modifiers: DnaModifiers,
+            integrity_zomes: Vec<ZomeName>,
+            coordinator_zomes: Vec<ZomeName>,
+            lineage: HashSet<DnaHash>,
+        }
 
-  **Notes**: This call MUST replace any installed coordinator zomes with the same zome name. If the zome name doesn't exist then the coordinator zome MUST be appended to the current list of coordinator zomes.
+* `UpdateCoordinators(UpdateCoordinatorsPayload) -> CoordinatorsUpdated`: Update coordinator zomes for an already installed DNA.
+    * **Notes**: This call MUST replace any installed coordinator zomes with the same zome name. If the zome name doesn't exist then the coordinator zome MUST be appended to the current list of coordinator zomes.
+    * **Arguments**: A struct defined as:
 
-  - `InstallApp(InstallAppPayload)->AppInfo`: Install an app using an `AppBundle`.
+        ```rust
+        struct UpdateCoordinatorsPayload {
+            dna_hash: DnaHash,
+            source: CoordinatorSource,
+        }
 
-  **Notes**: An app is intended for use by one and only one Agent and for that reason it takes an `AgentPubKey` and installs all the DNAs bound to that `AgentPubKey` as new Cells. The new app should not be enabled automatically after installation and instead must explicitly be enabled by calling `EnableApp`.
-  **Arguments**: `InstallAppPayload` is defined as:
+        enum CoordinatorSource {
+            // Load coordinators from a bundle file.
+            Path(PathBuf),
+            Bundle(Bundle<Vec<ZomeManifest>>),
+        }
+        ```
 
-```rust
-struct InstallAppPayload {
-    /// The unique identifier for an installed app in this conductor.
-    source: AppBundleSource,
+* `InstallApp(InstallAppPayload) -> AppInstalled(AppInfo)`: Install an app using an `AppBundle`.
+    * **Notes**: An app is intended for use by one and only one Agent, and for that reason it takes an `AgentPubKey` and instantiates all the DNAs bound to that `AgentPubKey` as new Cells. The new app should not be enabled automatically after installation, and instead must explicitly be enabled by calling `EnableApp`.
+    * **Arguments**: `InstallAppPayload` is defined as:
 
-    /// The agent to use when creating Cells for this App.
-    agent_key: AgentPubKey,
+        ```rust
+        struct InstallAppPayload {
+            source: AppBundleSource,
 
-    /// The unique identifier for an installed app in this conductor.
-    /// If not specified, it will be derived from the app name in the bundle manifest.
-    installed_app_id: Option<InstalledAppId>,
+            // The agent to use when creating Cells for this App.
+            agent_key: AgentPubKey,
 
-    /// Optional proof-of-membrane-membership data for any cells that require it,
-    /// keyed by the RoleName specified in the app bundle manifest.
-    membrane_proofs: HashMap<RoleName, MembraneProof>,
+            // The unique identifier for an installed app in this conductor.
+            // If not specified, it will be derived from the app name in the bundle manifest.
+            installed_app_id: Option<String>,
 
-    /// Optional: overwrites all network seeds for all DNAs of Cells created by this app.
-    /// The app can still use existing Cells, i.e. this does not require that
-    /// all Cells have DNAs with the same overridden DNA.
-    network_seed: Option<Vec<u8>>,
-}
-```
-  **Return Value**: The returned value MUST be the `AppInfo` data structure (which is also retreivable after installation via the `GetAppInfo` API), and is defined as:
-```rust
-struct AppInfo {
-    /// The unique identifier for an installed app in this conductor
-    installed_app_id: InstalledAppId,
-    /// Info about the cells installed in this app
-    cell_info: HashMap<RoleName, Vec<CellInfo>>,
-    /// The app's current status, in an API-friendly format
-    status: AppInfoStatus,
-}
-enum CellInfo {
-    // cells provisioned at app installation as defined in the bundle
-    Provisioned(Cell),
-    // cells created by cloning
-    Cloned(Cell),
-    // potential cells with deferred installation as defined in the bundle
-    Stem(StemCell),
-}
-struct Cell {
-    /// The cell's identifying data
-    cell_id: CellId,
-    /// If this is a cloned cell, a conductor-local identifier for that clone
-    clone_id: Option<CloneId>,
-    /// The Dna modifiers that were used to instantiate the cell
-    dna_modifiers: DnaModifiers,
-    /// The name the cell was instantiated with
-    name: String,
-    /// Whether or not the cell is running
-    enabled: bool,
-}
-struct StemCell {
-    /// The Dna that this cell would be instantiated from
-    dna: DnaHash,
-    /// An optional name to override the cell's bundle name when instantiating
-    name: Option<String>,
-    /// The Dna modifiers that will be used when instantiate the cell
-    dna_modifiers: DnaModifiers,
-}
+            // Optional proof-of-membrane-membership data for any cells that require it,
+            // keyed by the RoleName specified in the app bundle manifest.
+            membrane_proofs: HashMap<RoleName, MembraneProof>,
 
-enum AppInfoStatus {
-    Paused { reason: PausedAppReason },
-    Disabled { reason: DisabledAppReason },
-    Running,
-}
-```
+            // Optional: overwrites all network seeds for all DNAs of Cells created by this app. This does not affect cells provisioned by the `UseExisting strategy`. [WP-TODO: what about provisioned by the `CreateIfNotExists` strategy; hard to know what that's going to do because it's unimplemented.]
+            network_seed: Option<Vec<u8>>,
 
-* `UninstallApp(installed_app_id: InstalledAppId)` : Uninstalls the app specified by argument `installed_app_id` from the conductor.
+            // If app installation fails due to genesis failure, normally
+            // the app will be immediately uninstalled. When this flag is set,
+            // the app is left installed with empty cells intact. This can
+            // be useful for using `GraftRecordsOntoSourceChain` or diagnostics.
+            ignore_genesis_failure: bool,
+        }
+        ```
+    **Return Value**: The returned value MUST contain the `AppInfo` data structure (which is also retreivable after installation via the `GetAppInfo` API), and is defined as:
 
-  **Notes**: The app MUST be removed from the list of installed apps, and any cells which were referenced only by this app MUST be disabled and removed, clearing up any persisted data.
-     Cells which are still referenced by other installed apps MUST not be removed.
+        ```rust
+        struct AppInfo {
+            installed_app_id: String,
+            cell_info: HashMap<RoleName, Vec<CellInfo>>,
+            status: AppInfoStatus,
+        }
 
-* `GenerateAgentPubKey()-> AgentPubKey` : Generate a new `AgentPubKey`.
-  **Notes**: This call MUST cause a new key-pair to be added to the key store and return the public part of that key to the caller. This public key is intended to be used later when installing a DNA to create a Cell, as the conductor in expected to request all signing of data from the key-store.
+        enum CellInfo {
+            // Cell provisioned at app installation as defined in the bundle.
+            Provisioned(ProvisionedCell),
+            // Cell created at runtime by cloning a DNA.
+            Cloned(ClonedCell),
+            // Potential cell with deferred installation as defined in the bundle.
+            Stem(StemCell),
+        }
 
-* `ListDnas()-> Vec<DnaHash>` : List the hashes of all installed DNAs.
+        struct ProvisionedCell {
+            cell_id: CellId,
+            dna_modifiers: DnaModifiers,
+            name: String,
+        }
 
-* `ListCellIds()->Vec<CellId>`: List all the cell IDs in the conductor.
+        struct ClonedCell {
+            cell_id: CellId,
+            // A conductor-local clone identifier.
+            clone_id: CloneId,
+            // The hash of the DNA that this cell was instantiated from.
+            original_dna_hash: DnaHash,
+            // The DNA modifiers that were used to instantiate this clone cell.
+            dna_modifiers: DnaModifiers,
+            // The name the cell was instantiated with.
+            name: String,
+            // Whether or not the cell is running.
+            enabled: bool,
+        }
 
-* `ListEnabledApps()-> Vec<InstalledAppId>`: List the IDs of all enabled apps in the conductor.
+        struct StemCell {
+            // The hash of the DNA that this cell will be instantiated from.
+            original_dna_hash: DnaHash,
+            // The DNA modifiers that will be used when instantiating the cell.
+            dna_modifiers: DnaModifiers,
+            // An optional name to override the cell's bundle name when instantiating.
+            name: Option<String>,
+        }
 
-* `ListApps(status_filter: Option<AppStatusFilter>)-> Vec<AppInfo>`: List the apps and their information that are installed in the conductor.
-  **Notes**: If `status_filter` is `Some(_)`, it MUST return only the apps with the specified status.
+        struct Cell {
+            // The cell's unique identifier.
+            cell_id: CellId,
+            // If this is a cloned cell, a conductor-local identifier for that clone.
+            clone_id: Option<String>,
+            // The Dna modifiers that were used to instantiate the cell
+            dna_modifiers: DnaModifiers,
+            // The name the cell was instantiated with
+            name: String,
+            // Whether or not the cell is running
+            enabled: bool,
+        }
 
-* `EnableApp(installed_app_id: InstalledAppId) -> {app: AppInfo, errors: Vec<(CellId, String)>}`: Changes the specified app from a disabled to an enabled state in the conductor.
-  **Notes**: Once an app is enabled, zome functions of all the Cells associated with the App MUST immediately be callable. Applications MUST also be loaded and enabled automatically on any reboot of the conductor.
+        struct StemCell {
+            // The Dna that this cell would be instantiated from
+            dna: DnaHash,
+            // An optional name to override the cell's bundle name when instantiating
+            name: Option<String>,
+            // The Dna modifiers that will be used when instantiate the cell
+            dna_modifiers: DnaModifiers,
+        }
 
-* `DisableApp(installed_app_id: InstalledAppId)`: Changes the specified app from an enabled to a disabled state in the conductor.
-  **Notes**: When an app is disabled, calls to zome functions of all the Cells associated with the App MUST fail, and the app MUST not be loaded on a reboot of the conductor. Note if cells are associated with more than one app, they MUST not be disabled unless all of the other apps using the same cells have also been disabled.
+        enum AppInfoStatus {
+            // The app is paused due to a recoverable error.
+            // There is no way to manually pause an app.
+            Paused { reason: PausedAppReason },
+            // The app is disabled, and may be restartable depending
+            // on the reason.
+            Disabled { reason: DisabledAppReason },
+            Running,
+            AwaitingMemproofs,
+        }
 
-* `StartApp(installed_app_id: InstalledAppId) -> bool` : Starts an app that has been stopped by an error. The return value indicates whether the app was successfully started.
+        enum PausedAppReason {
+            Error(String);
+        }
 
-* `AttachAppInterface(port: Option<u16>) -> u16`: Open up a new websocket for processing `AppRequest`s.
-  **Notes**: Any active app MUST be callable via the attached app interface.
-     Optionally a `port` parameter MAY be passed to this request. If it is `None`, a free port SHOULD be chosen by the conductor.
-     The response MUST contain the port chosen by the conductor if `None` was passed.
+        enum DisabledAppReason {
+            // The app is freshly installed, and has not been started yet.
+            NeverStarted,
+            // The app is fully installed and deferred memproofs have been
+            // provided by the UI, but the app has not been started yet.
+            NotStartedAfterProvidingMemproofs,
+            // The app has been disabled manually by the user via an admin interface.
+            User,
+            // The app has been disabled due to an unrecoverable error.
+            Error(String),
+        }
+        ```
 
-* `ListAppInterfaces()->Vec<u16>`: List all the app interfaces currently attached with `AttachAppInterface` which is a list of websocket ports that can process `AppRequest()`s.
+* `UninstallApp { installed_app_id: InstalledAppId } -> AppUninstalled` : Uninstall the app specified by the argument `installed_app_id` from the conductor.
+    * **Notes**: The app MUST be removed from the list of installed apps, and any cells which were referenced only by this app MUST be disabled and removed, clearing up any persisted data. Cells which are still referenced by other installed apps MUST NOT be removed.
 
+* `ListDnas -> DnasListed(Vec<DnaHash>)` : List the hashes of all installed DNAs.
 
-* `DumpState (cell_id: CellId) -> String`: Dump the state of the cell specified by argument `cell_id`, including its chain, as a string containing JSON.
+* `GenerateAgentPubKey -> AgentPubKeyGenerated(AgentPubKey)` : Generate a new Ed25519 key pair.
+    * **Notes**: This call MUST cause a new key pair to be added to the key store and return the public part of that key to the caller. This public key is intended to be used later when installing an App, as a Cell represents the agency of an agent within the space created by a DNA, and that agency comes from the power to sign data with a private key.
 
-  **Notes**: Implementations MAY implement this function, it is meant for debuging and introspections tooling and there is no standard for what it returns other that it SHOULD be JSON blob of the state.
+* `ListCellIds -> CellIdsListed<Vec<CellId>>`: List all the cell IDs in the conductor.
 
-* `DumpNetworkMetrics(dna_hash: Option<DnaHash>) -> String` : Dump the network metrics tracked by kitsune.
+* `ListApps { status_filter: Option<AppStatusFilter> } -> AppsListed(Vec<AppInfo>)`: List the apps and their information that are installed in the conductor.
+    * **Notes**: If `status_filter` is `Some(_)`, it MUST return only the apps with the specified status.
+    * **Arguments**: The value of `status_filter` is defined as:
 
-  **Notes**: Implementations MAY implement this function, it is meant for debuging and introspections tooling and there is no standard for what it returns other that it SHOULD be JSON. If the `DnaHash` parameter is set, the call MUST limit the metrics dumped to a single DNA hash space. The result SHOULD be a JSON blob of metrics results.
+        ```rust
+        enum AppStatusFilter {
+            // Filter on apps which are Enabled, which can include both Running and Paused apps.
+            Enabled,
+            // Filter only on apps which are Disabled.
+            Disabled,
+            // Filter on apps which are currently Running (meaning they are also Enabled).
+            Running,
+            // Filter on apps which are Stopped, i.e. not Running.
+            // This includes apps in the Disabled status, as well as the Paused status.
+            Stopped,
+            // Filter only on Paused apps.
+            Paused,
+        }
+        ```
 
-* `AddAgentInfo(agent_infos: Vec<AgentInfoSigned>)`: Add a list of agents to this conductor's peer store.
+* `EnableApp { installed_app_id: InstalledAppId } -> AppEnabled { app: AppInfo, errors: Vec<(CellId, String)> }`: Change the specified app from a disabled to an enabled state in the conductor.
+    * **Notes**: Once an app is enabled, zome functions of all the Cells associated with the App that have a `Create` or `CreateIfNotExists` provisioning strategy MUST immediately be callable. Previously enabled Applications MUST also be loaded and enabled automatically on any reboot of the conductor.
+    * **Return value**: If the attempt to enable the app was successful, `AdminResponse::Error(ExternalApiWireError::ActivateApp(s))` MUST be returned, where `s` is an error message to be used for troubleshooting purposes.
 
-  **Notes**: Implementations MAY implement this function. It is intended as a way of shortcutting peer discovery and is useful for testing.
-    It is also intended for use-cases in which it is important for agent existence to be transmitted out-of-band.
+* `DisableApp { installed_app_id: InstalledAppId } -> AppDisabled`: Changes the specified app from an enabled to a disabled state in the conductor.
+    * **Notes**: When an app is disabled, calls to zome functions of all the Cells associated with the App MUST fail, and the app MUST not be loaded on a reboot of the conductor. Note if cells are associated with more than one app, they MUST not be disabled unless all of the other apps using the same cells have also been disabled.
 
-* `RequestAgentInfo(cell_id: Option<CellId>) -> Vec<AgentInfoSigned>`: Request the [`AgentInfoSigned`] stored in this conductor's peer store.
-  **Notes**: Implementations MAY implement this function. It useful for testing across networks.
-    It is also intended for use-cases in which it is important for agent existence to be transmitted out-of-band.
+* `AttachAppInterface { port: Option<u16>, allowed_origins: AllowedOrigins, installed_app_id: Option<InstalledAppID> } -> AppInterfaceAttached { port: u16 }`: Open up a new WebSocket interface for processing `AppRequest`s.
+    * **Notes**: All active apps, or the app specified by `installed_app_id`, if active, MUST be callable via the attached app interface. If an app is specified, all other apps MUST NOT be callable via the attached app interface. If the `allowed_origins` argument is not `Any`, the Conductor MUST reject any connection attempts supplying an HTTP `Origin` header value not in the list. Optionally a `port` parameter MAY be passed to this request. If it is `None`, a free port SHOULD be chosen by the conductor. The response MUST contain the port chosen by the conductor if `None` was passed.
+    * **Arguments**: The `allowed_origins` field is a value of the type:
 
-* `GraftRecords(
-        cell_id: CellId,
-        validate: bool,
-        records: Vec<Record>,
-    )->RecordsGrafted`: "Graft" `Record`s onto the source chain of the specified `CellId`.
+        ```rust
+        enum AllowedOrigins {
+            Any,
+            Origins(HashSet<String>),
+        }
+        ```
 
-  **Notes**: This admin call is provided for the purposes of restoring chains from backup.
-  If `validate` is `true`, then the records MUST be validated before insertion.
-  If `validate` is `false`, then records MUST be inserted as is.
+* `ListAppInterfaces -> AppInterfacesListed(Vec<AppInterfaceInfo>)`: List all the app interfaces currently attached with `AttachAppInterface`, which is a list of WebSocket ports that can process `AppRequest()`s.
+    * **Return value**: The app interface info is defined as:
 
-  Records provided are expected to form a valid chain segment (ascending sequence numbers, and valid `prev_action` references). If the first record contains a `prev_action` which matches the existing records, then the new records MUST be "grafted" onto the existing chain at that point, and any other records following that point which do not match the new records MUST be ignored.
+        ```rust
+        struct AppInterfaceInfo {
+            port: u16,
+            allowed_origins: AllowedOrigins,
+            installed_app_id: Option<InstalledAppId>,
+        }
+        ```
+* **Debugging and introspection dumps**: The following functions are for dumping data about the state of the Conductor. Implementations MAY implement these functions; there is no standard for what they return, other than that they SHOULD be self-describing JSON blobs of useful information that can be parsed by diagnostic tools.
 
-     All records must be authored and signed by the same agent, if they are not, the call MUST fail.
+    * `DumpState { cell_id: CellId } -> StateDumped(String)`: Dump the state of the cell specified by the argument `cell_id`, including its chain.
 
-     If the `DnaFile` (but not necessarily the cell) is not already be installed on this conductor, the call MUST fail.
+    * `DumpConductorState -> ConductorStateDumped(String)`: Dump the configured state of the Conductor, including the in-memory representation and the persisted state, as JSON. State to include MAY include status of Applications and Cells, networking configuration, and app interfaces.
 
-     If `truncate` is true, the chain head MUST not checked and any new records should be deleted.
+    * `DumpFullState { cell_id: CellId, dht_ops_cursor: Option<u64> } -> FullStateDumped(FullStateDump)`: Dump the full state of the specified Cell, including its chain, the list of known peers, and the contents of the DHT shard for which it has claimed authority.
+        * **Notes**: The full state including the DHT shard can be quite large.
+        * **Arguments**: The database cursor of the last-seen DHT operation row can be supplied in the `dht_ops_cursor` field to dump only unseen state. If specified, the call MUST NOT return DHT operation data from this row and earlier.
+        * **Return value**: Unlike other dump functions, this one has some explicit structure defined by Rust types, taking the form:
 
-* `GrantZomeCallCapability(cell_id: CellId, cap_grant: CapGrantEntry)`: Request capability grant for making zome calls.
+            ```rust
+            struct FullStateDump {
+                // Information from the Kitsune networking layer about the agent, the DHT space, and their known peers.
+                peer_dump: P2pAgentsDump,
+                // The cell's source chain.
+                source_chain_dump: SourceChainDump,
+                // The dump of the DHT shard for which the agent is responsible.
+                integration_dump: FullIntegrationStateDump,
+            }
 
-* `DeleteCloneCells(app_id: InstalledAppId, clone_cell_id: CloneCellId)`: Delete a disabled cloned cell
+            struct P2pAgentsDump {
+                // Information about this agent's cell.
+                pub this_agent_info: Option<AgentInfoDump>,
+                // Information about this DNA itself at the level of Kitsune networking.
+                pub this_dna: Option<(DnaHash, KitsuneSpace)>,
+                // Information about this agent at the level of Kitsune networking.
+                pub this_agent: Option<(AgentPubKey, KitsuneAgent)>,
+                // Information about the agent's known peers.
+                pub peers: Vec<AgentInfoDump>,
+            }
 
-  **Notes**: The conductor MUST return an error if the specified cell is not disabled
+            // Agent info dump with the agent,
+            // space, signed timestamp and expiry of last self-announced info, printed in a pretty way.
+            // [WP-TODO this could have way more information about it]
+            struct AgentInfoDump {
+                kitsune_agent: KitsuneAgent,
+                kitsune_space: KitsuneSpace,
+                dump: String,
+            }
+
+            struct SourceChainDump {
+                records: Vec<SourceChainDumpRecord>,
+                published_ops_count: usize,
+            }
+
+            struct SourceChainDumpRecord {
+                signature: Signature,
+                action_address: ActionHash,
+                action: Action,
+                entry: Option<Entry>,
+            }
+
+            struct FullIntegrationStateDump {
+                // Ops in validation limbo awaiting sys
+                // or app validation.
+                validation_limbo: Vec<DhtOp>,
+                // Ops waiting to be integrated.
+                integration_limbo: Vec<DhtOp>,
+                // Ops that are integrated.
+                // This includes rejected.
+                integrated: Vec<DhtOp>,
+                // Database row ID for the latest DhtOp that we have seen.
+                // Useful for subsequent calls to `FullStateDump`
+                // to return only what they haven't seen.
+                dht_ops_cursor: u64,
+            }
+            ```
+
+    * `DumpNetworkMetrics { dna_hash: Option<DnaHash> } -> NetworkMetricsDumped(String)`: Dump the network metrics tracked by Kitsune.
+        * **Arguments**: If the `dna_hash` argument is supplied, the call MUST limit the metrics dumped to a single DNA hash space.
+
+    * `DumpNetworkStats -> NetwokrStatsDumped(String)`: Dump network statistics from the back-end networking library. This library operates on a lower level than Kitsune and Holochain P2P, translating the P2P messages into protocol communications in a form appropriate for the physical layer. Our implementation currently includes a WebRTC library.
+
+* `AddAgentInfo { agent_infos: Vec<AgentInfoSigned> } -> AgentInfoAdded`: Add a list of agents to this conductor's peer store.
+    * **Notes**: Implementations MAY implement this function. It is intended as a way of shortcutting peer discovery and is useful for testing. It is altoso intended for use cases in which it is important for agent existence to be transmitted out-of-band.
+
+[WP-TODO: why was the name changed? all the others are verbs, and now the response message type collides with the request message type]
+
+* `AgentInfo { cell_id: Option<CellId> } -> AgentInfo(Vec<AgentInfoSigned>)`: Request information about the agents in this Conductor's peer store; that is, the peers that this Conductor knows about.
+    * **Notes**: Implementations MAY implement this function. It is useful for testing across networks. It is also intended for use cases in which it is important for peer info to be transmitted out-of-band.
+    * **Arguments**: If supplied, the `cell_id` argument MUST constrain the results to the peers of the specified cell. [WP-TODO: why not the DNA hash? peer tables are stored by network space, I believe]
+
+* `GraftRecords { cell_id: CellId, validate: bool, records: Vec<Record> } -> RecordsGrafted`: "Graft" `Record`s onto the source chain of the specified `CellId`.
+    * **Notes**: Implementations MAY implement this function. This admin call is provided for the purposes of restoring chains from backup. All records must be authored and signed by the same agent; if they are not, the call MUST fail. Caution must be exercised to avoid creating source chain forks, which will occur if the chains in the Conductor store and the new records supplied in this call diverge and have had their `RegisterAgentActivity` transforms already published.
+    * **Arguments**:
+        * If `validate` is `true`, then the records MUST be validated before insertion. If `validate` is `false`, then records MUST be inserted as-is.
+        * Records provided are expected to form a valid chain segment (ascending sequence numbers and valid `prev_action` references). If the first record contains a `prev_action` which matches an existing record, then the new records MUST be "grafted" onto the existing chain at that point, and any other records following that point which do not match the new records MUST be discarded. See the note above about the risk of source chain forks when using this call.
+        * If the DNA whose hash is referenced in the `cell_id` argument is not already installed on this conductor, the call MUST fail.
+
+* `GrantZomeCallCapability(GrantZomeCallCapabilityPayload) -> ZomeCallCapabilityGranted`: Attempt to store a capability grant on the source chain of the specified cell, so that a client may make zome calls to that cell.
+    * **Notes**: [WP-TODO: Is this good advice?] Callers SHOULD construct a grant that uses the strongest security compatible with the use case; if a client is able to construct and store an Ed25519 key pair and use it to sign zome call payloads, a grant using `CapAccess::Assigned` with the client's public key SHOULD be favored.
+    * **Arguments**: The payload is defined as:
+
+        ```rust
+        struct GrantZomeCallCapabilityPayload {
+            // Cell for which to authorize the capability.
+            pub cell_id: CellId,
+            // Specifies the capability, consisting of zomes and functions to allow
+            // signing for as well as access level, secret and assignees.
+            pub cap_grant: ZomeCallCapGrant,
+        }
+        ```
+
+* `DeleteCloneCell(DeleteCloneCellPayload) -> CloneCellDeleted`: Delete a disabled cloned cell.
+    * **Notes**: The conductor MUST return an error if the specified cell cannot be disabled.
+    * **Arguments**: The payload is defined as:
+
+        ```rust
+        struct DeleteCloneCellPayload {
+            app_id: InstalledAppId,
+            clone_cell_id: CloneCellID,
+        }
+        ```
+
+* `StorageInfo -> StorageInfo(StorageInfo)`: Request storage space consumed by the Conductor.
+    * **Notes**: Implementations MAY implement this function to allow resource consumption to be displayed. If implemented, all runtime resources consumption MUST be reported.
+    * **Return Value**: Storage consumption info, defined as:
+
+        ```rust
+        struct StorageInfo {
+            blobs: Vec<StorageBlob>,
+        }
+
+        enum StorageBlob {
+            Dna(DnaStorageInfo),
+        }
+
+        // All sizes are in bytes.
+        // Fields ending with `_on_disk` contain the actual file size,
+        // inclusive of allocated but empty space in the file.
+        // All other fields contain the space taken up by actual data.
+        struct DnaStorageInfo {
+            // The size of the source chain data.
+            authored_data_size: usize,
+            authored_data_size_on_disk: usize,
+            // The size of the DHT shard data for which all local cells are authorities.
+            dht_data_size: usize,
+            dht_data_size_on_disk: usize,
+            // The size of retrieved DHT data for which local cells are not authorities.
+            cache_data_size: usize,
+            cache_data_size_on_disk: usize,
+            // The ID of the app to which the above data applies.
+            used_by: Vec<InstalledAppId>,
+        }
+        ```
+
+* `IssueAppAuthenticationToken(IssueAppAuthenticationTokenPayload) -> AppAuthenticationTokenIssued(AppAuthenticationTokenIssued)`: Request an authentication token for use by a client that wishes to connect to the app WebSocket.
+    * **Notes**: Implementations MUST expect a client to supply a valid token in the initial HTTP request that establishes the WebSocket connection, and MUST reject connection attempts that do not supply a valid token. An invalid token is defined as either one that was never issued or one that is no longer usable. The latter happens in four different cases:
+
+        * The token had an expiry set and the expiry timeout hsa passed,
+        * The token was single-use and has been used once,
+        * The token was revoked,
+        * The conductor has been restarted since the token was issued (implementations MAY implement this case).
+
+    Implementations MUST bind the WebSocket connection to the app for which the token was issued, excluding the possibility of a client accessing the functionality, status, and data of an app other than the one the token is bound to. Implementations SHOULD NOT terminate an established WebSocket connection once the token has expired; the expiry is to be enforced at connection establishment time.
+    * **Arguments**: The payload is defined as:
+
+        ```rust
+        struct IssueAppAuthenticationTokenPayload {
+            // The app to bind the token to.
+            installed_app_id: InstalledAppID,
+            // MAY be set to a reasonable default such as 30 seconds if not specified; MUST NOT expire if set to 0.
+            expiry_seconds: u64,
+            // MAY default to true.
+            single_use: bool,
+        }
+        ```
+    * **Return type**: The payload is defined as:
+
+        ```rust
+        struct AppAuthenticationTokenIssued {
+            token: Vec<u8>,
+            expires_at: Option<Timestamp>,
+        }
+        ```
+
+        The generated token MUST be unguessable; that is, it MUST be sufficiently strong to thwart brute-force attempts and sufficiently random to thwart educated guesses.
+
+* `RevokeAppAuthenticationToken(AppAuthenticationToken) -> AppAuthenticationTokenRevoked`: Revoke a previously issued app interface authentication token.
+    * **Notes**: Implementations MUST reject all WebSocket connection attempts using this token after the call has completed.
+
+* `GetCompatibleCells(DnaHash) -> CompatibleCells(BTreeSet<(InstalledAppId, BTreeSet<CellId>)>)`: Find installed cells which use a DNA that is forward-compatible with the given DNA hash, as defined in the contents of the `lineage` field in the DNA manifest.
+    * **Notes**: Implementations SHOULD search DNAs installed by all applications, as well as DNAs installed ad-hoc via `RegisterDna`.
 
 #### App API
-The App API MUST implement the following commands:
-  - `GetAppInfo(installed_app_id: InstalledAppId)->Option<AppInfo>`: Get info about the app identified by the given `installed_app_id` argument, including info about each cell installed by this app. See above for the defintion of `AppInfo`
 
-* `CallZome(ZomeCall) -> ExternIO`: Call a zome function.
+An App interface MUST expose the following API for all the apps to which it is bound. However, it MUST also enforce the use of valid `Origin` headers and authentication tokens for each WebSocket connection establishment attempt, and MUST bind the connection to the app for which the token was issued.
 
-  **Return Value**: The returned value MUST be a MsgPack serialization of the zome function's return value.
+As with the Admin API, the following are expressed as variants of an `AppRequest` enum and a corresponding `AppResponse` enum.
 
-  **Arguments**: The `ZomeCall` paramater is defined as:
+For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e` is a variant of the following enum:
+
 ```rust
-struct ZomeCall {
-    /// The ID of the cell containing the zome to be called
-    cell_id: CellId,
-    /// The zome containing the function to be called
-    zome_name: ZomeName,
-    /// The name of the zome function to call
-    fn_name: FunctionName,
-    /// The serialized data to pass as an argument to the zome function call
-    payload: ExternIO,
-    /// The capability request authorization
-    ///
-    /// This can be `None` and calls will still succeed in the case where the function
-    /// in the zome function being called has been given an `Unrestricted` status
-    /// via a `CapGrant`. Otherwise it will be necessary to provide a `CapSecret` for every call.
-    cap_secret: Option<CapSecret>,
-}
-```
-Note: `payload` is a MsgPack encoded data structure provided to the zome function. This structure MUST be matched against the parameter defined by the zome function and a serialization error MUST be returned if the matching fails.
-
-* `CreateCloneCell(CreateCloneCellPayload) -> InstalledCell`: Clone a DNA thus creating a new `Cell`.
-  **Notes:** This call specifies a DNA to clone by it's `role_id` as specified in the AppBundle. The function MUST register a new DNA with a unique ID and the specified properties, create a new cell from this cloned DNA, and add the cell to the specified app.
-  Cloned cells are inteded to be used for such use-cases as adding private channels to chat apps where only a specific set of agents are allowed to join the DHT of that DNA; or for creating DHTs that have temporary life-spans in app, like logs that get rotated.
-
-  **Arguments**: The `CreateCloneCellPayload` is defined as:
-```rust
-struct CreateCloneCellPayload {
-    /// The app id that the DNA to clone belongs to
-    app_id: InstalledAppId,
-    /// The DNA's role name to clone
-    role_name: RoleName,
-    /// Modifiers to set for the new cell.
-    /// At least one of the modifiers must be set to obtain a distinct hash for
-    /// the clone cell's DNA.
-    modifiers: DnaModifiersOpt<YamlProperties>,
-    /// Optionally set a proof of membership for the clone cell
-    membrane_proof: Option<MembraneProof>,
-    /// Optionally a name for the DNA clone
-    name: Option<String>,
+enum ExternalApiWireError {
+    // Any internal error
+    InternalError(String),
+    // The input to the API failed to deseralize.
+    Deserialization(String),
+    // The DNA path provided was invalid.
+    DnaReadError(String),
+    // There was an error in the ribosome.
+    RibosomeError(String),
+    // Error activating app.
+    ActivateApp(String),
+    // The zome call is unauthorized.
+    ZomeCallUnauthorized(String),
+    // A countersigning session has failed.
+    CountersigningSessionError(String),
 }
 ```
 
-* `DisableCloneCell(app_id: InstalledAppId, clone_cell_id: CloneCellId)`: Disable a clone cell.
-  **Notes:** When the clone cell exists, it is disabled after which any zome calls made to the cell MUST fail. Additionally any API calls that return `AppInfo` should show a disabled status for the given cell. If the cell doesn't exist, the call MUST be treated a no-op.
-  Deleting a cloned cell can only be done from the Admin API, and cells MUST be disabled before they can be deleted.
+[WP-TODO: what happened to the verbiness of these endpoints?!]
 
-  **Arguments:** The `CloneCellId` argument MUST allow spacifying the cell either by `CloneId` or `CellId`:
-```rust
-enum CloneCellId {
-    /// Clone id consisting of role id and clone index.
-    CloneId(CloneId),
-    /// Cell id consisting of DNA hash and agent public key.
-    CellId(CellId),
-}
-```
+* `AppInfo -> AppInfo(Option<AppInfo>)`: Get info about the app, including info about each cell instantiated by this app. See above for the defintion of `AppInfo`.
+
+* `CallZome(ZomeCall) -> ZomeCalled(ExternIO)`: Call a zome function.
+    * **Notes**: Implementations MUST enforce a valid capability for the function being called. This means that if the function is covered by a transferrable or assigned grant, the secret MUST be provided and valid; and if the function is covered by an assigned grant, the provenance MUST be valid. Regardless of the grant's access type, implementations MUST enforce that the provided signature matches the provided provenance. Implementations also MUST prevent replay attacks by rejecting a call that supplies a nonce that has been seen before or an expiry timestamp that has passed.
+    * **Arguments**: The payload is defined as:
+
+        ```rust
+        struct ZomeCall {
+            // The ID of the cell containing the zome to be called.
+            pub cell_id: CellId,
+            // The zome containing the function to be called.
+            pub zome_name: ZomeName,
+            // The name of the zome function to call.
+            pub fn_name: FunctionName,
+            // The serialized data to pass as an argument to the zome function call.
+            pub payload: ExternIO,
+            // The secret necessary for exercising a claim against the granted capability, if the capability is `CapAccess::Transerable` or `CapAccess::Assigned`.
+            pub cap_secret: Option<CapSecret>,
+            // The provenance (source) of the call
+            // MUST match the signature.
+            pub provenance: AgentPubKey,
+            // The signature on a serialized `ZomeCallUnsigned` struct with the same field values as this struct instance, but without the `signature` field. See below.
+            pub signature: Signature,
+            // Implementations MUST reject a zome call made with a nonce that has been seen already.
+            pub nonce: Nonce256Bits,
+            // Implementations MUST reject a zome call made with a timestamp that
+            pub expires_at: Timestamp,
+        }
+
+        struct ZomeCallUnsigned {
+            pub provenance: AgentPubKey,
+            pub cell_id: CellId,
+            pub zome_name: ZomeName,
+            pub fn_name: FunctionName,
+            pub cap_secret: Option<CapSecret>,
+            pub payload: ExternIO,
+            pub nonce: Nonce256Bits,
+            pub expires_at: Timestamp,
+        }
+        ```
+
+        The `payload` property is a MsgPack-encoded data structure provided to the zome function. This structure MUST be matched against the parameter defined by the zome function, and the zome function MUST return a serialization error if it fails.
+
+    * **Return Value**: The payload MUST be `AppResponse::ZomeCalled` containing a MsgPack serialization of the zome function's return value if successful, or `AppResponse::Error` containing one of the following errors:
+        * For unauthorized zome calls, `ExternalApiWireError::ZomeCallUnauthorized(s)`, where `s` is a message that describes why the call was unauthorized.
+        * For zome calls that attempt to initiate, process, or commit a countersigned entry, `ExternalApiWireError::CountersigningSessionError(s)`, where `s` is a message that describes the nature of the failure.
+        * For all other errors, including errors returned by the zome function itself, `ExternalApiWireError::InternalError(s)`, where `s` describes the nature of the error.
+
+* `CreateCloneCell(CreateCloneCellPayload) -> CloneCellCreated(ClonedCell)`: Clone a DNA, thus creating a new `Cell`.
+    * **Notes:** This call specifies a DNA to clone by its `role_id` as specified in the app bundle manifest. The function MUST register a new DNA with a unique ID and the specified modifiers, create a new cell from this cloned DNA, and add the cell to the specified app. If at least one modifier is not distinct from the original DNA, or the act of cloning would result in a clone with the same DNA hash as an existing cell in the app, the call MUST fail.
+    * **Arguments**: The payload is defined as:
+
+        ```rust
+        struct CreateCloneCellPayload {
+            // The DNA to clone, by role name.
+            pub role_name: RoleName,
+            // Modifiers to set for the new cell.
+            // At least one of the modifiers must be set to obtain a distinct hash for
+            // the clone cell's DNA.
+            pub modifiers: DnaModifiersOpt<YamlProperties>,
+            // Optionally set a proof of membership for the clone cell.
+            pub membrane_proof: Option<MembraneProof>,
+            // Optionally set a human-readable name for the DNA clone.
+            pub name: Option<String>,
+        }
+        ```
+    * **Return value**: The payload is defined as:
+
+        ```rust
+        struct ClonedCell {
+            pub cell_id: CellId,
+            // A conductor-local clone identifier.
+            pub clone_id: CloneId,
+            pub original_dna_hash: DnaHash,
+            // The DNA modifiers that were used to instantiate this clone cell.
+            pub dna_modifiers: DnaModifiers,
+            // The name the cell was instantiated with.
+            pub name: String,
+            // Whether or not the cell is running.
+            pub enabled: bool,
+        }
+        ```
+
+* `DisableCloneCell(DisableCloneCellPayload) -> CloneCellDisabled`: Disable a clone cell.
+    * **Notes:** When the clone cell exists, it is disabled, after which any zome calls made to the cell MUST fail and functions scheduled by the cell MUST be descheduled. Additionally, any API calls that return `AppInfo` should show a disabled status for the given cell. If the cell doesn't exist or is already disabled, the call MUST be treated as a no-op. Deleting a cloned cell can only be done from the Admin API, and cells MUST be disabled before they can be deleted.
+    * **Arguments**: The payload is defined as:
+
+        ```rust
+        struct DisableCloneCellPayload {
+            clone_cell_id: CloneCellId,
+        }
+
+        enum CloneCellId {
+            // Clone ID consisting of role name and clone index.
+            CloneId(String),
+            // Cell id consisting of DNA hash and agent pub key.
+            CellId(CellId),
+        }
+        ```
 
 * `EnableCloneCell(app_id: InstalledAppId, clone_cell_id: CloneCellId) -> InstalledCell`: Enabled a clone cell that was previously disabled.
   **Notes:** When the clone cell exists, it MUST be enable, after which any zome calls made to the cell MUST be attempted. Additionally any API functions that return `AppInfo` should show a disabled status for the given cell. If the cell doesn't exist, the call MUST be treated as a no-op.

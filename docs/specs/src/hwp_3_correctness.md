@@ -156,12 +156,7 @@ c.  **Witnessed Authoritative Sequence:** Some applications may require
   signed, because either Carol or David would have been successfully
   removed and would no longer be authorized participate in a countersigning session to remove the other.
 
-d.  **Exclusive Control of Rivalrous Data:** Another common need for an
-  authoritative time sequence involves determining control of
-  rivalrous data such as name registrations. Using M of N signing
-  from a witness pool makes it easy to require witnessing for only
-  rivalrous data types, and forgo the overhead of witnessing for all
-  other data. For example, a Twitter-like app would not need
+d.  **Exclusive Control of Rivalrous Data:** Another common need for an authoritative time sequence involves determining control of rivalrous data such as name registrations. Using M of N signing from a witness pool makes it easy to require witnessing for only rivalrous data types, and forgo the overhead of witnessing for all other data. For example, a Twitter-like app would not need
   witnessing for tweets, follows, unfollows, likes, replies, etc,
   only for registration of new usernames and for name changes. This
   preserves the freedom for low-overhead and easy scaling by not
@@ -184,9 +179,8 @@ e.  **Generalized Micro-Consensus: Entwined multi-agent state
   b. **Bottleneck-Free Sharded DHT:** Holochain's DHT is sharded, meaning that each node only stores a fraction of the total data, reducing the storage and computational requirements for each participant. At the same time, the storage of content with agents whose public key is "near" the hash of each Action or Entry, in combination with the use of Linking metadata attached to such hashes, transforms the DHT into a graphing DHT in which data discovery is simple in spite of the sparseness of the address space. When the agents responsible for validating a particular state change receive an authoring agent's proposed state change, they are able to a) request information from others in the DHT regarding the prior state of the authoring agent (where relevant), and b) make use of their own copy of the app's validation rules to deterministically validate the change.
   While that agent and its validating peers are engaged with the creation and validation of a particular change to the state of the authors chain, in parallel, other agents are able to author state changes to their own chain and have these validated by the validating peers for each of those changes.  This bottle-neck free architecture allows users to continue interacting with the system without waiting for global agreement.
   With singular actions by any particular agent (and the validation of those actions by a small number of other agents) able to occur simultaneous with singular actions by other agents as well as countersigned actions by particular groups of agents. The network is not updating state globally (as blockchains typically do) but is instead creating, validating, storing and serving changes of the state of particular agents in parallel.
-  c. Multiple networks: In Holochain, each application (DNA) operates on its own independent network, effectively isolating the performance of individual apps. This prevents a high-traffic, data heavy, or processing-heavy app from affecting the performance of other lighter apps within the ecosystem. Participants are able to decide for themselves which applications they want to participate in.
-  \[WP-TODO: ACB REVIEW could we add in any O(n) notation here?\]
-  d. Order of Complexity: "Big O" notation is usually only applied to local computation based on handling `n` number of inputs. However, we may consider a new type of O-notation for decentralized systems which includes two inputs, `n` as the number transactions/inputs/actions, and `m` as the number of nodes/peers/agents/users, as a way of expressing the time complexity for both an individual node and for the aggregate power of the entire network of nodes. Most blockchains are some variant of $O\ n^2*m$ in their order of complexity. Every node must gossip and validate all state changes. However, Holochain retains a constant $O\ \frac{log(n)}{m}$ complexity for any network larger than a given size $R$, where $R$ is the sharding threshold. As the number of nodes in the network grows, each node performs a static workload irrespective of network size; or expressed inversely, a smaller portion of the total network workload.
+  c. Multiple networks: In Holochain, each application (DNA) operates on its own independent network, effectively isolating the performance of individual apps. This prevents a high-traffic, data-heavy, or processing-heavy app from affecting the performance of other lighter apps within the ecosystem. Participants are able to decide for themselves which applications they want to participate in.
+  d. Order of Complexity: "Big O" notation is usually only applied to local computation based on handling `n` number of inputs. However, we may consider a new type of O-notation for decentralized systems which includes two inputs, `n` as the number transactions/inputs/actions, and `m` as the number of nodes/peers/agents/users, as a way of expressing the time complexity for both an individual node and for the aggregate power of the entire network of nodes. Most blockchains are some variant of $\mathcal{O}(n^2*m)$ in their order of complexity. Every node must gossip and validate all state changes. However, Holochain retains a constant $\mathcal{O}(\frac{log(n)}{m})$ complexity for any network larger than a given size $R$, where $R$ is the sharding threshold. As the number of nodes in the network grows, each node performs a static workload irrespective of network size; or expressed inversely, a smaller portion of the total network workload.
 
 1.  **Shared-state Finality:** Many blockchains approximate chain
   finality by assuming that the "longest chain wins." That strategy
@@ -316,18 +310,7 @@ A large variety of membrane proofs is possible, ranging from none at all, loose 
 
 We generally suggest that applications may want to enforce some kind of membrane against Sybils, not because consensus or data integrity are at risk but because carrying a lot of Sybils makes unnecessary work for honest agents running an application. We cover more about this in the next section.
 
-#### Spamming Attacks
-
-Holochain includes a native rate-limiting on entry creation \[WP-TODO:
-ACB\]
-
-
-\[Arthur thinks this next DPKI stuff is out of scope for Sybil Attacks\]
-
-\[expand on: Holochain enables​ ​continuity​ ​of​ ​identity​ ​across​
-​application​ ​contexts​ ​with​ ​its​ ​DPKI​ ​app,​ ​which​ ​can​
-​interface with​ ​decentralized​ ​identity​ ​services​ ​of​ ​your​
-​choosing.\]
+<!-- [WP-TODO v2: talk about spamming attacks and weighing] -->
 
 #### Denial-of-Service Attacks
 
@@ -344,7 +327,7 @@ the application.
 
 #### Eclipse Attacks
 
- \[WP-TODO: ACB REVIEW\]
+\[WP-TODO: ACB REVIEW\]
 An Eclipse Attack is an attack in which an honest node's immediate peers are all dishonest, blocking or modifying communication between the honest node and the larger network. This attack is specific to gossip-based peer-to-peer networks such as Bitcoin, Holochain, and DHTs like IPFS. While this attack can never be fully prevented, it can be mitigated. As an example, Bitcoin nodes only connect to [one peer per /16 IP block](https://en.bitcoin.it/wiki/Weaknesses#Sybil_attack).
 
 Holochain reduces the impact of Eclipse Attacks by providing basic, built-in guarantees of data integrity. Each piece of data carries its author's signature, so adversaries can never tamper with others' data.
