@@ -154,6 +154,7 @@ reqwest = "0.12"
 serial_test = "3.0"
 test-case = "3.3"
 tokio-tungstenite = "0.21"
+tx5 = "0.1.1-beta"
 
 [build-dependencies]
 hdk = { version = "^0.4.0-dev.11", path = "../hdk" }

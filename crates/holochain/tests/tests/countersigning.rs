@@ -142,13 +142,18 @@ async fn listen_for_countersigning_completion() {
 async fn retry_countersigning_commit_on_missing_deps() {
     holochain_trace::test_run();
 
-    // Allow bootstrapping so that peers can find each other, but disable publish and recent gossip.
-    // The only way peers can get data is through get requests!
-    let config = SweetConductorConfig::rendezvous(true)
-        .historical_only()
-        .no_dpki();
+    let config = SweetConductorConfig::rendezvous(true);
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
-
+    for conductor in conductors.iter_mut() {
+        conductor.shutdown().await;
+    }
+    // Allow bootstrapping and network comms so that peers can find each other, and exchange DPKI info,
+    // but before creating any data, disable publish and recent gossip.
+    // Now the only way peers can get data is through get requests!
+    for conductor in conductors.iter_mut() {
+        conductor.update_config(|c| SweetConductorConfig::from(c).historical_only().into());
+        conductor.startup().await;
+    }
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
     let cells = apps.cells_flattened();

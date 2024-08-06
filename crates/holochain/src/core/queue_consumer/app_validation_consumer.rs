@@ -11,7 +11,7 @@ use parking_lot::lock_api::Mutex;
 /// Spawn the QueueConsumer for AppValidation workflow
 #[cfg_attr(
     feature = "instrument",
-    instrument(skip(
+    tracing::instrument(skip(
         workspace,
         conductor,
         trigger_integration,

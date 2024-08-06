@@ -53,13 +53,17 @@ async fn provisioning_1_create() {
         .await;
 
     let resolution = bundle
-        .resolve_cells(&std::collections::HashMap::new(), Default::default())
+        .resolve_cells(
+            &std::collections::HashMap::new(),
+            Default::default(),
+            Default::default(),
+        )
         .await
         .unwrap();
 
     // Build the expected output.
     // NB: this relies heavily on the particulars of the `app_manifest_fixture`
-    let role = AppRoleAssignment::new(dna.dna_hash().to_owned(), true, 50);
+    let role = AppRolePrimary::new(dna.dna_hash().to_owned(), true, 50).into();
 
     let expected = AppRoleResolution {
         dnas_to_register: vec![(dna, None)],

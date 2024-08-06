@@ -27,8 +27,8 @@ use std::sync::Arc;
 /// TODO - set this to holochain stun servers once they exist!
 const DEFAULT_WEBRTC_CONFIG: &str = r#"{
   "iceServers": [
-    { "urls": "stun:stun-0.main.infra.holo.host:443" },
-    { "urls": "stun:stun-1.main.infra.holo.host:443" }
+    { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
+    { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
   ]
 }"#;
 
