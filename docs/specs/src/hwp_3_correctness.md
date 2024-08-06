@@ -327,23 +327,11 @@ the application.
 
 #### Eclipse Attacks
 
-\[WP-TODO: ACB REVIEW\]
-An Eclipse Attack is an attack in which an honest node's immediate peers are all dishonest, blocking or modifying communication between the honest node and the larger network. This attack is specific to gossip-based peer-to-peer networks such as Bitcoin, Holochain, and DHTs like IPFS. While this attack can never be fully prevented, it can be mitigated. As an example, Bitcoin nodes only connect to [one peer per /16 IP block](https://en.bitcoin.it/wiki/Weaknesses#Sybil_attack).
+An Eclipse Attack happens when a newly joining node is prevented from ever joining the main/honest networkbecause it initially connects to a dishonest node which only ever shares information about other colluding dishonest nodes. This attack is specific to gossip-based peer-to-peer networks such as Bitcoin, Holochain, and DHTs like IPFS. 
 
-Holochain reduces the impact of Eclipse Attacks by providing basic, built-in guarantees of data integrity. Each piece of data carries its author's signature, so adversaries can never tamper with others' data.
+Holochain apps bypass the risk of an Eclipse Attacks by providing an address for a bootstrap service which ensures your first connection is to a trusted or honest peer. If an application fails to provide a bootstrap service, nodes will try connecting via https://bootstrap.holochain.org which provides initial trusted peers, if those have been specified. If not specified, the default bootstrap service provides random access to any and all peers using the app, which at least ensures nodes cannot be partitioned from honest peers.
 
-However, intrinsic data integrity merely protects the integrity of data which can be seen. Even though Holochain can guarantee that data hasn't been tampered with, adversaries in an Eclipse Attack could still make life miserable for an honest node by blocking the transmission of data. In general, Holochain's approach to the complexities of distributed computing is to provide affordances and capabilities that can be scaled appropriately according to what is appropriate for the specific use case of the application in question. Thus we provide some basic capacities at the base layer and assume that individual applications will also add hardening appropriate to their context. Built-in mitigation strategies include:
-
-- Provide a bootstrap server that provides a large number of randomly chosen peers to which a node can connect.
-- Avoid connecting with too many peers in a certain IP block, as with Bitcoin.
-- Allow DNAs to specify known peers that can act as ‘harbour pilots' so that a node's introduction to a new DHT is facilitated. This process can be extended to take advantage of existing human, or digital, trust, and reputation factors.
-- Nodes can ask their initial peers for assurances of trust based on reputation or identity verification.
-
-Application developers can take steps to further protect their users:
-
-- Implement a Membrane Proof appropriate for the social context in which the application will be used. An Eclipse Attack is more likely to be successful with a high number of Sybils in a network.
-- Design validation rules requiring high-stakes actions to carry proof of their author's reputation, ideally by referring to data outside of the DHT. This doesn't prevent an Eclipse Attack, but it does give an honest node the power to detect suspicious peers and reject data originating from them.
-
+Application developers can take steps to further protect their users by providing in-app methods of exchanging signed pings with known nodes (such as a progenetor, migrator, notary, witness, or initial admin node) so a node can ensure it is not partitioned from the real network.
 
 ### Human​ ​Error
 
