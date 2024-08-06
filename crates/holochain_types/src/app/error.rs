@@ -30,7 +30,7 @@ pub enum AppError {
 
     #[error("Agent key '{0}' does not exist for app '{1}")]
     AgentKeyMissing(AgentPubKey, InstalledAppId),
-    
+
     #[error("Tried to interact with a cell through a Dependency role assignment rather than the Primary assignment. Role name: '{0}'")]
     NonPrimaryCell(InstalledAppId, RoleName),
 }

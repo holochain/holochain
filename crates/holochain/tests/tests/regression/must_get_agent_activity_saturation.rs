@@ -12,7 +12,7 @@ use rand::{thread_rng, Rng};
 async fn must_get_agent_activity_saturation() {
     use holochain::sweettest::await_consistency;
 
-    holochain_trace::init_fmt(holochain_trace::Output::LogTimed).unwrap();
+    holochain_trace::test_run();
 
     let mut rng = thread_rng();
     let (dna, _, _) =

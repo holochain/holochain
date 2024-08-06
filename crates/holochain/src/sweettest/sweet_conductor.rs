@@ -335,7 +335,6 @@ impl SweetConductor {
             .raw_handle()
             .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof)
             .await?;
-        // app.all_cells()
 
         self.raw_handle().enable_app(installed_app_id).await?;
         Ok(agent)
@@ -878,7 +877,7 @@ impl SweetConductor {
     }
 
     /// Getter
-    pub fn rendezvous(&self) -> Option<&Arc<dyn SweetRendezvous + Send + Sync>> {
+    pub fn rendezvous(&self) -> Option<&DynSweetRendezvous> {
         self.rendezvous.as_ref()
     }
 }

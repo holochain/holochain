@@ -30,31 +30,30 @@ async fn remote_signals_work_after_sbd_restart() {
 
     let vous = SweetLocalRendezvous::new_raw().await;
 
-    let v1: DynSweetRendezvous = vous.clone();
-    let mut c1 =
-        SweetConductor::from_config_rendezvous(SweetConductorConfig::rendezvous(true), v1).await;
+    let vous_dyn: DynSweetRendezvous = vous.clone();
+    let mut c1 = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        vous_dyn.clone(),
+    )
+    .await;
 
-    let v2: DynSweetRendezvous = vous.clone();
-    let mut c2 =
-        SweetConductor::from_config_rendezvous(SweetConductorConfig::rendezvous(true), v2).await;
+    let mut c2 = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        vous_dyn.clone(),
+    )
+    .await;
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
         .0;
 
-    let a1 = SweetAgents::one(c1.keystore()).await;
-    let a2 = SweetAgents::one(c2.keystore()).await;
-
     let (app1,) = c1
-        .setup_app_for_agent("app", a1.clone(), &[dna_file.clone()])
+        .setup_app("app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
-    let (_app2,) = c2
-        .setup_app_for_agent("app", a2.clone(), &[dna_file])
-        .await
-        .unwrap()
-        .into_tuple();
+    let (app2,) = c2.setup_app("app", &[dna_file]).await.unwrap().into_tuple();
+    let a2 = app2.agent_pubkey().clone();
 
     let mut c2_rx = c2.subscribe_to_app_signals("app".to_string());
 
