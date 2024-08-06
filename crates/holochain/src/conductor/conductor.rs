@@ -15,9 +15,11 @@
 //! async fn async_main () {
 //! use holochain_state::test_utils::test_db_dir;
 //! use holochain::conductor::{Conductor, ConductorBuilder};
+//! use holochain::conductor::ConductorHandle;
+//!
 //! let env_dir = test_db_dir();
-//! let conductor: Conductor = ConductorBuilder::new()
-//!    .test(env_dir.path(), &[])
+//! let conductor: ConductorHandle = ConductorBuilder::new()
+//!    .test(&[])
 //!    .await
 //!    .unwrap();
 //!
@@ -27,7 +29,7 @@
 //! assert_eq!(conductor.list_dnas(), vec![]);
 //! conductor.shutdown();
 //!
-//! # }
+//! }
 //! ```
 
 /// Name of the wasm cache folder within the data root directory.
@@ -1457,6 +1459,7 @@ mod app_impls {
                 agent_key,
                 installed_app_id,
                 membrane_proofs,
+                existing_cells,
                 network_seed,
                 ..
             } = payload;
@@ -1473,9 +1476,14 @@ mod app_impls {
             };
 
             let manifest = bundle.manifest().clone();
+
+            // Use deferred memproofs only if no memproofs are provided.
+            // If a memproof map is provided, it will override the allow_deferred_memproofs setting,
+            // and the provided memproofs will be used immediately.
             let defer_memproofs = match &manifest {
-                AppManifest::V1(m) => m.membrane_proofs_deferred,
+                AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.is_none(),
             };
+            let membrane_proofs = membrane_proofs.unwrap_or_default();
 
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
@@ -1484,18 +1492,14 @@ mod app_impls {
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
 
-            let ops = if defer_memproofs {
-                // XXX: passing in empty memproofs, because this function is not constructed well.
-                //      it doesn't really need to know about the memproofs, it just needs to associate
-                //      the proper cells with the proper memproofs.
-                bundle
-                    .resolve_cells(&local_dnas, agent_key.clone(), Default::default())
-                    .await?
-            } else {
-                bundle
-                    .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
-                    .await?
-            };
+            let ops = bundle
+                .resolve_cells(
+                    &local_dnas,
+                    agent_key.clone(),
+                    membrane_proofs,
+                    existing_cells,
+                )
+                .await?;
             let cells_to_create = ops.cells_to_create();
 
             // check if cells_to_create contains a cell identical to an existing one
@@ -1558,31 +1562,50 @@ mod app_impls {
             }
         }
 
-        /// Uninstall an app
+        /// Uninstall an app, removing all traces of it including its cells.
+        ///
+        /// This will fail if the app is depended upon by other apps via the UseExisting
+        /// cell provisioning strategy, in which case the dependent app(s) would first need
+        /// to be uninstalled, or the `force` param can be set to true.
         #[tracing::instrument(skip(self))]
         pub async fn uninstall_app(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,
+            force: bool,
         ) -> ConductorResult<()> {
-            let self_clone = self.clone();
-            let app = self.remove_app_from_db(installed_app_id).await?;
-            tracing::debug!(msg = "Removed app from db.", app = ?app);
-
-            // Remove cells which may now be dangling due to the removed app
-            self_clone
-                .process_app_status_fx(AppStatusFx::SpinDown, None)
-                .await?;
-
-            let installed_app_ids = self
+            let deps = self
                 .get_state()
                 .await?
-                .installed_apps()
-                .iter()
-                .map(|(app_id, _)| app_id.clone())
-                .collect::<HashSet<_>>();
-            self.app_broadcast.retain(installed_app_ids);
+                .get_dependent_apps(installed_app_id, true)?;
 
-            Ok(())
+            // Only uninstall the app if there are no protected dependents,
+            // or if force is used
+            if force || deps.is_empty() {
+                let self_clone = self.clone();
+                let app = self.remove_app_from_db(installed_app_id).await?;
+                tracing::debug!(msg = "Removed app from db.", app = ?app);
+
+                // Remove cells which may now be dangling due to the removed app
+                self_clone
+                    .process_app_status_fx(AppStatusFx::SpinDown, None)
+                    .await?;
+
+                let installed_app_ids = self
+                    .get_state()
+                    .await?
+                    .installed_apps()
+                    .iter()
+                    .map(|(app_id, _)| app_id.clone())
+                    .collect::<HashSet<_>>();
+                self.app_broadcast.retain(installed_app_ids);
+
+                Ok(())
+            } else {
+                Err(ConductorError::AppHasDependents(
+                    installed_app_id.clone(),
+                    deps,
+                ))
+            }
         }
 
         /// List active AppIds
@@ -1684,8 +1707,7 @@ mod app_impls {
             Ok(maybe_app_info)
         }
 
-        /// Run genesis for cells of an app which was installed using
-        /// [`MemproofProvisioning::Deferred`]
+        /// Run genesis for cells of an app which was installed using `allow_deferred_memproofs`
         pub async fn provide_memproofs(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,
@@ -1697,7 +1719,7 @@ mod app_impls {
             let cells_to_genesis = app
                 .roles()
                 .iter()
-                .map(|(role_name, role)| (role.base_cell_id.clone(), memproofs.remove(role_name)))
+                .map(|(role_name, role)| (role.cell_id().clone(), memproofs.remove(role_name)))
                 .collect();
 
             crate::conductor::conductor::genesis_cells(self.clone(), cells_to_genesis).await?;
@@ -1942,7 +1964,7 @@ mod clone_cell_impls {
                         let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
                         let (cell_id, _) = app.enable_clone_cell(&clone_id)?.into_inner();
                         let app_role = app.role(&clone_id.as_base_role_name())?;
-                        let original_dna_hash = app_role.dna_hash().clone();
+                        let original_dna_hash = app_role.cell_id().dna_hash().clone();
                         let ribosome = conductor.get_ribosome(cell_id.dna_hash())?;
                         let dna = ribosome.dna_file.dna();
                         let dna_modifiers = dna.modifiers.clone();
@@ -3087,7 +3109,7 @@ impl Conductor {
                 let role_name = role_name.clone();
                 move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
-                    let app_role = app.role(&role_name)?;
+                    let app_role = app.primary_role(&role_name)?;
                     if app_role.is_clone_limit_reached() {
                         return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
                             app_role.clone_limit(),
@@ -3121,7 +3143,7 @@ impl Conductor {
             .update_state_prime(move |mut state| {
                 let state_copy = state.clone();
                 let app = state.get_app_mut(&app_id)?;
-                let agent_key = app.role(&role_name)?.agent_key().to_owned();
+                let agent_key = app.primary_role(&role_name)?.agent_key().to_owned();
                 let clone_cell_id = CellId::new(clone_dna_hash, agent_key);
 
                 // if cell id of new clone cell already exists, reject as duplicate

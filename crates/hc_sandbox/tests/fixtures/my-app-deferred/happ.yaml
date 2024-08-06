@@ -1,6 +1,6 @@
-manifest_version: '1'
-name: my-fixture-app
-allow_deferred_memproofs: false
+manifest_version: "1"
+name: my-fixture-app-deferred
+allow_deferred_memproofs: true
 roles:
   - name: role-1
     provisioning:

@@ -501,7 +501,7 @@ pub mod test {
     use kitsune_p2p_types::fixt::*;
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashSet;
     use tempfile::TempDir;
     use uuid::Uuid;
 
@@ -563,7 +563,8 @@ pub mod test {
             source: AppBundleSource::Bundle(app_bundle),
             agent_key: agent_key.clone(),
             installed_app_id: None,
-            membrane_proofs: HashMap::new(),
+            membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
         }));
