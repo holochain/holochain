@@ -436,7 +436,6 @@ async fn cells_by_dna_lineage() {
 #[tokio::test(flavor = "multi_thread")]
 async fn use_existing_integration() {
     let conductor = SweetConductor::from_standard_config().await;
-    let (alice, bob) = SweetAgents::two(conductor.keystore()).await;
 
     let (dna1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
     let (dna2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
@@ -525,7 +524,7 @@ async fn use_existing_integration() {
     let app_1 = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            agent_key: Some(alice.clone()),
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle1),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
@@ -541,7 +540,7 @@ async fn use_existing_integration() {
         let err = conductor
             .clone()
             .install_app_bundle(InstallAppPayload {
-                agent_key: Some(bob.clone()),
+                agent_key: None,
                 source: AppBundleSource::Bundle(bundle2(false).await),
                 installed_app_id: Some("app_2".into()),
                 network_seed: None,
@@ -562,7 +561,7 @@ async fn use_existing_integration() {
         let err = conductor
             .clone()
             .install_app_bundle(InstallAppPayload {
-                agent_key: Some(bob.clone()),
+                agent_key: None,
                 source: AppBundleSource::Bundle(bundle2(true).await),
                 installed_app_id: Some("app_2".into()),
                 network_seed: None,
@@ -593,7 +592,7 @@ async fn use_existing_integration() {
     let app_2 = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            agent_key: Some(bob.clone()),
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle2(true).await),
             installed_app_id: Some("app_2".into()),
             network_seed: None,
@@ -608,7 +607,6 @@ async fn use_existing_integration() {
 
     let cell_id_1 = app_1.all_cells().next().unwrap().clone();
     let cell_id_2 = app_2.all_cells().next().unwrap().clone();
-    // let zome1 = SweetZome::new(cell_id_1.clone(), "whoami".into());
     let zome2 = SweetZome::new(cell_id_2.clone(), "whoami".into());
 
     conductor.enable_app("app_1".into()).await.unwrap();

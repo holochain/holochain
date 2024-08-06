@@ -1868,14 +1868,13 @@ mod app_impls {
                 .running_apps()
                 .find(|(_, running_app)| running_app.all_cells().any(|i| i == *cell_id))
                 .and_then(|(_, running_app)| {
-                    running_app
-                        .clone()
-                        .into_common()
-                        .primary_role(role_name)
-                        .ok()
-                        .map(|role| {
-                            CellId::new(role.dna_hash().clone(), running_app.agent_key().clone())
-                        })
+                    let app = running_app.clone().into_common();
+                    app.role(role_name).ok().map(|role| match role {
+                        AppRoleAssignment::Primary(primary) => {
+                            CellId::new(primary.dna_hash().clone(), running_app.agent_key().clone())
+                        }
+                        AppRoleAssignment::Dependency(dependency) => dependency.cell_id.clone(),
+                    })
                 }))
         }
 
