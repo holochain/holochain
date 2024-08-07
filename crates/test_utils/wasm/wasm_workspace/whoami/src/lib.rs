@@ -49,7 +49,10 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
         // The decode() type needs to match the return type of "whoami"
         ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e))?),
         // This should be handled in real code.
-        _ => unreachable!(),
+        r => {
+            tracing::error!(?r);
+            unreachable!("Unexpected response: {:?}", r)
+        }
     }
 }
 
@@ -68,7 +71,10 @@ fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e))?),
         // This should be handled in real code.
-        _ => unreachable!(),
+        r => {
+            tracing::error!(?r);
+            unreachable!("Unexpected response: {:?}", r)
+        }
     }
 }
 
@@ -84,7 +90,29 @@ fn who_are_they_role(role_name: RoleName) -> ExternResult<AgentInfo> {
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e))?),
         // This should be handled in real code.
-        _ => unreachable!(),
+        r => {
+            tracing::error!(?r);
+            unreachable!("Unexpected response: {:?}", r)
+        }
+    }
+}
+
+#[hdk_extern]
+fn who_are_they_role_secret((role_name, secret): (RoleName, CapSecret)) -> ExternResult<AgentInfo> {
+    let zome_call_response: ZomeCallResponse = call(
+        CallTargetCell::OtherRole(role_name),
+        zome_info()?.name,
+        "whoami".to_string().into(),
+        Some(secret),
+        &(),
+    )?;
+    match zome_call_response {
+        ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e))?),
+        // This should be handled in real code.
+        r => {
+            tracing::error!(?r);
+            unreachable!("Unexpected response: {:?}", r)
+        }
     }
 }
 
@@ -103,6 +131,9 @@ fn call_create_entry(cell_id: CellId) -> ExternResult<ActionHash> {
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e))?),
         // This should be handled in real code.
-        _ => unreachable!(),
+        r => {
+            tracing::error!(?r);
+            unreachable!("Unexpected response: {:?}", r)
+        }
     }
 }

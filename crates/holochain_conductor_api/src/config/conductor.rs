@@ -318,8 +318,8 @@ mod tests {
           signal_url: wss://sbd-0.main.infra.holo.host
           webrtc_config: {
             "iceServers": [
-              { "urls": "stun:stun-0.main.infra.holo.host:443" },
-              { "urls": "stun:stun-1.main.infra.holo.host:443" }
+              { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
+              { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
             ]
           }
       tuning_params:
@@ -344,8 +344,8 @@ mod tests {
             signal_url: "wss://sbd-0.main.infra.holo.host".into(),
             webrtc_config: Some(serde_json::json!({
               "iceServers": [
-                { "urls": "stun:stun-0.main.infra.holo.host:443" },
-                { "urls": "stun:stun-1.main.infra.holo.host:443" }
+                { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
+                { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
               ]
             })),
         });

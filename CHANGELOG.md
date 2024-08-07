@@ -14,6 +14,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240731.003232
+
+## [hc\_service\_check-0.1.0-dev.13](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.13)
+
+## [hcterm-0.4.0-dev.15](crates/hcterm/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_cli-0.4.0-dev.15](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain-0.4.0-dev.15](crates/holochain/CHANGELOG.md#0.4.0-dev.15)
+
+- *BREAKING* Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies. \#4129
+- Based on the change above, about adding `IncompleteCommit`, a countersigning session will no longer terminate on missing dependencies. You may retry committing the countersigned entry if you get this error. \#4129
+- *BREAKING* CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry. This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded. \#4124
+
+## [holochain\_cli\_bundle-0.4.0-dev.15](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.15](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_cascade-0.4.0-dev.15](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_conductor\_api-0.4.0-dev.15](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_conductor\_services-0.3.0-dev.15](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.15)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.15](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_websocket-0.4.0-dev.15](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_state-0.4.0-dev.15](crates/holochain_state/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_p2p-0.4.0-dev.15](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.15)
+
+## [hc\_sleuth-0.4.0-dev.15](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_types-0.4.0-dev.15](crates/holochain_types/CHANGELOG.md#0.4.0-dev.15)
+
+## [kitsune\_p2p-0.4.0-dev.14](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.14)
+
 # 20240724.004744
 
 ## [hc\_service\_check-0.1.0-dev.12](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.12)
@@ -479,8 +517,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [holochain-0.4.0-dev.7](crates/holochain/CHANGELOG.md#0.4.0-dev.7)
 
 - App manifest now includes a new `membrane_proofs_deferred: bool` field, which allows the membrane proofs for the app’s cells to be provided at a time after installation, allowing the app’s UI to guide the process of creating membrane proofs.
-- Adds new `AppStatus::AwaitingMemproofs` to indicate an app which was installed with `MemproofProvisioning::Deferred`
-- Adds new app websocket method `ProvideMemproofs` for use with `MemproofProvisioning::Deferred`
+- Adds new `AppStatus::AwaitingMemproofs` to indicate an app which was installed with `membrane_proofs_deferred`
+- Adds new app websocket method `ProvideMemproofs` for use with `membrane_proofs_deferred`
 
 ## [holochain\_cli\_bundle-0.4.0-dev.7](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.7)
 

@@ -23,6 +23,9 @@ pub enum ConductorError {
     #[error(transparent)]
     AppBundleError(#[from] AppBundleError),
 
+    #[error("App can't be disabled/uninstalled because it is protected by its dependents. App: {0} Dependents: {1:?}")]
+    AppHasDependents(InstalledAppId, Vec<InstalledAppId>),
+
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
 

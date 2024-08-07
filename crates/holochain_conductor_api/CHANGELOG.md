@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - BREAKING: In the `InstallApp` request, the `agent_key` is now optional. When not specified, an agent key will be provided. This is especially applicable when using DPKI, which requires that all keys are generated rather than externally provided.
 
+## 0.4.0-dev.15
+
 ## 0.4.0-dev.14
 
 ## 0.4.0-dev.13

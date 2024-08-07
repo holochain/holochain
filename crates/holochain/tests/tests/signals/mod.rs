@@ -2,7 +2,7 @@
 //!
 
 use hdk::prelude::ExternIO;
-use holochain::sweettest::{SweetCell, SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
+use holochain::sweettest::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use serde::{Deserialize, Serialize};
@@ -20,6 +20,112 @@ fn to_signal_message(signal: Signal) -> SignalMessage {
             panic!("Only expected app signals");
         }
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn remote_signals_work_after_sbd_restart() {
+    holochain_trace::test_run();
+
+    const MAX: u64 = 30;
+
+    let vous = SweetLocalRendezvous::new_raw().await;
+
+    let vous_dyn: DynSweetRendezvous = vous.clone();
+    let mut c1 = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        vous_dyn.clone(),
+    )
+    .await;
+
+    let mut c2 = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true),
+        vous_dyn.clone(),
+    )
+    .await;
+
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+        .await
+        .0;
+
+    let (app1,) = c1
+        .setup_app("app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+    let (app2,) = c2.setup_app("app", &[dna_file]).await.unwrap().into_tuple();
+    let a2 = app2.agent_pubkey().clone();
+
+    let mut c2_rx = c2.subscribe_to_app_signals("app".to_string());
+
+    let _: () = c1
+        .call(
+            &app1.zome(TestWasm::EmitSignal),
+            "signal_others",
+            RemoteSignal {
+                agents: vec![a2.clone()],
+                signal: ExternIO::encode(SignalMessage {
+                    value: "hello".to_string(),
+                })
+                .unwrap(),
+            },
+        )
+        .await;
+
+    let msg = tokio::time::timeout(std::time::Duration::from_secs(MAX), c2_rx.recv())
+        .await
+        .unwrap()
+        .map(to_signal_message)
+        .unwrap()
+        .value;
+
+    assert_eq!("hello", &msg);
+
+    // restart the signal (sbd) server so we get new ids
+    vous.start_sig().await;
+
+    // wait for that to propagate in holochain
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+    let done1 = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let done2 = done1.clone();
+
+    tokio::join!(
+        async {
+            let msg = tokio::time::timeout(std::time::Duration::from_secs(MAX), c2_rx.recv())
+                .await
+                .unwrap()
+                .map(to_signal_message)
+                .unwrap()
+                .value;
+
+            assert_eq!("world", &msg);
+
+            done1.store(true, std::sync::atomic::Ordering::SeqCst);
+        },
+        async {
+            for _ in 0..MAX {
+                let _: () = c1
+                    .call(
+                        &app1.zome(TestWasm::EmitSignal),
+                        "signal_others",
+                        RemoteSignal {
+                            agents: vec![a2.clone()],
+                            signal: ExternIO::encode(SignalMessage {
+                                value: "world".to_string(),
+                            })
+                            .unwrap(),
+                        },
+                    )
+                    .await;
+
+                if done2.load(std::sync::atomic::Ordering::SeqCst) {
+                    break;
+                }
+
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+        },
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

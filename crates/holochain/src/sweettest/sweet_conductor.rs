@@ -2,6 +2,7 @@
 // TODO [ B-03669 ] move to own crate
 
 use super::*;
+use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::ConductorHandle;
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, CellError,
@@ -13,6 +14,7 @@ use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, CellInfo, ProvisionedCell,
 };
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::AgentPubKeyExt;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::source_chain::SourceChain;
 use holochain_state::test_utils::TestDir;
@@ -77,6 +79,14 @@ impl SweetConductor {
         self.config
             .tracing_scope()
             .expect("SweetConductor must have a tracing scope set")
+    }
+
+    /// Update the config if the conductor is shut down
+    pub fn update_config(&mut self, f: impl FnOnce(ConductorConfig) -> ConductorConfig) {
+        if self.is_running() {
+            panic!("Cannot update config while conductor is running");
+        }
+        self.config = Arc::from(f((*self.config).clone()));
     }
 
     /// Create a SweetConductor from an already-built ConductorHandle and environments
@@ -830,8 +840,44 @@ impl SweetConductor {
         .unwrap()
     }
 
+    /// Retries getting a list of peers from the conductor until all the given peers are in the response.
+    ///
+    /// You can optionally filter by `cell_id`. That is used in the `get_agent_infos` call to the conductor, so you
+    /// can see how that works in the conductor docs.
+    ///
+    /// If the max_wait is reached then this function will return a "Timeout" error.
+    pub async fn wait_for_peer_visible<P: IntoIterator<Item = AgentPubKey>>(
+        &self,
+        peers: P,
+        cell_id: Option<CellId>,
+        max_wait: Duration,
+    ) -> ConductorApiResult<()> {
+        let handle = self.raw_handle();
+
+        let peers = peers.into_iter().collect::<HashSet<_>>();
+
+        tokio::time::timeout(max_wait, async move {
+            loop {
+                let infos = handle
+                    .get_agent_infos(cell_id.clone())
+                    .await?
+                    .into_iter()
+                    .map(|p| AgentPubKey::from_kitsune(&p.agent))
+                    .collect::<HashSet<_>>();
+                if infos.is_superset(&peers) {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+
+            Ok(())
+        })
+        .await
+        .map_err(|_| ConductorApiError::other("Timeout"))?
+    }
+
     /// Getter
-    pub fn rendezvous(&self) -> Option<&Arc<dyn SweetRendezvous + Send + Sync>> {
+    pub fn rendezvous(&self) -> Option<&DynSweetRendezvous> {
         self.rendezvous.as_ref()
     }
 }

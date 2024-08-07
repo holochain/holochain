@@ -5,7 +5,7 @@ use crate::prelude::*;
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("Clone limit of {0} exceeded for app role assignment: {1:?}")]
-    CloneLimitExceeded(u32, AppRoleAssignment),
+    CloneLimitExceeded(u32, AppRolePrimary),
 
     #[error("Tried to create a cell with an existing id '{0}'")]
     DuplicateCellId(CellId),
@@ -30,5 +30,8 @@ pub enum AppError {
 
     #[error("Agent key '{0}' does not exist for app '{1}")]
     AgentKeyMissing(AgentPubKey, InstalledAppId),
+
+    #[error("Tried to interact with a cell through a Dependency role assignment rather than the Primary assignment. Role name: '{0}'")]
+    NonPrimaryCell(InstalledAppId, RoleName),
 }
 pub type AppResult<T> = Result<T, AppError>;

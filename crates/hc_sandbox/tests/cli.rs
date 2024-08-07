@@ -103,6 +103,30 @@ async fn package_fixture_if_not_packaged() {
 
     cmd.status().await.expect("Failed to pack hApp");
 
+    println!("@@ Package Fixture deferred memproofs");
+
+    let mut cmd = get_hc_command();
+
+    cmd.arg("dna")
+        .arg("pack")
+        .arg("tests/fixtures/my-app-deferred/dna");
+
+    println!("@@ {cmd:?}");
+
+    cmd.status().await.expect("Failed to pack DNA");
+
+    let mut cmd = get_hc_command();
+
+    cmd.arg("app")
+        .arg("pack")
+        .arg("tests/fixtures/my-app-deferred");
+
+    println!("@@ {cmd:?}");
+
+    cmd.status()
+        .await
+        .expect("Failed to pack hApp with deferred memproofs");
+
     println!("@@ Package Fixture Complete");
 }
 
@@ -181,6 +205,52 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg("--in-process-lair")
         .arg("--run=0")
         .arg("tests/fixtures/my-app/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .kill_on_drop(true);
+
+    let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
+    let mut child_stdin = hc_admin.stdin.take().unwrap();
+    child_stdin.write_all(b"test-phrase\n").await.unwrap();
+    drop(child_stdin);
+
+    let mut stdout = hc_admin.stdout.take().unwrap();
+    let launch_info = get_launch_info(&mut stdout).await;
+
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("call")
+        .arg(format!("--running={}", launch_info.admin_port))
+        .arg("list-dnas")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit());
+    let mut hc_call = cmd.spawn().expect("Failed to spawn holochain");
+
+    let exit_code = hc_call.wait().await.unwrap();
+    assert!(exit_code.success());
+}
+
+/// Generates a new sandbox with a single app deployed with membrane_proof_deferred
+/// set to true and tries to list DNA
+#[tokio::test(flavor = "multi_thread")]
+async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg("--run=0")
+        .arg("tests/fixtures/my-app-deferred/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())

@@ -35,11 +35,10 @@ pub fn check_clone_access(
 
     // Check whether the current cell belongs to the app we're trying to perform a clone operation on.
     let matched_app_role = installed_app
-        .roles()
-        .iter()
-        .find(|(_, app)| {
+        .primary_roles()
+        .find(|(_, role)| {
             target_cell_id.agent_pubkey() == agent_key
-                && target_cell_id.dna_hash() == app.dna_hash()
+                && target_cell_id.dna_hash() == role.dna_hash()
         })
         .map(|(role_name, _)| role_name);
 
