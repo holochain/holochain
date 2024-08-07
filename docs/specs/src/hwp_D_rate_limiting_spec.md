@@ -1,23 +1,22 @@
-Appendix C: Rate Limiting
-=======================================
+# Appendix C: Rate Limiting
 
 ## Context
 
 ### Problem: DHTs are a public good so people can take advantage by spamming data
 
-- Flood the network with garbage creating degraded service for other users
-- Force users to hold garbage data indefinitely locking up storage
-- Force authorities to verify garbage data thrashing CPU
-- Fill sequential logic causing delays for back of the queue
+* Flood the network with garbage creating degraded service for other users
+* Force users to hold garbage data indefinitely locking up storage
+* Force authorities to verify garbage data thrashing CPU
+* Fill sequential logic causing delays for back of the queue
 
 ### Solution: Rate limits
 
-- Actions have A units of weight
-- Apps can define their own weights in-wasm for app entries
-- System entry weights and rate limiting is defined by the system
-- A bucket of B units may fill to allow bursts of activity
-- Every X millis Y units is restored to the bucket
-- There are many buckets definable by the happ to tailor rate limits to different usage patterns for different system components
+* Actions have A units of weight
+* Apps can define their own weights in-wasm for app entries
+* System entry weights and rate limiting is defined by the system
+* A bucket of B units may fill to allow bursts of activity
+* Every X millis Y units is restored to the bucket
+* There are many buckets definable by the happ to tailor rate limits to different usage patterns for different system components
 
 ### Prior art:
 
@@ -34,7 +33,7 @@ There are several reasons to do this in Holochain's core and not assume/rely on 
     - Bugs in this logic can easily cripple an app / DHT
     - This type of logic SHOULD be implemented for EVERY app to protect from network spam
 - If core handles this then we know it will be implemented in such a way that an honest agent never accidentally exceeds the rate limit
-- 
+-
 
 ### Sybils
 
@@ -178,7 +177,7 @@ Creation of a link will be rejected if _either_ the system rate limit is hit _or
 
 Deletion of a link will _only_ be rejected if the application weight limit is hit.
 
-Unlike access controls, there is no assumption/intuition that there could be "enough" links for all valid applications. There are many use-cases (e.g. indexing large data sets for search) that would appreciate as much as we can squeeze out of the network. 
+Unlike access controls, there is no assumption/intuition that there could be "enough" links for all valid applications. There are many use-cases (e.g. indexing large data sets for search) that would appreciate as much as we can squeeze out of the network.
 
 **Question: What is the "safe maximum" for links?**
 

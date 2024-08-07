@@ -451,15 +451,7 @@ These message types exist at the lower level.
     * **FetchOp** requests the data for one or more DHT operations, usually as a follow-up from receiving a **Publish** broadcast message or **MissingOpHashes** gossip message advertising that such operations are available. While it is strictly a notify-class message, it functions similarly to a request-class message in that it anticipates a response in the form of a **PushOpData** message.
     * **PeerUnsolicited** is similar to **PeerQueryResp** below, but is initiated by a node without being prompted.
     * **PushOpData** sends the data for one or more DHT operations as a response to a **FetchOp** message. Each op optionally includes the quantized region it belongs to if it's being pushed as part of a historical sync.
-    * **Gossip** is a container for various types of gossip payloads among nodes who share authority for portions of the DHT's network location space. These payloads, in rough order of sequence in a gossip round, are:
-        * **Initiate** proposes a gossip round specifying one or more arcs of the location space for which the initiator is an authority. A gossip round can cover more than one agents on the initiator's device.
-        * **Accept** is a response to an **Initiate**, containing the arcs for which the agents on the acceptor's device is an authority. Note that the gossip round, as it goes forward, will concern network locations that are the _set intersection_ of all the network locations covered by all the arcs of both the initiator and the acceptor.
-        * **Agents** contains a Bloom filter of the public keys of all the agents for which a peer is storing AgentInfo data. The recipient is expected to compare this value against the value for their own held AgentInfo data, and supply the AgentInfos which the sender appears to be missing.
-        * **MissingAgents** is a response to **Agents**, supplying the AgentInfos for all the agents that did not appear to be included in the Bloom filter. This completes synchronization of the peer tables of two peers.
-        * **OpBloom** contains a Bloom filter of the hashes of all the _recent_ DHT operations which a peer is holding. As with **Agents**, the recipient compares this value with their own held recent DHT operations and supplies the hashes of DHT operations which the sender appears to be missing via the **MissingOpHashes** payload. This exchange is repeated until both peers' Bloom filter values match.
-        * **OpRegions** contains a map of quantized region coordinates to XOR fingerprints of the set of DHT operations the sender is holding for that region. Its purpose is to quickly communicate information about the infrequently changing set of _historical_ DHT operations which the sender holds for comparison and synchronization. The recipient is expected to send the DHT operation hashes for all mismatched regions via **MissingOpHashes**.
-        * **MissingOpHashes** responds to an **OpBloom** with a list of DHT operation hashes which don't match the sender's Bloom filter. If the list is large, it can be chunked into multiple messages, and a **finished** property in each message indicates whether more chunks will be sent. After this, the recipient of this message is expected to retrieve DHT operation data from the sender, not via gossip but via the via **FetchOp** notify message.
-        * **Error**, **Busy**, **NoAgents**, and **AlreadyInProgress** are sent by the receiver of a gossip message if they're unable to satisfy the sender's request for the specified reason.
+    * **Gossip** is a container for messages implementing various gossip strategies among nodes who share authority for portions of the DHT's network location space.
 * **Request** message types
     * **Call** and **CallResp** allow a peer to make an arbitrary, application-level function call to another peer and receive data in response. As with broadcast, the application in question is Holochain.
     * **PeerGet** and **PeerGetResp** allow a peer to ask another peer if they know about a specific agent. The response contains the same data as an **AgentInfo** message.
@@ -527,37 +519,27 @@ All zome calls must be signed and supply a required capabilty claim argument tha
 
 ### Warrants
 
-We take that, by definition, in a fully distributed system, there is no way for a single agent to control the actions of other agents that comprise the system; i.e., what makes an agent an agent is its ability to act independantly. This creates a challenge: How do agents deal with "bad-actor" agents, as they cannot be controlled by another party?
+We take that, by definition, in a fully distributed system, there is no way for a single agent to control the actions of other agents that comprise the system; i.e., what makes an agent an agent is its ability to act independently. This creates a challenge: How do agents deal with "bad-actor" agents, as they cannot be controlled by another party?
 
-In Holochain "bad-action" is defined by attempts by agents to act in a way not consistent with a DNA's validation rules. Because a DNA's network ID is defined by the hash of its integrity zomes (which includes data structures and the deterministic validation rules) we can know that every agent in a network started with the same rules, and thus can deterministically run those rules to determine if any action fails validation. (Note that some validation rules reveal bad actions not just in structure or content of data committed, but also bad behavior. For example, validating timestamps for the rate of committing entries enables protection against spam and denial-of-service attacks. Holochain has its own base validation rules as well; for instance, a source chain must never 'fork', so the presence of two parallel branching points from one prior source chain record is considered a bad-action.)
+In Holochain "bad-action" is defined by attempts by agents to act in a way inconsistent with a DNA's validation rules. Because a DNA's network ID is defined by the hash of its integrity bundle (which includes both data structures and the deterministic validation rules) we can know that every agent in a network started with the same rules, and thus can deterministically run those rules to determine if any action fails validation. (Note that some validation rules reveal bad actions not just in structure or content of data committed, but also bad behavior. For example, validating timestamps over contiguous sequences of Actions enables detection of and protection against spam and denial-of-service attacks. Holochain has its own base validation rules as well; for instance, a source chain must never 'fork', so the presence of two parallel branching points from one prior source chain record is considered a bad-action.)
 
-Once a bad-action has been identified via a validation failure, it is considered to be unambiguously a consequence of malicious intent. The only way invalid data can be published is by intentionally circumventing the validation process on the author's device when committing to chain. 
+Once a bad-action has been identified via a validation failure, it is considered to be unambiguously a consequence of malicious intent. The only way invalid data can be published is by intentionally circumventing the validation process on the author's device when committing to chain.
 
-Each Warrant must be self-proving. It must flag the agent being warranted as a bad actor and include references set of actions which fail to validate. This might be, for example, a single signed Action that fails validation, or it might be a set of Actions that are issued consecutively which exceed spam rate limits or cause the agents chain to fork.
+Each Warrant must be self-proving. It must flag the agent being warranted as a bad actor and include references to set of actions which fail to validate. This might be, for example, a single signed Action that fails validation, or it might be a set of Actions that are issued consecutively which exceed spam rate limits, or a set of Actions that are issued concurrently which cause the agent's chain to fork.
 
 Upon receipt of a Warrant, a node must take three actions:
 
-1. **Determine who is the bad actor.** For any Warrant, someone either performed a bad action, or someone created a false report of bad action. So a node must validate the referenced actions. If they fail validation, then the reported agent is the bad actor. If the actions pass validation, then the Wrrant author is the bad actor.
-2. **Block the bad actor.** Add either the warranted agent or the warrant author to the validating nodes peer blocklist. This node will no longer interact with bad actor, and will reject any connection attempts from that agent.
-3. **Report it to the bad actor's Agent Activity Authorities.** Because nodes expect to be able to find out if an agent is warranted by asking its neighbors who validate chain activity, those neighbors must be notified of any warrants.
+1. **Determine who is the bad actor.** For any Warrant, someone either performed a bad action, or someone created a false report of bad action. So a node must validate the referenced actions. If they fail validation, then the reported agent is the bad actor. If the actions pass validation, then the Warrant author is the bad actor.
+2. **Block the bad actor.** Add either the warranted agent or the Warrant author to the validating node's peer blocklist. This node will no longer interact with bad actor, and will reject any connection attempts from that agent.
+3. **Report it to the bad actor's Agent Activity Authorities.** Because nodes expect to be able to find out if an agent is warranted by asking its neighbors who validate its chain activity, those neighbors must be notified of any warrants.
 
-There is no global blocking of a bad actor. Each agent must confirm for themselves who to block. Warrants and blocking, taken together, enable the network defend itself from bad actors while preserving individual agency in the warranting process.
+There is no global blocking of a bad actor. Each agent must confirm for themselves whom to block. Warrants and blocking, taken together, enable the network to defend itself from bad actors while preserving individual agency in the warranting process.
 
-Note: Beyond Warrants, blocking can also theoretically be used by apps or agents for whatever reason the application logic or node owner may have to refuse to participate with a node. It allows for local, voluntary, self-defense against from whatever nodes someone might interpret as malicious or just peers that are no longer relevant (e.g. a terminated employee).
-
-[WP-TODO: Possible expansion with data from https://hackmd.io/nmv6PARCRCmx9PrUI-LtLw?edit]
-
+Note: Beyond Warrants, blocking can also theoretically be used by apps or agents for whatever reason the application logic or node owner may have to refuse to participate with a node. It allows for local, voluntary self-defense against whatever nodes someone might interpret as malicious, or simply ending communication with peers that are no longer relevant (e.g., a terminated employee).
 
 ## Cross-DNA Composibility
 
 Holochain is designed to be used to build micro-services that can be assembled into applications. We expect DNAs to be written that assume the existence of other long-running DNAs and make calls to them via the agency of a user having installed both DNAs on their node. The Capabilities security model described above makes sure this kind of calling is safe and can only happen when permisions to do so have been explicitly granted in a given context. The HDK `call` function provides an affordance to allow specification of the DNA by hash when making the call, so the Holochain node can make a zome call to that DNA and return the result to the calling node.
-
-### External References and Holochain Resource Locaters
-
-Additionally we define a standard by which to refer to entries in DNAs, called the Holochain Resource Locator (HRL), for application developers to use in passing around references to application data.
-
-[DRAFT OF SPEC TO BE MOVED HERE](https://hackmd.io/@hololtd/HyWnqhTnY)
-[WP-TODO: Reframe as enabling hash references across any spaces... convention for HRLs as a universal grammar for locating content across DHTs and even private chain data.]
 
 ## Holochain Implementation
 

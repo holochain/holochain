@@ -65,9 +65,32 @@ enum WasmErrorInner {
 
 The type `Result<T, WasmError>` is aliased to `ExternResult<T>` for convenience, and will be referred to as such in examples below.
 
-Our implmementation provides a `wasm_error!` macro for the guest that simplifies the construction of an error result with the correct file and line number, along with a `WasmErrorInner::Guest` containing an application-defined error string. It also provides various macros to 'shadow' host functions and guest callbacks, automatically performing the work of retrieving/deserializing and serializing/storing input and output data and presenting more ergonomic function signatures.
+Our implmementation provides a `wasm_error!` macro for the guest that simplifies the construction of an error result with the correct file and line number, along with a `WasmErrorInner::Guest` containing an application-defined error string.
 
-Hereafter, our examples of host and guest functions will assume the use of the ergonomic function signatures provided by the HDI and HDK.
+Our implementation also provides various macros to abstract over the mechanics of this process, wrapping host functions and guest callbacks, automatically performing the work of retrieving/deserializing and serializing/storing input and output data, and presenting more ergonomic function signatures (in the case of host functions) or allowing application developers to write more ergonomic function signatures (in the case of guest functions). In particular, the `#[hdk_extern]` procedural macro, when applied to a guest function, handles the conversion of the bytes stored in the memory to a map of arguments, passes those arguments, and handles the conversion of the return value to bytes stored in memory.
+
+Hereafter, our examples of host and guest functions will assume the use of ergonomic function signatures.
+
+### Handling Guest Functions
+
+For any guest function, the Ribosome MUST prepare a context which includes the list of host functions which may be called by the given type of function:
+
+* Guest functions which are only intended to establish valid entry and link types (`entry_defs` and `link_types`) MUST NOT be given access to any host functions.
+* Guest functions which are expected to give a repeatable result for the input arguments (`validate`) MUST NOT be given access to host functions whose return values vary by context.
+* Guest functions which are expected to not change source chain state (`validate`, `genesis_self_check`, `migrate_agent_open`, `migrate_agent_close`, `post_commit`) MUST NOT be given access to host functions which change state.
+
+For any guest functions which are permitted to change source chain state (`init`, `recv_remote_signal`, zome functions, and scheduled functions), the Ribosome MUST:
+
+1. Prepare a context which includes the aforementioned host function access, as well as the current source chain state and a temporary "scratch space" into which to write new source chain state changes.
+2. Check the state of the source chain; if it does not contain an `InitZomesComplete` action, run the `init` callback and remember any state changes in the scratch space.
+3. If no `init` callbacks fail, proceed to call the guest function, remembering any state changes in the scratch space.
+4. Produce DHT transforms from the state changes in the scratch space.
+5. Attempt to validate the DHT transforms.
+6. If all the DHT transforms are valid, persist the Actions in the scratch space to the source chain.
+7. If the called function was a zome function, return the zome function call's return value to the caller.
+7. Spawn the `post_commit` callback in the same Coordinator Zome as the called guest function and attempt to publish the DHT transforms to the DHT.
+
+State changes in a scratch space MUST be committed atomically to the source chain; that is, all of them MUST be written or fail as a batch.
 
 ### HDI
 
@@ -591,6 +614,20 @@ The HDK contains all the functions and callbacks needed for Holochain applicatio
 
 The HDK MUST allow application developers to define an `init() -> ExternResult<InitCallbackResult>` callback in each coordinator zome, which
 
+#### Arbitrary API Functions (Zome Functions)
+
+The HDK MUST allow application developers to define and expose functions in their Coordinator Zomes with arbitrary names, input payloads, and return payloads that serve as the application's API. While the content of the return payload of these functions may be arbitrary data, it MUST be wrapped in a `Result<T, WasmError>`, where `T` is the return payload.
+
+As function calls across the host/guest interface only deal with arbitrary bytes stored in memory address ranges, the HDK SHOULD provide an abstraction to allow developers to define functions in a more natural manner, with typed input and return payloads. We have provided a `#[hdk_extern]` prodecural macro that facilitates this abstraction, wrapping the following function definition with the necessary machinery to load and deserialize the input data and serialize and store the return data.
+
+The Conductor MUST also receive calls to these zome functions, enforce capability restrictions, dispatch the call to the correct WASM module, and handle side effects, error conditions, and the called function's return value. These calls MAY come from external clients, other zomes in the same cell, other cells in the same application, or other agents in the same DHT.
+
+#### Post-Commit Callback
+
+The HDK MUST allow application developers to define a `post_commit(Vec<SignedAction>) -> ExternResult<()>` callback in their Coordinator Zomes which receives a sequence of Actions committed to the source chain. The purpose of this callback is to provide a way of triggering follow-up activities when an atomic commit has definitively succeeded in persisting new Actions.
+
+The Conductor MUST call this callback with all the Actions successfully committed in any guest function that is permitted to persist state changes to the source chain. The Conductor MUST NOT permit this callback to make further state changes, but it MAY allow it to access any other host functions, including calling or scheduling other functions which may make state changes in their own call contexts.
+
 #### Chain Operations
 
 The HDK MUST implement the following functions that create source chain entries:
@@ -1009,7 +1046,7 @@ Agents MUST be able to communicate directly with other agents. They do so simply
     }
     ```
 
-* `send_remote_signal<I>(Vec<AgentPubKey>, I) -> ExternResult<()> where I: Serialize`: Send a best-effort signal to a list of agents. Signals are received by implementing the `recv_remote_signal(SerializedBytes) -> ExternResult<()>` callback which the Holochain system MUST attempt to call when signals are received.
+* `send_remote_signal<I>(Vec<AgentPubKey>, I) -> ExternResult<()> where I: Serialize`: Send a best-effort signal to a list of agents. Implementations SHOULD provide this function, SHOULD implement it by convention as a workflow that sends messages to the receivers as a remote call to a zome function with the signature `recv_remote_signal(SerializedBytes) -> ExternResult<()>` in the same coordinator zome as the function that calls this host function, and MUST NOT await responses from the receivers. Implementations MUST spawn a separate thread to send the signals in order to avoid blocking execution of the rest of the zome function call.
 
 #### Countersigning
 
@@ -1045,6 +1082,16 @@ In order to safely facilitate the peer interaction necessary to complete a count
     enum ActionBase {
         Create(CreateBase),
         Update(UpdateBase),
+    }
+
+    struct CreateBase {
+        entry_type: EntryType,
+    }
+
+    struct UpdateBase {
+        original_action_address: ActionHash,
+        original_entry_address: EntryHash,
+        entry_type: EntryType,
     }
 
     // An arbitrary application-defined role in a session.
@@ -1177,11 +1224,11 @@ The previous section describes the functions exposed to, and callable from, DNA 
 
 The State Manager MUST be able to manage the peristence of the following data elements:
 
-* `DhtOp` : a DhtOp and its hash, dependencies (entries, actions, and contiguous source chain records referenced by hash), validation status and stage, integration, and last published timestamps
+* `DhtOp`: a DHT transform and its hash, dependencies (entries, actions, and contiguous source chain records referenced by hash), validation status and stage, integration, and last published timestamps
 * `Record`: an Action and Entry pair
 * `SignedValidationReceipt`: a proof-of-validation receipt from another node regarding a Record
-* `DnaWasm` : the WASM code of a DNA
-* `DnaDef` : the modifiers that get hashed along with a DNA to create the hash of a specific application instance
+* `DnaWasm`: the WASM code of a DNA
+* `DnaDef`: the modifiers that get hashed along with a DNA to create the hash of a specific application instance
 * `Schedule`: a scheduled function request such that scheduled zome-calls can be implemented.
 * `ConductorState`: the state of all installed DNAs and their status
 
@@ -1426,7 +1473,6 @@ impl HashableContent for Warrant {
 Publish(multicast) --> author collects validation receipts
 Gossip(direct) --> ongoing aliveness & resilience based on uptime data
 
-
 ### DHT-Transform-Status Worklow:
 
 See workflows with state data across multiple LMDB tables. [WP-TODO: ACB fixme no more LMDB]
@@ -1540,9 +1586,9 @@ The process of changing data to these states is TBD.
 
 A robust networking implementation for Holochain involves three layers:
 
-1. The Holochain P2P networking layer, which is designed around the peer-to-peer communication needs of agents in a DNA and the building of the DNA's graph DHT
-2. An underlying P2P layer that handles the fact that a Holochain node will be managing communication on behalf of potentially multiple agents in multiple networks, and will be connecting with other nodes, any of which may be running non-overlapping sets of DNAs.
-3. A transport-level layer that supplies and interprets transport
+1. The Holochain P2P networking layer, which is designed around the peer-to-peer communication needs of agents in a DNA and the building of the DNA's graph DHT,
+2. An underlying P2P layer that handles the fact that a Holochain node will be managing communication on behalf of potentially multiple agents in multiple networks, and will be connecting with other nodes, any of which may be running non-overlapping sets of DNAs, and
+3. A transport-level layer that supplies and interprets transport.
 
 Thus, from a networking perspective, there is the view of a single DNA (which is its own network), in which more than one local agent may be participating, but there is also the view of an agent belonging to many DNAs at the same time.
 
@@ -1550,16 +1596,13 @@ Because the same DHT patterns that work at the level of a Holochain DNA sharing 
 
 ### High-Level Networking (Holochain P2P)
 
-There are a number of network messages that are sent and handled as a direct result of HDK functions or callbacks being executed in a zome call. These calls are all directed at specific agents in a DNA, either because they are explicitly targeted in the call (e.g., `send_remote_signal`) or because the agent has been determined to be responsible for holding data on the DHT.
+There is a number of network messages that are sent and handled as a direct result of HDK functions or callbacks being executed in a zome call. These calls are all directed at specific agents in a DNA, either because they are explicitly targeted in the call (e.g., `CallRemote`) or because the agent has been determined to be responsible for holding data on the DHT. And in most cases, these message types expect a response. Hence, all Holochain message types are implemented as the lower-level `Call` and `CallResp` message pairs, with the exception of `ValidationReceipts`, which is implemented as a lower-level `Broadcast` message.
 
-Note that the `ValidationReceipt` message is sent back to an authoring agent as a result of a node validating a `DhtOp`, and `Publish` messages are sent by the author authority nodes as a result of taking any chain action and transforming it into `DhtOp`s.
+Note that the `ValidationReceipts` message is sent back to an authoring agent as a result of a node validating a `DhtOp`, and `Publish` messages are sent by an author node as a result of committing any chain action and transforming it into `DhtOp`s.
 
-The following messages types MUST be implemented:
+The following messages types MUST be implemented. In our implementation, they are all defined as variants of a `WireMessage` enum which are wrapped in lower-level Kitsune messages before being serialized and sent via the network transport implementation.
 
-[WP-TODO: Make this into a nice bullet list like some of the sections above, with each bullet introducing the types it deals in]
-
-```rust
-enum WireMessage {
+*   ```rust
     CallRemote {
         zome_name: ZomeName,
         fn_name: FunctionName,
@@ -1570,105 +1613,199 @@ enum WireMessage {
         data: Vec<u8>,
         nonce: [u8; 32],
         expires_at: Timestamp,
-    },
-    CallRemoteMulti {
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        from_agent: AgentPubKey,
-        to_agents: Vec<(Signature, AgentPubKey)>,
-        cap_secret: Option<CapSecret>,
-        data: Vec<u8>,
-        nonce: [u8; 32],
-        expires_at: Timestamp,
-    },
+    }
+    ```
+
+    Call a zome function in a remote cell in the same DHT network, supllying a valid capability secret if required. The zome function payload is serialized into a `Vec<u8>`. The signature is generated by copying the above fields into the following struct, serializing it, and signing the hash of the serialized bytes.
+
+        ```rust
+        struct ZomeCallUnsigned {
+            provenance: AgentPubKey,
+            cell_id: CellId,
+            zome_name: ZomeName,
+            fn_name: FunctionName,
+            cap_secret: Option<CapSecret>,
+            payload: ExternIO,
+            nonce: Nonce256Bits,
+            expires_at: Timestamp,
+        }
+        ```
+
+    On the remote side, implementations MUST enforce permissions:
+
+    * They MUST check all the active capability grants for the function being called against the capability claim being exercised.
+    * They MUST check the `nonce` and `expires_at` field in order to detect replay attacks and MUST reject the call if the nonce has been seen for the same agent and/or the `expires_at` timestamp has passed.
+    * They MUST also check that the signature is valid for the supplied `from_agent` public key and the call data.
+
+    On the sending side, implementations MUST generate a nonce that is sufficiently unguessable, and an expiry time that is sufficiently short, to effectively thwart replay attacks while also avoiding spurious timeout failures.
+
+    As a performance optimization, implementations MUST also implement a `CallRemoteMulti` message type which provide a workflow to send the same `CallRemote` message to multiple remote cells in parallel. This message type differs in these ways:
+
+    * The `signature` field is removed.
+    * The `to_agent` field is replaced with a `to_agents: Vec<(Signature, AgentPubKey)>`, wherein each signature is valid for a serialized `ZomeCallUnsigned` struct with the given `AgentPubKe` in the `to_agent` field.
+
+    Implementations MUST respond with the function call's return value, if the function call was allowed and successful, or an error.
+
+    Implementations SHOULD terminate function execution on the remote node if it has exhausted an execution cost limit, to prevent denial-of-service attacks against the receiver.
+
+*   ```rust
     ValidationReceipts {
         receipts: Vec<SignedValidationReceipt>,
-    },
+    }
+    ```
+
+    Send validation receipts to the node that authored the DHT operations to which the receipts apply, as a result of integrating published operations. The receipt is defined as:
+
+        ```rust
+        struct SignedValidationReceipt {
+            receipt: ValidationReceipt,
+            // Because multiple agents on the remote node
+            // may claim authority for the same DHT basis hash,
+            // this field MUST be plural.
+            validators_signatures: Vec<Signature>,
+        }
+
+        struct ValidationReceipt {
+            // The hash of the DHT operation to which this receipt applies.
+            dht_op_hash: DhtOpHash,
+            // The result of validating the operation.
+            validation_status: ValidationStatus,
+            // The remote agents who have validated the operation.
+            // As with `validators_signatures` above,
+            // this field MUST be plural.
+            validators: Vec<AgentPubKey>,
+            // The time when the operation was integrated.
+            when_integrated: Timestamp,
+        }
+        ```
+
+*   ```rust
     Get {
         dht_hash: AnyDhtHash,
         options: GetOptions,
-    },
+    }
+    ```
+
+    Request addressable content and/or metadata stored at the basis hash. At the receiver side, implementations MUST return only integrated data unless pending data has been requested. The `options` field is defined as:
+
+    ```rust
+    struct GetOptions {
+        request_type: GetRequest,
+    }
+
+    enum GetRequest {
+        // Get integrated content and metadata.
+        All,
+        // Get only addressable content.
+        Content,
+        // Get only metadata.
+        Metadata,
+        // Get content even if it hasn't been integrated.
+        Pending,
+    }
+    ```
+
+*   ```rust
     GetMeta {
         dht_hash: AnyDhtHash,
-        options: GetMetaOptions,
-    },
+    }
+    ```
+
+    Request all metadata stored at the given basis hash.
+
+*   ```rust
     GetLinks {
-        link_key: WireLinkKey,
-        options: GetLinksOptions,
-    },
+        query: WireLinkQuery,
+    }
+    ```
+
+    Request link creation and deletion actions stored at the basis hash, optionally filtered by a query predicate defined as:
+
+    ```rust
+    struct WireLinkQuery {
+        base: AnyLinkableHash,
+        link_type: LinkTypeFilter,
+        tag_prefix: Option<LinkTag>,
+        before: Option<Timestamp>,
+        after: Option<Timestamp>,
+        author: Option<AgentPubKey>,
+    }
+
+    enum LinkTypeFilter {
+        Types(Vec<(ZomeIndex, Vec<LinkType>)>),
+        Dependencies(Vec<ZomeIndex>),
+    }
+    ```
+
+*   ```rust
     CountLinks {
         query: WireLinkQuery,
-    },
+    }
+    ```
+
+    Request only the count of _live_ link creation actions, optionally filtered by the query predicate.
+
+*   ```rust
     GetAgentActivity {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
-    },
+    }
+    ```
+
+    Request information about the given agent's activity, optionally filtered by the given predicate, which is defined above in the HDK section, and including or excluding data specified by the options defined as:
+
+        ```rust
+        struct GetActivityOptions {
+            // Include the agent activity actions in the response.
+            include_valid_activity: bool,
+            // Also include any rejected actions in the response.
+            include_rejected_activity: bool,
+            // Include warrants in the response.
+            include_warrants: bool,
+            // Include the full signed actions and hashes in the response
+            // instead of just the hashes.
+            include_full_actions: bool,
+        }
+        ```
+
+*   ```rust
     MustGetAgentActivity {
         agent: AgentPubKey,
         filter: ChainFilter,
-    },
+    }
+    ```
+
+    Request a contiguous sequence of agent activity actions for the given agent, bounded by the specified filter, which is defined above in the HDK section.
+
+*   ```rust
     CountersigningSessionNegotiation {
         message: CountersigningSessionNegotiationMessage,
-    },
+    }
+    ```
+
+    Negotiate a step in the countersigning process. The message payload is defined as:
+
+    ```rust
+    enum CountersigningSessionNegotiationMessage {
+        // Sent by a `StoreEntry` authority or enzyme after they have collected signed actions from all counterparties; the author (the receiver of the message) may now safely proceed to commit their own countersigning entry creation action.
+        AuthorityResponse(Vec<SignedAction>),
+        // Sent by a counterparty to the designated enzyme when they have determined that the countersigned entry creation action is valid from the perspective of all counterparties and they intend to commit their own entry creation action once they have received all signatures from the enzyme. The DhtOp payload is a `StoreEntry`.
+        EnzymePush(DhtOp),
+    }
+    ```
+
+*   ```rust
     PublishCountersign {
-        flag: bool,
+        is_action_author: bool,
         op: DhtOp,
-    },
-}
+    }
+    ```
 
-struct GetOptions {
-    // Unimplemented
-    follow_redirects: bool,
-    // Unimplemented
-    all_live_actions_with_metadata: bool,
-    request_type: GetRequest,
-}
+    Publish a countersigned DHT operation to a DHT authority. This happens in two steps:
 
-enum GetRequest {
-    // Get integrated content and metadata
-    All,
-    Content,
-    Metadata,
-    // Get content even if it hasn't been integrated
-    Pending,
-}
-
-struct GetMetaOptions {}
-
-// [WP-TODO: One of the following structs obviously shouldn't exist. Can we simplify to the spec that _should_ be?]
-
-// Query terms for GetLinks.
-struct WireLinkKey {
-    base: AnyLinkableHash,
-    type_query: LinkTypeFilter,
-    tag: Option<LinkTag>,
-    after: Option<Timestamp>,
-    before: Option<Timestamp>,
-    author: Option<AgentPubKey>,
-}
-
-struct WireLinkQuery {
-    base: AnyLinkableHash,
-    link_type: LinkTypeFilter,
-    tag_prefix: Option<LinkTag>,
-    before: Option<Timestamp>,
-    after: Option<Timestamp>,
-    author: Option<AgentPubKey>,
-}
-
-enum LinkTypeFilter {
-    Types(Vec<(ZomeIndex, Vec<LinkType>)>),
-    Dependencies(Vec<ZomeIndex>),
-}
-
-struct GetLinksOptions {}
-
-enum CountersigningSessionNegotiationMessage {
-    AuthorityResponse(Vec<SignedAction>),
-    EnzymePush(DhtOp),
-}
-```
+    1. When a counterparty has received preflight acceptances from all participating counterparties, and the countersigning session is not being managed by an enzyme, they proceed to register their intent to commit the countersigned entry creation action by publishing the `StoreEntry` operation with the `is_action_author` flag set to `true`. In this scenario, the authority is acting as a reliable witness to all counterparties' signatures and MUST send a `CountersigningSessionNegotiation(CountersigningSessionNegotiationMessage::AuthorityResponse)` message to all counterparties if, from their perspective, all operations have been received within the session time window.
+    2. When a counterparty has received all signed actions from all other participating counterparties, they publish a `RegisterAgentActivity` operation for each of their counterparties' signed actions with the `is_action_author` flag set to `false`. Note that the DHT operation is signed by the counterparty sending the message, while the enclosed action is signed by the counterparty that authored the action. Also note that this MUST also be accompanied by regular `Publish` messages for the DHT operations produced from this counterparty's entry creation action.
 
 ### Low Level Networking (Kitsune P2P)
 
@@ -1693,213 +1830,260 @@ Kitsune has two message classes:
 
 Messages of both of these classes are sent asynchronously; Request is simply a pattern of pairing two messages by means of a nonce.
 
-These are the message types that Kitsune uses:
+These are the message types that MUST be implemented. They are all defined as variants of a `Wire` enum, which are serialized and sent via the network transport layer.
 
-[WP-TODO: Make this into a nice bullet list like some of the sections above, with each bullet introducing the types it deals in]
-
-```rust
-enum Wire {
-    // Notify a peer of failure, as a response to a received message that couldn't be handled.
+*   ```rust
     Failure {
         reason: String,
-    },
+    }
+    ```
 
-    // Call a function on a remote peer.
+    Notify a peer of failure, as a response to a received message that couldn't be handled.
+
+*   ```rust
     Call {
         space: KitsuneSpace,
         to_agent: KitsuneAgent,
         data: Vec<u8>,
-    },
+    }
+    ```
 
-    // Respond to a `Call` message.
+    Make a remote procedure call (RPC) to a remote peer. The `space` and `to_agent` arguments hold space and agent IDs, which are mapped at the Holochain layer to DNA hash and agent public key, and are defined as:
+
+    ```rust
+        // Represents a space ID.
+    struct KitsuneSpace(Vec<u8>);
+
+    // Represents an agent public key.
+    struct KitsuneAgent(Vec<u8>);
+    ```
+
+    The `data` argument holds the input that will be passed to the remote function.
+
+*   ```rust
     CallResp {
         data: Vec<u8>,
-    },
+    }
+    ```
 
-    // Broadcast a message using Notify.
+    Respond to a `Call` message with the output of the called function.
+
+*   ```rust
     Broadcast {
         space: KitsuneSpace,
         to_agent: KitsuneAgent,
         data: BroadcastData,
-    },
+    }
+    ```
 
-    // Broadcast a message to peers covering a basis hash,
-    // requesting receivers broadcast to peers in the same neighborhood.
+    Broadcast a message using Notify. The `data` argument is defined as:
+
+    ```rust
+    enum BroadcastData {
+        // Broadcast arbitrary data.
+        User(Vec<u8>),
+        // Broadcast one's own agent info.
+        AgentInfo(AgentInfoSigned),
+        // Announce that one or more DHT transforms have been published for
+        // which the receiver is believed to be an authority; it is expected
+        // that they will follow up by sending `FetchOp` messages to request the
+        // transforms.
+        // Because the remote node may claim authority for a range of basis hashes, multiple operations MUST be permitted to be announced in one message.
+        Publish {
+            source: KitsuneAgent,
+            op_hash_list: Vec<RoughSized<KitsuneOpHash>>,
+            context: FetchContext,
+        },
+    }
+
+    struct AgentInfoSigned {
+        space: KitsuneSpace,
+        agent: KitsuneAgent,
+        storage_arq: Arq,
+        url_list: Vec<url2::Url2>,
+        signed_at_ms: u64,
+        expires_at_ms: u64,
+        signature: KitsuneSignature,
+        encoded_bytes: [u8],
+    }
+
+    // Description of a network location arc over which an agent claims authority.
+    struct Arq {
+        start: DhtLocation,
+        // The size of chunks for this arc, as 2^power * 4096.
+        power: u8,
+        // The number of chunks in this arc.
+        // Hence, the arc size in terms of is power * count.
+        count: u32,
+    }
+
+    // Network locations wrap at the bounds of u32.
+    struct DhtLocation(Wrapping<u32>);
+
+    // Represents a public key signature.
+    struct KitsuneSignature(Vec<u8>);
+
+    // Convey the rough size of the data behind a hash.
+    struct RoughSized<T> {
+        // The hash of the data to be rough-sized.
+        data: T,
+        // The approximate size of the data.
+        size: Option<RoughInt>,
+    }
+
+    // Positive numbers are an exact size; negative numbers represent a
+    // size of roughly -x * 4096.
+    struct RoughInt(i16);
+
+    // Represents a DHT transform hash.
+    struct KitsuneOpHash(Vec<u8>);
+
+    // Arbitrary context identifier.
+    struct FetchContext(u32);
+    ```
+
+*   ```rust
     DelegateBroadcast {
         space: KitsuneSpace,
         basis: KitsuneBasis,
         to_agent: KitsuneAgent,
-        // The following fields define the scope of the broadcast.
-        // Receivers modulo the network locations of candidate
-        // authorities in their peer tables by `mod_cnt`, only
-        // re-broadcasting if the modulo matches `mod_idx`.
-        // This avoids two nodes sending the same broadcast message
-        // to the same authority.
         mod_idx: u32,
         mod_cnt: u32,
         data: BroadcastData,
     }
+    ```
 
-    // Negotiate gossip, with an opaque data block to be interpreted
-    // by a gossip implementation. Uses Notify.
+    Broadcast a message to peers covering a basis hash, requesting receivers broadcast to peers in the same neighborhood. The `mod_cnt` and `mod_idx` fields fields define the scope of the broadcast. Receivers MUST modulo the network locations of candidate authorities in their own peer tables by `mod_cnt`, only re-broadcasting to a peer if the modulo matches `mod_idx`. This avoids two nodes sending the same broadcast message to the same peer. The `basis` argument represents the basis hash to target, and is defined as:
+
+    ```rust
+    struct KitsuneBasis(Vec<u8>);
+    ```
+
+    The `data` argument is the data to be psased on to the neighborhood, and is defined above.
+
+*   ```rust
     Gossip {
         space: KitsuneSpace,
         data: Vec<u8>,
         module: GossipModuleType,
-    },
+    }
+    ```
 
-    // Ask a remote node if they know about a specific agent.
+    Negotiate gossiping of DHT transforms, with an opaque data block to be interpreted by a gossip implementation. Uses Notify. Kitsune handles gossip per Space (which maps to a DNA at the higher Holochain layer) rather than a cell. The `module` argument specifies the gossip implementation being used. The currently implemented modules are:
+
+    ```rust
+    enum GossipModuleType {
+        // Recent gossip deals with DHT data with a recent timestamp.
+        ShardedRecent,
+        // Historical gossip deals with data whose timestamp is older than the recent gossip threshold.
+        ShardedHistorical,
+    }
+    ```
+
+    The message types that appear in the `data` argument are documented in the following section on [Gossip](#gossip).
+
+*   ```rust
     PeerGet {
         space: KitsuneSpace,
         agent: KitsuneAgent,
-    },
+    }
+    ```
 
-    // Respond to a `PeerGet` with information about the agent.
+    Ask a remote node if they know about a specific agent.
+
+*   ```rust
     PeerGetResp {
         agent_info_signed: AgentInfoSigned,
-    },
+    }
+    ```
 
-    // Query a remote node for peers holding
-    // or nearest to holding a u32 network location.
+    Respond to a `PeerGet` with information about the requested agent. The `agent_info_signed` field is defined above under `Broadcast`.
+
+*   ```rust
     PeerQuery {
         space: KitsuneSpace,
         basis_loc: DhtLocation,
-    },
+    }
+    ```
 
-    // Respond to a `PeerQuery`.
+    Query a remote node for peers holding or nearest to holding a `u32` network location.
+
+*   ```rust
     PeerQueryResp {
         peer_list: Vec<AgentInfoSigned>,
-    },
+    }
+    ```
 
-    // Nodes can just send peer info without prompting.
-    // Notably, they may want to send their own peer info to prevent being
-    // inadvertantly blocked.
+    Respond to a `PeerQuery`.
+
+*   ```rust
     PeerUnsolicited {
-        peer_list.0: Vec<AgentInfoSigned>,
-    },
+        peer_list: Vec<AgentInfoSigned>,
+    }
+    ```
 
-    // Request the data for one or more DHT operations for one or
-    // more network spaces.
-    // While a response in the form of `PushOpData` is expected,
-    // this uses Notify rather than Request.
+    Send peer information without being asked to. Notably, a node may want to send their own peer info to prevent being inadvertantly blocked.
+
+*   ```rust
     FetchOp {
         fetch_list: Vec<(KitsuneSpace, Vec<FetchKey>)>,
-    },
+    }
+    ```
 
-    // Send requested DHT operation data in response to `FetchOp`.
+    Request DHT transform data which a node claims to hold. This and its counterpart response `PushOpData` transfer the actual data which is validated and integrated at basis hashes for which a node is an authority. As an optimization, a node can request data for multiple Spaces which they believe the remote node has in common with them. The `FetchKey` type is defined as:
+
+    ```rust
+    enum FetchKey {
+        Op(KitsuneOpHash),
+    }
+    ```
+
+*   ```rust
     PushOpData {
         op_data_list: Vec<(KitsuneSpace, Vec<PushOpItem>)>,
-    },
+    }
+    ```
 
-    // Exchange availability information about one or more peers.
+    Send requested DHT operation data in response to `FetchOp`. The `PushOpItem` type is defined as:
+
+    ```rust
+    struct PushOpItem {
+        op_data: Vec<u8>,
+        region: Option<(RegionCoords, bool)>,
+    }
+
+    struct RegionCoords {
+        space: Segment,
+        time: Segment,
+    }
+
+    struct Segment {
+        power: u8,
+        offset: u32,
+    }
+    ```
+
+*   ```rust
     MetricExchange {
         space: KitsuneSpace,
         msgs: Vec<MetricExchangeMsg>,
-    },
-}
+    }
+    ```
 
-// Represents a space ID.
-struct KitsuneSpace(Vec<u8>);
+    Exchange availability information about one or more peers. Implementations SHOULD use this data to rebalance the arc of DHT basis hashes for which they claim authority, in order to ensure adequate availability for all basis hashes. The `MetricExchangeMsg` type is defined as:
 
-// Represents an agent public key.
-struct KitsuneAgent(Vec<u8>);
-
-enum BroadcastData {
-    // Broadcast arbitrary data.
-    User(Vec<u8>),
-    AgentInfo(AgentInfoSigned),
-    Publish {
-        source: KitsuneAgent,
-        op_hash_list: Vec<RoughSized<KitsuneOpHash>>,
-        context: FetchContext,
-    },
-}
-
-struct AgentInfoSigned {
-    space: KitsuneSpace,
-    agent: KitsuneAgent,
-    storage_arq: Arq,
-    url_list: Vec<url2::Url2>,
-    signed_at_ms: u64,
-    expires_at_ms: u64,
-    signature: KitsuneSignature,
-    encoded_bytes: [u8],
-}
-
-// Description of a network location arc over which an agent claims authority.
-struct Arq {
-    start: DhtLocation,
-    // The size of chunks for this arc, as 2^power * 4096.
-    power: u8,
-    // The number of chunks in this arc.
-    // Hence, the arc size in terms of is power * count.
-    count: u32,
-}
-
-// Network locations wrap at the bounds of u32.
-struct DhtLocation(Wrapping<u32>);
-
-// Represents a public key signature.
-struct KitsuneSignature(Vec<u8>);
-
-// Represents a DHT operation hash.
-struct KitsuneOpHash(Vec<u8>);
-
-// Arbitrary context identifier.
-struct FetchContext(u32);
-
-// Convey the rough size of the data behind a hash.
-struct RoughSized<T> {
-    // The hash of the data to be rough-sized.
-    data: T,
-    // The approximate size of the data.
-    size: Option<RoughInt>,
-}
-
-// Positive numbers are an exact size; negative numbers represent a
-// size of roughly -x * 4096.
-struct RoughInt(i16);
-
-// Represents a basis hash.
-struct KitsuneBasis(Vec<u8>);
-
-enum GossipModuleType {
-    // Recent gossip deals with DHT data with a recent timestamp.
-    ShardedRecent,
-    // Historical gossip deals with data whose timestamp is older than the recent gossip threshold.
-    ShardedHistorical,
-}
-
-enum FetchKey {
-    Op(KitsuneOpHash),
-}
-
-struct PushOpItem {
-    op_data: Vec<u8>,
-    region: Option<(RegionCoords, bool)>,
-}
-
-struct RegionCoords {
-    space: Segment,
-    time: Segment,
-}
-
-struct Segment {
-    power: u8,
-    offset: u32,
-}
-
-enum MetricExchangeMsg {
-    V1UniBlast {
-        extrap_cov_f32_le: Vec<u8>,
-    },
-    UnknownMessage,
-}
-```
+    ```rust
+    enum MetricExchangeMsg {
+        V1UniBlast {
+            extrap_cov_f32_le: Vec<u8>,
+        },
+        UnknownMessage,
+    }
+    ```
 
 #### Gossip
 
-Kitsune MUST provide a way for the DHT data to be gossiped among peers in a space. We assume that there will be many gossip implementations that are added over time. We have implemented a novel "quantized gossip" algorithm that effeciently shards and redistributes data as nodes come and go on the network. The full description of that gossip algorithm is beyond the scope of this document and details on this algorithim can be found here: [WP-TODO: ACB link?].
+Kitsune MUST provide a way for the DHT data to be gossiped among peers in a space. We assume that there will be many gossip implementations that are added over time.
 
 Any gossip algorithm to be used in the Holochain context MUST be able to handle the following constraints:
 
@@ -1907,6 +2091,19 @@ Any gossip algorithm to be used in the Holochain context MUST be able to handle 
 2. Gossiping SHOULD minimize total consumed bandwith, i.e., by re-transmitting as little data as possible.
 3. Gossip SHOULD prioritize the synchronization of data that is more likely to be in demand; for many common application scenarios, this means that more recently published data should be synchronized sooner and more frequently.
 4. ... [WP-TODO what should go here?]
+
+We have developed a hybrid gossip implementation that separates DHT transforms into "recent" and "historical", with recent gossip using a Bloom filter and historical gossip using a novel "quantized gossip" algorithm that effeciently shards and redistributes data as nodes come and go on the network. While the full description of that implementation is beyond the scope of this document, we will document the messages that nodes pass:
+
+* **Initiate** proposes a gossip round specifying one or more arcs of the location space for which the initiator is an authority. A gossip round can cover more than one agents on the initiator's device.
+* **Accept** is a response to an **Initiate**, containing the arcs for which the agents on the acceptor's device is an authority. Note that the gossip round, as it goes forward, will concern network locations that are the _set intersection_ of all the network locations covered by all the arcs of both the initiator and the acceptor.
+* **Agents** contains a Bloom filter of the public keys of all the agents for which a peer is storing AgentInfo data. The recipient is expected to compare this value against the value for their own held AgentInfo data, and supply the AgentInfos which the sender appears to be missing.
+* **MissingAgents** is a response to **Agents**, supplying the AgentInfos for all the agents that did not appear to be included in the Bloom filter. This completes synchronization of the peer tables of two peers.
+* **OpBloom** contains a Bloom filter of the hashes of all the _recent_ DHT operations which a peer is holding. As with **Agents**, the recipient compares this value with their own held recent DHT operations and supplies the hashes of DHT operations which the sender appears to be missing via the **MissingOpHashes** payload. This exchange is repeated until both peers' Bloom filter values match.
+* **OpRegions** contains a map of quantized region coordinates to XOR fingerprints of the set of DHT operations the sender is holding for that region. Its purpose is to quickly communicate information about the infrequently changing set of _historical_ DHT operations which the sender holds for comparison and synchronization. The recipient is expected to send the DHT operation hashes for all mismatched regions via **MissingOpHashes**.
+* **MissingOpHashes** responds to an **OpBloom** with a list of DHT operation hashes which don't match the sender's Bloom filter. If the list is large, it can be chunked into multiple messages, and a **finished** property in each message indicates whether more chunks will be sent. After this, the recipient of this message is expected to retrieve DHT operation data from the sender, not via gossip but via the via **FetchOp** notify message.
+* **Error**, **Busy**, **NoAgents**, and **AlreadyInProgress** are sent by the receiver of a gossip message if they're unable to satisfy the sender's request for the specified reason.
+
+Further details on this algorithim can be found here: [WP-TODO: ACB link?].
 
 ## The Conductor
 
@@ -2583,17 +2780,6 @@ enum ExternalApiWireError {
             // Implementations MUST reject a zome call made with a timestamp that
             expires_at: Timestamp,
         }
-
-        struct ZomeCallUnsigned {
-            provenance: AgentPubKey,
-            cell_id: CellId,
-            zome_name: ZomeName,
-            fn_name: FunctionName,
-            cap_secret: Option<CapSecret>,
-            payload: ExternIO,
-            nonce: Nonce256Bits,
-            expires_at: Timestamp,
-        }
         ```
 
         The `payload` property is a MsgPack-encoded data structure provided to the zome function. This structure MUST be matched against the parameter defined by the zome function, and the zome function MUST return a serialization error if it fails.
@@ -2700,16 +2886,3 @@ enum ExternalApiWireError {
 * `EnableApp -> Ok`: Enable an app which has been awaiting, and has received, deferred membrane proofs.
     * **Notes**: If the app is awaiting deferred membrane proofs, implementations MUST NOT allow an app to be enabled until the membrane proofs has been provided.
     * **Return value**: If this call is attempted on an already running app or an app that is still awaiting membrane proofs, implementations MUST return `AppResponse::Error` with an informative message.
-
-## Secure Private Key Management (lair-keystore)
-
-Holochain implementations MUST provide a secure way to create, manage and use public/private key pairs, as well as store them encrypted at rest. Implementations MAY vary how the Conductor connects to the keystore (e.g., including in the same process or communicating over a secure channel). The full specification of key the keystore API is beyond the scope of this document; see https://github.com/holochain/lair for our full implementation. However, we note that the API MUST be sufficient to service the following calls via the HDK and Conductor API:
-
-* `CreateKeyPair() -> PubKey`
-* `RegisterKeyPair(PrivKey, PubKey)`
-* `Sign(Vec<u8>, PubKey) -> Vec<u8>`
-* `VerifySignature(Vec<u8>, PubKey) -> bool`
-* `Encrypt(Vec<u8>, PubKey) -> Vec<u8>`
-* `Decrypt(Vec<u8>, PubKey) -> Vec<u8>`
-
-[WP-TODO: ACB]
