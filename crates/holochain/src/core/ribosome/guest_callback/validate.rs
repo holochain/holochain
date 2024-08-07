@@ -1,3 +1,4 @@
+use crate::conductor::api::DpkiApi;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
@@ -34,6 +35,7 @@ impl ValidateInvocation {
 pub struct ValidateHostAccess {
     pub workspace: HostFnWorkspaceRead,
     pub network: GenericNetwork,
+    pub dpki: DpkiApi,
     pub is_inline: bool,
 }
 

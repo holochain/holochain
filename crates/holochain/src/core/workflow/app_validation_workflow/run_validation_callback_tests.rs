@@ -87,6 +87,7 @@ async fn validation_callback_must_get_action() {
 
     let network = Arc::new(fixt!(HolochainP2pDna));
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let dpki = None;
 
     // a create by alice
     let mut create = fixt!(Create);
@@ -116,6 +117,7 @@ async fn validation_callback_must_get_action() {
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        dpki.clone(),
         false, // is_inline
     )
     .await
@@ -137,6 +139,7 @@ async fn validation_callback_must_get_action() {
         workspace,
         network,
         validation_dependencies.clone(),
+        dpki,
         false, // is_inline
     )
     .await
@@ -221,6 +224,7 @@ async fn validation_callback_awaiting_deps_hashes() {
 
     let network = Arc::new(network);
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let dpki = None;
 
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback(
@@ -230,6 +234,7 @@ async fn validation_callback_awaiting_deps_hashes() {
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        dpki.clone(),
         false, // is_inline
     )
     .await
@@ -252,6 +257,7 @@ async fn validation_callback_awaiting_deps_hashes() {
         workspace,
         network,
         validation_dependencies.clone(),
+        dpki,
         false, // is_inline
     )
     .await
@@ -366,6 +372,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     let network = Arc::new(network);
 
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let dpki = None;
 
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback(
@@ -375,6 +382,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        dpki.clone(),
         false, // is_inline
     )
     .await
@@ -400,6 +408,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         workspace,
         network,
         validation_dependencies.clone(),
+        dpki,
         false, // is_inline
     )
     .await
@@ -493,6 +502,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
     let network = Arc::new(network);
 
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let dpki = None;
 
     // run two op validations that depend on the same record in parallel
     let _validate_1 = run_validation_callback(
@@ -502,6 +512,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        dpki.clone(),
         false, // is_inline
     )
     .await;
@@ -530,6 +541,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
         workspace,
         network,
         validation_dependencies.clone(),
+        dpki,
         false, // is_inline
     )
     .await;
@@ -645,6 +657,7 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     let network = Arc::new(network);
 
     let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let dpki = None;
 
     // run two op validations that depend on the same record
     let _validate_1 = run_validation_callback(
@@ -654,6 +667,7 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        dpki.clone(),
         false, // is_inline
     )
     .await;
@@ -664,6 +678,7 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
         workspace,
         network,
         validation_dependencies.clone(),
+        dpki,
         false, // is_inline
     )
     .await;
@@ -790,6 +805,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
 
     // validate update op will not be able to validate due to missing original create action
     let invocation = ValidateInvocation::new(zomes_to_invoke.clone(), &update_action_op).unwrap();
+    let dpki = None;
     let _ = run_validation_callback(
         invocation.clone(),
         &update_dht_op_hash,
@@ -797,6 +813,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        dpki.clone(),
         false, // is_inline
     )
     .await
@@ -827,6 +844,7 @@ async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
         workspace.clone(),
         network.clone(),
         validation_dependencies.clone(),
+        dpki,
         false, // is_inline
     )
     .await

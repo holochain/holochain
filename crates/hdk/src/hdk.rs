@@ -278,6 +278,10 @@ impl HdiT for ErrHdk {
         Self::err()
     }
 
+    fn is_same_agent(&self, _: AgentPubKey, _: AgentPubKey) -> ExternResult<bool> {
+        Self::err()
+    }
+
     fn dna_info(&self, _dna_info_input: ()) -> ExternResult<DnaInfo> {
         Self::err()
     }
@@ -525,6 +529,9 @@ impl HdiT for HostHdk {
     }
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
         HostHdi::new().zome_info(())
+    }
+    fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool> {
+        HostHdi::new().is_same_agent(key_1, key_2)
     }
     fn trace(&self, m: TraceMsg) -> ExternResult<()> {
         HostHdi::new().trace(m)

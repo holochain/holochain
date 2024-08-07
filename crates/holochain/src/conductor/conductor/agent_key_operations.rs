@@ -1,3 +1,5 @@
+//! Tests related to key revocation are located under [tests/agent_key_revocation](tests).
+
 use holochain_types::deepkey_roundtrip_backward;
 
 use super::*;
