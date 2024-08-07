@@ -2916,7 +2916,7 @@ dependencies = [
  "kitsune_p2p_dht_arc 0.4.0-dev.6",
  "must_future",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "serde",
  "serde_bytes",
  "thiserror",
@@ -3228,9 +3228,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_deepkey_dna"
-version = "0.0.6-dev.7"
+version = "0.0.7-dev.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfbdb24ef30ed6bd30bbe7d6adb0f221a6ccc5f3d6f6c0afdb4115f5928cbb8c"
+checksum = "c4666909257e698333a451dc86e66aa3fd7ce4f302c16a731ce15a32dd7eea3d"
 dependencies = [
  "hc_deepkey_sdk",
 ]
@@ -3263,7 +3263,7 @@ dependencies = [
  "holochain_util 0.4.0-dev.1",
  "kitsune_p2p_timestamp 0.4.0-dev.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "serde",
  "serde_bytes",
  "subtle",
@@ -3605,7 +3605,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3776,7 +3776,7 @@ dependencies = [
  "num_enum",
  "once_cell",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -4485,7 +4485,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "rand 0.8.5",
  "sbd-server",
  "serde",
@@ -4738,7 +4738,7 @@ dependencies = [
  "chrono",
  "once_cell",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "rand 0.8.5",
  "serde",
 ]
