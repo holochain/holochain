@@ -58,20 +58,21 @@ The following are common use cases for countersigning; for a detailed technical 
 
 Holochain's architecture is specifically designed to maintain resilience and performance as both the number of users and interactions increase. Key factors contributing to its scaling capabilities include:
 
-* **Agent-centric approach:** Unlike traditional blockchain systems, which require global consensus before progressing, Holochain adopts an agent-centric approach where changes made to an agent's state become authoritative once stored on their chain, signed, and communicated to others via the DHT. As a result, agents are able to initiate actions without delay and in parallel to other agents initiating their own actions.
+1. **Agent-centric approach:** Unlike traditional blockchain systems, which require global consensus before progressing, Holochain adopts an agent-centric approach where changes made to an agent's state become authoritative once stored on their chain, signed, and communicated to others via the DHT. As a result, agents are able to initiate actions without delay and in parallel to other agents initiating their own actions.
 
-1. **Bottleneck-Free Sharded DHT:** Holochain's DHT is sharded, meaning that each node only stores a fraction of the total data, reducing the storage and computational requirements for each participant. At the same time, the storage of content with agents whose public key is "near" the hash of each Action or Entry, in combination with the use of Linking metadata attached to such hashes, transforms the DHT into a graphing DHT in which data discovery is simple in spite of the sparseness of the address space. When the agents responsible for validating a particular state change receive an authoring agent's proposed state change, they are able to:
+2. **Bottleneck-Free Sharded DHT:** Holochain's DHT is sharded, meaning that each node only stores a fraction of the total data, reducing the storage and computational requirements for each participant. At the same time, the storage of content with agents whose public key is "near" the hash of each Action or Entry, in combination with the use of Linking metadata attached to such hashes, transforms the DHT into a graphing DHT in which data discovery is simple in spite of the sparseness of the address space. When the agents responsible for validating a particular state change receive an authoring agent's proposed state change, they are able to:
 
     1. Request information from others in the DHT regarding the prior state of the authoring agent (where relevant), and
+
     2. Make use of their own copy of the app's validation rules to deterministically validate the change.
 
     While that agent and its validating peers are engaged with the creation and validation of a particular change to the state of the authors chain, in parallel, other agents are able to author state changes to their own chain and have these validated by the validating peers for each of those changes.  This bottle-neck free architecture allows users to continue interacting with the system without waiting for global agreement.
 
     With singular actions by any particular agent (and the validation of those actions by a small number of other agents) able to occur simultaneous with singular actions by other agents as well as countersigned actions by particular groups of agents. The network is not updating state globally (as blockchains typically do) but is instead creating, validating, storing and serving changes of the state of particular agents in parallel.
 
-2. **Multiple networks**: In Holochain, each application (DNA) operates on its own independent network, effectively isolating the performance of individual apps. This prevents a high-traffic, data-heavy, or processing-heavy app from affecting the performance of other lighter apps within the ecosystem. Participants are able to decide for themselves which applications they want to participate in.
+3. **Multiple networks**: In Holochain, each application (DNA) operates on its own independent network, effectively isolating the performance of individual apps. This prevents a high-traffic, data-heavy, or processing-heavy app from affecting the performance of other lighter apps within the ecosystem. Participants are able to decide for themselves which applications they want to participate in.
 
-3. **Order of Complexity**: "Big O" notation is usually only applied to local computation based on handling `n` number of inputs. However, we may consider a new type of O-notation for decentralized systems which includes two inputs, `n` as the number transactions/inputs/actions, and `m` as the number of nodes/peers/agents/users, as a way of expressing the time complexity for both an individual node and for the aggregate power of the entire network of nodes. Most blockchains are some variant of $\mathcal{O}(n^2*m)$ in their order of complexity. Every node must gossip and validate all state changes. However, Holochain retains a constant $\mathcal{O}(\frac{log(n)}{m})$ complexity for any network larger than a given size $R$, where $R$ is the sharding threshold. As the number of nodes in the network grows, each node performs a static workload irrespective of network size; or expressed inversely, a smaller portion of the total network workload.
+4. **Order of Complexity**: "Big O" notation is usually only applied to local computation based on handling `n` number of inputs. However, we may consider a new type of O-notation for decentralized systems which includes two inputs, `n` as the number transactions/inputs/actions, and `m` as the number of nodes/peers/agents/users, as a way of expressing the time complexity for both an individual node and for the aggregate power of the entire network of nodes. Most blockchains are some variant of $\mathcal{O}(n^2*m)$ in their order of complexity. Every node must gossip and validate all state changes. However, Holochain retains a constant $\mathcal{O}(\frac{log(n)}{m})$ complexity for any network larger than a given size $R$, where $R$ is the sharding threshold. As the number of nodes in the network grows, each node performs a static workload irrespective of network size; or expressed inversely, a smaller portion of the total network workload.
 
 ### Shared-state Finality
 
@@ -85,11 +86,11 @@ Many factors contribute to a system's ability to live up to the varying safety a
 
 1. Gating access to functions that change local state, for which Holochain provides a unified and flexible Object Capabilities model
 
-2.  Detecting and blocking participation of bad actors, including attempts to flood a DHT with otherwise valid data, for which Holochain provides the affordances of validation and warranting.
+2. Detecting and blocking participation of bad actors, including attempts to flood a DHT with otherwise valid data, for which Holochain provides the affordances of validation and warranting.
 
-3.  Protection from attack categories
+3. Protection from attack categories
 
-4.  Resilience to human error
+4. Resilience to human error
 
 ### Gating Access via Cryptographic Object Capabilities
 
@@ -99,13 +100,13 @@ To use a Holochain application, end-users must trigger Zome Calls that effect lo
 
 Access is thus mediated by Capability Grants of four types:
 
--   **Author**: only the agent owning the source change can make the zome call
+* **Author**: only the agent owning the source change can make the zome call
 
--   **Assigned**: only the specified public key holders can make the zome call, as verified by a signature on the function call payload
+* **Assigned**: only the specified public key holders can make the zome call, as verified by a signature on the function call payload
 
--   **Transferrable**: anybody with the given secret can make the zome call
+* **Transferrable**: anybody with the given secret can make the zome call
 
--   **Unrestricted**: anybody can make the zome call (no secret nor proof of authorized key needed to use this capability)
+* **Unrestricted**: anybody can make the zome call (no secret nor proof of authorized key needed to use this capability)
 
 All zome calls must be signed and also take a required capability claim parameter that MUST be checked by the system for making the call. Agents record capability grants on their source chains and distribute their corresponding secrets as applicable according to the application's needs. Receivers of secrets can record them as private capability claim entries on their chains for later lookup and use. The "agent" type grant is just the agent's public key.
 
@@ -123,11 +124,7 @@ For even stricter situations, apps can achieve a "0 of N" trust model, where no 
 
 #### Consensus​ ​Attacks
 
-This whole category of attack starts from the assumption that consensus is required for distributed systems. Because Holochain doesn't start from that assumption, the attack category really doesn't apply, but it's worth mentioning because there​ ​are​ ​a​ ​number​ ​of​ ​attacks​ ​on​
-​blockchain​ ​which​ threaten confidence in the reliability of the chain data through collusion between some majority of nodes. ​The​ ​usual thinking​ ​is​ ​that​ ​it​ ​takes​ ​a​ ​large​ ​number​ ​of​ ​nodes
-​and​ ​massive​ ​amounts​ ​of​ ​computing​ ​power or financial incentives​ ​to prevent​ ​undue​ ​hijacking​ ​of​ ​consensus.​
-​However,​ ​since​ ​Holochain's data coherence doesn't derive from all nodes awaiting consensus,​ ​but​ rather ​on​ deterministic validation, nobody​ ​ever​ ​needs​ ​to​ ​trust​ ​a​ ​consensus​ ​lottery.​ ​
-
+This whole category of attack starts from the assumption that consensus is required for distributed systems. Because Holochain doesn't start from that assumption, the attack category really doesn't apply, but it's worth mentioning because there​ ​are​ ​a​ ​number​ ​of​ ​attacks​ ​on​ ​blockchain​ ​which​ threaten confidence in the reliability of the chain data through collusion between some majority of nodes. ​The​ ​usual thinking​ ​is​ ​that​ ​it​ ​takes​ ​a​ ​large​ ​number​ ​of​ ​nodes ​and​ ​massive​ ​amounts​ ​of​ ​computing​ ​power or financial incentives​ ​to prevent​ ​undue​ ​hijacking​ ​of​ ​consensus.​ ​However,​ ​since​ ​Holochain's data coherence doesn't derive from all nodes awaiting consensus,​ ​but​ rather ​on​ deterministic validation, nobody​ ​ever​ ​needs​ ​to​ ​trust​ ​a​ ​consensus​ ​lottery.​
 #### Sybil Attacks
 
 Since Holochain does not rely on any kind of majority consensus, it is already less vulnerable to Sybil Attacks, the creation of many fake colluding accounts which are typically used to overwhelm consensus of honest agents. And since Holochain enables "1 of N" and even "0 of N" trust models, Sybils cannot entirely overwhem honest agents' ability to determine the validity of data.
@@ -156,7 +153,9 @@ Application developers can take steps to further protect their users by providin
 
 ### Human​ ​Error
 
-There are some aspects of security, especially those of human error, that all systems are subject to. People​ ​will​ ​still​ ​lose​ ​their​ ​keys,​ ​use​ ​weak​ ​passwords,​ ​get​ ​computer​ ​viruses, etc.​ ​​ But, crucially, in the realm of "System Correctness" and "confidence,"​ the question that needs addressing is how the system interfaces with mechanisms to mitigate against human error. Holochain provides significant tooling to support key management in the form of its ​core​ ​Distributed​ ​Public Key​ ​Infrastructure (DPKI) and DeepKey app built on that infrastructure. Among other things, this tooling ​provides​ ​assistance​ ​in​ ​managing​ ​keys,​ ​managing​ ​revocation​ ​methods,​ ​and reclaiming​ ​control​ ​of​ ​applications​ ​when​ ​keys​ ​or​ ​devices​ ​have​ ​become​ ​compromised. \[WP-TODO: ACB\] \[Need to be able to refer to external docs on DeepKey and DPKI\]
+There are some aspects of security, especially those of human error, that all systems are subject to. People​ ​will​ ​still​ ​lose​ ​their​ ​keys,​ ​use​ ​weak​ ​passwords,​ ​get​ ​computer​ ​viruses, etc. But, crucially, in the realm of "System Correctness" and "confidence,"​ the question that needs addressing is how the system interfaces with mechanisms to mitigate against human error. Holochain provides significant tooling to support key management in the form of its ​core​ ​Distributed​ ​Public Key​ ​Infrastructure (DPKI) and DeepKey app built on that infrastructure. Among other things, this tooling ​provides​ ​assistance​ ​in​ ​managing​ ​keys,​ ​managing​ ​revocation​ ​methods,​ ​and reclaiming​ ​control​ ​of​ ​applications​ ​when​ ​keys​ ​or​ ​devices​ ​have​ ​become​ ​compromised.
+
+A definition and specification of a DPKI system is outside of the scope of this paper; see the [DeepKey design specification](https://github.com/holochain/deepkey/blob/main/docs/2023/README.md) for a more thorough exploration.
 
 ## Evolvability
 
@@ -172,7 +171,4 @@ For large-scale systems to work well over time, we contend that specific archite
 
 2. **Grammatic composability:** Highly evolvable systems are built of grammatic elements that compose well with each other both "horizontally", which is the building of a vocabulary that fills out a given grammar, and "vertically" which is the creation of new grammars out of expressions of a lower level grammar. There is much more that can be said about grammatics and evolvability, but that is out of scope for this paper. However, we contend that the system as described above lives up to these criteria of having powerful grammatical elements that compose well as described. DNAs are essentially API definitions that can be used to create a large array of micro-services that can be assembled into small applications. Applications themselves can be assembled at the User Interface level. A number of frameworks in the Holochain ecosystem are already building off of this deep capacity for evolvability that is built into the system's architecture[^evolvability].
 
-3. **Membranics:** \[WP-TODO: EHB\]
-
-[^evolvability]: We, Neighborhoods, Ad4m (https://ad4m.dev/) \[WP-TODO: insert links
-    here\]
+[^evolvability]: A number of projects in the Holochain ecosystem are already exhibiting this characteristic of evolvability, such as [The Weave / Moss](https://theweave.social), [Ad4m](https://ad4m.dev/), [Memetic Activation Platform]().

@@ -9,10 +9,17 @@ formal state model.
 ## Definition of Foundational Principles
 
 * **Cryptography:** Holochain's integrity guarantees are largely enabled by cryptography. It is used in three main ways.
-    * *Hashes:* Data is uniquely identified by its hash, which is the key used to retrieve the data from a Content Addressable Store.
-    * *Signing:* Origination of data (for all storage and network communications) is verified by signing a hash with a private key.
-    * *Encryption:* Data is encrypted at rest and on the wire throughout the system.
-* **Agency:** Holochain is agent-centric. Each and every state change is a result of: 1) record of an agent's action 2) signed by the authoring agent, 3) linearly sequenced and timestamped 4) to their local source chain. Each agent is the sole authority for managing its local state (by virtue of controlling their private key required for signing new actions to their source chain).
+    * **Hashes:** Data is uniquely identified by its hash, which is the key used to retrieve the data from a Content Addressable Store.
+    * **Signing:** Origination of data (for all storage and network communications) is verified by signing a hash with a private key.
+    * **Encryption:** Data is encrypted at rest and on the wire throughout the system.
+* **Agency:** Holochain is agent-centric. Each and every state change is a result of:
+
+    1. A record of an agent's action,
+    2. signed by the authoring agent,
+    3. linearly sequenced and timestamped
+    4. to their local source chain.
+
+    Each agent is the sole authority for managing its local state (by virtue of controlling their private key required for signing new actions to their source chain).
 * **Accountability:** Holochain is also socio-centric. Each Holochain application defines its set of mutually enforced data integrity rules. Every local state change gets validated by other agents to ensure that it adheres to the rules of that application. Peers also enforce limits on publishing rates, protect against network integrity threats, and can ban rule-breakers by a process we call *warranting*.
 * **Data:** Unlike some other decentralized approaches, in Holochain, data does not have first-order, independent, ontological existence. Every record in the shared DHT network space MUST CARRY its provenance from a local source chain as described below.
 * **Provenance:** Each record created in a Holochain application starts as an action pair on someone's local source chain. As such, even when published to the shared DHT, records must carry the associated public key and signature of the agent who created it. This means every piece of data carries meta-information about where that data came from (who created it, and in what sequence on the their chain). Note: In other hash-chain based systems Holochain's "actions" are often called entry "headers," which link to the previous headers to create the chain.  In Holochain, while the action does establish temporal order, its core function is to record an act of agency, that of "speaking" data into existence.
@@ -52,7 +59,7 @@ Much of the discussion below is from the perspective of a single DNA, which is t
 
 Within the context of the Basic Assumptions and the System Architecture both described above, the Holochain system makes the following specific integrity guarantees for a given Holochain DNA and network:
 
-1. **State:** Agent's actions are unambiguiously ordered from any given action back to genesis, unforgeable, non-repudiable, and immutable (accomplished via local hash chains called a Source Chain, because all data within the network is sourced from these chains.)
+1. **State:** Agents' actions are unambiguiously ordered from any given action back to genesis, unforgeable, non-repudiable, and immutable (accomplished via local hash chains called a Source Chain, because all data within the network is sourced from these chains.)
 2. **Self-Validating Data:** Because all DHT data is stored at the hash of its content, if the data returned from a request does not hash to the address you requested, you know you've received altered data.
 3. **Self-Validating Keys:** Agents declare their address on the network as their public key. You can confirm any published data or remote call is valid by checking the signature using the from address as the public key.
 4. **Termination of Execution:** No node can be coerced into infinite loops by non-terminating application code in either remote zome call or validation callbacks. Holochain uses WASM metering to guarantee a maximum execution budget to address the the Halting Problem.
