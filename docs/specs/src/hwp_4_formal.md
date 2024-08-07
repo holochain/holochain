@@ -527,38 +527,37 @@ All zome calls must be signed and supply a required capabilty claim argument tha
 
 ### Warrants
 
-[WP-TODO: Paul has edited this whole section; check for correctness]
+We take that, by definition, in a fully distributed system, there is no way for a single agent to control the actions of other agents that comprise the system; i.e., what makes an agent an agent is its ability to act independantly. This creates a challenge: How do agents deal with "bad-actor" agents, as they cannot be controlled by another party?
 
-[WP-TODO: ACB REVIEW should we expand on this by adding in https://hackmd.io/nmv6PARCRCmx9PrUI-LtLw?edit]
-We take that, by definition, in a fully distributed system, there is no way for a single agent to control the actions of other agents that comprise the system; i.e., what makes an agent an agent is its ability to act independantly of external pressure. This creates a challenge: how do agents deal with "bad-actor" agents, as they can not be controlled directly?
+In Holochain "bad-action" is defined by attempts by agents to act in a way not consistent with a DNA's validation rules. Because a DNA's network ID is defined by the hash of its integrity zomes (which includes data structures and the deterministic validation rules) we can know that every agent in a network started with the same rules, and thus can deterministically run those rules to determine if any action fails validation. (Note that some validation rules reveal bad actions not just in structure or content of data committed, but also bad behavior. For example, validating timestamps for the rate of committing entries enables protection against spam and denial-of-service attacks. Holochain has its own base validation rules as well; for instance, a source chain must never 'fork', so the presence of two parallel branching points from one prior source chain record is considered a bad-action.)
 
-In Holochain "bad-action" is primarily defined by attempts by agents to act outside of a DNA's validation rules. Because a DNA's network ID is defined by the hash of its integrity zomes (which includes the deterministic validation rules) we can assume that every agent has these rules, and thus can deterministically run these rules to know if any action is a "bad-action". (Note that some of these validation rules that reveal bad actions may not just be about the structure or of data commitited to chains, but can also be about behavior in context, for example about the rate of committing entries, which allows protection against denial-of-service attacks. Holochain has its own base validation rules as well; for instance, a source chain must never 'fork', so the presence of two parallel branching points from one prior source chain record is considered a bad-action.)
+Once a bad-action has been identified via a validation failure, it is considered to be unambiguously a consequence of malicious intent. The only way invalid data can be published is by intentionally circumventing the validation process on the author's device when committing to chain. 
 
-Once a bad-action has been identified by validation, it is generally considered to be unambiguously a consequence of malicious intent. With few exceptions, the only case in which invalid data can be published is if the publish process has been intentionally circumvented on the author's device. (There is one notable exception which may be encountered in the real world: accidental chain forks may be introduced when an agent loses their source chain after committing and publishing a new record, then restores and attempts to write to that source chain from an out-of-date backup. In the future, the author will be able to remedy this by publishing a **Withdraw** action that marks the undesired branch obsolete.) Hence, it is appropriate for any peer encountering this sort of bad-action to always take decisive action against the bad actor by disseminating a **Warrant** and adding the bad actor to a network block list.
+Each Warrant must be self-proving. It must flag the agent being warranted as a bad actor and include references set of actions which fail to validate. This might be, for example, a single signed Action that fails validation, or it might be a set of Actions that are issued consecutively which exceed spam rate limits or cause the agents chain to fork.
 
-A Warrant must include proof of behavior; that is, the claim about which the warrant is being issued. This might be, for example, a signed Action that fails validation, or it might be Actions that are issued consecutively that violate the rate limit for the given data.
+Upon receipt of a Warrant, a node must take three actions:
 
-In other contexts, bad action is more ambiguous or subject to human judgment, and cannot be encoded in deterministic rules. The appropriate response depends on the contexts in which the application is being used. Warnings with escalating responses may make sense, or an immediate expulsion similar to that triggered by violation of validation rules may be more appropriate. Holochain offers an affordance for the latter in the form of **application-level blocking**, in which participants in an application can add an agent to their network block list as a self-defensive response to bad behavior. This can happen as a result of seeing the bad action in question, or as a result of seeing other peers' data or messages that suggest that the agent should be blocked.
+1. **Determine who is the bad actor.** For any Warrant, someone either performed a bad action, or someone created a false report of bad action. So a node must validate the referenced actions. If they fail validation, then the reported agent is the bad actor. If the actions pass validation, then the Wrrant author is the bad actor.
+2. **Block the bad actor.** Add either the warranted agent or the warrant author to the validating nodes peer blocklist. This node will no longer interact with bad actor, and will reject any connection attempts from that agent.
+3. **Report it to the bad actor's Agent Activity Authorities.** Because nodes expect to be able to find out if an agent is warranted by asking its neighbors who validate chain activity, those neighbors must be notified of any warrants.
 
-(It is also worth noting that application-level blocking can be used for other, more benign purposes, such as removing a retired employee's access to a company's applications.)
+There is no global blocking of a bad actor. Each agent must confirm for themselves who to block. Warrants and blocking, taken together, enable the network defend itself from bad actors while preserving individual agency in the warranting process.
 
-Abstractly, when a Warrant is received there are two fundamental actions to be taken:
+Note: Beyond Warrants, blocking can also theoretically be used by apps or agents for whatever reason the application logic or node owner may have to refuse to participate with a node. It allows for local, voluntary, self-defense against from whatever nodes someone might interpret as malicious or just peers that are no longer relevant (e.g. a terminated employee).
 
-1. Publishing or gossiping about that Warrant to others. A Warrant is not part of a source chain, so it does not come in the form of a Record, but it is contained in a special type of DHT transform operation. Because of this, there are no extra capabilities to add to Holochain, as DHT operations are already a fundamental primitive of the system. The most important agents on the DHT to gossip with about a Warrant are the ones responsible for storing agent activity information -- that is, the authorities in the neighborhood of the subject's agent ID hash.
-2. Taking the action required to neutralize the threat. Holochain necessarily includes the capacity for one sort of action, that of adding the agent against whom the Warrant has been issued to a block list such that all further interactions with that agent will be ignored.
+[WP-TODO: Possible expansion with data from https://hackmd.io/nmv6PARCRCmx9PrUI-LtLw?edit]
 
-In a sense, there is no such thing as a network-wide action against a bad actor; only agents taking individual action and communicating signals to other agents who may also want to take action. Warrants and blocking, taken together, allow individuals and the network as an aggregate of individual action to defend themselves from a bad actor while preserving our prior definition of an agent as one who may not be coerced by external force to take an action.
 
 ## Cross-DNA Composibility
 
 Holochain is designed to be used to build micro-services that can be assembled into applications. We expect DNAs to be written that assume the existence of other long-running DNAs and make calls to them via the agency of a user having installed both DNAs on their node. The Capabilities security model described above makes sure this kind of calling is safe and can only happen when permisions to do so have been explicitly granted in a given context. The HDK `call` function provides an affordance to allow specification of the DNA by hash when making the call, so the Holochain node can make a zome call to that DNA and return the result to the calling node.
 
-### Holochain Resource Locators
+### External References and Holochain Resource Locaters
 
 Additionally we define a standard by which to refer to entries in DNAs, called the Holochain Resource Locator (HRL), for application developers to use in passing around references to application data.
 
 [DRAFT OF SPEC TO BE MOVED HERE](https://hackmd.io/@hololtd/HyWnqhTnY)
-[WP-TODO:ACB/EHB]
+[WP-TODO: Reframe as enabling hash references across any spaces... convention for HRLs as a universal grammar for locating content across DHTs and even private chain data.]
 
 ## Holochain Implementation
 
