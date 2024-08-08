@@ -21,11 +21,11 @@ macro_rules! log_elapsed {
         if elapsed_ms < intervals[0] {
             // tracing::trace!(?elapsed, "(quick) {what}");
         } else if elapsed_ms < intervals[1] {
-            tracing::info!(?elapsed, ?intervals, "{what}exceeded LOW time threshold");
+            tracing::debug!(?elapsed, ?intervals, "{what}exceeded LOW time threshold");
         } else if elapsed_ms < intervals[2] {
-            tracing::warn!(?elapsed, ?intervals, "{what}exceeded MID time threshold");
+            tracing::debug!(?elapsed, ?intervals, "{what}exceeded MID time threshold");
         } else {
-            tracing::error!(?elapsed, ?intervals, "{what}exceeded HIGH time threshold");
+            tracing::debug!(?elapsed, ?intervals, "{what}exceeded HIGH time threshold");
         }
     }};
 }
