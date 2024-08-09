@@ -7,7 +7,6 @@ fn validate_create(
     author: AgentPubKey,
     action_hash: ActionHash,
 ) -> Result<ValidateCallbackResult, HostFnApiError> {
-    dbg!();
     let activity = h.must_get_agent_activity(MustGetAgentActivityInput {
         author,
         chain_filter: ChainFilter::new(action_hash),
@@ -19,7 +18,6 @@ fn validate_create(
                 .ok()
         })
         .collect();
-    dbg!(rs);
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -27,8 +25,10 @@ fn validate_create(
 async fn get_links_on_self() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true).no_publish();
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(12, config).await;
+    const N: usize = 20;
+
+    let config = SweetConductorConfig::rendezvous(true);
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(N, config).await;
 
     let entry_def = EntryDef::default_from_id("entry_def_id");
     let zomes = SweetInlineZomes::new(vec![entry_def.clone()], 0)
@@ -64,43 +64,18 @@ async fn get_links_on_self() {
             }])?;
             Ok(links.pop().unwrap())
         })
-        .integrity_function("validate", |h, op: Op| {
-            match op {
-                Op::StoreEntry(e) => Ok(validate_create(
-                    h,
-                    e.action.hashed.author().clone(),
-                    e.action.to_hash(),
-                )?),
-                Op::StoreRecord(e) => Ok(validate_create(
-                    h,
-                    e.record.action().author().clone(),
-                    e.record.action().to_hash(),
-                )?),
-                _ => Ok(ValidateCallbackResult::Valid),
-            }
-
-            // if let Ok(e) = op.flattened::<EntryTypes, LinkTypes>() {
-            //     match e {
-            //         FlatOp::StoreEntry(store_entry) => match (store_entry) {
-            //             OpEntry::CreateEntry {
-            //                 app_entry: _,
-            //                 action,
-            //             } => Ok(validate_create(h, action)?),
-            //             _ => Ok(ValidateCallbackResult::Valid),
-            //         },
-            //         FlatOp::StoreRecord(store_record) => match (store_record) {
-            //             OpRecord::CreateEntry {
-            //                 app_entry: _,
-            //                 action,
-            //             } => Ok(validate_create(h, action)?),
-            //             _ => Ok(ValidateCallbackResult::Valid),
-            //         },
-            //         _ => Ok(ValidateCallbackResult::Valid),
-            //     }
-            // } else {
-            //     dbg!("not flatteneable");
-            //     Ok(ValidateCallbackResult::Valid)
-            // }
+        .integrity_function("validate", |h, op: Op| match op {
+            Op::StoreEntry(e) => Ok(validate_create(
+                h,
+                e.action.hashed.author().clone(),
+                e.action.to_hash(),
+            )?),
+            Op::StoreRecord(e) => Ok(validate_create(
+                h,
+                e.record.action().author().clone(),
+                e.record.action().to_hash(),
+            )?),
+            _ => Ok(ValidateCallbackResult::Valid),
         });
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
@@ -117,17 +92,27 @@ async fn get_links_on_self() {
         .await
         .unwrap();
 
-    loop {
-        let links: Vec<Link> = conductors[1]
-            .call_fallible(&cells[1].zome("coordinator"), "get_links", bobkey.clone())
-            .await
-            .unwrap();
-        if !links.is_empty() {
-            dbg!(&links);
-            break;
+    let mut done: HashSet<usize> = (0..conductors.len()).collect();
+    let mut times = vec![0; N];
+    let start = std::time::Instant::now();
+
+    while !done.is_empty() {
+        for i in done.clone() {
+            let links: Vec<Link> = conductors[i]
+                .call_fallible(&cells[i].zome("coordinator"), "get_links", bobkey.clone())
+                .await
+                .unwrap();
+            if !links.is_empty() {
+                done.remove(&i);
+                times[i] = start.elapsed().as_millis();
+            }
         }
-        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+        if !done.is_empty() {
+            tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+        }
     }
+
+    println!("Time to complete for each node:\n{:?}", times);
 }
 
 #[hdk_entry_helper]
