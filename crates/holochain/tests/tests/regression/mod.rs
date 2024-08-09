@@ -222,4 +222,5 @@ async fn zero_arc_can_link_to_uncached_base() {
     println!("@!@!@ link_hash: {link_hash:?}");
 }
 
+pub mod get_links_on_self;
 pub mod must_get_agent_activity_saturation;
