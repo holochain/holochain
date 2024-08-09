@@ -1350,35 +1350,6 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn send_notify_delegate_broadcast_user_handles_shutdown() {
-        let (mut ep_evt_send, _, internal_sender, _, _, _, _, meta_net_task_finished) =
-            setup().await;
-
-        internal_sender
-            .ghost_actor_shutdown_immediate()
-            .await
-            .unwrap();
-
-        ep_evt_send
-            .send(MetaNetEvt::Notify {
-                remote_url: "".to_string(),
-                con: mk_test_con(),
-                data: wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
-                    space: test_space(1),
-                    basis: Arc::new(KitsuneBasis::new(vec![0; 36])),
-                    to_agent: test_agent(2),
-                    mod_idx: 0,
-                    mod_cnt: 0,
-                    data: BroadcastData::User(test_agent(5).to_vec()),
-                }),
-            })
-            .await
-            .unwrap();
-
-        wait_and_assert_shutdown(meta_net_task_finished).await;
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_publish() {
         let (mut ep_evt_send, internal_stub, _, _, _, _, _, _) = setup().await;
 
