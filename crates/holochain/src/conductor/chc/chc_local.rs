@@ -193,15 +193,15 @@ mod tests {
         let mut conductor = SweetConductor::from_config(config).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-        let (agent, _) = SweetAgents::alice_and_bob();
 
         let (cell,) = conductor
-            .setup_app_for_agent("app", agent.clone(), &[dna_file])
+            .setup_app("app", &[dna_file])
             .await
             .unwrap()
             .into_tuple();
 
         let cell_id = cell.cell_id();
+        let agent = cell_id.agent_pubkey().clone();
 
         let top_hash = {
             let mut dump = conductor
@@ -259,13 +259,17 @@ mod tests {
     // TODO: run this remotely too
     #[tokio::test(flavor = "multi_thread")]
     async fn multi_conductor_chc_sync() {
-        let mut config = ConductorConfig::default();
+        holochain_trace::test_run();
+
+        let mut config = SweetConductorConfig::standard().no_dpki();
         // config.chc_url = Some(url2::Url2::parse("http://127.0.0.1:40845/"));
         config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
         let mut conductors = SweetConductorBatch::from_config(4, config).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-        let (agent, _) = SweetAgents::alice_and_bob();
+
+        // All conductors share the same known agent, already installed in the test_keystore
+        let agent = SweetAgents::alice();
 
         let (c0,) = conductors[0]
             .setup_app_for_agent("app", agent.clone(), &[dna_file.clone()])
@@ -281,7 +285,8 @@ mod tests {
             let dna_file = dna_file.clone();
             async move {
                 let mut payload =
-                    get_install_app_payload_from_dnas("app", agent, &[(dna_file, None)]).await;
+                    get_install_app_payload_from_dnas("app", Some(agent), &[(dna_file, None)])
+                        .await;
                 payload.ignore_genesis_failure = ignore;
                 payload
             }

@@ -3,7 +3,7 @@ use holochain_types::prelude::ChainItem;
 
 use super::*;
 
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub(crate) async fn graft_records_onto_source_chain(
     conductor: ConductorHandle,
     cell_id: CellId,

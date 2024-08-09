@@ -43,15 +43,8 @@ pub mod dependencies {
 }
 
 /// This value determines protocol compatibility.
-/// Any time there is a protocol breaking change,
-/// this number must be incremented.
-///
-/// Version bump history:
-/// - 0 - 2024-03-11
-///     - The initial protocol version when added to the tx5 preflight.
-/// - 1 - 2024-06-06
-///     - Bumped for the switch from tx5-signal-srv to sbd-server.
-pub const KITSUNE_PROTOCOL_VERSION: u16 = 1;
+/// Any time there is a protocol breaking change, this number must be incremented.
+pub use kitsune_p2p_timestamp::KITSUNE_PROTOCOL_VERSION;
 
 pub mod metrics;
 

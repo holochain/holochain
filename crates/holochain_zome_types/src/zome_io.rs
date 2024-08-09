@@ -259,6 +259,12 @@ pub enum ZomeCallResponse {
     CountersigningSession(String),
 }
 
+impl std::fmt::Display for ZomeCallResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[cfg(feature = "test_utils")]
 impl ZomeCallResponse {
     pub fn unwrap(self) -> ExternIO {

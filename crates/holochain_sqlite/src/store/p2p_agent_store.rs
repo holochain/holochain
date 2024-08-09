@@ -316,7 +316,7 @@ impl AgentStoreByPath {
         }
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn get_async(&self, db: &DbRead<DbKindP2pAgents>) -> DatabaseResult<AgentStore> {
         let store_key = db.clone().into();
         {
@@ -354,7 +354,7 @@ async fn cache_get_async(db: &DbRead<DbKindP2pAgents>) -> DatabaseResult<AgentSt
 }
 
 /// Put an AgentInfoSigned record into the p2p_store
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn p2p_put(
     db: &DbWrite<DbKindP2pAgents>,
     signed: &AgentInfoSigned,
@@ -364,7 +364,7 @@ pub async fn p2p_put(
 }
 
 /// Put an iterator of AgentInfoSigned records into the p2p_store
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn p2p_put_all(
     db: &DbWrite<DbKindP2pAgents>,
     signed: impl Iterator<Item = &AgentInfoSigned>,
@@ -425,7 +425,7 @@ fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
 }
 
 /// Prune all expired AgentInfoSigned records from the p2p_store
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn p2p_prune(
     db: &DbWrite<DbKindP2pAgents>,
     local_agents: Vec<Arc<KitsuneAgent>>,
@@ -496,7 +496,7 @@ impl AsP2pStateReadExt for DbRead<DbKindP2pAgents> {
         cache_get_async(self).await?.query_near_basis(basis, limit)
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
         self.read_async(|txn| txn.p2p_extrapolated_coverage(dht_arc_set))
             .await
@@ -505,7 +505,7 @@ impl AsP2pStateReadExt for DbRead<DbKindP2pAgents> {
 
 #[async_trait::async_trait]
 impl AsP2pStateWriteExt for DbWrite<DbKindP2pAgents> {
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn p2p_remove_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
         let space = self.kind().0.clone();
         let agent = agent.clone();

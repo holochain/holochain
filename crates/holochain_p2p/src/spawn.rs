@@ -3,7 +3,6 @@ use crate::event::*;
 
 mod actor;
 use actor::*;
-use holo_hash::DnaHash;
 
 /// Spawn a new HolochainP2p actor.
 /// Conductor will call this on initialization.
@@ -34,6 +33,7 @@ pub async fn spawn_holochain_p2p(
 /// Some parameters used as part of a protocol compability check during tx5 preflight
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct NetworkCompatParams {
-    /// The hash of the installed DPKI service
-    pub dpki_hash: Option<DnaHash>,
+    /// The UUID of the installed DPKI service.
+    /// If the service is backed by a Dna, this is the core 32 bytes of the DnaHash.
+    pub dpki_uuid: Option<[u8; 32]>,
 }

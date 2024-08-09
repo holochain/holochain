@@ -36,7 +36,10 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 /// flooding the network with spurious publishes.
 pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 5);
 
-#[instrument(skip(db, network, trigger_self))]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(db, network, trigger_self))
+)]
 pub async fn publish_dht_ops_workflow(
     db: DbWrite<DbKindAuthored>,
     network: Arc<impl HolochainP2pDnaT>,

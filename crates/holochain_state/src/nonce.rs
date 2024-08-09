@@ -20,7 +20,7 @@ pub enum WitnessNonceResult {
     Future,
 }
 
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn witness_nonce(
     db: &DbWrite<DbKindConductor>,
     agent: AgentPubKey,

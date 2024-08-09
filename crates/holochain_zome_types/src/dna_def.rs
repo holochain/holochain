@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use crate::prelude::*;
 
 #[cfg(feature = "full-dna-def")]
-use holochain_integrity_types::info::DnaModifiersBuilder;
+use holochain_integrity_types::DnaModifiersBuilder;
 
 #[cfg(feature = "full-dna-def")]
 use crate::zome::ZomeError;
@@ -74,6 +74,7 @@ pub struct DnaDef {
     pub lineage: HashSet<DnaHash>,
 }
 
+#[cfg(feature = "full-dna-def")]
 #[derive(Serialize, Debug, PartialEq, Eq)]
 /// A reference to for creating the hash for [`DnaDef`].
 struct DnaDefHash<'a> {
@@ -101,6 +102,7 @@ impl DnaDef {
 
 impl DnaDef {
     /// Get all zomes including the integrity and coordinator zomes.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub fn all_zomes(&self) -> impl Iterator<Item = (&ZomeName, &ZomeDef)> {
         self.integrity_zomes
             .iter()
@@ -123,11 +125,17 @@ impl DnaDef {
             .cloned()
             .map(|(name, def)| IntegrityZome::new(name, def))
             .ok_or_else(|| {
-                ZomeError::ZomeNotFound(format!("Intengrity zome '{}' not found", &zome_name,))
+                tracing::error!(
+                    "ZomeNotFound: {zome_name}. (get_integrity_zome) Existing zomes: integrity={:?}, coordinator={:?}",
+                    self.integrity_zomes,
+                    self.coordinator_zomes,
+                );
+                ZomeError::ZomeNotFound(format!("Integrity zome '{}' not found", &zome_name,))
             })
     }
 
     /// Check if a zome is an integrity zome.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub fn is_integrity_zome(&self, zome_name: &ZomeName) -> bool {
         self.integrity_zomes
             .iter()
@@ -142,7 +150,12 @@ impl DnaDef {
             .cloned()
             .map(|(name, def)| CoordinatorZome::new(name, def))
             .ok_or_else(|| {
-                ZomeError::ZomeNotFound(format!("Coordinator zome '{}' not found", &zome_name,))
+                tracing::error!(
+                    "ZomeNotFound: {zome_name}. (get_coordinator_zome) Existing zomes: integrity={:?}, coordinator={:?}",
+                    self.integrity_zomes,
+                    self.coordinator_zomes,
+                );
+                ZomeError::ZomeNotFound(format!("Coordinator Zome '{}' not found", &zome_name,))
             })
     }
 
@@ -160,7 +173,14 @@ impl DnaDef {
                     .cloned()
                     .map(|(name, def)| Zome::new(name, def.erase_type()))
             })
-            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+            .ok_or_else(|| {
+                tracing::error!(
+                    "ZomeNotFound: {zome_name}. (get_zome) Existing zomes: integrity={:?}, coordinator={:?}",
+                    self.integrity_zomes,
+                    self.coordinator_zomes,
+                );
+                ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,))
+            })
     }
 
     /// Get all the [`CoordinatorZome`]s for this dna
@@ -178,6 +198,11 @@ impl DnaDef {
             .find(|(name, _)| *name == zome_name)
             .map(|(_, def)| def)
             .ok_or_else(|| {
+                tracing::error!(
+                    "ZomeNotFound: {zome_name}. (get_wasm_zome) Existing zomes: integrity={:?}, coordinator={:?}",
+                    self.integrity_zomes,
+                    self.coordinator_zomes,
+                );
                 ZomeError::ZomeNotFound(format!("Wasm zome '{}' not found", &zome_name,))
             })
             .and_then(|def| {
@@ -195,7 +220,12 @@ impl DnaDef {
             .find(|(name, _)| *name == zome_name)
             .map(|(_, def)| def)
             .ok_or_else(|| {
-                ZomeError::ZomeNotFound(format!("Wasm zome '{}' not found", &zome_name,))
+                tracing::error!(
+                    "ZomeNotFound: {zome_name}. (get_wasm_zome_hash) Existing zomes: integrity={:?}, coordinator={:?}",
+                    self.integrity_zomes,
+                    self.coordinator_zomes,
+                );
+                ZomeError::ZomeNotFound(format!("Hash for wasm zome '{}' not found", &zome_name,))
             })
             .and_then(|def| match def {
                 ZomeDef::Wasm(wasm_zome) => Ok(wasm_zome.wasm_hash.clone()),
@@ -212,9 +242,9 @@ impl DnaDef {
 
     /// Change the DNA modifiers -- the network seed, properties and origin time -- while
     /// leaving the actual DNA code intact.
-    pub fn update_modifiers(&self, dna_modifiers: DnaModifiersOpt) -> Self {
+    pub fn update_modifiers(&self, modifiers: DnaModifiersOpt) -> Self {
         let mut clone = self.clone();
-        clone.modifiers = clone.modifiers.update(dna_modifiers);
+        clone.modifiers = clone.modifiers.update(modifiers);
         clone
     }
 

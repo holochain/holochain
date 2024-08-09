@@ -271,3 +271,14 @@ impl From<(&'static str, InlineIntegrityZome)> for InlineZomeSet {
         }
     }
 }
+
+impl From<(&'static str, InlineCoordinatorZome)> for InlineZomeSet {
+    fn from((z, e): (&'static str, InlineCoordinatorZome)) -> Self {
+        let mut coordinator_zomes = HashMap::new();
+        coordinator_zomes.insert(z, e);
+        Self {
+            coordinator_zomes,
+            ..Default::default()
+        }
+    }
+}

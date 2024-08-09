@@ -729,7 +729,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         .into())
     }
 
-    #[tracing::instrument(skip(self, input))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, input)))]
     fn handle_rpc_multi(
         &mut self,
         input: actor::RpcMulti,

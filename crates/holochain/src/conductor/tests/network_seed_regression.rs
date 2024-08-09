@@ -12,7 +12,6 @@ use holochain_wasm_test_utils::TestWasm;
 #[tokio::test(flavor = "multi_thread")]
 async fn network_seed_regression() {
     let conductor = SweetConductor::from_standard_config().await;
-    let agent = SweetAgents::one(conductor.keystore()).await;
     let tmp = tempdir().unwrap();
     let (dna, _, _) = SweetDnaFile::from_test_wasms(
         "".into(),
@@ -62,7 +61,7 @@ async fn network_seed_regression() {
     let _app1 = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            agent_key: agent.clone(),
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle1),
             installed_app_id: Some("no-seed".into()),
             network_seed: None,
@@ -76,7 +75,7 @@ async fn network_seed_regression() {
     let _app2 = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            agent_key: agent.clone(),
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle2),
             installed_app_id: Some("yes-seed".into()),
             network_seed: Some("seed".into()),
@@ -242,7 +241,7 @@ impl TestCase {
             Seed::B => common.dnas[2].clone(),
         };
         let dna_hash = dna.dna_hash();
-        let agent_key = SweetAgents::one(common.conductor.keystore()).await;
+        let agent_key = Some(SweetAgents::one(common.conductor.keystore()).await);
 
         let dna_modifiers = match role_seed {
             Seed::None => DnaModifiersOpt::none(),

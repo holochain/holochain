@@ -30,7 +30,7 @@ impl DurationOrSeconds {
 }
 
 /// Wait for all cells to reach consistency
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn await_consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
     timeout: impl Into<DurationOrSeconds>,
     all_cells: I,
@@ -39,7 +39,7 @@ pub async fn await_consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
 }
 
 /// Wait for all cells to reach consistency
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn await_consistency_conditional<'a, I: IntoIterator<Item = &'a SweetCell>>(
     timeout: impl Into<DurationOrSeconds>,
     conditions: impl Into<ConsistencyConditions>,
@@ -59,7 +59,7 @@ pub async fn await_consistency_conditional<'a, I: IntoIterator<Item = &'a SweetC
 /// Cells paired with a `false` value will have their authored ops counted towards the total,
 /// but not their integrated ops (since they are not online to integrate things).
 /// This is useful for tests where nodes go offline.
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn await_consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
     timeout: impl Into<DurationOrSeconds>,
     conditions: impl Into<ConsistencyConditions>,

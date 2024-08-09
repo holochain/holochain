@@ -43,6 +43,7 @@ use contrafact::Fact;
 use error::SysValidationError;
 
 use futures::FutureExt;
+use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
@@ -282,7 +283,9 @@ async fn check_previous_action() {
     let mut g = random_generator();
 
     let keystore = holochain_keystore::test_keystore();
+    let previous_action = fixt!(SignedActionHashed);
     let mut action = Action::Delete(Delete::arbitrary(&mut g).unwrap());
+    *action.prev_action_mut().unwrap() = previous_action.as_hash().clone();
     *action.author_mut() = keystore.new_sign_keypair_random().await.unwrap();
 
     *action.action_seq_mut().unwrap() = 7;
@@ -298,8 +301,14 @@ async fn check_previous_action() {
         cascade
             .expect_retrieve_action()
             .times(2)
-            // Doesn't matter what we return, the action should be rejected before deps are checked.
-            .returning(|_, _| async move { Ok(None) }.boxed());
+            // Doesn't matter what we return, the action should be rejected before deps are checked,
+            // except for the previous action that is checked for agent validity.
+            .returning({
+                move |_, _| {
+                    let previous_action = previous_action.clone();
+                    async move { Ok(Some((previous_action.clone(), CascadeSource::Local))) }.boxed()
+                }
+            });
 
         let actual = sys_validate_record(
             &sign_record(&keystore, action, None).await,
@@ -348,6 +357,7 @@ async fn check_valid_if_dna_test() {
         cache.clone(),
         tmp_cache.to_db(),
         Arc::new(dna_def.clone()),
+        None,
         std::time::Duration::from_secs(10),
     );
 
@@ -862,16 +872,18 @@ async fn test_dpki_agent_update() {
     use crate::core::workflow::inline_validation;
     use crate::sweettest::SweetAgents;
     use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
     use holochain_p2p::actor::HolochainP2pRefToDna;
 
     let dna = SweetDnaFile::unique_empty().await;
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let agents = SweetAgents::get(conductor.keystore(), 4).await;
-    conductor
-        .setup_app_for_agent("app", agents[0].clone(), vec![&dna])
-        .await
-        .unwrap();
+    // TODO: this test fails with deepkey because the agent is not also updated in DPKI.
+    //       once there is a way to update the agent in deepkey, add that to this test
+    //       and re-enable DPKI for this conductor.
+    let config = SweetConductorConfig::standard().no_dpki_mustfix();
+    let mut conductor = SweetConductor::from_config(config).await;
+    let app = conductor.setup_app("app", vec![&dna]).await.unwrap();
+    let initial_agent = app.agent().clone();
 
     let dna_hash = dna.dna_hash().clone();
     let space = conductor
@@ -882,7 +894,7 @@ async fn test_dpki_agent_update() {
     let workspace = space
         .source_chain_workspace(
             conductor.keystore(),
-            agents[0].clone(),
+            initial_agent.clone(),
             Arc::new(dna.dna_def().clone()),
         )
         .await
@@ -898,8 +910,10 @@ async fn test_dpki_agent_update() {
 
     let head = chain.chain_head().unwrap().unwrap();
 
+    let agents = SweetAgents::get(conductor.keystore(), 3).await;
+
     let a1 = Action::AgentValidationPkg(AgentValidationPkg {
-        author: agents[0].clone(),
+        author: initial_agent.clone(),
         timestamp: (head.timestamp + sec).unwrap(),
         action_seq: head.seq + 1,
         prev_action: head.action.clone(),
@@ -907,19 +921,19 @@ async fn test_dpki_agent_update() {
     });
 
     let a2 = Action::Update(Update {
-        author: agents[0].clone(),
+        author: initial_agent.clone(),
         timestamp: (a1.timestamp() + sec).unwrap(),
         action_seq: a1.action_seq() + 1,
         prev_action: a1.to_hash(),
         entry_type: EntryType::AgentPubKey,
-        entry_hash: agents[1].clone().into(),
+        entry_hash: agents[0].clone().into(),
         original_action_address: head.action,
-        original_entry_address: agents[0].clone().into(),
+        original_entry_address: initial_agent.clone().into(),
         weight: EntryRateWeight::default(),
     });
 
     let a3 = Action::AgentValidationPkg(AgentValidationPkg {
-        author: agents[1].clone(),
+        author: agents[0].clone(),
         timestamp: (a2.timestamp() + sec).unwrap(),
         action_seq: a2.action_seq() + 1,
         prev_action: a2.to_hash(),
@@ -927,26 +941,26 @@ async fn test_dpki_agent_update() {
     });
 
     let a4 = Action::Update(Update {
-        author: agents[1].clone(),
+        author: agents[0].clone(),
         timestamp: (a3.timestamp() + sec).unwrap(),
         action_seq: a3.action_seq() + 1,
         prev_action: a3.to_hash(),
         entry_type: EntryType::AgentPubKey,
-        entry_hash: agents[2].clone().into(),
+        entry_hash: agents[1].clone().into(),
         original_action_address: ActionHash::with_data_sync(&a2),
-        original_entry_address: agents[1].clone().into(),
+        original_entry_address: agents[0].clone().into(),
         weight: EntryRateWeight::default(),
     });
 
     let a5 = Action::Update(Update {
-        author: agents[2].clone(),
+        author: agents[1].clone(),
         timestamp: (a4.timestamp() + sec).unwrap(),
         action_seq: a4.action_seq() + 1,
         prev_action: a4.to_hash(),
         entry_type: EntryType::AgentPubKey,
-        entry_hash: agents[3].clone().into(),
+        entry_hash: agents[2].clone().into(),
         original_action_address: ActionHash::with_data_sync(&a4),
-        original_entry_address: agents[2].clone().into(),
+        original_entry_address: agents[1].clone().into(),
         weight: EntryRateWeight::default(),
     });
 
@@ -957,7 +971,7 @@ async fn test_dpki_agent_update() {
     chain
         .put_with_action(
             a2,
-            Some(Entry::Agent(agents[1].clone())),
+            Some(Entry::Agent(agents[0].clone())),
             ChainTopOrdering::Strict,
         )
         .await
@@ -969,7 +983,7 @@ async fn test_dpki_agent_update() {
     chain
         .put_with_action(
             a4,
-            Some(Entry::Agent(agents[2].clone())),
+            Some(Entry::Agent(agents[1].clone())),
             ChainTopOrdering::Strict,
         )
         .await
@@ -987,7 +1001,7 @@ async fn test_dpki_agent_update() {
     chain
         .put_with_action(
             a5,
-            Some(Entry::Agent(agents[3].clone())),
+            Some(Entry::Agent(agents[2].clone())),
             ChainTopOrdering::Strict,
         )
         .await

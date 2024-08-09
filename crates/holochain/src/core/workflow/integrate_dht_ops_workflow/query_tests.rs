@@ -120,7 +120,7 @@ async fn integrate_query() {
         .unwrap();
     let diff = hashes.symmetric_difference(&expected.hashes);
     for d in diff {
-        debug!(?d, missing = ?expected.ops.get(d));
+        tracing::debug!(?d, missing = ?expected.ops.get(d));
     }
     assert_eq!(hashes, expected.hashes);
 }

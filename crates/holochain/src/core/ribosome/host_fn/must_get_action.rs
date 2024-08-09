@@ -10,7 +10,10 @@ use std::sync::Arc;
 use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
-#[tracing::instrument(skip(_ribosome, call_context))]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(_ribosome, call_context))
+)]
 pub fn must_get_action<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,

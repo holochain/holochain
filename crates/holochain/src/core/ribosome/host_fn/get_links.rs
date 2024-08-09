@@ -11,7 +11,7 @@ use std::sync::Arc;
 use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
-#[tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name)))]
 pub fn get_links<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
@@ -566,7 +566,7 @@ pub mod slow_tests {
     async fn get_links_local_only() {
         holochain_trace::test_run();
         // agents should not pass around data
-        let config = SweetConductorConfig::rendezvous(false).tune(|config| {
+        let config = SweetConductorConfig::rendezvous(false).no_dpki().tune(|config| {
             config.disable_historical_gossip = true;
             config.disable_recent_gossip = true;
             config.disable_publish = true;

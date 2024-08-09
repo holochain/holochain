@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[instrument(skip(channel))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(channel)))]
 async fn a(mut channel: MyChannel) -> Result<(), Box<dyn Error>> {
     for _ in 0..10 {
         span_context!(Span::current());
@@ -57,7 +57,7 @@ async fn a(mut channel: MyChannel) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[instrument(skip(channel, to_c))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(channel, to_c)))]
 async fn b(mut channel: MyChannel, mut to_c: MyChannel) -> Result<(), Box<dyn Error>> {
     for _ in 0..10 {
         span_context!(Span::current());
@@ -71,7 +71,7 @@ async fn b(mut channel: MyChannel, mut to_c: MyChannel) -> Result<(), Box<dyn Er
     Ok(())
 }
 
-#[instrument(skip(from_b_to_a))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(from_b_to_a)))]
 async fn c(mut from_b_to_a: MyChannel) -> Result<(), Box<dyn Error>> {
     for _ in 0..10 {
         span_context!(Span::current());

@@ -156,15 +156,18 @@ mod run_validation_callback_tests;
 mod error;
 mod types;
 
-#[instrument(skip(
-    workspace,
-    trigger_integration,
-    trigger_publish,
-    conductor_handle,
-    network,
-    dht_query_cache,
-    validation_dependencies,
-))]
+#[cfg_attr(
+    feature = "instrument",
+    instrument(skip(
+        workspace,
+        trigger_integration,
+        trigger_publish,
+        conductor_handle,
+        network,
+        dht_query_cache,
+        validation_dependencies,
+    ))
+)]
 #[allow(clippy::too_many_arguments)]
 pub async fn app_validation_workflow(
     dna_hash: Arc<DnaHash>,
@@ -360,12 +363,12 @@ async fn app_validation_workflow_inner(
                                 put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Valid)
                             }
                         }
-                        Outcome::AwaitingDeps(deps) => {
+                        Outcome::AwaitingDeps(_) => {
                             awaiting_ops.fetch_add(1, Ordering::SeqCst);
                             put_validation_limbo(
                                 txn,
                                 &dht_op_hash,
-                                ValidationStage::AwaitingAppDeps(deps),
+                                ValidationStage::AwaitingAppDeps,
                             )
                         }
                         Outcome::Rejected(_) => {
