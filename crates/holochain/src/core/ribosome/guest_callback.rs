@@ -18,7 +18,6 @@ pub type CallStream = tokio_stream::wrappers::ReceiverStream<CallStreamItem>;
 
 pub fn call_stream<R: RibosomeT + 'static, I: Invocation + 'static>(
     host_context: HostContext,
-    // ribosome: RealRibosome,
     ribosome: R,
     invocation: I,
 ) -> (
