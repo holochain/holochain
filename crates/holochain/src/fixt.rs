@@ -6,8 +6,6 @@ use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentHostAccess;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
@@ -429,16 +427,6 @@ fixturator!(
 );
 
 fixturator!(
-    MigrateAgentInvocation;
-    constructor fn new(DnaDef, MigrateAgent);
-);
-
-fixturator!(
-    MigrateAgentHostAccess;
-    constructor fn new(HostFnWorkspace);
-);
-
-fixturator!(
     PostCommitInvocation;
     constructor fn new(CoordinatorZome, SignedActionHashedVec);
 );
@@ -488,7 +476,6 @@ fixturator!(
         Validate(ValidateHostAccess)
         Init(InitHostAccess)
         EntryDefs(EntryDefsHostAccess)
-        MigrateAgent(MigrateAgentHostAccess)
         PostCommit(PostCommitHostAccess)
     ];
 );

@@ -238,11 +238,6 @@ fixturator!(
 );
 
 fixturator!(
-    MigrateAgent;
-    unit variants [ Open Close ] empty Close;
-);
-
-fixturator!(
     GrantedFunction;
     curve Empty (
         ZomeNameFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),

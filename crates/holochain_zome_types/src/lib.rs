@@ -42,8 +42,6 @@ pub mod judged;
 pub mod link;
 pub mod metadata;
 #[allow(missing_docs)]
-pub mod migrate_agent;
-#[allow(missing_docs)]
 pub mod op;
 pub mod prelude;
 #[cfg(feature = "properties")]
