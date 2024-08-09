@@ -409,7 +409,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         path: &Path,
         sync_level: DbSyncLevel,
     ) -> rusqlite::Result<Option<PathBuf>> {
-        Connection::open(path)
+        Connection::open_with_flags_and_vfs(path, OpenFlags::default(), "win32-longpath")
             // For some reason calling pragma_update is necessary to prove the database file is valid.
             .and_then(|mut c| {
                 initialize_connection(&mut c, sync_level)?;
