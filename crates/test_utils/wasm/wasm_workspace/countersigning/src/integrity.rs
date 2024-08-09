@@ -1,6 +1,6 @@
 use hdi::prelude::*;
 
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 pub enum Thing {
     Valid,
     Invalid,
@@ -15,7 +15,7 @@ impl From<Thing> for ValidateCallbackResult {
     }
 }
 
-#[hdk_entry_types]
+#[hdi_entry_types]
 #[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     Thing(Thing),

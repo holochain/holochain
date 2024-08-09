@@ -24,7 +24,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         Item::Enum(ItemEnum {
             ident, variants, ..
         }) => (ident, variants),
-        _ => abort!(input, "hdk_link_types can only be used on Enums"),
+        _ => abort!(input, "hdi_link_types can only be used on Enums"),
     };
 
     // Get all the variant idents.
@@ -32,7 +32,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         .iter()
         .map(|syn::Variant { ident, fields, .. }| {
             if !matches!(fields, syn::Fields::Unit) {
-                abort!(ident, "hdk_link_types can only be used on Unit enums.");
+                abort!(ident, "hdi_link_types can only be used on Unit enums.");
             }
             quote::quote! {#ident,}
         })
@@ -53,7 +53,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
     let output = quote::quote! {
         // Add the required derives and attributes.
-        #[hdk_to_coordinates(entry = false)]
+        #[hdi_to_coordinates(entry = false)]
         #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
         #input
 

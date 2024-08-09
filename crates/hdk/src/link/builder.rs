@@ -20,7 +20,7 @@ use holochain_zome_types::prelude::*;
 /// ```rust,no_run
 /// use hdk::prelude::*;
 ///
-/// #[hdk_link_types]
+/// #[hdi_link_types]
 /// pub enum LinkTypes {
 ///     Example,
 /// }

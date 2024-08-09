@@ -1,4 +1,4 @@
-error: hdk_entry_types_conversions must only have a single enum tuple
+error: hdi_entry_types_conversions must only have a single enum tuple
  --> tests/macros/entry_type_conversions_wrong_enum.rs:5:7
   |
 5 |     A(A, B),

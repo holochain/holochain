@@ -19,13 +19,13 @@ use holochain_zome_types::prelude::{GetValidationReceiptsInput, ValidationReceip
 ///
 /// #[derive(Serialize, Deserialize)]
 /// #[serde(tag = "type")]
-/// #[hdk_entry_types]
+/// #[hdi_entry_types]
 /// #[unit_enum(UnitEntryTypes)]
 /// pub enum EntryTypes {
 ///     MyType(MyType),
 /// }
 ///
-/// #[hdk_entry_helper]
+/// #[hdi_entry_helper]
 /// pub struct MyType {
 ///     value: String,
 /// }
