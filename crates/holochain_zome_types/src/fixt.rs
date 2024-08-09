@@ -553,13 +553,18 @@ fixturator!(
 );
 
 fixturator!(
+    MigrationTarget;
+    variants [ Dna(DnaHash) Agent(AgentPubKey) ];
+);
+
+fixturator!(
     OpenChain;
-    constructor fn from_builder(ActionBuilderCommon, DnaHash);
+    constructor fn from_builder(ActionBuilderCommon, MigrationTarget, ActionHash);
 );
 
 fixturator!(
     CloseChain;
-    constructor fn from_builder(ActionBuilderCommon, DnaHash);
+    constructor fn from_builder(ActionBuilderCommon, MigrationTarget);
 );
 
 fixturator!(

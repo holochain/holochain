@@ -218,24 +218,25 @@ pub fn dna(dna_hash: DnaHash) -> Dna {
 }
 
 /// Create [`OpenChain`].
-pub fn oc(previous_dna_hash: DnaHash) -> OpenChain {
+pub fn oc(prev_target: MigrationTarget, close_hash: ActionHash) -> OpenChain {
     OpenChain {
         author: ak(0),
         timestamp: Timestamp(0),
         action_seq: 1,
         prev_action: ah(0),
-        prev_dna_hash: previous_dna_hash,
+        prev_target,
+        close_hash,
     }
 }
 
 /// Create [`CloseChain`].
-pub fn cc(new_dna_hash: DnaHash) -> CloseChain {
+pub fn cc(new_target: MigrationTarget) -> CloseChain {
     CloseChain {
         author: ak(0),
         timestamp: Timestamp(0),
         action_seq: 1,
         prev_action: ah(0),
-        new_dna_hash,
+        new_target,
     }
 }
 

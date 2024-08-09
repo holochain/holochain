@@ -19,7 +19,7 @@ pub fn open_chain(
             ..
         } => {
             // Construct the open chain action
-            let action_builder = builder::OpenChain::new(input.prev_dna_hash);
+            let action_builder = builder::OpenChain::new(input.prev_target, input.close_hash);
 
             let action_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
                 // push the action into the source chain
@@ -61,7 +61,6 @@ mod tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::fixt::{CallContextFixturator, RealRibosomeFixturator};
     use ::fixt::prelude::*;
-    use holo_hash::fixt::DnaHashFixturator;
     use holochain_util::tokio_helper;
     use holochain_wasm_test_utils::{TestWasm, TestWasmPair};
     use holochain_zome_types::prelude::*;
@@ -83,7 +82,8 @@ mod tests {
         let host_access_2 = host_access.clone();
         call_context.host_context = host_access.into();
         let input = OpenChainInput {
-            prev_dna_hash: fixt!(DnaHash),
+            prev_target: fixt!(MigrationTarget),
+            close_hash: fixt!(ActionHash),
         };
 
         let output = open_chain(Arc::new(ribosome), Arc::new(call_context), input).unwrap();

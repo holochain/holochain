@@ -1,4 +1,5 @@
 use super::EntryType;
+use super::MigrationTarget;
 use super::Timestamp;
 use crate::action;
 use crate::link::LinkTag;
@@ -249,11 +250,12 @@ builder_variant!(DeleteLink {
 });
 
 builder_variant!(OpenChain {
-    prev_dna_hash: DnaHash,
+    prev_target: MigrationTarget,
+    close_hash: ActionHash,
 });
 
 builder_variant!(CloseChain {
-    new_dna_hash: DnaHash,
+    new_target: MigrationTarget,
 });
 
 builder_variant!(Create<EntryRateWeight> {

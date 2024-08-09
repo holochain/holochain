@@ -3,9 +3,11 @@
 
 use std::collections::HashSet;
 
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holo_hash::{ActionHash, DnaHash};
 use holochain_serialized_bytes::prelude::*;
+
+use crate::MigrationTarget;
 
 #[cfg(test)]
 mod test;
@@ -178,13 +180,16 @@ impl<H: Eq + Ord + std::hash::Hash> Default for ChainFilters<H> {
 /// Input to close a chain.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct CloseChainInput {
-    /// The hash of the DNA that will be migrated to.
-    pub new_dna_hash: DnaHash,
+    /// The target identifier for the chain that will be migrated to.
+    pub new_target: MigrationTarget,
 }
 
 /// Input to open a chain.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct OpenChainInput {
-    /// The hash of the DNA that was migrated from.
-    pub prev_dna_hash: DnaHash,
+    /// The identifier for the chain that was migrated from.
+    pub prev_target: MigrationTarget,
+
+    /// Hash of the corresponding CloseChain action
+    pub close_hash: ActionHash,
 }
