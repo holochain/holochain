@@ -77,6 +77,63 @@ impl From<TestConfig> for SweetConductorConfig {
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
+async fn bad_network_gossip() {
+    holochain_trace::test_run();
+
+    let vous = SweetLocalRendezvous::new_raw().await;
+
+    vous.drop_sig().await;
+
+    let v1: DynSweetRendezvous = vous.clone();
+    let mut c1 =
+        SweetConductor::from_config_rendezvous(SweetConductorConfig::rendezvous(true), v1).await;
+
+    let v2: DynSweetRendezvous = vous.clone();
+    let mut c2 =
+        SweetConductor::from_config_rendezvous(SweetConductorConfig::rendezvous(true), v2).await;
+
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
+
+    let a1 = SweetAgents::one(c1.keystore()).await;
+    let a2 = SweetAgents::one(c2.keystore()).await;
+
+    let (app1,) = c1
+        .setup_app_for_agent("app", a1.clone(), &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+    let (app2,) = c2
+        .setup_app_for_agent("app", a2.clone(), &[dna_file])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let hash: ActionHash = c1.call(&app1.zome("simple"), "create", ()).await;
+
+    // should not be possible to achieve consistency if the sbd server is down
+    // note, the 3 seconds is small because we don't want the test to take
+    // a long time, but also, this check isn't as important as the next one
+    // that ensures after the server is back up we DO get consistency!
+    assert!(await_consistency(3, [&app1, &app2]).await.is_err());
+
+    vous.start_sig().await;
+
+    await_consistency(60, [&app1, &app2]).await.unwrap();
+
+    let record: Option<Record> = c2.call(&app2.zome("simple"), "read", hash).await;
+    let record = record.expect("Record was None: bobbo couldn't `get` it");
+
+    assert_eq!(record.action().author(), &a1);
+    assert_eq!(
+        *record.entry(),
+        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+    );
+}
+
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
     holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 2;

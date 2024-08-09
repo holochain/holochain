@@ -7,20 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.0-dev.16
+
 - App manifest field `membrane_proofs_deferred` renamed to `allow_deferred_memproofs`, and the semantics are changed accordingly: if this field is set and memproofs are not provided at installation time (i.e. None is used), then the app will go into the deferred memproof state. Otherwise, if the field is set and memproofs are provided, installation will proceed as if the field were not set.
 - Adds the [`UseExisting`](https://github.com/holochain/holochain/blob/293d6e775b3f02285b831626c9911802207a8d85/crates/holochain_types/src/app/app_manifest/app_manifest_v1.rs#L155-L165) cell provisioning strategy, an alternative to `Create`, allowing an app to depend on a cell from another installed app. Read the rustdocs for more info on this new type of provisioning.
-- New protections are put in place for apps which are depended upon by other apps via `UseExisting`. Any "protected" inter-app dependency will prevent a dependency app from being uninstalled until the dependent app is also uninstalled, or if the `force` parameter is set to true in the `UninstallApp` call.
-- CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the 
-- *BREAKING* Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. 
-  I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. 
-  The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are
-  fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies. #4129
-- Based on the change above, about adding `IncompleteCommit`, a countersigning session will no longer terminate on missing dependencies.
-  You may retry committing the countersigned entry if you get this error. #4129
-- *BREAKING* CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the 
-  `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry.
-  This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded. #4124
 - Possible performance improvement: better async handling of wasm function calls which should allow more concurrent throughput system during long-running zome calls #4111
+- New protections are put in place for apps which are depended upon by other apps via `UseExisting`. Any “protected” inter-app dependency will prevent a dependency app from being uninstalled until the dependent app is also uninstalled, or if the `force` parameter is set to true in the `UninstallApp` call.
+- CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the
+- *BREAKING* Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies. \#4129
+- Based on the change above, about adding `IncompleteCommit`, a countersigning session will no longer terminate on missing dependencies. You may retry committing the countersigned entry if you get this error. \#4129
+- *BREAKING* CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry. This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded. \#4124
 
 ## 0.4.0-dev.15
 
