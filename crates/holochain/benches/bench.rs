@@ -5,7 +5,6 @@ use criterion::Criterion;
 use criterion::Throughput;
 use hdk::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
-use holochain::core::ribosome::RibosomeT;
 use holochain::core::ribosome::ZomeCallInvocation;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasm_test_utils::TestZomes;
@@ -60,9 +59,9 @@ pub fn wasm_call_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("wasm_call_n");
 
     for n in [
-        1,     // 1 byte
-        1_000, // 1 kb
-        1_000_000,
+        1,         // 1 byte
+        1_000,     // 1 kB
+        1_000_000, // 1 MB
     ] {
         group.throughput(Throughput::Bytes(n as _));
 
@@ -86,7 +85,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     signature: [0; 64].into(),
                 };
                 let ribosome = REAL_RIBOSOME.lock().unwrap().clone();
-                let fut = ribosome.maybe_call(ha.clone().into(), &i, &zome, &i.fn_name);
+                let fut = ribosome.maybe_call(ha.clone().into(), &i, zome, i.fn_name.clone());
                 futures::executor::block_on(fut).unwrap();
             });
         });

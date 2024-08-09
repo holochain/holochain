@@ -85,27 +85,29 @@ where
         hash: dna_hash,
         properties: properties.clone(),
     };
-    let result = ribosome.run_genesis_self_check(
-        GenesisSelfCheckHostAccess {
-            host_access_1: GenesisSelfCheckHostAccessV1,
-            host_access_2: GenesisSelfCheckHostAccessV2,
-        },
-        GenesisSelfCheckInvocation {
-            invocation_1: GenesisSelfCheckInvocationV1 {
-                payload: Arc::new(GenesisSelfCheckDataV1 {
-                    dna_info,
-                    membrane_proof: membrane_proof.clone(),
-                    agent_key: agent_pubkey.clone(),
-                }),
+    let result = ribosome
+        .run_genesis_self_check(
+            GenesisSelfCheckHostAccess {
+                host_access_1: GenesisSelfCheckHostAccessV1,
+                host_access_2: GenesisSelfCheckHostAccessV2,
             },
-            invocation_2: GenesisSelfCheckInvocationV2 {
-                payload: Arc::new(GenesisSelfCheckDataV2 {
-                    membrane_proof: membrane_proof.clone(),
-                    agent_key: agent_pubkey.clone(),
-                }),
+            GenesisSelfCheckInvocation {
+                invocation_1: GenesisSelfCheckInvocationV1 {
+                    payload: Arc::new(GenesisSelfCheckDataV1 {
+                        dna_info,
+                        membrane_proof: membrane_proof.clone(),
+                        agent_key: agent_pubkey.clone(),
+                    }),
+                },
+                invocation_2: GenesisSelfCheckInvocationV2 {
+                    payload: Arc::new(GenesisSelfCheckDataV2 {
+                        membrane_proof: membrane_proof.clone(),
+                        agent_key: agent_pubkey.clone(),
+                    }),
+                },
             },
-        },
-    )?;
+        )
+        .await?;
 
     // If the self-check fails, fail genesis, and don't create the source chain.
     if let GenesisSelfCheckResult::Invalid(reason) = result {
