@@ -18,5 +18,37 @@ teardown() {
 
 @test "expected scaffold an example to succeed" {
   set -e
-  hc scaffold example forum -t vue
+
+  print_version() {
+    hc-scaffold --version
+  }
+
+  setup_and_build_hello_world() {
+    version=$(print_version)
+
+    echo version
+
+    if [[ "$version" = 0.2* ]] || [[ "$version" = 0.1* ]]
+    then
+      hc-scaffold example hello-world
+      cd hello-world
+
+      nix develop --command bash -c "
+        set -e
+        npm install
+        npm test
+        "
+    else
+      hc-scaffold example -p=yarn hello-world
+      cd hello-world
+
+      nix develop --command bash -c "
+        set -e
+        yarn install
+        yarn test
+        "
+    fi
+  }
+
+  setup_and_build_hello_world
 }
