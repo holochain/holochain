@@ -4,7 +4,9 @@ use crate::{
     Action, ActionRef, ActionType, AppEntryDef, Create, CreateLink, Delete, DeleteLink, Entry,
     EntryType, Record, SignedActionHashed, SignedHashed, Update,
 };
-use holo_hash::{ActionHash, AgentPubKey, EntryHash, HashableContent};
+use holo_hash::{
+    ActionHash, AgentPubKey, EntryHash, HasHash, HashableContent, HashableContentExtSync,
+};
 use holochain_serialized_bytes::prelude::*;
 use kitsune_p2p_timestamp::Timestamp;
 
@@ -231,6 +233,24 @@ impl Op {
             }
             Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => {
                 &delete_link.hashed.author
+            }
+        }
+    }
+    /// Get the hash of the [`Action`] for this op.
+    pub fn action_hash(&self) -> ActionHash {
+        match self {
+            Op::StoreRecord(StoreRecord { record }) => record.action().to_hash(),
+            Op::StoreEntry(StoreEntry { action, .. }) => action.hashed.as_hash().clone(),
+            Op::RegisterUpdate(RegisterUpdate { update, .. }) => update.hashed.as_hash().clone(),
+            Op::RegisterDelete(RegisterDelete { delete, .. }) => delete.hashed.as_hash().clone(),
+            Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
+                action.hashed.as_hash().clone()
+            }
+            Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
+                create_link.hashed.as_hash().clone()
+            }
+            Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => {
+                delete_link.hashed.as_hash().clone()
             }
         }
     }

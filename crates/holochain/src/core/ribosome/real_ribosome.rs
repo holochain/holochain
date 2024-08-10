@@ -695,7 +695,7 @@ impl RealRibosome {
 }
 
 /// General purpose macro which relies heavily on various impls of the form:
-/// From<Vec<(ZomeName, $callback_result)>> for ValidationResult
+/// From<Vec<(ZomeName, $callback_result)>> for ValidateResult
 macro_rules! do_callback {
     ( $self:ident, $access:ident, $invocation:ident, $callback_result:ty ) => {{
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();

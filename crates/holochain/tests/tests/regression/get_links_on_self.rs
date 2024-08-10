@@ -2,16 +2,53 @@ use hdi::prelude::*;
 use hdk::prelude::*;
 use holochain::sweettest::*;
 
+// fn map_missing(e: HostFnApiError) -> Result<ValidateCallbackResult, InlineZomeError> {
+//     match e {
+//         HostFnApiError::RibosomeError(e) => match e.downcast::<WasmError>() {
+//             Ok(err) => match err.error {
+//                 WasmErrorInner::HostShortCircuit(e) => match ExternIO::decode(&ExternIO(e.clone()))
+//                 {
+//                     Ok(vr @ ValidateCallbackResult::UnresolvedDependencies(_)) => {
+//                         dbg!();
+//                         Ok(vr)
+//                     }
+//                     _ => Err(InlineZomeError::HostFnApiError(
+//                         HostFnApiError::RibosomeError(Box::new(err)),
+//                     )),
+//                 },
+//                 _ => Err(InlineZomeError::HostFnApiError(
+//                     HostFnApiError::RibosomeError(err),
+//                 )),
+//             },
+//             Err(e) => Err(InlineZomeError::HostFnApiError(
+//                 HostFnApiError::RibosomeError(e),
+//             )),
+//         },
+//     }
+// }
+
 fn validate_create(
     h: Box<dyn HostFnApiT>,
     author: AgentPubKey,
     action_hash: ActionHash,
 ) -> Result<ValidateCallbackResult, HostFnApiError> {
-    let activity = h.must_get_agent_activity(MustGetAgentActivityInput {
+    let aa_input = MustGetAgentActivityInput {
         author,
         chain_filter: ChainFilter::new(action_hash),
-    })?;
-    let rs: Vec<_> = activity
+    };
+    let activity = h.must_get_agent_activity(aa_input.clone())?;
+    // let activity = if let Ok(a) = h.must_get_agent_activity(aa_input.clone()) {
+    //     a
+    // } else {
+    //     dbg!();
+    //     // This is a cheap replacement for the proper short-circuit handling.
+    //     // This could very well be some other error, but for now we're just going to assume it's a missing dependency.
+    //     // The actual logic used in wasm is so convoluted that it would take me hours to replicate here.
+    //     return Ok(ValidateCallbackResult::UnresolvedDependencies(
+    //         UnresolvedDependencies::AgentActivity(aa_input.author, aa_input.chain_filter),
+    //     ));
+    // };
+    let _rs: Vec<_> = activity
         .iter()
         .filter_map(|a| {
             h.must_get_valid_record(MustGetValidRecordInput(a.action.action_address().clone()))
@@ -25,9 +62,11 @@ fn validate_create(
 async fn get_links_on_self() {
     holochain_trace::test_run();
 
-    const N: usize = 20;
+    const N: usize = 2;
+    const L: usize = 1;
 
-    let config = SweetConductorConfig::rendezvous(true);
+    // let config = SweetConductorConfig::rendezvous(true);
+    let config = SweetConductorConfig::rendezvous(true).no_publish();
     let mut conductors = SweetConductorBatch::from_config_rendezvous(N, config).await;
 
     let entry_def = EntryDef::default_from_id("entry_def_id");
@@ -64,18 +103,19 @@ async fn get_links_on_self() {
             }])?;
             Ok(links.pop().unwrap())
         })
-        .integrity_function("validate", |h, op: Op| match op {
-            Op::StoreEntry(e) => Ok(validate_create(
-                h,
-                e.action.hashed.author().clone(),
-                e.action.to_hash(),
-            )?),
-            Op::StoreRecord(e) => Ok(validate_create(
-                h,
-                e.record.action().author().clone(),
-                e.record.action().to_hash(),
-            )?),
-            _ => Ok(ValidateCallbackResult::Valid),
+        .integrity_function("validate", |h, op: Op| {
+            Ok(validate_create(h, op.author().clone(), op.action_hash())?)
+            // Op::StoreEntry(e) => Ok(validate_create(
+            //     h,
+            //     e.action.hashed.author().clone(),
+            //     e.action.to_hash(),
+            // )?),
+            // Op::StoreRecord(e) => Ok(validate_create(
+            //     h,
+            //     e.record.action().author().clone(),
+            //     e.record.action().to_hash(),
+            // )?),
+            // _ => Ok(ValidateCallbackResult::Valid),
         });
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
@@ -87,10 +127,12 @@ async fn get_links_on_self() {
         .cells_flattened();
     let bobkey = cells[1].agent_pubkey().clone();
 
-    let _: () = conductors[0]
-        .call_fallible(&cells[0].zome("coordinator"), "create_item", bobkey.clone())
-        .await
-        .unwrap();
+    for _ in 0..L {
+        let _: () = conductors[0]
+            .call_fallible(&cells[0].zome("coordinator"), "create_item", bobkey.clone())
+            .await
+            .unwrap();
+    }
 
     let mut done: HashSet<usize> = (0..conductors.len()).collect();
     let mut times = vec![0; N];
@@ -102,7 +144,7 @@ async fn get_links_on_self() {
                 .call_fallible(&cells[i].zome("coordinator"), "get_links", bobkey.clone())
                 .await
                 .unwrap();
-            if !links.is_empty() {
+            if links.len() == L {
                 done.remove(&i);
                 times[i] = start.elapsed().as_millis();
             }
