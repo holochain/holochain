@@ -4,6 +4,7 @@ members = [
   "anchor",
   "app_validation",
   "bench",
+  "bulbasaur",
   "capability",
   "clone",
   "coordinator_zome",

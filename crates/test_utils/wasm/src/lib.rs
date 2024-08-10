@@ -25,6 +25,7 @@ pub enum TestWasm {
     Anchor,
     AppValidation,
     Bench,
+    Bulbasaur,
     Capability,
     Clone,
     CounterSigning,
@@ -134,6 +135,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Anchor => "anchor",
             TestWasm::AppValidation => "app_validation",
             TestWasm::Bench => "bench",
+            TestWasm::Bulbasaur => "bulbasaur",
             TestWasm::Capability => "capability",
             TestWasm::Clone => "clone",
             TestWasm::CounterSigning => "countersigning",
@@ -208,6 +210,7 @@ impl From<TestWasm> for PathBuf {
             TestWasm::Anchor => "wasm32-unknown-unknown/release/test_wasm_anchor.wasm",
             TestWasm::AppValidation => "wasm32-unknown-unknown/release/test_wasm_app_validation.wasm",
             TestWasm::Bench => "wasm32-unknown-unknown/release/test_wasm_bench.wasm",
+            TestWasm::Bulbasaur => "wasm32-unknown-unknown/release/test_wasm_bulbasaur.wasm",
             TestWasm::Capability => "wasm32-unknown-unknown/release/test_wasm_capability.wasm",
             TestWasm::Clone => "wasm32-unknown-unknown/release/test_wasm_clone.wasm",
             TestWasm::CounterSigning => {
