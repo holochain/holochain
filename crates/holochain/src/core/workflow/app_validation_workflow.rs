@@ -308,8 +308,12 @@ async fn app_validation_workflow_inner(
                         agent_activity.push(activity);
                     }
                 }
-                if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
-                    warn!(?outcome, ?dht_op_lite, "DhtOp has failed app validation");
+                if let Outcome::Rejected(_) = &outcome {
+                    warn!(
+                        ?outcome,
+                        ?dht_op_lite,
+                        "DhtOp has been rejected by app validation"
+                    );
                 }
 
                 let accepted_ops = accepted_ops.clone();
@@ -816,7 +820,7 @@ async fn run_validation_callback(
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(hashes)) => {
             tracing::debug!(
                 ?hashes,
-                "Op validation returned unresolved dependencies -  AgentActivity"
+                "Op validation returned unresolved dependencies -  Hashes"
             );
             // fetch all missing hashes in the background without awaiting them
             let cascade_workspace = workspace.clone();
@@ -837,9 +841,10 @@ async fn run_validation_callback(
                     let result = cascade
                         .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
                         .await;
-                    if let Err(err) = result {
+                    if let Err(err) = &result {
                         tracing::warn!("error fetching dependent hash {hash:?}: {err}");
                     }
+                    tracing::info!("fetch hash {hash:?} result {result:?}");
                     // Dependency has been fetched and added to the cache
                     // or an error occurred along the way.
                     // In case of an error the hash is still removed from
@@ -847,6 +852,7 @@ async fn run_validation_callback(
                     // fetched in the subsequent workflow run.
                     validation_dependencies.lock().remove_missing_hash(&hash);
                 }
+                .instrument(tracing::info_span!(""))
             });
             // await all fetches in a separate task in the background
             tokio::spawn(async { futures::future::join_all(fetches).await });
@@ -881,11 +887,12 @@ async fn run_validation_callback(
                         let result = cascade
                             .must_get_agent_activity(author.clone(), filter)
                             .await;
-                        if let Err(err) = result {
+                        if let Err(err) = &result {
                             tracing::warn!(
                                 "error fetching dependent chain of agent {author:?}: {err}"
                             );
                         }
+                        tracing::info!("fetch agent activity for {author:?} result {result:?}");
                         // dependency has been fetched and added to the cache
                         // or an error occurred along the way; in case of an
                         // error the hash is still removed from the
@@ -895,6 +902,7 @@ async fn run_validation_callback(
                             .lock()
                             .remove_missing_hash(&author.into());
                     }
+                    .instrument(tracing::info_span!(""))
                 });
             }
             Ok(Outcome::AwaitingDeps(vec![author.into()]))
