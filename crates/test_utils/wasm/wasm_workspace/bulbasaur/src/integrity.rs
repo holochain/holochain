@@ -33,10 +33,8 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     // _ => Ok(ValidateCallbackResult::Valid),
     if let Some(hash) = op.prev_action() {
         tracing::info!("op: {:?} {}", op.action_type(), op.action_seq());
-        let activity = must_get_agent_activity(
-            op.author().clone(),
-            ChainFilter::new(op.action_hash().clone()),
-        )?;
+        let activity =
+            must_get_agent_activity(op.author().clone(), ChainFilter::new(hash.clone()))?;
 
         let _rs: Vec<_> = activity
             .iter()
