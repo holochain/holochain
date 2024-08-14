@@ -2179,10 +2179,10 @@ mod app_status_impls {
                         Ok(r) => {
                             match r {
                                 Ok(_) => {
-                                    aitia::trace!(&hc_sleuth::Event::AgentJoined {
+                                    aitia::trace!(&hc_sleuth::Fact::AgentJoined {
                                         node: sleuth_id,
                                         agent: cell_id.agent_pubkey().clone()
-                                    });
+                                    }.now());
                                 }
                                 Err(e) => {
                                     tracing::error!(

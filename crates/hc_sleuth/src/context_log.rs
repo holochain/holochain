@@ -1,4 +1,4 @@
-use std::{collections::HashSet, io::BufRead};
+use std::{collections::HashSet, io::BufRead, sync::Arc};
 
 use holochain_types::prelude::*;
 use once_cell::sync::OnceCell;
@@ -26,8 +26,11 @@ pub static SUBSCRIBER: OnceCell<ContextSubscriber> = OnceCell::new();
 
 #[derive(Default, Debug)]
 pub struct Context {
+    /// All events ever recorded
+    pub events: Vec<(Timestamp, Arc<Fact>)>,
+
     /// All facts ever recorded
-    pub facts: HashSet<Event>,
+    pub facts: HashSet<Arc<Fact>>,
 
     /// Track which agents are part of which nodes
     pub map_node_to_agents: HashMap<SleuthId, HashSet<AgentPubKey>>,
@@ -64,7 +67,7 @@ impl Context {
         la
     }
 
-    pub fn check(&self, fact: &Event) -> bool {
+    pub fn check(&self, fact: &Fact) -> bool {
         self.facts.contains(fact)
     }
 
@@ -132,23 +135,23 @@ impl Context {
 }
 
 impl aitia::logging::Log for Context {
-    type Fact = Event;
+    type Event = Event;
 
-    fn apply(&mut self, fact: Event) {
-        match fact.clone() {
-            Event::Integrated { .. } => {}
-            Event::AppValidated { .. } => {}
-            Event::SysValidated { .. } => {}
-            Event::MissingAppValDep { by: _, op, deps } => {
+    fn apply(&mut self, event: Event) {
+        match event.fact.clone() {
+            Fact::Integrated { .. } => {}
+            Fact::AppValidated { .. } => {}
+            Fact::SysValidated { .. } => {}
+            Fact::MissingAppValDep { by: _, op, deps } => {
                 self.map_op_to_appval_dep_hash
                     .entry(op)
                     .or_default()
                     .extend(deps);
             }
-            Event::Fetched { .. } => {}
-            Event::ReceivedHash { .. } => {}
-            Event::SentHash { .. } => {}
-            Event::Authored { by: _, op } => {
+            Fact::Fetched { .. } => {}
+            Fact::ReceivedHash { .. } => {}
+            Fact::SentHash { .. } => {}
+            Fact::Authored { by: _, op } => {
                 // TODO: add check that the same op is not authored twice?
                 let op_hash = op.as_hash();
                 let a = match &op.op {
@@ -163,14 +166,14 @@ impl aitia::logging::Log for Context {
                     .insert(op_hash.clone(), op.dep.clone());
                 self.op_info.insert(op_hash.clone(), op);
             }
-            Event::AgentJoined { node, agent } => {
+            Fact::AgentJoined { node, agent } => {
                 self.map_agent_to_node.insert(agent.clone(), node.clone());
                 self.map_node_to_agents
                     .entry(node)
                     .or_default()
                     .insert(agent);
             }
-            Event::SweetConductorShutdown { node } => {
+            Fact::SweetConductorShutdown { node } => {
                 if let Some(agents) = self.map_node_to_agents.remove(&node) {
                     for a in agents {
                         self.map_agent_to_node.remove(&a);
@@ -178,9 +181,14 @@ impl aitia::logging::Log for Context {
                 }
             }
         }
+
+        let timestamp = event.timestamp;
+        let fact = Arc::new(event.fact);
+
         let duplicate = self.facts.insert(fact.clone());
         if duplicate {
             tracing::warn!("Duplicate fact {:?}", fact);
         }
+        self.events.push((timestamp, fact));
     }
 }

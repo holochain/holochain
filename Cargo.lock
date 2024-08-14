@@ -89,6 +89,8 @@ name = "aitia"
 version = "0.3.0-dev.3"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
+ "chrono",
  "derive_more",
  "holochain_trace",
  "maplit",
@@ -96,8 +98,8 @@ dependencies = [
  "petgraph",
  "pretty_assertions",
  "regex",
+ "rmp-serde",
  "serde",
- "serde_json",
  "test-case",
  "tracing",
  "tracing-core",

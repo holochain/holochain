@@ -705,7 +705,7 @@ where
             .flat_map(|hash| {
                 other_node_ids
                     .iter()
-                    .map(move |node_id| hc_sleuth::Event::Integrated {
+                    .map(move |node_id| hc_sleuth::Fact::Integrated {
                         by: node_id.to_owned(),
                         op: hash.clone(),
                     })

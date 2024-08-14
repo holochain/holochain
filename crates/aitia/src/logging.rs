@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use base64::Engine;
 use tracing_core::Subscriber;
 use tracing_subscriber::{
     fmt::{writer::MakeWriterExt, MakeWriter},
@@ -9,10 +10,15 @@ use tracing_subscriber::{
     Layer,
 };
 
-use crate::FactTraits;
+use crate::{Fact, FactTraits};
 
 pub trait FactLogTraits: FactTraits + serde::Serialize + serde::de::DeserializeOwned {}
 impl<T> FactLogTraits for T where T: FactTraits + serde::Serialize + serde::de::DeserializeOwned {}
+
+pub struct Event<F: Fact> {
+    pub fact: F,
+    pub timestamp: chrono::DateTime<chrono::Local>,
+}
 
 /// Add a JSON-serialized Fact to the tracing output at the Info level
 #[macro_export]
@@ -31,31 +37,31 @@ macro_rules! trace {
                 aitia = "json",
                 ?fact,
                 "<AITIA>{}</AITIA>",
-                $crate::logging::LogLine::encode(fact)
+                $crate::logging::FactLog::encode(fact)
             ),
             "debug" => tracing::debug!(
                 aitia = "json",
                 ?fact,
                 "<AITIA>{}</AITIA>",
-                $crate::logging::LogLine::encode(fact)
+                $crate::logging::FactLog::encode(fact)
             ),
             "info" => tracing::info!(
                 aitia = "json",
                 ?fact,
                 "<AITIA>{}</AITIA>",
-                $crate::logging::LogLine::encode(fact)
+                $crate::logging::FactLog::encode(fact)
             ),
             "warn" => tracing::warn!(
                 aitia = "json",
                 ?fact,
                 "<AITIA>{}</AITIA>",
-                $crate::logging::LogLine::encode(fact)
+                $crate::logging::FactLog::encode(fact)
             ),
             "error" => tracing::error!(
                 aitia = "json",
                 ?fact,
                 "<AITIA>{}</AITIA>",
-                $crate::logging::LogLine::encode(fact)
+                $crate::logging::FactLog::encode(fact)
             ),
             level => unimplemented!("Invalid AITIA_LOG setting: {}", level),
         }
@@ -63,38 +69,55 @@ macro_rules! trace {
 }
 
 /// Adds encode/decode functionality to a Fact so it can be logged
-pub trait LogLine: FactLogTraits {
+pub trait FactLog: FactLogTraits {
     /// Encode as string
     fn encode(&self) -> String;
     /// Decode from string
     fn decode(s: &str) -> Self;
 }
 
-/// A JSON-encoded fact
-pub trait FactLogJson: LogLine {}
+// /// A ready-made implementation of FactLog, using JSON-encoded facts
+// pub trait FactLogJson: FactLog {}
 
-impl<J: FactLogJson> LogLine for J {
+// impl<J: FactLogJson> FactLog for J {
+//     fn encode(&self) -> String {
+//         serde_json::to_string(self).unwrap()
+//     }
+
+//     fn decode(s: &str) -> Self {
+//         serde_json::from_str(s).unwrap()
+//     }
+// }
+
+/// A ready-made implementation of FactLog, using msgpack-encoded facts with base-64 string encoding
+pub trait FactLogMsgpackB64: FactLog {}
+
+impl<J: FactLogMsgpackB64> FactLog for J {
     fn encode(&self) -> String {
-        serde_json::to_string(self).unwrap()
+        let bytes = rmp_serde::to_vec(self).unwrap();
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&bytes)
     }
 
     fn decode(s: &str) -> Self {
-        serde_json::from_str(s).unwrap()
+        let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(s)
+            .unwrap();
+        rmp_serde::from_slice(&bytes).unwrap()
     }
 }
 
 pub trait Log: Default {
-    type Fact: LogLine;
+    type Event: FactLog;
 
-    fn parse(line: &str) -> Option<Self::Fact> {
+    fn parse(line: &str) -> Option<Self::Event> {
         regex::Regex::new("<AITIA>(.*?)</AITIA>")
             .unwrap()
             .captures(line)
             .and_then(|m| m.get(1))
-            .map(|m| Self::Fact::decode(m.as_str()))
+            .map(|m| Self::Event::decode(m.as_str()))
     }
 
-    fn apply(&mut self, fact: Self::Fact);
+    fn apply(&mut self, fact: Self::Event);
 }
 
 /// A layer which only records logs emitted from aitia::trace!
@@ -150,7 +173,7 @@ mod tests {
 
     use crate::{dep::DepResult, logging::AitiaSubscriber, Fact};
 
-    use super::{tracing_layer, FactLogJson};
+    use super::{tracing_layer, FactLogMsgpackB64};
 
     #[derive(
         Debug,
@@ -179,15 +202,15 @@ mod tests {
         }
     }
 
-    impl FactLogJson for TestFact {}
+    impl FactLogMsgpackB64 for TestFact {}
 
     #[derive(Default)]
     struct Log(Vec<TestFact>);
 
     impl super::Log for Log {
-        type Fact = TestFact;
+        type Event = TestFact;
 
-        fn apply(&mut self, fact: Self::Fact) {
+        fn apply(&mut self, fact: Self::Event) {
             self.0.push(fact)
         }
     }

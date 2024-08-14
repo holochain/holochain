@@ -69,7 +69,13 @@ impl ChainOpAction {
 pub type SleuthId = String;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum Event {
+pub struct Event {
+    pub fact: Fact,
+    pub timestamp: Timestamp,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum Fact {
     /// The node has integrated an op authored by someone else
     Integrated {
         by: SleuthId,
@@ -126,46 +132,46 @@ pub enum Event {
     },
 }
 
-impl aitia::logging::FactLogJson for Event {}
+impl aitia::logging::FactLogMsgpackB64 for Event {}
 
-impl aitia::Fact for Event {
+impl aitia::Fact for Fact {
     type Context = Context;
 
     fn explain(&self, ctx: &Self::Context) -> String {
         match self {
-            Event::Integrated { by, op } => {
+            Fact::Integrated { by, op } => {
                 format!("[{by}] Integrated: {op}")
             }
-            Event::AppValidated { by, op } => {
+            Fact::AppValidated { by, op } => {
                 format!("[{by}] AppValidated: {op}")
             }
-            Event::SysValidated { by, op } => {
+            Fact::SysValidated { by, op } => {
                 format!("[{by}] SysValidated: {op}")
             }
-            Event::MissingAppValDep { by, op, deps } => {
+            Fact::MissingAppValDep { by, op, deps } => {
                 format!("[{by}] PendingAppValidation: {op} deps: {deps:#?}")
             }
-            Event::Fetched { by, op } => format!("[{by}] Fetched: {op}"),
-            Event::SentHash { by, op, method } => format!("[{by}] SentHash({method}): {op:?}"),
-            Event::ReceivedHash { by, op, method } => {
+            Fact::Fetched { by, op } => format!("[{by}] Fetched: {op}"),
+            Fact::SentHash { by, op, method } => format!("[{by}] SentHash({method}): {op:?}"),
+            Fact::ReceivedHash { by, op, method } => {
                 format!("[{by}] ReceivedHash({method}): {op:?}")
             }
-            Event::Authored { by, op } => {
+            Fact::Authored { by, op } => {
                 let node = ctx.agent_node(by).expect("I got lazy");
                 let op_hash = op.as_hash();
                 format!("[{node}] Authored: {op_hash}")
             }
-            Event::AgentJoined { node, agent } => {
+            Fact::AgentJoined { node, agent } => {
                 format!("[{node}] AgentJoined: {agent}")
             }
-            Event::SweetConductorShutdown { node } => {
+            Fact::SweetConductorShutdown { node } => {
                 format!("[{node}] SweetConductorShutdown")
             }
         }
     }
 
     fn dep(&self, ctx: &Self::Context) -> DepResult<Self> {
-        use Event::*;
+        use Fact::*;
 
         let mapper = |e: CtxError| DepError {
             info: e,
@@ -278,7 +284,14 @@ impl aitia::Fact for Event {
     }
 }
 
-impl Event {
+impl Fact {
+    pub fn now(self) -> Event {
+        Event {
+            fact: self,
+            timestamp: Timestamp::now(),
+        }
+    }
+
     /// The cause which is satisfied by either Integrating this op,
     /// or having authored this op by any of the local agents
     #[allow(clippy::result_large_err)]

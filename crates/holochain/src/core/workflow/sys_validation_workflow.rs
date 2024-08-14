@@ -331,10 +331,11 @@ async fn sys_validation_workflow_inner(
                                 put_integrated(txn, &op_hash, ValidationStatus::Valid)?
                             }
                         };
-                        aitia::trace!(&hc_sleuth::Event::SysValidated {
+                        aitia::trace!(&hc_sleuth::Fact::SysValidated {
                             by: sleuth_id.clone(),
                             op: op_hash
-                        });
+                        }
+                        .now());
                     }
                     Outcome::MissingDhtDep(missing_dep) => {
                         summary.missing += 1;

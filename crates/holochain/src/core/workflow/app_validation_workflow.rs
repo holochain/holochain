@@ -344,16 +344,16 @@ async fn app_validation_workflow_inner(
                     .write_async(move|txn| match outcome {
                         Outcome::Accepted => {
                             accepted_ops.fetch_add(1, Ordering::SeqCst);
-                            aitia::trace!(&hc_sleuth::Event::AppValidated {
+                            aitia::trace!(&hc_sleuth::Fact::AppValidated {
                                 by: sleuth_id.clone(),
                                 op: dht_op_hash.clone()
-                            });
+                            }.now());
 
                             if deps.is_empty() {
-                                aitia::trace!(&hc_sleuth::Event::Integrated {
+                                aitia::trace!(&hc_sleuth::Fact::Integrated {
                                     by: sleuth_id.clone(),
                                     op: dht_op_hash.clone()
-                                });
+                                }.now());
 
                                 put_integrated(txn, &dht_op_hash, ValidationStatus::Valid)
                             } else {

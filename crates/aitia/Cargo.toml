@@ -19,11 +19,16 @@ petgraph = "0.6"
 regex = "1"
 tracing = "0.1"
 
+
+base64 = { version = "0.22", optional = true }
+chrono = { version = "*", optional = true }
+rmp-serde = { version = "=1.3.0", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
-serde_json = { version = "1.0", optional = true }
+# serde_json = { version = "1.0", optional = true }
 tracing-core = { version = "0.1", optional = true }
 tracing-serde = { version = "0.1", optional = true }
 tracing-subscriber = { version = "0.3", optional = true }
+
 
 [dev-dependencies]
 maplit = "1"
@@ -37,8 +42,10 @@ workspace = true
 default = ["tracing"]
 
 tracing = [
+  "base64",
+  "chrono",
   "serde",
-  "serde_json",
+  "rmp-serde",
   "tracing-core",
   "tracing-serde",
   "tracing-subscriber",

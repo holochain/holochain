@@ -3,7 +3,7 @@
 
 use std::{path::PathBuf, str::FromStr};
 
-use hc_sleuth::{report, Event};
+use hc_sleuth::{report, Fact};
 use holochain_types::prelude::*;
 use structopt::StructOpt;
 
@@ -13,7 +13,7 @@ fn main() {
     match opt {
         HcSleuth::ShowGraph => {
             report(
-                Event::Integrated {
+                Fact::Integrated {
                     by: "".into(),
                     op: DhtOpHash::from_raw_32(vec![0; 32]),
                 },
