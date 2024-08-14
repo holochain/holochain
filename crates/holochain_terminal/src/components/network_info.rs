@@ -9,15 +9,32 @@ use holochain_util::tokio_helper::block_on;
 use kitsune_p2p_types::dependencies::tokio;
 use once_cell::sync::Lazy;
 use ratatui::{prelude::*, widgets::*};
-use std::sync::{Arc, RwLock};
-use std::time::Duration;
+use std::sync::{Arc, OnceLock, RwLock};
+use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
 type NetworkInfoParams = (AgentPubKey, Vec<(String, DnaHash)>);
 
 static NETWORK_INFO_PARAMS: Lazy<Arc<RwLock<Option<NetworkInfoParams>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
-static SELECTED: Lazy<RwLock<usize>> = Lazy::new(|| RwLock::new(0));
+
+fn get_selected() -> &'static RwLock<usize> {
+    static SELECTED: OnceLock<RwLock<usize>> = OnceLock::new();
+
+    SELECTED.get_or_init(|| RwLock::new(0))
+}
+
+fn get_last_refresh_at() -> &'static RwLock<Option<Instant>> {
+    static LAST_REFRESH_AT: OnceLock<RwLock<Option<Instant>>> = OnceLock::new();
+
+    LAST_REFRESH_AT.get_or_init(|| RwLock::new(None))
+}
+
+fn get_network_info() -> &'static RwLock<Vec<NetworkInfo>> {
+    static NETWORK_INFO: OnceLock<RwLock<Vec<NetworkInfo>>> = OnceLock::new();
+
+    NETWORK_INFO.get_or_init(|| RwLock::new(vec![]))
+}
 
 pub struct NetworkInfoWidget {
     args: Arc<Args>,
@@ -26,8 +43,16 @@ pub struct NetworkInfoWidget {
 }
 
 impl NetworkInfoWidget {
-    pub fn new(args: Arc<Args>, app_client: Option<Arc<Mutex<AppClient>>>, events: Vec<ScreenEvent>) -> Self {
-        Self { args, app_client, events }
+    pub fn new(
+        args: Arc<Args>,
+        app_client: Option<Arc<Mutex<AppClient>>>,
+        events: Vec<ScreenEvent>,
+    ) -> Self {
+        Self {
+            args,
+            app_client,
+            events,
+        }
     }
 }
 
@@ -60,24 +85,43 @@ impl Widget for NetworkInfoWidget {
                 };
         }
 
-        let network_infos = match get_network_info(app_client) {
-            Ok(network_infos) => network_infos,
-            Err(e) => {
-                show_message(format!("{:?}", e).as_str(), area, buf);
-                return;
+        {
+            let mut last_refreshed = get_last_refresh_at().write().unwrap();
+            let mut do_refresh = false;
+            if let Some(lr) = *last_refreshed {
+                if lr.elapsed() > Duration::from_secs(10) {
+                    *last_refreshed = Some(Instant::now());
+                    do_refresh = true;
+                }
+            } else {
+                *last_refreshed = Some(Instant::now());
+                do_refresh = true;
             }
-        };
 
+            if do_refresh {
+                match fetch_network_info(app_client) {
+                    Ok(network_infos) => {
+                        *get_network_info().write().unwrap() = network_infos;
+                    }
+                    Err(e) => {
+                        show_message(format!("{:?}", e).as_str(), area, buf);
+                        return;
+                    }
+                }
+            };
+        }
+
+        let network_infos = get_network_info().read().unwrap();
         for event in self.events {
             match event {
                 ScreenEvent::NavDown => {
-                    let mut selected = SELECTED.write().unwrap();
+                    let mut selected = get_selected().write().unwrap();
                     if *selected < network_infos.len() - 1 {
                         *selected += 1;
                     }
                 }
                 ScreenEvent::NavUp => {
-                    let mut selected = SELECTED.write().unwrap();
+                    let mut selected = get_selected().write().unwrap();
 
                     if *selected > 0 {
                         *selected -= 1;
@@ -107,13 +151,22 @@ impl Widget for NetworkInfoWidget {
         let list = List::new(list_items)
             .block(
                 Block::default()
-                    .title(format!(" Network info for {} ", app_id))
+                    .title(format!(
+                        " Network info for {} (age: {}s)",
+                        app_id,
+                        get_last_refresh_at()
+                            .read()
+                            .unwrap()
+                            .expect("Should be able to get refresh time")
+                            .elapsed()
+                            .as_secs() as u32
+                    ))
                     .borders(Borders::ALL),
             )
             .style(Style::default().fg(Color::White))
             .highlight_symbol(">> ");
 
-        let selected = *SELECTED.read().unwrap();
+        let selected = *get_selected().read().unwrap();
         let selected = if !network_infos.is_empty() && selected < network_infos.len() {
             let detail_line = List::new(vec![
                 ListItem::new(format!(
@@ -137,8 +190,8 @@ impl Widget for NetworkInfoWidget {
                     network_infos[selected].fetch_pool_info.op_bytes_to_fetch
                 )),
             ])
-                .block(Block::default().title(" Info ").borders(Borders::ALL))
-                .style(Style::default().fg(Color::White));
+            .block(Block::default().title(" Info ").borders(Borders::ALL))
+            .style(Style::default().fg(Color::White));
 
             Widget::render(detail_line, content_layout[1], buf);
 
@@ -147,7 +200,12 @@ impl Widget for NetworkInfoWidget {
             None
         };
 
-        StatefulWidget::render(list, content_layout[0], buf, &mut ListState::default().with_selected(selected));
+        StatefulWidget::render(
+            list,
+            content_layout[0],
+            buf,
+            &mut ListState::default().with_selected(selected),
+        );
     }
 }
 
@@ -171,7 +229,7 @@ fn get_network_info_params(
     }
 }
 
-fn get_network_info(app_client: Arc<Mutex<AppClient>>) -> anyhow::Result<Vec<NetworkInfo>> {
+fn fetch_network_info(app_client: Arc<Mutex<AppClient>>) -> anyhow::Result<Vec<NetworkInfo>> {
     let (agent, named_dna_hashes) = NETWORK_INFO_PARAMS.read().unwrap().clone().unwrap();
     match block_on(
         async {
