@@ -1,8 +1,9 @@
 use crate::app::App;
 use crate::components::bootstrap::BootstrapWidget;
+use crate::components::home::HomeWidget;
 use crate::components::network_info::NetworkInfoWidget;
-use crossterm::{terminal, ExecutableCommand};
 use crossterm::terminal::{enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::{terminal, ExecutableCommand};
 use ratatui::backend::Backend;
 use ratatui::layout::{Alignment, Constraint};
 use ratatui::prelude::{Color, Direction, Layout, Line, Style};
@@ -12,7 +13,6 @@ use ratatui::{Frame, Terminal};
 use std::io;
 use std::io::stdout;
 use std::panic;
-use crate::components::home::HomeWidget;
 
 #[derive(Debug)]
 pub struct Tui<B: Backend> {
@@ -70,7 +70,10 @@ fn render(app: &mut App, frame: &mut Frame) {
         .constraints([Constraint::Length(2), Constraint::Min(0)])
         .split(frame.area());
 
-    let titles = ["Home", "Network", "Bootstrap"].iter().cloned().map(Line::from);
+    let titles = ["Home", "Network", "Bootstrap"]
+        .iter()
+        .cloned()
+        .map(Line::from);
     let tabs = Tabs::new(titles)
         .select(app.tab_index())
         .block(
