@@ -14,6 +14,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240814.004012
+
+## [hcterm-0.4.0-dev.17](crates/hcterm/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_cli-0.4.0-dev.17](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain-0.4.0-dev.17](crates/holochain/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_cli\_bundle-0.4.0-dev.17](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.17](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_cascade-0.4.0-dev.17](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_conductor\_api-0.4.0-dev.17](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_conductor\_services-0.3.0-dev.17](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.17)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.17](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_websocket-0.4.0-dev.17](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_state-0.4.0-dev.17](crates/holochain_state/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_p2p-0.4.0-dev.17](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.17)
+
+## [hc\_sleuth-0.4.0-dev.17](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_types-0.4.0-dev.17](crates/holochain_types/CHANGELOG.md#0.4.0-dev.17)
+
+## [kitsune\_p2p-0.4.0-dev.16](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.16)
+
+## [holochain\_keystore-0.4.0-dev.16](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.16)
+
 # 20240807.004831
 
 ## [hcterm-0.4.0-dev.16](crates/hcterm/CHANGELOG.md#0.4.0-dev.16)
