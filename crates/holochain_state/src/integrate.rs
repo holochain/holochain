@@ -65,9 +65,19 @@ pub async fn authored_ops_to_dht_db_without_check(
     let activity = dht_db
         .write_async(|txn| {
             for op in ops {
+                // TODO: only for aitia runs
+                let op_hash = op.as_hash().clone();
+                let op_lite = op.clone().to_lite();
+                let author = op.author().clone();
+                let deps = op.sys_validation_dependencies();
                 if let Some(op) = insert_locally_validated_op(txn, op)? {
                     activity.push(op);
                 }
+                aitia::trace!(&hc_sleuth::Fact::Authored {
+                    by: author,
+                    op: hc_sleuth::OpInfo::new(op_lite, op_hash, deps),
+                }
+                .now());
             }
             StateMutationResult::Ok(activity)
         })

@@ -12,6 +12,7 @@ use crate::fixt::OpenChainFixturator;
 use crate::fixt::UpdateFixturator;
 use crate::prelude::*;
 use ::fixt::prelude::*;
+use arbitrary::Arbitrary;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::*;
 use holochain_trace;
@@ -454,4 +455,12 @@ fn test_all_ops_basis() {
     for record in all_records() {
         check_all_ops(record);
     }
+}
+
+#[test]
+fn chain_op_hashes() {
+    let mut u = unstructured_noise();
+    let chain_op = ChainOp::arbitrary(&mut u).unwrap();
+    let dht_op = DhtOp::from(chain_op.clone());
+    assert_eq!(chain_op.to_hash(), dht_op.to_hash());
 }

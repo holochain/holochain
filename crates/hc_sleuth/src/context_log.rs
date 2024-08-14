@@ -55,12 +55,11 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn from_file(mut r: impl BufRead) -> Self {
+    pub fn from_file(r: impl BufRead) -> Self {
         use aitia::logging::Log;
         let mut la = Self::default();
-        let mut line = String::new();
-        while let Ok(_bytes) = r.read_line(&mut line) {
-            if let Some(fact) = Self::parse(&line) {
+        for line in r.lines() {
+            if let Some(fact) = Self::parse(&line.unwrap()) {
                 la.apply(fact);
             }
         }
@@ -139,18 +138,31 @@ impl aitia::logging::Log for Context {
 
     fn apply(&mut self, event: Event) {
         match event.fact.clone() {
-            Fact::Integrated { .. } => {}
-            Fact::AppValidated { .. } => {}
-            Fact::SysValidated { .. } => {}
+            Fact::Integrated { op, .. } => {
+                debug_assert!(self.op_info.contains_key(&op))
+            }
+            Fact::AppValidated { op, .. } => {
+                debug_assert!(self.op_info.contains_key(&op))
+            }
+            Fact::SysValidated { op, .. } => {
+                debug_assert!(self.op_info.contains_key(&op))
+            }
             Fact::MissingAppValDep { by: _, op, deps } => {
+                debug_assert!(self.op_info.contains_key(&op));
                 self.map_op_to_appval_dep_hash
                     .entry(op)
                     .or_default()
                     .extend(deps);
             }
-            Fact::Fetched { .. } => {}
-            Fact::ReceivedHash { .. } => {}
-            Fact::SentHash { .. } => {}
+            Fact::Fetched { op, .. } => {
+                debug_assert!(self.op_info.contains_key(&op))
+            }
+            Fact::ReceivedHash { op, .. } => {
+                debug_assert!(self.op_info.contains_key(&op))
+            }
+            Fact::SentHash { op, .. } => {
+                debug_assert!(self.op_info.contains_key(&op))
+            }
             Fact::Authored { by: _, op } => {
                 // TODO: add check that the same op is not authored twice?
                 let op_hash = op.as_hash();

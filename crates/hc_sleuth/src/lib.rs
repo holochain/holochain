@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 pub(crate) use holochain_types::prelude::*;
 
+pub use aitia;
 pub mod context_log;
-pub mod query;
 mod report;
 
 pub use context_log::{init_subscriber, Context, ContextSubscriber, SUBSCRIBER};
