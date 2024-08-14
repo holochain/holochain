@@ -14,9 +14,11 @@ use super::error::WorkflowResult;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holo_hash::*;
+use holochain_p2p::DhtOpHashExt;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time;
@@ -42,6 +44,7 @@ pub async fn publish_dht_ops_workflow(
     network: Arc<impl HolochainP2pDnaT>,
     trigger_self: TriggerSender,
     agent: AgentPubKey,
+    sleuth_id: String,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
     let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent.clone()).await?;
@@ -76,6 +79,14 @@ pub async fn publish_dht_ops_workflow(
                 warn!(failed_to_send_publish = ?e);
             }
             Ok(()) => {
+                for op_hash in op_hash_list.iter() {
+                    aitia::trace!(&hc_sleuth::Fact::SentHash {
+                        by: sleuth_id.clone(),
+                        op: DhtOpHash::from_kitsune(op_hash.data_ref()),
+                        method: TransferMethod::Publish
+                    }
+                    .now());
+                }
                 success.extend(op_hash_list);
             }
         }
@@ -256,9 +267,15 @@ mod tests {
         author: AgentPubKey,
     ) {
         let (trigger_sender, _) = TriggerSender::new();
-        publish_dht_ops_workflow(db.clone(), Arc::new(dna_network), trigger_sender, author)
-            .await
-            .unwrap();
+        publish_dht_ops_workflow(
+            db.clone(),
+            Arc::new(dna_network),
+            trigger_sender,
+            author,
+            "sleuth_id".to_string(),
+        )
+        .await
+        .unwrap();
     }
 
     /// There is a test that shows that network messages would be sent to all agents via broadcast.

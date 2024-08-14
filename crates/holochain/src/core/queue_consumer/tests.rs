@@ -259,9 +259,15 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
-        .await
-        .unwrap();
+    publish_dht_ops_workflow(
+        db.clone(),
+        dna_network.clone(),
+        ts.clone(),
+        author.clone(),
+        "sleuth_id".to_string(),
+    )
+    .await
+    .unwrap();
 
     // - Op was published.
     op_published.recv().await.unwrap();
@@ -273,9 +279,15 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
-        .await
-        .unwrap();
+    publish_dht_ops_workflow(
+        db.clone(),
+        dna_network.clone(),
+        ts.clone(),
+        author.clone(),
+        "sleuth_id".to_string(),
+    )
+    .await
+    .unwrap();
 
     // - But the op isn't published because it was published in the last five minutes.
     assert_eq!(
@@ -289,9 +301,15 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
-        .await
-        .unwrap();
+    publish_dht_ops_workflow(
+        db.clone(),
+        dna_network.clone(),
+        ts.clone(),
+        author.clone(),
+        "sleuth_id".to_string(),
+    )
+    .await
+    .unwrap();
 
     // - But still no op is published.
     assert_eq!(
@@ -322,9 +340,15 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
-        .await
-        .unwrap();
+    publish_dht_ops_workflow(
+        db.clone(),
+        dna_network.clone(),
+        ts.clone(),
+        author.clone(),
+        "sleuth_id".to_string(),
+    )
+    .await
+    .unwrap();
 
     // - The data is published because of the last publish time being greater then the interval.
     op_published.recv().await.unwrap();
@@ -346,9 +370,15 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
-        .await
-        .unwrap();
+    publish_dht_ops_workflow(
+        db.clone(),
+        dna_network.clone(),
+        ts.clone(),
+        author.clone(),
+        "sleuth_id".to_string(),
+    )
+    .await
+    .unwrap();
 
     // - But no op is published because receipts are complete.
     assert_eq!(
@@ -383,9 +413,15 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
-        .await
-        .unwrap();
+    publish_dht_ops_workflow(
+        db.clone(),
+        dna_network.clone(),
+        ts.clone(),
+        author.clone(),
+        "sleuth_id".to_string(),
+    )
+    .await
+    .unwrap();
 
     // - Op was published.
     op_published.recv().await.unwrap();
@@ -397,9 +433,15 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
-        .await
-        .unwrap();
+    publish_dht_ops_workflow(
+        db.clone(),
+        dna_network.clone(),
+        ts.clone(),
+        author.clone(),
+        "sleuth_id".to_string(),
+    )
+    .await
+    .unwrap();
     // - The op is not published because of the time interval.
     assert_eq!(
         op_published.try_recv(),

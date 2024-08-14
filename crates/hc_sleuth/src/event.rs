@@ -323,4 +323,21 @@ impl Fact {
         any.extend(authors);
         Ok(Dep::any_named("Authority", any))
     }
+
+    pub fn op(&self) -> Option<&OpRef> {
+        use Fact::*;
+        match self {
+            Integrated { op, .. }
+            | AppValidated { op, .. }
+            | SysValidated { op, .. }
+            | MissingAppValDep { op, .. }
+            | Fetched { op, .. }
+            | SentHash { op, .. }
+            | ReceivedHash { op, .. } => Some(op),
+
+            Authored { op, .. } => Some(op.as_hash()),
+
+            AgentJoined { .. } | SweetConductorShutdown { .. } => None,
+        }
+    }
 }

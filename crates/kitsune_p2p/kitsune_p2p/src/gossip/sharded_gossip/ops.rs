@@ -297,9 +297,10 @@ impl ShardedGossipLocal {
         &self,
         source: FetchSource,
         ops: Vec<OpHashSized>,
-        transfer_method: TransferMethod,
     ) -> KitsuneResult<()> {
         for op_hash in ops {
+            self.host_api
+                .handle_op_hash_received(&self.space, &op_hash, TransferMethod::Gossip);
             let (hash, size) = op_hash.into_inner();
             let request = FetchPoolPush {
                 key: FetchKey::Op(hash),
@@ -307,7 +308,7 @@ impl ShardedGossipLocal {
                 space: self.space.clone(),
                 source: source.clone(),
                 size,
-                transfer_method,
+                transfer_method: TransferMethod::Gossip,
             };
             self.fetch_pool.push(request);
         }

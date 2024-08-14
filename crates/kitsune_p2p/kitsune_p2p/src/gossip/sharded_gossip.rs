@@ -1035,8 +1035,7 @@ impl ShardedGossipLocal {
                             // there is at least 1 agent
                             let agent = agent.agent.clone();
                             let source = FetchSource::Agent(agent);
-                            self.incoming_missing_op_hashes(source, ops, TransferMethod::Gossip)
-                                .await?;
+                            self.incoming_missing_op_hashes(source, ops).await?;
                         } else {
                             tracing::warn!(
                                 "Op hashes were received for a round with no remote agent(s). {} ops dropped!",

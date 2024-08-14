@@ -29,9 +29,15 @@ async fn no_ops_to_publish() {
     let (tx, rx) =
         TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
 
-    let work_complete = publish_dht_ops_workflow(vault, Arc::new(network), tx, fixt!(AgentPubKey))
-        .await
-        .unwrap();
+    let work_complete = publish_dht_ops_workflow(
+        vault,
+        Arc::new(network),
+        tx,
+        fixt!(AgentPubKey),
+        "sleuth_id".to_string(),
+    )
+    .await
+    .unwrap();
 
     assert_eq!(WorkComplete::Complete, work_complete);
     assert!(rx.is_paused());
@@ -58,9 +64,15 @@ async fn workflow_incomplete_on_routing_error() {
     let (tx, rx) =
         TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
 
-    let work_complete = publish_dht_ops_workflow(vault.clone(), Arc::new(network), tx, agent)
-        .await
-        .unwrap();
+    let work_complete = publish_dht_ops_workflow(
+        vault.clone(),
+        Arc::new(network),
+        tx,
+        agent,
+        "sleuth_id".to_string(),
+    )
+    .await
+    .unwrap();
 
     let publish_timestamp = get_publish_time(vault, op_hash).await;
 
@@ -90,9 +102,15 @@ async fn workflow_handles_publish_errors() {
     let (tx, rx) =
         TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
 
-    let work_complete = publish_dht_ops_workflow(vault.clone(), Arc::new(network), tx, agent)
-        .await
-        .unwrap();
+    let work_complete = publish_dht_ops_workflow(
+        vault.clone(),
+        Arc::new(network),
+        tx,
+        agent,
+        "sleuth_id".to_string(),
+    )
+    .await
+    .unwrap();
 
     let publish_timestamp = get_publish_time(vault, op_hash).await;
 
@@ -123,10 +141,15 @@ async fn retry_publish_until_receipts_received() {
     let network = Arc::new(network);
 
     for _ in 0..3 {
-        let work_complete =
-            publish_dht_ops_workflow(vault.clone(), network.clone(), tx.clone(), agent.clone())
-                .await
-                .unwrap();
+        let work_complete = publish_dht_ops_workflow(
+            vault.clone(),
+            network.clone(),
+            tx.clone(),
+            agent.clone(),
+            "sleuth_id".to_string(),
+        )
+        .await
+        .unwrap();
 
         // The work should complete but the trigger shouldn't pause so that the workflow keeps publishing until
         // enough validation receipts have been received for this op
@@ -138,9 +161,10 @@ async fn retry_publish_until_receipts_received() {
 
     do_set_receipts_complete(vault.clone(), op_hash.clone()).await;
 
-    let work_complete = publish_dht_ops_workflow(vault.clone(), network, tx, agent)
-        .await
-        .unwrap();
+    let work_complete =
+        publish_dht_ops_workflow(vault.clone(), network, tx, agent, "sleuth_id".to_string())
+            .await
+            .unwrap();
 
     assert_eq!(WorkComplete::Complete, work_complete);
     assert!(rx.is_paused()); // Should now pause, no more work to do
@@ -166,10 +190,15 @@ async fn loop_resumes_on_new_data() {
     let network = Arc::new(network);
 
     // Do a publish with no data to get into a paused state
-    let work_complete =
-        publish_dht_ops_workflow(vault.clone(), network.clone(), tx.clone(), agent.clone())
-            .await
-            .unwrap();
+    let work_complete = publish_dht_ops_workflow(
+        vault.clone(),
+        network.clone(),
+        tx.clone(),
+        agent.clone(),
+        "sleuth_id".to_string(),
+    )
+    .await
+    .unwrap();
 
     assert_eq!(WorkComplete::Complete, work_complete);
     assert!(rx.is_paused()); // No work to do, so it should pause
@@ -177,9 +206,10 @@ async fn loop_resumes_on_new_data() {
     // Now create an op and try to publish again
     create_op(vault.clone(), agent.clone()).await.unwrap();
 
-    let work_complete = publish_dht_ops_workflow(vault, network, tx, agent.clone())
-        .await
-        .unwrap();
+    let work_complete =
+        publish_dht_ops_workflow(vault, network, tx, agent.clone(), "sleuth_id".to_string())
+            .await
+            .unwrap();
 
     assert_eq!(WorkComplete::Complete, work_complete);
     assert!(!rx.is_paused()); // No validation receipts yet so might need to publish again, should it should resume
@@ -205,10 +235,15 @@ async fn ignores_data_by_other_authors() {
 
     let network = Arc::new(network);
 
-    let work_complete =
-        publish_dht_ops_workflow(vault.clone(), network.clone(), tx.clone(), agent.clone())
-            .await
-            .unwrap();
+    let work_complete = publish_dht_ops_workflow(
+        vault.clone(),
+        network.clone(),
+        tx.clone(),
+        agent.clone(),
+        "sleuth_id".to_string(),
+    )
+    .await
+    .unwrap();
 
     // Should be nothing to do, so complete and paused
     assert_eq!(WorkComplete::Complete, work_complete);

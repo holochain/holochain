@@ -534,6 +534,12 @@ impl SpaceInternalHandler for Space {
                     }
                     continue;
                 } else {
+                    ro_inner.host_api.handle_op_hash_received(
+                        &space,
+                        &op_hash,
+                        TransferMethod::Publish,
+                    );
+
                     // Add this hash to our fetch queue.
                     ro_inner.fetch_pool.push(FetchPoolPush {
                         key: FetchKey::Op(op_hash.data()),
@@ -543,12 +549,6 @@ impl SpaceInternalHandler for Space {
                         context: Some(context),
                         transfer_method: TransferMethod::Publish,
                     });
-
-                    ro_inner.host_api.handle_op_hash_received(
-                        &space,
-                        &op_hash,
-                        TransferMethod::Publish,
-                    );
 
                     // Register a callback if maybe_delegate.is_some()
                     // to invoke the delegation on receipt of data.
