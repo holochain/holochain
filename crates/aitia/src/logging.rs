@@ -93,7 +93,7 @@ pub trait FactLogMsgpackB64: FactLog {}
 impl<J: FactLogMsgpackB64> FactLog for J {
     fn encode(&self) -> String {
         let bytes = rmp_serde::to_vec(self).unwrap();
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&bytes)
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
     }
 
     fn decode(s: &str) -> Self {
