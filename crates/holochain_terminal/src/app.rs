@@ -19,7 +19,7 @@ pub struct App {
     pending_events: Vec<ScreenEvent>,
 
     /// The command line args provided to the terminal on launch
-    args: Args,
+    args: Arc<Args>,
 
     /// An admin client if the `admin_url` flag was provided
     #[allow(dead_code)]
@@ -41,7 +41,7 @@ impl App {
             tab_index: 0,
             tab_count,
             pending_events: vec![ScreenEvent::Refresh],
-            args,
+            args: Arc::new(args),
             admin_client: admin_client.map(|c| Arc::new(Mutex::new(c))),
             app_client: app_client.map(|c| Arc::new(Mutex::new(c))),
         }
@@ -72,8 +72,13 @@ impl App {
         self.tab_index
     }
 
-    pub fn args(&self) -> &Args {
-        &self.args
+    pub fn decr_tab_index(&mut self) -> usize {
+        self.tab_index = (self.tab_index + self.tab_count - 1) % self.tab_count;
+        self.tab_index
+    }
+
+    pub fn args(&self) -> Arc<Args> {
+        self.args.clone()
     }
 
     #[allow(dead_code)]
