@@ -2635,7 +2635,7 @@ dependencies = [
 
 [[package]]
 name = "hc_service_check"
-version = "0.1.0-dev.13"
+version = "0.1.0-dev.14"
 dependencies = [
  "clap 4.5.9",
  "kitsune_p2p_bootstrap_client",
@@ -2647,7 +2647,7 @@ dependencies = [
 
 [[package]]
 name = "hc_sleuth"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2671,7 +2671,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2862,7 +2862,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2976,7 +2976,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "async-trait",
  "fixt",
@@ -3006,7 +3006,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "anyhow",
  "clap 4.5.9",
@@ -3020,7 +3020,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -3046,7 +3046,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_run_local_services"
-version = "0.4.0-dev.12"
+version = "0.4.0-dev.13"
 dependencies = [
  "clap 4.5.9",
  "futures",
@@ -3060,7 +3060,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3088,7 +3088,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "derive_more",
  "holo_hash",
@@ -3114,7 +3114,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_services"
-version = "0.3.0-dev.17"
+version = "0.3.0-dev.18"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3221,7 +3221,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "aitia",
  "async-trait",
@@ -3289,7 +3289,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.4.0-dev.15"
+version = "0.4.0-dev.16"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3334,7 +3334,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "aitia",
  "anyhow",
@@ -3416,7 +3416,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3451,7 +3451,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.5.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3490,7 +3490,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -3549,7 +3549,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "async-trait",
  "criterion",
@@ -4270,7 +4270,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.4.0-dev.16"
+version = "0.4.0-dev.17"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -4306,7 +4306,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.5.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "sbd-server",
  "serde",

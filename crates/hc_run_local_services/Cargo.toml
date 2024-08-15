@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_run_local_services"
-version = "0.4.0-dev.12"
+version = "0.4.0-dev.13"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_run_local_services"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
