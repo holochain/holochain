@@ -4,6 +4,8 @@
 //! array or a base-64 string. This type just specifies how serialization should
 //! be done.
 
+use std::str::FromStr;
+
 use super::*;
 use crate::HoloHash;
 use crate::{error::HoloHashResult, HashType};
@@ -33,6 +35,13 @@ impl<T: HashType> HoloHashB64<T> {
     pub fn from_b64_str(str: &str) -> HoloHashResult<Self> {
         let bytes = holo_hash_decode_unchecked(str)?;
         HoloHash::from_raw_39(bytes).map(Into::into)
+    }
+}
+
+impl<P: PrimitiveHashType> FromStr for HoloHashB64<P> {
+    type Err = HoloHashError;
+    fn from_str(s: &str) -> Result<Self, HoloHashError> {
+        Self::from_b64_str(s)
     }
 }
 

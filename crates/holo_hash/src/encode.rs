@@ -10,6 +10,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use std::str::FromStr;
 
 impl<P: PrimitiveHashType> TryFrom<&str> for HoloHash<P> {
     type Error = HoloHashError;
@@ -30,6 +31,13 @@ impl<P: PrimitiveHashType> TryFrom<String> for HoloHash<P> {
     type Error = HoloHashError;
     fn try_from(s: String) -> Result<Self, HoloHashError> {
         Self::try_from(&s)
+    }
+}
+
+impl<P: PrimitiveHashType> FromStr for HoloHash<P> {
+    type Err = HoloHashError;
+    fn from_str(s: &str) -> Result<Self, HoloHashError> {
+        HoloHash::try_from(s)
     }
 }
 

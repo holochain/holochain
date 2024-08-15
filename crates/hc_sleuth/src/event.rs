@@ -140,29 +140,29 @@ impl aitia::Fact for Fact {
     fn explain(&self, ctx: &Self::Context) -> String {
         match self {
             Fact::Integrated { by, op } => {
-                format!("[{by}] Integrated: {op}")
+                format!("[{by}] {op} Integrated")
             }
             Fact::AppValidated { by, op } => {
-                format!("[{by}] AppValidated: {op}")
+                format!("[{by}] {op} AppValidated")
             }
             Fact::SysValidated { by, op } => {
-                format!("[{by}] SysValidated: {op}")
+                format!("[{by}] {op} SysValidated")
             }
             Fact::MissingAppValDep { by, op, deps } => {
-                format!("[{by}] PendingAppValidation: {op} deps: {deps:#?}")
+                format!("[{by}] {op} PendingAppValidation deps: {deps:#?}")
             }
-            Fact::Fetched { by, op } => format!("[{by}] Fetched: {op}"),
-            Fact::SentHash { by, op, method } => format!("[{by}] SentHash({method}): {op:?}"),
+            Fact::Fetched { by, op } => format!("[{by}] {op} Fetched"),
+            Fact::SentHash { by, op, method } => format!("[{by}] {op} SentHash({method})"),
             Fact::ReceivedHash { by, op, method } => {
-                format!("[{by}] ReceivedHash({method}): {op:?}")
+                format!("[{by}] {op} ReceivedHash({method})")
             }
             Fact::Authored { by, op } => {
                 let node = ctx.agent_node(by).expect("I got lazy");
                 let op_hash = op.as_hash();
-                format!("[{node}] Authored: {op_hash}")
+                format!("[{node}] {op_hash} Authored")
             }
             Fact::AgentJoined { node, agent } => {
-                format!("[{node}] AgentJoined: {agent}")
+                format!("[{node}] {agent} AgentJoined")
             }
             Fact::SweetConductorShutdown { node } => {
                 format!("[{node}] SweetConductorShutdown")
