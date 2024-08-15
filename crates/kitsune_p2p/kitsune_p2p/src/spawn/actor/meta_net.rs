@@ -972,6 +972,7 @@ impl MetaNet {
             tracing_enabled: tuning_params.tx5_backend_tracing_enabled,
             ephemeral_udp_port_min: tuning_params.tx5_min_ephemeral_udp_port,
             ephemeral_udp_port_max: tuning_params.tx5_max_ephemeral_udp_port,
+            ..Default::default()
         })
         .set_as_global_default()
         {
