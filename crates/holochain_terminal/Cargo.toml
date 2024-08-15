@@ -7,6 +7,7 @@ homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_terminal"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
+default-run = "hcterm"
 
 [[bin]]
 name = "hcterm"
@@ -15,8 +16,8 @@ path = "src/main.rs"
 # reminder - do not use workspace deps
 [dependencies]
 anyhow = "1.0"
-crossterm = "0.27.0"
-ratatui = "0.26"
+crossterm = "0.28.0"
+ratatui = "0.28"
 clap = { version = "4", features = ["derive"] }
 url = "2"
 once_cell = "1"

@@ -1,6 +1,6 @@
 use ratatui::{prelude::*, widgets::*};
 
-pub fn show_message(message: &str, frame: &mut Frame, rect: Rect) {
+pub fn show_message(message: &str, area: Rect, buf: &mut Buffer) {
     let p = Paragraph::new(message).block(Block::default());
-    frame.render_widget(p, rect);
+    p.render(area, buf);
 }
