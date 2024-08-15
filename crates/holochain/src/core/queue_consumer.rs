@@ -58,8 +58,8 @@ use holochain_p2p::*;
 use holochain_sqlite::prelude::DatabaseResult;
 use publish_dht_ops_consumer::*;
 
-mod countersigning_consumer;
-use countersigning_consumer::*;
+mod witnessing_consumer;
+use witnessing_consumer::*;
 
 #[cfg(test)]
 mod tests;
@@ -180,8 +180,8 @@ pub async fn spawn_queue_consumer_tasks(
         )
     });
 
-    let tx_cs = queue_consumer_map.spawn_once_countersigning(dna_hash, || {
-        spawn_countersigning_consumer(
+    let tx_witnessing = queue_consumer_map.spawn_once_countersigning(dna_hash, || {
+        spawn_witnessing_consumer(
             space.clone(),
             conductor.task_manager(),
             network.clone(),
@@ -193,7 +193,7 @@ pub async fn spawn_queue_consumer_tasks(
         QueueTriggers {
             sys_validation: tx_sys.clone(),
             publish_dht_ops: tx_publish.clone(),
-            countersigning: tx_cs,
+            witnessing: tx_witnessing,
             integrate_dht_ops: tx_integration.clone(),
         },
         InitialQueueTriggers::new(tx_sys, tx_publish, tx_app, tx_integration, tx_receipt),
@@ -319,7 +319,7 @@ pub struct QueueTriggers {
     pub publish_dht_ops: TriggerSender,
     /// Notify the countersigning workflow to run, i.e. after receiving
     /// new countersigning data.
-    pub countersigning: TriggerSender,
+    pub witnessing: TriggerSender,
     /// Notify the IntegrateDhtOps workflow to run, i.e. after InvokeCallZome
     pub integrate_dht_ops: TriggerSender,
 }
