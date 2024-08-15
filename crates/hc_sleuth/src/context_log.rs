@@ -27,7 +27,7 @@ pub static SUBSCRIBER: OnceCell<ContextSubscriber> = OnceCell::new();
 #[derive(Default, Debug)]
 pub struct Context {
     /// All events ever recorded
-    pub events: Vec<(Timestamp, Arc<Fact>)>,
+    pub events: Vec<(Timestamp, Arc<Fact>, String)>,
 
     /// All facts ever recorded
     pub facts: HashSet<Arc<Fact>>,
@@ -67,8 +67,8 @@ impl Context {
     pub fn apply_log(&mut self, r: impl BufRead) {
         use aitia::logging::Log;
         for line in r.lines() {
-            if let Some(fact) = Self::parse(&line.unwrap()) {
-                self.apply(fact);
+            if let Some((fact, raw)) = Self::parse(&line.unwrap()) {
+                self.apply(fact, raw);
             }
         }
     }
@@ -142,7 +142,7 @@ impl Context {
 impl aitia::logging::Log for Context {
     type Event = Event;
 
-    fn apply(&mut self, event: Event) {
+    fn apply(&mut self, event: Event, raw: &str) {
         match event.fact.clone() {
             Fact::Integrated { op, .. } => {
                 debug_assert!(self.op_info.contains_key(&op))
@@ -216,6 +216,6 @@ impl aitia::logging::Log for Context {
         if duplicate {
             tracing::warn!("Duplicate fact {:?}", fact);
         }
-        self.events.push((timestamp, fact));
+        self.events.push((timestamp, fact, raw.to_string()));
     }
 }

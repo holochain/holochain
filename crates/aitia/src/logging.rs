@@ -107,15 +107,15 @@ impl<J: FactLogMsgpackB64> FactLog for J {
 pub trait Log: Default {
     type Event: FactLog;
 
-    fn parse(line: &str) -> Option<Self::Event> {
+    fn parse(line: &str) -> Option<(Self::Event, &str)> {
         regex::Regex::new("<AITIA>(.*?)</AITIA>")
             .unwrap()
             .captures(line)
             .and_then(|m| m.get(1))
-            .map(|m| Self::Event::decode(m.as_str()))
+            .map(|m| (Self::Event::decode(m.as_str()), m.as_str()))
     }
 
-    fn apply(&mut self, fact: Self::Event);
+    fn apply(&mut self, fact: Self::Event, raw: &str);
 }
 
 /// A layer which only records logs emitted from aitia::trace!
@@ -153,8 +153,8 @@ impl<L: Log> std::io::Write for AitiaSubscriber<L> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let mut g = self.0.lock();
         let line = String::from_utf8_lossy(buf);
-        let step = L::parse(&line).unwrap();
-        g.apply(step);
+        let (step, raw) = L::parse(&line).unwrap();
+        g.apply(step, raw);
         Ok(buf.len())
     }
 
@@ -208,7 +208,7 @@ mod tests {
     impl super::Log for Log {
         type Event = TestFact;
 
-        fn apply(&mut self, fact: Self::Event) {
+        fn apply(&mut self, fact: Self::Event, _raw: &str) {
             self.0.push(fact)
         }
     }

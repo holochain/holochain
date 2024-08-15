@@ -164,7 +164,9 @@ pub fn test_run() {
     static INIT_ONCE: std::sync::Once = std::sync::Once::new();
 
     INIT_ONCE.call_once(|| {
-        init_fmt(Output::Log).unwrap();
+        if let Err(err) = init_fmt(Output::Log) {
+            tracing::error!("Failed to setup tracing {:?}", err);
+        }
     });
 }
 
@@ -297,7 +299,7 @@ where
                     .event_format(FormatEvent)
                     .with_filter(filter),
             )
-            .init(),
+            .try_init()?,
 
         Output::JsonTimed => Registry::default()
             .with(
@@ -308,9 +310,11 @@ where
                     .event_format(FormatEvent)
                     .with_filter(filter),
             )
-            .init(),
+            .try_init()?,
 
-        Output::Log => Registry::default().with(standard_layer(writer)?).init(),
+        Output::Log => Registry::default()
+            .with(standard_layer(writer)?)
+            .try_init()?,
 
         Output::LogTimed => Registry::default()
             .with(
@@ -318,7 +322,7 @@ where
                     .with_span_events(FmtSpan::FULL)
                     .with_filter(filter),
             )
-            .init(),
+            .try_init()?,
 
         Output::FlameTimed => Registry::default()
             .with(
@@ -328,7 +332,7 @@ where
                     .event_format(FormatEventFlame)
                     .with_filter(filter),
             )
-            .init(),
+            .try_init()?,
 
         Output::IceTimed => Registry::default()
             .with(
@@ -338,7 +342,7 @@ where
                     .event_format(FormatEventIce)
                     .with_filter(filter),
             )
-            .init(),
+            .try_init()?,
 
         Output::Compact => Registry::default()
             .with(
@@ -346,7 +350,7 @@ where
                     .compact()
                     .with_filter(filter),
             )
-            .init(),
+            .try_init()?,
 
         Output::OpenTel => {
             #[cfg(feature = "opentelemetry-on")]
@@ -363,7 +367,7 @@ where
                         .with(standard_layer(writer)?)
                         .with(telemetry)
                         .with(open::OpenLayer)
-                        .init(),
+                        .try_init()?,
                 )
             }
             #[cfg(not(feature = "opentelemetry-on"))]
@@ -391,5 +395,7 @@ pub mod errors {
         TracingFlame,
         #[error(transparent)]
         BadDirective(#[from] tracing_subscriber::filter::ParseError),
+        #[error(transparent)]
+        TryInitError(#[from] tracing_subscriber::util::TryInitError),
     }
 }

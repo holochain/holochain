@@ -3,7 +3,8 @@
 
 use std::{borrow::Cow, path::PathBuf, str::FromStr};
 
-use hc_sleuth::{aitia::Fact, Fact as HcFact};
+use aitia::logging::FactLog;
+use hc_sleuth::{aitia::Fact, Event, Fact as HcFact};
 use holochain_types::prelude::*;
 use regex::Regex;
 use structopt::StructOpt;
@@ -36,27 +37,25 @@ fn shortening<'a>(s: &'a str, n: usize) -> Cow<'a, str> {
 }
 
 fn main() {
+    holochain_trace::test_run();
     let opt = HcSleuth::from_args();
 
     match opt {
         HcSleuth::ShowGraph {
-            hash,
+            event,
             log_paths,
             shorten,
         } => {
             let ctx = build_context(log_paths);
-
-            let fact = HcFact::Integrated {
-                by: "".into(),
-                op: hash,
-            };
-            let report = aitia::simple_report(&fact.traverse(&ctx)).unwrap();
+            let event = Event::decode(&event);
+            let report = aitia::simple_report(&event.fact.traverse(&ctx)).unwrap();
             println!("{}", shortening(&report, shorten));
         }
         HcSleuth::Events {
             hash,
             log_paths,
             shorten,
+            encoded,
         } => {
             let ctx = build_context(log_paths);
 
@@ -70,7 +69,7 @@ fn main() {
             let events: Vec<_> = ctx
                 .events
                 .iter()
-                .filter(|(_, f)| f.op().map(|op| ops.contains(&op)).unwrap_or(false))
+                .filter(|(_, f, _)| f.op().map(|op| ops.contains(&op)).unwrap_or(false))
                 // .filter(|(_, f)| {
                 //     matches!(
                 //         **f,
@@ -82,10 +81,14 @@ fn main() {
             if events.is_empty() {
                 println!("No filtered events found for hash {}", hash);
             } else {
-                for (ts, fact) in events {
+                for (ts, fact, raw) in events {
                     let show = fact.explain(&ctx);
                     let show = shortening(&show, shorten);
-                    println!("{ts}: {show}");
+                    if encoded {
+                        println!("{ts}: {show}   {raw}");
+                    } else {
+                        println!("{ts}: {show}");
+                    }
                 }
             }
         }
@@ -99,8 +102,8 @@ fn main() {
 )]
 pub enum HcSleuth {
     ShowGraph {
-        #[structopt(help = "The base-64 DhtOpHash (prefix \"uhCQk\") to check for integration")]
-        hash: DhtOpHash,
+        #[structopt(help = "The base-64 encoded aitia Event to show the graph for")]
+        event: String,
 
         #[structopt(
             short,
@@ -137,6 +140,13 @@ pub enum HcSleuth {
             help = "Shorten hashes in output to the last N base64 characters"
         )]
         shorten: usize,
+
+        #[structopt(
+            short,
+            long,
+            help = "Include the base64 event encoding in the output, useful for input to `hc-sleuth show-graph`"
+        )]
+        encoded: bool,
     },
     //
     // Query {
