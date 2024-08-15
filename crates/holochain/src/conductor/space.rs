@@ -17,10 +17,10 @@ use crate::conductor::{error::ConductorError, state::ConductorState};
 use crate::core::{
     queue_consumer::QueueConsumerMap,
     workflow::{
-        countersigning_workflow::{incoming_countersigning, CountersigningWorkspace},
         incoming_dht_ops_workflow::{
             incoming_dht_ops_workflow, IncomingOpHashes, IncomingOpsBatch,
         },
+        witnessing_workflow::{receive_incoming_countersigning_ops, WitnessingWorkspace},
     },
 };
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
@@ -108,7 +108,7 @@ pub struct Space {
     pub dht_query_cache: DhtDbQueryCache,
 
     /// Countersigning workspace that is shared across this cell.
-    pub countersigning_workspace: CountersigningWorkspace,
+    pub witnessing_workspace: WitnessingWorkspace,
 
     /// Incoming op hashes that are queued for processing.
     pub incoming_op_hashes: IncomingOpHashes,
@@ -699,7 +699,7 @@ impl Spaces {
 
             let (workspace, trigger) = self.get_or_create_space_ref(dna_hash, |space| {
                 (
-                    space.countersigning_workspace.clone(),
+                    space.witnessing_workspace.clone(),
                     self.queue_consumer_map
                         .countersigning_trigger(space.dna_hash.clone()),
                 )
@@ -709,7 +709,7 @@ impl Spaces {
                 // If the workflow has not been spawned yet we can't handle incoming messages.
                 None => return Ok(()),
             };
-            incoming_countersigning(ops, &workspace, trigger)?;
+            receive_incoming_countersigning_ops(ops, &workspace, trigger)?;
         } else {
             let space = self.get_or_create_space(dna_hash)?;
             let trigger = match self
@@ -803,7 +803,7 @@ impl Space {
         ));
         let p2p_batch_sender = tx;
 
-        let countersigning_workspace = CountersigningWorkspace::new();
+        let countersigning_workspace = WitnessingWorkspace::new();
         let incoming_op_hashes = IncomingOpHashes::default();
         let incoming_ops_batch = IncomingOpsBatch::default();
         let dht_query_cache = DhtDbQueryCache::new(dht_db.clone().into());
@@ -815,7 +815,7 @@ impl Space {
             p2p_agents_db,
             p2p_metrics_db,
             p2p_batch_sender,
-            countersigning_workspace,
+            witnessing_workspace: countersigning_workspace,
             incoming_op_hashes,
             incoming_ops_batch,
             dht_query_cache,
