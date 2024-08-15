@@ -2643,6 +2643,7 @@ dependencies = [
  "holochain_trace",
  "holochain_types",
  "kitsune_p2p",
+ "maplit",
  "once_cell",
  "parking_lot 0.12.3",
  "petgraph",

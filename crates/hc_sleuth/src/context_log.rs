@@ -47,8 +47,11 @@ pub struct Context {
     /// Track which op a dependency is part of
     pub map_dep_hash_to_op: HashMap<AnyDhtHash, OpRef>,
 
-    /// Map the (action hash + op type) representation to the actual op hash
-    pub map_action_to_op: HashMap<ChainOpAction, OpRef>,
+    /// Map the action hash to the associated op hashes
+    pub map_action_to_ops: HashMap<ActionHash, HashSet<OpRef>>,
+
+    /// Map the warrant hash to the op hashes
+    pub map_warrant_to_ops: HashMap<WarrantHash, HashSet<OpRef>>,
 
     /// The full info associated with each op hash
     pub op_info: HashMap<OpRef, OpInfo>,
@@ -56,14 +59,18 @@ pub struct Context {
 
 impl Context {
     pub fn from_file(r: impl BufRead) -> Self {
-        use aitia::logging::Log;
         let mut la = Self::default();
+        la.apply_log(r);
+        la
+    }
+
+    pub fn apply_log(&mut self, r: impl BufRead) {
+        use aitia::logging::Log;
         for line in r.lines() {
             if let Some(fact) = Self::parse(&line.unwrap()) {
-                la.apply(fact);
+                self.apply(fact);
             }
         }
-        la
     }
 
     pub fn check(&self, fact: &Fact) -> bool {
@@ -118,12 +125,11 @@ impl Context {
         self.op_info.get(op).ok_or(format!("op_info({op})"))
     }
 
-    pub fn op_from_action(&self, action: ActionHash, op_type: ChainOpType) -> ContextResult<OpRef> {
-        let oa = ChainOpAction(action, op_type);
-        self.map_action_to_op
-            .get(&oa)
+    pub fn ops_from_action(&self, action: &ActionHash) -> ContextResult<HashSet<OpRef>> {
+        self.map_action_to_ops
+            .get(action)
             .cloned()
-            .ok_or(format!("map_action_to_op({oa:?})"))
+            .ok_or(format!("map_action_to_ops({action:?})"))
     }
 
     pub fn as_if(&mut self) {
@@ -166,14 +172,23 @@ impl aitia::logging::Log for Context {
             Fact::Authored { by: _, op } => {
                 // TODO: add check that the same op is not authored twice?
                 let op_hash = op.as_hash();
-                let a = match &op.op {
-                    DhtOpLite::Chain(op) => ChainOpAction::from((**op).clone()),
-                    _ => unimplemented!("hc_sleuth can only handle chain ops"),
+                match &op.op {
+                    DhtOpLite::Chain(op) => {
+                        self.map_action_to_ops
+                            .entry(op.action_hash().clone())
+                            .or_default()
+                            .insert(op_hash.clone());
+                    }
+                    DhtOpLite::Warrant(op) => {
+                        self.map_warrant_to_ops
+                            .entry(op.warrant().to_hash())
+                            .or_default()
+                            .insert(op_hash.clone());
+                    }
                 };
                 for h in op.fetch_dependency_hashes() {
                     self.map_dep_hash_to_op.insert(h, op_hash.clone());
                 }
-                self.map_action_to_op.insert(a, op_hash.clone());
                 self.map_op_to_sysval_dep_hashes
                     .insert(op_hash.clone(), op.dep.clone());
                 self.op_info.insert(op_hash.clone(), op);
