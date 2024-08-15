@@ -40,9 +40,9 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::call_zome_workflow;
 use crate::core::workflow::countersigning_workflow::countersigning_success;
-use crate::core::workflow::countersigning_workflow::incoming_countersigning;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::initialize_zomes_workflow;
+use crate::core::workflow::witnessing_workflow::receive_incoming_countersigning_ops;
 use crate::core::workflow::CallZomeWorkflowArgs;
 use crate::core::workflow::GenesisWorkflowArgs;
 use crate::core::workflow::GenesisWorkspace;
@@ -587,7 +587,7 @@ impl Cell {
         Ok(())
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, message)))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     /// we are receiving a response from a countersigning authority
     async fn handle_countersigning_session_negotiation(
         &self,
@@ -602,10 +602,10 @@ impl Cell {
                         (hash, op)
                     })
                     .collect();
-                incoming_countersigning(
+                receive_incoming_countersigning_ops(
                     ops,
-                    &self.space.countersigning_workspace,
-                    self.queue_triggers.countersigning.clone(),
+                    &self.space.witnessing_workspace,
+                    self.queue_triggers.witnessing.clone(),
                 )
                 .map_err(Box::new)?;
                 Ok(())
