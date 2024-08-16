@@ -1,7 +1,7 @@
 //! This is just the beginnings of a CLI tool for generating hc_sleuth reports.
 //! It's nowhere near useful, so it's not even built yet.
 
-use std::{borrow::Cow, path::PathBuf, str::FromStr};
+use std::{borrow::Cow, path::PathBuf, str::FromStr, thread::panicking};
 
 use aitia::logging::FactLog;
 use hc_sleuth::{aitia::Fact, Event, Fact as HcFact};
@@ -48,8 +48,11 @@ fn main() {
         } => {
             let ctx = build_context(log_paths);
             let event = Event::decode(&event);
-            let report = aitia::simple_report(&event.fact.traverse(&ctx)).unwrap();
-            println!("{}", shortening(&report, shorten));
+            if let Some(report) = aitia::simple_report(&event.fact.traverse(&ctx)) {
+                println!("{}", shortening(&report, shorten));
+            } else {
+                // No report means success
+            }
         }
         HcSleuth::Events {
             hash,

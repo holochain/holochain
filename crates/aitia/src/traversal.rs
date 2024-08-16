@@ -177,7 +177,7 @@ fn traverse_inner<F: Fact>(
                 table.insert(dep.clone(), Some(TraversalStep::Continue(cs.clone())));
                 err
             })?;
-            tracing::trace!("Any. checks: {:?}", checks);
+            tracing::trace!("Any. checks: {:#?}", checks);
             if checks.is_empty() {
                 // All loops
                 tracing::debug!("All loops");
@@ -188,7 +188,7 @@ fn traverse_inner<F: Fact>(
                 .into_iter()
                 .filter_map(|(dep, check)| (!check.is_pass()).then_some(dep))
                 .collect();
-            tracing::trace!("Any. fails: {:?}", fails);
+            tracing::trace!("Any. fails: {:#?}", fails);
             if fails.len() < num_checks {
                 TraversalStep::Terminate
             } else {

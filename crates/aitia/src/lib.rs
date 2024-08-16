@@ -83,7 +83,7 @@ impl<'c, F: Fact> TraversalOutcome<'c, F> {
         match self {
             TraversalOutcome::Success => None,
             TraversalOutcome::DependencyNotMet => Some("aitia dependency not met given the context".to_string()) ,
-            TraversalOutcome::IncorrectModel(deps) => Some(format!("Target fact was true, but some dependency checks failed. Your model may be incorrect. Failed checks: {deps:?}")) ,
+            TraversalOutcome::IncorrectModel(deps) => Some(format!("Target fact was true, but some dependency checks failed. Your model may be incorrect. Failed checks: {deps:#?}")) ,
         }
     }
 
