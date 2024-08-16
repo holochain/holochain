@@ -4,16 +4,104 @@ use super::error::WorkflowResult;
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::QueueTriggers;
 use crate::core::ribosome::weigh_placeholder;
+use crate::core::workflow::WorkflowError;
 use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, OpBasis};
-use holochain_keystore::AgentPubKeyExt;
+use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::mutations;
 use holochain_state::prelude::*;
+use kitsune_p2p_types::tx2::tx2_utils::Share;
+use kitsune_p2p_types::KitsuneError;
 use rusqlite::{named_params, Transaction};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::broadcast;
+
+/// Countersigning workspace to hold session state.
+#[derive(Clone, Default)]
+pub struct CountersigningWorkspace {
+    inner: Share<CountersigningWorkspaceInner>,
+}
+
+/// The inner state of a countersigning workspace.
+#[derive(Default)]
+pub struct CountersigningWorkspaceInner {
+    sessions: HashMap<AgentPubKey, PreflightRequest>,
+}
+
+/// Accept a countersigning session.
+///
+/// This will register the session in the workspace, lock the agent's source chain and build the
+/// pre-flight response.
+pub(crate) async fn accept_countersigning_request(
+    space: Space,
+    keystore: MetaLairClient,
+    author: AgentPubKey,
+    request: PreflightRequest,
+) -> WorkflowResult<PreflightRequestAcceptance> {
+    // First check if there is already a session in progress.
+    // If there is, we can't start another one.
+    // If there isn't, then we register the session in the workspace. This will be used later when
+    // tracking session expiry.
+    if let Err(_) = space.countersigning_workspace.inner.share_mut(|inner, _| {
+        match inner.sessions.entry(author.clone()) {
+            std::collections::hash_map::Entry::Occupied(_) => {
+                Err(KitsuneError::other("Session already exists"))
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(request.clone());
+                Ok(())
+            }
+        }
+    }) {
+        return Ok(PreflightRequestAcceptance::AnotherSessionIsInProgress);
+    };
+
+    // Find the index of our agent in the list of signing agents.
+    let agent_index = match request
+        .signing_agents
+        .iter()
+        .position(|(agent, _)| agent == &author)
+    {
+        Some(agent_index) => agent_index as u8,
+        None => return Ok(PreflightRequestAcceptance::UnacceptableAgentNotFound),
+    };
+
+    // Take out a lock on our source chain and build our current state to include in the pre-flight
+    // response.
+    let source_chain = space.source_chain(keystore.clone(), author.clone()).await?;
+    let countersigning_agent_state = source_chain
+        .accept_countersigning_preflight_request(request.clone(), agent_index)
+        .await?;
+
+    // Create a signature for the pre-fight response, so that other agents can verify that the
+    // acceptance really came from us.
+    let signature: Signature = match keystore
+        .sign(
+            author,
+            PreflightResponse::encode_fields_for_signature(&request, &countersigning_agent_state)?
+                .into(),
+        )
+        .await
+    {
+        Ok(signature) => signature,
+        Err(e) => {
+            // Attempt to unlock the chain again.
+            // If this fails the chain will remain locked until the session end time.
+            // But also we're handling a keystore error already, so we should return that.
+            if let Err(unlock_result) = source_chain.unlock_chain().await {
+                tracing::error!(?unlock_result);
+            }
+            return Err(WorkflowError::other(e));
+        }
+    };
+
+    Ok(PreflightRequestAcceptance::Accepted(
+        PreflightResponse::try_new(request, countersigning_agent_state, signature)?,
+    ))
+}
 
 /// An incoming countersigning session success.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]

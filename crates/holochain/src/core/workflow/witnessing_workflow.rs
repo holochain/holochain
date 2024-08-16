@@ -11,15 +11,15 @@ use holochain_state::prelude::*;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use std::collections::HashMap;
 
-#[derive(Clone, Default)]
 /// A cheaply cloneable, thread-safe and in-memory store for
 /// active countersigning sessions.
+#[derive(Clone, Default)]
 pub struct WitnessingWorkspace {
     inner: Share<WitnessingWorkspaceInner>,
 }
 
-#[derive(Default)]
 /// Pending countersigning sessions.
+#[derive(Default)]
 pub struct WitnessingWorkspaceInner {
     pending: HashMap<EntryHash, Session>,
 }
