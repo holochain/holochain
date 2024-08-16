@@ -14,6 +14,83 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240815.102626
+
+## [hc\_service\_check-0.1.0-dev.14](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.14)
+
+## [hcterm-0.4.0-dev.18](crates/hcterm/CHANGELOG.md#0.4.0-dev.18)
+
+- Adds a new `hcterm` landing screen to show what args have been provided and how to use the app.
+- Fixes the network info screen of `hcterm` to not fetch network info on every render. Instead, it uses a 10s automatic refresh to fetch the network info.
+
+## [holochain\_cli-0.4.0-dev.18](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain-0.4.0-dev.18](crates/holochain/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_cli\_bundle-0.4.0-dev.18](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.13](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.18](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_cascade-0.4.0-dev.18](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_conductor\_api-0.4.0-dev.18](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_conductor\_services-0.3.0-dev.18](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.18)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.18](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_websocket-0.4.0-dev.18](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_state-0.4.0-dev.18](crates/holochain_state/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_p2p-0.4.0-dev.18](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.18)
+
+## [hc\_sleuth-0.4.0-dev.18](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_types-0.4.0-dev.18](crates/holochain_types/CHANGELOG.md#0.4.0-dev.18)
+
+## [kitsune\_p2p-0.4.0-dev.17](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.17)
+
+- minor sbd rate limiting fix - tx5 webrtc buffer size fix - tx5 webrtc connection close fix - better tx5 connection tracing [\#4184](https://github.com/holochain/holochain/pull/4184)
+
+## [holochain\_sqlite-0.4.0-dev.16](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.16)
+
+# 20240814.004012
+
+## [hcterm-0.4.0-dev.17](crates/hcterm/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_cli-0.4.0-dev.17](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain-0.4.0-dev.17](crates/holochain/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_cli\_bundle-0.4.0-dev.17](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.17](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_cascade-0.4.0-dev.17](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_conductor\_api-0.4.0-dev.17](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_conductor\_services-0.3.0-dev.17](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.17)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.17](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_websocket-0.4.0-dev.17](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_state-0.4.0-dev.17](crates/holochain_state/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_p2p-0.4.0-dev.17](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.17)
+
+## [hc\_sleuth-0.4.0-dev.17](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_types-0.4.0-dev.17](crates/holochain_types/CHANGELOG.md#0.4.0-dev.17)
+
+## [kitsune\_p2p-0.4.0-dev.16](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.16)
+
+## [holochain\_keystore-0.4.0-dev.16](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.16)
+
 # 20240807.004831
 
 ## [hcterm-0.4.0-dev.16](crates/hcterm/CHANGELOG.md#0.4.0-dev.16)

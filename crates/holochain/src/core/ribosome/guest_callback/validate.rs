@@ -252,6 +252,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .await
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -268,6 +269,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .await
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -302,6 +304,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .await
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()));
     }
