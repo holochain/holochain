@@ -1,3 +1,4 @@
+use super::guest_callback::call_stream;
 use super::guest_callback::entry_defs::EntryDefsHostAccess;
 use super::guest_callback::init::InitHostAccess;
 use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
@@ -27,7 +28,7 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::CallIterator;
+use crate::core::ribosome::guest_callback::CallStream;
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
 use crate::core::ribosome::host_fn::block_agent::block_agent;
@@ -84,12 +85,14 @@ use crate::core::ribosome::GenesisSelfCheckHostAccessV2;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
-use fallible_iterator::FallibleIterator;
+use futures::FutureExt;
+use ghost_actor::dependencies::must_future::MustBoxFuture;
 use holochain_types::prelude::*;
 use holochain_util::timed;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
+use tokio_stream::StreamExt;
 use wasmer::AsStoreMut;
 use wasmer::Exports;
 use wasmer::Function;
@@ -656,11 +659,10 @@ impl RealRibosome {
             .ok_or_else(|| ZomeTypesError::MissingDependenciesForZome(zome_name.clone()))?)
     }
 
-    pub fn call_zome_fn<I: Invocation>(
-        &self,
-        invocation: &I,
-        zome: &Zome,
-        fn_name: &FunctionName,
+    pub fn call_zome_fn(
+        input: ExternIO,
+        zome: Zome,
+        fn_name: FunctionName,
         instance_with_store: Arc<InstanceWithStore>,
     ) -> Result<ExternIO, RibosomeError> {
         let fn_name = fn_name.clone();
@@ -668,15 +670,8 @@ impl RealRibosome {
 
         let mut store_lock = instance_with_store.store.lock();
         let mut store_mut = store_lock.as_store_mut();
-        let result = holochain_wasmer_host::guest::call(
-            &mut store_mut,
-            instance,
-            fn_name.as_ref(),
-            // be aware of this clone!
-            // the whole invocation is cloned!
-            // @todo - is this a problem for large payloads like entries?
-            invocation.to_owned().host_input()?,
-        );
+        let result =
+            holochain_wasmer_host::guest::call(&mut store_mut, instance, fn_name.as_ref(), input);
         if let Err(runtime_error) = &result {
             tracing::error!(?runtime_error, ?zome, ?fn_name);
         }
@@ -685,7 +680,6 @@ impl RealRibosome {
     }
 
     pub fn call_const_fn(
-        &self,
         instance_with_store: Arc<InstanceWithStore>,
         name: &str,
     ) -> Result<Option<i32>, RibosomeError> {
@@ -728,25 +722,26 @@ impl RealRibosome {
 /// From<Vec<(ZomeName, $callback_result)>> for ValidationResult
 macro_rules! do_callback {
     ( $self:ident, $access:ident, $invocation:ident, $callback_result:ty ) => {{
+        use tokio_stream::StreamExt;
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
         // fallible iterator syntax instead of for loop
-        let mut call_iterator = $self.call_iterator($access.into(), $invocation);
+        let mut call_stream = $self.call_stream($access.into(), $invocation);
         loop {
             let (zome_name, callback_result): (ZomeName, $callback_result) =
-                match call_iterator.next() {
-                    Ok(Some((zome, extern_io))) => (
+                match call_stream.next().await {
+                    Some(Ok((zome, extern_io))) => (
                         zome.into(),
                         extern_io
                             .decode()
                             .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                     ),
-                    Err((zome, RibosomeError::WasmRuntimeError(runtime_error))) => (
+                    Some(Err((zome, RibosomeError::WasmRuntimeError(runtime_error)))) => (
                         zome.into(),
                         <$callback_result>::try_from_wasm_error(runtime_error.downcast()?)
                             .map_err(|e| -> RuntimeError { e.into() })?,
                     ),
-                    Err((_zome, other_error)) => return Err(other_error),
-                    Ok(None) => {
+                    Some(Err((_zome, other_error))) => return Err(other_error),
+                    None => {
                         break;
                     }
                 };
@@ -763,7 +758,7 @@ macro_rules! do_callback {
 }
 
 impl RealRibosome {
-    fn run_genesis_self_check_v1(
+    async fn run_genesis_self_check_v1(
         &self,
         host_access: GenesisSelfCheckHostAccessV1,
         invocation: GenesisSelfCheckInvocationV1,
@@ -771,12 +766,112 @@ impl RealRibosome {
         do_callback!(self, host_access, invocation, ValidateCallbackResult)
     }
 
-    fn run_genesis_self_check_v2(
+    async fn run_genesis_self_check_v2(
         &self,
         host_access: GenesisSelfCheckHostAccessV2,
         invocation: GenesisSelfCheckInvocationV2,
     ) -> RibosomeResult<GenesisSelfCheckResultV1> {
         do_callback!(self, host_access, invocation, ValidateCallbackResult)
+    }
+
+    /// call a function in a zome for an invocation if it exists
+    /// if it does not exist, then return Ok(None)
+    pub async fn maybe_call<I: Invocation>(
+        &self,
+        host_context: HostContext,
+        invocation: &I,
+        zome: Zome,
+        fn_name: FunctionName,
+    ) -> Result<Option<ExternIO>, RibosomeError> {
+        let mut otel_info = vec![
+            opentelemetry_api::KeyValue::new("dna", self.dna_file.dna().hash.to_string()),
+            opentelemetry_api::KeyValue::new("zome", zome.zome_name().to_string()),
+            opentelemetry_api::KeyValue::new("fn", fn_name.to_string()),
+        ];
+
+        if let Some(agent_pubkey) = host_context.maybe_workspace().and_then(|workspace| {
+            workspace
+                .source_chain()
+                .as_ref()
+                .map(|source_chain| source_chain.agent_pubkey().to_string())
+        }) {
+            otel_info.push(opentelemetry_api::KeyValue::new("agent", agent_pubkey));
+        }
+
+        let call_context = CallContext {
+            zome: zome.clone(),
+            function_name: fn_name.clone(),
+            host_context,
+            auth: invocation.auth(),
+        };
+
+        match zome.zome_def() {
+            ZomeDef::Wasm(_) => {
+                let module = self.get_module_for_zome(&zome).await?;
+                if module.info().exports.contains_key(fn_name.as_ref()) {
+                    // there is a corresponding zome fn
+                    let context_key = Self::next_context_key();
+                    let instance_with_store =
+                        self.build_instance_with_store(module, context_key)?;
+                    // add call context to map for the following call
+                    {
+                        CONTEXT_MAP
+                            .lock()
+                            .insert(context_key, Arc::new(call_context));
+                    }
+
+                    let instance = instance_with_store.instance.clone();
+                    {
+                        let mut store_lock = instance_with_store.store.lock();
+                        let mut store_mut = store_lock.as_store_mut();
+                        set_remaining_points(
+                            &mut store_mut,
+                            instance.as_ref(),
+                            WASM_METERING_LIMIT,
+                        );
+                    }
+
+                    // be aware of this clone!
+                    // the whole invocation is cloned!
+                    // @todo - is this a problem for large payloads like entries?
+                    let input = invocation.clone().host_input()?;
+                    let instance_with_store_clone = instance_with_store.clone();
+                    let result = tokio::task::spawn_blocking(move || {
+                        Self::call_zome_fn(input, zome, fn_name, instance_with_store_clone)
+                            .map(Some)
+                    })
+                    .await?;
+
+                    {
+                        let mut store_lock = instance_with_store.store.lock();
+                        let mut store_mut = store_lock.as_store_mut();
+                        let points_used =
+                            match get_remaining_points(&mut store_mut, instance.as_ref()) {
+                                MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
+                                MeteringPoints::Exhausted => WASM_METERING_LIMIT,
+                            };
+                        self.usage_meter.add(points_used, &otel_info);
+                    }
+
+                    // remove context from map after call
+                    {
+                        CONTEXT_MAP.lock().remove(&context_key);
+                    }
+                    result
+                } else {
+                    // the callback fn does not exist
+                    Ok(None)
+                }
+            }
+            ZomeDef::Inline {
+                inline_zome: zome, ..
+            } => {
+                let input = invocation.clone().host_input()?;
+                let api = HostFnApi::new(Arc::new(self.clone()), Arc::new(call_context));
+                let result = zome.0.maybe_call(Box::new(api), &fn_name, input)?;
+                Ok(result)
+            }
+        }
     }
 }
 
@@ -785,7 +880,7 @@ impl RibosomeT for RealRibosome {
         self.dna_file.dna()
     }
 
-    fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo> {
+    async fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo> {
         // Get the dependencies for this zome.
         let zome_dependencies = self.get_zome_dependencies(zome.zome_name())?;
         // Scope the zome types to these dependencies.
@@ -800,6 +895,7 @@ impl RibosomeT for RealRibosome {
             entry_defs: {
                 match self
                     .run_entry_defs(EntryDefsHostAccess, EntryDefsInvocation)
+                    .await
                     .map_err(|e| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(e.to_string())).into()
                     })? {
@@ -849,95 +945,25 @@ impl RibosomeT for RealRibosome {
 
     /// call a function in a zome for an invocation if it exists
     /// if it does not exist, then return Ok(None)
-    async fn maybe_call<I: Invocation>(
+    fn maybe_call<I: Invocation + 'static>(
         &self,
         host_context: HostContext,
         invocation: &I,
         zome: &Zome,
         fn_name: &FunctionName,
-    ) -> Result<Option<ExternIO>, RibosomeError> {
-        let mut otel_info = vec![
-            opentelemetry_api::KeyValue::new("dna", self.dna_file.dna().hash.to_string()),
-            opentelemetry_api::KeyValue::new("zome", zome.zome_name().to_string()),
-            opentelemetry_api::KeyValue::new("fn", fn_name.to_string()),
-        ];
-
-        if let Some(agent_pubkey) = host_context.maybe_workspace().and_then(|workspace| {
-            workspace
-                .source_chain()
-                .as_ref()
-                .map(|source_chain| source_chain.agent_pubkey().to_string())
-        }) {
-            otel_info.push(opentelemetry_api::KeyValue::new("agent", agent_pubkey));
-        }
-
-        let call_context = CallContext {
-            zome: zome.clone(),
-            function_name: fn_name.clone(),
-            host_context,
-            auth: invocation.auth(),
-        };
-
-        match zome.zome_def() {
-            ZomeDef::Wasm(_) => {
-                let module = self.get_module_for_zome(zome).await?;
-                if module.info().exports.contains_key(fn_name.as_ref()) {
-                    // there is a corresponding zome fn
-                    let context_key = Self::next_context_key();
-                    let instance_with_store =
-                        self.build_instance_with_store(module, context_key)?;
-                    // add call context to map for the following call
-                    {
-                        CONTEXT_MAP
-                            .lock()
-                            .insert(context_key, Arc::new(call_context));
-                    }
-
-                    let instance = instance_with_store.instance.clone();
-                    {
-                        let mut store_lock = instance_with_store.store.lock();
-                        let mut store_mut = store_lock.as_store_mut();
-                        set_remaining_points(
-                            &mut store_mut,
-                            instance.as_ref(),
-                            WASM_METERING_LIMIT,
-                        );
-                    }
-
-                    let result = self
-                        .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store.clone())
-                        .map(Some);
-
-                    {
-                        let mut store_lock = instance_with_store.store.lock();
-                        let mut store_mut = store_lock.as_store_mut();
-                        let points_used =
-                            match get_remaining_points(&mut store_mut, instance.as_ref()) {
-                                MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
-                                MeteringPoints::Exhausted => WASM_METERING_LIMIT,
-                            };
-                        self.usage_meter.add(points_used, &otel_info);
-                    }
-
-                    // remove context from map after call
-                    {
-                        CONTEXT_MAP.lock().remove(&context_key);
-                    }
-                    result
-                } else {
-                    // the callback fn does not exist
-                    Ok(None)
-                }
-            }
-            ZomeDef::Inline {
-                inline_zome: zome, ..
-            } => {
-                let input = invocation.clone().host_input()?;
-                let api = HostFnApi::new(Arc::new(self.clone()), Arc::new(call_context));
-                let result = zome.0.maybe_call(Box::new(api), fn_name, input)?;
-                Ok(result)
-            }
-        }
+    ) -> MustBoxFuture<'static, Result<Option<ExternIO>, RibosomeError>>
+    where
+        Self: 'static,
+    {
+        let this = self.clone();
+        let invocation = invocation.clone();
+        let zome = zome.clone();
+        let fn_name = fn_name.clone();
+        let f = tokio::spawn(async move {
+            this.maybe_call(host_context, &invocation, zome, fn_name)
+                .await
+        });
+        async move { f.await.unwrap() }.boxed().into()
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
@@ -972,7 +998,11 @@ impl RibosomeT for RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
-                    let result = self.call_const_fn(instance_with_store, name);
+                    let name = name.to_string();
+                    let result = tokio::task::spawn_blocking(move || {
+                        Self::call_const_fn(instance_with_store, &name)
+                    })
+                    .await?;
                     // remove the blank context.
                     {
                         CONTEXT_MAP.lock().remove(&context_key);
@@ -990,17 +1020,18 @@ impl RibosomeT for RealRibosome {
         }
     }
 
-    fn call_iterator<I: crate::core::ribosome::Invocation>(
+    fn call_stream<I: crate::core::ribosome::Invocation + 'static>(
         &self,
         host_context: HostContext,
         invocation: I,
-    ) -> CallIterator<Self, I> {
-        CallIterator::new(host_context, self.clone(), invocation)
+    ) -> CallStream {
+        let (s, _h) = call_stream(host_context, self.clone(), invocation);
+        s
     }
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function(
+    async fn call_zome_function(
         &self,
         host_access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
@@ -1009,11 +1040,14 @@ impl RibosomeT for RealRibosome {
         let zome_name = invocation.zome.zome_name().clone();
         let fn_name = invocation.fn_name.clone();
 
-        let guest_output: ExternIO = match self.call_iterator(host_access.into(), invocation).next()
+        let guest_output: ExternIO = match self
+            .call_stream(host_access.into(), invocation)
+            .next()
+            .await
         {
-            Ok(Some((_zome, extern_io))) => extern_io,
-            Ok(None) => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
-            Err((_zome, ribosome_error)) => return Err(ribosome_error),
+            None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
+            Some(Ok((_zome, extern_io))) => extern_io,
+            Some(Err((_zome, ribosome_error))) => return Err(ribosome_error),
         };
 
         Ok(ZomeCallResponse::Ok(guest_output))
@@ -1022,18 +1056,22 @@ impl RibosomeT for RealRibosome {
     /// Post commit works a bit different to the other callbacks.
     /// As it is dispatched from a spawned task there is nothing to handle any
     /// result, good or bad, other than to maybe log some error.
-    fn run_post_commit(
+    async fn run_post_commit(
         &self,
         host_access: PostCommitHostAccess,
         invocation: PostCommitInvocation,
     ) -> RibosomeResult<()> {
-        match self.call_iterator(host_access.into(), invocation).next() {
-            Ok(_) => Ok(()),
-            Err((_zome, ribosome_error)) => Err(ribosome_error),
+        match self
+            .call_stream(host_access.into(), invocation)
+            .next()
+            .await
+        {
+            Some(Ok(_)) | None => Ok(()),
+            Some(Err((_zome, ribosome_error))) => Err(ribosome_error),
         }
     }
 
-    fn run_genesis_self_check(
+    async fn run_genesis_self_check(
         &self,
         host_access: GenesisSelfCheckHostAccess,
         invocation: GenesisSelfCheckInvocation,
@@ -1046,15 +1084,19 @@ impl RibosomeT for RealRibosome {
             GenesisSelfCheckHostAccessV1,
             GenesisSelfCheckHostAccessV2,
         ) = host_access.into();
-        match self.run_genesis_self_check_v1(host_access_v1, invocation_v1) {
+        match self
+            .run_genesis_self_check_v1(host_access_v1, invocation_v1)
+            .await
+        {
             Ok(GenesisSelfCheckResultV1::Valid) => Ok(self
-                .run_genesis_self_check_v2(host_access_v2, invocation_v2)?
+                .run_genesis_self_check_v2(host_access_v2, invocation_v2)
+                .await?
                 .into()),
             result => Ok(result?.into()),
         }
     }
 
-    fn run_validate(
+    async fn run_validate(
         &self,
         host_access: ValidateHostAccess,
         invocation: ValidateInvocation,
@@ -1062,7 +1104,7 @@ impl RibosomeT for RealRibosome {
         do_callback!(self, host_access, invocation, ValidateCallbackResult)
     }
 
-    fn run_init(
+    async fn run_init(
         &self,
         host_access: InitHostAccess,
         invocation: InitInvocation,
@@ -1070,7 +1112,7 @@ impl RibosomeT for RealRibosome {
         do_callback!(self, host_access, invocation, InitCallbackResult)
     }
 
-    fn run_entry_defs(
+    async fn run_entry_defs(
         &self,
         host_access: EntryDefsHostAccess,
         invocation: EntryDefsInvocation,
@@ -1078,7 +1120,7 @@ impl RibosomeT for RealRibosome {
         do_callback!(self, host_access, invocation, EntryDefsCallbackResult)
     }
 
-    fn run_migrate_agent(
+    async fn run_migrate_agent(
         &self,
         host_access: MigrateAgentHostAccess,
         invocation: MigrateAgentInvocation,

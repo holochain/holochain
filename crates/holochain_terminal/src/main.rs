@@ -62,9 +62,9 @@ fn main() -> anyhow::Result<()> {
         (None, None)
     };
 
-    let mut app = App::new(args, admin_client, app_client, 2);
+    let mut app = App::new(args, admin_client, app_client, 3);
 
-    let backend = CrosstermBackend::new(io::stderr());
+    let backend = CrosstermBackend::new(io::stdout());
     let terminal = Terminal::new(backend)?;
     let mut tui = Tui::new(terminal);
     tui.init()?;

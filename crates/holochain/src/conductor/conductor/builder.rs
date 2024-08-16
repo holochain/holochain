@@ -293,12 +293,7 @@ impl ConductorBuilder {
                     } = post_commit_args;
                     match conductor_handle.clone().get_ribosome(cell_id.dna_hash()) {
                         Ok(ribosome) => {
-                            if let Err(e) = tokio::task::spawn_blocking(move || {
-                                if let Err(e) = ribosome.run_post_commit(host_access, invocation) {
-                                    tracing::error!(?e);
-                                }
-                            })
-                            .await
+                            if let Err(e) = ribosome.run_post_commit(host_access, invocation).await
                             {
                                 tracing::error!(?e);
                             }

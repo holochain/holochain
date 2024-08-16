@@ -9,6 +9,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - `AppRoleAssignment::base_cell_id` has become `AppRoleAssignment::base_dna_hash`, because the agent key will always be the same for every cell in the app, so it's redundant to include a CellId which contains the same agent key as the app.
 
+## 0.4.0-dev.18
+
+## 0.4.0-dev.17
+
+## 0.4.0-dev.16
+
 ## 0.4.0-dev.15
 
 ## 0.4.0-dev.14

@@ -816,10 +816,12 @@ async fn run_validation_callback(
     dpki: Option<Arc<DpkiService>>,
     is_inline: bool,
 ) -> AppValidationResult<Outcome> {
-    let validate_result = ribosome.run_validate(
-        ValidateHostAccess::new(workspace.clone(), network.clone(), dpki, is_inline),
-        invocation.clone(),
-    )?;
+    let validate_result = ribosome
+        .run_validate(
+            ValidateHostAccess::new(workspace.clone(), network.clone(), dpki, is_inline),
+            invocation.clone(),
+        )
+        .await?;
     match validate_result {
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),

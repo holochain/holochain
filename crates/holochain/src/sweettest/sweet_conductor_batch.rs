@@ -69,9 +69,18 @@ impl SweetConductorBatch {
             .await,
         );
 
+        let not_full_bootstrap = conductors
+            .iter()
+            .any(|c| !c.get_config().has_rendezvous_bootstrap());
+
         let dpki_cells = conductors.dpki_cells();
         if !dpki_cells.is_empty() {
-            conductors.exchange_peer_info().await;
+            // Typically we expect either all nodes are using a rendezvous bootstrap, or none are.
+            // To cover all cases, we say if any are not using bootstrap, we'll exchange peer info
+            // for everyone, even though this may be incorrect.
+            if not_full_bootstrap {
+                conductors.exchange_peer_info().await;
+            }
             await_consistency(15, dpki_cells.as_slice()).await.unwrap();
         }
 
