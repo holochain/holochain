@@ -85,12 +85,18 @@ async fn bad_network_gossip() {
     vous.drop_sig().await;
 
     let v1: DynSweetRendezvous = vous.clone();
-    let mut c1 =
-        SweetConductor::from_config_rendezvous(SweetConductorConfig::rendezvous(true), v1).await;
+    let mut c1 = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true).no_dpki(),
+        v1,
+    )
+    .await;
 
     let v2: DynSweetRendezvous = vous.clone();
-    let mut c2 =
-        SweetConductor::from_config_rendezvous(SweetConductorConfig::rendezvous(true), v2).await;
+    let mut c2 = SweetConductor::from_config_rendezvous(
+        SweetConductorConfig::rendezvous(true).no_dpki(),
+        v2,
+    )
+    .await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
