@@ -4,85 +4,61 @@ use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::{named_params, Transaction};
 use holochain_zome_types::prelude::*;
 
-/// Checks whether the author's chain is locked.
+/// Represents a lock on an author's source chain.
 ///
-/// Note that this takes expiry into account, so if the lock has expired then this function will
-/// return false.
-pub fn is_chain_locked(txn: &Transaction, author: &AgentPubKey) -> StateMutationResult<bool> {
-    Ok(txn.query_row(
-        "
-            SELECT EXISTS(
-                SELECT author
-                FROM ChainLock
-                WHERE author = :author
-                AND expires_at_timestamp >= :now
-            )
-            ",
-        named_params! {
-            ":author": author,
-            ":now": Timestamp::now()
-        },
-        |row| row.get::<_, bool>(0),
-    )?)
+/// The subject is used to identify the lock. If you took out the lock then you should know what is
+/// in the subject. The expires_at field is the time at which the lock will expire.
+///
+/// Note that the lock is not automatically removed when it expires. It is up to the caller to
+/// check the expiry timestamp to determine if the lock is still valid.
+#[derive(Debug, Clone)]
+pub struct ChainLock {
+    subject: Vec<u8>,
+    expires_at: Timestamp,
 }
 
-/// Get the subject of the chain lock.
+impl ChainLock {
+    /// Get the subject of the lock.
+    pub fn subject(&self) -> &[u8] {
+        &self.subject
+    }
+
+    /// Check whether the lock is expired at the current time.
+    pub fn is_expired(&self) -> bool {
+        self.is_expired_at(Timestamp::now())
+    }
+
+    /// Check whether the lock is still valid at the given time.
+    fn is_expired_at(&self, timestamp: Timestamp) -> bool {
+        timestamp > self.expires_at
+    }
+}
+
+/// Get the chain lock for the given author.
 ///
-/// If the chain is not locked or the lock has expired then this function will return `None`.
-/// Otherwise, it will return the subject of the lock that was specified when the chain was locked.
-pub fn get_chain_lock_subject(
+/// If the chain is locked, then a [ChainLock] is returned. Otherwise, `None` is returned.
+pub fn get_chain_lock(
     txn: &Transaction,
     author: &AgentPubKey,
-) -> StateMutationResult<Option<Vec<u8>>> {
+) -> StateMutationResult<Option<ChainLock>> {
     Ok(txn
         .query_row(
             "
-            SELECT subject
+            SELECT subject, expires_at_timestamp
             FROM ChainLock
             WHERE author = :author
-            AND expires_at_timestamp >= :now
             ",
             named_params! {
                 ":author": author,
-                ":now": Timestamp::now()
             },
-            |row| row.get(0),
+            |row| {
+                Ok(ChainLock {
+                    subject: row.get(0)?,
+                    expires_at: row.get(1)?,
+                })
+            },
         )
         .optional()?)
-}
-
-/// Check if the chain lock is expired.
-///
-/// If there is no lock then this function returns true. So it is important to check that the chain
-/// is locked in the same transaction where you use this function, if you need to be able to
-/// distinguish between the chain being unlocked and the lock being expired.
-pub fn is_chain_lock_expired(txn: &Transaction, author: &AgentPubKey) -> StateMutationResult<bool> {
-    is_chain_lock_expired_inner(txn, author, Timestamp::now())
-}
-
-#[inline]
-fn is_chain_lock_expired_inner(
-    txn: &Transaction,
-    author: &AgentPubKey,
-    at_time: Timestamp,
-) -> StateMutationResult<bool> {
-    let r = txn
-        .query_row(
-            "
-            SELECT expires_at_timestamp < :now AS expired
-            FROM ChainLock
-            WHERE
-            author = :author
-            ",
-            named_params! {
-                ":author": author,
-                ":now": at_time
-            },
-            |row| row.get::<_, bool>("expired"),
-        )
-        .optional()?;
-
-    Ok(r.unwrap_or(true))
 }
 
 #[cfg(test)]
@@ -104,15 +80,16 @@ mod tests {
         .unwrap();
 
         // The chain should not be locked initially
-        let initially_locked = db
+        let lock = db
             .read_async({
                 let agent_pub_key = agent_pub_key.clone();
-                move |txn| is_chain_locked(&txn, &agent_pub_key)
+                move |txn| get_chain_lock(&txn, &agent_pub_key)
             })
             .await
             .unwrap();
-        assert!(!initially_locked);
+        assert!(lock.is_none());
 
+        // Lock the chain
         db.write_async({
             let agent_pub_key = agent_pub_key.clone();
             move |txn| {
@@ -124,47 +101,18 @@ mod tests {
         .unwrap();
 
         // The chain should be locked now
-        let locked = db
+        let lock = db
             .read_async({
                 let agent_pub_key = agent_pub_key.clone();
-                move |txn| is_chain_locked(&txn, &agent_pub_key)
+                move |txn| get_chain_lock(&txn, &agent_pub_key)
             })
             .await
             .unwrap();
-        assert!(locked);
-
-        // The lock should not be expired
-        let expired = db
-            .read_async({
-                let agent_pub_key = agent_pub_key.clone();
-                move |txn| is_chain_lock_expired_inner(&txn, &agent_pub_key, Timestamp::now())
-            })
-            .await
-            .unwrap();
-        assert!(!expired);
-
-        // We should be able to retrieve the subject of the lock
-        let subject = db
-            .read_async({
-                let agent_pub_key = agent_pub_key.clone();
-                move |txn| get_chain_lock_subject(&txn, &agent_pub_key)
-            })
-            .await
-            .unwrap();
-        assert_eq!(subject, Some(vec![1, 2, 3]));
-
+        assert!(lock.is_some());
+        assert!(!lock.as_ref().unwrap().is_expired());
+        assert_eq!(&[1, 2, 3], lock.as_ref().unwrap().subject());
         // In the future, the lock should be expired
-        let expired = db
-            .read_async({
-                let agent_pub_key = agent_pub_key.clone();
-                move |txn| {
-                    let timestamp = Timestamp::now().add(Duration::from_secs(30)).unwrap();
-                    is_chain_lock_expired_inner(&txn, &agent_pub_key, timestamp)
-                }
-            })
-            .await
-            .unwrap();
-        assert!(expired);
+        assert!(lock.unwrap().is_expired_at(Timestamp::now().add(Duration::from_secs(12)).unwrap()));
 
         // Now let's unlock the chain
         db.write_async({
@@ -175,34 +123,14 @@ mod tests {
         .unwrap();
 
         // Which should make the chain unlocked
-        let locked = db
+        let lock = db
             .read_async({
                 let agent_pub_key = agent_pub_key.clone();
-                move |txn| is_chain_locked(&txn, &agent_pub_key)
+                move |txn| get_chain_lock(&txn, &agent_pub_key)
             })
             .await
             .unwrap();
-        assert!(!locked);
-
-        // Slightly strangely, the chain lock will be expired, even though there isn't one
-        let expired = db
-            .read_async({
-                let agent_pub_key = agent_pub_key.clone();
-                move |txn| is_chain_lock_expired_inner(&txn, &agent_pub_key, Timestamp::now())
-            })
-            .await
-            .unwrap();
-        assert!(expired);
-
-        // And we shouldn't be able to retrieve the subject of the lock
-        let subject = db
-            .read_async({
-                let agent_pub_key = agent_pub_key.clone();
-                move |txn| get_chain_lock_subject(&txn, &agent_pub_key)
-            })
-            .await
-            .unwrap();
-        assert!(subject.is_none());
+        assert!(lock.is_none());
     }
 
     #[tokio::test]
@@ -262,13 +190,13 @@ mod tests {
         check_is_constraint_err(err);
 
         // Check that the chain is still locked
-        let locked = db
+        let lock = db
             .read_async({
                 let agent_pub_key = agent_pub_key.clone();
-                move |txn| is_chain_locked(&txn, &agent_pub_key)
+                move |txn| get_chain_lock(&txn, &agent_pub_key)
             })
             .await
             .unwrap();
-        assert!(locked);
+        assert!(lock.is_some());
     }
 }

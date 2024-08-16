@@ -2,8 +2,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::chain_lock::is_chain_lock_expired;
-use crate::chain_lock::{get_chain_lock_subject, is_chain_locked};
+use crate::chain_lock::{get_chain_lock, ChainLock};
 use crate::integrate::authored_ops_to_dht_db;
 use crate::integrate::authored_ops_to_dht_db_without_check;
 use crate::query::chain_head::ChainHeadQuery;
@@ -100,7 +99,10 @@ impl SourceChain {
         let countersigning_agent_state = self
             .vault
             .write_async(move |txn| {
-                if is_chain_locked(txn, author.as_ref())? {
+                // Check for a chain lock.
+                // Note that the lock may not be valid anymore, but we must respect it here anyway.
+                let chain_lock = get_chain_lock(txn, author.as_ref())?;
+                if chain_lock.is_some() {
                     return Err(SourceChainError::ChainLocked);
                 }
                 let HeadInfo {
@@ -330,19 +332,27 @@ impl SourceChain {
                 }
 
                 // TODO: should this be moved to the top of the function?
-                if let Some(subject) = get_chain_lock_subject(txn, author.as_ref())? {
-                    // Can't write when the chain is locked, except if the lock is for this entry.
-                    if subject != lock_subject {
-                        return Err(SourceChainError::ChainLocked);
+                let chain_lock = get_chain_lock(txn, author.as_ref())?;
+                match chain_lock {
+                    Some(chain_lock) => {
+                        // If the chain is locked, the lock must be for this entry.
+                        if chain_lock.subject() != &lock_subject {
+                            return Err(SourceChainError::ChainLocked);
+                        }
+                        // If the lock is expired then we can't write this countersigning session.
+                        else if chain_lock.is_expired() {
+                            return Err(SourceChainError::LockExpired);
+                        }
+
+                        // Otherwise, the lock matches this entry and has not expired. We can proceed!
                     }
-                }
-                // If this is a countersigning session, and the chain is NOT
-                // locked then either the session expired or the countersigning
-                // entry being committed now is the correct one for the lock.
-                else if is_countersigning_session {
-                    // If the lock is expired then we can't write this countersigning session.
-                    if is_chain_lock_expired(txn, author.as_ref())? {
-                        return Err(SourceChainError::LockExpired);
+                    None => {
+                        // If this is a countersigning entry but there is no chain lock then maybe
+                        // the session expired before the entry could be written or maybe the app
+                        // has just made a mistake. Either way, it's not valid to write this entry!
+                        if is_countersigning_session {
+                            return Err(SourceChainError::CountersigningWriteWithoutSession);
+                        }
                     }
                 }
 
@@ -922,11 +932,11 @@ where
         Ok(query.filter_records(records))
     }
 
-    pub async fn is_chain_locked(&self) -> SourceChainResult<Option<Vec<u8>>> {
+    pub async fn get_chain_lock(&self) -> SourceChainResult<Option<ChainLock>> {
         let author = self.author.clone();
         Ok(self
             .vault
-            .read_async(move |txn| get_chain_lock_subject(&txn, author.as_ref()))
+            .read_async(move |txn| get_chain_lock(&txn, author.as_ref()))
             .await?)
     }
 
@@ -1226,7 +1236,8 @@ pub fn current_countersigning_session(
     author: Arc<AgentPubKey>,
 ) -> SourceChainResult<Option<(EntryHash, CounterSigningSessionData)>> {
     // The chain must be locked for a session to be active.
-    if is_chain_locked(txn, author.as_ref())? {
+    let chain_lock = get_chain_lock(txn, author.as_ref())?;
+    if chain_lock.is_some() && !chain_lock.unwrap().is_expired() {
         match chain_head_db(txn, author) {
             // We haven't done genesis so no session can be active.
             Err(e) => Err(e),

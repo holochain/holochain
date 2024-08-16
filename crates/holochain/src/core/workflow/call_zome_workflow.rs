@@ -197,10 +197,10 @@ where
             if !lock_subject.is_empty() {
                 // Otherwise, we can check whether the chain was locked with a subject matching
                 // the entry that failed validation.
-                if let Some(subject) = workspace.source_chain().is_chain_locked().await? {
+                if let Some(chain_lock) = workspace.source_chain().get_chain_lock().await? {
                     // Here we know the chain is locked, and if the lock subject matches the entry
                     // that the app was trying to commit then we can unlock the chain.
-                    if subject == lock_subject {
+                    if chain_lock.subject() == &lock_subject {
                         if let Err(error) = workspace.source_chain().unlock_chain().await {
                             tracing::error!(?error);
                         }
