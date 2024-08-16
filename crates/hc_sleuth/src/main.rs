@@ -18,10 +18,10 @@ fn build_context(logs: Vec<PathBuf>) -> hc_sleuth::Context {
     ctx
 }
 
-fn shortening<'a>(s: &'a str, n: usize) -> Cow<'a, str> {
+fn shortening(s: &str, n: usize) -> Cow<'_, str> {
     Regex::new(r"uhC(.)k(.{48})")
         .unwrap()
-        .replace_all(&s, |caps: &regex::Captures| {
+        .replace_all(s, |caps: &regex::Captures| {
             let ch = &caps[1];
             let pre = match ch {
                 "Q" => " DhtOp",
@@ -58,7 +58,7 @@ fn main() {
 
                 ctx.events
                     .iter()
-                    .filter(|(_, f, _)| f.op().map(|op| ops.contains(&op)).unwrap_or(false))
+                    .filter(|(_, f, _)| f.op().map(|op| ops.contains(op)).unwrap_or(false))
                     .collect()
             } else {
                 ctx.events.iter().collect()
