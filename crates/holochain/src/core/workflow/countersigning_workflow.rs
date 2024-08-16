@@ -17,6 +17,7 @@ use kitsune_p2p_types::KitsuneError;
 use rusqlite::{named_params, Transaction};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
 
 /// Countersigning workspace to hold session state.
@@ -37,7 +38,23 @@ pub(crate) async fn countersigning_workflow(
     self_trigger: TriggerSender,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
-    Ok(WorkComplete::Complete)
+    // At the end of the workflow, if we have any sessions still in progress, then schedule a
+    // workflow run for the one that will finish soonest.
+    let maybe_earliest_finish = space
+        .countersigning_workspace
+        .inner
+        .share_ref(|inner| Ok(inner.sessions.values().map(|s| s.session_times.end).min()))
+        .unwrap();
+    if let Some(earliest_finish) = maybe_earliest_finish {
+        Ok(WorkComplete::Incomplete(Some(
+            match (earliest_finish - Timestamp::now()).map(|d| d.to_std()) {
+                Ok(Ok(d)) => d,
+                _ => Duration::from_millis(100),
+            },
+        )))
+    } else {
+        Ok(WorkComplete::Complete)
+    }
 }
 
 /// Accept a countersigning session.
