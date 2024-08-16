@@ -8,11 +8,13 @@
 //! Access to Cells can be shared between different Apps.
 
 mod app_bundle;
+mod app_bundle_store;
 mod app_manifest;
 mod error;
 
 use crate::{dna::DnaBundle, prelude::*};
 pub use app_bundle::*;
+pub use app_bundle_store::AppBundleStore;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
 use derive_more::Into;
@@ -160,17 +162,19 @@ pub enum AppBundleSource {
     Bundle(AppBundle),
     /// A local file path
     Path(PathBuf),
-    // /// A URL
-    // Url(String),
+    /// Source app info and DNAs from an existing installed app
+    FromInstalledApp(InstalledAppId),
 }
 
 impl AppBundleSource {
     /// Get the bundle from the source. Consumes the source.
-    pub async fn resolve(self) -> Result<AppBundle, AppBundleError> {
+    pub async fn resolve(self, store: &impl AppBundleStore) -> Result<AppBundle, AppBundleError> {
         Ok(match self {
             Self::Bundle(bundle) => bundle,
             Self::Path(path) => AppBundle::decode(&ffs::read(&path).await?)?,
-            // Self::Url(url) => todo!("reqwest::get"),
+            Self::FromInstalledApp(installed_app_id) => {
+                store.get_app_bundle(&installed_app_id).await?
+            }
         })
     }
 }

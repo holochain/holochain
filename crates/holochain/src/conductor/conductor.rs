@@ -1464,7 +1464,7 @@ mod app_impls {
             } = payload;
 
             let bundle = {
-                let original_bundle = source.resolve().await?;
+                let original_bundle = source.resolve(&*self).await?;
                 if let Some(network_seed) = network_seed {
                     let mut manifest = original_bundle.manifest().to_owned();
                     manifest.set_network_seed(network_seed);
@@ -2802,6 +2802,17 @@ mod authenticate_token_impls {
                 app_connection_auth.authenticate_token(token, app_id)
             })
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl AppBundleStore for Conductor {
+    async fn get_app_bundle(&self, app_id: &InstalledAppId) -> AppBundleResult<AppBundle> {
+        let state = self
+            .get_state()
+            .await
+            .map_err(|e| AppBundleError::AppBundleMissing(app_id.clone(), e.to_string()))?;
+        state.get_app(app_id).map(|app| app.bundle().clone())
     }
 }
 

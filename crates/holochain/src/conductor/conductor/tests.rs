@@ -1336,3 +1336,9 @@ async fn test_deferred_memproof_provisioning_uninstall() {
     conductor.clone().uninstall_app(&app_id).await.unwrap();
     assert_eq!(conductor.list_apps(None).await.unwrap().len(), 0);
 }
+
+/// After installing an app bundle, we can get it back
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_app_bundle() {
+    todo!("rebuild bundle from installed app")
+}

@@ -3,9 +3,14 @@ use mr_bundle::error::MrBundleError;
 
 use crate::prelude::{AppManifestError, DnaError, RoleName};
 
+use super::InstalledAppId;
+
 /// Errors occurring while installing an AppBundle
 #[derive(thiserror::Error, Debug)]
 pub enum AppBundleError {
+    #[error("App bundle couldn't be retrieved: {0}. Detail: {1}")]
+    AppBundleMissing(InstalledAppId, String),
+
     #[error("Could not resolve the app role '{0}'. Detail: {1}")]
     CellResolutionFailure(RoleName, String),
 
