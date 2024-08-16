@@ -1,10 +1,9 @@
 //! This is just the beginnings of a CLI tool for generating hc_sleuth reports.
 //! It's nowhere near useful, so it's not even built yet.
 
-use std::{borrow::Cow, path::PathBuf, str::FromStr, thread::panicking};
+use std::{borrow::Cow, path::PathBuf, str::FromStr};
 
-use aitia::logging::FactLog;
-use hc_sleuth::{aitia::Fact, Event, Fact as HcFact};
+use hc_sleuth::aitia::Fact;
 use holochain_types::prelude::*;
 use regex::Regex;
 use structopt::StructOpt;
@@ -41,19 +40,6 @@ fn main() {
     let opt = HcSleuth::from_args();
 
     match opt {
-        HcSleuth::ShowGraph {
-            event,
-            log_paths,
-            shorten,
-        } => {
-            let ctx = build_context(log_paths);
-            let event = Event::decode(&event);
-            if let Some(report) = aitia::simple_report(&event.fact.traverse(&ctx)) {
-                println!("{}", shortening(&report, shorten));
-            } else {
-                // No report means success
-            }
-        }
         HcSleuth::Events {
             hash,
             log_paths,
@@ -73,12 +59,6 @@ fn main() {
                 ctx.events
                     .iter()
                     .filter(|(_, f, _)| f.op().map(|op| ops.contains(&op)).unwrap_or(false))
-                    // .filter(|(_, f)| {
-                    //     matches!(
-                    //         **f,
-                    //         HcFact::ReceivedHash { .. } | HcFact::SentHash { .. } | HcFact::Fetched { .. }
-                    //     )
-                    // })
                     .collect()
             } else {
                 ctx.events.iter().collect()
@@ -86,7 +66,7 @@ fn main() {
 
             if events.is_empty() {
                 if let Some(hash) = hash {
-                    println!("No filtered events found for hash {}", hash);
+                    println!("No events found for hash {}", hash);
                 } else {
                     println!("No events found");
                 }
@@ -101,7 +81,21 @@ fn main() {
                     }
                 }
             }
-        }
+        } //
+          //
+          // HcSleuth::ShowGraph {
+          //     event,
+          //     log_paths,
+          //     shorten,
+          // } => {
+          //     let ctx = build_context(log_paths);
+          //     let event = Event::decode(&event);
+          //     if let Some(report) = aitia::simple_report(&event.fact.traverse(&ctx)) {
+          //         println!("{}", shortening(&report, shorten));
+          //     } else {
+          //         // No report means success
+          //     }
+          // }
     }
 }
 
@@ -111,25 +105,6 @@ fn main() {
     about = "Examine the causal relationships between events in Holochain"
 )]
 pub enum HcSleuth {
-    ShowGraph {
-        #[structopt(help = "The base-64 encoded aitia Event to show the graph for")]
-        event: String,
-
-        #[structopt(
-            short,
-            long = "log",
-            help = "Paths to the log file(s) which contain aitia-enabled logs with hc-sleuth events"
-        )]
-        log_paths: Vec<PathBuf>,
-
-        #[structopt(
-            short,
-            long,
-            default_value = "4",
-            help = "Shorten hashes in output to the last N base64 characters"
-        )]
-        shorten: usize,
-    },
     Events {
         #[structopt(
             help = "The base-64 ActionHash or DhtOpHash (prefix \"uhCkk\" or \"uhCQk\") to check for integration"
@@ -159,20 +134,25 @@ pub enum HcSleuth {
         encoded: bool,
     },
     //
-    // Query {
+    //
+    // ShowGraph {
+    //     #[structopt(help = "The base-64 encoded aitia Event to show the graph for")]
+    //     event: String,
+
     //     #[structopt(
-    //         short = "h",
-    //         long,
-    //         help = "The action or entry hash to check for integration"
+    //         short,
+    //         long = "log",
+    //         help = "Paths to the log file(s) which contain aitia-enabled logs with hc-sleuth events"
     //     )]
-    //     op_hash: TargetHash,
+    //     log_paths: Vec<PathBuf>,
+
     //     #[structopt(
     //         short,
     //         long,
-    //         help = "The node ID which integrated (check the `tracing_scope` setting of your conductor config for this value)"
+    //         default_value = "4",
+    //         help = "Shorten hashes in output to the last N base64 characters"
     //     )]
-    //     node: String,
-    //     log_paths: Vec<PathBuf>,
+    //     shorten: usize,
     // },
 }
 
