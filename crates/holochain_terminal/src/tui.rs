@@ -1,8 +1,9 @@
 use crate::app::App;
-use crate::components::bootstrap::render_bootstrap_widget;
-use crate::components::network_info::render_network_info_widget;
-use crossterm::terminal;
-use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
+use crate::components::bootstrap::BootstrapWidget;
+use crate::components::home::HomeWidget;
+use crate::components::network_info::NetworkInfoWidget;
+use crossterm::terminal::{enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::{terminal, ExecutableCommand};
 use ratatui::backend::Backend;
 use ratatui::layout::{Alignment, Constraint};
 use ratatui::prelude::{Color, Direction, Layout, Line, Style};
@@ -10,6 +11,7 @@ use ratatui::symbols::DOT;
 use ratatui::widgets::{Block, Tabs};
 use ratatui::{Frame, Terminal};
 use std::io;
+use std::io::stdout;
 use std::panic;
 
 #[derive(Debug)]
@@ -25,8 +27,8 @@ impl<B: Backend> Tui<B> {
     }
 
     pub fn init(&mut self) -> anyhow::Result<()> {
-        terminal::enable_raw_mode()?;
-        crossterm::execute!(io::stderr(), EnterAlternateScreen)?;
+        stdout().execute(EnterAlternateScreen)?;
+        enable_raw_mode()?;
 
         // Define a custom panic hook to reset the terminal properties.
         // This way, you won't have your terminal messed up if an unexpected error happens.
@@ -66,9 +68,12 @@ fn render(app: &mut App, frame: &mut Frame) {
     let root_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(2), Constraint::Min(0)])
-        .split(frame.size());
+        .split(frame.area());
 
-    let titles = ["Network", "Bootstrap"].iter().cloned().map(Line::from);
+    let titles = ["Home", "Network", "Bootstrap"]
+        .iter()
+        .cloned()
+        .map(Line::from);
     let tabs = Tabs::new(titles)
         .select(app.tab_index())
         .block(
@@ -86,11 +91,17 @@ fn render(app: &mut App, frame: &mut Frame) {
 
     match app.tab_index() {
         0 => {
-            let app_client = app.app_client();
-            render_network_info_widget(app.args(), app_client, events, frame, root_layout[1]);
+            let home_widget = HomeWidget::new(app.args());
+            frame.render_widget(home_widget, root_layout[1]);
         }
         1 => {
-            render_bootstrap_widget(app.args(), events, frame, root_layout[1]);
+            let app_client = app.app_client();
+            let network_info_widget = NetworkInfoWidget::new(app.args(), app_client, events);
+            frame.render_widget(network_info_widget, root_layout[1]);
+        }
+        2 => {
+            let bootstrap_widget = BootstrapWidget::new(app.args(), events);
+            frame.render_widget(bootstrap_widget, root_layout[1]);
         }
         _ => {
             panic!("Page not implemented");

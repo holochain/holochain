@@ -13,14 +13,12 @@ pub struct FetchTask {
 
 impl FetchTask {
     pub fn spawn(
-        config: KitsuneP2pConfig,
+        _config: KitsuneP2pConfig,
         fetch_pool: FetchPool,
         host: HostApiLegacy,
         internal_sender: GhostSender<Internal>,
     ) -> Arc<RwLock<Self>> {
         let this = Arc::new(RwLock::new(FetchTask { is_finished: false }));
-
-        let span = tracing::info_span!("FetchTask::spawn", scope = config.tracing_scope);
 
         tokio::spawn({
             let this = this.clone();
@@ -61,7 +59,7 @@ impl FetchTask {
 
                 tracing::info!("Fetch task is finishing");
                 this.write().is_finished = true;
-            }.instrument(span)
+            }.in_current_span()
         });
 
         this

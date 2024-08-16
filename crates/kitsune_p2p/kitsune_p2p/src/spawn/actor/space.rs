@@ -172,6 +172,14 @@ impl ghost_actor::GhostHandler<SpaceInternal> for Space {}
 
 impl SpaceInternalHandler for Space {
     fn handle_new_address(&mut self, local_url: String) -> SpaceInternalHandlerResult<()> {
+        // shut down open gossip rounds, since we will
+        // now be identified differently
+        for agent in self.local_joined_agents.keys() {
+            for module in self.gossip_mod.values() {
+                module.local_agent_leave(agent.clone());
+                module.local_agent_join(agent.clone());
+            }
+        }
         *self.ro_inner.local_url.lock().unwrap() = Some(local_url);
         self.handle_update_agent_info()
     }
@@ -360,6 +368,7 @@ impl SpaceInternalHandler for Space {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_incoming_delegate_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -570,6 +579,7 @@ impl SpaceInternalHandler for Space {
         .into())
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_notify(&mut self, to_agent: KAgent, data: wire::Wire) -> InternalHandlerResult<()> {
         let ro_inner = self.ro_inner.clone();
         let timeout = ro_inner.config.tuning_params.implicit_timeout();
@@ -975,6 +985,7 @@ impl KitsuneP2pHandler for Space {
         Ok(fut.boxed().into())
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -1131,6 +1142,7 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_targeted_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,

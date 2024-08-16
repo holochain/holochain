@@ -478,12 +478,14 @@ pub mod test {
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
     use crate::sweettest::websocket_client_by_port;
-    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::WsPollRecv;
     use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
+    use holochain_conductor_api::conductor::ConductorConfig;
+    use holochain_conductor_api::conductor::DpkiConfig;
     use holochain_conductor_api::*;
     use holochain_keystore::test_keystore;
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
@@ -501,7 +503,7 @@ pub mod test {
     use kitsune_p2p_types::fixt::*;
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashSet;
     use tempfile::TempDir;
     use uuid::Uuid;
 
@@ -550,20 +552,15 @@ pub mod test {
         let (admin_tx, rx) = websocket_client_by_port(admin_port).await.unwrap();
         let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
-        let agent_key = conductor_handle
-            .keystore()
-            .new_sign_keypair_random()
-            .await
-            .unwrap();
-
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::PostCommitSignal]).await;
-        let app_bundle = app_bundle_from_dnas([&dna_file], false).await;
+        let app_bundle = app_bundle_from_dnas(&[dna_file.clone()], false).await;
         let request = AdminRequest::InstallApp(Box::new(InstallAppPayload {
             source: AppBundleSource::Bundle(app_bundle),
-            agent_key: agent_key.clone(),
+            agent_key: None,
             installed_app_id: None,
-            membrane_proofs: HashMap::new(),
+            membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
         }));
@@ -580,6 +577,7 @@ pub mod test {
             CellInfo::Provisioned(cell) => cell.cell_id.clone(),
             _ => panic!("emit_signal cell not available"),
         };
+        let agent_key = cell_id.agent_pubkey().clone();
 
         // Activate cells
         let request = AdminRequest::EnableApp {
@@ -670,7 +668,11 @@ pub mod test {
         dnas_with_proofs: Vec<(DnaFile, Option<MembraneProof>)>,
     ) -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
+        let config = holochain::sweettest::SweetConductorConfig::standard()
+            .no_dpki()
+            .into();
         let conductor_handle = ConductorBuilder::new()
+            .config(config)
             .with_data_root_path(db_dir.path().to_path_buf().into())
             .test(&[])
             .await
@@ -682,7 +684,7 @@ pub mod test {
 
         conductor_handle
             .clone()
-            .install_app_minimal("test app".to_string(), agent, &dnas_with_proofs)
+            .install_app_minimal("test app".to_string(), Some(agent), &dnas_with_proofs)
             .await
             .unwrap();
 
@@ -785,14 +787,10 @@ pub mod test {
             .unwrap();
 
         let dna_hash = dna.dna_hash().clone();
-        let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
 
-        let (_tmpdir, _, handle) = setup_app_in_new_conductor(
-            "test app".to_string(),
-            cell_id.agent_pubkey().clone(),
-            vec![(dna, None)],
-        )
-        .await;
+        let (_tmpdir, _, handle, agent_key) =
+            setup_app_in_new_conductor("test app".to_string(), None, vec![(dna, None)]).await;
+        let cell_id = CellId::from((dna_hash.clone(), agent_key));
 
         call_zome(
             handle.clone(),
@@ -826,14 +824,9 @@ pub mod test {
             .unwrap();
 
         let dna_hash = dna.dna_hash().clone();
-        let agent_pub_key = fake_agent_pubkey_1();
 
-        let (_tmpdir, app_api, handle) = setup_app_in_new_conductor(
-            "test app".to_string(),
-            agent_pub_key.clone(),
-            vec![(dna, None)],
-        )
-        .await;
+        let (_tmpdir, app_api, handle, agent_pub_key) =
+            setup_app_in_new_conductor("test app".to_string(), None, vec![(dna, None)]).await;
         let request = NetworkInfoRequestPayload {
             agent_pub_key,
             dnas: vec![dna_hash],
@@ -850,7 +843,7 @@ pub mod test {
                         current_number_of_peers: 1,
                         arc_size: 1.0,
                         total_network_peers: 1,
-                        bytes_since_last_time_queried: 1842,
+                        bytes_since_last_time_queried: 1838,
                         completed_rounds_since_last_time_queried: 0,
                     }]
                 )
@@ -892,17 +885,30 @@ pub mod test {
         // Run the same DNA in cell 3 to check that grouping works correctly
         let cell_id_3 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_2()));
 
-        let (_tmpdir, _, handle) = setup_app_in_new_conductor(
+        let db_dir = test_db_dir();
+
+        let handle = ConductorBuilder::new()
+            .config(ConductorConfig {
+                dpki: DpkiConfig::disabled(),
+                ..Default::default()
+            })
+            .with_data_root_path(db_dir.path().to_path_buf().into())
+            .test(&[])
+            .await
+            .unwrap();
+
+        install_app_in_conductor(
+            handle.clone(),
             "test app 1".to_string(),
-            cell_id_1.agent_pubkey().clone(),
-            vec![(dna_1, None)],
+            Some(cell_id_1.agent_pubkey().clone()),
+            &[(dna_1, None)],
         )
         .await;
 
         install_app_in_conductor(
             handle.clone(),
             "test app 2".to_string(),
-            cell_id_2.agent_pubkey().clone(),
+            Some(cell_id_2.agent_pubkey().clone()),
             &[(dna_2.clone(), None)],
         )
         .await;
@@ -910,7 +916,7 @@ pub mod test {
         install_app_in_conductor(
             handle.clone(),
             "test app 3".to_string(),
-            cell_id_3.agent_pubkey().clone(),
+            Some(cell_id_3.agent_pubkey().clone()),
             &[(dna_2, None)],
         )
         .await;
@@ -1035,7 +1041,6 @@ pub mod test {
             })
             .unwrap()
             .all_cells()
-            .cloned()
             .collect();
 
         // Collect the expected result
@@ -1083,7 +1088,6 @@ pub mod test {
             })
             .unwrap()
             .all_cells()
-            .cloned()
             .collect();
 
         assert_eq!(expected, cell_ids);
@@ -1226,7 +1230,11 @@ pub mod test {
             make_dna("2", vec![TestWasm::Anchor]).await,
         ];
 
-        let mut conductor = SweetConductor::from_standard_config().await;
+        let mut conductor = SweetConductorConfig::standard()
+            .no_dpki()
+            .build_conductor()
+            .await;
+
         let agent = conductor.setup_app("app", &dnas).await.unwrap().cells()[0]
             .agent_pubkey()
             .clone();

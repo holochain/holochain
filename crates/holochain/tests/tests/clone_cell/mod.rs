@@ -10,12 +10,7 @@ async fn create_clone_cell() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
 
-    let alice = SweetAgents::alice();
-
-    let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&dna_file])
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
     let (cell,) = app.clone().into_tuple();
 
     let zome = SweetZome::new(
@@ -56,12 +51,7 @@ async fn disable_enable_and_delete_clone_cell() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
 
-    let alice = SweetAgents::alice();
-
-    let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&dna_file])
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
     let (cell,) = app.clone().into_tuple();
 
     let zome = SweetZome::new(
@@ -152,12 +142,7 @@ async fn prevents_cross_app_clone_operations() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
 
-    let alice = SweetAgents::alice();
-
-    let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&dna_file])
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
     let (cell,) = app.clone().into_tuple();
 
     let zome = SweetZome::new(
@@ -174,7 +159,7 @@ async fn prevents_cross_app_clone_operations() {
 
     let (other_dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
     let other_app = conductor
-        .setup_app_for_agent("other app", alice.clone(), [&other_dna_file])
+        .setup_app("other app", [&other_dna_file])
         .await
         .unwrap();
     let (other_cell,) = other_app.clone().into_tuple();
@@ -266,12 +251,7 @@ async fn create_clone_cell_from_a_clone() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
 
-    let alice = SweetAgents::alice();
-
-    let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&dna_file])
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
     let (cell,) = app.clone().into_tuple();
 
     let zome = SweetZome::new(
@@ -328,10 +308,8 @@ async fn create_clone_of_another_cell_in_same_app() {
     let (dna_file_2, _, _) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::DnaProperties]).await;
 
-    let alice = SweetAgents::alice();
-
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&dna_file_1, &dna_file_2])
+        .setup_app("app", [&dna_file_1, &dna_file_2])
         .await
         .unwrap();
     let (cell_1, cell_2) = app.clone().into_tuple();

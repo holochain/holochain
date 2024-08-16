@@ -1,3 +1,4 @@
+use crate::conductor::api::DpkiApi;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
@@ -34,6 +35,7 @@ impl ValidateInvocation {
 pub struct ValidateHostAccess {
     pub workspace: HostFnWorkspaceRead,
     pub network: GenericNetwork,
+    pub dpki: DpkiApi,
     pub is_inline: bool,
 }
 
@@ -252,6 +254,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .await
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -268,6 +271,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .await
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -302,6 +306,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .await
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()));
     }

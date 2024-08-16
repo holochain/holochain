@@ -44,6 +44,7 @@ workspace = true
 [features]
 default = []
 trace = ["tracing", "tracing-core", "holochain_integrity_types/tracing"]
+fuzzing = ["holochain_integrity_types/fuzzing"]
 mock = ["hdk_derive/mock", "mockall"]
 test_utils = [
   "holochain_integrity_types/fuzzing",

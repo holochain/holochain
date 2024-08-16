@@ -99,9 +99,16 @@ pub struct ConductorConfig {
     #[serde(default)]
     pub keystore: KeystoreConfig,
 
-    /// Optional DPKI configuration if conductor is using a DPKI app to initalize and manage
-    /// keys for new instances.
-    pub dpki: Option<DpkiConfig>,
+    /// DPKI config for this conductor. This setting must not change once the conductor has been
+    /// started for the first time.
+    ///  
+    /// If `dna_path` is present, the DNA file at this path will be used to install the DPKI service upon first conductor startup.
+    /// If not present, the Deepkey DNA specified by the `holochain_deepkey_dna` crate will be used instead.
+    ///
+    /// `device_seed_lair_tag` is currently unused but may be required in the future.
+    // TODO: once device seed generation is fully hooked up, make this config required.
+    #[serde(default)]
+    pub dpki: DpkiConfig,
 
     /// Setup admin interfaces to control this conductor through a websocket connection.
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
@@ -270,7 +277,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: Default::default(),
-                dpki: None,
+                dpki: Default::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
@@ -295,8 +302,8 @@ mod tests {
       type: lair_server_in_proc
 
     dpki:
-      instance_id: some_id
-      init_params: some_params
+      dna_path: path/to/dna.dna
+      device_seed_lair_tag: "device-seed"
 
     admin_interfaces:
       - driver:
@@ -311,8 +318,8 @@ mod tests {
           signal_url: wss://sbd-0.main.infra.holo.host
           webrtc_config: {
             "iceServers": [
-              { "urls": "stun:stun-0.main.infra.holo.host:443" },
-              { "urls": "stun:stun-1.main.infra.holo.host:443" }
+              { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
+              { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
             ]
           }
       tuning_params:
@@ -337,8 +344,8 @@ mod tests {
             signal_url: "wss://sbd-0.main.infra.holo.host".into(),
             webrtc_config: Some(serde_json::json!({
               "iceServers": [
-                { "urls": "stun:stun-0.main.infra.holo.host:443" },
-                { "urls": "stun:stun-1.main.infra.holo.host:443" }
+                { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
+                { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
               ]
             })),
         });
@@ -360,10 +367,7 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                dpki: Some(DpkiConfig {
-                    instance_id: "some_id".into(),
-                    init_params: "some_params".into()
-                }),
+                dpki: DpkiConfig::new(Some("path/to/dna.dna".into()), "device-seed".into()),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket {
@@ -397,7 +401,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: Default::default(),
-                dpki: None,
+                dpki: Default::default(),
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },

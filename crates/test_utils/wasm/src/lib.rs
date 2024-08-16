@@ -22,6 +22,7 @@ pub enum TestCoordinatorWasm {
 #[derive(EnumIter, Clone, Copy)]
 pub enum TestWasm {
     AgentInfo,
+    AgentLineage,
     Anchor,
     AppValidation,
     Bench,
@@ -131,6 +132,7 @@ impl From<TestWasm> for ZomeName {
     fn from(test_wasm: TestWasm) -> ZomeName {
         ZomeName::from(match test_wasm {
             TestWasm::AgentInfo => "agent_info",
+            TestWasm::AgentLineage => "agent_lineage",
             TestWasm::Anchor => "anchor",
             TestWasm::AppValidation => "app_validation",
             TestWasm::Bench => "bench",
@@ -205,6 +207,7 @@ impl From<TestWasm> for PathBuf {
     fn from(test_wasm: TestWasm) -> Self {
         PathBuf::from(match test_wasm {
             TestWasm::AgentInfo => "wasm32-unknown-unknown/release/test_wasm_agent_info.wasm",
+            TestWasm::AgentLineage => "wasm32-unknown-unknown/release/test_wasm_agent_lineage.wasm",
             TestWasm::Anchor => "wasm32-unknown-unknown/release/test_wasm_anchor.wasm",
             TestWasm::AppValidation => "wasm32-unknown-unknown/release/test_wasm_app_validation.wasm",
             TestWasm::Bench => "wasm32-unknown-unknown/release/test_wasm_bench.wasm",

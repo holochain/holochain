@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use holochain::prelude::dht::region::Region;
+use kitsune_p2p::dht::region::Region;
 
 use super::*;
 

@@ -1,7 +1,8 @@
 use holo_hash::ActionHash;
 use holochain::conductor::conductor::WASM_CACHE;
 use holochain::conductor::config::ConductorConfig;
-use holochain::sweettest::{SweetAgents, SweetConductor, SweetConductorBatch, SweetDnaFile};
+use holochain::sweettest::*;
+use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
@@ -11,7 +12,8 @@ use std::sync::Arc;
 #[tokio::test(flavor = "multi_thread")]
 async fn wasm_disk_cache() {
     holochain_trace::test_run();
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor =
+        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
 
     let mut cache_dir = conductor.db_path().to_owned();
     cache_dir.push(WASM_CACHE);
@@ -52,10 +54,9 @@ async fn zome_with_no_entry_types_does_not_prevent_deletes() {
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::ValidateRejectAppTypes, TestWasm::Crd])
             .await;
-    let agent = SweetAgents::alice();
 
     let (cell,) = conductor
-        .setup_app_for_agent("app", agent, &[dna_file])
+        .setup_app("app", &[dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -89,10 +90,9 @@ async fn zome_with_no_link_types_does_not_prevent_delete_links() {
         TestWasm::Link,
     ])
     .await;
-    let agent = SweetAgents::alice();
 
     let (cell,) = conductor
-        .setup_app_for_agent("app", agent, &[dna_file])
+        .setup_app("app", &[dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -130,6 +130,7 @@ async fn zero_arc_can_link_to_uncached_base() {
     network_config.tuning_params = Arc::new(tuning_params);
 
     empty_arc_conductor_config.network = network_config;
+    empty_arc_conductor_config.dpki = DpkiConfig::disabled();
 
     let mut conductors = SweetConductorBatch::from_configs(vec![
         ConductorConfig::default(),
