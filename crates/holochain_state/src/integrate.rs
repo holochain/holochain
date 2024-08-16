@@ -67,7 +67,7 @@ pub async fn authored_ops_to_dht_db_without_check(
             for op in ops {
                 // TODO: only for aitia runs
                 let op_hash = op.as_hash().clone();
-                let op_lite = op.clone().to_lite();
+                let op_lite = op.to_lite();
                 let author = op.author().clone();
                 let deps = op.sys_validation_dependencies();
                 if let Some(op) = insert_locally_validated_op(txn, op)? {
