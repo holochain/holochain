@@ -2,7 +2,7 @@
 
 use super::error::WorkflowResult;
 use crate::conductor::space::Space;
-use crate::core::queue_consumer::QueueTriggers;
+use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
 use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::WorkflowError;
 use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, OpBasis};
@@ -31,6 +31,15 @@ pub struct CountersigningWorkspaceInner {
     sessions: HashMap<AgentPubKey, PreflightRequest>,
 }
 
+pub(crate) async fn countersigning_workflow(
+    space: Space,
+    network: impl HolochainP2pDnaT,
+    self_trigger: TriggerSender,
+    sys_validation_trigger: TriggerSender,
+) -> WorkflowResult<WorkComplete> {
+    Ok(WorkComplete::Complete)
+}
+
 /// Accept a countersigning session.
 ///
 /// This will register the session in the workspace, lock the agent's source chain and build the
@@ -40,6 +49,7 @@ pub(crate) async fn accept_countersigning_request(
     keystore: MetaLairClient,
     author: AgentPubKey,
     request: PreflightRequest,
+    countersigning_trigger: TriggerSender,
 ) -> WorkflowResult<PreflightRequestAcceptance> {
     // First check if there is already a session in progress.
     // If there is, we can't start another one.
@@ -80,7 +90,7 @@ pub(crate) async fn accept_countersigning_request(
     // acceptance really came from us.
     let signature: Signature = match keystore
         .sign(
-            author,
+            author.clone(),
             PreflightResponse::encode_fields_for_signature(&request, &countersigning_agent_state)?
                 .into(),
         )
@@ -91,12 +101,26 @@ pub(crate) async fn accept_countersigning_request(
             // Attempt to unlock the chain again.
             // If this fails the chain will remain locked until the session end time.
             // But also we're handling a keystore error already, so we should return that.
-            if let Err(unlock_result) = source_chain.unlock_chain().await {
-                tracing::error!(?unlock_result);
+            if let Err(unlock_error) = source_chain.unlock_chain().await {
+                tracing::error!(?unlock_error);
             }
+
+            // Drop the state from the workspace.
+            if let Err(workspace_state_error) =
+                space.countersigning_workspace.inner.share_mut(|inner, _| {
+                    inner.sessions.remove(&author);
+                    Ok(())
+                })
+            {
+                tracing::error!(?workspace_state_error);
+            }
+
             return Err(WorkflowError::other(e));
         }
     };
+
+    // Kick off the countersigning workflow and let it figure out what actions to take.
+    countersigning_trigger.trigger(&"accept_countersigning_request");
 
     Ok(PreflightRequestAcceptance::Accepted(
         PreflightResponse::try_new(request, countersigning_agent_state, signature)?,

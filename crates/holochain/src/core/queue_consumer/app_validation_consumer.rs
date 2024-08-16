@@ -30,7 +30,7 @@ pub fn spawn_app_validation_consumer(
     let (tx, rx) = TriggerSender::new();
     let workspace = Arc::new(workspace);
 
-    super::queue_consumer_dna_bound(
+    queue_consumer_dna_bound(
         "app_validation_consumer",
         dna_hash.clone(),
         conductor.task_manager(),
