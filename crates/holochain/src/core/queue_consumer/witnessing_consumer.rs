@@ -1,4 +1,4 @@
-//! The workflow and queue consumer for witnessing countersigning sessions.
+//! The queue consumer for the witnessing workflow.
 
 use super::*;
 use crate::conductor::manager::TaskManagerClient;
@@ -9,16 +9,16 @@ use tracing::*;
 #[instrument(skip_all)]
 pub(crate) fn spawn_witnessing_consumer(
     space: Space,
-    tm: TaskManagerClient,
+    task_manager: TaskManagerClient,
     dna_network: HolochainP2pDna,
     trigger_sys: TriggerSender,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
 
-    super::queue_consumer_dna_bound(
+    queue_consumer_dna_bound(
         "witnessing_consumer",
         space.dna_hash.clone(),
-        tm,
+        task_manager,
         (tx.clone(), rx),
         move || witnessing_workflow(space.clone(), dna_network.clone(), trigger_sys.clone()),
     );
