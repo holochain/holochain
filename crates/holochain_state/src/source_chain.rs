@@ -86,7 +86,7 @@ impl SourceChain {
         preflight_request: PreflightRequest,
         agent_index: u8,
     ) -> SourceChainResult<CounterSigningAgentState> {
-        let hashed_preflight_request = holo_hash::encode::blake2b_256(
+        let hashed_preflight_request = blake2b_256(
             &holochain_serialized_bytes::encode(&preflight_request)?,
         );
 
