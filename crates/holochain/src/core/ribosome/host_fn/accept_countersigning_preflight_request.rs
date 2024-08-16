@@ -29,7 +29,7 @@ pub fn accept_countersigning_preflight_request<'a>(
                 return Ok(PreflightRequestAcceptance::Invalid(e.to_string()));
             }
             tokio_helper::block_forever_on(async move {
-                if (holochain_zome_types::prelude::Timestamp::now() + SESSION_TIME_FUTURE_MAX)
+                if (Timestamp::now() + SESSION_TIME_FUTURE_MAX)
                     .unwrap_or(Timestamp::MAX)
                     < *input.session_times.start()
                 {
@@ -59,6 +59,7 @@ pub fn accept_countersigning_preflight_request<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use matches::assert_matches;
     use crate::conductor::api::error::ConductorApiError;
     use crate::conductor::api::ZomeCall;
     use crate::conductor::CellError;
@@ -166,7 +167,7 @@ pub mod wasm_test {
             )
             .await;
 
-        // Everyone accepts a short lived session.
+        // Everyone accepts a short-lived session.
         let preflight_request: PreflightRequest = conductor
             .call(
                 &alice,
@@ -546,10 +547,10 @@ pub mod wasm_test {
                 .unwrap(),
             )
             .await;
-        assert!(matches!(
+        assert_matches!(
             preflight_acceptance_fail,
             Ok(Err(RibosomeError::WasmRuntimeError(RuntimeError { .. })))
-        ));
+        );
 
         // Bob can also accept the preflight request.
         let bob_acceptance: PreflightRequestAcceptance = conductor

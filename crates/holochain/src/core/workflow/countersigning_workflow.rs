@@ -68,24 +68,6 @@ pub(crate) async fn accept_countersigning_request(
     request: PreflightRequest,
     countersigning_trigger: TriggerSender,
 ) -> WorkflowResult<PreflightRequestAcceptance> {
-    // First check if there is already a session in progress.
-    // If there is, we can't start another one.
-    // If there isn't, then we register the session in the workspace. This will be used later when
-    // tracking session expiry.
-    if let Err(_) = space.countersigning_workspace.inner.share_mut(|inner, _| {
-        match inner.sessions.entry(author.clone()) {
-            std::collections::hash_map::Entry::Occupied(_) => {
-                Err(KitsuneError::other("Session already exists"))
-            }
-            std::collections::hash_map::Entry::Vacant(entry) => {
-                entry.insert(request.clone());
-                Ok(())
-            }
-        }
-    }) {
-        return Ok(PreflightRequestAcceptance::AnotherSessionIsInProgress);
-    };
-
     // Find the index of our agent in the list of signing agents.
     let agent_index = match request
         .signing_agents
@@ -122,18 +104,25 @@ pub(crate) async fn accept_countersigning_request(
                 tracing::error!(?unlock_error);
             }
 
-            // Drop the state from the workspace.
-            if let Err(workspace_state_error) =
-                space.countersigning_workspace.inner.share_mut(|inner, _| {
-                    inner.sessions.remove(&author);
-                    Ok(())
-                })
-            {
-                tracing::error!(?workspace_state_error);
-            }
-
             return Err(WorkflowError::other(e));
         }
+    };
+
+    // At this point the chain has been locked, and we are in a countersigning session. Store the
+    // session request in the workspace.
+    if let Err(_) = space.countersigning_workspace.inner.share_mut(|inner, _| {
+        match inner.sessions.entry(author.clone()) {
+            std::collections::hash_map::Entry::Occupied(_) => {
+                Err(KitsuneError::other("Session already exists"))
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(request.clone());
+                Ok(())
+            }
+        }
+    }) {
+        // This really shouldn't happen. The chain lock is the primary state and that should be in place here.
+        return Ok(PreflightRequestAcceptance::AnotherSessionIsInProgress);
     };
 
     // Kick off the countersigning workflow and let it figure out what actions to take.
@@ -190,13 +179,12 @@ pub(crate) async fn countersigning_success(
                     &holochain_serialized_bytes::encode(&session_data.preflight_request())?,
                 );
 
-                if let Some(subject) =
-                    holochain_state::chain_lock::get_chain_lock_subject(&txn, &author)?
-                {
+                let chain_lock = holochain_state::chain_lock::get_chain_lock(&txn, &author)?;
+                if let Some(chain_lock) = chain_lock {
                     // This is the case where we have already locked the chain for another session and are
                     // receiving another signature bundle from a different session. We don't need this, so
                     // it's safe to short circuit.
-                    if cs_entry_hash != entry_hash || subject != lock_subject {
+                    if cs_entry_hash != entry_hash || chain_lock.subject() != &lock_subject {
                         return SourceChainResult::Ok(None);
                     }
 
