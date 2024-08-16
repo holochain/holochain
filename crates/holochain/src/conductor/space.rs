@@ -705,12 +705,12 @@ impl Spaces {
                 (
                     space.witnessing_workspace.clone(),
                     self.queue_consumer_map
-                        .countersigning_trigger(space.dna_hash.clone()),
+                        .witnessing_trigger(space.dna_hash.clone()),
                 )
             })?;
             let trigger = match trigger {
                 Some(t) => t,
-                // If the workflow has not been spawned yet we can't handle incoming messages.
+                // If the workflow has not been spawned yet, we can't handle incoming messages.
                 None => return Ok(()),
             };
             receive_incoming_countersigning_ops(ops, &workspace, trigger)?;
