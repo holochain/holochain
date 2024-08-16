@@ -157,7 +157,10 @@ impl aitia::Fact for Fact {
                 format!("[{by}] {op} ReceivedHash({method})")
             }
             Fact::Authored { by, op } => {
-                let node = ctx.agent_node(by).expect("I got lazy");
+                let node = ctx
+                    .agent_node(by)
+                    .cloned()
+                    .unwrap_or("???unknown???".to_string());
                 let op_hash = op.as_hash();
                 format!("[{node}] {op_hash} Authored")
             }

@@ -59,27 +59,34 @@ fn main() {
         } => {
             let ctx = build_context(log_paths);
 
-            let ops = match InputHash::from_str(&hash).expect("Invalid hash") {
-                InputHash::Action(hash) => ctx.ops_from_action(&hash).unwrap(),
-                InputHash::DhtOp(hash) => {
-                    maplit::hashset![hash]
-                }
+            let events: Vec<_> = if let Some(hash) = hash.as_ref() {
+                let ops = match InputHash::from_str(hash).expect("Invalid hash") {
+                    InputHash::Action(hash) => ctx.ops_from_action(&hash).unwrap(),
+                    InputHash::DhtOp(hash) => {
+                        maplit::hashset![hash]
+                    }
+                };
+
+                ctx.events
+                    .iter()
+                    .filter(|(_, f, _)| f.op().map(|op| ops.contains(&op)).unwrap_or(false))
+                    // .filter(|(_, f)| {
+                    //     matches!(
+                    //         **f,
+                    //         HcFact::ReceivedHash { .. } | HcFact::SentHash { .. } | HcFact::Fetched { .. }
+                    //     )
+                    // })
+                    .collect()
+            } else {
+                ctx.events.iter().collect()
             };
 
-            let events: Vec<_> = ctx
-                .events
-                .iter()
-                .filter(|(_, f, _)| f.op().map(|op| ops.contains(&op)).unwrap_or(false))
-                // .filter(|(_, f)| {
-                //     matches!(
-                //         **f,
-                //         HcFact::ReceivedHash { .. } | HcFact::SentHash { .. } | HcFact::Fetched { .. }
-                //     )
-                // })
-                .collect();
-
             if events.is_empty() {
-                println!("No filtered events found for hash {}", hash);
+                if let Some(hash) = hash {
+                    println!("No filtered events found for hash {}", hash);
+                } else {
+                    println!("No events found");
+                }
             } else {
                 for (ts, fact, raw) in events {
                     let show = fact.explain(&ctx);
@@ -124,7 +131,7 @@ pub enum HcSleuth {
         #[structopt(
             help = "The base-64 ActionHash or DhtOpHash (prefix \"uhCkk\" or \"uhCQk\") to check for integration"
         )]
-        hash: String,
+        hash: Option<String>,
 
         #[structopt(
             short,
