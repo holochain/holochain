@@ -353,6 +353,8 @@ pub enum PreflightRequestAcceptance {
     UnacceptableFutureStart,
     /// The preflight request does not include the agent.
     UnacceptableAgentNotFound,
+    /// The preflight hasn't been checked because another session is already in progress.
+    AnotherSessionIsInProgress,
     /// The preflight request is invalid as it failed some integrity check.
     Invalid(String),
 }

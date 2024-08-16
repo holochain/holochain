@@ -5,7 +5,6 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
-use tracing::error;
 use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -29,8 +28,6 @@ pub fn accept_countersigning_preflight_request<'a>(
             if let Err(e) = input.check_integrity() {
                 return Ok(PreflightRequestAcceptance::Invalid(e.to_string()));
             }
-            let author = super::agent_info::agent_info(_ribosome, call_context.clone(), ())?
-                .agent_latest_pubkey;
             tokio_helper::block_forever_on(async move {
                 if (holochain_zome_types::prelude::Timestamp::now() + SESSION_TIME_FUTURE_MAX)
                     .unwrap_or(Timestamp::MAX)
@@ -39,65 +36,12 @@ pub fn accept_countersigning_preflight_request<'a>(
                     return Ok(PreflightRequestAcceptance::UnacceptableFutureStart);
                 }
 
-                let agent_index = match input
-                    .signing_agents
-                    .iter()
-                    .position(|(agent, _)| agent == &author)
-                {
-                    Some(agent_index) => agent_index as u8,
-                    None => return Ok(PreflightRequestAcceptance::UnacceptableAgentNotFound),
-                };
-                let countersigning_agent_state = call_context
-                    .host_context
-                    .workspace_write()
-                    .source_chain()
-                    .as_ref()
-                    .expect("Must have source chain if write_workspace access is given")
-                    .accept_countersigning_preflight_request(input.clone(), agent_index)
-                    .await
-                    .map_err(|source_chain_error| -> RuntimeError {
-                        wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
-                    })?;
-                let signature: Signature = match call_context
-                    .host_context
-                    .keystore()
-                    .sign(
-                        author,
-                        PreflightResponse::encode_fields_for_signature(
-                            &input,
-                            &countersigning_agent_state,
-                        )
-                        .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
-                        .into(),
-                    )
-                    .await
-                {
-                    Ok(signature) => signature,
-                    Err(e) => {
-                        // Attempt to unlock the chain again.
-                        // If this fails the chain will remain locked until the session end time.
-                        // But also we're handling a keystore error already so we should return that.
-                        if let Err(unlock_result) = call_context
-                            .host_context
-                            .workspace_write()
-                            .source_chain()
-                            .as_ref()
-                            .expect("Must have source chain if write_workspace access is given")
-                            .unlock_chain()
-                            .await
-                        {
-                            error!(?unlock_result);
-                        }
-                        return Err(wasm_error!(WasmErrorInner::Host(e.to_string())).into());
-                    }
-                };
+                let cell_id = call_context.host_context.call_zome_handle().cell_id();
 
-                Ok(PreflightRequestAcceptance::Accepted(
-                    PreflightResponse::try_new(input, countersigning_agent_state, signature)
-                        .map_err(|e| -> RuntimeError {
-                            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
-                        })?,
-                ))
+                call_context.host_context.call_zome_handle().accept_countersigning_session(cell_id.clone(), input.clone()).await
+                    .map_err(|e| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                    })
             })
         }
         _ => Err(wasm_error!(WasmErrorInner::Host(
