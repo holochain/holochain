@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 
 use ::fixt::prelude::strum_macros;
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 use tempfile::{tempdir, TempDir};
 
 use crate::sweettest::*;
@@ -101,7 +101,7 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
 
     let write_dna = |seed: Seed| {
         let mut dna = dna.clone();
-        let path = tmp.as_ref().join(format!("{}.dna", seed.to_string()));
+        let path = tmp.as_ref().join(format!("{seed}.dna"));
         async move {
             if seed != Seed::None {
                 dna = dna.with_network_seed(seed.to_string()).await;
@@ -175,22 +175,10 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     assert_ne!(hash_0, hash_a);
 
     for (h, c) in group_0.iter() {
-        assert_eq!(
-            hash_0,
-            h,
-            "case mismatch: {}, {}",
-            case_0.to_string(),
-            c.to_string()
-        );
+        assert_eq!(hash_0, h, "case mismatch: {case_0}, {c}");
     }
     for (h, c) in group_a.iter() {
-        assert_eq!(
-            hash_a,
-            h,
-            "case mismatch: {}, {}",
-            case_a.to_string(),
-            c.to_string()
-        );
+        assert_eq!(hash_a, h, "case mismatch: {case_a}, {c}");
     }
 }
 
@@ -201,13 +189,13 @@ struct TestcaseCommon {
     _start: std::time::Instant,
 }
 
-#[derive(Clone, Copy, Debug, strum_macros::ToString)]
+#[derive(Clone, Copy, Debug, strum_macros::Display)]
 enum Location {
     Path,
     Bundle,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::ToString)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::Display)]
 enum Seed {
     None,
     A,
@@ -217,16 +205,9 @@ enum Seed {
 #[derive(Debug)]
 struct TestCase(Seed, Seed, Seed, Location, Location);
 
-impl ToString for TestCase {
-    fn to_string(&self) -> String {
-        format!(
-            "{}-{}-{}-{}-{}",
-            self.0.to_string(),
-            self.1.to_string(),
-            self.2.to_string(),
-            self.3.to_string(),
-            self.4.to_string(),
-        )
+impl Display for TestCase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}-{}-{}-{}", self.0, self.1, self.2, self.3, self.4,)
     }
 }
 
@@ -249,10 +230,7 @@ impl TestCase {
             Seed::B => DnaModifiersOpt::none().with_network_seed(Seed::B.to_string()),
         };
 
-        let dna_path = common
-            .tmp
-            .as_ref()
-            .join(format!("{}.dna", dna_seed.to_string()));
+        let dna_path = common.tmp.as_ref().join(format!("{dna_seed}.dna"));
 
         let bundle = match dna_loc {
             Location::Bundle => {
