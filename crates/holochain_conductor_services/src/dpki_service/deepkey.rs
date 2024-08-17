@@ -59,6 +59,8 @@ impl DeepkeyState {
     }
 }
 
+// Tests for these calls are located in the Holochain conductor package in the form of
+// full integration tests.
 #[async_trait::async_trait]
 impl DpkiState for DeepkeyState {
     async fn next_derivation_details(
@@ -100,5 +102,14 @@ impl DpkiState for DeepkeyState {
         let agent_anchor = key.get_raw_32();
         let payload = (agent_anchor, timestamp);
         self.call_deepkey_zome("key_state", payload).await
+    }
+
+    async fn is_same_agent(
+        &self,
+        key_1: AgentPubKey,
+        key_2: AgentPubKey,
+    ) -> DpkiServiceResult<bool> {
+        self.call_deepkey_zome("same_lineage", (key_1.get_raw_32(), key_2.get_raw_32()))
+            .await
     }
 }
