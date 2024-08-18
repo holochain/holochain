@@ -439,7 +439,7 @@ impl CascadeImpl {
         Ok(())
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
         cache
@@ -454,7 +454,7 @@ impl CascadeImpl {
         Ok(())
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn merge_link_ops_into_cache(
         &self,
         responses: Vec<WireLinkOps>,
@@ -474,7 +474,7 @@ impl CascadeImpl {
     }
 
     /// Add new activity to the Cache.
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn add_activity_into_cache(
         &self,
         responses: Vec<MustGetAgentActivityResponse>,
@@ -532,7 +532,7 @@ impl CascadeImpl {
     }
 
     /// Fetch a Record from the network, caching and returning the results
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn fetch_record(
         &self,
         hash: AnyDhtHash,
@@ -548,7 +548,7 @@ impl CascadeImpl {
         Ok(())
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     async fn fetch_links(
         &self,
         link_key: WireLinkKey,
@@ -562,7 +562,7 @@ impl CascadeImpl {
         Ok(())
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     async fn fetch_agent_activity(
         &self,
         agent: AgentPubKey,
@@ -573,7 +573,7 @@ impl CascadeImpl {
         Ok(network.get_agent_activity(agent, query, options).await?)
     }
 
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     /// Fetch hash bounded agent activity from the network.
     async fn fetch_must_get_agent_activity(
         &self,
@@ -698,7 +698,7 @@ impl CascadeImpl {
     /// Get Entry data along with all CRUD actions associated with it.
     ///
     /// Also returns Rejected actions, which may affect the interpreted validity status of this Entry.
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn get_entry_details(
         &self,
         entry_hash: EntryHash,
@@ -725,7 +725,7 @@ impl CascadeImpl {
     /// Get the specified Record along with all Updates and Deletes associated with it.
     ///
     /// Can return a Rejected Record.
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn get_record_details(
         &self,
         action_hash: ActionHash,
@@ -756,7 +756,7 @@ impl CascadeImpl {
         self.cascading(query).await
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     /// Returns the [Record] for this [ActionHash] if it is live
     /// by getting the latest available metadata from authorities
     /// combined with this agents authored data.
@@ -790,7 +790,7 @@ impl CascadeImpl {
         self.cascading(query).await
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     /// Returns the oldest live [Record] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
     pub async fn dht_get_entry(
@@ -840,7 +840,7 @@ impl CascadeImpl {
             .await
     }
 
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     /// Updates the cache with the latest network authority data
     /// and returns what is in the cache.
     /// This gives you the latest possible picture of the current dht state.
@@ -857,7 +857,7 @@ impl CascadeImpl {
     }
 
     /// Get either [`EntryDetails`] or [`RecordDetails`], depending on the hash provided
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub async fn get_details(
         &self,
         hash: AnyDhtHash,
@@ -875,7 +875,7 @@ impl CascadeImpl {
         }
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     /// Gets an links from the cas or cache depending on it's metadata
     // The default behavior is to skip deleted or replaced entries.
     pub async fn dht_get_links(
@@ -906,7 +906,7 @@ impl CascadeImpl {
         self.cascading(query).await
     }
 
-    #[instrument(skip(self, key, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, key, options)))]
     /// Return all CreateLink actions
     /// and DeleteLink actions ordered by time.
     pub async fn get_link_details(
@@ -927,7 +927,7 @@ impl CascadeImpl {
     }
 
     /// Count the number of links matching the `query`.
-    #[instrument(skip(self, query))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, query)))]
     pub async fn dht_count_links(&self, query: WireLinkQuery) -> CascadeResult<usize> {
         let mut links = HashSet::<ActionHash>::new();
         if !self.am_i_an_authority(query.base.clone()).await? {
@@ -1021,7 +1021,10 @@ impl CascadeImpl {
         }
     }
 
-    #[instrument(skip(self, agent, query, options))]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self, agent, query, options))
+    )]
     /// Get agent activity from agent activity authorities.
     /// Hashes are requested from the authority and cache for valid chains.
     /// Options:

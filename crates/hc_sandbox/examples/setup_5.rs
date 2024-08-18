@@ -43,15 +43,12 @@ async fn main() -> anyhow::Result<()> {
         let (mut cmd, _conductor_guard) =
             CmdRunner::from_sandbox_with_bin_path(&input.holochain_path, path.clone()).await?;
 
-        // Generate a new agent key using the simple calls api.
-        let agent_key = hc_sandbox::calls::generate_agent_pub_key(&mut cmd).await?;
-
         let bundle = AppBundleSource::Path(happ.clone()).resolve().await?;
 
         // Create the raw InstallAppPayload request.
         let payload = InstallAppPayload {
             installed_app_id: Some(app_id),
-            agent_key,
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle),
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),

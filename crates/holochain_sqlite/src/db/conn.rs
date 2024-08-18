@@ -29,27 +29,27 @@ impl<'e> PConn {
         Self { inner }
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub(super) fn execute_in_read_txn<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: 'e + FnOnce(Transaction) -> Result<R, E>,
     {
         let txn = timed!(
-            [10, 100, 1000],
-            "timing_1",
+            [1, 100, 1000],
+            "acquiring read transaction",
             self.transaction().map_err(DatabaseError::from)?
         );
 
         // TODO It would be possible to prevent the transaction from calling commit here if we passed a reference instead of a move.
-        timed!([10, 20, 50], "execute_in_read_txn:closure", { f(txn) })
+        timed!([10, 20, 50], "running closure", { f(txn) })
     }
 
     /// Run a closure, passing in a mutable reference to a read-write
     /// transaction, and commit the transaction after the closure has run.
     /// If there is a SQLite error, recover from it and re-run the closure.
     // FIXME: B-01566: implement write failure detection
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub(super) fn execute_in_exclusive_rw_txn<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
@@ -57,24 +57,16 @@ impl<'e> PConn {
     {
         tracing::trace!("entered execute_in_exclusive_rw_txn");
 
-        let mut txn = timed!(
-            [10, 100, 1000],
-            "execute_in_exclusive_rw_txn:transaction_with_behavior",
-            {
-                self.transaction_with_behavior(TransactionBehavior::Exclusive)
-                    .map_err(DatabaseError::from)?
-            }
-        );
+        let mut txn = timed!([10, 100, 1000], "getting exclusive r/w transaction", {
+            self.transaction_with_behavior(TransactionBehavior::Exclusive)
+                .map_err(DatabaseError::from)?
+        });
 
-        let result = timed!(
-            [10, 100, 1000],
-            "closure in execute_in_exclusive_rw_txn",
-            f(&mut txn)?
-        );
+        let result = timed!([10, 100, 1000], "running closure", f(&mut txn)?);
 
         timed!(
             [10, 100, 1000],
-            "execute_in_exclusive_rw_txn:commit",
+            "comitting transaction",
             txn.commit().map_err(DatabaseError::from)?
         );
 

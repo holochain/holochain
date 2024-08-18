@@ -17,7 +17,6 @@ use holochain_state::query::Txn;
 use holochain_state::query::{Query, Store};
 use holochain_types::prelude::*;
 use holochain_zome_types::agent_activity::DeterministicGetAgentActivityFilter;
-use tracing::*;
 
 #[cfg(test)]
 mod test;
@@ -28,7 +27,7 @@ pub(crate) mod get_links_ops_query;
 pub(crate) mod get_record_query;
 
 /// Handler for get_entry query to an Entry authority
-#[instrument(skip(db))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(db)))]
 pub async fn handle_get_entry(
     db: DbRead<DbKindDht>,
     hash: EntryHash,
@@ -40,7 +39,7 @@ pub async fn handle_get_entry(
 }
 
 /// Handler for get_record query to a Record authority
-#[tracing::instrument(skip(env))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(env)))]
 pub async fn handle_get_record(
     env: DbRead<DbKindDht>,
     hash: ActionHash,
@@ -54,7 +53,7 @@ pub async fn handle_get_record(
 }
 
 /// Handler for get_agent_activity query to an Activity authority
-#[instrument(skip(env))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(env)))]
 pub async fn handle_get_agent_activity(
     env: DbRead<DbKindDht>,
     agent: AgentPubKey,
@@ -77,7 +76,7 @@ pub async fn handle_get_agent_activity(
 }
 
 /// Handler for must_get_agent_activity query to an Activity authority
-#[instrument(skip(env))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(env)))]
 pub async fn handle_must_get_agent_activity(
     env: DbRead<DbKindDht>,
     author: AgentPubKey,
@@ -87,7 +86,7 @@ pub async fn handle_must_get_agent_activity(
 }
 
 /// Handler for get_agent_activity_deterministic query to an Activity authority
-#[instrument(skip(env))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(env)))]
 pub async fn handle_get_agent_activity_deterministic(
     env: DbRead<DbKindDht>,
     agent: AgentPubKey,
@@ -102,7 +101,7 @@ pub async fn handle_get_agent_activity_deterministic(
 }
 
 /// Handler for get_links query to a Record/Entry authority
-#[instrument(skip(env, _options))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(env, _options)))]
 pub async fn handle_get_links(
     env: DbRead<DbKindDht>,
     link_key: WireLinkKey,
@@ -116,7 +115,7 @@ pub async fn handle_get_links(
 }
 
 /// Handler for querying links
-#[instrument(skip(db))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(db)))]
 pub async fn handle_get_links_query(
     db: DbRead<DbKindDht>,
     query: WireLinkQuery,

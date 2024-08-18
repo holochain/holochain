@@ -49,7 +49,7 @@ pub(crate) async fn get_entry_def(
     }
 }
 
-#[tracing::instrument(skip(ribosome))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(ribosome)))]
 /// Get all the [EntryDef] for this dna
 pub(crate) async fn get_entry_defs(
     ribosome: RealRibosome,

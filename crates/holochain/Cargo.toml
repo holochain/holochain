@@ -33,6 +33,7 @@ holo_hash = { version = "^0.4.0-dev.9", path = "../holo_hash", features = [
 ] }
 holochain_cascade = { version = "^0.4.0-dev.18", path = "../holochain_cascade" }
 holochain_conductor_api = { version = "^0.4.0-dev.18", path = "../holochain_conductor_api" }
+holochain_deepkey_dna = "0.0.7-dev.1"
 holochain_keystore = { version = "^0.4.0-dev.16", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.4.0-dev.18", path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.4.0-dev.16", path = "../holochain_sqlite" }
@@ -56,6 +57,7 @@ kitsune_p2p_types = { version = "^0.4.0-dev.10", path = "../kitsune_p2p/types" }
 kitsune_p2p_block = { version = "^0.4.0-dev.9", path = "../kitsune_p2p/block" }
 mockall = "0.11.3"
 mr_bundle = { version = "^0.4.0-dev.5", path = "../mr_bundle" }
+must_future = "0.1.1"
 nanoid = "0.4"
 holochain_trace = { version = "^0.4.0-dev.3", path = "../holochain_trace" }
 holochain_metrics = { version = "^0.4.0-dev.4", path = "../holochain_metrics", default_features = false }
@@ -134,6 +136,7 @@ holochain = { path = ".", default-features = false, features = [
   "tx2",
   "tx5",
   "metrics_influxive",
+  "deepkey-wasm-cache",
 ] }
 
 anyhow = "1.0"
@@ -197,6 +200,7 @@ metrics_influxive = ["holochain_metrics/influxive"]
 # This feature should be turned off for production builds.
 test_utils = [
   "contrafact",
+  "deepkey-wasm-cache",
   "diff",
   "ghost_actor/test_utils",
   "hdk/test_utils",
@@ -206,6 +210,7 @@ test_utils = [
   "holochain_zome_types/test_utils",
   "kitsune_p2p_types/test_utils",
   "holochain_cascade/test_utils",
+  "holochain_conductor_services/test_utils",
   "kitsune_p2p/test_utils",
   "kitsune_p2p_bootstrap",
   "holochain_p2p/mock_network",
@@ -214,6 +219,7 @@ test_utils = [
   "arbitrary",
   "matches",
   "holochain_test_wasm_common",
+  "holochain_deepkey_dna/fuzzing",
   "unwrap_to",
   "contrafact",
   "sbd-server",
@@ -279,3 +285,9 @@ chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_types/chc"]
 dpki = []
 
 sweettest = ["test_utils", "sqlite"]
+
+deepkey-wasm-cache = []
+
+# Enables tracing instrumentation 
+# (we experience segfaults in some tests if there is too much instrumentation)
+instrument = []

@@ -118,7 +118,7 @@ impl AppManifest {
     /// with defaults.
     pub fn from_legacy(cells: impl Iterator<Item = InstalledCell>) -> Self {
         let roles = cells
-            .map(|InstalledCell { role_name, cell_id }| {
+            .map(|InstalledCell { role_name, .. }| {
                 let path = PathBuf::from(role_name.clone());
                 AppRoleManifest {
                     name: role_name,
@@ -126,7 +126,7 @@ impl AppManifest {
                     dna: AppRoleDnaManifest {
                         location: Some(mr_bundle::Location::Bundled(path)),
                         modifiers: Default::default(),
-                        installed_hash: Some(cell_id.dna_hash().clone().into()),
+                        installed_hash: None,
                         clone_limit: 256,
                     },
                 }

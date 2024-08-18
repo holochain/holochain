@@ -113,6 +113,7 @@ use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
 
 pub use error::*;
+use holochain_conductor_services::DpkiService;
 pub use types::Outcome;
 pub use validation_dependencies::ValidationDependencies;
 
@@ -156,15 +157,18 @@ mod run_validation_callback_tests;
 mod error;
 mod types;
 
-#[instrument(skip(
-    workspace,
-    trigger_integration,
-    trigger_publish,
-    conductor_handle,
-    network,
-    dht_query_cache,
-    validation_dependencies,
-))]
+#[cfg_attr(
+    feature = "instrument",
+    instrument(skip(
+        workspace,
+        trigger_integration,
+        trigger_publish,
+        conductor_handle,
+        network,
+        dht_query_cache,
+        validation_dependencies,
+    ))
+)]
 #[allow(clippy::too_many_arguments)]
 pub async fn app_validation_workflow(
     dna_hash: Arc<DnaHash>,
@@ -360,12 +364,12 @@ async fn app_validation_workflow_inner(
                                 put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Valid)
                             }
                         }
-                        Outcome::AwaitingDeps(deps) => {
+                        Outcome::AwaitingDeps(_) => {
                             awaiting_ops.fetch_add(1, Ordering::SeqCst);
                             put_validation_limbo(
                                 txn,
                                 &dht_op_hash,
-                                ValidationStage::AwaitingAppDeps(deps),
+                                ValidationStage::AwaitingAppDeps,
                             )
                         }
                         Outcome::Rejected(_) => {
@@ -569,6 +573,8 @@ async fn validate_op_outer(
         .get_ribosome(dna_hash.as_ref())
         .map_err(|_| AppValidationError::DnaMissing((*dna_hash).clone()))?;
 
+    let dpki = conductor_handle.running_services().dpki;
+
     validate_op(
         op,
         dht_op_hash,
@@ -577,6 +583,7 @@ async fn validate_op_outer(
         &ribosome,
         conductor_handle,
         validation_dependencies,
+        dpki,
         false, // is_inline
     )
     .await
@@ -591,6 +598,7 @@ pub async fn validate_op(
     ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    dpki: Option<Arc<DpkiService>>,
     is_inline: bool,
 ) -> AppValidationOutcome<Outcome> {
     check_entry_def(op, &network.dna_hash(), conductor_handle)
@@ -614,6 +622,7 @@ pub async fn validate_op(
         workspace,
         network,
         validation_dependencies,
+        dpki,
         is_inline,
     )
     .await?;
@@ -797,6 +806,7 @@ fn get_integrity_zome_from_ribosome(
     Ok(ZomesToInvoke::OneIntegrity(zome))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_validation_callback(
     invocation: ValidateInvocation,
     dht_op_hash: &DhtOpHash,
@@ -804,11 +814,12 @@ async fn run_validation_callback(
     workspace: HostFnWorkspaceRead,
     network: GenericNetwork,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    dpki: Option<Arc<DpkiService>>,
     is_inline: bool,
 ) -> AppValidationResult<Outcome> {
     let validate_result = ribosome
         .run_validate(
-            ValidateHostAccess::new(workspace.clone(), network.clone(), is_inline),
+            ValidateHostAccess::new(workspace.clone(), network.clone(), dpki, is_inline),
             invocation.clone(),
         )
         .await?;

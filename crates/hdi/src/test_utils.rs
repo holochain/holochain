@@ -35,6 +35,10 @@ pub fn set_zome_types(entries: &[(u8, u8)], links: &[(u8, u8)]) {
             todo!()
         }
 
+        fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool> {
+            todo!()
+        }
+
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo> {
             todo!()
         }

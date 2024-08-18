@@ -76,8 +76,8 @@ pub enum ChainOp {
     ///     references from that action up-to-date.
     /// - Add a "created-by" reference from the entry to the hash of the action.
     ///
-    /// TODO: document how those "created-by" references are stored in
-    /// reality.
+    // TODO: document how those "created-by" references are stored in
+    // reality.
     StoreEntry(Signature, NewEntryAction, Entry),
 
     #[display(fmt = "RegisterAgentActivity")]
@@ -92,8 +92,8 @@ pub enum ChainOp {
     /// - Add an "agent-activity" reference from the public key to the hash
     ///   of the action.
     ///
-    /// TODO: document how those "agent-activity" references are stored in
-    /// reality.
+    // TODO: document how those "agent-activity" references are stored in
+    // reality.
     RegisterAgentActivity(Signature, Action),
 
     #[display(fmt = "RegisterUpdatedContent")]
@@ -558,6 +558,23 @@ impl ChainOp {
         }
     }
 
+    /// Check if this represents a genesis op.
+    pub fn is_genesis(&self) -> bool {
+        // XXX: Not great encapsulation here, but hey, at least it's using
+        // a const value for the comparison.
+        match self {
+            ChainOp::StoreRecord(_, a, _) => a.is_genesis(),
+            ChainOp::StoreEntry(_, a, _) => a.action_seq() < POST_GENESIS_SEQ_THRESHOLD,
+            ChainOp::RegisterAgentActivity(_, a) => a.is_genesis(),
+            ChainOp::RegisterUpdatedContent(_, a, _) => a.action_seq < POST_GENESIS_SEQ_THRESHOLD,
+            ChainOp::RegisterUpdatedRecord(_, a, _) => a.action_seq < POST_GENESIS_SEQ_THRESHOLD,
+            ChainOp::RegisterDeletedBy(_, a) => a.action_seq < POST_GENESIS_SEQ_THRESHOLD,
+            ChainOp::RegisterDeletedEntryAction(_, a) => a.action_seq < POST_GENESIS_SEQ_THRESHOLD,
+            ChainOp::RegisterAddLink(_, a) => a.action_seq < POST_GENESIS_SEQ_THRESHOLD,
+            ChainOp::RegisterRemoveLink(_, a) => a.action_seq < POST_GENESIS_SEQ_THRESHOLD,
+        }
+    }
+
     /// Get the entry from this op, if one exists
     pub fn entry(&self) -> RecordEntryRef {
         match self {
@@ -663,6 +680,26 @@ impl ChainOp {
             ChainOp::RegisterAddLink(_, a) => a.timestamp,
             ChainOp::RegisterRemoveLink(_, a) => a.timestamp,
         }
+    }
+
+    /// returns a reference to the action author
+    pub fn author(&self) -> &AgentPubKey {
+        match self {
+            ChainOp::StoreRecord(_, a, _) => a.author(),
+            ChainOp::StoreEntry(_, a, _) => a.author(),
+            ChainOp::RegisterAgentActivity(_, a) => a.author(),
+            ChainOp::RegisterUpdatedContent(_, a, _) => &a.author,
+            ChainOp::RegisterUpdatedRecord(_, a, _) => &a.author,
+            ChainOp::RegisterDeletedBy(_, a) => &a.author,
+            ChainOp::RegisterDeletedEntryAction(_, a) => &a.author,
+            ChainOp::RegisterAddLink(_, a) => &a.author,
+            ChainOp::RegisterRemoveLink(_, a) => &a.author,
+        }
+    }
+
+    /// Calculate the op's sys validation dependency action hash
+    pub fn sys_validation_dependencies(&self) -> SysValDeps {
+        self.get_type().sys_validation_dependencies(&self.action())
     }
 }
 

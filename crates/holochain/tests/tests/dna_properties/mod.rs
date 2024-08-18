@@ -1,5 +1,4 @@
 use hdk::prelude::*;
-use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetDnaFile;
 use holochain_conductor_api::conductor::ConductorConfig;
@@ -30,11 +29,7 @@ async fn test_dna_properties_macro() {
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_config(ConductorConfig::default()).await;
-    let agent = SweetAgents::one(conductor.keystore()).await;
-    let app = conductor
-        .setup_app_for_agent("app", agent, dnas)
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app", dnas).await.unwrap();
     let alice_zome = app.cells()[0].zome(TestWasm::DnaProperties);
 
     // Get DNA Properties via helper macro
@@ -58,20 +53,17 @@ async fn test_dna_properties_fails_with_invalid_properties() {
     // Set DNA Properties
     let properties = MyInvalidProperties { bad_property: 500 };
     let properties_sb: SerializedBytes = properties.try_into().unwrap();
-    let dnas = &[dna_file.update_modifiers(DnaModifiersOpt {
+    let modifiers = DnaModifiersOpt {
         network_seed: None,
         properties: Some(properties_sb),
         origin_time: None,
         quantum_time: None,
-    })];
+    };
+    let dnas = &[dna_file.update_modifiers(modifiers)];
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_config(ConductorConfig::default()).await;
-    let agent = SweetAgents::one(conductor.keystore()).await;
-    let app = conductor
-        .setup_app_for_agent("app", agent, dnas)
-        .await
-        .unwrap();
+    let app = conductor.setup_app("app", dnas).await.unwrap();
     let alice_zome = app.cells()[0].zome(TestWasm::DnaProperties);
 
     // Fail to get DNA Properties via helper macro

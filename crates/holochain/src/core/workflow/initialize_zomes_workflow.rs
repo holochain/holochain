@@ -37,7 +37,7 @@ where
     }
 }
 
-// #[instrument(skip(network, keystore, workspace, args))]
+// #[cfg_attr(feature = "instrument", tracing::instrument(skip(network, keystore, workspace, args)))]
 pub async fn initialize_zomes_workflow<Ribosome>(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
@@ -97,6 +97,7 @@ where
     } = args;
     let call_zome_handle =
         CellConductorApi::new(conductor_handle.clone(), cell_id.clone()).into_call_zome_handle();
+
     // Call the init callback
     let result = {
         let host_access = InitHostAccess::new(
@@ -209,6 +210,7 @@ mod tests {
 
         let db_dir = test_db_dir();
         let conductor_handle = Conductor::builder()
+            .config(SweetConductorConfig::standard().no_dpki().into())
             .with_data_root_path(db_dir.path().to_path_buf().into())
             .test(&[])
             .await

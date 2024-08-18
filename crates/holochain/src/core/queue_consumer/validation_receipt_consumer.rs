@@ -3,10 +3,12 @@
 use super::*;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
 use futures::FutureExt;
-use tracing::*;
 
 /// Spawn the QueueConsumer for validation receipt workflow
-#[instrument(skip(env, conductor, network))]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(env, conductor, network))
+)]
 pub fn spawn_validation_receipt_consumer(
     dna_hash: Arc<DnaHash>,
     env: DbWrite<DbKindDht>,
