@@ -20,16 +20,16 @@
     "cargo-rdme": {
       "flake": false,
       "locked": {
-        "lastModified": 1675118998,
-        "narHash": "sha256-lrYWqu3h88fr8gG3Yo5GbFGYaq5/1Os7UtM+Af0Bg4k=",
+        "lastModified": 1718044745,
+        "narHash": "sha256-Oa667BTz/PdxZmhGSP+qfPcUbORlk7nP5OrCJyYqVQg=",
         "owner": "orium",
         "repo": "cargo-rdme",
-        "rev": "f9dbb6bccc078f4869f45ae270a2890ac9a75877",
+        "rev": "22d756971037ad4c7953db882c5b96a662364f15",
         "type": "github"
       },
       "original": {
         "owner": "orium",
-        "ref": "v1.1.0",
+        "ref": "v1.4.4",
         "repo": "cargo-rdme",
         "type": "github"
       }
