@@ -3,7 +3,7 @@ use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::app_validation_workflow::{
     app_validation_workflow_inner, check_app_entry_def, put_validation_limbo,
-    AppValidationWorkspace, OutcomeSummary, ValidationDependencies,
+    AppValidationWorkspace, OutcomeSummary,
 };
 use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
@@ -32,7 +32,6 @@ use holochain_zome_types::fixt::{CreateFixturator, DeleteFixturator, SignatureFi
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
 use matches::assert_matches;
-use parking_lot::Mutex;
 use rusqlite::{named_params, Transaction};
 use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
@@ -125,8 +124,6 @@ async fn main_workflow() {
             .len();
     assert_eq!(ops_to_validate, 1);
 
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
-
     // run validation workflow
     // outcome should be incomplete - delete op is missing the dependent create op
     let outcome_summary = app_validation_workflow_inner(
@@ -138,7 +135,6 @@ async fn main_workflow() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
-        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -181,7 +177,6 @@ async fn main_workflow() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
-        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -322,8 +317,6 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             .len();
     assert_eq!(ops_to_validate, 2);
 
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
-
     // run validation workflow
     // outcome should be complete
     let outcome_summary = app_validation_workflow_inner(
@@ -335,7 +328,6 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
-        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -464,8 +456,6 @@ async fn validate_ops_in_sequence_must_get_action() {
             .len();
     assert_eq!(ops_to_validate, 2);
 
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
-
     // run validation workflow
     // outcome should be complete
     let outcome_summary = app_validation_workflow_inner(
@@ -477,7 +467,6 @@ async fn validate_ops_in_sequence_must_get_action() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
-        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -621,8 +610,6 @@ async fn handle_error_in_op_validation() {
             .len();
     assert_eq!(ops_to_validate, 2);
 
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
-
     // running validation workflow should finish without errors
     // outcome summary should show 1 validated and accepted op and the error-causing op as still to validate
     // the failed op should be among the failed op hashes
@@ -635,7 +622,6 @@ async fn handle_error_in_op_validation() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
-        validation_dependencies.clone(),
     )
     .await
     .unwrap();
