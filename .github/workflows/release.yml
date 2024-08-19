@@ -72,7 +72,7 @@ concurrency:
 
 env:
   HOLOCHAIN_REPO: "/var/tmp/holochain_repo"
-  CACHIX_REV: "v1.2"
+  CACHIX_REV: "v1.7.4"
 
 jobs:
   vars:
