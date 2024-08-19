@@ -1,7 +1,6 @@
 use super::app_validation_workflow;
 use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
-use super::app_validation_workflow::ValidationDependencies;
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
@@ -22,7 +21,6 @@ use holochain_state::prelude::IncompleteCommitReason;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use holochain_zome_types::record::Record;
-use parking_lot::Mutex;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
@@ -292,20 +290,17 @@ where
             let outcome =
                 app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;
 
-            let (op, dht_op_hash, omitted_entry) = match outcome {
+            let (op, _, omitted_entry) = match outcome {
                 Ok(op) => op,
                 Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
             };
-            let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
             let outcome = app_validation_workflow::validate_op(
                 &op,
-                &dht_op_hash,
                 workspace.clone().into(),
                 &network,
                 &ribosome,
                 &conductor_handle,
-                validation_dependencies.clone(),
                 dpki.clone(),
                 true, // is_inline
             )
