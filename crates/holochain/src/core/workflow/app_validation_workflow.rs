@@ -806,7 +806,6 @@ async fn run_validation_callback(
                 ?filter,
                 "Op validation returned unresolved dependencies -  AgentActivity"
             );
-            println!("unresolved deps here now");
             // fetch missing agent activities in the background without awaiting them
             let cascade_workspace = workspace.clone();
             let author = author.clone();
