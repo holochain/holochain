@@ -361,9 +361,6 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 }
 
 // test that unresolved dependent hashes can be fetched multiple times
-// it cannot be tested for must_get_agent_activity calls, because in this small
-// test scenario every agent is an authority and are expected to hold data
-// they are an authority of
 #[tokio::test(flavor = "multi_thread")]
 async fn validation_callback_allow_multiple_identical_hash_fetches() {
     holochain_trace::test_run();
