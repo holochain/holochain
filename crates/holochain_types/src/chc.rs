@@ -23,7 +23,7 @@ pub trait ChainHeadCoordinator {
     /// Whenever Holochain is about to commit something, this function will first be called.
     /// The CHC will do some integrity checks, which may fail.
     /// All signatures and hashes need to line up properly.
-    /// If the records added would result in a fork, then a [`ChcError::OutOfSync`] will be returned
+    /// If the records added would result in a fork, then a [`ChcError::InvalidChain`] will be returned
     /// along with the current chain top.
     // If there is an out-of-sync error, it will return a hash, designating the point of fork.
     async fn add_records_request(&self, request: AddRecordsRequest) -> ChcResult<()>;
@@ -126,6 +126,8 @@ pub struct AddRecordPayload {
 impl AddRecordPayload {
     /// Create a payload from a list of records.
     /// This performs the necessary signing and encryption the CHC requires.
+
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(keystore, records)))]
     pub async fn from_records(
         keystore: MetaLairClient,
         agent_pubkey: AgentPubKey,
@@ -138,6 +140,7 @@ impl AddRecordPayload {
              }| {
                 let keystore = keystore.clone();
                 let agent_pubkey = agent_pubkey.clone();
+
                 async move {
                     let encrypted_entry_bytes = entry
                         .into_option()

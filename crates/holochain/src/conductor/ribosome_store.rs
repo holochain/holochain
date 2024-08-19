@@ -1,7 +1,6 @@
 use holochain_types::{prelude::*, share::RwShare};
 use holochain_zome_types::entry_def::EntryDef;
 use std::collections::HashMap;
-use tracing::*;
 
 use crate::core::ribosome::{real_ribosome::RealRibosome, RibosomeT};
 
@@ -30,12 +29,12 @@ impl RibosomeStore {
         self.ribosomes.extend(ribosomes);
     }
 
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub fn list(&self) -> Vec<DnaHash> {
         self.ribosomes.keys().cloned().collect()
     }
 
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
         self.ribosomes
             .get(hash)
@@ -43,7 +42,7 @@ impl RibosomeStore {
     }
 
     // TODO: use Arc, eliminate cloning
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
         self.ribosomes.get(hash).map(|r| r.dna_file().clone())
     }

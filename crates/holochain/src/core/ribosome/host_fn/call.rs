@@ -230,7 +230,6 @@ pub mod wasm_test {
     use rusqlite::named_params;
 
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use crate::sweettest::SweetAgents;
     use crate::test_utils::new_zome_call_unsigned;
     use holochain_conductor_api::ZomeCall;
     use holochain_sqlite::prelude::DatabaseResult;
@@ -247,12 +246,10 @@ pub mod wasm_test {
             .await;
 
         let mut conductor = SweetConductor::from_standard_config().await;
-        let (alice_pubkey, _) = SweetAgents::alice_and_bob();
 
-        let apps = conductor
-            .setup_app_for_agents(
+        let app = conductor
+            .setup_app(
                 "app-",
-                [&alice_pubkey],
                 [
                     &("role1".to_string(), dna_file_1),
                     &("role2".to_string(), dna_file_2),
@@ -261,7 +258,8 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let ((cell1, cell2),) = apps.into_tuples();
+        let agent_pubkey = app.agent().clone();
+        let (cell1, cell2) = app.into_tuple();
 
         let zome1 = cell1.zome(test_wasm);
         let zome2 = cell2.zome(test_wasm);
@@ -272,13 +270,13 @@ pub mod wasm_test {
             let agent_info: AgentInfo = conductor
                 .call(&zome1, "who_are_they_local", cell2.cell_id())
                 .await;
-            assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
-            assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
+            assert_eq!(agent_info.agent_initial_pubkey, agent_pubkey);
+            assert_eq!(agent_info.agent_latest_pubkey, agent_pubkey);
         }
         {
             let agent_info: AgentInfo = conductor.call(&zome1, "who_are_they_role", "role2").await;
-            assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
-            assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
+            assert_eq!(agent_info.agent_initial_pubkey, agent_pubkey);
+            assert_eq!(agent_info.agent_latest_pubkey, agent_pubkey);
         }
     }
 
@@ -347,17 +345,14 @@ pub mod wasm_test {
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
         let mut conductor = SweetConductor::from_standard_config().await;
-        let (alice, bob) = SweetAgents::two(conductor.keystore()).await;
 
-        let apps = conductor
-            .setup_app_for_agents("app", &[alice.clone(), bob.clone()], &[dna_file])
-            .await
-            .unwrap();
-        let ((alice,), (_bobbo,)) = apps.into_tuples();
+        let apps = conductor.setup_apps("app", 2, &[dna_file]).await.unwrap();
+        let ((alice,), (bobbo,)) = apps.into_tuples();
+        let bob_pubkey = bobbo.agent_pubkey().clone();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
         let apps = conductor
-            .setup_app_for_agents("app2", &[bob.clone()], &[dna_file])
+            .setup_app_for_agents("app2", &[bob_pubkey], &[dna_file])
             .await
             .unwrap();
         let ((bobbo2,),) = apps.into_tuples();

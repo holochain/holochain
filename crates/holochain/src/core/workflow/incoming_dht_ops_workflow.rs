@@ -9,7 +9,6 @@ use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use incoming_ops_batch::InOpBatchEntry;
 use std::{collections::HashSet, sync::Arc};
-use tracing::instrument;
 
 mod incoming_ops_batch;
 
@@ -68,7 +67,7 @@ impl Drop for OpsClaim {
     }
 }
 
-#[instrument(skip(txn, ops))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, ops)))]
 fn batch_process_entry(
     txn: &mut rusqlite::Transaction<'_>,
     request_validation_receipt: bool,
@@ -93,7 +92,10 @@ fn batch_process_entry(
 #[derive(Default, Clone)]
 pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
 
-#[instrument(skip(space, sys_validation_trigger, ops))]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(space, sys_validation_trigger, ops))
+)]
 pub async fn incoming_dht_ops_workflow(
     space: Space,
     sys_validation_trigger: TriggerSender,
@@ -207,7 +209,7 @@ pub async fn incoming_dht_ops_workflow(
         .map_err(|_| super::error::WorkflowError::RecvError)?
 }
 
-#[instrument(skip(op))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(op)))]
 /// If this op fails the counterfeit check it should be dropped
 async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
     match op {

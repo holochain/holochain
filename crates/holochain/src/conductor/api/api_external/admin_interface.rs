@@ -175,6 +175,26 @@ impl AdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AgentPubKeyGenerated(agent_pub_key))
             }
+            RevokeAgentKey(payload) => {
+                let RevokeAgentKeyPayload { agent_key, app_id } = *payload;
+                let results = self
+                    .conductor_handle
+                    .clone()
+                    .revoke_agent_key_for_app(agent_key, app_id)
+                    .await?;
+                // Convert errors to strings
+                let results: Vec<(CellId, String)> = results
+                    .into_iter()
+                    .filter_map(|(cell_id, result)| {
+                        if let Err(err) = result {
+                            Some((cell_id, err.to_string()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                Ok(AdminResponse::AgentKeyRevoked(results))
+            }
             ListCellIds => {
                 let cell_ids = self
                     .conductor_handle

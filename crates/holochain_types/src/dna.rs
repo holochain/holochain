@@ -8,6 +8,7 @@ mod dna_bundle;
 mod dna_file;
 mod dna_manifest;
 mod dna_store;
+mod dna_with_role;
 mod error;
 mod ribosome_store;
 
@@ -17,6 +18,7 @@ pub use dna_bundle::*;
 pub use dna_file::*;
 pub use dna_manifest::*;
 pub use dna_store::*;
+pub use dna_with_role::*;
 pub use error::*;
 pub use holo_hash::*;
 pub use ribosome_store::*;

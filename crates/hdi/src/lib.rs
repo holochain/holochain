@@ -327,6 +327,8 @@ pub mod trace;
 /// See mocking examples in the test WASMs crate, such as `agent_info`.
 pub mod hdi;
 
+pub mod agent;
+
 pub mod link;
 
 pub mod chain;

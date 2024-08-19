@@ -421,6 +421,7 @@ impl MetaNetCon {
         }
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn notify(&self, payload: &wire::Wire, timeout: KitsuneTimeout) -> KitsuneResult<()> {
         let start = std::time::Instant::now();
         let msg_id = next_msg_id();

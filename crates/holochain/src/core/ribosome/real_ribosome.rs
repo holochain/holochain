@@ -53,6 +53,7 @@ use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash::hash;
+use crate::core::ribosome::host_fn::is_same_agent::is_same_agent;
 use crate::core::ribosome::host_fn::must_get_action::must_get_action;
 use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
@@ -116,13 +117,14 @@ use once_cell::sync::Lazy;
 use opentelemetry_api::global::meter_with_version;
 use opentelemetry_api::metrics::Counter;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use wasmer_middlewares::metering::get_remaining_points;
 use wasmer_middlewares::metering::set_remaining_points;
 use wasmer_middlewares::metering::MeteringPoints;
 
-pub type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
+pub(crate) type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -144,6 +146,10 @@ pub struct RealRibosome {
 
     /// File system and in-memory cache for wasm modules.
     pub wasmer_module_cache: Arc<ModuleCacheLock>,
+
+    #[cfg(test)]
+    /// Wasm cache for Deepkey wasm in a temporary directory to be shared across all tests.
+    pub shared_test_module_cache: Arc<ModuleCacheLock>,
 }
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
@@ -241,21 +247,34 @@ impl RealRibosome {
     }
 
     /// Create a new instance
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn new(
         dna_file: DnaFile,
         wasmer_module_cache: Arc<ModuleCacheLock>,
     ) -> RibosomeResult<Self> {
+        let mut _shared_test_module_cache: Option<PathBuf> = None;
+        #[cfg(test)]
+        {
+            // Create this temporary directory only in tests.
+            let shared_test_module_cache_dir = std::env::temp_dir().join("deepkey_wasm_cache");
+            let _ = std::fs::create_dir_all(shared_test_module_cache_dir.clone());
+            _shared_test_module_cache = Some(shared_test_module_cache_dir);
+        }
         let mut ribosome = Self {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache,
+            #[cfg(test)]
+            shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
+                _shared_test_module_cache,
+            ))),
         };
 
         // Collect the number of entry and link types
         // for each integrity zome.
+        // TODO: should this be in parallel? Are they all beholden to the same lock?
         let items = futures::future::join_all(ribosome.dna_def().integrity_zomes.iter().map(
             |(name, zome)| async {
                 let zome = Zome::new(name.clone(), zome.clone().erase_type());
@@ -346,16 +365,23 @@ impl RealRibosome {
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
+            #[cfg(test)]
+            shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         }
     }
 
-    #[tracing::instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub async fn runtime_compiled_module(
         &self,
         zome_name: &ZomeName,
     ) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
+        // When running tests, use cache folder accessible to all tests.
+        #[cfg(test)]
+        let cache_lock = self.shared_test_module_cache.clone();
+        #[cfg(not(test))]
         let cache_lock = self.wasmer_module_cache.clone();
+
         let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.code();
         tokio::task::spawn_blocking(move || {
             let cache = timed!([1, 10, 1000], cache_lock.write());
@@ -367,6 +393,7 @@ impl RealRibosome {
     // Create a key for module cache.
     // Format: [WasmHash] as bytes
     // watch out for cache misses in the tests that make things slooow if you change this!
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub fn get_module_cache_key(&self, zome_name: &ZomeName) -> Result<CacheKey, DnaError> {
         let mut key = [0; 32];
         let wasm_zome_hash = self.dna_file.dna().get_wasm_zome_hash(zome_name)?;
@@ -375,7 +402,7 @@ impl RealRibosome {
         Ok(key)
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn get_module_for_zome(&self, zome: &Zome<ZomeDef>) -> RibosomeResult<Arc<Module>> {
         match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
@@ -392,6 +419,7 @@ impl RealRibosome {
         }
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub fn build_instance_with_store(
         &self,
         module: Arc<Module>,
@@ -447,6 +475,7 @@ impl RealRibosome {
         }))
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn next_context_key() -> u64 {
         CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
@@ -507,6 +536,7 @@ impl RealRibosome {
                 "__hc__accept_countersigning_preflight_request_1",
                 accept_countersigning_preflight_request,
             )
+            .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
             .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
             .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
             .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
@@ -936,7 +966,7 @@ impl RibosomeT for RealRibosome {
         async move { f.await.unwrap() }.boxed().into()
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError> {
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
@@ -1130,19 +1160,19 @@ pub mod wasm_test {
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetLocalRendezvous;
-    use ::fixt::prelude::*;
+    use crate::wait_for_10s;
     use hdk::prelude::*;
     use holochain_nonce::fresh_nonce;
-    use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
+    use parking_lot::Mutex;
+    use std::collections::HashMap;
     use std::sync::Arc;
     use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
     // guard to assure that response time to zome calls and concurrent zome calls
     // is not increasing disproportionally
-    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     async fn concurrent_zome_call_response_time_guard() {
         holochain_trace::test_run();
         let mut conductor = SweetConductor::from_config_rendezvous(
@@ -1228,8 +1258,14 @@ pub mod wasm_test {
             );
         }
 
-        // make sure the context map does not retain items
-        assert!(CONTEXT_MAP.lock().is_empty());
+        // Make sure the context map does not retain items.
+        // Zome `deepkey_csr`` does a post_commit call which takes some time to complete,
+        // before it is removed from the context map.
+        wait_for_10s!(
+            CONTEXT_MAP.clone(),
+            |context_map: &Arc<Mutex<HashMap<u64, Arc<_>>>>| context_map.lock().is_empty(),
+            |_| true
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -1240,17 +1276,13 @@ pub mod wasm_test {
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern]).await;
-        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
-        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
 
         let mut conductor = SweetConductor::from_standard_config().await;
 
-        let apps = conductor
-            .setup_app_for_agents("app-", &[alice_pubkey.clone(), bob_pubkey], &[dna_file])
-            .await
-            .unwrap();
+        let apps = conductor.setup_apps("app-", 2, &[dna_file]).await.unwrap();
 
         let ((alice,), (_bob,)) = apps.into_tuples();
+        let alice_pubkey = alice.cell_id().agent_pubkey().clone();
         let alice = alice.zome(TestWasm::HdkExtern);
 
         let foo_result: String = conductor.call(&alice, "foo", ()).await;
@@ -1331,6 +1363,7 @@ pub mod wasm_test {
                 "__hc__get_links_1",
                 "__hc__get_validation_receipts_1",
                 "__hc__hash_1",
+                "__hc__is_same_agent_1",
                 "__hc__must_get_action_1",
                 "__hc__must_get_agent_activity_1",
                 "__hc__must_get_entry_1",

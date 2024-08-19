@@ -61,7 +61,6 @@ impl AppBundle {
     pub async fn resolve_cells(
         self,
         dna_store: &impl DnaStore,
-        agent: AgentPubKey,
         membrane_proofs: MemproofMap,
         existing_cells: ExistingCellsMap,
     ) -> AppBundleResult<AppRoleResolution> {
@@ -83,14 +82,12 @@ impl AppBundle {
             .collect::<AppBundleResult<Vec<_>>>()?
             .into_iter()
             .try_fold(
-                AppRoleResolution::new(agent.clone()),
+                AppRoleResolution::default(),
                 |mut resolution: AppRoleResolution, (role_name, op)| {
                     match op {
                         CellProvisioningOp::CreateFromDnaFile(dna, clone_limit) => {
-                            let agent = resolution.agent.clone();
                             let dna_hash = dna.dna_hash().clone();
-                            let cell_id = CellId::new(dna_hash, agent);
-                            let role = AppRolePrimary::new(cell_id, true, clone_limit).into();
+                            let role = AppRolePrimary::new(dna_hash, true, clone_limit).into();
                             // TODO: could sequentialize this to remove the clone
                             let proof = membrane_proofs.get(&role_name).cloned();
                             resolution.dnas_to_register.push((dna, proof));
@@ -103,16 +100,14 @@ impl AppBundle {
                         }
 
                         CellProvisioningOp::ProvisionOnly(dna, clone_limit) => {
-                            let agent = resolution.agent.clone();
                             let dna_hash = dna.dna_hash().clone();
-                            let cell_id = CellId::new(dna_hash, agent);
 
                             // TODO: could sequentialize this to remove the clone
                             let proof = membrane_proofs.get(&role_name).cloned();
                             resolution.dnas_to_register.push((dna, proof));
                             resolution.role_assignments.push((
                                 role_name,
-                                AppRolePrimary::new(cell_id, false, clone_limit).into(),
+                                AppRolePrimary::new(dna_hash, false, clone_limit).into(),
                             ));
                         }
                     }
@@ -192,15 +187,15 @@ impl AppBundle {
         modifiers: DnaModifiersOpt,
     ) -> AppBundleResult<DnaFile> {
         let dna_file = if let Some(expected_hash) = expected_hash {
+            let expected_hash = expected_hash.clone().into();
             let (dna_file, original_hash) =
-                if let Some(mut dna_file) = dna_store.get_dna(&expected_hash.clone().into()) {
+                if let Some(mut dna_file) = dna_store.get_dna(&expected_hash) {
                     let original_hash = dna_file.dna_hash().clone();
                     dna_file = dna_file.update_modifiers(modifiers);
                     (dna_file, original_hash)
                 } else {
                     self.resolve_location(location, modifiers).await?
                 };
-            let expected_hash: DnaHash = expected_hash.clone().into();
             if expected_hash != original_hash {
                 return Err(AppBundleError::CellResolutionFailure(
                     role_name,
@@ -231,33 +226,24 @@ impl AppBundle {
 /// Includes the DNAs selected to fill the roles and the details of the role assignments.
 // TODO: rework, make fields private
 #[allow(missing_docs)]
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Default)]
 pub struct AppRoleResolution {
-    pub agent: AgentPubKey,
     pub dnas_to_register: Vec<(DnaFile, Option<MembraneProof>)>,
     pub role_assignments: Vec<(RoleName, AppRoleAssignment)>,
 }
 
 #[allow(missing_docs)]
 impl AppRoleResolution {
-    pub fn new(agent: AgentPubKey) -> Self {
-        Self {
-            agent,
-            dnas_to_register: Default::default(),
-            role_assignments: Default::default(),
-        }
-    }
-
     /// Return the IDs of new cells to be created as part of the resolution.
     /// Does not return existing cells to be reused.
-    pub fn cells_to_create(&self) -> Vec<(CellId, Option<MembraneProof>)> {
+    pub fn cells_to_create(&self, agent_key: AgentPubKey) -> Vec<(CellId, Option<MembraneProof>)> {
         let provisioned = self
             .role_assignments
             .iter()
             .filter_map(|(_name, role)| {
                 let role = role.as_primary()?;
                 if role.is_provisioned {
-                    Some(role.cell_id().clone())
+                    Some(CellId::new(role.dna_hash().clone(), agent_key.clone()))
                 } else {
                     None
                 }
@@ -267,7 +253,7 @@ impl AppRoleResolution {
         self.dnas_to_register
             .iter()
             .filter_map(|(dna, proof)| {
-                let cell_id = CellId::new(dna.dna_hash().clone(), self.agent.clone());
+                let cell_id = CellId::new(dna.dna_hash().clone(), agent_key.clone());
                 if provisioned.contains(&cell_id) {
                     Some((cell_id, proof.clone()))
                 } else {

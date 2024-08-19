@@ -9,6 +9,10 @@ use tracing::error;
 use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(_ribosome, call_context))
+)]
 pub fn accept_countersigning_preflight_request<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
@@ -515,6 +519,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
+    #[cfg_attr(target_os = "windows", ignore = "stack overflow on windows")]
     async fn lock_chain() {
         use holochain_nonce::fresh_nonce;
         holochain_trace::test_run();

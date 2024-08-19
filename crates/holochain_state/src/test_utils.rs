@@ -367,7 +367,7 @@ macro_rules! here {
     };
 }
 
-#[tracing::instrument(skip(txn))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn)))]
 pub fn dump_db(txn: &Transaction) {
     let dump = |mut stmt: Statement| {
         let mut rows = stmt.query([]).unwrap();

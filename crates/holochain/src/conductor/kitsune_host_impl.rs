@@ -123,7 +123,7 @@ impl KitsuneHost for KitsuneHostImpl {
         .into()
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn record_metrics(
         &self,
         space: std::sync::Arc<kitsune_p2p::KitsuneSpace>,
@@ -241,7 +241,7 @@ impl KitsuneHost for KitsuneHostImpl {
         .into()
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn check_op_data(
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,

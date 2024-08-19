@@ -193,7 +193,7 @@ async fn test_update_coordinators() {
     );
     assert_eq!(dna.dna_hash(), original_dna.dna_hash());
 
-    expect_def.coordinator_zomes = new_coordinators.clone();
+    expect_def.coordinator_zomes.clone_from(&new_coordinators);
     expect_wasms[2] = new_dna_wasms[0].clone();
     expect_wasms[3] = new_dna_wasms[1].clone();
     expect_wasms[4] = new_dna_wasms[2].clone();

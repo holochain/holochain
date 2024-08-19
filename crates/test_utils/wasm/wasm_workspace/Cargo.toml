@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "agent_lineage",
   "agent_info",
   "anchor",
   "app_validation",

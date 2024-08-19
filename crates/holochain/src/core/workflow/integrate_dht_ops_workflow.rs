@@ -7,14 +7,15 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
 
-use tracing::*;
-
 #[cfg(test)]
 mod query_tests;
 #[cfg(feature = "test_utils")]
 mod tests;
 
-#[instrument(skip(vault, trigger_receipt, network, dht_query_cache))]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(vault, trigger_receipt, network, dht_query_cache))
+)]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
     dht_query_cache: DhtDbQueryCache,

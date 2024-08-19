@@ -82,8 +82,8 @@ pub type TraversalMap<T> = HashMap<Dep<T>, Option<TraversalStep<T>>>;
 /// to add this path to the graph.
 /// If a path ends in a failing check, or if it forms a loop without encountering
 /// a passing check, we don't add that path to the graph.
-#[tracing::instrument(skip(ctx))]
-pub fn traverse<'c, F: Fact>(fact: F, ctx: &'c F::Context) -> TraversalResult<'c, F> {
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(ctx)))]
+pub fn traverse<F: Fact>(fact: F, ctx: &F::Context) -> TraversalResult<F> {
     let mut table = TraversalMap::default();
 
     let root_check_passed = fact.check(ctx);
@@ -120,7 +120,7 @@ pub fn traverse<'c, F: Fact>(fact: F, ctx: &'c F::Context) -> TraversalResult<'c
     }
 }
 
-#[tracing::instrument(skip(ctx, table))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(ctx, table)))]
 fn traverse_inner<F: Fact>(
     dep: &Dep<F>,
     ctx: &F::Context,
@@ -224,7 +224,7 @@ fn traverse_inner<F: Fact>(
     Ok(Some(check))
 }
 
-#[tracing::instrument(skip(ctx, table))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(ctx, table)))]
 fn traverse_fact<F: Fact>(
     fact: &F,
     ctx: &F::Context,

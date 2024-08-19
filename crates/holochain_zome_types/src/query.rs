@@ -109,9 +109,9 @@ pub struct LinkQuery {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// An agents chain records returned from a agent_activity_query
 pub struct AgentActivity {
-    /// Valid actions on this chain.
+    /// Valid actions on this chain. `(sequence, action_hash)`.
     pub valid_activity: Vec<(u32, ActionHash)>,
-    /// Rejected actions on this chain.
+    /// Rejected actions on this chain. `(sequence, action_hash)`.
     pub rejected_activity: Vec<(u32, ActionHash)>,
     /// The status of this chain.
     pub status: ChainStatus,

@@ -3,21 +3,21 @@
 use super::*;
 use crate::core::workflow::app_validation_workflow::app_validation_workflow;
 use crate::core::workflow::app_validation_workflow::AppValidationWorkspace;
-use crate::core::workflow::app_validation_workflow::ValidationDependencies;
 use holochain_p2p::*;
 use holochain_types::db_cache::DhtDbQueryCache;
-use parking_lot::lock_api::Mutex;
-use tracing::*;
 
 /// Spawn the QueueConsumer for AppValidation workflow
-#[instrument(skip(
-    workspace,
-    conductor,
-    trigger_integration,
-    trigger_publish,
-    network,
-    dht_query_cache
-))]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(
+        workspace,
+        conductor,
+        trigger_integration,
+        trigger_publish,
+        network,
+        dht_query_cache
+    ))
+)]
 pub fn spawn_app_validation_consumer(
     dna_hash: Arc<DnaHash>,
     workspace: AppValidationWorkspace,
@@ -29,7 +29,6 @@ pub fn spawn_app_validation_consumer(
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
     let workspace = Arc::new(workspace);
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
     super::queue_consumer_dna_bound(
         "app_validation_consumer",
@@ -45,7 +44,6 @@ pub fn spawn_app_validation_consumer(
                 conductor.clone(),
                 network.clone(),
                 dht_query_cache.clone(),
-                validation_dependencies.clone(),
             )
         },
     );

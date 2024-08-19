@@ -19,10 +19,10 @@ macro_rules! wait_for {
 
 #[macro_export]
 macro_rules! wait_for_10s {
-    ($test:expr, $check:expr, $assert:expr) => {
+    ($test:expr, $check:expr, $assert:expr) => {{
         let wait_for = $crate::test_utils::WaitFor::ten_s();
         $crate::wait_for!(wait_for, $test, $check, $assert)
-    };
+    }};
 }
 
 #[macro_export]
@@ -35,8 +35,8 @@ macro_rules! wait_for_1m {
 
 #[macro_export]
 macro_rules! assert_retry {
-    ($wait:expr, $test:expr, $check:expr $(, $reason:literal)?) => {
-        $crate::wait_for!($wait, $test, $check, |x| assert!(x $(, $reason)?))
+    ($wait:expr, $test:expr $(, $reason:literal)?) => {
+        $crate::wait_for!($wait, $test, |x: &bool| *x, |x: bool| assert!(x $(, $reason)?))
     };
 }
 
@@ -49,9 +49,9 @@ macro_rules! assert_eq_retry {
 
 #[macro_export]
 macro_rules! assert_retry_10s {
-    ($test:expr, $check:expr $(, $reason:literal)? $(,)?) => {
+    ($test:expr $(, $reason:literal)? $(,)?) => {
         let wait_for = $crate::test_utils::WaitFor::ten_s();
-        $crate::assert_retry!(wait_for, $test, $check  $(, $reason:literal)?)
+        $crate::assert_retry!(wait_for, $test  $(, $reason:literal)?)
     };
 }
 
@@ -65,9 +65,9 @@ macro_rules! assert_eq_retry_10s {
 
 #[macro_export]
 macro_rules! assert_retry_1m {
-    ($test:expr, $check:expr $(, $reason:literal)? $(,)?) => {
+    ($test:expr $(, $reason:literal)? $(,)?) => {
         let wait_for = $crate::test_utils::WaitFor::one_m();
-        $crate::assert_retry!(wait_for, $test, $check  $(, $reason:literal)?)
+        $crate::assert_retry!(wait_for, $test $(, $reason:literal)?)
     };
 }
 
@@ -130,7 +130,7 @@ impl WaitFor {
 
     /// Wait for some time before trying again.
     /// Will return false when you should stop waiting.
-    #[tracing::instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub async fn wait_any(&mut self) -> bool {
         if self.attempt >= self.num_attempts {
             return false;
