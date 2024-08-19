@@ -322,25 +322,6 @@ impl RawGetEntryResponse {
 
 /// Extension trait to keep zome types minimal
 #[async_trait::async_trait]
-pub trait RecordExt {
-    /// Validate the signature matches the data
-    async fn validate(&self) -> Result<(), KeystoreError>;
-}
-
-#[async_trait::async_trait]
-impl RecordExt for Record {
-    /// Validates a chain record
-    async fn validate(&self) -> Result<(), KeystoreError> {
-        self.signed_action().validate().await?;
-
-        //TODO: make sure that any cases around entry existence are valid:
-        //      SourceChainError::InvalidStructure(ActionAndEntryMismatch(address)),
-        Ok(())
-    }
-}
-
-/// Extension trait to keep zome types minimal
-#[async_trait::async_trait]
 pub trait SignedActionHashedExt {
     /// Create a hash from data
     fn from_content_sync(signed_action: SignedAction) -> SignedActionHashed;
@@ -351,7 +332,7 @@ pub trait SignedActionHashedExt {
         action: ActionHashed,
     ) -> LairResult<SignedActionHashed>;
     /// Validate the data
-    async fn validate(&self) -> Result<(), KeystoreError>;
+    async fn verify_signature(&self) -> Result<(), KeystoreError>;
 }
 
 #[allow(missing_docs)]
@@ -367,17 +348,17 @@ impl SignedActionHashedExt for SignedActionHashed {
     /// Construct by signing the Action (NOT including the hash)
     async fn sign(keystore: &MetaLairClient, action_hashed: ActionHashed) -> LairResult<Self> {
         let signature = action_hashed
-            .author()
+            .signer()
             .sign(keystore, action_hashed.as_content())
             .await?;
         Ok(Self::with_presigned(action_hashed, signature))
     }
 
-    /// Validates a signed action
-    async fn validate(&self) -> Result<(), KeystoreError> {
+    /// Verify that the signature matches the signed action
+    async fn verify_signature(&self) -> Result<(), KeystoreError> {
         if !self
             .action()
-            .author()
+            .signer()
             .verify_signature(self.signature(), self.action())
             .await?
         {
