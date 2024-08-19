@@ -49,7 +49,7 @@ pub(crate) async fn get_entry_def(
     }
 }
 
-#[tracing::instrument(skip(ribosome))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(ribosome)))]
 /// Get all the [EntryDef] for this dna
 pub(crate) async fn get_entry_defs(
     ribosome: RealRibosome,
@@ -66,12 +66,11 @@ pub(crate) async fn get_entry_defs(
         .map(|(i, (zome_name, zome))| (zome_name, (ZomeIndex(i as u8), zome)))
         .collect::<HashMap<_, _>>();
 
-    let result = tokio::task::spawn_blocking(move || {
-        ribosome.run_entry_defs(EntryDefsHostAccess, invocation)
-    })
-    .await?;
+    let result = ribosome
+        .run_entry_defs(EntryDefsHostAccess, invocation)
+        .await?;
 
-    match result? {
+    match result {
         EntryDefsResult::Defs(map) => {
             // Turn the defs map into a vec of keys and entry defs
             map.into_iter()

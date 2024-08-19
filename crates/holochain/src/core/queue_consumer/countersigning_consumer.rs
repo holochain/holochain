@@ -3,10 +3,12 @@
 use super::*;
 use crate::conductor::manager::TaskManagerClient;
 use crate::core::workflow::countersigning_workflow::countersigning_workflow;
-use tracing::*;
 
 /// Spawn the QueueConsumer for countersigning workflow
-#[instrument(skip(space, tm, dna_network, trigger_sys))]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(space, tm, dna_network, trigger_sys))
+)]
 pub(crate) fn spawn_countersigning_consumer(
     space: Space,
     tm: TaskManagerClient,

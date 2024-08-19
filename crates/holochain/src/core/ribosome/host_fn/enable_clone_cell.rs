@@ -13,8 +13,8 @@ use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::clone::{ClonedCell, EnableCloneCellInput};
 use wasmer::RuntimeError;
 
-#[tracing::instrument(skip(_ribosome, call_context), fields(? call_context.zome, function = ? call_context.function_name))]
-pub fn enable_clone_cell<'a>(
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context), fields(? call_context.zome, function = ? call_context.function_name)))]
+pub fn enable_clone_cell(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: EnableCloneCellInput,
@@ -32,9 +32,12 @@ pub fn enable_clone_cell<'a>(
 
             tokio_helper::block_forever_on(async move {
                 conductor_handle
-                    .enable_clone_cell(&installed_app_id, EnableCloneCellPayload {
-                        clone_cell_id: input.clone_cell_id,
-                    })
+                    .enable_clone_cell(
+                        &installed_app_id,
+                        EnableCloneCellPayload {
+                            clone_cell_id: input.clone_cell_id,
+                        },
+                    )
                     .await
             })
             .map_err(|conductor_error| -> RuntimeError {

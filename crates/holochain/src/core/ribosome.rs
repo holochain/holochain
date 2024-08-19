@@ -67,9 +67,10 @@ use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::CallIterator;
+use crate::core::ribosome::guest_callback::CallStream;
 use derive_more::Constructor;
 use error::RibosomeResult;
+use ghost_actor::dependencies::must_future::MustBoxFuture;
 use guest_callback::entry_defs::EntryDefsHostAccess;
 use guest_callback::init::InitHostAccess;
 use guest_callback::post_commit::PostCommitHostAccess;
@@ -622,9 +623,8 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     fn dna_file(&self) -> &DnaFile;
 
-    fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
+    async fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
 
-    #[tracing::instrument(skip_all)]
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
         match zomes_to_invoke {
             ZomesToInvoke::AllIntegrity => self
@@ -657,19 +657,21 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     fn get_integrity_zome(&self, zome_index: &ZomeIndex) -> Option<IntegrityZome>;
 
-    fn call_iterator<I: Invocation + 'static>(
+    fn call_stream<I: Invocation + 'static>(
         &self,
         host_context: HostContext,
         invocation: I,
-    ) -> CallIterator<Self, I>;
+    ) -> CallStream;
 
-    async fn maybe_call<I: Invocation + 'static>(
+    fn maybe_call<I: Invocation + 'static>(
         &self,
         host_context: HostContext,
         invocation: &I,
         zome: &Zome,
         to_call: &FunctionName,
-    ) -> Result<Option<ExternIO>, RibosomeError>;
+    ) -> MustBoxFuture<'static, Result<Option<ExternIO>, RibosomeError>>
+    where
+        Self: 'static;
 
     /// Get a value from a const wasm function.
     ///
@@ -695,25 +697,25 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         // self.instance().exports().filter(|e| !e.is_callback())
     }
 
-    fn run_genesis_self_check(
+    async fn run_genesis_self_check(
         &self,
         access: GenesisSelfCheckHostAccess,
         invocation: GenesisSelfCheckInvocation,
     ) -> RibosomeResult<GenesisSelfCheckResult>;
 
-    fn run_init(
+    async fn run_init(
         &self,
         access: InitHostAccess,
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult>;
 
-    fn run_entry_defs(
+    async fn run_entry_defs(
         &self,
         access: EntryDefsHostAccess,
         invocation: EntryDefsInvocation,
     ) -> RibosomeResult<EntryDefsResult>;
 
-    fn run_post_commit(
+    async fn run_post_commit(
         &self,
         access: PostCommitHostAccess,
         invocation: PostCommitInvocation,
@@ -721,7 +723,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     /// Helper function for running a validation callback. Calls
     /// private fn `do_callback!` under the hood.
-    fn run_validate(
+    async fn run_validate(
         &self,
         access: ValidateHostAccess,
         invocation: ValidateInvocation,
@@ -729,7 +731,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function(
+    async fn call_zome_function(
         &self,
         access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
@@ -747,7 +749,6 @@ pub fn weigh_placeholder() -> EntryRateWeight {
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
     use crate::core::ribosome::ZomeCall;
-    use crate::sweettest::SweetAgents;
     use crate::sweettest::SweetCell;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
@@ -865,12 +866,8 @@ pub mod wasm_test {
             let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
             let mut conductor = SweetConductor::from_standard_config().await;
-            let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
 
-            let apps = conductor
-                .setup_app_for_agents("app-", [&alice_pubkey, &bob_pubkey], [&dna_file])
-                .await
-                .unwrap();
+            let apps = conductor.setup_apps("app-", 2, [&dna_file]).await.unwrap();
 
             let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
 
@@ -892,6 +889,9 @@ pub mod wasm_test {
 
             let alice = alice_cell.zome(test_wasm);
             let bob = bob_cell.zome(test_wasm);
+
+            let alice_pubkey = alice_cell.agent_pubkey().clone();
+            let bob_pubkey = bob_cell.agent_pubkey().clone();
 
             Self {
                 conductor,

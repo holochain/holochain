@@ -3,75 +3,59 @@ pub mod genesis_self_check;
 pub mod init;
 pub mod post_commit;
 pub mod validate;
+use std::collections::VecDeque;
+
 use super::HostContext;
 use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
-use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
+use tokio::task::JoinHandle;
 
-pub struct CallIterator<R: RibosomeT, I: Invocation> {
+pub type CallStreamItem = Result<(Zome, ExternIO), (Zome, RibosomeError)>;
+pub type CallStream = tokio_stream::wrappers::ReceiverStream<CallStreamItem>;
+
+pub fn call_stream<R: RibosomeT + 'static, I: Invocation + 'static>(
     host_context: HostContext,
     ribosome: R,
     invocation: I,
-    remaining_zomes: Vec<Zome>,
-    remaining_components: FnComponents,
-}
+) -> (
+    CallStream,
+    JoinHandle<Result<(), tokio::sync::mpsc::error::SendError<CallStreamItem>>>,
+) {
+    let (tx, rx) = tokio::sync::mpsc::channel(1);
 
-impl<R: RibosomeT, I: Invocation> CallIterator<R, I> {
-    pub fn new(host_context: HostContext, ribosome: R, invocation: I) -> Self {
-        Self {
-            host_context,
-            remaining_zomes: ribosome.zomes_to_invoke(invocation.zomes()),
-            ribosome,
-            remaining_components: invocation.fn_components(),
-            invocation,
-        }
-    }
-}
+    let h = tokio::spawn(async move {
+        let mut remaining_zomes: VecDeque<_> = ribosome
+            .zomes_to_invoke(invocation.zomes())
+            .into_iter()
+            .collect();
+        let remaining_components_original: VecDeque<_> = invocation.fn_components().collect();
 
-impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R, I> {
-    type Item = (Zome, ExternIO);
-    type Error = (Zome, RibosomeError);
-    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        Ok(match self.remaining_zomes.first() {
-            Some(zome) => {
-                match self.remaining_components.next() {
-                    Some(to_call) => {
-                        let to_call = to_call.into();
-                        // TODO: some day maybe we can remove this CallIterator fanciness and let this
-                        // be truly async. Or at least make it a CallStream?
-                        let r = tokio_helper::block_forever_on(self.ribosome.maybe_call(
-                            self.host_context.clone(),
-                            &self.invocation,
-                            zome,
-                            &to_call,
-                        ));
-                        match r {
-                            Ok(Some(result)) => Some((zome.clone(), result)),
-                            Ok(None) => self.next()?,
-                            Err(e) => return Err((zome.clone(), e)),
-                        }
-                    }
-                    // there are no more callbacks to call in this zome
-                    // reset fn components and move to the next zome
-                    None => {
-                        self.remaining_components = self.invocation.fn_components();
-                        self.remaining_zomes.remove(0);
-                        self.next()?
-                    }
+        while let Some(zome) = remaining_zomes.pop_front() {
+            // reset fn components
+            let mut remaining_components = remaining_components_original.clone();
+            while let Some(to_call) = remaining_components.pop_front() {
+                let to_call = to_call.into();
+                let r = ribosome
+                    .maybe_call(host_context.clone(), &invocation, &zome, &to_call)
+                    .await;
+                match r {
+                    Ok(None) => {}
+                    Ok(Some(result)) => tx.send(Ok((zome.clone(), result))).await?,
+                    Err(e) => tx.send(Err((zome.clone(), e))).await?,
                 }
             }
-            None => None,
-        })
-    }
+        }
+        Ok(())
+    });
+    (tokio_stream::wrappers::ReceiverStream::new(rx), h)
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod tests {
-    use super::CallIterator;
+    use crate::core::ribosome::guest_callback::call_stream;
     use crate::core::ribosome::FnComponents;
     use crate::core::ribosome::MockInvocation;
     use crate::core::ribosome::MockRibosomeT;
@@ -79,13 +63,14 @@ mod tests {
     use crate::fixt::FnComponentsFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::fixt::ZomeFixturator;
-    use fallible_iterator::FallibleIterator;
     use holochain_types::prelude::*;
+    use kitsune_p2p_types::box_fut;
     use mockall::predicate::*;
     use mockall::Sequence;
+    use tokio_stream::StreamExt;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn call_iterator_iterates() {
+    async fn call_stream_streams() {
         // stuff we need to test with
         let mut sequence = Sequence::new();
         let mut ribosome = MockRibosomeT::new();
@@ -137,21 +122,17 @@ mod tests {
                     .times(1)
                     .in_sequence(&mut sequence)
                     .returning(|_, _, _, _| {
-                        Ok(Some(ExternIO::encode(InitCallbackResult::Pass).unwrap()))
+                        box_fut(Ok(Some(
+                            ExternIO::encode(InitCallbackResult::Pass).unwrap(),
+                        )))
                     });
             }
-
-            // the fn components are reset from the invocation every zome
-            invocation
-                .expect_fn_components()
-                .times(1)
-                .in_sequence(&mut sequence)
-                .return_const(fn_components.clone());
         }
 
-        let call_iterator = CallIterator::new(host_access.into(), ribosome, invocation);
+        let (calls, _h) = call_stream(host_access.into(), ribosome, invocation);
 
-        let output: Vec<(_, ExternIO)> = call_iterator.collect().unwrap();
+        let output: Vec<Result<(_, ExternIO), _>> = calls.collect().await;
+        assert!(output.iter().all(|r| r.is_ok()));
         assert_eq!(output.len(), zomes.len() * fn_components.0.len());
     }
 }

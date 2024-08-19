@@ -535,11 +535,6 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         network_seed,
     } = args;
 
-    let agent_key = match agent_key {
-        Some(agent) => agent,
-        None => generate_agent_pub_key(cmd).await?,
-    };
-
     let payload = InstallAppPayload {
         installed_app_id: app_id,
         agent_key,

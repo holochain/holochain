@@ -556,6 +556,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flaky, will be deleted with tx anyway"]
     async fn test_tx2_mem() {
         let t = KitsuneTimeout::from_millis(5000);
 

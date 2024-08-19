@@ -37,6 +37,17 @@ pub type IntegrityZome = Zome<IntegrityZomeDef>;
 
 pub type CoordinatorZome = Zome<CoordinatorZomeDef>;
 
+// Use an integrity zome as a coordinator zome,
+// for cases where integrity zomes define zome functions
+impl From<IntegrityZome> for CoordinatorZome {
+    fn from(zome: IntegrityZome) -> Self {
+        Zome {
+            name: zome.name,
+            def: CoordinatorZomeDef(zome.def.0),
+        }
+    }
+}
+
 impl<T: Send + Sync> Zome<T> {
     /// Constructor
     pub fn new(name: ZomeName, def: T) -> Self {
