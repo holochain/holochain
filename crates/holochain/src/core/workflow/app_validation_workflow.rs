@@ -806,6 +806,7 @@ fn get_integrity_zome_from_ribosome(
     Ok(ZomesToInvoke::OneIntegrity(zome))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_validation_callback(
     invocation: ValidateInvocation,
     dht_op_hash: &DhtOpHash,

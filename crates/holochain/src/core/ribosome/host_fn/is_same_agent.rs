@@ -27,7 +27,6 @@ pub fn is_same_agent<'a>(
                         .is_same_agent(input.0, input.1)
                         .await
                         .map_err(|error| RuntimeError::new(error.to_string()))
-                        .into()
                 }),
             }
         }
