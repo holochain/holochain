@@ -843,13 +843,11 @@ impl KitsuneP2pHandler for Space {
             // This agent is new to the network and has no arc stored on the Kitsune host.
             // Get a default arc for the agent
             None => {
-                self.agent_arqs.insert(agent.clone(), self.default_arc_for_agent(agent.clone()));
+                self.agent_arqs
+                    .insert(agent.clone(), self.default_arc_for_agent(agent.clone()));
             }
         }
 
-        if let Some(initial_arq) = initial_arq {
-            self.agent_arqs.insert(agent.clone(), initial_arq);
-        }
         self.local_joined_agents
             .insert(agent.clone(), maybe_agent_info);
         for module in self.gossip_mod.values() {
@@ -1263,7 +1261,12 @@ impl KitsuneP2pHandler for Space {
         _space: Arc<KitsuneSpace>,
         basis: Arc<KitsuneBasis>,
     ) -> KitsuneP2pHandlerResult<bool> {
+        tracing::info!("Have local joined agents {:?}", self.local_joined_agents);
         let loc = basis.get_loc();
+        tracing::info!(
+            "Doing basis check against num arcs {}",
+            self.agent_arqs.len()
+        );
         let r = self
             .agent_arqs
             .values()
