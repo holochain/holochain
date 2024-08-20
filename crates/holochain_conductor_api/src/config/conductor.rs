@@ -42,8 +42,8 @@
 //!       ## to what you can see here:
 //!       webrtc_config: {
 //!         "iceServers": [
-//!           { "urls": "stun:stun-0.main.infra.holo.host:443" },
-//!           { "urls": "stun:stun-1.main.infra.holo.host:443" }
+//!           { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
+//!           { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
 //!         ]
 //!       }
 //! "#;
