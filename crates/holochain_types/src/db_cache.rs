@@ -268,7 +268,7 @@ impl DhtDbQueryCache {
         .await
     }
 
-    /// Set activity to be integrated.
+    /// Set activity to integrated.
     pub async fn set_activity_to_integrated(
         &self,
         agent: &AgentPubKey,

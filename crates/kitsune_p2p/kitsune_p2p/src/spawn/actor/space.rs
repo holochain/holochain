@@ -1261,12 +1261,7 @@ impl KitsuneP2pHandler for Space {
         _space: Arc<KitsuneSpace>,
         basis: Arc<KitsuneBasis>,
     ) -> KitsuneP2pHandlerResult<bool> {
-        tracing::info!("Have local joined agents {:?}", self.local_joined_agents);
         let loc = basis.get_loc();
-        tracing::info!(
-            "Doing basis check against num arcs {}",
-            self.agent_arqs.len()
-        );
         let r = self
             .agent_arqs
             .values()
