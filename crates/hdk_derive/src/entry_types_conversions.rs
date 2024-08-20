@@ -12,7 +12,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         Item::Enum(ItemEnum {
             ident, variants, ..
         }) => (ident, variants),
-        _ => abort!(input, "hdk_entry_def_conversions can only be used on Enums"),
+        _ => abort!(input, "hdi_entry_def_conversions can only be used on Enums"),
     };
 
     let inner: proc_macro2::TokenStream = variants

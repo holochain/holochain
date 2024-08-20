@@ -4,24 +4,24 @@ use crate::test_utils::set_zome_types;
 use crate::test_utils::short_hand::*;
 use test_case::test_case;
 
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 #[derive(Clone, PartialEq, Eq)]
 pub struct A;
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 #[derive(Clone, PartialEq, Eq)]
 pub struct B;
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 #[derive(Clone, PartialEq, Eq)]
 pub struct C;
 
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct D {
     a: (),
     b: (),
 }
 
-#[hdk_entry_types(skip_hdk_extern = true)]
+#[hdi_entry_types(skip_hdk_extern = true)]
 #[unit_enum(UnitEntryTypes)]
 #[derive(Clone, PartialEq, Eq)]
 pub enum EntryTypes {
@@ -30,7 +30,7 @@ pub enum EntryTypes {
     B(B),
     C(C),
 }
-#[hdk_link_types(skip_no_mangle = true)]
+#[hdi_link_types(skip_no_mangle = true)]
 pub enum LinkTypes {
     A,
     B,

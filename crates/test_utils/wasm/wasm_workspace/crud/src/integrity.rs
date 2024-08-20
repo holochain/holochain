@@ -1,11 +1,11 @@
 use hdi::prelude::*;
 
 /// a tree of counters
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 #[derive(Default, Clone, Copy, PartialEq)]
 pub struct CounTree(pub u32);
 
-#[hdk_entry_types]
+#[hdi_entry_types]
 #[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     Countree(CounTree),

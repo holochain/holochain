@@ -7,10 +7,10 @@ pub enum TemperatureUnit {
     Celcius,
 }
 
-#[hdk_entry_helper]
+#[hdi_entry_helper]
 pub struct Temperature(pub u32, pub TemperatureUnit);
 
-#[hdk_entry_types]
+#[hdi_entry_types]
 #[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     Temperature(Temperature),

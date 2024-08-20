@@ -13,7 +13,7 @@ use crate::util::ignore_enum_data;
 use crate::util::index_to_u8;
 
 #[derive(Debug, FromMeta)]
-/// Type for parsing the `#[hdk_to_coordinates(nested = true)]`
+/// Type for parsing the `#[hdi_to_coordinates(nested = true)]`
 /// attribute into. Defaults to false.
 pub struct MacroArgs {
     #[darling(default)]
@@ -33,7 +33,7 @@ pub fn build(args: TokenStream, input: TokenStream) -> TokenStream {
             ident, variants, ..
         }) => (ident, variants),
         r => {
-            abort!(r, "The `hdk_to_coordinates` macro can only be used on enums."; help = "Make this an enum.";)
+            abort!(r, "The `hdi_to_coordinates` macro can only be used on enums."; help = "Make this an enum.";)
         }
     };
 

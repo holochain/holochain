@@ -1,6 +1,6 @@
 use hdk::prelude::hdi::prelude::*;
 
-#[hdk_entry_types_conversions]
+#[hdi_entry_types_conversions]
 enum Nesting {
     A(A, B),
     B,
