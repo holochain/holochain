@@ -3,7 +3,7 @@ use crate::db::databases::DATABASE_HANDLES;
 use crate::db::guard::{PConnGuard, PTxnGuard};
 use crate::db::kind::{DbKind, DbKindT};
 use crate::db::pool::{
-    initialize_connection, new_connection_pool, num_read_threads, ConnectionPool, DbSyncLevel,
+    initialize_connection, new_connection_pool, num_read_threads, ConnectionPool, PoolConfig,
 };
 use crate::error::{DatabaseError, DatabaseResult};
 use derive_more::Into;
@@ -223,25 +223,20 @@ impl<Kind: DbKindT> DbRead<Kind> {
 pub struct DbWrite<Kind: DbKindT>(DbRead<Kind>);
 
 impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
-    /// Create or open an existing database reference,
-    pub fn open(path_prefix: &Path, kind: Kind) -> DatabaseResult<Self> {
-        Self::open_with_sync_level(path_prefix, kind, DbSyncLevel::default())
-    }
-
-    pub fn open_with_sync_level(
+    pub fn open_with_pool_config(
         path_prefix: &Path,
         kind: Kind,
-        sync_level: DbSyncLevel,
+        pool_config: PoolConfig,
     ) -> DatabaseResult<Self> {
         DATABASE_HANDLES.get_or_insert(&kind, path_prefix, |kind| {
-            Self::new(Some(path_prefix), kind, sync_level, None)
+            Self::new(Some(path_prefix), kind, pool_config, None)
         })
     }
 
     pub fn new(
         path_prefix: Option<&Path>,
         kind: Kind,
-        sync_level: DbSyncLevel,
+        pool_config: PoolConfig,
         statement_trace_fn: Option<fn(&str)>,
     ) -> DatabaseResult<Self> {
         let path = match path_prefix {
@@ -256,7 +251,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                 }
                 // Check if the database is valid and take the appropriate
                 // action if it isn't.
-                match Self::check_database_file(&path, sync_level) {
+                match Self::check_database_file(&path, &pool_config) {
                     Ok(path) => path,
                     // These are the two errors that can
                     // occur if the database is not valid.
@@ -292,7 +287,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                         }
 
                         // Now that we've taken the appropriate action we can try again.
-                        match Self::check_database_file(&path, sync_level) {
+                        match Self::check_database_file(&path, &pool_config) {
                             Ok(path) => path,
                             Err(e) => return Err(e.into()),
                         }
@@ -305,7 +300,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         };
 
         // Now we know the database file is valid we can open a connection pool.
-        let pool = new_connection_pool(path.as_ref().map(|p| p.as_ref()), sync_level);
+        let pool = new_connection_pool(path.as_ref().map(|p| p.as_ref()), pool_config);
         let mut conn = pool.get()?;
         // set to faster write-ahead-log mode
         conn.pragma_update(None, "journal_mode", "WAL".to_string())?;
@@ -403,12 +398,12 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
 
     fn check_database_file(
         path: &Path,
-        sync_level: DbSyncLevel,
+        pool_config: &PoolConfig,
     ) -> rusqlite::Result<Option<PathBuf>> {
         Connection::open(path)
             // For some reason calling pragma_update is necessary to prove the database file is valid.
             .and_then(|mut c| {
-                initialize_connection(&mut c, sync_level)?;
+                initialize_connection(&mut c, pool_config)?;
                 c.pragma_update(None, "synchronous", "0".to_string())?;
                 Ok(c.path().map(PathBuf::from))
             })
@@ -418,12 +413,12 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test(path: &Path, kind: Kind) -> DatabaseResult<Self> {
-        Self::new(Some(path), kind, DbSyncLevel::default(), None)
+        Self::new(Some(path), kind, PoolConfig::default(), None)
     }
 
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test_in_mem(kind: Kind) -> DatabaseResult<Self> {
-        Self::new(None, kind, DbSyncLevel::default(), None)
+        Self::new(None, kind, PoolConfig::default(), None)
     }
 
     #[cfg(all(any(test, feature = "test_utils"), not(loom)))]

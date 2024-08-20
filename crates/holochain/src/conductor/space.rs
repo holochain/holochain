@@ -35,7 +35,7 @@ use holochain_p2p::{
 };
 use holochain_sqlite::prelude::{
     DatabaseResult, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgents,
-    DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite, ReadAccess,
+    DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite, PoolConfig, ReadAccess,
 };
 use holochain_state::{
     host_fn_workspace::SourceChainWorkspace,
@@ -66,6 +66,7 @@ pub struct Spaces {
     pub(crate) queue_consumer_map: QueueConsumerMap,
     pub(crate) conductor_db: DbWrite<DbKindConductor>,
     pub(crate) wasm_db: DbWrite<DbKindWasm>,
+    passphrase: sodoken::BufRead,
 }
 
 #[derive(Clone)]
@@ -114,6 +115,7 @@ pub struct Space {
     pub incoming_ops_batch: IncomingOpsBatch,
 
     root_db_dir: Arc<PathBuf>,
+    passphrase: sodoken::BufRead,
 }
 
 #[cfg(test)]
@@ -130,7 +132,10 @@ pub struct TestSpace {
 
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
-    pub fn new(config: Arc<ConductorConfig>) -> ConductorResult<Self> {
+    pub fn new(
+        config: Arc<ConductorConfig>,
+        passphrase: sodoken::BufRead,
+    ) -> ConductorResult<Self> {
         let root_db_dir: DatabasesRootPath = config
             .data_root_path
             .clone()
@@ -142,10 +147,24 @@ impl Spaces {
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
 
-        let conductor_db =
-            DbWrite::open_with_sync_level(root_db_dir.as_ref(), DbKindConductor, db_sync_level)?;
-        let wasm_db =
-            DbWrite::open_with_sync_level(root_db_dir.as_ref(), DbKindWasm, db_sync_level)?;
+        let conductor_db = DbWrite::open_with_pool_config(
+            root_db_dir.as_ref(),
+            DbKindConductor,
+            PoolConfig {
+                synchronous_level: db_sync_level,
+                passphrase: passphrase.clone(),
+                ..Default::default()
+            },
+        )?;
+        let wasm_db = DbWrite::open_with_pool_config(
+            root_db_dir.as_ref(),
+            DbKindWasm,
+            PoolConfig {
+                synchronous_level: db_sync_level,
+                passphrase: passphrase.clone(),
+                ..Default::default()
+            },
+        )?;
         Ok(Spaces {
             map: RwShare::new(HashMap::new()),
             db_dir: Arc::new(root_db_dir),
@@ -153,6 +172,7 @@ impl Spaces {
             queue_consumer_map: QueueConsumerMap::new(),
             conductor_db,
             wasm_db,
+            passphrase,
         })
     }
 
@@ -333,6 +353,7 @@ impl Spaces {
                             Arc::new(dna_hash.clone()),
                             self.db_dir.to_path_buf(),
                             self.config.db_sync_strategy,
+                            self.passphrase.clone(),
                         )?;
 
                         let r = f(&space);
@@ -685,34 +706,58 @@ impl Space {
         dna_hash: Arc<DnaHash>,
         root_db_dir: PathBuf,
         db_sync_strategy: DbSyncStrategy,
+        passphrase: sodoken::BufRead,
     ) -> DatabaseResult<Self> {
         let space = dna_hash.to_kitsune();
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
-        let cache = DbWrite::open_with_sync_level(
+        let cache = DbWrite::open_with_pool_config(
             root_db_dir.as_ref(),
             DbKindCache(dna_hash.clone()),
-            db_sync_level,
+            PoolConfig {
+                synchronous_level: db_sync_level,
+                passphrase: passphrase.clone(),
+                ..Default::default()
+            },
         )?;
-        let dht_db = DbWrite::open_with_sync_level(
+        let dht_db = DbWrite::open_with_pool_config(
             root_db_dir.as_ref(),
             DbKindDht(dna_hash.clone()),
-            db_sync_level,
+            PoolConfig {
+                synchronous_level: db_sync_level,
+                passphrase: passphrase.clone(),
+                ..Default::default()
+            },
         )?;
-        let p2p_agents_db = DbWrite::open_with_sync_level(
+        let p2p_agents_db = DbWrite::open_with_pool_config(
             root_db_dir.as_ref(),
             DbKindP2pAgents(space.clone()),
-            db_sync_level,
+            PoolConfig {
+                synchronous_level: db_sync_level,
+                passphrase: passphrase.clone(),
+                ..Default::default()
+            },
         )?;
-        let p2p_metrics_db = DbWrite::open_with_sync_level(
+        let p2p_metrics_db = DbWrite::open_with_pool_config(
             root_db_dir.as_ref(),
             DbKindP2pMetrics(space),
-            db_sync_level,
+            PoolConfig {
+                synchronous_level: db_sync_level,
+                passphrase: passphrase.clone(),
+                ..Default::default()
+            },
         )?;
-        let conductor_db: DbWrite<DbKindConductor> =
-            DbWrite::open_with_sync_level(root_db_dir.as_ref(), DbKindConductor, db_sync_level)?;
+        let conductor_db: DbWrite<DbKindConductor> = DbWrite::open_with_pool_config(
+            root_db_dir.as_ref(),
+            DbKindConductor,
+            PoolConfig {
+                synchronous_level: db_sync_level,
+                passphrase: passphrase.clone(),
+                ..Default::default()
+            },
+        )?;
 
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         tokio::spawn(p2p_agent_store::p2p_put_all_batch(
@@ -739,6 +784,7 @@ impl Space {
             dht_query_cache,
             conductor_db,
             root_db_dir: Arc::new(root_db_dir),
+            passphrase,
         };
         Ok(r)
     }
@@ -786,10 +832,14 @@ impl Space {
         match self.authored_dbs.lock().entry(author.clone()) {
             hash_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
             hash_map::Entry::Vacant(entry) => {
-                let db = DbWrite::open_with_sync_level(
+                let db = DbWrite::open_with_pool_config(
                     self.root_db_dir.as_ref(),
                     DbKindAuthored(Arc::new(CellId::new((*self.dna_hash).clone(), author))),
-                    DbSyncLevel::Normal,
+                    PoolConfig {
+                        synchronous_level: DbSyncLevel::Normal,
+                        passphrase: self.passphrase.clone(),
+                        ..Default::default()
+                    },
                 )?;
 
                 entry.insert(db.clone());

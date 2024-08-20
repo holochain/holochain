@@ -17,7 +17,7 @@ pub use kind::{
     DbKind, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindOp, DbKindP2pAgents,
     DbKindP2pMetrics, DbKindT, DbKindWasm,
 };
-pub use pool::{DbSyncLevel, DbSyncStrategy};
+pub use pool::{DbSyncLevel, DbSyncStrategy, PoolConfig};
 
 #[cfg(feature = "test_utils")]
 pub use access::set_acquire_timeout;

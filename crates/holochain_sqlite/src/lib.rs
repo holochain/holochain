@@ -16,7 +16,7 @@
 //!
 //! Unpack and run the build commands per the README.md:
 //!
-//! ```
+//! ```text
 //! ./configure --enable-tempstore=yes CFLAGS="-DSQLITE_HAS_CODEC" LDFLAGS="-lcrypto"
 //! make
 //! ```
@@ -25,13 +25,13 @@
 //!
 //! Connect to your encrypted holochain database:
 //!
-//! ```
+//! ```text
 //! ./sqlcipher /tmp/holochain-test-environmentsyQCJLKxtXcDuglEQNVAerzPBUCM/databases/conductor/conductor
 //! ```
 //!
 //! At the `sqlite>` prompt, input your key:
 //!
-//! ```
+//! ```text
 //! PRAGMA key = "x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C483648101010101010101010101010101010101'";
 //! ```
 //!
@@ -39,7 +39,7 @@
 //!
 //! You should now be able to make sqlite queries:
 //!
-//! ```
+//! ```text
 //! select count(id) from ConductorState;
 //! ```
 

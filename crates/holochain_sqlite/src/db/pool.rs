@@ -52,16 +52,32 @@ pub enum DbSyncStrategy {
     Resilient,
 }
 
-pub(super) fn new_connection_pool(
-    path: Option<&Path>,
-    synchronous_level: DbSyncLevel,
-) -> ConnectionPool {
+/// Configuration for holochain_sqlite ConnectionPool.
+#[derive(Debug, Clone)]
+pub struct PoolConfig {
+    /// The sqlite synchronous level.
+    pub synchronous_level: DbSyncLevel,
+
+    /// The passphrase with which to encrypt the database.
+    pub passphrase: sodoken::BufRead,
+}
+
+impl Default for PoolConfig {
+    fn default() -> Self {
+        Self {
+            synchronous_level: DbSyncLevel::default(),
+            passphrase: sodoken::BufRead::new_no_lock(&[]),
+        }
+    }
+}
+
+pub(super) fn new_connection_pool(path: Option<&Path>, config: PoolConfig) -> ConnectionPool {
     use r2d2_sqlite::SqliteConnectionManager;
     let manager = match path {
         Some(path) => SqliteConnectionManager::file(path),
         None => SqliteConnectionManager::memory(),
     };
-    let customizer = Box::new(ConnCustomizer { synchronous_level });
+    let customizer = Box::new(ConnCustomizer { config });
 
     /*
      * We want
@@ -89,20 +105,17 @@ pub(super) fn new_connection_pool(
 
 #[derive(Debug)]
 struct ConnCustomizer {
-    synchronous_level: DbSyncLevel,
+    config: PoolConfig,
 }
 
 impl r2d2::CustomizeConnection<Connection, rusqlite::Error> for ConnCustomizer {
     fn on_acquire(&self, conn: &mut Connection) -> Result<(), rusqlite::Error> {
-        initialize_connection(conn, self.synchronous_level)?;
+        initialize_connection(conn, &self.config)?;
         Ok(())
     }
 }
 
-pub(super) fn initialize_connection(
-    conn: &mut Connection,
-    synchronous_level: DbSyncLevel,
-) -> Result<()> {
+pub(super) fn initialize_connection(conn: &mut Connection, config: &PoolConfig) -> Result<()> {
     // Tell SQLite to wait this long during write contention.
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
 
@@ -128,7 +141,7 @@ pub(super) fn initialize_connection(
     // enable foreign key support
     conn.pragma_update(None, "foreign_keys", "ON".to_string())?;
 
-    match synchronous_level {
+    match config.synchronous_level {
         DbSyncLevel::Full => conn.pragma_update(None, "synchronous", "2".to_string())?,
         DbSyncLevel::Normal => conn.pragma_update(None, "synchronous", "1".to_string())?,
         DbSyncLevel::Off => conn.pragma_update(None, "synchronous", "0".to_string())?,

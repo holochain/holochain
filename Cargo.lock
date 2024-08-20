@@ -3493,6 +3493,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shrinkwraprs",
+ "sodoken 0.0.11",
  "sqlformat",
  "tempfile",
  "thiserror",

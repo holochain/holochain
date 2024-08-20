@@ -73,6 +73,11 @@ impl ConductorBuilder {
     pub async fn build(self) -> ConductorResult<ConductorHandle> {
         tracing::debug!(?self.config);
 
+        let passphrase = match &self.passphrase {
+            Some(p) => p.clone(),
+            None => sodoken::BufRead::new_no_lock(&[]),
+        };
+
         let keystore = if let Some(keystore) = self.keystore {
             keystore
         } else {
@@ -149,7 +154,7 @@ impl ConductorBuilder {
 
         let ribosome_store = RwShare::new(ribosome_store);
 
-        let spaces = Spaces::new(config.clone())?;
+        let spaces = Spaces::new(config.clone(), passphrase)?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();
@@ -423,7 +428,7 @@ impl ConductorBuilder {
             .unwrap_or_else(holochain_keystore::test_keystore);
 
         let config = Arc::new(self.config);
-        let spaces = Spaces::new(config.clone())?;
+        let spaces = Spaces::new(config.clone(), sodoken::BufRead::new_no_lock(&[]))?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();
