@@ -833,6 +833,20 @@ impl KitsuneP2pHandler for Space {
         initial_arq: Option<Arq>,
     ) -> KitsuneP2pHandlerResult<()> {
         tracing::debug!(?space, ?agent, ?initial_arq, "handle_join");
+
+        match initial_arq {
+            // This agent has been on the network before and has an arc stored on the Kitsune host.
+            // Respect the current storage settings and apply this arc.
+            Some(initial_arq) => {
+                self.agent_arqs.insert(agent.clone(), initial_arq);
+            }
+            // This agent is new to the network and has no arc stored on the Kitsune host.
+            // Get a default arc for the agent
+            None => {
+                self.agent_arqs.insert(agent.clone(), self.default_arc_for_agent(agent.clone()));
+            }
+        }
+
         if let Some(initial_arq) = initial_arq {
             self.agent_arqs.insert(agent.clone(), initial_arq);
         }
@@ -1620,15 +1634,25 @@ impl Space {
         // In the case an initial_arc is passed into the join request,
         // handle_join will initialize this agent_arcs map to that value.
         self.agent_arqs.get(agent).cloned().unwrap_or_else(|| {
-            let dim = SpaceDimension::standard();
-            match self.config.tuning_params.arc_clamping() {
-                Some(ArqClamping::Empty) => Arq::new_empty(dim, agent.get_loc()),
-                Some(ArqClamping::Full) | None => {
-                    let strat = self.config.tuning_params.to_arq_strat();
-                    Arq::new_full_max(dim, &strat, agent.get_loc())
-                }
-            }
+            tracing::warn!("Using default arc for agent, this should be configured by the host or initialised on network join");
+            self.default_arc_for_agent((*agent).clone())
         })
+    }
+
+    /// Get the default arc for an agent.
+    ///
+    /// The default arc depends on the Kitsune tuning parameters.
+    /// - Either arc clamping is set to empty and the arc is empty, or
+    /// - The arc clamping is set to full or not set, in which cases the arc is full.
+    fn default_arc_for_agent(&self, agent: Arc<KitsuneAgent>) -> Arq {
+        let dim = SpaceDimension::standard();
+        match self.config.tuning_params.arc_clamping() {
+            Some(ArqClamping::Empty) => Arq::new_empty(dim, agent.get_loc()),
+            Some(ArqClamping::Full) | None => {
+                let strat = self.config.tuning_params.to_arq_strat();
+                Arq::new_full_max(dim, &strat, agent.get_loc())
+            }
+        }
     }
 }
 
