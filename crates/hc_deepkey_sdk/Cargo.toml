@@ -4,7 +4,7 @@ version = "0.7.0-dev.2"
 authors = ["Matthew Brisebois <matthew.brisebois@holo.host>"]
 edition = "2021"
 license = "CAL-1.0"
-repository = "https://github.com/holochain/deepkey"
+repository = "https://github.com/holochain/holochain"
 description = "SDK for the Deepkey DNA Zomes"
 readme = "README.md"
 
