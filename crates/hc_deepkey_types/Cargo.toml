@@ -15,8 +15,11 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 hdi = "=0.5.0-dev.10"
-holo_hash = { version = "=0.4.0-dev.9", features = ["hashing", "encoding"] }
-holochain_integrity_types = "=0.4.0-dev.10"
+holo_hash = { version = "=0.4.0-dev.9", path = "../holo_hash", features = [
+  "hashing",
+  "encoding",
+] }
+holochain_integrity_types = { version = "=0.4.0-dev.10", path = "../holochain_integrity_types" }
 rmpv = { version = "1", features = ["with-serde"] }
 serde = "1"
 
