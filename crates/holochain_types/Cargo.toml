@@ -30,6 +30,7 @@ flate2 = "1.0.14"
 futures = "0.3"
 getrandom = { version = "0.2.7" }
 one_err = "0.0.8"
+hc_deepkey_sdk = { version = "0.7.0-dev.2", path = "../hc_deepkey_sdk" }
 holo_hash = { version = "^0.4.0-dev.10", path = "../holo_hash", features = [
   "encoding",
 ] }

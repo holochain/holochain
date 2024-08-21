@@ -1,5 +1,5 @@
-pub use deepkey_types;
-pub use deepkey_types::*;
+pub use hc_deepkey_types;
+pub use hc_deepkey_types::*;
 
 pub use hdk;
 
@@ -38,7 +38,7 @@ pub struct AppBindingInput {
     pub installed_app_id: String,
     pub dna_hashes: Vec<DnaHash>,
     #[serde(default)]
-    pub metadata: deepkey_types::MetaData,
+    pub metadata: hc_deepkey_types::MetaData,
 }
 
 #[cfg(feature = "fuzzing")]
@@ -48,7 +48,7 @@ impl<'a> arbitrary::Arbitrary<'a> for AppBindingInput {
             app_name: arbitrary::Arbitrary::arbitrary(u)?,
             installed_app_id: arbitrary::Arbitrary::arbitrary(u)?,
             dna_hashes: arbitrary::Arbitrary::arbitrary(u)?,
-            metadata: deepkey_types::MetaData::new(),
+            metadata: hc_deepkey_types::MetaData::new(),
         })
     }
 }
