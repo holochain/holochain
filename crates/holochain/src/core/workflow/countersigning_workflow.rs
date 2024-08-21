@@ -1,5 +1,7 @@
 //! Countersigning workflow to maintain countersigning session state.
 
+#![allow(unused)]
+
 use super::error::WorkflowResult;
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
@@ -20,6 +22,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
 
+mod accept;
+
+pub(crate) use accept::accept_countersigning_request;
+
 /// Countersigning workspace to hold session state.
 #[derive(Clone, Default)]
 pub struct CountersigningWorkspace {
@@ -28,8 +34,16 @@ pub struct CountersigningWorkspace {
 
 /// The inner state of a countersigning workspace.
 #[derive(Default)]
-pub struct CountersigningWorkspaceInner {
-    sessions: HashMap<AgentPubKey, PreflightRequest>,
+struct CountersigningWorkspaceInner {
+    sessions: HashMap<AgentPubKey, SessionState>,
+}
+
+#[derive(Debug)]
+enum SessionState {
+    Accepted(PreflightRequest),
+    /// Multiple responses in the outer vec, sets of responses in the inner vec
+    SignaturesCollected(Vec<Vec<SignedAction>>),
+    FailedValidation,
 }
 
 pub(crate) async fn countersigning_workflow(
@@ -37,13 +51,95 @@ pub(crate) async fn countersigning_workflow(
     network: impl HolochainP2pDnaT,
     self_trigger: TriggerSender,
     sys_validation_trigger: TriggerSender,
+    integration_trigger: TriggerSender,
+    publish_trigger: TriggerSender,
+    signal: broadcast::Sender<Signal>,
 ) -> WorkflowResult<WorkComplete> {
+    let timed_out_sessions = space
+        .countersigning_workspace
+        .inner
+        .share_ref(|inner| {
+            Ok(inner
+                .sessions
+                .iter()
+                .filter_map(|(author, session_state)| match session_state {
+                    SessionState::Accepted(request) => {
+                        if request.session_times.end < Timestamp::now() {
+                            Some((author.clone(), request.clone()))
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>())
+        })
+        .unwrap();
+
+    for (author, request) in timed_out_sessions {
+        // TODO resolved timed out sessions
+    }
+
+    let completed_sessions = space
+        .countersigning_workspace
+        .inner
+        .share_ref(|inner| {
+            Ok(inner
+                .sessions
+                .iter()
+                .filter_map(|(author, session_state)| match session_state {
+                    SessionState::SignaturesCollected(signatures) => {
+                        Some((author.clone(), signatures.clone()))
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>())
+        })
+        .unwrap();
+
+    for (author, signatures) in completed_sessions {
+        for signature_bundle in signatures {
+            // Try to complete the session using this signature bundle.
+            if let Ok(true) = inner_countersigning_session_complete(
+                space.clone(),
+                &network,
+                author.clone(),
+                signature_bundle.clone(),
+                integration_trigger.clone(),
+                publish_trigger.clone(),
+                signal.clone(),
+            )
+            .await
+            {
+                // If the session completed successfully with this bundle then we can remove the
+                // session from the workspace.
+                space
+                    .countersigning_workspace
+                    .inner
+                    .share_mut(|inner, _| {
+                        inner.sessions.remove(&author);
+                        Ok(())
+                    })
+                    .unwrap();
+                break;
+            }
+        }
+    }
+
     // At the end of the workflow, if we have any sessions still in progress, then schedule a
     // workflow run for the one that will finish soonest.
     let maybe_earliest_finish = space
         .countersigning_workspace
         .inner
-        .share_ref(|inner| Ok(inner.sessions.values().map(|s| s.session_times.end).min()))
+        .share_ref(|inner| Ok(inner.sessions.values().filter_map(|s| {
+            match s {
+                SessionState::Accepted(request) => Some(request.session_times.end),
+                state => {
+                    tracing::warn!("Countersigning session should be resolved but is still the workspace for agent: {:?}", state);
+                    None
+                }
+            }
+        }).min()))
         .unwrap();
     if let Some(earliest_finish) = maybe_earliest_finish {
         Ok(WorkComplete::Incomplete(Some(
@@ -57,100 +153,66 @@ pub(crate) async fn countersigning_workflow(
     }
 }
 
-/// Accept a countersigning session.
-///
-/// This will register the session in the workspace, lock the agent's source chain and build the
-/// pre-flight response.
-pub(crate) async fn accept_countersigning_request(
-    space: Space,
-    keystore: MetaLairClient,
-    author: AgentPubKey,
-    request: PreflightRequest,
-    countersigning_trigger: TriggerSender,
-) -> WorkflowResult<PreflightRequestAcceptance> {
-    // Find the index of our agent in the list of signing agents.
-    let agent_index = match request
-        .signing_agents
-        .iter()
-        .position(|(agent, _)| agent == &author)
-    {
-        Some(agent_index) => agent_index as u8,
-        None => return Ok(PreflightRequestAcceptance::UnacceptableAgentNotFound),
-    };
-
-    // Take out a lock on our source chain and build our current state to include in the pre-flight
-    // response.
-    let source_chain = space.source_chain(keystore.clone(), author.clone()).await?;
-    let countersigning_agent_state = source_chain
-        .accept_countersigning_preflight_request(request.clone(), agent_index)
-        .await?;
-
-    // Create a signature for the pre-fight response, so that other agents can verify that the
-    // acceptance really came from us.
-    let signature: Signature = match keystore
-        .sign(
-            author.clone(),
-            PreflightResponse::encode_fields_for_signature(&request, &countersigning_agent_state)?
-                .into(),
-        )
-        .await
-    {
-        Ok(signature) => signature,
-        Err(e) => {
-            // Attempt to unlock the chain again.
-            // If this fails the chain will remain locked until the session end time.
-            // But also we're handling a keystore error already, so we should return that.
-            if let Err(unlock_error) = source_chain.unlock_chain().await {
-                tracing::error!(?unlock_error);
-            }
-
-            return Err(WorkflowError::other(e));
-        }
-    };
-
-    // At this point the chain has been locked, and we are in a countersigning session. Store the
-    // session request in the workspace.
-    if let Err(_) = space.countersigning_workspace.inner.share_mut(|inner, _| {
-        match inner.sessions.entry(author.clone()) {
-            std::collections::hash_map::Entry::Occupied(_) => {
-                Err(KitsuneError::other("Session already exists"))
-            }
-            std::collections::hash_map::Entry::Vacant(entry) => {
-                entry.insert(request.clone());
-                Ok(())
-            }
-        }
-    }) {
-        // This really shouldn't happen. The chain lock is the primary state and that should be in place here.
-        return Ok(PreflightRequestAcceptance::AnotherSessionIsInProgress);
-    };
-
-    // Kick off the countersigning workflow and let it figure out what actions to take.
-    countersigning_trigger.trigger(&"accept_countersigning_request");
-
-    Ok(PreflightRequestAcceptance::Accepted(
-        PreflightResponse::try_new(request, countersigning_agent_state, signature)?,
-    ))
-}
-
 /// An incoming countersigning session success.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub(crate) async fn countersigning_success(
     space: Space,
-    network: &HolochainP2pDna,
     author: AgentPubKey,
     signed_actions: Vec<SignedAction>,
-    trigger: QueueTriggers,
+    countersigning_trigger: TriggerSender,
+) {
+    let should_trigger = space
+        .countersigning_workspace
+        .inner
+        .share_mut(|inner, _| {
+            match inner.sessions.entry(author.clone()) {
+                std::collections::hash_map::Entry::Occupied(mut entry) => {
+                    match entry.get_mut() {
+                        SessionState::Accepted(_) => {
+                            entry.insert(SessionState::SignaturesCollected(vec![signed_actions]));
+                        }
+                        SessionState::SignaturesCollected(sigs) => {
+                            sigs.push(signed_actions);
+                        }
+                        SessionState::FailedValidation => {
+                            // This is not expected, we shouldn't have published a signature if our session failed validation.
+                            // Where did this remote get a full set of signatures from to send to us?
+                            tracing::warn!("Countersigning session success received but the the session has failed validation locally");
+                            return Ok(false);
+                        }
+                    }
+                }
+                std::collections::hash_map::Entry::Vacant(_) => {
+                    // This will happen if the session has already been resolved and removed from
+                    // internal state. Or if the conductor has restarted.
+                    tracing::trace!("Countersigning session signatures received but is not in the workspace for agent: {:?}", author);
+                    return Ok(false);
+                }
+            }
+
+            Ok(true)
+        })
+        // Unwrap the error, because this share_mut callback doesn't return an error.
+        .unwrap();
+
+    if should_trigger {
+        countersigning_trigger.trigger(&"countersigning_success");
+    }
+}
+
+pub(crate) async fn inner_countersigning_session_complete(
+    space: Space,
+    network: &impl HolochainP2pDnaT,
+    author: AgentPubKey,
+    signed_actions: Vec<SignedAction>,
+    integration_trigger: TriggerSender,
+    publish_trigger: TriggerSender,
     signal: broadcast::Sender<Signal>,
-) -> WorkflowResult<()> {
+) -> WorkflowResult<bool> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
     let dht_db = space.dht_db;
     let dht_db_cache = space.dht_query_cache;
-    let QueueTriggers {
-        publish_dht_ops: publish_trigger,
-        integrate_dht_ops: integration_trigger,
-        ..
-    } = trigger;
+
     // Using iterators is fine in this function as there can only be a maximum of 8 actions.
     let (this_cells_action_hash, entry_hash) = match signed_actions
         .iter()
@@ -161,10 +223,10 @@ pub(crate) async fn countersigning_success(
                 .map(|eh| (ActionHash::with_data_sync(sa), eh))
         }) {
         Some(a) => a,
-        None => return Ok(()),
+        None => return Ok(false),
     };
 
-    // Do a quick check to see if this entry hash matches the current locked session so we don't
+    // Do a quick check to see if this entry hash matches the current locked session, so we don't
     // check signatures unless there is an active session.
     let reader_closure = {
         let entry_hash = entry_hash.clone();
@@ -215,14 +277,17 @@ pub(crate) async fn countersigning_success(
         }
     };
 
-    let (session_data, this_cell_actions_op_basis_hashes) =
-        match authored_db.read_async(reader_closure).await? {
-            Some((cs, r)) => (cs, r),
-            None => {
-                // If there is no active session then we can short circuit.
-                return Ok(());
-            }
-        };
+    let (session_data, this_cell_actions_op_basis_hashes) = match authored_db
+        .read_async(reader_closure)
+        .await?
+    {
+        Some((cs, r)) => (cs, r),
+        None => {
+            // If there is no active session then we can short circuit.
+            tracing::warn!("Received a signature bundle for a session that exists in state but is missing from the database");
+            return Ok(true);
+        }
+    };
 
     // Verify signatures of actions.
     let mut i_am_an_author = false;
@@ -233,15 +298,18 @@ pub(crate) async fn countersigning_success(
             .verify_signature(sa.signature(), sa.action())
             .await?
         {
-            return Ok(());
+            return Ok(false);
         }
         if sa.action().author() == &author {
             i_am_an_author = true;
         }
     }
+
     // Countersigning success is ultimately between authors to agree and publish.
     if !i_am_an_author {
-        return Ok(());
+        // We're effectively rejecting this signature bundle but communicate that this signature
+        // bundle wasn't acceptable so that we can try another one.
+        return Ok(false);
     }
 
     // Hash actions.
@@ -321,10 +389,11 @@ pub(crate) async fn countersigning_success(
 
         publish_trigger.trigger(&"publish countersigning_success");
     }
-    Ok(())
+
+    Ok(true)
 }
 
-/// Publish to entry authorities so they can gather all the signed
+/// Publish to entry authorities, so they can gather all the signed
 /// actions for this session and respond with a session complete.
 pub async fn countersigning_publish(
     network: &HolochainP2pDna,
