@@ -141,7 +141,8 @@ impl Cell {
                 &space,
                 conductor_handle.clone(),
             )
-            .await?;
+            .await
+            .map_err(Box::new)?;
 
             Ok((
                 Self {
@@ -609,16 +610,15 @@ impl Cell {
                 Ok(())
             }
             CountersigningSessionNegotiationMessage::AuthorityResponse(signed_actions) => {
-                Ok(countersigning_success(
+                countersigning_success(
                     self.space.clone(),
-                    &self.holochain_p2p_cell,
                     self.id.agent_pubkey().clone(),
                     signed_actions,
-                    self.queue_triggers.clone(),
-                    self.signal_tx.clone(),
+                    self.queue_triggers.countersigning.clone(),
                 )
-                .await
-                .map_err(Box::new)?)
+                .await;
+
+                Ok(())
             }
         }
     }
