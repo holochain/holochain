@@ -160,7 +160,6 @@ mod types;
         conductor_handle,
         network,
         dht_query_cache,
-        validation_dependencies,
     ))
 )]
 #[allow(clippy::too_many_arguments)]
