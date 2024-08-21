@@ -2,7 +2,7 @@
 name = "hc_deepkey_sdk"
 version = "0.7.0-dev.2"
 authors = ["Matthew Brisebois <matthew.brisebois@holo.host>"]
-edition = "2018"
+edition = "2021"
 license = "CAL-1.0"
 repository = "https://github.com/holochain/deepkey"
 description = "SDK for the Deepkey DNA Zomes"
@@ -13,8 +13,8 @@ name = "hc_deepkey_sdk"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-hc_deepkey_types = { version = "0.7", path = "../hc_deepkey_types" }
-hdk = { version = "^0.4.0-dev.13", path = "../hdk" }
+hc_deepkey_types = { version = "0.8.0-dev.2", path = "../types" }
+hdk = "=0.4.0-dev.11"
 serde = "1"
 serde_bytes = "0.11"
 
