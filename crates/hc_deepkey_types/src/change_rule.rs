@@ -1,9 +1,6 @@
 use hdi::prelude::*;
 
-use crate::{
-    AuthorizedSpecChange,
-};
-
+use crate::AuthorizedSpecChange;
 
 // The author needs to be linked from the KeysetRoot
 #[hdk_entry_helper]

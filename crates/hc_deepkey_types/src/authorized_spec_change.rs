@@ -1,9 +1,7 @@
 use crate::AuthoritySpec;
 use hdi::prelude::*;
 
-
 pub type Authorization = (u8, Signature);
-
 
 #[hdk_entry_helper]
 #[derive(Clone)]
@@ -14,7 +12,6 @@ pub struct AuthorizedSpecChange {
     // or according to previous AuthSpec upon Update.
     pub authorization_of_new_spec: Vec<Authorization>,
 }
-
 
 impl AuthorizedSpecChange {
     pub fn new(new_spec: AuthoritySpec, authorization_of_new_spec: Vec<Authorization>) -> Self {

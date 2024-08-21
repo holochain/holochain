@@ -1,7 +1,6 @@
 use crate::KeyBytes;
 use hdi::prelude::*;
 
-
 // Represents an M:N multisignature spec.
 // The trivial case 1:1 represents a single agent to sign.
 // We need an entry to define the rules of authority
@@ -16,7 +15,6 @@ pub struct AuthoritySpec {
     // E.g. a revocation key used to create the first change rule.
     pub authorized_signers: Vec<KeyBytes>,
 }
-
 
 impl AuthoritySpec {
     pub fn new(sigs_required: u8, authorized_signers: Vec<KeyBytes>) -> Self {
