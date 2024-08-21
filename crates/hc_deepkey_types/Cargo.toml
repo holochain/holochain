@@ -5,6 +5,7 @@ authors = ["Matthew Brisebois <matthew.brisebois@holo.host>"]
 edition = "2021"
 license = "CAL-1.0"
 repository = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/hc_deepkey_types"
 description = "Definitions used by the Deepkey DNA Zomes"
 readme = "README.md"
 
