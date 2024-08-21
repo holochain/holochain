@@ -1,9 +1,6 @@
 use hdi::prelude::*;
 
-use crate::{
-    AuthorizedSpecChange,
-};
-
+use crate::AuthorizedSpecChange;
 
 // The author needs to be linked from the KeysetRoot
 #[hdk_entry_helper]
@@ -14,10 +11,7 @@ pub struct ChangeRule {
 }
 
 impl ChangeRule {
-    pub fn new(
-        keyset_root: ActionHash,
-        spec_change: AuthorizedSpecChange,
-    ) -> Self {
+    pub fn new(keyset_root: ActionHash, spec_change: AuthorizedSpecChange) -> Self {
         Self {
             keyset_root,
             spec_change,

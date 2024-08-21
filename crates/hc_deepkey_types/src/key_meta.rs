@@ -1,6 +1,5 @@
 use hdi::prelude::*;
 
-
 // This is expected to have some compatibility with Lair Key API
 // #[derive(Debug, Clone, Serialize, Deserialize)]
 // pub enum KeyType {
@@ -9,7 +8,6 @@ use hdi::prelude::*;
 //     AppEncryption,
 //     TLS,
 // }
-
 
 #[hdk_entry_helper]
 #[derive(Clone)]
@@ -22,6 +20,5 @@ pub struct KeyMeta {
     pub key_anchor_addr: ActionHash,
     pub derivation_seed: Option<Vec<u8>>,
     pub derivation_bytes: Option<Vec<u8>>,
-
     // pub key_type: KeyType,
 }

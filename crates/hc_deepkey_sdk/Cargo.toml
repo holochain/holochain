@@ -13,7 +13,7 @@ name = "hc_deepkey_sdk"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-hc_deepkey_types = { version = "0.8.0-dev.2", path = "../types" }
+hc_deepkey_types = { version = "0.8.0-dev.2", path = "../hc_deepkey_types" }
 hdk = "=0.4.0-dev.11"
 serde = "1"
 serde_bytes = "0.11"

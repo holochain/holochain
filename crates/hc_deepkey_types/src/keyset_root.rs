@@ -3,7 +3,6 @@ use hdi::prelude::*;
 
 pub const KEYSET_ROOT_INDEX: u32 = POST_GENESIS_SEQ_THRESHOLD + 1;
 
-
 #[hdk_entry_helper]
 #[derive(Clone)]
 pub struct KeysetRoot {
@@ -27,6 +26,6 @@ impl KeysetRoot {
     }
 
     pub fn root_pub_key_as_agent(&self) -> AgentPubKey {
-        holo_hash::AgentPubKey::from_raw_32( self.root_pub_key.to_vec() )
+        holo_hash::AgentPubKey::from_raw_32(self.root_pub_key.to_vec())
     }
 }

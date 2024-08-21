@@ -1,10 +1,6 @@
 use hdi::prelude::*;
 
-use crate::{
-    KeyAnchor,
-    Authorization,
-};
-
+use crate::{Authorization, KeyAnchor};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
@@ -13,7 +9,6 @@ pub struct KeyGeneration {
 
     // The private key has signed the deepkey agent key to prove ownership
     pub new_key_signing_of_author: Signature,
-
     // TODO
     // generator: ActionHash, // This is the key authorized to generate new keys on this chain
     // generator_signature: Signature, // The generator key signing the new key
@@ -30,16 +25,15 @@ impl KeyGeneration {
 
 impl From<(AgentPubKey, Signature)> for KeyGeneration {
     fn from((key, signature): (AgentPubKey, Signature)) -> Self {
-        Self::new( key, signature )
+        Self::new(key, signature)
     }
 }
 
 impl From<(&AgentPubKey, &Signature)> for KeyGeneration {
     fn from((key, signature): (&AgentPubKey, &Signature)) -> Self {
-        ( key.to_owned(), signature.to_owned() ).into()
+        (key.to_owned(), signature.to_owned()).into()
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
@@ -59,16 +53,15 @@ impl KeyRevocation {
 
 impl From<(ActionHash, Vec<Authorization>)> for KeyRevocation {
     fn from((prior_key, authorizations): (ActionHash, Vec<Authorization>)) -> Self {
-        Self::new( prior_key, authorizations )
+        Self::new(prior_key, authorizations)
     }
 }
 
 impl From<(&ActionHash, &Vec<Authorization>)> for KeyRevocation {
     fn from((prior_key, authorizations): (&ActionHash, &Vec<Authorization>)) -> Self {
-        ( prior_key.to_owned(), authorizations.to_owned() ).into()
+        (prior_key.to_owned(), authorizations.to_owned()).into()
     }
 }
-
 
 /// Registration information used to validate operations on a `KeyAnchor`
 ///
@@ -92,7 +85,7 @@ pub enum KeyRegistration {
     Update(KeyRevocation, KeyGeneration),
 
     // Permanently revokes a key (Note: still uses an update action.)
-    Delete(KeyRevocation)
+    Delete(KeyRevocation),
 }
 
 impl KeyRegistration {
@@ -104,10 +97,11 @@ impl KeyRegistration {
             KeyRegistration::Delete(_) => Err(wasm_error!(WasmErrorInner::Guest(
                 "Cannot derive KeyAnchor from a KeyRegistration::Delete".to_string()
             )))?,
-        }.try_into()
+        }
+        .try_into()
     }
 
     pub fn key_anchor_hash(&self) -> ExternResult<EntryHash> {
-        hash_entry( self.key_anchor()? )
+        hash_entry(self.key_anchor()?)
     }
 }

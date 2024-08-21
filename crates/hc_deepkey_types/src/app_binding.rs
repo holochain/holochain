@@ -1,9 +1,6 @@
-use crate::{
-    MetaData,
-};
+use crate::MetaData;
 use hdi::prelude::*;
 use holo_hash::DnaHash;
-
 
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
