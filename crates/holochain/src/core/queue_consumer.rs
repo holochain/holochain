@@ -40,7 +40,6 @@ use futures::future::Either;
 use futures::{Future, Stream, StreamExt};
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::*;
-use holochain_sqlite::prelude::DatabaseResult;
 use holochain_types::prelude::*;
 use publish_dht_ops_consumer::*;
 use std::collections::HashMap;
@@ -58,7 +57,9 @@ mod sys_validation_consumer;
 use sys_validation_consumer::*;
 mod app_validation_consumer;
 use app_validation_consumer::*;
+
 mod publish_dht_ops_consumer;
+use crate::conductor::error::ConductorResult;
 use crate::core::queue_consumer::countersigning_consumer::spawn_countersigning_consumer;
 use validation_receipt_consumer::*;
 
@@ -81,7 +82,7 @@ pub async fn spawn_queue_consumer_tasks(
     network: HolochainP2pDna,
     space: &Space,
     conductor: ConductorHandle,
-) -> DatabaseResult<(QueueTriggers, InitialQueueTriggers)> {
+) -> ConductorResult<(QueueTriggers, InitialQueueTriggers)> {
     let Space {
         dht_db,
         cache_db: cache,
@@ -96,7 +97,7 @@ pub async fn spawn_queue_consumer_tasks(
 
     // Publish
     let tx_publish = spawn_publish_dht_ops_consumer(
-        cell_id,
+        cell_id.clone(),
         authored_db.clone(),
         conductor.clone(),
         network.clone(),
@@ -181,12 +182,16 @@ pub async fn spawn_queue_consumer_tasks(
         )
     });
 
+    let signal_tx = conductor.get_signal_tx(&cell_id).await?;
     let tx_countersigning = queue_consumer_map.spawn_once_countersigning(dna_hash.clone(), || {
         spawn_countersigning_consumer(
             space.clone(),
             conductor.task_manager(),
             network.clone(),
             tx_sys.clone(),
+            tx_integration.clone(),
+            tx_publish.clone(),
+            signal_tx,
         )
     });
 
