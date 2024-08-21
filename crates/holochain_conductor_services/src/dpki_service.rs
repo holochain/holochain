@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-pub use holochain_deepkey_dna::types::*;
+pub use hc_deepkey_sdk::*;
 use holochain_types::prelude::*;
 use holochain_util::timed;
 

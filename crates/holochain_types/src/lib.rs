@@ -59,7 +59,7 @@ pub use holochain_zome_types::entry::EntryHashed;
 macro_rules! deepkey_roundtrip_backward(
     ($t:ident, $v:expr) => {{
         let v: &$t = $v;
-        let v: holochain_deepkey_dna::hdk::prelude::$t = holochain_serialized_bytes::decode(
+        let v: hc_deepkey_sdk::hdk::prelude::$t = holochain_serialized_bytes::decode(
             &holochain_serialized_bytes::encode(v).expect("Couldn't roundtrip encode"),
         )
         .expect("Couldn't roundtrip decode");
@@ -71,7 +71,7 @@ macro_rules! deepkey_roundtrip_backward(
 #[macro_export]
 macro_rules! deepkey_roundtrip_forward(
     ($t:ident, $v:expr) => {{
-        let v: &holochain_deepkey_dna::hdk::prelude::$t = $v;
+        let v: &hc_deepkey_sdk::hdk::prelude::$t = $v;
         let v: $t = holochain_serialized_bytes::decode(
             &holochain_serialized_bytes::encode($v).expect("Couldn't roundtrip encode"),
         )

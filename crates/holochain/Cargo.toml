@@ -28,12 +28,13 @@ futures = "0.3"
 getrandom = "0.2.7"
 get_if_addrs = "0.5.3"
 ghost_actor = "0.3.0-alpha.6"
+hc_deepkey_sdk = { version = "0.7.0-dev.2", path = "../hc_deepkey_sdk" }
 holo_hash = { version = "^0.4.0-dev.10", path = "../holo_hash", features = [
   "full",
 ] }
 holochain_cascade = { version = "^0.4.0-dev.19", path = "../holochain_cascade" }
 holochain_conductor_api = { version = "^0.4.0-dev.19", path = "../holochain_conductor_api" }
-holochain_deepkey_dna = "0.0.7-dev.1"
+holochain_deepkey_dna = "0.0.8-dev.1"
 holochain_keystore = { version = "^0.4.0-dev.17", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.4.0-dev.19", path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.4.0-dev.17", path = "../holochain_sqlite" }
@@ -219,7 +220,6 @@ test_utils = [
   "arbitrary",
   "matches",
   "holochain_test_wasm_common",
-  "holochain_deepkey_dna/fuzzing",
   "unwrap_to",
   "contrafact",
   "sbd-server",
