@@ -435,7 +435,7 @@ pub async fn record_to_op(
     let action = sah.into();
     // Register agent activity doesn't store the entry so we need to
     // save it so we can reconstruct the record later.
-    if matches!(op_type, RegisterAgentActivity) {
+    if matches!(op_type, ChainOpType::RegisterAgentActivity) {
         hidden_entry = entry.take().or(hidden_entry);
     }
     let chain_op = ChainOp::from_type(op_type, action, entry)?;
