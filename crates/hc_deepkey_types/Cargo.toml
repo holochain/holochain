@@ -14,12 +14,13 @@ name = "hc_deepkey_types"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-hdi = "=0.5.0-dev.10"
-holo_hash = { version = "=0.4.0-dev.9", path = "../holo_hash", features = [
+# TODO: remove path designation to allow this crate to trail behind the current monorepo version
+hdi = { version = "=0.5.0-dev.11", path = "../hdi" }
+holo_hash = { version = "0.4.0-dev.10", path = "../holo_hash", features = [
   "hashing",
   "encoding",
 ] }
-holochain_integrity_types = { version = "=0.4.0-dev.10", path = "../holochain_integrity_types" }
+holochain_integrity_types = { version = "0.4.0-dev.11", path = "../holochain_integrity_types" }
 rmpv = { version = "1", features = ["with-serde"] }
 serde = "1"
 
@@ -29,7 +30,7 @@ arbitrary = { version = "1.0", features = ["derive"], optional = true }
 [features]
 fuzzing = [
   "arbitrary",
-  # "hdi/fuzzing",
+  "hdi/fuzzing",
   "holochain_integrity_types/fuzzing",
   "holo_hash/fuzzing",
 ]
