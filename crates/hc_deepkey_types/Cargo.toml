@@ -9,10 +9,6 @@ documentation = "https://docs.rs/hc_deepkey_types"
 description = "Definitions used by the Deepkey DNA Zomes"
 readme = "README.md"
 
-[lib]
-name = "hc_deepkey_types"
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
 # TODO: remove path designation to allow this crate to trail behind the current monorepo version
 hdi = { version = "0.5.0-dev.11", path = "../hdi" }

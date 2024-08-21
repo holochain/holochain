@@ -9,9 +9,6 @@ documentation = "https://docs.rs/hc_deepkey_sdk"
 description = "SDK for the Deepkey DNA Zomes"
 readme = "README.md"
 
-[lib]
-name = "hc_deepkey_sdk"
-crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 hc_deepkey_types = { version = "0.8.0-dev.2", path = "../hc_deepkey_types" }
