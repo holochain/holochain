@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.0-dev.19
+
 ## 0.4.0-dev.18
 
 - Adds a new `hcterm` landing screen to show what args have been provided and how to use the app.

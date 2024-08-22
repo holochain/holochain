@@ -7,8 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.0-dev.19
+
 - Adds DPKI support. This is not fully hooked up, so the main implication for this particular implementation is that you must be using the same DPKI implementation as all other nodes on the network that you wish to talk to. If the DPKI version mismatches, you cannot establish connections, and will see so as an error in the logs. This work is in preparation for future work which will make it possible to restore your keys if you lose your device, and to revoke and replace your keys if your device is stolen or compromised.
-- Add feature to revoke agent keys. A new call `AdminRequest::RevokeAgentKey` is exposed on the Admin API. Revoking a key for an app will render the key invalid from that moment on and make the source chain of all cells of the app read-only. The key is revoked in the Deepkey service if installed and deleted on all cells' source chains. No more actions can be written to any of these source chains. Further it will fail to clone a cell of the app.
+- Add feature to revoke agent keys. A new call `AdminRequest::RevokeAgentKey` is exposed on the Admin API. Revoking a key for an app will render the key invalid from that moment on and make the source chain of all cells of the app read-only. The key is revoked in the Deepkey service if installed and deleted on all cells’ source chains. No more actions can be written to any of these source chains. Further it will fail to clone a cell of the app.
 - App validation workflow: Remove tracking of missing dependencies. Tracking them introduces higher complexity and the possibility of ops under validation to be stuck. The delay before re-triggering app validation is increased to 100-3000 ms, giving the background task that fetches missing dependencies a chance to complete.
 
 ## 0.4.0-dev.18
@@ -54,7 +56,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.4.0-dev.9
 
-- Warrants: When an authority rejects another agent's authored data, that authority creates a Warrant which is gossiped to the offending agent's Agent Activity Authority, who then serves that warrant along with any `get_agent_activity` request.
+- Warrants: When an authority rejects another agent’s authored data, that authority creates a Warrant which is gossiped to the offending agent’s Agent Activity Authority, who then serves that warrant along with any `get_agent_activity` request.
 - The `warrants` field of `AgentActivity` is now populated with warrants for that agent.
 - Authorities author ChainFork warrants when detecting two actions by the same author with the same `prev_action`
 

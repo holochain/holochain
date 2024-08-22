@@ -224,6 +224,7 @@ mockall::mock! {
             &self,
             ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
         ) -> ExternResult<XSalsa20Poly1305Data>;
+        fn is_same_agent(&self, key1: AgentPubKey, key2: AgentPubKey) -> ExternResult<bool>;
     }
 
 }

@@ -426,7 +426,7 @@ impl Sequences {
         // Track why the sequence start of the range was chosen.
         let mut chain_bottom_type = ChainBottomType::Genesis;
 
-        // If their are any until hashes in the filter,
+        // If there are any until hashes in the filter,
         // then find the highest sequence of the set
         // and find the distance from the position.
         let distance = match filter.get_until() {

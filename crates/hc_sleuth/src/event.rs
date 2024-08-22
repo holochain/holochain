@@ -74,44 +74,42 @@ pub struct Event {
     pub timestamp: Timestamp,
 }
 
+pub struct Fact {
+    node: SleuthId,
+    ty: FactType,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum Fact {
+pub enum FactType {
     /// The node has integrated an op authored by someone else
     Integrated {
-        by: SleuthId,
         op: OpRef,
     },
     /// The node has app validated an op authored by someone else
     AppValidated {
-        by: SleuthId,
         op: OpRef,
     },
     /// The node has sys validated an op authored by someone else
     SysValidated {
-        by: SleuthId,
         op: OpRef,
     },
 
     /// TODO: handle a missing app validation dep
     MissingAppValDep {
-        by: SleuthId,
         op: OpRef,
         deps: Vec<AnyDhtHash>,
     },
     /// The node has fetched an op after hearing about the hash via publish or gossip
     Fetched {
-        by: SleuthId,
         op: OpRef,
     },
     /// The node has published or gossiped this at least once, to somebody
     SentHash {
-        by: SleuthId,
         op: OpRef,
         method: TransferMethod,
     },
     /// The node has received an op hash via publish or gossip
     ReceivedHash {
-        by: SleuthId,
         op: OpRef,
         method: TransferMethod,
     },
@@ -122,13 +120,11 @@ pub enum Fact {
     },
     /// An agent has joined the network
     AgentJoined {
-        node: SleuthId,
         agent: AgentPubKey,
     },
     // XXX: this is a replacement for a proper AgentLeave. This just lets us act as if every
     // agent in the SweetConductor has left
     SweetConductorShutdown {
-        node: SleuthId,
     },
 }
 
@@ -138,36 +134,33 @@ impl aitia::Fact for Fact {
     type Context = Context;
 
     fn explain(&self, ctx: &Self::Context) -> String {
-        match self {
-            Fact::Integrated { by, op } => {
-                format!("[{by}] {op} Integrated")
+        let Self {node, ty} = self;
+        match ty {
+            Fact::Integrated { op } => {
+                format!("[{node}] {op} Integrated")
             }
-            Fact::AppValidated { by, op } => {
-                format!("[{by}] {op} AppValidated")
+            Fact::AppValidated { op } => {
+                format!("[{node}] {op} AppValidated")
             }
-            Fact::SysValidated { by, op } => {
-                format!("[{by}] {op} SysValidated")
+            Fact::SysValidated { op } => {
+                format!("[{node}] {op} SysValidated")
             }
-            Fact::MissingAppValDep { by, op, deps } => {
-                format!("[{by}] {op} PendingAppValidation deps: {deps:#?}")
+            Fact::MissingAppValDep { op, deps } => {
+                format!("[{node}] {op} PendingAppValidation deps: {deps:#?}")
             }
-            Fact::Fetched { by, op } => format!("[{by}] {op} Fetched"),
-            Fact::SentHash { by, op, method } => format!("[{by}] {op} SentHash({method})"),
-            Fact::ReceivedHash { by, op, method } => {
-                format!("[{by}] {op} ReceivedHash({method})")
+            Fact::Fetched { op } => format!("[{node}] {op} Fetched"),
+            Fact::SentHash { op, method } => format!("[{node}] {op} SentHash({method})"),
+            Fact::ReceivedHash { op, method } => {
+                format!("[{node}] {op} ReceivedHash({method})")
             }
             Fact::Authored { by, op } => {
-                let node = ctx
-                    .agent_node(by)
-                    .cloned()
-                    .unwrap_or("???unknown???".to_string());
                 let op_hash = op.as_hash();
-                format!("[{node}] {op_hash} Authored")
+                format!("[{node}] {op_hash} Authored({by}")
             }
-            Fact::AgentJoined { node, agent } => {
+            Fact::AgentJoined { agent } => {
                 format!("[{node}] {agent} AgentJoined")
             }
-            Fact::SweetConductorShutdown { node } => {
+            Fact::SweetConductorShutdown { } => {
                 format!("[{node}] SweetConductorShutdown")
             }
         }
@@ -298,7 +291,6 @@ impl Fact {
     /// The cause which is satisfied by either Integrating this op,
     /// or having authored this op by any of the local agents
     #[allow(clippy::result_large_err)]
-    pub fn authority(ctx: &Context, by: SleuthId, op: OpRef) -> Result<Dep<Self>, DepError<Self>> {
         let integrated = Self::Integrated {
             by: by.clone(),
             op: op.clone(),
