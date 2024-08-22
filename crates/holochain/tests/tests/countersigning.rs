@@ -332,7 +332,7 @@ async fn signature_bundle_noise() {
                 4,
                 std::time::Duration::from_secs(10),
             )
-            .await;
+            .await.unwrap();
     }
 
     let alice_zome = cells[0].zome(TestWasm::CounterSigning);
