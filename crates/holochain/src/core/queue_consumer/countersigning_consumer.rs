@@ -1,7 +1,6 @@
 //! The queue consumer for the countersigning workflow.
 
 use super::*;
-use crate::conductor::manager::TaskManagerClient;
 use crate::core::workflow::countersigning_workflow::countersigning_workflow;
 use tracing::*;
 
@@ -9,7 +8,6 @@ use tracing::*;
 #[instrument(skip_all)]
 pub(crate) fn spawn_countersigning_consumer(
     space: Space,
-    task_manager: TaskManagerClient,
     dna_network: HolochainP2pDna,
     cell_id: CellId,
     conductor: ConductorHandle,
@@ -23,7 +21,7 @@ pub(crate) fn spawn_countersigning_consumer(
     queue_consumer_dna_bound(
         "countersigning_consumer",
         space.dna_hash.clone(),
-        task_manager,
+        conductor.task_manager(),
         (tx.clone(), rx),
         move || {
             countersigning_workflow(
