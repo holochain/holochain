@@ -16,7 +16,7 @@
 //!
 //! Unpack and run the build commands per the README.md:
 //!
-//! ```text
+//! ```sh
 //! ./configure --enable-tempstore=yes CFLAGS="-DSQLITE_HAS_CODEC" LDFLAGS="-lcrypto"
 //! make
 //! ```
@@ -25,7 +25,7 @@
 //!
 //! Connect to your encrypted holochain database:
 //!
-//! ```text
+//! ```sh
 //! ./sqlcipher /tmp/holochain-test-environmentsyQCJLKxtXcDuglEQNVAerzPBUCM/databases/conductor/conductor
 //! ```
 //!
