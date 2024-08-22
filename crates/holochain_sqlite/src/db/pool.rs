@@ -109,7 +109,7 @@ pub(super) fn initialize_connection(conn: &mut Connection, config: &PoolConfig) 
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
 
     #[cfg(feature = "sqlite-encrypted")]
-    conn.execute_batch(&String::from_utf8_lossy(&*config.key.unlocked.read_lock()))?;
+    conn.execute_batch(&String::from_utf8_lossy(&config.key.unlocked.read_lock()))?;
 
     // this is recommended to always be off:
     // https://sqlite.org/pragma.html#pragma_trusted_schema

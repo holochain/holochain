@@ -428,7 +428,8 @@ impl ConductorBuilder {
             .unwrap_or_else(holochain_keystore::test_keystore);
 
         let config = Arc::new(self.config);
-        let spaces = Spaces::new(config.clone(), sodoken::BufRead::new_no_lock(&[]))?;
+        let spaces =
+            Spaces::new(config.clone(), sodoken::BufRead::new_no_lock(b"passphrase")).await?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();

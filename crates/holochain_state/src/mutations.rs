@@ -956,7 +956,7 @@ mod tests {
         let op1 = make_op(warrant1.clone());
         let op2 = make_op(warrant2.clone());
 
-        let db = DbWrite::<DbKindAuthored>::open(dir.as_ref(), DbKindAuthored(cell_id)).unwrap();
+        let db = DbWrite::<DbKindAuthored>::test(dir.as_ref(), DbKindAuthored(cell_id)).unwrap();
         db.test_write({
             let op1 = op1.clone();
             let op2 = op2.clone();

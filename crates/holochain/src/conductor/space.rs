@@ -166,7 +166,6 @@ impl Spaces {
                 PoolConfig {
                     synchronous_level: db_sync_level,
                     key: db_key.clone(),
-                    ..Default::default()
                 },
             )?;
             let wasm_db = DbWrite::open_with_pool_config(
@@ -175,7 +174,6 @@ impl Spaces {
                 PoolConfig {
                     synchronous_level: db_sync_level,
                     key: db_key.clone(),
-                    ..Default::default()
                 },
             )?;
             ConductorResult::Ok((conductor_db, wasm_db))
@@ -738,7 +736,6 @@ impl Space {
                     PoolConfig {
                         synchronous_level: db_sync_level,
                         key: db_key.clone(),
-                        ..Default::default()
                     },
                 )?;
                 let dht_db = DbWrite::open_with_pool_config(
@@ -747,7 +744,6 @@ impl Space {
                     PoolConfig {
                         synchronous_level: db_sync_level,
                         key: db_key.clone(),
-                        ..Default::default()
                     },
                 )?;
                 let p2p_agents_db = DbWrite::open_with_pool_config(
@@ -756,7 +752,6 @@ impl Space {
                     PoolConfig {
                         synchronous_level: db_sync_level,
                         key: db_key.clone(),
-                        ..Default::default()
                     },
                 )?;
                 let p2p_metrics_db = DbWrite::open_with_pool_config(
@@ -765,7 +760,6 @@ impl Space {
                     PoolConfig {
                         synchronous_level: db_sync_level,
                         key: db_key.clone(),
-                        ..Default::default()
                     },
                 )?;
                 let conductor_db: DbWrite<DbKindConductor> = DbWrite::open_with_pool_config(
@@ -774,7 +768,6 @@ impl Space {
                     PoolConfig {
                         synchronous_level: db_sync_level,
                         key: db_key.clone(),
-                        ..Default::default()
                     },
                 )?;
                 DatabaseResult::Ok((cache, dht_db, p2p_agents_db, p2p_metrics_db, conductor_db))
@@ -860,7 +853,6 @@ impl Space {
                         PoolConfig {
                             synchronous_level: DbSyncLevel::Normal,
                             key: self.db_key.clone(),
-                            ..Default::default()
                         },
                     )
                 })?;
@@ -898,12 +890,12 @@ pub async fn query_conductor_state(
 
 #[cfg(test)]
 impl TestSpaces {
-    pub fn new(dna_hashes: impl IntoIterator<Item = DnaHash>) -> Self {
+    pub async fn new(dna_hashes: impl IntoIterator<Item = DnaHash>) -> Self {
         let queue_consumer_map = QueueConsumerMap::new();
-        Self::with_queue_consumer(dna_hashes, queue_consumer_map)
+        Self::with_queue_consumer(dna_hashes, queue_consumer_map).await
     }
 
-    pub fn with_queue_consumer(
+    pub async fn with_queue_consumer(
         dna_hashes: impl IntoIterator<Item = DnaHash>,
         queue_consumer_map: QueueConsumerMap,
     ) -> Self {
@@ -921,7 +913,9 @@ impl TestSpaces {
                 ..Default::default()
             }
             .into(),
+            sodoken::BufRead::new_no_lock(b"passphrase"),
         )
+        .await
         .unwrap();
         spaces.map.share_mut(|map| {
             map.extend(
@@ -950,6 +944,7 @@ impl TestSpace {
             space: Space::new(
                 Arc::new(dna_hash),
                 temp_dir.path().to_path_buf(),
+                Default::default(),
                 Default::default(),
             )
             .unwrap(),

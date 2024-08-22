@@ -96,9 +96,9 @@ impl DbKey {
         let cipher = easy(nonce.clone(), key.clone(), secret).await?;
 
         let mut buf = Vec::with_capacity(NONCEBYTES + 32 + MACBYTES + 16);
-        buf.extend_from_slice(&*nonce.read_lock());
-        buf.extend_from_slice(&*cipher.read_lock());
-        buf.extend_from_slice(&*salt.read_lock());
+        buf.extend_from_slice(&nonce.read_lock());
+        buf.extend_from_slice(&cipher.read_lock());
+        buf.extend_from_slice(&salt.read_lock());
 
         let locked = URL_SAFE_NO_PAD.encode(&buf);
 
@@ -170,8 +170,8 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            String::from_utf8_lossy(&*test1.unlocked.read_lock()),
-            String::from_utf8_lossy(&*test2.unlocked.read_lock()),
+            String::from_utf8_lossy(&test1.unlocked.read_lock()),
+            String::from_utf8_lossy(&test2.unlocked.read_lock()),
         );
 
         assert_eq!(
@@ -181,7 +181,7 @@ PRAGMA cipher_salt = "x'00000000000000000000000000000000'";
 PRAGMA cipher_compatibility = 4;
 PRAGMA cipher_plaintext_header_size = 32;
 "#,
-            &String::from_utf8_lossy(&*test2.unlocked.read_lock()),
+            &String::from_utf8_lossy(&test2.unlocked.read_lock()),
         );
 
         let test3 = DbKey::generate(sodoken::BufRead::new_no_lock(b"passphrase"))
@@ -189,8 +189,8 @@ PRAGMA cipher_plaintext_header_size = 32;
             .unwrap();
 
         assert_ne!(
-            String::from_utf8_lossy(&*test1.unlocked.read_lock()),
-            String::from_utf8_lossy(&*test3.unlocked.read_lock()),
+            String::from_utf8_lossy(&test1.unlocked.read_lock()),
+            String::from_utf8_lossy(&test3.unlocked.read_lock()),
         );
 
         let test4 = DbKey::load(test3.locked, sodoken::BufRead::new_no_lock(b"passphrase"))
@@ -198,8 +198,8 @@ PRAGMA cipher_plaintext_header_size = 32;
             .unwrap();
 
         assert_eq!(
-            String::from_utf8_lossy(&*test3.unlocked.read_lock()),
-            String::from_utf8_lossy(&*test4.unlocked.read_lock()),
+            String::from_utf8_lossy(&test3.unlocked.read_lock()),
+            String::from_utf8_lossy(&test4.unlocked.read_lock()),
         );
     }
 }
