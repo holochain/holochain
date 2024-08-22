@@ -22,6 +22,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
+use holochain_cascade::CascadeImpl;
+use holochain_p2p::actor::GetActivityOptions;
 
 mod accept;
 
@@ -50,7 +52,7 @@ enum SessionState {
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub(crate) async fn countersigning_workflow(
     space: Space,
-    network: impl HolochainP2pDnaT,
+    network: Arc<impl HolochainP2pDnaT>,
     cell_id: CellId,
     conductor: ConductorHandle,
     self_trigger: TriggerSender,
@@ -66,6 +68,8 @@ pub(crate) async fn countersigning_workflow(
             .share_ref(|inner| Ok(inner.sessions.len()))
             .unwrap()
     );
+
+    // TODO load locks from the database and make sure that all sessions are accounted for in the workspace.
 
     let signal_tx = conductor
         .get_signal_tx(&cell_id)
@@ -95,7 +99,13 @@ pub(crate) async fn countersigning_workflow(
 
     for (author, request) in timed_out_sessions {
         tracing::info!("Countersigning session timed out for agent: {:?}", author);
-        match inner_countersigning_session_incomplete(space.clone(), author.clone(), request).await
+        match inner_countersigning_session_incomplete(
+            space.clone(),
+            network.clone(),
+            author.clone(),
+            request,
+        )
+        .await
         {
             Ok(true) => {
                 // The session state has been resolved, so we can remove it from the workspace.
@@ -107,6 +117,8 @@ pub(crate) async fn countersigning_workflow(
                         Ok(())
                     })
                     .unwrap();
+
+                // TODO emit signal to let clients know that this session failed
             }
             Ok(false) => {
                 // TODO reduce log level and trigger a retry for this case?
@@ -148,7 +160,7 @@ pub(crate) async fn countersigning_workflow(
 
             match inner_countersigning_session_complete(
                 space.clone(),
-                &network,
+                network.clone(),
                 author.clone(),
                 signature_bundle.clone(),
                 integration_trigger.clone(),
@@ -215,6 +227,15 @@ pub(crate) async fn countersigning_workflow(
     Ok(WorkComplete::Complete)
 }
 
+const NUM_AUTHORITIES_TO_QUERY: usize = 3;
+
+#[derive(Clone, Debug, PartialEq)]
+enum SessionCompletionDecision {
+    Complete,
+    Abandoned,
+    Indeterminate,
+}
+
 /// Resolve an incomplete countersigning session.
 ///
 /// This function is responsible for deciding what action to take when a countersigning session
@@ -224,34 +245,214 @@ pub(crate) async fn countersigning_workflow(
 /// Otherwise, the function returns false and the cleanup needs to be retried to resolved manually.
 async fn inner_countersigning_session_incomplete(
     space: Space,
+    network: Arc<impl HolochainP2pDnaT>,
     author: AgentPubKey,
     request: PreflightRequest,
 ) -> WorkflowResult<bool> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
-    let maybe_current_session = authored_db
-        .write_async(
-            move |txn| -> SourceChainResult<Option<(EntryHash, CounterSigningSessionData)>> {
-                let maybe_current_session =
-                    current_countersigning_session(&txn, Arc::new(author.clone()))?;
+    let maybe_current_session =
+        authored_db
+            .write_async({
+                let author = author.clone();
+                move |txn| -> SourceChainResult<
+                    Option<(Action, EntryHash, CounterSigningSessionData)>,
+                > {
+                    let maybe_current_session =
+                        current_countersigning_session(&txn, Arc::new(author.clone()))?;
 
-                // This is the simplest failure case, something has gone wrong but the countersigning entry
-                // hasn't been committed then we can unlock the chain and remove the session.
-                if maybe_current_session.is_none() {
-                    mutations::unlock_chain(txn, &author)?;
-                    return Ok(None);
+                    // This is the simplest failure case, something has gone wrong but the countersigning entry
+                    // hasn't been committed then we can unlock the chain and remove the session.
+                    if maybe_current_session.is_none() {
+                        mutations::unlock_chain(txn, &author)?;
+                        return Ok(None);
+                    }
+
+                    Ok(maybe_current_session)
                 }
-
-                Ok(maybe_current_session)
-            },
-        )
-        .await?;
+            })
+            .await?;
 
     if maybe_current_session.is_none() {
         return Ok(true);
     }
 
-    // TODO exit value
+    // Now things get more complicated. We have a countersigning entry on our chain but the session
+    // is in a bad state. We need to figure out what the session state is and how to resolve it.
+
+    let (cs_action, cs_entry_hash, session_data) = maybe_current_session.unwrap();
+
+    // We need to find out what state the other signing agents are in.
+    // TODO Note that we are ignoring the optional signing agents here - that's something we can figure out later because it's not clear what it means for them
+    //      to be optional.
+    let other_signing_agents = session_data
+        .signing_agents()
+        .filter(|a| **a != author)
+        .collect::<Vec<_>>();
+
+    let cascade = CascadeImpl::empty().with_network(network, space.cache_db);
+
+    let mut get_activity_options = GetActivityOptions::default();
+    get_activity_options.include_warrants = true;
+    // We're going to be potentially running quite a lot of these requests, so set the timeout reasonably low.
+    get_activity_options.timeout_ms = Some(10_000);
+
+    let mut by_agent_decisions = Vec::new();
+
+    for agent in other_signing_agents {
+        let agent_state = session_data.agent_state_for_agent(agent)?;
+
+        // Query for the other agent's activity.
+        // We only need a small sample to determine whether they've committed the session entry
+        // or something else in the sequence number after their declared chain top.
+        let filter = ChainQueryFilter::new()
+            .sequence_range(ChainQueryFilterRange::ActionSeqRange(
+                *agent_state.action_seq() + 1,
+                agent_state.action_seq() + 1,
+            ))
+            .include_entries(true);
+
+        let mut authority_decisions = Vec::new();
+        let mut misbehaving_authorities = 0;
+
+        // Try multiple times to get the activity for this agent.
+        // Ideally, each request will go to a different authority, so we don't have to trust a single
+        // authority. However, that is not guaranteed.
+        for i in 0..NUM_AUTHORITIES_TO_QUERY {
+            let activity_result = cascade
+                .get_agent_activity(agent.clone(), filter.clone(), get_activity_options.clone())
+                .await;
+
+            let decision = match activity_result {
+                Ok(activity) => {
+                    if !activity.warrants.is_empty() {
+                        // If this agent is warranted then we can't make the decision on our agent's behalf
+                        // whether to trust this agent or not.
+                        tracing::info!(
+                            "Ignoring evidence from agent {:?} because they are warranted",
+                            agent
+                        );
+                        break;
+                    }
+
+                    match activity.valid_activity {
+                        ChainItems::Full(ref items) => {
+                            if items.len() != 1 {
+                                tracing::warn!("Agent authority returned an unexpected response for agent {:?}: {:?}", agent, activity);
+                                // Continue to try a different authority.
+                                misbehaving_authorities += 1;
+                                continue;
+                            }
+
+                            let maybe_countersigning_record = &items[0];
+                            match &maybe_countersigning_record.entry {
+                                RecordEntry::Present(Entry::CounterSign(cs, _)) => {
+                                    // Check that this is the same session, and not some other session on the other agent's chain.
+                                    if cs.preflight_request == session_data.preflight_request {
+                                        // This is evidence that the other agent has put the countersigning entry on their chain.
+                                        // That is a strong signal that the session is complete.
+                                        SessionCompletionDecision::Complete
+                                    } else {
+                                        // This is evidence that the other agent has put something else on their chain.
+                                        SessionCompletionDecision::Abandoned
+                                    }
+                                }
+                                RecordEntry::Present(_) => {
+                                    // Anything else on the chain is evidence that the agent did not complete the countersigning.
+                                    SessionCompletionDecision::Abandoned
+                                }
+                                RecordEntry::Hidden | RecordEntry::NA => {
+                                    // This wouldn't be the case for a countersigning entry so this is evidence that
+                                    // the agent has put something else on their chain.
+                                    SessionCompletionDecision::Abandoned
+                                }
+                                RecordEntry::NotStored => {
+                                    // This case is not determinate. The agent activity authority might
+                                    // have the action but not the entry yet. We can't make a decision here.
+                                    SessionCompletionDecision::Indeterminate
+                                }
+                            }
+                        }
+                        _ => {
+                            tracing::warn!("Agent authority returned an unexpected response for agent {:?}: {:?}", agent, activity);
+                            misbehaving_authorities += 1;
+                            continue;
+                        }
+                    }
+                }
+                e => {
+                    tracing::debug!(
+                        "Failed to get activity for agent {:?} because of: {:?}",
+                        agent,
+                        e
+                    );
+                    SessionCompletionDecision::Indeterminate
+                }
+            };
+
+            authority_decisions.push(decision);
+        }
+
+        if misbehaving_authorities > 1 {
+            // If more than one authority is misbehaving then we can't make a decision.
+            // We need to wait for more evidence.
+            tracing::info!(
+                "More than one authority is misbehaving for agent {:?}, looking for more evidence",
+                agent
+            );
+            continue;
+        }
+
+        if authority_decisions
+            .iter()
+            .all(|d| *d == SessionCompletionDecision::Complete)
+        {
+            by_agent_decisions.push(SessionCompletionDecision::Complete);
+        } else if authority_decisions
+            .iter()
+            .all(|d| *d == SessionCompletionDecision::Abandoned)
+        {
+            by_agent_decisions.push(SessionCompletionDecision::Abandoned);
+        } else {
+            by_agent_decisions.push(SessionCompletionDecision::Indeterminate);
+        }
+    }
+
+    let complete_decision_count = by_agent_decisions
+        .iter()
+        .filter(|d| **d == SessionCompletionDecision::Complete)
+        .count();
+    let abandoned_decision_count = by_agent_decisions
+        .iter()
+        .filter(|d| **d == SessionCompletionDecision::Abandoned)
+        .count();
+
+    // If there is no evidence that the session is complete, and we have evidence that the session
+    // has been abandoned by a majority of agents, then we can make a decision and abandon the session
+    if complete_decision_count == 0
+        && abandoned_decision_count
+            > (session_data.preflight_request.signing_agents.len() as f64 * 0.5).floor() as usize
+    {
+        abandon_session(authored_db, author.clone(), cs_action, cs_entry_hash).await?;
+        // We can remove the session from the workspace and signal clients that the session is abandoned.
+        return Ok(true);
+    }
+    // If there is no evidence that the session is abandoned, and we have evidence that the session
+    // has been completed by a majority of agents, then we can make a decision and complete the session
+    else if abandoned_decision_count == 0
+        && complete_decision_count
+            > (session_data.preflight_request.signing_agents.len() as f64 * 0.5).floor() as usize
+    {
+        // TODO complete
+    } else {
+        tracing::info!(
+            "Countersigning session state for agent {:?} is indeterminate based on evidence: {:?}",
+            author,
+            by_agent_decisions
+        );
+    }
+
+    // TODO exit value?
     Ok(false)
 }
 
@@ -305,7 +506,7 @@ pub(crate) async fn countersigning_success(
 
 pub(crate) async fn inner_countersigning_session_complete(
     space: Space,
-    network: &impl HolochainP2pDnaT,
+    network: Arc<impl HolochainP2pDnaT>,
     author: AgentPubKey,
     signed_actions: Vec<SignedAction>,
     integration_trigger: TriggerSender,
@@ -337,7 +538,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         let author = author.clone();
         move |txn: Transaction| {
             // This chain lock isn't necessarily for the current session, we can't check that until later.
-            if let Some((cs_entry_hash, session_data)) =
+            if let Some((_, cs_entry_hash, session_data)) =
                 current_countersigning_session(&txn, Arc::new(author.clone()))?
             {
                 let lock_subject = holo_hash::encode::blake2b_256(
@@ -529,5 +730,27 @@ pub async fn countersigning_publish(
             return Err(ZomeCallResponse::CountersigningSession(e.to_string()));
         }
     }
+    Ok(())
+}
+
+/// Abandon a countersigning session.
+async fn abandon_session(
+    authored_db: DbWrite<DbKindAuthored>,
+    author: AgentPubKey,
+    cs_action: Action,
+    cs_entry_hash: EntryHash,
+) -> StateMutationResult<()> {
+    authored_db
+        .write_async(move |txn| -> StateMutationResult<()> {
+            // Do the dangerous thing and remove the countersigning session.
+            remove_countersigning_session(txn, cs_action, cs_entry_hash)?;
+
+            // Once the session is removed we can unlock the chain.
+            unlock_chain(txn, &author)?;
+
+            Ok(())
+        })
+        .await?;
+
     Ok(())
 }
