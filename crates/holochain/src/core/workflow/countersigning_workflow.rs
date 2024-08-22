@@ -4,6 +4,7 @@
 
 use super::error::WorkflowResult;
 use crate::conductor::space::Space;
+use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
 use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::WorkflowError;
@@ -21,7 +22,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
-use crate::conductor::ConductorHandle;
 
 mod accept;
 
@@ -58,9 +58,19 @@ pub(crate) async fn countersigning_workflow(
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
-    tracing::debug!("Starting countersigning workflow, with {} sessions", space.countersigning_workspace.inner.share_ref(|inner| Ok(inner.sessions.len())).unwrap());
+    tracing::debug!(
+        "Starting countersigning workflow, with {} sessions",
+        space
+            .countersigning_workspace
+            .inner
+            .share_ref(|inner| Ok(inner.sessions.len()))
+            .unwrap()
+    );
 
-    let signal_tx = conductor.get_signal_tx(&cell_id).await.map_err(|e| WorkflowError::other(e))?;
+    let signal_tx = conductor
+        .get_signal_tx(&cell_id)
+        .await
+        .map_err(|e| WorkflowError::other(e))?;
 
     let timed_out_sessions = space
         .countersigning_workspace
