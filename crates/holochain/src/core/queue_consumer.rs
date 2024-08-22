@@ -212,7 +212,14 @@ pub async fn spawn_queue_consumer_tasks(
             witnessing: tx_witnessing,
             integrate_dht_ops: tx_integration.clone(),
         },
-        InitialQueueTriggers::new(tx_sys, tx_publish, tx_app, tx_integration, tx_receipt, tx_countersigning),
+        InitialQueueTriggers::new(
+            tx_sys,
+            tx_publish,
+            tx_app,
+            tx_integration,
+            tx_receipt,
+            tx_countersigning,
+        ),
     ))
 }
 
