@@ -1234,7 +1234,7 @@ pub fn chain_head_db_nonempty(
 pub fn current_countersigning_session(
     txn: &Transaction<'_>,
     author: Arc<AgentPubKey>,
-) -> SourceChainResult<Option<(EntryHash, CounterSigningSessionData)>> {
+) -> SourceChainResult<Option<(Action, EntryHash, CounterSigningSessionData)>> {
     match chain_head_db(txn, author) {
         // We haven't done genesis so no session can be active.
         Err(e) => Err(e),
@@ -1246,10 +1246,10 @@ pub fn current_countersigning_session(
                 Some(record) => record,
                 None => return Ok(None),
             };
-            let (shh, ee) = record.into_inner();
-            Ok(match (shh.action().entry_hash(), ee.into_option()) {
+            let (sah, ee) = record.into_inner();
+            Ok(match (sah.action().entry_hash(), ee.into_option()) {
                 (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
-                    Some((entry_hash.to_owned(), *cs))
+                    Some((sah.action().clone(), entry_hash.clone(), *cs))
                 }
                 _ => None,
             })
