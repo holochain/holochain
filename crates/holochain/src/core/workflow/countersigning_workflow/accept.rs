@@ -76,6 +76,7 @@ pub async fn accept_countersigning_request(
     };
 
     // Kick off the countersigning workflow and let it figure out what actions to take.
+    tracing::debug!("Accepted countersigning session, triggering countersigning workflow");
     countersigning_trigger.trigger(&"accept_countersigning_request");
 
     Ok(PreflightRequestAcceptance::Accepted(

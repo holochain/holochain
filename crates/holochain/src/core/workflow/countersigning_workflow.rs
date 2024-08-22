@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
+use crate::conductor::ConductorHandle;
 
 mod accept;
 
@@ -46,15 +47,21 @@ enum SessionState {
     FailedValidation,
 }
 
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub(crate) async fn countersigning_workflow(
     space: Space,
     network: impl HolochainP2pDnaT,
+    cell_id: CellId,
+    conductor: ConductorHandle,
     self_trigger: TriggerSender,
     sys_validation_trigger: TriggerSender,
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
-    signal: broadcast::Sender<Signal>,
 ) -> WorkflowResult<WorkComplete> {
+    tracing::debug!("Starting countersigning workflow, with {} sessions", space.countersigning_workspace.inner.share_ref(|inner| Ok(inner.sessions.len())).unwrap());
+
+    let signal_tx = conductor.get_signal_tx(&cell_id).await.map_err(|e| WorkflowError::other(e))?;
+
     let timed_out_sessions = space
         .countersigning_workspace
         .inner
@@ -78,6 +85,7 @@ pub(crate) async fn countersigning_workflow(
 
     for (author, request) in timed_out_sessions {
         // TODO resolved timed out sessions
+        tracing::warn!("Countersigning session timed out for agent: {:?}", author);
     }
 
     let completed_sessions = space
@@ -107,7 +115,7 @@ pub(crate) async fn countersigning_workflow(
                 signature_bundle.clone(),
                 integration_trigger.clone(),
                 publish_trigger.clone(),
-                signal.clone(),
+                signal_tx.clone(),
             )
             .await
             {
@@ -142,12 +150,12 @@ pub(crate) async fn countersigning_workflow(
         }).min()))
         .unwrap();
     if let Some(earliest_finish) = maybe_earliest_finish {
-        Ok(WorkComplete::Incomplete(Some(
-            match (earliest_finish - Timestamp::now()).map(|d| d.to_std()) {
-                Ok(Ok(d)) => d,
-                _ => Duration::from_millis(100),
-            },
-        )))
+        let delay = match (earliest_finish - Timestamp::now()).map(|d| d.to_std()) {
+            Ok(Ok(d)) => d,
+            _ => Duration::from_millis(100),
+        };
+        tracing::debug!("Countersigning workflow will run again in {:?}", delay);
+        Ok(WorkComplete::Incomplete(Some(delay)))
     } else {
         Ok(WorkComplete::Complete)
     }
@@ -196,6 +204,7 @@ pub(crate) async fn countersigning_success(
         .unwrap();
 
     if should_trigger {
+        tracing::debug!("Received a signature bundle, triggering countersigning workflow");
         countersigning_trigger.trigger(&"countersigning_success");
     }
 }
@@ -285,7 +294,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         None => {
             // If there is no active session then we can short circuit.
             tracing::warn!("Received a signature bundle for a session that exists in state but is missing from the database");
-            return Ok(true);
+            return Ok(false);
         }
     };
 
@@ -361,7 +370,7 @@ pub(crate) async fn inner_countersigning_session_complete(
             &dht_db_cache,
         )
         .await?;
-        integration_trigger.trigger(&"countersigning_success");
+        integration_trigger.trigger(&"integrate countersigning_success");
         // Publish other signers agent activity ops to their agent activity authorities.
         for sa in signed_actions {
             let (action, signature) = sa.into();
@@ -386,6 +395,8 @@ pub(crate) async fn inner_countersigning_session_complete(
                 app_entry_hash,
             )))
             .ok();
+
+        tracing::info!("Countersigning session complete for agent: {:?}", author);
 
         publish_trigger.trigger(&"publish countersigning_success");
     }
