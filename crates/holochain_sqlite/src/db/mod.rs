@@ -4,6 +4,7 @@ mod access;
 mod conn;
 mod databases;
 mod guard;
+mod key;
 mod kind;
 mod metrics;
 mod pool;
@@ -13,6 +14,7 @@ mod tests;
 
 pub use access::{DbRead, DbWrite, ReadAccess};
 pub use guard::PTxnGuard;
+pub use key::DbKey;
 pub use kind::{
     DbKind, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindOp, DbKindP2pAgents,
     DbKindP2pMetrics, DbKindT, DbKindWasm,

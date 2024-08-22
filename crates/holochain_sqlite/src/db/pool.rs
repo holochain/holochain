@@ -1,3 +1,4 @@
+use crate::db::key::DbKey;
 use crate::functions::add_custom_functions;
 use holochain_serialized_bytes::prelude::*;
 use once_cell::sync::Lazy;
@@ -10,9 +11,6 @@ use std::{path::Path, sync::Arc, time::Duration};
 static CONNECTION_TIMEOUT_MS: AtomicU64 = AtomicU64::new(3_000);
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
-
-#[cfg(feature = "sqlite-encrypted")]
-pub(super) const FAKE_KEY: &str = "x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C483648101010101010101010101010101010101'";
 
 static R2D2_THREADPOOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
     let t = ScheduledThreadPool::new(1);
@@ -53,22 +51,13 @@ pub enum DbSyncStrategy {
 }
 
 /// Configuration for holochain_sqlite ConnectionPool.
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct PoolConfig {
     /// The sqlite synchronous level.
     pub synchronous_level: DbSyncLevel,
 
-    /// The passphrase with which to encrypt the database.
-    pub passphrase: sodoken::BufRead,
-}
-
-impl Default for PoolConfig {
-    fn default() -> Self {
-        Self {
-            synchronous_level: DbSyncLevel::default(),
-            passphrase: sodoken::BufRead::new_no_lock(&[]),
-        }
-    }
+    /// The key with which to encrypt this database.
+    pub key: DbKey,
 }
 
 pub(super) fn new_connection_pool(path: Option<&Path>, config: PoolConfig) -> ConnectionPool {
@@ -120,19 +109,7 @@ pub(super) fn initialize_connection(conn: &mut Connection, config: &PoolConfig) 
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
 
     #[cfg(feature = "sqlite-encrypted")]
-    {
-        use std::io::Write;
-        let key = get_encryption_key_shim();
-        let mut hex = *br#"0000000000000000000000000000000000000000000000000000000000000000"#;
-        let mut c = std::io::Cursor::new(&mut hex[..]);
-        for b in &key {
-            write!(c, "{:02X}", b)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-        }
-        let _keyval = std::str::from_utf8(&hex).unwrap();
-        // conn.pragma_update(None, "key", &keyval)?;
-        conn.pragma_update(None, "key", FAKE_KEY)?;
-    }
+    conn.execute_batch(&String::from_utf8_lossy(&*config.key.unlocked.read_lock()))?;
 
     // this is recommended to always be off:
     // https://sqlite.org/pragma.html#pragma_trusted_schema
@@ -156,15 +133,6 @@ pub fn num_read_threads() -> usize {
     let num_cpus = num_cpus::get();
     let num_threads = num_cpus.checked_div(2).unwrap_or(0);
     std::cmp::max(num_threads, 4)
-}
-
-#[cfg(feature = "sqlite-encrypted")]
-/// Simulate getting an encryption key from Lair.
-fn get_encryption_key_shim() -> [u8; 32] {
-    [
-        26, 111, 7, 31, 52, 204, 156, 103, 203, 171, 156, 89, 98, 51, 158, 143, 57, 134, 93, 56,
-        199, 225, 53, 141, 39, 77, 145, 130, 136, 108, 96, 201,
-    ]
 }
 
 #[cfg(feature = "test_utils")]

@@ -253,22 +253,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                 // action if it isn't.
                 match Self::check_database_file(&path, &pool_config) {
                     Ok(path) => path,
-                    // These are the two errors that can
-                    // occur if the database is not valid.
-                    err @ Err(Error::SqliteFailure(
-                        ffi::Error {
-                            code: ErrorCode::DatabaseCorrupt,
-                            ..
-                        },
-                        ..,
-                    ))
-                    | err @ Err(Error::SqliteFailure(
-                        ffi::Error {
-                            code: ErrorCode::NotADatabase,
-                            ..
-                        },
-                        ..,
-                    )) => {
+                    Err(err) => {
                         // Check if the database might be unencrypted.
                         if "true"
                             == std::env::var("HOLOCHAIN_MIGRATE_UNENCRYPTED")
@@ -276,14 +261,14 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                                 .as_str()
                         {
                             #[cfg(feature = "sqlite-encrypted")]
-                            encrypt_unencrypted_database(&path)?;
+                            encrypt_unencrypted_database(&path, &pool_config)?;
                         }
                         // Check if this database kind requires wiping.
                         else if kind.if_corrupt_wipe() {
                             std::fs::remove_file(&path)?;
                         } else {
                             // If we don't wipe we need to return an error.
-                            err?;
+                            return Err(err.into());
                         }
 
                         // Now that we've taken the appropriate action we can try again.
@@ -292,8 +277,6 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                             Err(e) => return Err(e.into()),
                         }
                     }
-                    // Another error has occurred when trying to open the db.
-                    Err(e) => return Err(e.into()),
                 }
             }
             None => None,
@@ -437,7 +420,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
 
 // The method for this function is taken from https://discuss.zetetic.net/t/how-to-encrypt-a-plaintext-sqlite-database-to-use-sqlcipher-and-avoid-file-is-encrypted-or-is-not-a-database-errors/868
 #[cfg(feature = "sqlite-encrypted")]
-pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
+pub fn encrypt_unencrypted_database(path: &Path, pool_config: &PoolConfig) -> DatabaseResult<()> {
     // e.g. conductor/conductor.sqlite3 -> conductor/conductor-encrypted.sqlite3
     let encrypted_path = path
         .parent()
@@ -466,13 +449,26 @@ pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
         // Start an exclusive transaction to avoid anybody writing to the database while we're migrating it
         conn.execute("BEGIN EXCLUSIVE", ())?;
 
-        conn.execute(
-            "ATTACH DATABASE :db_name AS encrypted KEY :key",
-            rusqlite::named_params! {
-                ":db_name": encrypted_path.to_str(),
-                ":key": super::pool::FAKE_KEY,
-            },
-        )?;
+        {
+            let lock = pool_config.key.unlocked.read_lock();
+            conn.execute(
+                "ATTACH DATABASE :db_name AS encrypted KEY :key",
+                rusqlite::named_params! {
+                    ":db_name": encrypted_path.to_str(),
+                    ":key": &lock[15..82],
+                },
+            )?;
+        }
+
+        let mut batch = "PRAGMA encrypted.cipher_salt = \"x'".to_string();
+        for b in &*pool_config.key.salt.read_lock() {
+            batch.push_str(&format!("{b:02X}"));
+        }
+        batch.push_str("'\";\n");
+        batch.push_str("PRAGMA encrypted.cipher_compatibility = 4;\n");
+        batch.push_str("PRAGMA encrypted.cipher_plaintext_header_size = 32;\n");
+
+        conn.execute_batch(&batch)?;
 
         conn.query_row("SELECT sqlcipher_export('encrypted')", (), |_| Ok(0))?;
 

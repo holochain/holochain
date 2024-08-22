@@ -154,7 +154,7 @@ impl ConductorBuilder {
 
         let ribosome_store = RwShare::new(ribosome_store);
 
-        let spaces = Spaces::new(config.clone(), passphrase)?;
+        let spaces = Spaces::new(config.clone(), passphrase).await?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();

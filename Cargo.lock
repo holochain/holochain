@@ -3337,6 +3337,7 @@ version = "0.4.0-dev.17"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.22.1",
  "derive_more",
  "fallible-iterator 0.3.0",
  "futures",

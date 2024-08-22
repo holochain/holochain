@@ -30,8 +30,7 @@ async fn migrate_unencrypted() {
     }
 
     // Without the HOLOCHAIN_MIGRATE_UNENCRYPTED variable set, it should fail to open
-    let err = DbWrite::test(std::path::Path::new(tmp_dir.path()), DbKindConductor).unwrap_err();
-    assert_eq!(err.to_string(), "file is not a database");
+    DbWrite::test(std::path::Path::new(tmp_dir.path()), DbKindConductor).unwrap_err();
 
     std::env::set_var("HOLOCHAIN_MIGRATE_UNENCRYPTED", "true");
 
