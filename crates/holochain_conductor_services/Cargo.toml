@@ -24,7 +24,8 @@ thiserror = "1.0"
 tokio = "1"
 tracing = "0.1"
 
-holochain_deepkey_dna = "0.0.7-dev.1"
+hc_deepkey_sdk = { version = "0.7.0-dev.2", path = "../hc_deepkey_sdk" }
+holochain_deepkey_dna = "0.0.8-dev.1"
 holochain_keystore = { version = "^0.4.0-dev.17", path = "../holochain_keystore" }
 holochain_types = { version = "^0.4.0-dev.19", path = "../holochain_types" }
 holochain_util = { version = "^0.4.0-dev.3", path = "../holochain_util", features = [
@@ -39,7 +40,7 @@ hdk = { version = "^0.4.0-dev.13", path = "../hdk" }
 [features]
 test_utils = ["fuzzing"]
 
-fuzzing = ["arbitrary", "holochain_deepkey_dna/fuzzing"]
+fuzzing = ["arbitrary", "hc_deepkey_sdk/fuzzing"]
 
 [lints]
 workspace = true
