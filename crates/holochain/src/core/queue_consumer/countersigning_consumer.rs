@@ -5,16 +5,17 @@ use crate::conductor::manager::TaskManagerClient;
 use crate::core::workflow::countersigning_workflow::countersigning_workflow;
 use tracing::*;
 
-/// Spawn the QueueConsumer for the witnessing workflow
+/// Spawn the QueueConsumer for the countersigning workflow
 #[instrument(skip_all)]
 pub(crate) fn spawn_countersigning_consumer(
     space: Space,
     task_manager: TaskManagerClient,
     dna_network: HolochainP2pDna,
+    cell_id: CellId,
+    conductor: ConductorHandle,
     trigger_sys: TriggerSender,
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
-    signal: broadcast::Sender<Signal>,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
 
@@ -28,11 +29,12 @@ pub(crate) fn spawn_countersigning_consumer(
             countersigning_workflow(
                 space.clone(),
                 dna_network.clone(),
+                cell_id.clone(),
+                conductor.clone(),
                 self_trigger.clone(),
                 trigger_sys.clone(),
                 integration_trigger.clone(),
                 publish_trigger.clone(),
-                signal.clone(),
             )
         },
     );

@@ -182,16 +182,16 @@ pub async fn spawn_queue_consumer_tasks(
         )
     });
 
-    let signal_tx = conductor.get_signal_tx(&cell_id).await?;
     let tx_countersigning = queue_consumer_map.spawn_once_countersigning(dna_hash.clone(), || {
         spawn_countersigning_consumer(
             space.clone(),
             conductor.task_manager(),
             network.clone(),
+            cell_id,
+            conductor.clone(),
             tx_sys.clone(),
             tx_integration.clone(),
             tx_publish.clone(),
-            signal_tx,
         )
     });
 
@@ -208,11 +208,11 @@ pub async fn spawn_queue_consumer_tasks(
         QueueTriggers {
             sys_validation: tx_sys.clone(),
             publish_dht_ops: tx_publish.clone(),
-            countersigning: tx_countersigning,
+            countersigning: tx_countersigning.clone(),
             witnessing: tx_witnessing,
             integrate_dht_ops: tx_integration.clone(),
         },
-        InitialQueueTriggers::new(tx_sys, tx_publish, tx_app, tx_integration, tx_receipt),
+        InitialQueueTriggers::new(tx_sys, tx_publish, tx_app, tx_integration, tx_receipt, tx_countersigning),
     ))
 }
 
@@ -364,6 +364,7 @@ pub struct InitialQueueTriggers {
     app_validation: TriggerSender,
     integrate_dht_ops: TriggerSender,
     validation_receipt: TriggerSender,
+    countersigning: TriggerSender,
 }
 
 impl InitialQueueTriggers {
@@ -373,6 +374,7 @@ impl InitialQueueTriggers {
         app_validation: TriggerSender,
         integrate_dht_ops: TriggerSender,
         validation_receipt: TriggerSender,
+        countersigning: TriggerSender,
     ) -> Self {
         Self {
             sys_validation,
@@ -380,6 +382,7 @@ impl InitialQueueTriggers {
             app_validation,
             integrate_dht_ops,
             validation_receipt,
+            countersigning,
         }
     }
 
@@ -390,6 +393,7 @@ impl InitialQueueTriggers {
         self.integrate_dht_ops.trigger(&"init");
         self.publish_dht_ops.trigger(&"init");
         self.validation_receipt.trigger(&"init");
+        self.countersigning.trigger(&"init");
     }
 }
 
@@ -614,7 +618,7 @@ async fn rx_fut(
 ) -> Result<(), QueueTriggerClosedError> {
     match rx.recv().await {
         Ok(context) => {
-            tracing::trace!(msg = "trigger received", ?context);
+            tracing::warn!(msg = "trigger received", ?context);
             Ok(())
         }
         Err(broadcast::error::RecvError::Closed) => Err(QueueTriggerClosedError),
