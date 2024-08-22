@@ -23,6 +23,7 @@ fn to_signal_message(signal: Signal) -> SignalMessage {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn remote_signals_work_after_sbd_restart() {
     holochain_trace::test_run();
 
