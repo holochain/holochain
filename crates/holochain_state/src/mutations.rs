@@ -906,6 +906,40 @@ pub fn schedule_fn(
     Ok(())
 }
 
+/// Force remove a countersigning session from the source chain.
+///
+/// This is a dangerous operation and should only be used:
+/// - If the countersigning workflow has determined to a reasonable level of confidence that other
+///   peers abandoned the session.
+/// - If the user decides to force remove the session from their source chain when the
+///   countersigning session is unable to make a decision.
+///
+/// Note that this mutation is defensive about sessions that have any of their ops published to the
+/// network. If any of the ops have been published, the session cannot be removed.
+pub fn remove_countersigning_session(
+    txn: &mut Transaction,
+    cs_action: Action,
+    cs_entry_hash: EntryHash,
+) -> StateMutationResult<()> {
+    // Check, just for paranoia's sake that the countersigning session is not fully published.
+    // It is acceptable to delete a countersigning session that has been written to the source chain,
+    // with signatures published. As soon as the session's ops have been published to the network,
+    // it is unacceptable to remove the session from the database.
+    let count = txn.query_row(
+        "SELECT count(withhold_publish) WHERE withhold_publish != NULL AND action_hash = ?",
+        [cs_action.to_hash()],
+        |row| row.get::<_, usize>(0),
+    )?;
+    if count != 0 {
+        return Err(StateMutationError::CannotRemoveFullyPublished);
+    }
+
+    txn.execute("DELETE FROM Entry WHERE hash = ?", [cs_entry_hash])?;
+    txn.execute("DELETE FROM Action WHERE hash = ?", [cs_action.to_hash()])?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use ::fixt::fixt;

@@ -26,7 +26,7 @@ pub(crate) fn spawn_countersigning_consumer(
         move || {
             countersigning_workflow(
                 space.clone(),
-                dna_network.clone(),
+                Arc::new(dna_network.clone()),
                 cell_id.clone(),
                 conductor.clone(),
                 self_trigger.clone(),
