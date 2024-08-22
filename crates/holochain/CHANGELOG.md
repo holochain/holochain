@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING:** Modifies `Action::CloseChain` and `Action::OpenChain` to be able to represent both DNA migrations and Agent migrations:
+  - CloseChain can be used on its own, with no forward reference, to make a chain read-only.
+  - CloseChain can include a forward reference to either a new AgentPubKey or a new DNA hash, which represent a migration to a new chain. The new chain is expected to begin with a corresponding OpenChain which has a backward reference to the CloseChain action. (This will become a validation rule in future work.)
+
 ## 0.4.0-dev.19
 
 - Adds DPKI support. This is not fully hooked up, so the main implication for this particular implementation is that you must be using the same DPKI implementation as all other nodes on the network that you wish to talk to. If the DPKI version mismatches, you cannot establish connections, and will see so as an error in the logs. This work is in preparation for future work which will make it possible to restore your keys if you lose your device, and to revoke and replace your keys if your device is stolen or compromised.

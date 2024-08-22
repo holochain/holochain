@@ -609,6 +609,10 @@ impl From<AgentPubKey> for MigrationTarget {
 /// When migrating to a new version of a DNA, this action is committed to the
 /// old chain to declare the migration path taken. This action can also be taken
 /// to simply close down a chain with no forward reference to a migration.
+///
+/// Note that if `MigrationTarget::Agent` is used, this action will be signed with
+/// that key rather than the authoring key, so that new key must be a valid keypair
+/// that you control in the keystore, so that the action can be signed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(
     feature = "fuzzing",
