@@ -38,16 +38,20 @@ impl Signal {
 /// DataAvailable signal for doing async network requests
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub enum SystemSignal {
-    /// Since we have no real system signals, we use a test signal for testing
-    /// TODO: replace instances of this with something real
-    Test(String),
     /// A countersigning session has successfully completed.
     SuccessfulCountersigning(holo_hash::EntryHash),
+    /// A countersigning session has been abandoned.
+    ///
+    /// The countersigning session is identified by `CellId` for the DNA and agent where the
+    /// session was initiated. The countersigning entry might not exist when this signal is emitted
+    /// so we can't use the entry hash to identify the session.
+    AbandonedCountersigning(CellId),
 }
 
 /// Create a test signal
+#[cfg(all(test, feature = "test_utils"))]
 pub fn test_signal(s: &str) -> Signal {
-    SystemSignal::Test(s.to_string()).into()
+    SystemSignal::SuccessfulCountersigning(fixt!(EntryHash)).into()
 }
 
 impl_from! {

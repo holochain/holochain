@@ -9,7 +9,9 @@ use crate::core::queue_consumer::{QueueTriggers, TriggerSender, WorkComplete};
 use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::WorkflowError;
 use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, OpBasis};
+use holochain_cascade::CascadeImpl;
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
+use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
@@ -22,8 +24,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
-use holochain_cascade::CascadeImpl;
-use holochain_p2p::actor::GetActivityOptions;
 
 mod accept;
 
