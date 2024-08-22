@@ -160,7 +160,6 @@ mod types;
         conductor_handle,
         network,
         dht_query_cache,
-        validation_dependencies,
     ))
 )]
 #[allow(clippy::too_many_arguments)]
@@ -416,8 +415,6 @@ pub async fn record_to_op(
     op_type: ChainOpType,
     cascade: Arc<impl Cascade>,
 ) -> AppValidationOutcome<(Op, DhtOpHash, Option<Entry>)> {
-    use ChainOpType::*;
-
     // Hide private data where appropriate
     let (record, mut hidden_entry) = if matches!(op_type, ChainOpType::StoreEntry) {
         // We don't want to hide private data for a StoreEntry, because when doing
@@ -436,7 +433,7 @@ pub async fn record_to_op(
     let action = sah.into();
     // Register agent activity doesn't store the entry so we need to
     // save it so we can reconstruct the record later.
-    if matches!(op_type, RegisterAgentActivity) {
+    if matches!(op_type, ChainOpType::RegisterAgentActivity) {
         hidden_entry = entry.take().or(hidden_entry);
     }
     let chain_op = ChainOp::from_type(op_type, action, entry)?;
