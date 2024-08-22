@@ -955,6 +955,7 @@ impl Cell {
             args,
             self.queue_triggers.publish_dht_ops.clone(),
             self.queue_triggers.integrate_dht_ops.clone(),
+            self.queue_triggers.countersigning.clone(),
         )
         .await
         .map_err(Box::new)?)

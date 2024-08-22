@@ -46,10 +46,26 @@ enum SessionState {
     Accepted(PreflightRequest),
     /// Multiple responses in the outer vec, sets of responses in the inner vec
     SignaturesCollected(Vec<Vec<SignedAction>>),
-    FailedValidation,
+    /// The session is in an unknown state and needs to be resolved.
+    ///
+    /// In most cases, we do know how we got into this state, but we treat it as unknown because
+    /// we want to always go through the same checks when leaving a countersigning session in any
+    /// way that is not a successful completion.
+    Unknown(PreflightRequest),
+}
+
+const NUM_AUTHORITIES_TO_QUERY: usize = 3;
+const RETRY_UNKNOWN_SESSION_STATE_DELAY: Duration = Duration::from_secs(300);
+
+#[derive(Clone, Debug, PartialEq)]
+enum SessionCompletionDecision {
+    Complete,
+    Abandoned,
+    Indeterminate,
 }
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn countersigning_workflow(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,
@@ -74,9 +90,30 @@ pub(crate) async fn countersigning_workflow(
     let signal_tx = conductor
         .get_signal_tx(&cell_id)
         .await
-        .map_err(|e| WorkflowError::other(e))?;
+        .map_err(WorkflowError::other)?;
 
-    let timed_out_sessions = space
+    // Apply timeouts by moving accepted sessions to unknown state if their end time is in the past.
+    space
+        .countersigning_workspace
+        .inner
+        .share_mut(|inner, _| {
+            inner
+                .sessions
+                .iter_mut()
+                .for_each(|(author, session_state)| {
+                    if let SessionState::Accepted(request) = session_state {
+                        if request.session_times.end < Timestamp::now() {
+                            *session_state = SessionState::Unknown(request.clone());
+                        }
+                    }
+                });
+
+            Ok(())
+        })
+        .unwrap();
+
+    // Find sessions that are in an unknown state, we need to try to resolve those.
+    let sessions_in_unknown_state = space
         .countersigning_workspace
         .inner
         .share_ref(|inner| {
@@ -84,7 +121,7 @@ pub(crate) async fn countersigning_workflow(
                 .sessions
                 .iter()
                 .filter_map(|(author, session_state)| match session_state {
-                    SessionState::Accepted(request) => {
+                    SessionState::Unknown(request) => {
                         if request.session_times.end < Timestamp::now() {
                             Some((author.clone(), request.clone()))
                         } else {
@@ -97,8 +134,12 @@ pub(crate) async fn countersigning_workflow(
         })
         .unwrap();
 
-    for (author, request) in timed_out_sessions {
-        tracing::info!("Countersigning session timed out for agent: {:?}", author);
+    let mut remaining_sessions_in_unknown_state = 0;
+    for (author, request) in sessions_in_unknown_state {
+        tracing::info!(
+            "Countersigning session for agent {:?} is in an unknown state, attempting to resolve",
+            author
+        );
         match inner_countersigning_session_incomplete(
             space.clone(),
             network.clone(),
@@ -119,12 +160,10 @@ pub(crate) async fn countersigning_workflow(
                         Ok(())
                     })
                     .unwrap();
-
-                // TODO emit signal to let clients know that this session failed
             }
             Ok(false) => {
-                // TODO reduce log level and trigger a retry for this case?
-                tracing::warn!(
+                remaining_sessions_in_unknown_state += 1;
+                tracing::info!(
                     "Failed to cleanup countersigning session for agent: {:?}",
                     author
                 );
@@ -137,6 +176,16 @@ pub(crate) async fn countersigning_workflow(
                 );
             }
         }
+    }
+
+    if remaining_sessions_in_unknown_state > 0 {
+        tokio::task::spawn({
+            let self_trigger = self_trigger.clone();
+            async move {
+                tokio::time::sleep(RETRY_UNKNOWN_SESSION_STATE_DELAY).await;
+                self_trigger.trigger(&"unknown_session_state_retry");
+            }
+        });
     }
 
     let completed_sessions = space
@@ -222,20 +271,11 @@ pub(crate) async fn countersigning_workflow(
         tracing::debug!("Countersigning workflow will run again in {:?}", delay);
         tokio::task::spawn(async move {
             tokio::time::sleep(delay).await;
-            self_trigger.trigger(&"retrigger myself because countersigning");
+            self_trigger.trigger(&"retrigger_expiry_check");
         });
     }
 
     Ok(WorkComplete::Complete)
-}
-
-const NUM_AUTHORITIES_TO_QUERY: usize = 3;
-
-#[derive(Clone, Debug, PartialEq)]
-enum SessionCompletionDecision {
-    Complete,
-    Abandoned,
-    Indeterminate,
 }
 
 /// Resolve an incomplete countersigning session.
@@ -263,7 +303,7 @@ async fn inner_countersigning_session_incomplete(
                     Option<(Action, EntryHash, CounterSigningSessionData)>,
                 > {
                     let maybe_current_session =
-                        current_countersigning_session(&txn, Arc::new(author.clone()))?;
+                        current_countersigning_session(txn, Arc::new(author.clone()))?;
 
                     // This is the simplest failure case, something has gone wrong but the countersigning entry
                     // hasn't been committed then we can unlock the chain and remove the session.
@@ -303,10 +343,12 @@ async fn inner_countersigning_session_incomplete(
 
     let cascade = CascadeImpl::empty().with_network(network, space.cache_db);
 
-    let mut get_activity_options = GetActivityOptions::default();
-    get_activity_options.include_warrants = true;
-    // We're going to be potentially running quite a lot of these requests, so set the timeout reasonably low.
-    get_activity_options.timeout_ms = Some(10_000);
+    let mut get_activity_options = holochain_p2p::actor::GetActivityOptions {
+        include_warrants: true,
+        // We're going to be potentially running quite a lot of these requests, so set the timeout reasonably low.
+        timeout_ms: Some(10_000),
+        ..Default::default()
+    };
 
     let mut by_agent_decisions = Vec::new();
 
@@ -496,10 +538,10 @@ pub(crate) async fn countersigning_success(
                         SessionState::SignaturesCollected(sigs) => {
                             sigs.push(signed_actions);
                         }
-                        SessionState::FailedValidation => {
-                            // This is not expected, we shouldn't have published a signature if our session failed validation.
-                            // Where did this remote get a full set of signatures from to send to us?
-                            tracing::warn!("Countersigning session success received but the the session has failed validation locally");
+                        SessionState::Unknown(_) => {
+                            // If the session is in a bad state when we receive signatures then
+                            // we can't do anything with them.
+                            tracing::warn!("Countersigning session success received but the the session is in an unknown state for agent: {:?}", author);
                             return Ok(false);
                         }
                     }
@@ -569,7 +611,7 @@ pub(crate) async fn inner_countersigning_session_complete(
                     // This is the case where we have already locked the chain for another session and are
                     // receiving another signature bundle from a different session. We don't need this, so
                     // it's safe to short circuit.
-                    if cs_entry_hash != entry_hash || chain_lock.subject() != &lock_subject {
+                    if cs_entry_hash != entry_hash || chain_lock.subject() != lock_subject {
                         return SourceChainResult::Ok(None);
                     }
 
