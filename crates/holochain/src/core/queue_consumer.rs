@@ -185,7 +185,6 @@ pub async fn spawn_queue_consumer_tasks(
     let tx_countersigning = queue_consumer_map.spawn_once_countersigning(dna_hash.clone(), || {
         spawn_countersigning_consumer(
             space.clone(),
-            conductor.task_manager(),
             network.clone(),
             cell_id,
             conductor.clone(),
@@ -625,7 +624,7 @@ async fn rx_fut(
 ) -> Result<(), QueueTriggerClosedError> {
     match rx.recv().await {
         Ok(context) => {
-            tracing::warn!(msg = "trigger received", ?context);
+            tracing::trace!(msg = "trigger received", ?context);
             Ok(())
         }
         Err(broadcast::error::RecvError::Closed) => Err(QueueTriggerClosedError),
