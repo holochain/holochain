@@ -335,7 +335,7 @@ impl SourceChain {
                 match chain_lock {
                     Some(chain_lock) => {
                         // If the chain is locked, the lock must be for this entry.
-                        if chain_lock.subject() != &lock_subject {
+                        if chain_lock.subject() != lock_subject {
                             return Err(SourceChainError::ChainLocked);
                         }
                         // If the lock is expired then we can't write this countersigning session.
