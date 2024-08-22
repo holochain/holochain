@@ -1236,31 +1236,25 @@ pub fn current_countersigning_session(
     txn: &Transaction<'_>,
     author: Arc<AgentPubKey>,
 ) -> SourceChainResult<Option<(EntryHash, CounterSigningSessionData)>> {
-    // The chain must be locked for a session to be active.
-    let chain_lock = get_chain_lock(txn, author.as_ref())?;
-    if chain_lock.is_some() && !chain_lock.unwrap().is_expired() {
-        match chain_head_db(txn, author) {
-            // We haven't done genesis so no session can be active.
-            Err(e) => Err(e),
-            Ok(None) => Ok(None),
-            Ok(Some(HeadInfo { action: hash, .. })) => {
-                let txn: Txn = txn.into();
-                // Get the session data from the database.
-                let record = match txn.get_record(&hash.into())? {
-                    Some(record) => record,
-                    None => return Ok(None),
-                };
-                let (shh, ee) = record.into_inner();
-                Ok(match (shh.action().entry_hash(), ee.into_option()) {
-                    (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
-                        Some((entry_hash.to_owned(), *cs))
-                    }
-                    _ => None,
-                })
-            }
+    match chain_head_db(txn, author) {
+        // We haven't done genesis so no session can be active.
+        Err(e) => Err(e),
+        Ok(None) => Ok(None),
+        Ok(Some(HeadInfo { action: hash, .. })) => {
+            let txn: Txn = txn.into();
+            // Get the session data from the database.
+            let record = match txn.get_record(&hash.into())? {
+                Some(record) => record,
+                None => return Ok(None),
+            };
+            let (shh, ee) = record.into_inner();
+            Ok(match (shh.action().entry_hash(), ee.into_option()) {
+                (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
+                    Some((entry_hash.to_owned(), *cs))
+                }
+                _ => None,
+            })
         }
-    } else {
-        Ok(None)
     }
 }
 
