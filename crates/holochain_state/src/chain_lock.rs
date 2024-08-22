@@ -112,7 +112,9 @@ mod tests {
         assert!(!lock.as_ref().unwrap().is_expired());
         assert_eq!(&[1, 2, 3], lock.as_ref().unwrap().subject());
         // In the future, the lock should be expired
-        assert!(lock.unwrap().is_expired_at(Timestamp::now().add(Duration::from_secs(12)).unwrap()));
+        assert!(lock
+            .unwrap()
+            .is_expired_at(Timestamp::now().add(Duration::from_secs(12)).unwrap()));
 
         // Now let's unlock the chain
         db.write_async({
