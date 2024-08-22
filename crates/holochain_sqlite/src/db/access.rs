@@ -455,6 +455,9 @@ pub fn encrypt_unencrypted_database(path: &Path, pool_config: &PoolConfig) -> Da
                 "ATTACH DATABASE :db_name AS encrypted KEY :key",
                 rusqlite::named_params! {
                     ":db_name": encrypted_path.to_str(),
+                    // we have to pull out the hex encoded key
+                    // with the x'..' but NOT the surrounding
+                    // double quotes.
                     ":key": &lock[15..82],
                 },
             )?;
