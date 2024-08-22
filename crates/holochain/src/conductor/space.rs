@@ -2,6 +2,7 @@
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
 use std::{
+    cell::Cell,
     collections::{hash_map, HashMap},
     sync::Arc,
     time::Duration,
@@ -131,12 +132,27 @@ pub struct TestSpace {
     _temp_dir: tempfile::TempDir,
 }
 
+thread_local!(static DANGER_PRINT_DB_SECRETS: Cell<bool> = Cell::new(false));
+
+/// WARNING!! DANGER!! This exposes your database decryption secrets!
+/// Print the database decryption secrets to stderr.
+/// With these PRAGMA commands, you'll be able to run sqlcipher
+/// directly to manipulate holochain databases.
+pub fn set_danger_print_db_secrets(v: bool) {
+    DANGER_PRINT_DB_SECRETS.set(v);
+}
+
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub async fn new(
         config: Arc<ConductorConfig>,
         passphrase: sodoken::BufRead,
     ) -> ConductorResult<Self> {
+        // do this before any awaits
+        let danger_print_db_secrets = DANGER_PRINT_DB_SECRETS.get();
+        // clear the value
+        DANGER_PRINT_DB_SECRETS.set(false);
+
         let root_db_dir: DatabasesRootPath = config
             .data_root_path
             .clone()
@@ -152,6 +168,13 @@ impl Spaces {
                 db_key
             }
         };
+
+        if danger_print_db_secrets {
+            eprintln!(
+                "--beg-db-secrets--{}--end-db-secrets--",
+                &String::from_utf8_lossy(&db_key.unlocked.read_lock())
+            );
+        }
 
         let db_sync_strategy = config.db_sync_strategy;
         let db_sync_level = match db_sync_strategy {

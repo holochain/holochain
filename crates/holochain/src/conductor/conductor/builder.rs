@@ -34,6 +34,12 @@ pub struct ConductorBuilder {
 
     /// Skip printing setup info to stdout
     pub no_print_setup: bool,
+
+    /// WARNING!! DANGER!! This exposes your database decryption secrets!
+    /// Print the database decryption secrets to stderr.
+    /// With these PRAGMA commands, you'll be able to run sqlcipher
+    /// directly to manipulate holochain databases.
+    pub danger_print_db_secrets: bool,
 }
 
 impl ConductorBuilder {
@@ -59,6 +65,15 @@ impl ConductorBuilder {
     /// Set up the builder to skip printing setup
     pub fn no_print_setup(mut self) -> Self {
         self.no_print_setup = true;
+        self
+    }
+
+    /// WARNING!! DANGER!! This exposes your database decryption secrets!
+    /// Print the database decryption secrets to stderr.
+    /// With these PRAGMA commands, you'll be able to run sqlcipher
+    /// directly to manipulate holochain databases.
+    pub fn danger_print_db_secrets(mut self, v: bool) -> Self {
+        self.danger_print_db_secrets = v;
         self
     }
 
@@ -154,6 +169,7 @@ impl ConductorBuilder {
 
         let ribosome_store = RwShare::new(ribosome_store);
 
+        crate::conductor::space::set_danger_print_db_secrets(self.danger_print_db_secrets);
         let spaces = Spaces::new(config.clone(), passphrase).await?;
         let tag = spaces.get_state().await?.tag().clone();
 
