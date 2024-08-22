@@ -94,8 +94,35 @@ pub(crate) async fn countersigning_workflow(
         .unwrap();
 
     for (author, request) in timed_out_sessions {
-        // TODO resolved timed out sessions
-        tracing::warn!("Countersigning session timed out for agent: {:?}", author);
+        tracing::info!("Countersigning session timed out for agent: {:?}", author);
+        match inner_countersigning_session_incomplete(space.clone(), author.clone(), request).await
+        {
+            Ok(true) => {
+                // The session state has been resolved, so we can remove it from the workspace.
+                space
+                    .countersigning_workspace
+                    .inner
+                    .share_mut(|inner, _| {
+                        inner.sessions.remove(&author);
+                        Ok(())
+                    })
+                    .unwrap();
+            }
+            Ok(false) => {
+                // TODO reduce log level and trigger a retry for this case?
+                tracing::warn!(
+                    "Failed to cleanup countersigning session for agent: {:?}",
+                    author
+                );
+            }
+            Err(e) => {
+                tracing::error!(
+                    "Error cleaning up countersigning session for agent: {:?}: {:?}",
+                    author,
+                    e
+                );
+            }
+        }
     }
 
     let completed_sessions = space
@@ -118,7 +145,8 @@ pub(crate) async fn countersigning_workflow(
     for (author, signatures) in completed_sessions {
         for signature_bundle in signatures {
             // Try to complete the session using this signature bundle.
-            if let Ok(true) = inner_countersigning_session_complete(
+
+            match inner_countersigning_session_complete(
                 space.clone(),
                 &network,
                 author.clone(),
@@ -129,17 +157,29 @@ pub(crate) async fn countersigning_workflow(
             )
             .await
             {
-                // If the session completed successfully with this bundle then we can remove the
-                // session from the workspace.
-                space
-                    .countersigning_workspace
-                    .inner
-                    .share_mut(|inner, _| {
-                        inner.sessions.remove(&author);
-                        Ok(())
-                    })
-                    .unwrap();
-                break;
+                Ok(true) => {
+                    // If the session completed successfully with this bundle then we can remove the
+                    // session from the workspace.
+                    space
+                        .countersigning_workspace
+                        .inner
+                        .share_mut(|inner, _| {
+                            inner.sessions.remove(&author);
+                            Ok(())
+                        })
+                        .unwrap();
+                    break;
+                }
+                Ok(false) => {
+                    tracing::warn!("Rejected signature bundle for countersigning session for agent: {:?}: {:?}", author, signature_bundle);
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "Error completing countersigning session for agent: {:?}: {:?}",
+                        author,
+                        e
+                    );
+                }
             }
         }
     }
@@ -173,6 +213,46 @@ pub(crate) async fn countersigning_workflow(
     }
 
     Ok(WorkComplete::Complete)
+}
+
+/// Resolve an incomplete countersigning session.
+///
+/// This function is responsible for deciding what action to take when a countersigning session
+/// has failed to complete.
+///
+/// The function returns true if the session state has been cleaned up and the chain has been unlocked.
+/// Otherwise, the function returns false and the cleanup needs to be retried to resolved manually.
+async fn inner_countersigning_session_incomplete(
+    space: Space,
+    author: AgentPubKey,
+    request: PreflightRequest,
+) -> WorkflowResult<bool> {
+    let authored_db = space.get_or_create_authored_db(author.clone())?;
+
+    let maybe_current_session = authored_db
+        .write_async(
+            move |txn| -> SourceChainResult<Option<(EntryHash, CounterSigningSessionData)>> {
+                let maybe_current_session =
+                    current_countersigning_session(&txn, Arc::new(author.clone()))?;
+
+                // This is the simplest failure case, something has gone wrong but the countersigning entry
+                // hasn't been committed then we can unlock the chain and remove the session.
+                if maybe_current_session.is_none() {
+                    mutations::unlock_chain(txn, &author)?;
+                    return Ok(None);
+                }
+
+                Ok(maybe_current_session)
+            },
+        )
+        .await?;
+
+    if maybe_current_session.is_none() {
+        return Ok(true);
+    }
+
+    // TODO exit value
+    Ok(false)
 }
 
 /// An incoming countersigning session success.
