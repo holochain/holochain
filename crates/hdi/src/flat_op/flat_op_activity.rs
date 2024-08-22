@@ -164,10 +164,11 @@ pub enum OpActivity<UnitType, LT> {
     },
     /// This operation registers the [`Action`] for an
     /// [`Action::CloseChain`] to the author's chain
-    /// and contains the new chains's [`MigrationTarget`].
+    /// and contains the new chains's [`MigrationTarget`]
+    /// if applicable.
     CloseChain {
         /// Target for the new chain that we are migrating to
-        new_target: MigrationTarget,
+        new_target: Option<MigrationTarget>,
         /// The [`CloseChain`] action
         action: CloseChain,
     },

@@ -230,7 +230,7 @@ pub fn oc(prev_target: MigrationTarget, close_hash: ActionHash) -> OpenChain {
 }
 
 /// Create [`CloseChain`].
-pub fn cc(new_target: MigrationTarget) -> CloseChain {
+pub fn cc(new_target: Option<MigrationTarget>) -> CloseChain {
     CloseChain {
         author: ak(0),
         timestamp: Timestamp(0),

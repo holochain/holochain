@@ -1456,7 +1456,7 @@ mod tests {
         .await?;
 
         let action_builder = builder::CloseChain {
-            new_target: fixt!(MigrationTarget),
+            new_target: Some(fixt!(MigrationTarget)),
         };
         chain_1
             .put(action_builder.clone(), None, ChainTopOrdering::Strict)

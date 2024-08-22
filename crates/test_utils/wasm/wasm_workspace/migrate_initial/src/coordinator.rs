@@ -29,5 +29,5 @@ fn get_all_my_types() -> ExternResult<Vec<MyType>> {
 
 #[hdk_extern]
 fn close_chain_for_new(dna_hash: DnaHash) -> ExternResult<ActionHash> {
-    close_chain(dna_hash.into())
+    close_chain(Some(dna_hash.into()))
 }

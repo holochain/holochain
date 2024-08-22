@@ -255,7 +255,7 @@ builder_variant!(OpenChain {
 });
 
 builder_variant!(CloseChain {
-    new_target: MigrationTarget,
+    new_target: Option<MigrationTarget>,
 });
 
 builder_variant!(Create<EntryRateWeight> {

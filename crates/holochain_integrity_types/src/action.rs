@@ -302,7 +302,7 @@ impl Action {
             // - Moreover, we don't want an attacker to close the chain on behalf of the user, because they would be pointing to some key that doesn't match the DPKI state.
             // - We should let the author be the old key and make a special case for the signature check, because that prevents special cases in other areas, such as determining the agent activity basis hash (should be the old key), running sys validation for prev_action (prev and next author must match) and probably more.
             Action::CloseChain(CloseChain {
-                new_target: MigrationTarget::Agent(agent),
+                new_target: Some(MigrationTarget::Agent(agent)),
                 ..
             }) => agent,
 
@@ -607,7 +607,8 @@ impl From<AgentPubKey> for MigrationTarget {
 }
 
 /// When migrating to a new version of a DNA, this action is committed to the
-/// old chain to declare the migration path taken.
+/// old chain to declare the migration path taken. This action can also be taken
+/// to simply close down a chain with no forward reference to a migration.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(
     feature = "fuzzing",
@@ -619,7 +620,7 @@ pub struct CloseChain {
     pub action_seq: u32,
     pub prev_action: ActionHash,
 
-    pub new_target: MigrationTarget,
+    pub new_target: Option<MigrationTarget>,
 }
 
 /// When migrating to a new version of a DNA, this action is committed to the

@@ -83,7 +83,7 @@ mod tests {
         let host_access_2 = host_access.clone();
         call_context.host_context = host_access.into();
         let input = CloseChainInput {
-            new_target: fixt!(MigrationTarget),
+            new_target: Some(fixt!(MigrationTarget)),
         };
 
         let output = close_chain(Arc::new(ribosome), Arc::new(call_context), input).unwrap();

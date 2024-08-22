@@ -108,7 +108,7 @@ fn op_errors(op: Op) -> WasmErrorInner {
 // Action's without entries
 #[test_case(FlatOp::RegisterAgentActivity(OpActivity::Dna { action: dna(dh(0)), dna_hash: dh(0)}))]
 #[test_case(FlatOp::RegisterAgentActivity(OpActivity::open_chain(oc(dh(0).into(), ah(0)))))]
-#[test_case(FlatOp::RegisterAgentActivity(OpActivity::close_chain(cc(dh(0).into()))))]
+#[test_case(FlatOp::RegisterAgentActivity(OpActivity::close_chain(cc(Some(dh(0).into())))))]
 #[test_case(FlatOp::RegisterAgentActivity(OpActivity::InitZomesComplete { action: izc()}))]
 #[test_case(FlatOp::RegisterAgentActivity(OpActivity::AgentValidationPkg{ membrane_proof: None, action: avp(None) }))]
 #[test_case(FlatOp::RegisterAgentActivity(OpActivity::AgentValidationPkg{ membrane_proof: Some(mp()), action: avp(Some(mp())) }))]
@@ -137,7 +137,7 @@ fn op_errors(op: Op) -> WasmErrorInner {
 // Action's without entries
 #[test_case(FlatOp::StoreRecord(OpRecord::Dna{ action: dna(dh(0)), dna_hash: dh(0)}))]
 #[test_case(FlatOp::StoreRecord(OpRecord::open_chain(oc(dh(0).into(), ah(0)))))]
-#[test_case(FlatOp::StoreRecord(OpRecord::close_chain(cc(dh(1).into()))))]
+#[test_case(FlatOp::StoreRecord(OpRecord::close_chain(cc(Some(dh(1).into())))))]
 #[test_case(FlatOp::StoreRecord(OpRecord::InitZomesComplete { action: izc() }))]
 #[test_case(FlatOp::StoreRecord(OpRecord::AgentValidationPkg { action: avp(None), membrane_proof: None}))]
 #[test_case(FlatOp::StoreRecord(OpRecord::AgentValidationPkg { action: avp(Some(mp())), membrane_proof: Some(mp())}))]

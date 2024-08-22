@@ -162,10 +162,10 @@ pub enum OpRecord<ET: UnitEnum, LT> {
     },
     /// This operation stores the [`Record`] for an
     /// [`Action::CloseChain`] and contains the new
-    /// chains's [`MigrationTarget`].
+    /// chains's [`MigrationTarget`], if applicable.
     CloseChain {
         /// Specifier for the new chain that we are migrating to
-        new_target: MigrationTarget,
+        new_target: Option<MigrationTarget>,
         /// The [`CloseChain`] action
         action: CloseChain,
     },

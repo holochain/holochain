@@ -2284,7 +2284,7 @@ async fn action_after_close_chain() {
         timestamp: Timestamp::now(),
         action_seq: 23,
         prev_action: fixt!(ActionHash),
-        new_target: fixt!(MigrationTarget),
+        new_target: Some(fixt!(MigrationTarget)),
     };
     let previous_action = test_case.sign_action(Action::CloseChain(dna_action)).await;
 
