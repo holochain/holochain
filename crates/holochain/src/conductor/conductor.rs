@@ -3220,7 +3220,7 @@ mod countersigning_impls {
                     request,
                     countersigning_trigger,
                 )
-                    .await?,
+                .await?,
             )
         }
     }
