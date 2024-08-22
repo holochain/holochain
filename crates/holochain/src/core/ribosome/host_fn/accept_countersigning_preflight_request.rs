@@ -96,7 +96,7 @@ pub mod wasm_test {
         match result {
             Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
                 match *workflow_error {
-                    WorkflowError::SourceChainError(SourceChainError::LockExpired) => {}
+                    WorkflowError::SourceChainError(SourceChainError::CountersigningWriteWithoutSession) => {}
                     _ => panic!("{:?}", workflow_error),
                 }
             }
@@ -218,7 +218,7 @@ pub mod wasm_test {
             .await;
 
         // Bob tries to do the same thing but after timeout.
-        tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(10500)).await;
         let bob_result: Result<ActionHash, _> = conductor
             .call_fallible(
                 &bob,
