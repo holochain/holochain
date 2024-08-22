@@ -80,11 +80,22 @@ mod tests {
                 .coordinator
                 .erase_type();
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
-        let host_access_2 = host_access.clone();
-        call_context.host_context = host_access.into();
-        let input = CloseChainInput {
+        let mut input = CloseChainInput {
             new_target: Some(fixt!(MigrationTarget)),
         };
+
+        // If this is an agent migration, the agent keypair needs to exist
+        // so the Close can be signed.
+        if let Some(MigrationTarget::Agent(agent)) = input.new_target.as_mut() {
+            *agent = host_access
+                .keystore
+                .new_sign_keypair_random()
+                .await
+                .unwrap();
+        }
+
+        let host_access_2 = host_access.clone();
+        call_context.host_context = host_access.into();
 
         let output = close_chain(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
