@@ -33,9 +33,6 @@ impl Signal {
 
 /// A Signal which originates from within the Holochain system, as opposed to
 /// from within a Cell
-///
-/// TODO, decide what these will be. For instance, maybe there is a
-/// DataAvailable signal for doing async network requests
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub enum SystemSignal {
     /// A countersigning session has successfully completed.
@@ -46,12 +43,6 @@ pub enum SystemSignal {
     /// session was initiated. The countersigning entry might not exist when this signal is emitted
     /// so we can't use the entry hash to identify the session.
     AbandonedCountersigning(CellId),
-}
-
-/// Create a test signal
-#[cfg(all(test, feature = "test_utils"))]
-pub fn test_signal(s: &str) -> Signal {
-    SystemSignal::SuccessfulCountersigning(fixt!(EntryHash)).into()
 }
 
 impl_from! {
