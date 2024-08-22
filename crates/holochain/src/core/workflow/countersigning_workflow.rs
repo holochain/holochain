@@ -159,16 +159,20 @@ pub(crate) async fn countersigning_workflow(
             }
         }).min()))
         .unwrap();
+
     if let Some(earliest_finish) = maybe_earliest_finish {
         let delay = match (earliest_finish - Timestamp::now()).map(|d| d.to_std()) {
             Ok(Ok(d)) => d,
             _ => Duration::from_millis(100),
         };
         tracing::debug!("Countersigning workflow will run again in {:?}", delay);
-        Ok(WorkComplete::Incomplete(Some(delay)))
-    } else {
-        Ok(WorkComplete::Complete)
+        tokio::task::spawn(async move {
+            tokio::time::sleep(delay).await;
+            self_trigger.trigger(&"retrigger myself because countersigning");
+        });
     }
+
+    Ok(WorkComplete::Complete)
 }
 
 /// An incoming countersigning session success.
