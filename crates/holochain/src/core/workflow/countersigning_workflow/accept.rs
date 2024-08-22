@@ -60,8 +60,10 @@ pub async fn accept_countersigning_request(
 
     // At this point the chain has been locked, and we are in a countersigning session. Store the
     // session request in the workspace.
-    if let Err(_) = space.countersigning_workspace.inner.share_mut(|inner, _| {
-        match inner.sessions.entry(author.clone()) {
+    if space
+        .countersigning_workspace
+        .inner
+        .share_mut(|inner, _| match inner.sessions.entry(author.clone()) {
             std::collections::hash_map::Entry::Occupied(_) => {
                 Err(KitsuneError::other("Session already exists"))
             }
@@ -69,8 +71,9 @@ pub async fn accept_countersigning_request(
                 entry.insert(SessionState::Accepted(request.clone()));
                 Ok(())
             }
-        }
-    }) {
+        })
+        .is_err()
+    {
         // This really shouldn't happen. The chain lock is the primary state and that should be in place here.
         return Ok(PreflightRequestAcceptance::AnotherSessionIsInProgress);
     };
