@@ -103,7 +103,9 @@ pub(crate) async fn countersigning_workflow(
             space.clone(),
             network.clone(),
             author.clone(),
+            cell_id.clone(),
             request,
+            signal_tx.clone(),
         )
         .await
         {
@@ -247,7 +249,9 @@ async fn inner_countersigning_session_incomplete(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,
     author: AgentPubKey,
+    cell_id: CellId,
     request: PreflightRequest,
+    signal: broadcast::Sender<Signal>,
 ) -> WorkflowResult<bool> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
@@ -274,6 +278,13 @@ async fn inner_countersigning_session_incomplete(
             .await?;
 
     if maybe_current_session.is_none() {
+        // Best effort to let clients know that the session has been abandoned.
+        signal
+            .send(Signal::System(SystemSignal::AbandonedCountersigning(
+                cell_id,
+            )))
+            .ok();
+
         return Ok(true);
     }
 
@@ -434,6 +445,14 @@ async fn inner_countersigning_session_incomplete(
             > (session_data.preflight_request.signing_agents.len() as f64 * 0.5).floor() as usize
     {
         abandon_session(authored_db, author.clone(), cs_action, cs_entry_hash).await?;
+
+        // Best effort to let clients know that the session has been abandoned.
+        signal
+            .send(Signal::System(SystemSignal::AbandonedCountersigning(
+                cell_id,
+            )))
+            .ok();
+
         // We can remove the session from the workspace and signal clients that the session is abandoned.
         return Ok(true);
     }
