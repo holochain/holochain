@@ -686,7 +686,7 @@ async fn incoming_ops_filters_private_entry() {
     let mut g = random_generator();
 
     let dna = DnaHash::arbitrary(&mut g).unwrap();
-    let spaces = TestSpaces::new([dna.clone()]);
+    let spaces = TestSpaces::new([dna.clone()]).await;
     let space = Arc::new(spaces.test_spaces[&dna].space.clone());
     let vault = space.dht_db.clone();
     let keystore = test_keystore();

@@ -52,6 +52,13 @@ struct Opt {
         help = "Display version information such as git revision and HDK version"
     )]
     build_info: bool,
+
+    /// WARNING!! DANGER!! This exposes your database decryption secrets!
+    /// Print the database decryption secrets to stderr.
+    /// With these PRAGMA commands, you'll be able to run sqlcipher
+    /// directly to manipulate holochain databases.
+    #[structopt(long)]
+    pub danger_print_db_secrets: bool,
 }
 
 fn main() {
@@ -149,6 +156,7 @@ async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> Con
     match Conductor::builder()
         .config(config)
         .passphrase(passphrase)
+        .danger_print_db_secrets(opt.danger_print_db_secrets)
         .build()
         .await
     {

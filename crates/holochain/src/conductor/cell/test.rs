@@ -21,7 +21,7 @@ async fn test_cell_handle_publish() {
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
 
-    let spaces = TestSpaces::new([dna.clone()]);
+    let spaces = TestSpaces::new([dna.clone()]).await;
     let db = spaces.test_spaces[&dna]
         .space
         .get_or_create_authored_db(cell_id.agent_pubkey().clone())
