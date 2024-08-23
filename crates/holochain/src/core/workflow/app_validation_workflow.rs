@@ -196,7 +196,7 @@ pub async fn app_validation_workflow(
         // If not all ops have been validated, trigger app validation workflow again.
         if outcome_summary.validated < outcome_summary.ops_to_validate {
             // Trigger app validation workflow again in 100-3000 milliseconds.
-            let interval = 3000u64.saturating_sub(outcome_summary.missing as u64 * 100) + 100;
+            let interval = 2900u64.saturating_sub(outcome_summary.missing as u64 * 100) + 100;
             WorkComplete::Incomplete(Some(Duration::from_millis(interval)))
         } else {
             WorkComplete::Complete
