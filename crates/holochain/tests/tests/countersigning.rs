@@ -3,6 +3,7 @@ use holo_hash::{ActionHash, EntryHash};
 use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};
 use holochain::conductor::CellError;
 use holochain::core::workflow::WorkflowError;
+use holochain::prelude::Timestamp;
 use holochain::sweettest::{
     await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
 };
@@ -11,11 +12,13 @@ use holochain_types::app::DisabledAppReason;
 use holochain_types::prelude::Signal;
 use holochain_types::signal::SystemSignal;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::cell::CellId;
 use holochain_zome_types::countersigning::Role;
 use holochain_zome_types::prelude::{
     ActivityRequest, AgentActivity, ChainQueryFilter, GetAgentActivityInput,
 };
-use std::time::Duration;
+use std::ops::Add;
+use std::time::{Duration, Instant};
 use tokio::sync::broadcast::Receiver;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -410,6 +413,152 @@ async fn signature_bundle_noise() {
     }
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn ruin_the_day_of_a_peer() {
+    holochain_trace::test_run();
+
+    let config = SweetConductorConfig::rendezvous(true);
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
+    let apps = conductors.setup_app("app", &[dna]).await.unwrap();
+    let cells = apps.cells_flattened();
+    let alice = &cells[0];
+    let bob = &cells[1];
+    let carol = &cells[2];
+
+    // Need an initialised source chain for countersigning, so commit anything
+    let alice_zome = alice.zome(TestWasm::CounterSigning);
+    let _: ActionHash = conductors[0]
+        .call_fallible(&alice_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+    let bob_zome = bob.zome(TestWasm::CounterSigning);
+    let _: ActionHash = conductors[1]
+        .call_fallible(&bob_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+
+    await_consistency(30, vec![alice, bob, carol])
+        .await
+        .unwrap();
+
+    // Need chain head for each other, so get agent activity before starting a session
+    let _: AgentActivity = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "get_agent_activity",
+            GetAgentActivityInput {
+                agent_pubkey: bob.agent_pubkey().clone(),
+                chain_query_filter: ChainQueryFilter::new(),
+                activity_request: ActivityRequest::Full,
+            },
+        )
+        .await
+        .unwrap();
+    let _: AgentActivity = conductors[1]
+        .call_fallible(
+            &bob_zome,
+            "get_agent_activity",
+            GetAgentActivityInput {
+                agent_pubkey: alice.agent_pubkey().clone(),
+                chain_query_filter: ChainQueryFilter::new(),
+                activity_request: ActivityRequest::Full,
+            },
+        )
+        .await
+        .unwrap();
+
+    // Set up the session and accept it for both agents
+    let preflight_request: PreflightRequest = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "generate_countersigning_preflight_request_fast",
+            vec![
+                (alice.agent_pubkey().clone(), vec![Role(0)]),
+                (bob.agent_pubkey().clone(), vec![]),
+            ],
+        )
+        .await
+        .unwrap();
+    let alice_acceptance: PreflightRequestAcceptance = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "accept_countersigning_preflight_request",
+            preflight_request.clone(),
+        )
+        .await
+        .unwrap();
+    let alice_response =
+        if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
+            response
+        } else {
+            unreachable!();
+        };
+    let bob_acceptance: PreflightRequestAcceptance = conductors[1]
+        .call_fallible(
+            &bob_zome,
+            "accept_countersigning_preflight_request",
+            preflight_request.clone(),
+        )
+        .await
+        .unwrap();
+    let bob_response = if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
+        response
+    } else {
+        unreachable!();
+    };
+
+    // Alice doesn't realise that Bob is a very bad man, and goes ahead and commits
+    let (_, _): (ActionHash, EntryHash) = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "create_a_countersigned_thing_with_entry_hash",
+            vec![alice_response.clone(), bob_response.clone()],
+        )
+        .await
+        .unwrap();
+
+    // Bob proceeds to laugh maniacally and not commit
+
+    // Bob's session should time out and be abandoned
+    wait_for_abandoned(
+        conductors[1].subscribe_to_app_signals("app".into()),
+        bob.cell_id(),
+    )
+    .await;
+
+    tracing::info!("Session abandoned for bob");
+
+    // Let's wait for the session to time out and see how badly this ends for Alice
+    // let end = Instant::now().add(
+    //     (preflight_request.session_times.end - Timestamp::now())
+    //         .unwrap()
+    //         .to_std()
+    //         .unwrap(),
+    // );
+    // tokio::time::sleep_until(end.into()).await;
+
+    // Okay, so the chain lock has timed out and Alice should be able to commit now
+    let _: ActionHash = conductors[0]
+        .call_fallible(&alice_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+
+    // But her countersigning entry is still on her authored chain. It's not published though
+    // because the session didn't complete. So now validation won't be able to proceed for AAAs.
+    // The thing we just created is the next action sequence along from the countersigning entry
+    // so... goodnight Alice. Bob's evil plan has succeeded.
+    await_consistency(30, vec![alice, bob, carol])
+        .await
+        .unwrap();
+
+    // Alice continues to exist on the network and see other people's data. Sadly her future actions
+    // effectively go into limbo because they can't be validated.
+
+    // Alice begins plotting her revenge against Bob.
+}
+
 async fn wait_for_completion(mut signal_rx: Receiver<Signal>, expected_hash: EntryHash) {
     let signal = tokio::time::timeout(std::time::Duration::from_secs(30), signal_rx.recv())
         .await
@@ -418,6 +567,24 @@ async fn wait_for_completion(mut signal_rx: Receiver<Signal>, expected_hash: Ent
     match signal {
         Signal::System(SystemSignal::SuccessfulCountersigning(hash)) => {
             assert_eq!(expected_hash, hash);
+        }
+        _ => {
+            panic!(
+                "Expected SuccessfulCountersigning signal, got: {:?}",
+                signal
+            );
+        }
+    }
+}
+
+async fn wait_for_abandoned(mut signal_rx: Receiver<Signal>, expected_cell_id: &CellId) {
+    let signal = tokio::time::timeout(std::time::Duration::from_secs(30), signal_rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    match signal {
+        Signal::System(SystemSignal::AbandonedCountersigning(ref cell_id)) => {
+            assert_eq!(expected_cell_id, cell_id);
         }
         _ => {
             panic!(
