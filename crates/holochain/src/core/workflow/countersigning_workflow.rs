@@ -140,13 +140,14 @@ pub(crate) async fn countersigning_workflow(
             space.clone(),
             network.clone(),
             author.clone(),
-            cell_id.clone(),
             integration_trigger.clone(),
-            signal_tx.clone(),
         )
         .await
         {
-            Ok(true) => {
+            Ok(
+                decision @ (SessionCompletionDecision::Abandoned, _)
+                | decision @ (SessionCompletionDecision::Complete, _),
+            ) => {
                 // The session state has been resolved, so we can remove it from the workspace.
                 space
                     .countersigning_workspace
@@ -156,8 +157,29 @@ pub(crate) async fn countersigning_workflow(
                         Ok(())
                     })
                     .unwrap();
+
+                match decision {
+                    (SessionCompletionDecision::Abandoned, _) => {
+                        signal_tx
+                            .send(Signal::System(SystemSignal::AbandonedCountersigning(
+                                cell_id.clone(),
+                            )))
+                            .ok();
+                    }
+                    (SessionCompletionDecision::Complete, Some(cs_entry_hash)) => {
+                        signal_tx
+                            .send(Signal::System(SystemSignal::SuccessfulCountersigning(
+                                cs_entry_hash,
+                            )))
+                            .ok();
+                    }
+                    (SessionCompletionDecision::Complete, None) => {
+                        tracing::error!("Countersigning session completed but no entry hash was returned, this is a bug");
+                    }
+                    _ => unreachable!(),
+                }
             }
-            Ok(false) => {
+            Ok((SessionCompletionDecision::Indeterminate, _)) => {
                 remaining_sessions_in_unknown_state += 1;
                 tracing::info!(
                     "Failed to cleanup countersigning session for agent: {:?}",
@@ -212,11 +234,10 @@ pub(crate) async fn countersigning_workflow(
                 signature_bundle.clone(),
                 integration_trigger.clone(),
                 publish_trigger.clone(),
-                signal_tx.clone(),
             )
             .await
             {
-                Ok(true) => {
+                Ok(Some(cs_entry_hash)) => {
                     // If the session completed successfully with this bundle then we can remove the
                     // session from the workspace.
                     space
@@ -227,9 +248,18 @@ pub(crate) async fn countersigning_workflow(
                             Ok(())
                         })
                         .unwrap();
+
+                    // Signal to the UI.
+                    // If there are no active connections this won't emit anything.
+                    signal_tx
+                        .send(Signal::System(SystemSignal::SuccessfulCountersigning(
+                            cs_entry_hash,
+                        )))
+                        .ok();
+
                     break;
                 }
-                Ok(false) => {
+                Ok(None) => {
                     tracing::warn!("Rejected signature bundle for countersigning session for agent: {:?}: {:?}", author, signature_bundle);
                 }
                 Err(e) => {
@@ -326,7 +356,7 @@ async fn refresh_workspace_state(
     }
 
     // Any sessions that are in the workspace but not locked need to be removed.
-    let sessions_to_drop = workspace
+    let dropped_sessions = workspace
         .inner
         .share_mut(|inner, _| {
             let (keep, drop) = inner
@@ -340,7 +370,7 @@ async fn refresh_workspace_state(
 
     // This is expected to happen when the countersigning commit fails validation. The chain gets
     // unlocked, and we are just cleaning up state here.
-    for (agent, _) in sessions_to_drop {
+    for (agent, _) in dropped_sessions {
         tracing::debug!("Countersigning session for agent {:?} is in the workspace but the chain is not locked, removing from workspace", agent);
 
         // Best effort attempt to let clients know that the session has been abandoned.
@@ -363,10 +393,8 @@ async fn inner_countersigning_session_incomplete(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,
     author: AgentPubKey,
-    cell_id: CellId,
     integration_trigger: TriggerSender,
-    signal: broadcast::Sender<Signal>,
-) -> WorkflowResult<bool> {
+) -> WorkflowResult<(SessionCompletionDecision, Option<EntryHash>)> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
     let maybe_current_session =
@@ -392,14 +420,7 @@ async fn inner_countersigning_session_incomplete(
             .await?;
 
     if maybe_current_session.is_none() {
-        // Best effort to let clients know that the session has been abandoned.
-        signal
-            .send(Signal::System(SystemSignal::AbandonedCountersigning(
-                cell_id,
-            )))
-            .ok();
-
-        return Ok(true);
+        return Ok((SessionCompletionDecision::Abandoned, None));
     }
 
     // Now things get more complicated. We have a countersigning entry on our chain but the session
@@ -562,15 +583,8 @@ async fn inner_countersigning_session_incomplete(
     {
         abandon_session(authored_db, author.clone(), cs_action, cs_entry_hash).await?;
 
-        // Best effort to let clients know that the session has been abandoned.
-        signal
-            .send(Signal::System(SystemSignal::AbandonedCountersigning(
-                cell_id,
-            )))
-            .ok();
-
         // We can remove the session from the workspace and signal clients that the session is abandoned.
-        return Ok(true);
+        return Ok((SessionCompletionDecision::Abandoned, None));
     }
     // If there is no evidence that the session is abandoned, and we have evidence that the session
     // has been completed by a majority of agents, then we can make a decision and complete the session
@@ -596,14 +610,7 @@ async fn inner_countersigning_session_incomplete(
         )
         .await?;
 
-        // Send a signal to clients to let them know that we've resolved this session. They may not
-        // be available at this point because Holochain is trying to resolve a session in the
-        // background which might have taken some time.
-        signal
-            .send(Signal::System(SystemSignal::SuccessfulCountersigning(
-                cs_entry_hash,
-            )))
-            .ok();
+        return Ok((SessionCompletionDecision::Complete, Some(cs_entry_hash)));
     } else {
         tracing::info!(
             "Countersigning session state for agent {:?} is indeterminate based on evidence: {:?}",
@@ -617,7 +624,7 @@ async fn inner_countersigning_session_incomplete(
         "Countersigning session state for agent {:?} is indeterminate, will retry later",
         author
     );
-    Ok(false)
+    Ok((SessionCompletionDecision::Indeterminate, None))
 }
 
 /// An incoming countersigning session success.
@@ -675,8 +682,7 @@ pub(crate) async fn inner_countersigning_session_complete(
     signed_actions: Vec<SignedAction>,
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
-    signal: broadcast::Sender<Signal>,
-) -> WorkflowResult<bool> {
+) -> WorkflowResult<Option<EntryHash>> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
     let dht_db = space.dht_db.clone();
     let dht_db_cache = space.dht_query_cache.clone();
@@ -691,7 +697,7 @@ pub(crate) async fn inner_countersigning_session_complete(
                 .map(|eh| (ActionHash::with_data_sync(sa), eh))
         }) {
         Some(a) => a,
-        None => return Ok(false),
+        None => return Ok(None),
     };
 
     // Do a quick check to see if this entry hash matches the current locked session, so we don't
@@ -732,7 +738,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         None => {
             // If there is no active session then we can short circuit.
             tracing::warn!("Received a signature bundle for a session that exists in state but is missing from the database");
-            return Ok(false);
+            return Ok(None);
         }
     };
 
@@ -745,7 +751,7 @@ pub(crate) async fn inner_countersigning_session_complete(
             .verify_signature(sa.signature(), sa.action())
             .await?
         {
-            return Ok(false);
+            return Ok(None);
         }
         if sa.action().author() == &author {
             i_am_an_author = true;
@@ -756,7 +762,7 @@ pub(crate) async fn inner_countersigning_session_complete(
     if !i_am_an_author {
         // We're effectively rejecting this signature bundle but communicating that this signature
         // bundle wasn't acceptable so that we can try another one.
-        return Ok(false);
+        return Ok(None);
     }
 
     // Hash actions.
@@ -782,7 +788,7 @@ pub(crate) async fn inner_countersigning_session_complete(
 
     if !integrity_check_passed {
         // If the integrity check fails then we can't proceed with this signature bundle.
-        return Ok(false);
+        return Ok(None);
     }
 
     apply_success_state_changes(
@@ -793,15 +799,6 @@ pub(crate) async fn inner_countersigning_session_complete(
         integration_trigger,
     )
     .await?;
-
-    // Signal to the UI.
-    // If there are no active connections this won't emit anything.
-    let app_entry_hash = session_data.preflight_request.app_entry_hash.clone();
-    signal
-        .send(Signal::System(SystemSignal::SuccessfulCountersigning(
-            app_entry_hash,
-        )))
-        .ok();
 
     // Publish other signers agent activity ops to their agent activity authorities.
     for sa in signed_actions {
@@ -823,7 +820,7 @@ pub(crate) async fn inner_countersigning_session_complete(
 
     tracing::info!("Countersigning session complete for agent: {:?}", author);
 
-    Ok(true)
+    Ok(Some(session_data.preflight_request.app_entry_hash))
 }
 
 async fn apply_success_state_changes(
