@@ -211,6 +211,7 @@ impl DnaFile {
     }
 
     /// Fetch the Webassembly byte code for a zome.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub fn get_wasm_for_zome(&self, zome_name: &ZomeName) -> Result<&wasm::DnaWasm, DnaError> {
         let wasm_hash = self.dna.get_wasm_zome_hash(zome_name)?;
         self.code.0.get(&wasm_hash).ok_or(DnaError::InvalidWasmHash)
@@ -223,8 +224,7 @@ impl DnaFile {
         clone
     }
 
-    /// Change the DNA modifiers -- the network seed, origin time and properties -- while
-    /// leaving the actual DNA code intact.
+    /// Change the DNA modifiers while leaving the actual DNA code intact.
     pub fn update_modifiers(&self, dna_modifiers: DnaModifiersOpt) -> Self {
         let mut clone = self.clone();
         clone.dna = DnaDefHashed::from_content_sync(clone.dna.update_modifiers(dna_modifiers));

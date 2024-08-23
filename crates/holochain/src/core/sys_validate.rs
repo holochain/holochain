@@ -5,6 +5,8 @@ use super::queue_consumer::TriggerSender;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::space::Space;
+use holochain_conductor_services::DpkiService;
+use holochain_conductor_services::KeyState;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -33,7 +35,7 @@ pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Verify the signature for this action
 pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysValidationResult<()> {
-    if action.author().verify_signature(sig, action).await? {
+    if action.signer().verify_signature(sig, action).await? {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
@@ -291,27 +293,7 @@ pub fn check_agent_validation_pkg_predecessor(
 
 /// Check that the author didn't change between actions
 pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
-    // Agent updates will be valid when DPKI support lands
-    let a1: AgentPubKey = if let Action::Update(
-        u @ Update {
-            entry_type: EntryType::AgentPubKey,
-            ..
-        },
-    ) = prev_action
-    {
-        #[cfg(feature = "dpki")]
-        {
-            u.entry_hash.clone().into()
-        }
-
-        #[cfg(not(feature = "dpki"))]
-        {
-            u.author.clone()
-        }
-    } else {
-        prev_action.author().clone()
-    };
-
+    let a1 = prev_action.author().clone();
     let a2 = action.author();
     if a1 == *a2 {
         Ok(())
@@ -388,6 +370,79 @@ pub fn check_entry_visibility(op: &ChainOp) -> SysValidationResult<()> {
         }
         (None, NA) => Ok(()),
         (None, _) => err("Entry must be N/A for action with no entry type"),
+    }
+}
+
+/// Check that the record is valid from the perspective of DPKI.
+pub async fn check_dpki_agent_validity_for_record(
+    dpki: &DpkiService,
+    record: &Record,
+) -> SysValidationResult<()> {
+    let author = record.action().author().clone();
+    let timestamp = if record.action().is_genesis() {
+        None
+    } else {
+        Some(record.action().timestamp())
+    };
+    check_dpki_agent_validity(dpki, author, timestamp).await
+}
+
+/// Check that the op is valid from the perspective of DPKI.
+pub async fn check_dpki_agent_validity_for_op(
+    dpki: &DpkiService,
+    op: &ChainOp,
+) -> SysValidationResult<()> {
+    let author = op.author().clone();
+    let timestamp = if op.is_genesis() {
+        None
+    } else {
+        Some(op.timestamp())
+    };
+    let agent_validity_result = check_dpki_agent_validity(dpki, author, timestamp).await;
+    // If agent key is invalid in Dpki and the op being validated is a `Delete` of that agent key, it must pass
+    // for the delete to succeed. Otherwise Dpki would prevent deletion of an agent key on the source chain.
+    if let Err(SysValidationError::ValidationOutcome(ValidationOutcome::DpkiAgentInvalid(_, _))) =
+        &agent_validity_result
+    {
+        if let Action::Delete(d) = &op.action() {
+            if d.deletes_entry_address == op.author().clone().into() {
+                return Ok(());
+            }
+        }
+    }
+    agent_validity_result
+}
+
+/// Check that the agent is valid from the perspective of DPKI.
+///
+/// There are different rules for genesis actions and all other actions:
+/// - For genesis actions, we use None for the timestamp, and we only check that the key is the
+///   first key in the app's keyset, i.e. that key_index == 0.
+/// - For all other actions, we include the timestamp, and use `key_state` to check that the key
+///   is valid as-at that timestamp.
+async fn check_dpki_agent_validity(
+    dpki: &DpkiService,
+    author: AgentPubKey,
+    timestamp: Option<Timestamp>,
+) -> SysValidationResult<()> {
+    if let Some(timestamp) = timestamp {
+        let key_state = dpki
+            .state()
+            .await
+            .key_state(author.clone(), timestamp)
+            .await?;
+
+        match key_state {
+            KeyState::Valid(_) => Ok(()),
+            KeyState::Invalid(_) => {
+                Err(ValidationOutcome::DpkiAgentInvalid(author, timestamp).into())
+            }
+            KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(author).into()),
+        }
+    } else {
+        // TODO: add check for key_index == 0 once updates are possible
+        tracing::info!("Skipping DPKI check for genesis action until updates are possible");
+        Ok(())
     }
 }
 

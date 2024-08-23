@@ -20,6 +20,7 @@ use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::params;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_sqlite::sql::sql_cell::SELECT_VALID_AGENT_PUB_KEY;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
 use holochain_state_types::SourceChainDumpRecord;
@@ -67,7 +68,7 @@ pub type SourceChainRead = SourceChain<DbRead<DbKindAuthored>, DbRead<DbKindDht>
 //       not the entire source chain!
 /// Writable functions for a source chain with write access.
 impl SourceChain {
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn unlock_chain(&self) -> SourceChainResult<()> {
         self.vault
             .write_async({
@@ -79,7 +80,7 @@ impl SourceChain {
         Ok(())
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn accept_countersigning_preflight_request(
         &self,
         preflight_request: PreflightRequest,
@@ -234,7 +235,7 @@ impl SourceChain {
     }
 
     #[async_recursion]
-    #[tracing::instrument(skip(self, network))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, network)))]
     pub async fn flush(
         &self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
@@ -266,6 +267,7 @@ impl SourceChain {
             )
             .await
             .map_err(SourceChainError::other)?;
+
             if let Err(err @ ChcError::InvalidChain(_, _)) = chc.add_records_request(payload).await
             {
                 return Err(SourceChainError::ChcHeadMoved(
@@ -414,6 +416,66 @@ impl SourceChain {
             }
             result => result,
         }
+    }
+
+    /// Checks if the current [`AgentPubKey`] of the source chain is valid and returns its [`Create`] action.
+    ///
+    /// Valid means that there's no [`Update`] or [`Delete`] action for the key on the chain.
+    /// Returns the create action if it is valid, and an [`SourceChainError::InvalidAgentKey`] otherwise.
+    pub async fn valid_create_agent_key_action(&self) -> SourceChainResult<Action> {
+        let agent_key_entry_hash: EntryHash = self.agent_pubkey().clone().into();
+        self.author_db()
+            .read_async({
+                let agent_key = self.agent_pubkey().clone();
+                let cell_id = self.cell_id().as_ref().clone();
+                move |txn| {
+                    txn.query_row(
+                        SELECT_VALID_AGENT_PUB_KEY,
+                        named_params! {
+                            ":author": agent_key.clone(),
+                            ":type": ActionType::Create.to_string(),
+                            ":entry_type": EntryType::AgentPubKey.to_string(),
+                            ":entry_hash": agent_key_entry_hash
+                        },
+                        |row| {
+                            let create_agent_signed_action = from_blob::<SignedAction>(row.get(0)?)
+                                .map_err(|_| rusqlite::Error::BlobSizeError)?;
+                            let create_agent_action = create_agent_signed_action.action().clone();
+                            Ok(create_agent_action)
+                        },
+                    )
+                    .map_err(|err| match err {
+                        rusqlite::Error::BlobSizeError | rusqlite::Error::QueryReturnedNoRows => {
+                            SourceChainError::InvalidAgentKey(agent_key, cell_id)
+                        }
+                        _ => {
+                            tracing::error!(?err, "Error looking up valid agent pub key");
+                            SourceChainError::other(err)
+                        }
+                    })
+                }
+            })
+            .await
+    }
+
+    /// Deletes the current [`AgentPubKey`] of the source chain if it is valid and returns a [`SourceChainError::InvalidAgentKey`]
+    /// otherwise.
+    ///
+    /// The agent key is valid if there are no [`Update`] or [`Delete`] actions for that key on the chain.
+    pub async fn delete_valid_agent_pub_key(&self) -> SourceChainResult<()> {
+        let valid_create_agent_key_action = self.valid_create_agent_key_action().await?;
+
+        self.put_weightless(
+            builder::Delete::new(
+                valid_create_agent_key_action.to_hash(),
+                self.agent_pubkey().clone().into(),
+            ),
+            None,
+            ChainTopOrdering::Strict,
+        )
+        .await?;
+
+        Ok(())
     }
 }
 
@@ -990,7 +1052,7 @@ async fn rebase_actions_on(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn genesis(
     authored: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
@@ -1057,6 +1119,7 @@ pub async fn genesis(
         )
         .await
         .map_err(SourceChainError::other)?;
+
         match chc.add_records_request(payload).await {
             Err(e @ ChcError::InvalidChain(_, _)) => {
                 Err(SourceChainError::ChcHeadMoved("genesis".into(), e))
@@ -1247,7 +1310,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
 }
 
 /// dump the entire source chain as a pretty-printed json string
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn dump_state(
     vault: DbRead<DbKindAuthored>,
     author: AgentPubKey,
@@ -1392,9 +1455,7 @@ mod tests {
         )
         .await?;
 
-        let action_builder = builder::CloseChain {
-            new_target: fixt!(MigrationTarget),
-        };
+        let action_builder = builder::CloseChain { new_target: None };
         chain_1
             .put(action_builder.clone(), None, ChainTopOrdering::Strict)
             .await?;
@@ -1571,6 +1632,47 @@ mod tests {
         .await?;
 
         Ok(())
+    }
+
+    // Test that a valid agent pub key can be deleted and that repeated deletes fail.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn delete_valid_agent_pub_key() {
+        let authored_db = test_authored_db().to_db();
+        let dht_db = test_dht_db().to_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.clone().into());
+        let keystore = test_keystore();
+        let agent_key = keystore.new_sign_keypair_random().await.unwrap();
+        let mut mock_network = MockHolochainP2pDnaT::new();
+        mock_network
+            .expect_authority_for_hash()
+            .returning(|_| Ok(false));
+        mock_network.expect_chc().return_const(None);
+
+        source_chain::genesis(
+            authored_db.clone(),
+            dht_db.clone(),
+            &dht_db_cache,
+            keystore.clone(),
+            fake_dna_hash(1),
+            agent_key.clone(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        // Delete valid agent pub key should succeed.
+        let chain = SourceChain::new(authored_db, dht_db, dht_db_cache, keystore, agent_key)
+            .await
+            .unwrap();
+        let result = chain.delete_valid_agent_pub_key().await;
+        assert!(result.is_ok());
+        chain.flush(&mock_network).await.unwrap();
+
+        // Valid agent pub key has been deleted. Repeating the operation should fail now as no valid
+        // pub key can be found.
+        let result = chain.delete_valid_agent_pub_key().await.unwrap_err();
+        assert_matches!(result, SourceChainError::InvalidAgentKey(invalid_key, cell_id) if invalid_key == *chain.author && cell_id == *chain.cell_id());
     }
 
     #[tokio::test(flavor = "multi_thread")]

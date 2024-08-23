@@ -7,7 +7,7 @@ use holo_hash::ActionHash;
 ///
 /// This must be the last entry you try to make in your source chain. Holochain's sytem validation
 /// will reject any actions that come after this one.
-pub fn close_chain(new_target: MigrationTarget) -> ExternResult<ActionHash> {
+pub fn close_chain(new_target: Option<MigrationTarget>) -> ExternResult<ActionHash> {
     HDK.with(|h| h.borrow().close_chain(CloseChainInput { new_target }))
 }
 

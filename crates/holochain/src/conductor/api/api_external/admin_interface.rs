@@ -152,10 +152,13 @@ impl AdminInterfaceApi {
                     &dna_definitions,
                 )))
             }
-            UninstallApp { installed_app_id } => {
+            UninstallApp {
+                installed_app_id,
+                force,
+            } => {
                 self.conductor_handle
                     .clone()
-                    .uninstall_app(&installed_app_id)
+                    .uninstall_app(&installed_app_id, force)
                     .await?;
                 Ok(AdminResponse::AppUninstalled)
             }
@@ -171,6 +174,26 @@ impl AdminInterfaceApi {
                     .new_sign_keypair_random()
                     .await?;
                 Ok(AdminResponse::AgentPubKeyGenerated(agent_pub_key))
+            }
+            RevokeAgentKey(payload) => {
+                let RevokeAgentKeyPayload { agent_key, app_id } = *payload;
+                let results = self
+                    .conductor_handle
+                    .clone()
+                    .revoke_agent_key_for_app(agent_key, app_id)
+                    .await?;
+                // Convert errors to strings
+                let results: Vec<(CellId, String)> = results
+                    .into_iter()
+                    .filter_map(|(cell_id, result)| {
+                        if let Err(err) = result {
+                            Some((cell_id, err.to_string()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                Ok(AdminResponse::AgentKeyRevoked(results))
             }
             ListCellIds => {
                 let cell_ids = self

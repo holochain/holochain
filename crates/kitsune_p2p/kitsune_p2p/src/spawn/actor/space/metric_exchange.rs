@@ -75,6 +75,7 @@ impl MetricExchange {
         self.shutdown = true;
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub fn tick(&mut self) {
         for (_, r) in self.remote_refs.iter_mut() {
             if r.last_sync.should_trigger() {

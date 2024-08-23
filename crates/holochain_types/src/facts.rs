@@ -17,6 +17,12 @@ pub fn valid_chain_op(
 ) -> impl Fact<'static, ChainOp> {
     facts![
         brute(
+            "Action is not CloseChain or OpenChain",
+            move |op: &ChainOp| {
+                !matches!(op.action(), Action::CloseChain(_) | Action::OpenChain(_))
+            }
+        ),
+        brute(
             "Action type matches Entry existence, and is public if exists",
             move |op: &ChainOp| {
                 let action = op.action();

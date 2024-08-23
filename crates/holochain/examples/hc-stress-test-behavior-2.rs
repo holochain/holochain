@@ -15,6 +15,8 @@ struct Args {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
+    holochain_trace::test_run();
+
     let args = Args::parse();
 
     let test = LocalBehavior2::new(args.dna_count, args.node_count);

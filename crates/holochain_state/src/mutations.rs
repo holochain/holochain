@@ -148,7 +148,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
 /// can be used in queries with other databases.
 /// Because we are sharing queries across databases
 /// we need the data in the same shape.
-#[tracing::instrument(skip(txn))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn)))]
 pub fn insert_op_lite_into_authored(
     txn: &mut Transaction,
     op_lite: &DhtOpLite,
@@ -583,7 +583,7 @@ pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMut
 }
 
 /// Insert a [`Action`] into the database.
-#[tracing::instrument(skip(txn))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn)))]
 pub fn insert_action(
     txn: &mut Transaction,
     action: &SignedActionHashed,
@@ -689,7 +689,7 @@ pub fn insert_action(
 }
 
 /// Insert an [`Entry`] into the database.
-#[tracing::instrument(skip(txn, entry))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, entry)))]
 pub fn insert_entry(
     txn: &mut Transaction,
     hash: &EntryHash,
@@ -956,7 +956,7 @@ mod tests {
         let op1 = make_op(warrant1.clone());
         let op2 = make_op(warrant2.clone());
 
-        let db = DbWrite::<DbKindAuthored>::open(dir.as_ref(), DbKindAuthored(cell_id)).unwrap();
+        let db = DbWrite::<DbKindAuthored>::test(dir.as_ref(), DbKindAuthored(cell_id)).unwrap();
         db.test_write({
             let op1 = op1.clone();
             let op2 = op2.clone();

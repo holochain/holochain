@@ -14,7 +14,6 @@ use action::Dna;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyLinkableHash;
-use holo_hash::DnaHash;
 use holo_hash::EntryHash;
 
 #[derive(Clone, Debug)]
@@ -255,7 +254,7 @@ builder_variant!(OpenChain {
 });
 
 builder_variant!(CloseChain {
-    new_target: MigrationTarget,
+    new_target: Option<MigrationTarget>,
 });
 
 builder_variant!(Create<EntryRateWeight> {
@@ -284,7 +283,7 @@ builder_variant!(AgentValidationPkg {
 /// `prev_action` field, so this helper is provided as a special case
 #[cfg(feature = "test_utils")]
 impl Dna {
-    pub fn from_builder(hash: DnaHash, builder: ActionBuilderCommon) -> Self {
+    pub fn from_builder(hash: holo_hash::DnaHash, builder: ActionBuilderCommon) -> Self {
         Self {
             author: builder.author,
             timestamp: builder.timestamp,

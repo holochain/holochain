@@ -181,7 +181,7 @@ impl<H: Eq + Ord + std::hash::Hash> Default for ChainFilters<H> {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct CloseChainInput {
     /// The target identifier for the chain that will be migrated to.
-    pub new_target: MigrationTarget,
+    pub new_target: Option<MigrationTarget>,
 }
 
 /// Input to open a chain.

@@ -224,6 +224,7 @@ mockall::mock! {
             &self,
             ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
         ) -> ExternResult<XSalsa20Poly1305Data>;
+        fn is_same_agent(&self, key1: AgentPubKey, key2: AgentPubKey) -> ExternResult<bool>;
     }
 
 }
@@ -275,6 +276,10 @@ impl HdiT for ErrHdk {
         &self,
         _: MustGetAgentActivityInput,
     ) -> ExternResult<Vec<RegisterAgentActivity>> {
+        Self::err()
+    }
+
+    fn is_same_agent(&self, _: AgentPubKey, _: AgentPubKey) -> ExternResult<bool> {
         Self::err()
     }
 
@@ -525,6 +530,9 @@ impl HdiT for HostHdk {
     }
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
         HostHdi::new().zome_info(())
+    }
+    fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool> {
+        HostHdi::new().is_same_agent(key_1, key_2)
     }
     fn trace(&self, m: TraceMsg) -> ExternResult<()> {
         HostHdi::new().trace(m)

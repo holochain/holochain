@@ -7,6 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.0-dev.20
+
+## 0.4.0-dev.19
+
+## 0.4.0-dev.18
+
+- Adds a new `hcterm` landing screen to show what args have been provided and how to use the app.
+- Fixes the network info screen of `hcterm` to not fetch network info on every render. Instead, it uses a 10s automatic refresh to fetch the network info.
+
+## 0.4.0-dev.17
+
+## 0.4.0-dev.16
+
 ## 0.4.0-dev.15
 
 ## 0.4.0-dev.14

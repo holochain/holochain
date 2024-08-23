@@ -6,7 +6,7 @@ use crate::core::workflow::WorkflowResult;
 /// Get all ops that need to sys or app validated in order.
 /// - Sys validated or awaiting app dependencies.
 /// - Ordered by type then timestamp (See [`OpOrder`])
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn get_ops_to_app_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
     get_ops_to_validate(db, false).await
 }
@@ -14,7 +14,7 @@ pub async fn get_ops_to_app_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<V
 /// Get all ops that need to sys or app validated in order.
 /// - Pending or awaiting sys dependencies.
 /// - Ordered by type then timestamp (See [`OpOrder`])
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn get_ops_to_sys_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
     get_ops_to_validate(db, true).await
 }
@@ -283,21 +283,11 @@ mod tests {
                 if facts.pending {
                     // No need to do anything because status and stage are null already.
                 } else if facts.awaiting_sys_deps {
-                    set_validation_stage(
-                        txn,
-                        &hash,
-                        ValidationStage::AwaitingSysDeps(fixt!(AnyDhtHash)),
-                    )
-                    .unwrap();
+                    set_validation_stage(txn, &hash, ValidationStage::AwaitingSysDeps).unwrap();
                 } else if facts.sys_validated {
                     set_validation_stage(txn, &hash, ValidationStage::SysValidated).unwrap();
                 } else if facts.awaiting_app_deps {
-                    set_validation_stage(
-                        txn,
-                        &hash,
-                        ValidationStage::AwaitingAppDeps(vec![fixt!(AnyDhtHash)]),
-                    )
-                    .unwrap();
+                    set_validation_stage(txn, &hash, ValidationStage::AwaitingAppDeps).unwrap();
                 } else if facts.awaiting_integration {
                     set_validation_stage(txn, &hash, ValidationStage::AwaitingIntegration).unwrap();
                 }

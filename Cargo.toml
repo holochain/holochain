@@ -29,6 +29,9 @@ members = [
   "crates/holochain_secure_primitive",
   "crates/holochain_conductor_services",
 
+  "crates/hc_deepkey_sdk",
+  "crates/hc_deepkey_types",
+
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
@@ -95,6 +98,8 @@ opt-level = "z"
 lto = true
 
 [patch.crates-io]
+# holochain_deepkey_dna = { path = "../deepkey/crates/holochain_deepkey_dna" }
+
 # task-motel = { path = "../task-motel" }
 # proptest = { path = "/home/michael/gitfork/proptest/proptest" }
 # proptest = { git = "https://github.com/maackle/proptest", branch = "arbitrary-pathbuf" }
@@ -114,13 +119,14 @@ lto = true
 # tx5-signal = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
+# holochain_wasmer_host = { path = "../holochain-wasmer/crates/host" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "proptest" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 #ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
-#lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
+# lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
 #lair_keystore = { path = "../lair/crates/lair_keystore" }
 #lair_keystore_api_0_0 = { path = "../lair_0_0/crates/lair_keystore_api", package = "lair_keystore_api" }
 #lair_keystore_client_0_0 = { path = "../lair_0_0/crates/lair_keystore_client", package = "lair_keystore_client" }

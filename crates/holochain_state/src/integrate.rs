@@ -40,7 +40,7 @@ pub async fn authored_ops_to_dht_db(
 /// for these ops, which sort of makes sense to skip for the author, even though
 /// the author IS an authority, the network doesn't necessarily think so based
 /// on basis hash alone.
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn authored_ops_to_dht_db_without_check(
     hashes: Vec<DhtOpHash>,
     authored_db: DbRead<DbKindAuthored>,
@@ -98,7 +98,7 @@ fn insert_locally_validated_op(
     txn: &mut Transaction,
     op: DhtOpHashed,
 ) -> StateMutationResult<Option<DhtOpHashed>> {
-    // These checks are redundant but cheap and future proof this function
+    // These checks are redundant but cheap and future-proof this function
     // against anyone using it with private entries.
     if is_private_store_entry(op.as_content()) {
         return Ok(None);
@@ -114,7 +114,7 @@ fn insert_locally_validated_op(
     // Set the status to valid because we authored it.
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
 
-    // If this is a `RegisterAgentActivity` or a warrant, we can mark it integrated immediately.
+    // If this op has no dependencies or is a warrant, we can mark it integrated immediately.
     if deps.is_empty() || matches!(op_type, DhtOpType::Warrant(_)) {
         // This set the validation stage to pending which is correct when
         // it's integrated.
