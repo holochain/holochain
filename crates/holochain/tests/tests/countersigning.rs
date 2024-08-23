@@ -364,7 +364,10 @@ async fn signature_bundle_noise() {
             if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
                 response
             } else {
-                unreachable!();
+                unreachable!(
+                    "Expected PreflightRequestAcceptance::Accepted, got {:?}",
+                    alice_acceptance
+                );
             };
         let bob_acceptance: PreflightRequestAcceptance = conductors[1]
             .call_fallible(
