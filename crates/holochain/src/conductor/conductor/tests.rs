@@ -47,7 +47,9 @@ async fn can_update_state() {
             ..Default::default()
         }
         .into(),
+        sodoken::BufRead::new_no_lock(b"passphrase"),
     )
+    .await
     .unwrap();
     let conductor = Conductor::new(
         Default::default(),
@@ -101,7 +103,9 @@ async fn app_ids_are_unique() {
             ..Default::default()
         }
         .into(),
+        sodoken::BufRead::new_no_lock(b"passphrase"),
     )
+    .await
     .unwrap();
     let conductor = Conductor::new(
         Default::default(),

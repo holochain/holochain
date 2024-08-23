@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING:** Modifies `Action::CloseChain` and `Action::OpenChain` to be able to represent both DNA migrations and Agent migrations:
   - CloseChain can be used on its own, with no forward reference, to make a chain read-only.
   - CloseChain can include a forward reference to either a new AgentPubKey or a new DNA hash, which represent a migration to a new chain. The new chain is expected to begin with a corresponding OpenChain which has a backward reference to the CloseChain action. (This will become a validation rule in future work.)
+  
+## 0.4.0-dev.20
+
+- **BREAKING\!** Enables dynamic database encryption. (as opposed to the hard-coded key that was previously being used.) NOTE - this is incompatible with all previous holochain databases, they will not open, and must be deleted. NOTE - this is incompatible with all previous lair databases, they will not open and must be deleted. [\#4198](https://github.com/holochain/holochain/pull/4198)
 
 ## 0.4.0-dev.19
 
