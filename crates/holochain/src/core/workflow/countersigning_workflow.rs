@@ -20,14 +20,16 @@ use holochain_state::prelude::*;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use kitsune_p2p_types::KitsuneError;
 use rusqlite::{named_params, Transaction};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
+use tokio::sync::broadcast::Sender;
 
 mod accept;
 
 pub(crate) use accept::accept_countersigning_request;
+use holochain_state::chain_lock::get_chain_lock;
 
 /// Countersigning workspace to hold session state.
 #[derive(Clone, Default)]
@@ -51,7 +53,7 @@ enum SessionState {
     /// In most cases, we do know how we got into this state, but we treat it as unknown because
     /// we want to always go through the same checks when leaving a countersigning session in any
     /// way that is not a successful completion.
-    Unknown(PreflightRequest),
+    Unknown,
 }
 
 const NUM_AUTHORITIES_TO_QUERY: usize = 3;
@@ -85,12 +87,12 @@ pub(crate) async fn countersigning_workflow(
             .unwrap()
     );
 
-    // TODO load locks from the database and make sure that all sessions are accounted for in the workspace.
-
     let signal_tx = conductor
         .get_signal_tx(&cell_id)
         .await
         .map_err(WorkflowError::other)?;
+
+    refresh_workspace_state(&space, cell_id.clone(), signal_tx.clone());
 
     // Apply timeouts by moving accepted sessions to unknown state if their end time is in the past.
     space
@@ -103,7 +105,7 @@ pub(crate) async fn countersigning_workflow(
                 .for_each(|(author, session_state)| {
                     if let SessionState::Accepted(request) = session_state {
                         if request.session_times.end < Timestamp::now() {
-                            *session_state = SessionState::Unknown(request.clone());
+                            *session_state = SessionState::Unknown;
                         }
                     }
                 });
@@ -121,13 +123,7 @@ pub(crate) async fn countersigning_workflow(
                 .sessions
                 .iter()
                 .filter_map(|(author, session_state)| match session_state {
-                    SessionState::Unknown(request) => {
-                        if request.session_times.end < Timestamp::now() {
-                            Some((author.clone(), request.clone()))
-                        } else {
-                            None
-                        }
-                    }
+                    SessionState::Unknown => Some(author.clone()),
                     _ => None,
                 })
                 .collect::<Vec<_>>())
@@ -135,7 +131,7 @@ pub(crate) async fn countersigning_workflow(
         .unwrap();
 
     let mut remaining_sessions_in_unknown_state = 0;
-    for (author, request) in sessions_in_unknown_state {
+    for author in sessions_in_unknown_state {
         tracing::info!(
             "Countersigning session for agent {:?} is in an unknown state, attempting to resolve",
             author
@@ -145,7 +141,7 @@ pub(crate) async fn countersigning_workflow(
             network.clone(),
             author.clone(),
             cell_id.clone(),
-            request,
+            integration_trigger.clone(),
             signal_tx.clone(),
         )
         .await
@@ -278,6 +274,85 @@ pub(crate) async fn countersigning_workflow(
     Ok(WorkComplete::Complete)
 }
 
+async fn refresh_workspace_state(
+    space: &Space,
+    cell_id: CellId,
+    signal: broadcast::Sender<Signal>,
+) {
+    let workspace = &space.countersigning_workspace;
+
+    // We don't want to keep the entire space locked for writes, so just get the agents and release the lock.
+    // We can then lock each agent individually.
+    let agents = {
+        space
+            .authored_dbs
+            .lock()
+            .keys()
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+
+    let mut locked_for_agents = HashSet::new();
+    for agent in agents {
+        if let Some(authored_db) = space.get_or_create_authored_db(agent.clone()).ok() {
+            let lock = authored_db
+                .read_async({
+                    let agent = agent.clone();
+                    move |txn| get_chain_lock(&txn, &agent)
+                })
+                .await
+                .ok()
+                .flatten();
+
+            // If the chain is locked, then we need to check the session state.
+            if let Some(lock) = lock {
+                locked_for_agents.insert(agent.clone());
+
+                // Any locked chains, that aren't registered in the workspace, need to be added.
+                // They have to go in as `Unknown` because we don't know the state of the session.
+                workspace
+                    .inner
+                    .share_mut(|inner, _| {
+                        inner
+                            .sessions
+                            .entry(agent.clone())
+                            .or_insert(SessionState::Unknown);
+
+                        Ok(())
+                    })
+                    .unwrap();
+            }
+        }
+    }
+
+    // Any sessions that are in the workspace but not locked need to be removed.
+    let sessions_to_drop = workspace
+        .inner
+        .share_mut(|inner, _| {
+            let (keep, drop) = inner
+                .sessions
+                .drain()
+                .partition::<HashMap<_, _>, _>(|(agent, _)| locked_for_agents.contains(agent));
+            inner.sessions = keep;
+            Ok(drop)
+        })
+        .unwrap();
+
+    // This is expected to happen when the countersigning commit fails validation. The chain gets
+    // unlocked, and we are just cleaning up state here.
+    for (agent, _) in sessions_to_drop {
+        tracing::debug!("Countersigning session for agent {:?} is in the workspace but the chain is not locked, removing from workspace", agent);
+
+        // Best effort attempt to let clients know that the session has been abandoned.
+        signal
+            .send(Signal::System(SystemSignal::AbandonedCountersigning(
+                cell_id.clone(),
+            )))
+            .ok();
+    }
+}
+
 /// Resolve an incomplete countersigning session.
 ///
 /// This function is responsible for deciding what action to take when a countersigning session
@@ -290,7 +365,7 @@ async fn inner_countersigning_session_incomplete(
     network: Arc<impl HolochainP2pDnaT>,
     author: AgentPubKey,
     cell_id: CellId,
-    request: PreflightRequest,
+    integration_trigger: TriggerSender,
     signal: broadcast::Sender<Signal>,
 ) -> WorkflowResult<bool> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
@@ -341,7 +416,7 @@ async fn inner_countersigning_session_incomplete(
         .filter(|a| **a != author)
         .collect::<Vec<_>>();
 
-    let cascade = CascadeImpl::empty().with_network(network, space.cache_db);
+    let cascade = CascadeImpl::empty().with_network(network, space.cache_db.clone());
 
     let mut get_activity_options = holochain_p2p::actor::GetActivityOptions {
         include_warrants: true,
@@ -504,7 +579,32 @@ async fn inner_countersigning_session_incomplete(
         && complete_decision_count
             > (session_data.preflight_request.signing_agents.len() as f64 * 0.5).floor() as usize
     {
-        // TODO complete
+        // Force local state changes and publish.
+        //
+        // Note: that this means we aren't doing signature verification or integrity checks here.
+        // We also aren't able to participate in the publishing of signed actions to other agents.
+        //
+        // This should be okay because the point of gathering and verifying signatures is to check
+        // that everyone involved in the session agreed. If we have found a sample of agents that
+        // have gone beyond that step and publish their entries that is an alternative statement
+        // of agreement.
+        apply_success_state_changes(
+            space,
+            &session_data,
+            &author,
+            cs_action.to_hash(),
+            integration_trigger,
+        )
+        .await?;
+
+        // Send a signal to clients to let them know that we've resolved this session. They may not
+        // be available at this point because Holochain is trying to resolve a session in the
+        // background which might have taken some time.
+        signal
+            .send(Signal::System(SystemSignal::SuccessfulCountersigning(
+                cs_entry_hash,
+            )))
+            .ok();
     } else {
         tracing::info!(
             "Countersigning session state for agent {:?} is indeterminate based on evidence: {:?}",
@@ -513,7 +613,11 @@ async fn inner_countersigning_session_incomplete(
         );
     }
 
-    // TODO exit value?
+    // We couldn't resolve the session state, try again later
+    tracing::debug!(
+        "Countersigning session state for agent {:?} is indeterminate, will retry later",
+        author
+    );
     Ok(false)
 }
 
@@ -538,7 +642,7 @@ pub(crate) async fn countersigning_success(
                         SessionState::SignaturesCollected(sigs) => {
                             sigs.push(signed_actions);
                         }
-                        SessionState::Unknown(_) => {
+                        SessionState::Unknown => {
                             // If the session is in a bad state when we receive signatures then
                             // we can't do anything with them.
                             tracing::warn!("Countersigning session success received but the the session is in an unknown state for agent: {:?}", author);
@@ -575,8 +679,8 @@ pub(crate) async fn inner_countersigning_session_complete(
     signal: broadcast::Sender<Signal>,
 ) -> WorkflowResult<bool> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
-    let dht_db = space.dht_db;
-    let dht_db_cache = space.dht_query_cache;
+    let dht_db = space.dht_db.clone();
+    let dht_db_cache = space.dht_query_cache.clone();
 
     // Using iterators is fine in this function as there can only be a maximum of 8 actions.
     let (this_cells_action_hash, entry_hash) = match signed_actions
@@ -595,7 +699,6 @@ pub(crate) async fn inner_countersigning_session_complete(
     // check signatures unless there is an active session.
     let reader_closure = {
         let entry_hash = entry_hash.clone();
-        let this_cells_action_hash = this_cells_action_hash.clone();
         let author = author.clone();
         move |txn: Transaction| {
             // This chain lock isn't necessarily for the current session, we can't check that until later.
@@ -617,24 +720,7 @@ pub(crate) async fn inner_countersigning_session_complete(
 
                     let transaction: holochain_state::prelude::Txn = (&txn).into();
                     if transaction.contains_entry(&entry_hash)? {
-                        // If this is a countersigning session we can grab all the ops for this
-                        // cells action, so we can check if we need to self-publish them.
-                        let r = txn
-                            .prepare(
-                                "SELECT basis_hash, hash FROM DhtOp WHERE action_hash = :action_hash",
-                            ).map_err(DatabaseError::from)?
-                            .query_map(
-                                named_params! {
-                                ":action_hash": this_cells_action_hash
-                            },
-                                |row| {
-                                    let hash: DhtOpHash = row.get("hash")?;
-                                    let basis: OpBasis = row.get("basis_hash")?;
-                                    Ok((hash, basis))
-                                },
-                            ).map_err(DatabaseError::from)?
-                            .collect::<Result<Vec<_>, _>>().map_err(DatabaseError::from)?;
-                        return Ok(Some((session_data, r)));
+                        return Ok(Some(session_data));
                     }
                 }
             }
@@ -642,11 +728,8 @@ pub(crate) async fn inner_countersigning_session_complete(
         }
     };
 
-    let (session_data, this_cell_actions_op_basis_hashes) = match authored_db
-        .read_async(reader_closure)
-        .await?
-    {
-        Some((cs, r)) => (cs, r),
+    let session_data = match authored_db.read_async(reader_closure).await? {
+        Some(cs) => cs,
         None => {
             // If there is no active session then we can short circuit.
             tracing::warn!("Received a signature bundle for a session that exists in state but is missing from the database");
@@ -672,7 +755,7 @@ pub(crate) async fn inner_countersigning_session_complete(
 
     // Countersigning success is ultimately between authors to agree and publish.
     if !i_am_an_author {
-        // We're effectively rejecting this signature bundle but communicate that this signature
+        // We're effectively rejecting this signature bundle but communicating that this signature
         // bundle wasn't acceptable so that we can try another one.
         return Ok(false);
     }
@@ -683,81 +766,133 @@ pub(crate) async fn inner_countersigning_session_complete(
         .map(ActionHash::with_data_sync)
         .collect();
 
-    let result = authored_db
-        .write_async({
-            let author = author.clone();
-            let entry_hash = entry_hash.clone();
-            move |txn| {
-                let weight = weigh_placeholder();
-                let stored_actions = session_data.build_action_set(entry_hash, weight)?;
-                if stored_actions.len() == incoming_actions.len() {
-                    // Check all stored action hashes match an incoming action hash.
-                    if stored_actions.iter().all(|a| {
-                        let a = ActionHash::with_data_sync(a);
-                        incoming_actions.iter().any(|i| *i == a)
-                    }) {
-                        // All checks have passed so unlock the chain.
-                        mutations::unlock_chain(txn, &author)?;
-                        // Update ops to publish.
-                        txn.execute("UPDATE DhtOp SET withhold_publish = NULL WHERE action_hash = :action_hash",
-                        named_params! {
-                            ":action_hash": this_cells_action_hash,
-                            }
-                        ).map_err(holochain_state::prelude::StateMutationError::from)?;
-                        return Ok(Some(session_data));
-                    }
-                }
-                SourceChainResult::Ok(None)
-        }})
-        .await?;
+    let mut integrity_check_passed = false;
 
-    if let Some(session_data) = result {
-        // If all signatures are valid (above) and i signed then i must have
-        // validated it previously so i now agree that i authored it.
-        // TODO: perhaps this should be `authored_ops_to_dht_db`, i.e. the arc check should
-        //       be performed, because we may not be an authority for these ops
-        authored_ops_to_dht_db_without_check(
-            this_cell_actions_op_basis_hashes
-                .into_iter()
-                .map(|(op_hash, _)| op_hash)
-                .collect(),
-            authored_db.into(),
-            dht_db,
-            &dht_db_cache,
-        )
-        .await?;
-        integration_trigger.trigger(&"integrate countersigning_success");
-        // Publish other signers agent activity ops to their agent activity authorities.
-        for sa in signed_actions {
-            let (action, signature) = sa.into();
-            if *action.author() == author {
-                continue;
-            }
-            let op = ChainOp::RegisterAgentActivity(signature, action);
-            let basis = op.dht_basis();
-            if let Err(e) = network.publish_countersign(false, basis, op.into()).await {
-                tracing::error!(
-                    "Failed to publish to other countersigners agent authorities because of: {:?}",
-                    e
-                );
-            }
+    let weight = weigh_placeholder();
+    let stored_actions = session_data.build_action_set(entry_hash, weight)?;
+    if stored_actions.len() == incoming_actions.len() {
+        // Check all stored action hashes match an incoming action hash.
+        if stored_actions.iter().all(|a| {
+            let a = ActionHash::with_data_sync(a);
+            incoming_actions.iter().any(|i| *i == a)
+        }) {
+            // All checks have passed, proceed to update the session state.
+            integrity_check_passed = true;
         }
-
-        // Signal to the UI.
-        // If there are no active connections this won't emit anything.
-        let app_entry_hash = session_data.preflight_request.app_entry_hash.clone();
-        signal
-            .send(Signal::System(SystemSignal::SuccessfulCountersigning(
-                app_entry_hash,
-            )))
-            .ok();
-
-        tracing::info!("Countersigning session complete for agent: {:?}", author);
-
-        publish_trigger.trigger(&"publish countersigning_success");
     }
 
+    if !integrity_check_passed {
+        // If the integrity check fails then we can't proceed with this signature bundle.
+        return Ok(false);
+    }
+
+    apply_success_state_changes(
+        space,
+        &session_data,
+        &author,
+        this_cells_action_hash,
+        integration_trigger,
+    )
+    .await?;
+
+    // Signal to the UI.
+    // If there are no active connections this won't emit anything.
+    let app_entry_hash = session_data.preflight_request.app_entry_hash.clone();
+    signal
+        .send(Signal::System(SystemSignal::SuccessfulCountersigning(
+            app_entry_hash,
+        )))
+        .ok();
+
+    // Publish other signers agent activity ops to their agent activity authorities.
+    for sa in signed_actions {
+        let (action, signature) = sa.into();
+        if *action.author() == author {
+            continue;
+        }
+        let op = ChainOp::RegisterAgentActivity(signature, action);
+        let basis = op.dht_basis();
+        if let Err(e) = network.publish_countersign(false, basis, op.into()).await {
+            tracing::error!(
+                "Failed to publish to other countersigners agent authorities because of: {:?}",
+                e
+            );
+        }
+    }
+
+    publish_trigger.trigger(&"publish countersigning_success");
+
+    tracing::info!("Countersigning session complete for agent: {:?}", author);
+
     Ok(true)
+}
+
+async fn apply_success_state_changes(
+    space: Space,
+    session_data: &CounterSigningSessionData,
+    author: &AgentPubKey,
+    this_cells_action_hash: ActionHash,
+    integration_trigger: TriggerSender,
+) -> Result<(), WorkflowError> {
+    let authored_db = space.get_or_create_authored_db(author.clone())?;
+    let dht_db = space.dht_db.clone();
+    let dht_db_cache = space.dht_query_cache.clone();
+
+    // Unlock the chain and remove the withhold publish flag from all ops in this session.
+    let this_cell_actions_op_basis_hashes = authored_db
+        .write_async({
+            let author = author.clone();
+            move |txn| -> SourceChainResult<Vec<DhtOpHash>> {
+                // All checks have passed so unlock the chain.
+                mutations::unlock_chain(txn, &author)?;
+                // Update ops to publish.
+                txn.execute(
+                    "UPDATE DhtOp SET withhold_publish = NULL WHERE action_hash = :action_hash",
+                    named_params! {
+                    ":action_hash": this_cells_action_hash,
+                    },
+                )
+                .map_err(holochain_state::prelude::StateMutationError::from)?;
+
+                // Load the op hashes for this session so that we can publish them.
+                Ok(get_countersigning_op_hashes(txn, this_cells_action_hash)?)
+            }
+        })
+        .await?;
+
+    // If all signatures are valid (above) and i signed then i must have
+    // validated it previously so i now agree that i authored it.
+    // TODO: perhaps this should be `authored_ops_to_dht_db`, i.e. the arc check should
+    //       be performed, because we may not be an authority for these ops
+    authored_ops_to_dht_db_without_check(
+        this_cell_actions_op_basis_hashes,
+        authored_db.into(),
+        dht_db,
+        &dht_db_cache,
+    )
+    .await?;
+
+    integration_trigger.trigger(&"integrate countersigning_success");
+
+    Ok(())
+}
+
+fn get_countersigning_op_hashes(
+    txn: &mut Transaction,
+    this_cells_action_hash: ActionHash,
+) -> DatabaseResult<Vec<DhtOpHash>> {
+    Ok(txn
+        .prepare("SELECT basis_hash, hash FROM DhtOp WHERE action_hash = :action_hash")?
+        .query_map(
+            named_params! {
+                ":action_hash": this_cells_action_hash
+            },
+            |row| {
+                let hash: DhtOpHash = row.get("hash")?;
+                Ok(hash)
+            },
+        )?
+        .collect::<Result<Vec<_>, _>>()?)
 }
 
 /// Publish to entry authorities, so they can gather all the signed
