@@ -770,7 +770,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.95"
-source = "git+https://github.com/mattyg/holochain-wasmer.git?branch=feat/wasmer-wamr-integration#eb3abe0ee03bf62513ee9bea264361d43132a6ee"
+source = "git+https://github.com/mattyg/holochain-wasmer.git?branch=feat/wasmer-wamr-integration#e04902a89407ce919284dd739d2487ebec428b00"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -782,7 +782,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.95"
-source = "git+https://github.com/mattyg/holochain-wasmer.git?branch=feat/wasmer-wamr-integration#eb3abe0ee03bf62513ee9bea264361d43132a6ee"
+source = "git+https://github.com/mattyg/holochain-wasmer.git?branch=feat/wasmer-wamr-integration#e04902a89407ce919284dd739d2487ebec428b00"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",

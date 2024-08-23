@@ -616,7 +616,7 @@ dependencies = [
  "bitflags 2.5.0",
  "cexpr",
  "clang-sys",
- "itertools 0.10.5",
+ "itertools 0.12.1",
  "lazy_static",
  "lazycell",
  "log",
@@ -3500,7 +3500,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.95"
-source = "git+https://github.com/mattyg/holochain-wasmer.git?branch=feat/wasmer-wamr-integration#eb3abe0ee03bf62513ee9bea264361d43132a6ee"
+source = "git+https://github.com/mattyg/holochain-wasmer.git?branch=feat/wasmer-wamr-integration#e04902a89407ce919284dd739d2487ebec428b00"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -3512,7 +3512,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.95"
-source = "git+https://github.com/mattyg/holochain-wasmer.git?branch=feat/wasmer-wamr-integration#eb3abe0ee03bf62513ee9bea264361d43132a6ee"
+source = "git+https://github.com/mattyg/holochain-wasmer.git?branch=feat/wasmer-wamr-integration#e04902a89407ce919284dd739d2487ebec428b00"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -3525,7 +3525,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_host"
 version = "0.0.95"
-source = "git+https://github.com/mattyg/holochain-wasmer.git?branch=feat/wasmer-wamr-integration#eb3abe0ee03bf62513ee9bea264361d43132a6ee"
+source = "git+https://github.com/mattyg/holochain-wasmer.git?branch=feat/wasmer-wamr-integration#e04902a89407ce919284dd739d2487ebec428b00"
 dependencies = [
  "bimap",
  "bytes",
@@ -4610,7 +4610,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c2a198fb6b0eada2a8df47933734e6d35d350665a33a3593d7164fa52c75c19"
 dependencies = [
  "cfg-if 1.0.0",
- "windows-targets 0.52.5",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -8824,7 +8824,7 @@ dependencies = [
 [[package]]
 name = "wasmer"
 version = "4.3.2"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#1ee96a2789bf6f04eb088f61b9099552a0085f40"
 dependencies = [
  "bindgen",
  "bytes",
@@ -8855,7 +8855,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler"
 version = "4.3.2"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#1ee96a2789bf6f04eb088f61b9099552a0085f40"
 dependencies = [
  "backtrace",
  "bytes",
@@ -8883,7 +8883,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler-cranelift"
 version = "4.3.2"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#1ee96a2789bf6f04eb088f61b9099552a0085f40"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -8923,7 +8923,7 @@ dependencies = [
 [[package]]
 name = "wasmer-derive"
 version = "4.3.2"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#1ee96a2789bf6f04eb088f61b9099552a0085f40"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -8934,7 +8934,7 @@ dependencies = [
 [[package]]
 name = "wasmer-middlewares"
 version = "4.3.2"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#1ee96a2789bf6f04eb088f61b9099552a0085f40"
 dependencies = [
  "wasmer",
  "wasmer-types",
@@ -8944,7 +8944,7 @@ dependencies = [
 [[package]]
 name = "wasmer-types"
 version = "4.3.2"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#1ee96a2789bf6f04eb088f61b9099552a0085f40"
 dependencies = [
  "bytecheck",
  "enum-iterator",
@@ -8964,7 +8964,7 @@ dependencies = [
 [[package]]
 name = "wasmer-vm"
 version = "4.3.2"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#6ef88497d2d100d8c792903041f2677ce819474c"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=wamr#1ee96a2789bf6f04eb088f61b9099552a0085f40"
 dependencies = [
  "backtrace",
  "cc",
