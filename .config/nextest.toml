@@ -21,7 +21,7 @@ failure-output = "immediate-final"
 # Do not cancel the test run on the first failure.
 fail-fast = false
 
-test-threads = 2
+test-threads = 1
 
 [profile.ci.junit]
 path = "junit.xml"

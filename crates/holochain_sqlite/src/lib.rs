@@ -9,10 +9,12 @@
 //! Ubuntu doesn't ship with the correct version of the sqlcipher utility.
 //! We're going to need to build it ourselves.
 //!
-//! As of this writing, we are using rusqlite 0.31. You can find the sqlcipher
-//! version used here: <https://github.com/rusqlite/rusqlite/blob/v0.31.0/libsqlite3-sys/upgrade_sqlcipher.sh#L11> -- `4.5.3`.
+//! As of this writing, we are using rusqlite 0.32.1. You can find the sqlcipher
+//! version used here: <https://github.com/rusqlite/rusqlite/blob/v0.32.1/libsqlite3-sys/upgrade_sqlcipher.sh#L11> -- `4.5.7`.
 //!
-//! Download the source from here: <https://github.com/sqlcipher/sqlcipher/releases/tag/v4.5.3>
+//! #### Building `sqlcipher`
+//!
+//! Download the source from here: <https://github.com/sqlcipher/sqlcipher/releases/tag/v4.5.7>
 //!
 //! Unpack and run the build commands per the README.md:
 //!
@@ -21,21 +23,61 @@
 //! make
 //! ```
 //!
-//! Now you have a compatible sqlcipher cli utility: `./sqlcipher`.
+//! Now you have a compatible sqlcipher cli utility: `./sqlcipher`, but we
+//! need the secrets used to encrypt the database.
 //!
-//! Connect to your encrypted holochain database:
+//! #### Getting the database secrets out of holochain.
+//!
+//! Holochain stores secrets in a file named `db.key` in the configured
+//! `data_root_path`. If you print out the file, it will just be base64:
 //!
 //! ```sh
-//! ./sqlcipher /tmp/holochain-test-environmentsyQCJLKxtXcDuglEQNVAerzPBUCM/databases/conductor/conductor
+//! $ cat /tmp/bob/databases/db.key
+//! RXfUEZzCURLrG8hJVcUP4A6T1qY_gql0Fata5PxEgbV7P5IuKoeTu8hyCo9MYdH3vZTU8Loprip22YmRk0vdd_Lcuz3lfKx5FeB_0pskegI_6Zsb4zcTZA
+//! ```
+//!
+//! To decrypt this, we will need the passphrase. We can use a cli flag
+//! on holochain, `--danger-print-db-secrets`, which will print the secrets
+//! out on stderr:
+//!
+//! ```sh
+//! $ holochain --danger-print-db-secrets -c ~/conductor-config.yaml
+//! Initialising log output formatting with option Log
+//! # passphrase>
+//! # lair-keystore connection_url # unix:///tmp/bob/ks/socket?k=aq19xrSyPaDZbL-Keb8WHhaZ2xbxN07yYztfwqpNAxs #
+//! # lair-keystore running #
+//! --beg-db-secrets--
+//! PRAGMA key = "x'6D71B0A31666195576242A41129FE9387ECA216DA241C98F92A18A01557A8199'";
+//! PRAGMA cipher_salt = "x'15E07FD29B247A023FE99B1BE3371364'";
+//! PRAGMA cipher_compatibility = 4;
+//! PRAGMA cipher_plaintext_header_size = 32;
+//! --end-db-secrets--
+//!
+//! ###HOLOCHAIN_SETUP###
+//! ###HOLOCHAIN_SETUP_END###
+//! Conductor ready.
+//! ```
+//!
+//! Note the `PRAGMA` directives printed out between the `--beg-db-secrets--`
+//! and `--end-db-secrets--` markers.
+//!
+//! #### Connect to your encrypted holochain database via sqlcipher
+//!
+//! ```sh
+//! ./sqlcipher /tmp/bob/databases/conductor/conductor
 //! ```
 //!
 //! At the `sqlite>` prompt, input your key:
 //!
 //! ```text
-//! PRAGMA key = "x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C483648101010101010101010101010101010101'";
+//! PRAGMA key = "x'6D71B0A31666195576242A41129FE9387ECA216DA241C98F92A18A01557A8199'";
+//! PRAGMA cipher_salt = "x'15E07FD29B247A023FE99B1BE3371364'";
+//! PRAGMA cipher_compatibility = 4;
+//! PRAGMA cipher_plaintext_header_size = 32;
 //! ```
 //!
-//! It should print out `ok`.
+//! It should print out `ok` for the `key` pragma, and nothing for the other
+//! three lines.
 //!
 //! You should now be able to make sqlite queries:
 //!
