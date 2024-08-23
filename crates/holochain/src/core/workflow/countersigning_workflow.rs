@@ -278,15 +278,21 @@ pub(crate) async fn countersigning_workflow(
     let maybe_earliest_finish = space
         .countersigning_workspace
         .inner
-        .share_ref(|inner| Ok(inner.sessions.values().filter_map(|s| {
-            match s {
-                SessionState::Accepted(request) => Some(request.session_times.end),
-                state => {
-                    tracing::warn!("Countersigning session should be resolved but is still the workspace for agent: {:?}", state);
-                    None
-                }
-            }
-        }).min()))
+        .share_ref(|inner| {
+            Ok(inner
+                .sessions
+                .values()
+                .filter_map(|s| {
+                    match s {
+                        SessionState::Accepted(request) => Some(request.session_times.end),
+                        state => {
+                            // Could be waiting for more signatures, or in an unknown state.
+                            None
+                        }
+                    }
+                })
+                .min())
+        })
         .unwrap();
 
     if let Some(earliest_finish) = maybe_earliest_finish {
@@ -420,6 +426,7 @@ async fn inner_countersigning_session_incomplete(
             .await?;
 
     if maybe_current_session.is_none() {
+        tracing::info!("Countersigning session was in an unknown state but no session entry was found, unlocking chain and removing session: {:?}", author);
         return Ok((SessionCompletionDecision::Abandoned, None));
     }
 
@@ -440,6 +447,8 @@ async fn inner_countersigning_session_incomplete(
 
     let mut get_activity_options = holochain_p2p::actor::GetActivityOptions {
         include_warrants: true,
+        include_full_actions: true,
+        include_valid_activity: true,
         // We're going to be potentially running quite a lot of these requests, so set the timeout reasonably low.
         timeout_ms: Some(10_000),
         ..Default::default()
@@ -461,7 +470,7 @@ async fn inner_countersigning_session_incomplete(
             .include_entries(true);
 
         let mut authority_decisions = Vec::new();
-        let mut misbehaving_authorities = 0;
+        let mut unusable_authority_responses = 0;
 
         // Try multiple times to get the activity for this agent.
         // Ideally, each request will go to a different authority, so we don't have to trust a single
@@ -485,45 +494,50 @@ async fn inner_countersigning_session_incomplete(
 
                     match activity.valid_activity {
                         ChainItems::Full(ref items) => {
-                            if items.len() != 1 {
+                            println!("items: {:?}", items.len());
+
+                            if items.len() == 0 {
+                                // The agent has not published any new activity
+                                SessionCompletionDecision::Abandoned
+                            } else if items.len() > 1 {
                                 tracing::warn!("Agent authority returned an unexpected response for agent {:?}: {:?}", agent, activity);
                                 // Continue to try a different authority.
-                                misbehaving_authorities += 1;
+                                unusable_authority_responses += 1;
                                 continue;
-                            }
-
-                            let maybe_countersigning_record = &items[0];
-                            match &maybe_countersigning_record.entry {
-                                RecordEntry::Present(Entry::CounterSign(cs, _)) => {
-                                    // Check that this is the same session, and not some other session on the other agent's chain.
-                                    if cs.preflight_request == session_data.preflight_request {
-                                        // This is evidence that the other agent has put the countersigning entry on their chain.
-                                        // That is a strong signal that the session is complete.
-                                        SessionCompletionDecision::Complete
-                                    } else {
-                                        // This is evidence that the other agent has put something else on their chain.
+                            } else {
+                                let maybe_countersigning_record = &items[0];
+                                match &maybe_countersigning_record.entry {
+                                    RecordEntry::Present(Entry::CounterSign(cs, _)) => {
+                                        // Check that this is the same session, and not some other session on the other agent's chain.
+                                        if cs.preflight_request == session_data.preflight_request {
+                                            // This is evidence that the other agent has put the countersigning entry on their chain.
+                                            // That is a strong signal that the session is complete.
+                                            SessionCompletionDecision::Complete
+                                        } else {
+                                            // This is evidence that the other agent has put something else on their chain.
+                                            SessionCompletionDecision::Abandoned
+                                        }
+                                    }
+                                    RecordEntry::Present(_) => {
+                                        // Anything else on the chain is evidence that the agent did not complete the countersigning.
                                         SessionCompletionDecision::Abandoned
                                     }
-                                }
-                                RecordEntry::Present(_) => {
-                                    // Anything else on the chain is evidence that the agent did not complete the countersigning.
-                                    SessionCompletionDecision::Abandoned
-                                }
-                                RecordEntry::Hidden | RecordEntry::NA => {
-                                    // This wouldn't be the case for a countersigning entry so this is evidence that
-                                    // the agent has put something else on their chain.
-                                    SessionCompletionDecision::Abandoned
-                                }
-                                RecordEntry::NotStored => {
-                                    // This case is not determinate. The agent activity authority might
-                                    // have the action but not the entry yet. We can't make a decision here.
-                                    SessionCompletionDecision::Indeterminate
+                                    RecordEntry::Hidden | RecordEntry::NA => {
+                                        // This wouldn't be the case for a countersigning entry so this is evidence that
+                                        // the agent has put something else on their chain.
+                                        SessionCompletionDecision::Abandoned
+                                    }
+                                    RecordEntry::NotStored => {
+                                        // This case is not determinate. The agent activity authority might
+                                        // have the action but not the entry yet. We can't make a decision here.
+                                        SessionCompletionDecision::Indeterminate
+                                    }
                                 }
                             }
                         }
                         _ => {
                             tracing::warn!("Agent authority returned an unexpected response for agent {:?}: {:?}", agent, activity);
-                            misbehaving_authorities += 1;
+                            unusable_authority_responses += 1;
                             continue;
                         }
                     }
@@ -541,11 +555,11 @@ async fn inner_countersigning_session_incomplete(
             authority_decisions.push(decision);
         }
 
-        if misbehaving_authorities > 1 {
-            // If more than one authority is misbehaving then we can't make a decision.
+        if unusable_authority_responses > 1 {
+            // If more than one authority returned an unusable response then we can't make a decision.
             // We need to wait for more evidence.
             tracing::info!(
-                "More than one authority is misbehaving for agent {:?}, looking for more evidence",
+                "More than one authority returned an unusable response for agent {:?}, looking for more evidence",
                 agent
             );
             continue;
