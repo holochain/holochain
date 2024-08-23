@@ -3853,7 +3853,7 @@ fn query_dht_ops_from_statement(
     dht_ops_cursor: Option<u64>,
 ) -> ConductorApiResult<Vec<DhtOp>> {
     let final_stmt_str = match dht_ops_cursor {
-        Some(cursor) => format!("{} AND rowid > {}", stmt_str, cursor),
+        Some(cursor) => format!("{} AND DhtOp.rowid > {}", stmt_str, cursor),
         None => stmt_str.into(),
     };
 

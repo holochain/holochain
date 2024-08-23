@@ -132,7 +132,7 @@ pub struct TestSpace {
     _temp_dir: tempfile::TempDir,
 }
 
-thread_local!(static DANGER_PRINT_DB_SECRETS: Cell<bool> = Cell::new(false));
+thread_local!(static DANGER_PRINT_DB_SECRETS: Cell<bool> = const { Cell::new(false) });
 
 /// WARNING!! DANGER!! This exposes your database decryption secrets!
 /// Print the database decryption secrets to stderr.
