@@ -8,7 +8,7 @@
         version = "1.77.2";
       };
 
-      craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
+      craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
 
       crateInfo = craneLib.crateNameFromCargoToml { cargoToml = flake.config.reconciledInputs.launcher + "/crates/hc_launch/src-tauri/Cargo.toml"; };
 

@@ -46,7 +46,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    versions.url = "github:holochain/holochain?dir=versions/0_2";
+    versions.url = "github:holochain/holochain?dir=versions/0_3";
 
     holochain.follows = "empty";
     holochain.flake = false;
@@ -63,7 +63,7 @@
     };
 
     cargo-rdme = {
-      url = "github:orium/cargo-rdme/v1.1.0";
+      url = "github:orium/cargo-rdme/v1.4.4";
       flake = false;
     };
   };

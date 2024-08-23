@@ -15,7 +15,7 @@ async fn migrate_unencrypted() {
 
     // Set up an unencrypted database
     {
-        let conn = Connection::open(tmp_dir.path().join("conductor/conductor.sqlite3")).unwrap();
+        let conn = Connection::open(tmp_dir.path().join("conductor/conductor")).unwrap();
 
         // Needs to contain data otherwise encryption will just succeed!
         conn.execute("CREATE TABLE migrate_me (name TEXT NOT NULL)", ())
@@ -30,14 +30,13 @@ async fn migrate_unencrypted() {
     }
 
     // Without the HOLOCHAIN_MIGRATE_UNENCRYPTED variable set, it should fail to open
-    let err = DbWrite::open(std::path::Path::new(tmp_dir.path()), DbKindConductor).unwrap_err();
-    assert_eq!(err.to_string(), "file is not a database");
+    DbWrite::test(std::path::Path::new(tmp_dir.path()), DbKindConductor).unwrap_err();
 
     std::env::set_var("HOLOCHAIN_MIGRATE_UNENCRYPTED", "true");
 
     // Now it should open and read just fine, because it will be encrypted automatically
     let db: DbWrite<DbKindConductor> =
-        DbWrite::open(std::path::Path::new(tmp_dir.path()), DbKindConductor).unwrap();
+        DbWrite::test(std::path::Path::new(tmp_dir.path()), DbKindConductor).unwrap();
     let msg = db
         .read_async(|txn| -> DatabaseResult<String> {
             Ok(txn.query_row(

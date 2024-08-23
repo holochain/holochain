@@ -1,6 +1,7 @@
 pub mod curve;
 
 use crate::conductor::api::CellConductorReadHandle;
+use crate::conductor::api::DpkiApi;
 use crate::conductor::api::MockCellConductorReadHandleT;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
@@ -476,9 +477,18 @@ fixturator!(
     constructor fn one(Zome);
 );
 
+// DPKI service itself cannot be fixturated. This is just needed for the ValidateHostAccess
+// fixturator.
+fixturator!(
+    DpkiApi;
+    curve Empty None;
+    curve Unpredictable None;
+    curve Predictable None;
+);
+
 fixturator!(
     ValidateHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pDna);
+    constructor fn new(HostFnWorkspace, HolochainP2pDna, DpkiApi, bool);
 );
 
 fixturator!(

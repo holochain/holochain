@@ -79,7 +79,7 @@ impl DhtDbQueryCache {
     }
 
     /// Lazily initiate the activity cache.
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn get_or_try_init(&self) -> DatabaseResult<&ActivityCache> {
         self.activity
             .get_or_try_init(|| {
@@ -268,7 +268,7 @@ impl DhtDbQueryCache {
         .await
     }
 
-    /// Set activity to to integrated.
+    /// Set activity to integrated.
     pub async fn set_activity_to_integrated(
         &self,
         agent: &AgentPubKey,
@@ -284,7 +284,7 @@ impl DhtDbQueryCache {
         .await
     }
 
-    /// Add an authors activity.
+    /// Add an author's activity.
     async fn new_activity_inner(
         &self,
         agent: &AgentPubKey,

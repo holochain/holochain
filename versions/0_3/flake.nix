@@ -2,18 +2,18 @@
   inputs =
     {
       holochain = {
-        url = "github:holochain/holochain/holochain-0.3.1";
+        url = "github:holochain/holochain/holochain-0.3.2";
         flake = false;
       };
 
       lair = {
-        url = "github:holochain/lair/lair_keystore-v0.4.4";
+        url = "github:holochain/lair/lair_keystore-v0.4.5";
         flake = false;
       };
 
       # holochain_cli_launch
       launcher = {
-        url = "github:holochain/launcher/holochain-0.3";
+        url = "github:holochain/hc-launch/holochain-0.3";
         flake = false;
       };
 

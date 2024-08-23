@@ -1,7 +1,7 @@
+use super::*;
+use crate::metrics::{GENERATE_OP_BLOOMS_TIME, GENERATE_OP_REGION_SET_TIME};
 use kitsune_p2p_types::dht::{arq::ArqSet, ArqBounds};
 use rand::Rng;
-
-use super::*;
 
 impl ShardedGossipLocal {
     /// Try to initiate gossip if we don't currently
@@ -49,6 +49,7 @@ impl ShardedGossipLocal {
         {
             let id = rand::thread_rng().gen();
 
+            // TODO Why send both the agents and the intervals? The agents contain their arcs
             let gossip = ShardedGossipWire::initiate(
                 intervals,
                 id,
@@ -216,12 +217,20 @@ impl ShardedGossipLocal {
         let common_arqs = Arc::new(local_arqs.intersection(&topo, &remote_arqs));
 
         let region_set = if let GossipType::Historical = self.gossip_type {
+            let start = Instant::now();
             let region_set = store::query_region_set(
                 self.host_api.clone().api,
                 self.space.clone(),
                 (*common_arqs).clone(),
             )
             .await?;
+            GENERATE_OP_REGION_SET_TIME.record(
+                start.elapsed().as_secs_f64(),
+                &[opentelemetry_api::KeyValue::new(
+                    "space",
+                    format!("{:?}", self.space),
+                )],
+            );
             gossip.push(ShardedGossipWire::op_regions(region_set.clone()));
             Some(region_set)
         } else {
@@ -279,9 +288,24 @@ impl ShardedGossipLocal {
         if let Some(cursor) = state.bloom_batch_cursor.take() {
             window.start = cursor;
         }
+
+        let start = Instant::now();
         let blooms = self
             .generate_op_blooms_for_time_window(&state.common_arq_set, window)
             .await?;
+        GENERATE_OP_BLOOMS_TIME.record(
+            start.elapsed().as_secs_f64(),
+            &[
+                opentelemetry_api::KeyValue::new("space", format!("{:?}", self.space)),
+                opentelemetry_api::KeyValue::new(
+                    "batch_size",
+                    match &blooms {
+                        bloom::Batch::Complete(blooms) => blooms.len() as i64,
+                        bloom::Batch::Partial { data, .. } => data.len() as i64,
+                    },
+                ),
+            ],
+        );
 
         let blooms = match blooms {
             bloom::Batch::Complete(blooms) => blooms,

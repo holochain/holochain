@@ -7,6 +7,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.4.0-dev.18
+
+## 0.4.0-dev.17
+
+## 0.4.0-dev.16
+
+## 0.4.0-dev.15
+
+## 0.4.0-dev.14
+
+## 0.4.0-dev.13
+
+- **Breaking**: Shorten paths to database files by removing the name prefix where that prefix matches the directory name. The file extensions have also been removed. For example, an authored database would have been stored at `<root-dir>/authored/authored-<dna-hash>-<agent-key>.sqlite` and will now be stored at `<root-dir>/authored/<dna-hash>-<agent-key>`. This also affects the DHT, cache, agent store and metrics databases. You can work around this being a breaking change by renaming your database files to match the new expected names.
+
+## 0.4.0-dev.12
+
+## 0.4.0-dev.11
+
+## 0.4.0-dev.10
+
+## 0.4.0-dev.9
+
 ## 0.4.0-dev.8
 
 ## 0.4.0-dev.7

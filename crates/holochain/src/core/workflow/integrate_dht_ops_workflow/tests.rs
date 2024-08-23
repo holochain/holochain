@@ -35,7 +35,7 @@ impl TestData {
         Self::new_inner(original_entry, new_entry)
     }
 
-    #[instrument()]
+    #[cfg_attr(feature = "instrument", tracing::instrument())]
     fn new_inner(original_entry: Entry, new_entry: Entry) -> Self {
         // original entry
         let original_entry_hash =
@@ -46,7 +46,7 @@ impl TestData {
 
         // Original entry and action for updates
         let mut original_action = fixt!(NewEntryAction, PublicCurve);
-        debug!(?original_action);
+        tracing::debug!(?original_action);
 
         match &mut original_action {
             NewEntryAction::Create(c) => c.entry_hash = original_entry_hash.clone(),
@@ -136,7 +136,7 @@ enum Db {
 
 impl Db {
     /// Checks that the database is in a state
-    #[instrument(skip(expects, env))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(expects, env)))]
     async fn check(expects: Vec<Self>, env: DbWrite<DbKindDht>, here: String) {
         env.read_async(move |txn| -> DatabaseResult<()> {
             for expect in expects {
@@ -148,7 +148,7 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP
+                                    SELECT 1 FROM DhtOp
                                     WHERE when_integrated IS NOT NULL
                                     AND hash = :hash
                                     AND validation_status = :status
@@ -170,7 +170,7 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP
+                                    SELECT 1 FROM DhtOp
                                     WHERE when_integrated IS NULL
                                     AND validation_stage = 3
                                     AND hash = :hash
@@ -193,7 +193,7 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP
+                                    SELECT 1 FROM DhtOp
                                     WHERE when_integrated IS NOT NULL
                                     AND basis_hash = :basis
                                     AND action_hash = :hash
@@ -218,7 +218,7 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP
+                                    SELECT 1 FROM DhtOp
                                     WHERE when_integrated IS NOT NULL
                                     AND basis_hash = :basis
                                     AND action_hash = :hash
@@ -244,7 +244,7 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP
+                                    SELECT 1 FROM DhtOp
                                     JOIN Action on DhtOp.action_hash = Action.hash
                                     WHERE when_integrated IS NOT NULL
                                     AND validation_status = :status
@@ -270,7 +270,7 @@ impl Db {
                     Db::IntegratedEmpty => {
                         let not_empty: bool = txn
                             .query_row(
-                                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NOT NULL)",
+                                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NOT NULL)",
                                 [],
                                 |row| row.get(0),
                             )
@@ -280,7 +280,7 @@ impl Db {
                     Db::IntQueueEmpty => {
                         let not_empty: bool = txn
                             .query_row(
-                                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NULL)",
+                                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
                                 [],
                                 |row| row.get(0),
                             )
@@ -290,7 +290,7 @@ impl Db {
                     Db::MetaEmpty => {
                         let not_empty: bool = txn
                             .query_row(
-                                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NOT NULL)",
+                                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NOT NULL)",
                                 [],
                                 |row| row.get(0),
                             )
@@ -315,7 +315,7 @@ impl Db {
     }
 
     // Sets the database to a certain state
-    #[instrument(skip(pre_state, env))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(pre_state, env)))]
     async fn set<'env>(pre_state: Vec<Self>, env: DbWrite<DbKindDht>) {
         env.write_async(move |txn| -> DatabaseResult<()> {
             for state in pre_state {
@@ -365,7 +365,7 @@ async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
 // Need to clear the data from the previous test
 async fn clear_dbs(env: DbWrite<DbKindDht>) {
     env.write_async(move |txn| -> StateMutationResult<()> {
-        txn.execute("DELETE FROM DhtOP", []).unwrap();
+        txn.execute("DELETE FROM DhtOp", []).unwrap();
         txn.execute("DELETE FROM Action", []).unwrap();
         txn.execute("DELETE FROM Entry", []).unwrap();
         Ok(())

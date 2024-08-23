@@ -7,17 +7,52 @@ use kitsune_p2p_timestamp::Timestamp;
 
 use crate::signature::Signed;
 
-/// Placeholder for warrant type
+/// A Warrant is an authored, timestamped proof of wrongdoing by another agent.
 #[derive(
-    Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::From,
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+    Eq,
+    PartialEq,
+    Hash,
+    derive_more::From,
+    derive_more::Deref,
 )]
 #[cfg_attr(
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary,)
 )]
-pub enum Warrant {
-    /// Signifies evidence of a breach of chain integrity
-    ChainIntegrity(ChainIntegrityWarrant),
+pub struct Warrant {
+    /// The self-proving part of the warrant containing evidence of bad behavior
+    #[deref]
+    pub proof: WarrantProof,
+    /// The author of the warrant
+    pub author: AgentPubKey,
+    /// Time when the warrant was issued
+    pub timestamp: Timestamp,
+}
+
+impl Warrant {
+    /// Constructor
+    pub fn new(proof: WarrantProof, author: AgentPubKey, timestamp: Timestamp) -> Self {
+        Self {
+            proof,
+            author,
+            timestamp,
+        }
+    }
+
+    /// Constructor with timestamp set to now()
+    #[cfg(feature = "full")]
+    pub fn new_now(proof: WarrantProof, author: AgentPubKey) -> Self {
+        Self {
+            proof,
+            author,
+            timestamp: Timestamp::now(),
+        }
+    }
 }
 
 impl HashableContent for Warrant {
@@ -30,6 +65,19 @@ impl HashableContent for Warrant {
     fn hashable_content(&self) -> HashableContentBytes {
         HashableContentBytes::Content(self.try_into().expect("Could not serialize Warrant"))
     }
+}
+
+/// The self-proving part of a Warrant which demonstrates bad behavior by another agent
+#[derive(
+    Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::From,
+)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary,)
+)]
+pub enum WarrantProof {
+    /// Signifies evidence of a breach of chain integrity
+    ChainIntegrity(ChainIntegrityWarrant),
 }
 
 /// Just the type of the warrant
@@ -106,19 +154,20 @@ pub enum ChainIntegrityWarrant {
 /// Action hash with the signature of the action at that hash
 pub type ActionHashAndSig = (ActionHash, Signature);
 
-impl Warrant {
+impl WarrantProof {
     /// Basis hash where this warrant should be delivered.
     /// Warrants always have the authoring agent as a basis, so that warrants
     /// can be accumulated by the agent activity authorities.
     pub fn dht_basis(&self) -> OpBasis {
+        self.action_author().clone().into()
+    }
+
+    /// The author of the action which led to this warrant, i.e. the target of the warrant
+    pub fn action_author(&self) -> &AgentPubKey {
         match self {
-            Warrant::ChainIntegrity(w) => match w {
-                ChainIntegrityWarrant::InvalidChainOp { action_author, .. } => {
-                    action_author.clone().into()
-                }
-                ChainIntegrityWarrant::ChainFork { chain_author, .. } => {
-                    chain_author.clone().into()
-                }
+            Self::ChainIntegrity(w) => match w {
+                ChainIntegrityWarrant::InvalidChainOp { action_author, .. } => action_author,
+                ChainIntegrityWarrant::ChainFork { chain_author, .. } => chain_author,
             },
         }
     }
@@ -126,7 +175,7 @@ impl Warrant {
     /// Get the warrant type
     pub fn get_type(&self) -> WarrantType {
         match self {
-            Warrant::ChainIntegrity(_) => WarrantType::ChainIntegrityWarrant,
+            Self::ChainIntegrity(_) => WarrantType::ChainIntegrityWarrant,
         }
     }
 }
@@ -146,20 +195,5 @@ pub enum ValidationType {
     App,
 }
 
-/// A warrant with timestamp
-#[derive(
-    Clone,
-    Debug,
-    Serialize,
-    Deserialize,
-    SerializedBytes,
-    Eq,
-    PartialEq,
-    Hash,
-    derive_more::From,
-    derive_more::Into,
-)]
-pub struct TimedWarrant(pub Warrant, pub Timestamp);
-
 /// A signed warrant with timestamp
-pub type SignedWarrant = Signed<TimedWarrant>;
+pub type SignedWarrant = Signed<Warrant>;

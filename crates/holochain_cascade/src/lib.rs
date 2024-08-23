@@ -229,6 +229,11 @@ impl CascadeImpl {
             duration_metric: create_cascade_duration_metric(),
         }
     }
+
+    /// Getter
+    pub fn cache(&self) -> Option<&DbWrite<DbKindCache>> {
+        self.cache.as_ref()
+    }
 }
 
 /// TODO
@@ -390,7 +395,16 @@ impl CascadeImpl {
 
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_rendered_ops(txn: &mut Transaction, ops: &RenderedOps) -> CascadeResult<()> {
-        let RenderedOps { ops, entry } = ops;
+        let RenderedOps {
+            ops,
+            entry,
+            warrant,
+        } = ops;
+
+        if let Some(warrant) = warrant {
+            let op = DhtOpHashed::from_content_sync(warrant.clone());
+            insert_op(txn, &op)?;
+        }
         if let Some(entry) = entry {
             insert_entry(txn, entry.as_hash(), entry.as_content())?;
         }
@@ -425,7 +439,7 @@ impl CascadeImpl {
         Ok(())
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
         cache
@@ -440,7 +454,7 @@ impl CascadeImpl {
         Ok(())
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn merge_link_ops_into_cache(
         &self,
         responses: Vec<WireLinkOps>,
@@ -460,7 +474,7 @@ impl CascadeImpl {
     }
 
     /// Add new activity to the Cache.
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn add_activity_into_cache(
         &self,
         responses: Vec<MustGetAgentActivityResponse>,
@@ -478,10 +492,11 @@ impl CascadeImpl {
                 "Got different must_get_agent_activity responses from different authorities"
             );
             // TODO: Handle conflict.
-            // For now try to find one that has got the activity.
+            // For now try to find one that has got the activity
             responses
-                .into_iter()
-                .find(|a| matches!(a, MustGetAgentActivityResponse::Activity(_)))
+                .iter()
+                .find(|a| matches!(a, MustGetAgentActivityResponse::Activity { .. }))
+                .cloned()
         };
 
         let cache = some_or_return!(
@@ -491,18 +506,24 @@ impl CascadeImpl {
 
         // Commit the activity to the chain.
         match response {
-            Some(MustGetAgentActivityResponse::Activity(activity)) => {
+            Some(MustGetAgentActivityResponse::Activity { activity, warrants }) => {
                 // TODO: Avoid this clone by committing the ops as references to the db.
                 cache
                     .write_async({
                         let activity = activity.clone();
+                        let warrants = warrants.clone();
                         move |txn| {
                             Self::insert_activity(txn, activity)?;
+                            for warrant in warrants {
+                                let op = DhtOpHashed::from_content_sync(warrant);
+                                insert_op(txn, &op)?;
+                            }
+
                             CascadeResult::Ok(())
                         }
                     })
                     .await?;
-                Ok(MustGetAgentActivityResponse::Activity(activity))
+                Ok(MustGetAgentActivityResponse::Activity { activity, warrants })
             }
             Some(response) => Ok(response),
             // Got no responses so the chain is incomplete.
@@ -511,7 +532,7 @@ impl CascadeImpl {
     }
 
     /// Fetch a Record from the network, caching and returning the results
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn fetch_record(
         &self,
         hash: AnyDhtHash,
@@ -527,7 +548,7 @@ impl CascadeImpl {
         Ok(())
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     async fn fetch_links(
         &self,
         link_key: WireLinkKey,
@@ -541,7 +562,7 @@ impl CascadeImpl {
         Ok(())
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     async fn fetch_agent_activity(
         &self,
         agent: AgentPubKey,
@@ -552,7 +573,7 @@ impl CascadeImpl {
         Ok(network.get_agent_activity(agent, query, options).await?)
     }
 
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     /// Fetch hash bounded agent activity from the network.
     async fn fetch_must_get_agent_activity(
         &self,
@@ -677,7 +698,7 @@ impl CascadeImpl {
     /// Get Entry data along with all CRUD actions associated with it.
     ///
     /// Also returns Rejected actions, which may affect the interpreted validity status of this Entry.
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn get_entry_details(
         &self,
         entry_hash: EntryHash,
@@ -704,7 +725,7 @@ impl CascadeImpl {
     /// Get the specified Record along with all Updates and Deletes associated with it.
     ///
     /// Can return a Rejected Record.
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn get_record_details(
         &self,
         action_hash: ActionHash,
@@ -735,7 +756,7 @@ impl CascadeImpl {
         self.cascading(query).await
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     /// Returns the [Record] for this [ActionHash] if it is live
     /// by getting the latest available metadata from authorities
     /// combined with this agents authored data.
@@ -769,7 +790,7 @@ impl CascadeImpl {
         self.cascading(query).await
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     /// Returns the oldest live [Record] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
     pub async fn dht_get_entry(
@@ -819,7 +840,7 @@ impl CascadeImpl {
             .await
     }
 
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     /// Updates the cache with the latest network authority data
     /// and returns what is in the cache.
     /// This gives you the latest possible picture of the current dht state.
@@ -836,7 +857,7 @@ impl CascadeImpl {
     }
 
     /// Get either [`EntryDetails`] or [`RecordDetails`], depending on the hash provided
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub async fn get_details(
         &self,
         hash: AnyDhtHash,
@@ -854,7 +875,7 @@ impl CascadeImpl {
         }
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     /// Gets an links from the cas or cache depending on it's metadata
     // The default behavior is to skip deleted or replaced entries.
     pub async fn dht_get_links(
@@ -885,7 +906,7 @@ impl CascadeImpl {
         self.cascading(query).await
     }
 
-    #[instrument(skip(self, key, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, key, options)))]
     /// Return all CreateLink actions
     /// and DeleteLink actions ordered by time.
     pub async fn get_link_details(
@@ -906,7 +927,7 @@ impl CascadeImpl {
     }
 
     /// Count the number of links matching the `query`.
-    #[instrument(skip(self, query))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, query)))]
     pub async fn dht_count_links(&self, query: WireLinkQuery) -> CascadeResult<usize> {
         let mut links = HashSet::<ActionHash>::new();
         if !self.am_i_an_authority(query.base.clone()).await? {
@@ -954,14 +975,14 @@ impl CascadeImpl {
             move || {
                 let mut results = Vec::with_capacity(txn_guards.len() + 1);
                 for txn_guard in &mut txn_guards {
-                    let mut txn = txn_guard.transaction()?;
+                    let txn = txn_guard.transaction()?;
                     let r = match &scratch {
                         Some(scratch) => {
                             scratch.apply_and_then(|scratch| {
-                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, Some(scratch), &author, filter.clone())
+                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&txn, Some(scratch), &author, filter.clone())
                             })?
                         }
-                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, None, &author, filter.clone())?
+                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&txn, None, &author, filter.clone())?
                     };
                     results.push(r);
                 }
@@ -983,7 +1004,7 @@ impl CascadeImpl {
             );
 
         // Short circuit if we have a result.
-        if matches!(result, MustGetAgentActivityResponse::Activity(_)) {
+        if matches!(result, MustGetAgentActivityResponse::Activity { .. }) {
             return Ok(result);
         }
 
@@ -994,12 +1015,16 @@ impl CascadeImpl {
             // this point then the chain is incomplete for this request.
             Ok(MustGetAgentActivityResponse::IncompleteChain)
         } else {
-            self.fetch_must_get_agent_activity(author.clone(), filter)
-                .await
+            Ok(self
+                .fetch_must_get_agent_activity(author.clone(), filter)
+                .await?)
         }
     }
 
-    #[instrument(skip(self, agent, query, options))]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self, agent, query, options))
+    )]
     /// Get agent activity from agent activity authorities.
     /// Hashes are requested from the authority and cache for valid chains.
     /// Options:

@@ -1,4 +1,5 @@
 use derive_more::Display;
+use holochain_conductor_services::DpkiServiceError;
 use std::convert::TryFrom;
 
 use super::SourceChainError;
@@ -49,6 +50,8 @@ pub enum SysValidationError {
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
+    #[error(transparent)]
+    DpkiServiceError(#[from] DpkiServiceError),
     #[error(transparent)]
     ConductorApiError(#[from] Box<ConductorApiError>),
     #[error("Expected Entry-based Action, but got: {0:?}")]
@@ -104,15 +107,21 @@ pub enum ValidationOutcome {
     #[error("The record with signature {0:?} and action {1:?} was found to be counterfeit")]
     CounterfeitAction(Signature, Action),
     #[error("A warrant op was found to be counterfeit. Warrant: {0:?}")]
-    CounterfeitWarrant(WarrantOp),
+    CounterfeitWarrant(Warrant),
     #[error("A warrant op was found to be invalid. Reason: {1}, Warrant: {0:?}")]
-    InvalidWarrantOp(WarrantOp, String),
+    InvalidWarrant(Warrant, String),
     #[error("The action {1:?} is not found in the countersigning session data {0:?}")]
     ActionNotInCounterSigningSession(CounterSigningSessionData, NewEntryAction),
     #[error(transparent)]
     CounterSigningError(#[from] CounterSigningError),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
+    #[error("The agent {0:?} could not be found in DPKI")]
+    DpkiAgentMissing(AgentPubKey),
+    #[error("The agent {0:?} was found to be invalid at {1:?} according to the DPKI service")]
+    DpkiAgentInvalid(AgentPubKey, Timestamp),
+    #[error("Agent key {0} invalid")]
+    InvalidAgentKey(AgentPubKey),
     #[error("The entry def index for {0:?} was out of range")]
     EntryDefId(AppEntryDef),
     #[error("The entry has a different hash to the action's entry hash")]
@@ -164,6 +173,18 @@ impl ValidationOutcome {
     /// and exit early
     pub fn into_outcome<T>(self) -> SysValidationOutcome<T> {
         Err(OutcomeOrError::Outcome(self))
+    }
+
+    /// The outcome is pending further information, so no determination can be made at this time.
+    /// If this is false, then the outcome is determinate, meaning we can reject validation now.
+    pub fn is_indeterminate(&self) -> bool {
+        if let ValidationOutcome::CounterfeitAction(_, _)
+        | ValidationOutcome::CounterfeitWarrant(_) = self
+        {
+            // Just a helpful assertion for us
+            unreachable!("Counterfeit ops are dropped before sys validation")
+        }
+        matches!(self, Self::DepMissingFromDht(_) | Self::DpkiAgentMissing(_))
     }
 }
 

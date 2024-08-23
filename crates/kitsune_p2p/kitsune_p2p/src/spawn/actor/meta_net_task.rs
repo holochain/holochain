@@ -22,6 +22,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tracing::Instrument;
 
+struct DelegateBroadcastItem {
+    space: Arc<KitsuneSpace>,
+    basis: Arc<crate::KitsuneBasis>,
+    to_agent: Arc<KitsuneAgent>,
+    mod_idx: u32,
+    mod_cnt: u32,
+    data: BroadcastData,
+}
+
 pub struct MetaNetTask {
     host: HostApiLegacy,
     config: KitsuneP2pConfig,
@@ -30,6 +39,14 @@ pub struct MetaNetTask {
     ep_evt: Option<MetaNetEvtRecv>,
     i_s: GhostSender<Internal>,
     is_finished: Arc<AtomicBool>,
+    delegate_broadcast_send: tokio::sync::mpsc::Sender<DelegateBroadcastItem>,
+    delegate_broadcast_task: tokio::task::JoinHandle<()>,
+}
+
+impl Drop for MetaNetTask {
+    fn drop(&mut self) {
+        self.delegate_broadcast_task.abort();
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -63,6 +80,31 @@ impl MetaNetTask {
         ep_evt: MetaNetEvtRecv,
         i_s: GhostSender<Internal>,
     ) -> Self {
+        const MAX_DELEGATE_BROADCAST: usize = 512;
+
+        let (delegate_broadcast_send, mut db_recv) =
+            tokio::sync::mpsc::channel(MAX_DELEGATE_BROADCAST);
+
+        let i_s2 = i_s.clone();
+        let delegate_broadcast_task = tokio::task::spawn(async move {
+            while let Some(DelegateBroadcastItem {
+                space,
+                basis,
+                to_agent,
+                mod_idx,
+                mod_cnt,
+                data,
+            }) = db_recv.recv().await
+            {
+                if let Err(err) = i_s2
+                    .incoming_delegate_broadcast(space, basis, to_agent, mod_idx, mod_cnt, data)
+                    .await
+                {
+                    tracing::warn!(?err, "failed to handle delegate broadcast");
+                }
+            }
+        });
+
         Self {
             host,
             config,
@@ -71,6 +113,8 @@ impl MetaNetTask {
             ep_evt: Some(ep_evt),
             i_s,
             is_finished: Arc::new(AtomicBool::new(false)),
+            delegate_broadcast_send,
+            delegate_broadcast_task,
         }
     }
 
@@ -348,15 +392,19 @@ impl MetaNetTask {
                     // the space incoming_delegate_broadcast
                     // handler.
                     if let Err(err) = self
-                        .i_s
-                        .incoming_delegate_broadcast(space, basis, to_agent, mod_idx, mod_cnt, data)
-                        .await
+                        .delegate_broadcast_send
+                        .try_send(DelegateBroadcastItem {
+                            space,
+                            basis,
+                            to_agent,
+                            mod_idx,
+                            mod_cnt,
+                            data,
+                        })
                     {
-                        tracing::warn!(?err, "failed to handle incoming delegate broadcast");
-                        Err(err.into())
-                    } else {
-                        Ok(())
+                        tracing::warn!(?err, "failed to enqueue incoming delegate broadcast");
                     }
+                    Ok(())
                 }
             },
             wire::Wire::Broadcast(wire::Broadcast {
@@ -1299,35 +1347,6 @@ mod tests {
             .is_empty());
 
         verify_task_live(ep_evt_send, meta_net_task_finished).await;
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn send_notify_delegate_broadcast_user_handles_shutdown() {
-        let (mut ep_evt_send, _, internal_sender, _, _, _, _, meta_net_task_finished) =
-            setup().await;
-
-        internal_sender
-            .ghost_actor_shutdown_immediate()
-            .await
-            .unwrap();
-
-        ep_evt_send
-            .send(MetaNetEvt::Notify {
-                remote_url: "".to_string(),
-                con: mk_test_con(),
-                data: wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
-                    space: test_space(1),
-                    basis: Arc::new(KitsuneBasis::new(vec![0; 36])),
-                    to_agent: test_agent(2),
-                    mod_idx: 0,
-                    mod_cnt: 0,
-                    data: BroadcastData::User(test_agent(5).to_vec()),
-                }),
-            })
-            .await
-            .unwrap();
-
-        wait_and_assert_shutdown(meta_net_task_finished).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]

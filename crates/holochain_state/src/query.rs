@@ -168,7 +168,7 @@ pub trait Store {
         &self,
         hash: &AnyLinkableHash,
         check_valid: bool,
-    ) -> StateQueryResult<Vec<Warrant>>;
+    ) -> StateQueryResult<Vec<WarrantOp>>;
 
     /// Get an [`Record`] from this store.
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>>;
@@ -205,6 +205,7 @@ pub trait StoresIter<T> {
 }
 
 /// Wrapper around a transaction reference, to which trait impls are attached
+#[derive(derive_more::Deref, derive_more::DerefMut)]
 pub struct Txn<'borrow, 'txn> {
     txn: &'borrow Transaction<'txn>,
 }
@@ -352,11 +353,11 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         &self,
         hash: &AnyLinkableHash,
         check_valid: bool,
-    ) -> StateQueryResult<Vec<Warrant>> {
+    ) -> StateQueryResult<Vec<WarrantOp>> {
         let sql = if check_valid {
-            "            
+            "
             SELECT
-            Action.blob
+            Action.blob as action_blob
             FROM Action
             JOIN DhtOp ON DhtOp.action_hash = Action.hash
             WHERE Action.base_hash = :hash
@@ -364,9 +365,9 @@ impl<'stmt> Store for Txn<'stmt, '_> {
             AND DhtOp.validation_status = :status
             "
         } else {
-            "            
+            "
             SELECT
-            Action.blob
+            Action.blob as action_blob
             FROM Action
             WHERE Action.base_hash = :hash
             AND Action.type = :type
@@ -375,15 +376,10 @@ impl<'stmt> Store for Txn<'stmt, '_> {
 
         let row_fn = |row: &Row<'_>| {
             Ok(
-                from_blob::<SignedWarrant>(row.get(row.as_ref().column_index("blob")?)?).map(
-                    |signed_warrant| {
-                        let (warrant, _) = signed_warrant.into_data().into();
-                        warrant
-                    },
-                ),
+                from_blob::<SignedWarrant>(row.get(row.as_ref().column_index("action_blob")?)?)
+                    .map(Into::into),
             )
         };
-
         let warrants = if check_valid {
             self.txn
                 .prepare_cached(sql)?
@@ -683,7 +679,7 @@ impl<'stmt> Store for Txns<'stmt, '_> {
         &self,
         hash: &AnyLinkableHash,
         check_validity: bool,
-    ) -> StateQueryResult<Vec<Warrant>> {
+    ) -> StateQueryResult<Vec<WarrantOp>> {
         let mut warrants = vec![];
         for txn in &self.txns {
             let r = txn.get_warrants_for_basis(hash, check_validity)?;
@@ -794,7 +790,7 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
         &self,
         hash: &AnyLinkableHash,
         check_validity: bool,
-    ) -> StateQueryResult<Vec<Warrant>> {
+    ) -> StateQueryResult<Vec<WarrantOp>> {
         // The scratch will never contain warrants, since they are not committed to chain
         self.txns.get_warrants_for_basis(hash, check_validity)
     }
@@ -1098,11 +1094,7 @@ pub fn map_sql_dht_op_common(
         }
         DhtOpType::Warrant(_) => {
             let warrant = from_blob::<SignedWarrant>(row.get("action_blob")?)?;
-            let author: AgentPubKey = row.get("author")?;
-            let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
-            Ok(Some(
-                WarrantOp::new(warrant, author, signature, timestamp).into(),
-            ))
+            Ok(Some(warrant.into()))
         }
     }
 }

@@ -19,7 +19,8 @@ async fn sys_validation_workflow_test() {
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let config = SweetConductorConfig::standard().no_dpki_mustfix();
+    let mut conductors = SweetConductorBatch::from_config(2, config).await;
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
     let alice_cell_id = alice.cell_id().clone();
@@ -65,6 +66,7 @@ async fn sys_validation_produces_invalid_chain_warrant() {
         &op,
         &dna_def,
         Default::default(),
+        None,
     )
     .await
     .unwrap();
@@ -110,13 +112,13 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
-
     let ((alice,), (bob,)) = conductors
         .setup_app("app", [&dna])
         .await
         .unwrap()
         .into_tuples();
     let alice_pubkey = alice.agent_pubkey().clone();
+    let bob_pubkey = bob.agent_pubkey().clone();
 
     // For this test we want bob to get alice's chain so he can detect the fork
     conductors.exchange_peer_info().await;
@@ -132,14 +134,15 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let record = records.unwrap();
     let (action, _) = record.into_inner();
     let mut action = action.into_inner().0.into_content();
-    let entry = Entry::App(::fixt::fixt!(AppEntryBytes));
+    let entry = Entry::App(AppEntryBytes(UnsafeBytes::from(vec![11; 11]).into()));
     *action.entry_data_mut().unwrap().0 = entry.to_hash();
     let action = SignedActionHashed::sign(&conductors[0].keystore(), action.into_hashed())
         .await
         .unwrap();
     let (action, signature) = action.into_inner();
     let action = SignedAction::new(action.into_content(), signature);
-    let forked_op = ChainOp::from_type(ChainOpType::StoreRecord, action, Some(entry)).unwrap();
+    let forked_op =
+        ChainOp::from_type(ChainOpType::StoreRecord, action.clone(), Some(entry)).unwrap();
 
     //- Check that the op is valid
     let dna_def = dna.dna_def().clone().into_hashed();
@@ -147,12 +150,21 @@ async fn sys_validation_produces_forked_chain_warrant() {
         &forked_op.clone().into(),
         &dna_def,
         Default::default(),
+        None,
     )
     .await
     .unwrap();
     matches::assert_matches!(outcome, Outcome::Accepted);
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    //- Check that the op creates a fork
+    let maybe_fork = conductors[0]
+        .spaces
+        .dht_db(dna.dna_hash())
+        .unwrap()
+        .test_write(move |txn| detect_fork(txn, &action).unwrap());
+    assert!(maybe_fork.is_some());
+
+    await_consistency(30, [&alice, &bob]).await.unwrap();
 
     //- Inject the forked op directly into bob's DHT db
     let forked_op = DhtOpHashed::from_content_sync(forked_op);
@@ -161,34 +173,32 @@ async fn sys_validation_produces_forked_chain_warrant() {
         insert_op(txn, &forked_op).unwrap();
     });
 
-    conductors.persist_dbs();
-
-    //- Trigger sys validation
-    conductors[1]
-        .get_cell_triggers(bob.cell_id())
-        .await
-        .unwrap()
-        .sys_validation
-        .trigger(&"test");
-
     //- Check that bob authored a chain fork warrant
-    crate::wait_for_10s!(
+    crate::wait_for_1m!(
         {
+            //- Trigger sys validation
+            conductors[1]
+                .get_cell_triggers(bob.cell_id())
+                .await
+                .unwrap()
+                .sys_validation
+                .trigger(&"test");
+
             let basis: AnyLinkableHash = alice_pubkey.clone().into();
             conductors[1]
                 .spaces
-                .get_all_authored_dbs(dna.dna_hash())
-                .unwrap()[0]
+                .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
+                .unwrap()
                 .test_read(move |txn| {
                     let store = Txn::from(&txn);
                     store.get_warrants_for_basis(&basis, false).unwrap()
                 })
         },
-        |warrants: &Vec<Warrant>| { !warrants.is_empty() },
-        |mut warrants: Vec<Warrant>| {
+        |warrants: &Vec<WarrantOp>| { !warrants.is_empty() },
+        |mut warrants: Vec<WarrantOp>| {
             matches::assert_matches!(
-                warrants.pop().unwrap(),
-                Warrant::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. })
+                warrants.pop().unwrap().proof,
+                WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. })
             )
         }
     );
@@ -220,12 +230,13 @@ async fn run_test(
         num_attempts,
         delay_per_attempt,
     )
-    .await;
+    .await
+    .unwrap();
 
     let limbo_is_empty = |txn: &Transaction| {
         let not_empty: bool = txn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NULL)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
                 [],
                 |row| row.get(0),
             )
@@ -240,12 +251,13 @@ async fn run_test(
         assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
         let num_valid_ops: usize = txn
-                .query_row("SELECT COUNT(hash) FROM DhtOP WHERE when_integrated IS NOT NULL AND validation_status = :status",
-                named_params!{
-                    ":status": ValidationStatus::Valid,
-                },
-                |row| row.get(0))
-                .unwrap();
+            .query_row("SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NOT NULL AND validation_status = :status",
+            named_params!{
+                ":status": ValidationStatus::Valid,
+            },
+            |row| row.get(0))
+            .unwrap();
+
         assert_eq!(num_valid_ops, expected_count);
 
         Ok(())
@@ -254,18 +266,20 @@ async fn run_test(
     let (bad_update_action, bad_update_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
 
-    // Integration should have 14 ops in it + the running tally
-    let expected_count = 14 + expected_count;
+    // Integration should have 14 chain ops in it + 1 warrant op + the running tally
+    let expected_count = 14 + 1 + expected_count;
 
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
     let num_valid_ops = move |txn: Transaction| -> DatabaseResult<usize> {
         let valid_ops: usize = txn
                 .query_row(
                     "
-                    SELECT COUNT(hash) FROM DhtOP
+                    SELECT COUNT(hash) FROM DhtOp
                     WHERE
                     when_integrated IS NOT NULL
                     AND
@@ -303,16 +317,17 @@ async fn run_test(
         Ok(valid_ops)
     };
 
-    alice_db
-        .read_async(move |txn| -> DatabaseResult<()> {
+    let (limbo, empty) = alice_db
+        .read_async(move |txn| {
             // Validation should be empty
             let limbo = show_limbo(&txn);
-            assert!(limbo_is_empty(&txn), "{:?}", limbo);
-
-            Ok(())
+            let empty = limbo_is_empty(&txn);
+            DatabaseResult::Ok((limbo, empty))
         })
         .await
         .unwrap();
+
+    assert!(empty, "{:?}", limbo);
 
     let valid_ops = alice_db.read_async(num_valid_ops.clone()).await.unwrap();
     assert_eq!(valid_ops, expected_count);
@@ -451,14 +466,13 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
         match op_type {
             DhtOpType::Chain(op_type) => {
                 let hash: ActionHash = row.get("hash")?;
+
                 let action: SignedAction = from_blob(row.get("blob")?)?;
                 Ok(ChainOpLite::from_type(op_type, hash, &action)?.into())
             }
             DhtOpType::Warrant(_) => {
                 let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
-                let author: AgentPubKey = row.get("author")?;
-                let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
-                Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
+                Ok(warrant.into())
             }
         }
     })

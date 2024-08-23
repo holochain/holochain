@@ -6,6 +6,9 @@
 #![allow(clippy::ptr_arg)]
 #![recursion_limit = "256"]
 
+#[cfg(doc)]
+pub mod docs;
+
 #[cfg(feature = "hdk")]
 pub use hdk::HDI_VERSION;
 
@@ -45,13 +48,8 @@ pub mod prelude {
     #[cfg(feature = "hdk")]
     pub use hdk::link::GetLinksInputBuilder;
 
-    #[cfg(not(feature = "fuzzing"))]
     pub use holochain_types::prelude::{fixt, *};
-    #[cfg(not(feature = "fuzzing"))]
-    pub use kitsune_p2p::{KITSUNE_PROTOCOL_VERSION, *};
 
-    #[cfg(feature = "fuzzing")]
-    pub use holochain_types::prelude::{fixt, *};
     #[cfg(feature = "fuzzing")]
     pub use kitsune_p2p::{NOISE, *};
 

@@ -7,9 +7,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- Change the default `DbSyncStrategy` from `Fast` to `Resilient` which should reduce database corruptions. You can 
-  override this setting in your conductor config if you wish to go faster and are willing to rebuild your database if
-  it gets corrupted. #4010
+## 0.4.0-dev.19
+
+## 0.4.0-dev.18
+
+## 0.4.0-dev.17
+
+- minor sbd rate limiting fix - tx5 webrtc buffer size fix - tx5 webrtc connection close fix - better tx5 connection tracing [\#4184](https://github.com/holochain/holochain/pull/4184)
+
+## 0.4.0-dev.16
+
+## 0.4.0-dev.15
+
+## 0.4.0-dev.14
+
+## 0.4.0-dev.13
+
+## 0.4.0-dev.12
+
+## 0.4.0-dev.11
+
+## 0.4.0-dev.10
+
+## 0.4.0-dev.9
+
+- Change the default `DbSyncStrategy` from `Fast` to `Resilient` which should reduce database corruptions. You can override this setting in your conductor config if you wish to go faster and are willing to rebuild your database if it gets corrupted. \#4010
 
 ## 0.4.0-dev.8
 

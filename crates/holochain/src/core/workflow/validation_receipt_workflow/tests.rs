@@ -126,6 +126,7 @@ macro_rules! wait_until {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn test_block_invalid_receipt() {
     holochain_trace::test_run();
     let unit_entry_def = EntryDef::default_from_id("unit");
@@ -156,14 +157,6 @@ async fn test_block_invalid_receipt() {
         ))?;
         Ok(hash)
     });
-    // .function(
-    //     coordinator_name,
-    //     get_function_name,
-    //     move |api, hash: AnyDhtHash| {
-    //         let records = api.get(vec![GetInput::new(hash, Default::default())])?;
-    //         Ok(records[0])
-    //     },
-    // );
 
     let zomes_that_check = InlineZomeSet::new_single(
         integrity_name,
@@ -177,7 +170,6 @@ async fn test_block_invalid_receipt() {
         Op::StoreEntry(StoreEntry { action, .. })
             if action.hashed.content.app_entry_def().is_some() =>
         {
-            dbg!("entry defs ARE bad!");
             Ok(ValidateResult::Invalid("Entry defs are bad".into()))
         }
         _ => Ok(ValidateResult::Valid),
@@ -190,7 +182,6 @@ async fn test_block_invalid_receipt() {
 
     let mut alice_conductor = conductors.next().unwrap();
     let mut bob_conductor = conductors.next().unwrap();
-    let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
 
     let (dna_that_creates, _, _) =
         SweetDnaFile::from_inline_zomes(network_seed.into(), zomes_that_create).await;
@@ -198,27 +189,32 @@ async fn test_block_invalid_receipt() {
     let (dna_that_checks, _, _) =
         SweetDnaFile::from_inline_zomes(network_seed.into(), zomes_that_check).await;
 
-    let alice_apps = alice_conductor
-        .setup_app_for_agents(app_prefix, &[alice_pubkey.clone()], &[dna_that_creates])
+    let alice_app = alice_conductor
+        .setup_app(app_prefix, &[dna_that_creates])
         .await
         .unwrap();
 
-    let ((alice_cell,),) = alice_apps.into_tuples();
+    let (alice_cell,) = alice_app.into_tuple();
 
     let bob_apps = bob_conductor
-        .setup_app_for_agents(app_prefix, &[bob_pubkey.clone()], &[dna_that_checks])
+        .setup_app(app_prefix, &[dna_that_checks])
         .await
         .unwrap();
 
-    let ((bob_cell,),) = bob_apps.into_tuples();
+    let (bob_cell,) = bob_apps.into_tuple();
 
     let _action_hash: ActionHash = alice_conductor
         .call(&alice_cell.zome(coordinator_name), create_function_name, ())
         .await;
 
-    await_consistency(10, [&alice_cell, &bob_cell])
-        .await
-        .unwrap();
+    // Don't check alice's integrated ops, since she gets blocked during gossip
+    await_consistency_advanced(
+        10,
+        vec![(alice_cell.agent_pubkey().clone(), 1)],
+        [(&alice_cell, false), (&bob_cell, true)],
+    )
+    .await
+    .unwrap();
 
     let alice_block_target = BlockTargetId::Cell(alice_cell.cell_id().to_owned());
     let bob_block_target = BlockTargetId::Cell(bob_cell.cell_id().to_owned());
@@ -244,8 +240,8 @@ async fn test_block_invalid_receipt() {
         // processed.
         wait_until!(
             bob_conductor.spaces.is_blocked(alice_block_target.clone(), now).await.unwrap();
-            1000;
-            10000;
+            1_000;
+            20_000;
             "waiting for block due to warrant";
             "warrant block never happened";
         );

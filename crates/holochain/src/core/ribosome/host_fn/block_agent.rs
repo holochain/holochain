@@ -96,7 +96,7 @@ mod test {
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-        let config = SweetConductorConfig::standard()
+        let config = SweetConductorConfig::standard().no_dpki()
             .tune(|tune| {
                 tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
                 tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;
@@ -107,6 +107,7 @@ mod test {
             });
         let mut conductors = SweetConductorBatch::from_config(3, config).await;
         let apps = conductors.setup_app("create", [&dna_file]).await.unwrap();
+
 
         let ((alice_cell,), (bob_cell,), (carol_cell,)) = apps.into_tuples();
 
@@ -143,7 +144,9 @@ mod test {
         let action1: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
         // Now that bob is blocked by alice he cannot get data from alice.
-        await_consistency(10, [&alice_cell]).await.unwrap();
+        await_consistency_advanced(10, vec![], [(&alice_cell, true), (&bob_cell, false)])
+            .await
+            .unwrap();
         let bob_get1: Option<Record> = bob_conductor.call(&bob, "get_post", action1.clone()).await;
 
         assert!(bob_get1.is_none());

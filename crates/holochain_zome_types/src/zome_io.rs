@@ -101,6 +101,9 @@ wasm_io_types! {
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
+    // Check if agent key 2 is of the same lineage as agent key 2.
+    fn is_same_agent ((AgentPubKey, AgentPubKey)) -> bool;
+
     // Retreive a record from the DHT or short circuit.
     fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> zt::record::Record;
 
@@ -204,6 +207,9 @@ wasm_io_types! {
 
     // Open your chain, pointing to the previous DNA
     fn open_chain(zt::chain::OpenChainInput) -> holo_hash::ActionHash;
+
+    // Get validation receipts for an action
+    fn get_validation_receipts(zt::validate::GetValidationReceiptsInput) -> Vec<zt::validate::ValidationReceiptSet>;
 }
 
 /// Anything that can go wrong while calling a HostFnApi method
@@ -255,6 +261,23 @@ pub enum ZomeCallResponse {
     /// A countersigning session has failed to start.
     CountersigningSession(String),
 }
+
+impl std::fmt::Display for ZomeCallResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+#[cfg(feature = "test_utils")]
+impl ZomeCallResponse {
+    pub fn unwrap(self) -> ExternIO {
+        match self {
+            ZomeCallResponse::Ok(output) => output,
+            _ => panic!("Attempted to unwrap a non-Ok ZomeCallResponse"),
+        }
+    }
+}
+
 /// Zome calls need to be signed regardless of how they are called.
 /// This defines exactly what needs to be signed.
 #[derive(Serialize, Deserialize, Debug, Clone)]

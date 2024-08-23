@@ -3,19 +3,20 @@ use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::app_validation_workflow::{
     app_validation_workflow_inner, check_app_entry_def, put_validation_limbo,
-    AppValidationWorkspace, OutcomeSummary, ValidationDependencies,
+    AppValidationWorkspace, OutcomeSummary,
 };
 use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
-use crate::test_utils::{host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration};
+use crate::test_utils::{
+    host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration, ConsistencyConditions,
+};
 use ::fixt::fixt;
 use arbitrary::Arbitrary;
 use hdk::hdi::test_utils::set_zome_types;
 use hdk::prelude::*;
 use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, EntryHash};
 use holochain_conductor_api::conductor::paths::DataRootPath;
-use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations::insert_op;
@@ -31,7 +32,6 @@ use holochain_zome_types::fixt::{CreateFixturator, DeleteFixturator, SignatureFi
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
 use matches::assert_matches;
-use parking_lot::Mutex;
 use rusqlite::{named_params, Transaction};
 use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
@@ -124,8 +124,6 @@ async fn main_workflow() {
             .len();
     assert_eq!(ops_to_validate, 1);
 
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
-
     // run validation workflow
     // outcome should be incomplete - delete op is missing the dependent create op
     let outcome_summary = app_validation_workflow_inner(
@@ -137,7 +135,6 @@ async fn main_workflow() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
-        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -180,7 +177,6 @@ async fn main_workflow() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
-        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -321,8 +317,6 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             .len();
     assert_eq!(ops_to_validate, 2);
 
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
-
     // run validation workflow
     // outcome should be complete
     let outcome_summary = app_validation_workflow_inner(
@@ -334,7 +328,6 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
-        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -463,8 +456,6 @@ async fn validate_ops_in_sequence_must_get_action() {
             .len();
     assert_eq!(ops_to_validate, 2);
 
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
-
     // run validation workflow
     // outcome should be complete
     let outcome_summary = app_validation_workflow_inner(
@@ -476,7 +467,6 @@ async fn validate_ops_in_sequence_must_get_action() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
-        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -513,9 +503,8 @@ async fn multi_create_link_validation() {
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AppValidation]).await;
 
-    let mut conductors = SweetConductorBatch::from_config(2, ConductorConfig::default()).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
     let apps = conductors.setup_app("posts_test", &[dna]).await.unwrap();
-    conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
@@ -621,8 +610,6 @@ async fn handle_error_in_op_validation() {
             .len();
     assert_eq!(ops_to_validate, 2);
 
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
-
     // running validation workflow should finish without errors
     // outcome summary should show 1 validated and accepted op and the error-causing op as still to validate
     // the failed op should be among the failed op hashes
@@ -635,7 +622,6 @@ async fn handle_error_in_op_validation() {
             .get_or_create_space(&dna_hash)
             .unwrap()
             .dht_query_cache,
-        validation_dependencies.clone(),
     )
     .await
     .unwrap();
@@ -783,7 +769,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
         .call(&alice.zome("coordinator"), "create", ())
         .await;
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
+    await_consistency(30, [&alice, &bob]).await.unwrap();
 
     {
         let vfs = validation_failures.lock();
@@ -868,6 +854,7 @@ async fn check_app_entry_def_test() {
             coordinator_zomes: vec![TestZomes::from(TestWasm::EntryDefs)
                 .coordinator
                 .into_inner()],
+            lineage: Default::default(),
         },
         [integrity, coordinator],
     )
@@ -1034,9 +1021,15 @@ async fn app_validation_produces_warrants() {
         )
         .await;
 
-    await_consistency(10, [&alice, &bob]).await.unwrap();
-    // TODO: fix await_consistency to recognize warrants
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    let conditions = ConsistencyConditions::from(vec![(alice.agent_pubkey().clone(), 1)]);
+
+    await_consistency_advanced(
+        10,
+        conditions.clone(),
+        [(&alice, false), (&bob, true), (&carol, false)],
+    )
+    .await
+    .unwrap();
 
     conductors[0].shutdown().await;
     conductors[2].startup().await;
@@ -1053,12 +1046,19 @@ async fn app_validation_produces_warrants() {
         let warrants = store
             .get_warrants_for_basis(&alice_pubkey.into(), false)
             .unwrap();
+        // 3 warrants, one for each op
         assert_eq!(warrants.len(), 1);
     });
 
     // TODO: ensure that bob blocked alice
 
-    await_consistency(10, [&bob, &carol]).await.unwrap();
+    await_consistency_advanced(
+        10,
+        conditions,
+        [(&alice, false), (&bob, true), (&carol, true)],
+    )
+    .await
+    .unwrap();
 
     //- Ensure that carol gets gossiped the warrant for alice from bob
 
@@ -1087,9 +1087,10 @@ async fn app_validation_produces_warrants() {
         )
         .await;
 
+    // 1 warrant, even though there are 3 ops, because we de-dupe
     assert_eq!(activity.warrants.len(), 1);
-    match activity.warrants.first().unwrap() {
-        Warrant::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+    match &activity.warrants.first().unwrap().proof {
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
             action_author,
             action: (hash, _),
             validation_type: _,
@@ -1175,7 +1176,7 @@ fn expected_invalid_remove_link(txn: &Transaction, invalid_remove_hash: &ActionH
 fn limbo_is_empty(txn: &Transaction) -> bool {
     let not_empty: bool = txn
         .query_row(
-            "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NULL)",
+            "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
             [],
             |row| row.get(0),
         )
@@ -1204,9 +1205,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
             }
             DhtOpType::Warrant(_) => {
                 let warrant: SignedWarrant = from_blob(row.get("blob")?)?;
-                let author: AgentPubKey = from_blob(row.get("author")?)?;
-                let (TimedWarrant(warrant, timestamp), signature) = warrant.into();
-                Ok(WarrantOp::new(warrant, author, signature, timestamp).into())
+                Ok(warrant.into())
             }
         }
     })
@@ -1217,7 +1216,7 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
 
 fn num_valid(txn: &Transaction) -> usize {
     txn
-    .query_row("SELECT COUNT(hash) FROM DhtOP WHERE when_integrated IS NOT NULL AND validation_status = :status",
+    .query_row("SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NOT NULL AND validation_status = :status",
             named_params!{
                 ":status": ValidationStatus::Valid,
             },
@@ -1253,7 +1252,9 @@ async fn run_test(
     // Plus 2 for Cap Grant
     let expected_count = 3 + 16 + 2;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
 
@@ -1279,7 +1280,9 @@ async fn run_test(
     // RegisterAgentActivity will be valid.
     let expected_count = 3 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     alice_db
         .read_async({
@@ -1319,7 +1322,9 @@ async fn run_test(
     // Integration should have 6 ops in it
     let expected_count = 6 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     alice_db
         .read_async({
@@ -1367,7 +1372,9 @@ async fn run_test(
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     alice_db
         .read_async({
@@ -1415,7 +1422,9 @@ async fn run_test(
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     alice_db
         .read_async({
@@ -1465,7 +1474,9 @@ async fn run_test(
     // Integration should have 12 ops in it
     let expected_count = 12 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     alice_db
         .read_async({
@@ -1521,7 +1532,9 @@ async fn run_test_entry_def_id(
     // StoreEntry and StoreRecord should be invalid.
     let expected_count = 3 + expected_count;
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
+    wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
+        .await
+        .unwrap();
 
     alice_db
         .read_async(move |txn| -> DatabaseResult<()> {

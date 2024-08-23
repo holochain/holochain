@@ -127,7 +127,8 @@ async fn get_agent_activity_test() {
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
     )
-    .await;
+    .await
+    .unwrap();
 
     let agent_activity = alice_call_data
         .network
@@ -229,7 +230,8 @@ async fn get_agent_activity_test() {
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
     )
-    .await;
+    .await
+    .unwrap();
 
     let mut agent_activity = alice_call_data
         .network
@@ -275,7 +277,8 @@ async fn get_agent_activity_test() {
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
     )
-    .await;
+    .await
+    .unwrap();
 
     // Call alice and get the activity
     let agent_activity = cascade
@@ -366,7 +369,8 @@ async fn get_agent_activity_host_fn_test() {
         NUM_ATTEMPTS,
         DELAY_PER_ATTEMPT.clone(),
     )
-    .await;
+    .await
+    .unwrap();
 
     let agent_activity = alice_call_data
         .get_api(TestWasm::Create)

@@ -1,5 +1,5 @@
 use hdk::prelude::*;
-use holochain::conductor::config::ConductorConfig;
+use holochain::conductor::config::{ConductorConfig, DpkiConfig};
 use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::*;
 use holochain_conductor_api::conductor::ConductorTuningParams;
@@ -11,6 +11,36 @@ use unwrap_to::unwrap_to;
 #[serde(transparent)]
 #[repr(transparent)]
 struct AppString(String);
+
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+async fn dpki_publish() {
+    holochain_trace::test_run();
+
+    let config = SweetConductorConfig::standard();
+    let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+
+    conductors.exchange_peer_info().await;
+
+    await_consistency(10, conductors.dpki_cells().as_slice())
+        .await
+        .unwrap();
+}
+
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+async fn dpki_no_publish() {
+    holochain_trace::test_run();
+
+    let config = SweetConductorConfig::standard().no_publish();
+    let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+
+    conductors.exchange_peer_info().await;
+
+    await_consistency(10, conductors.dpki_cells().as_slice())
+        .await
+        .unwrap();
+}
 
 /// Test that op publishing is sufficient for bobbo to get alice's op
 /// even with gossip disabled.
@@ -36,6 +66,7 @@ async fn test_publish() -> anyhow::Result<()> {
         tuning_params: Some(ConductorTuningParams {
             sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),
         }),
+        dpki: DpkiConfig::disabled(),
         ..ConductorConfig::default()
     };
 
@@ -77,19 +108,20 @@ async fn test_publish() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
-    holochain_trace::test_run();
+    holochain_trace::init_fmt(holochain_trace::Output::Log).unwrap();
 
     const NUM_CONDUCTORS: usize = 3;
 
-    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|config| {
-        // The default is 10s which makes the test very slow in the case that get requests in the sys validation workflow
-        // hit a conductor which isn't serving that data yet. Speed up by retrying more quickly.
-        config.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
-    });
+    let config = SweetConductorConfig::rendezvous(true)
+        .tune_conductor(|config| {
+            // The default is 10s which makes the test very slow in the case that get requests in the sys validation workflow
+            // hit a conductor which isn't serving that data yet. Speed up by retrying more quickly.
+            config.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+        })
+        .no_dpki_mustfix();
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 
@@ -97,7 +129,10 @@ async fn multi_conductor() -> anyhow::Result<()> {
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    conductors.exchange_peer_info().await;
+
+    let dpki_cells = conductors.dpki_cells();
+
+    await_consistency(20, dpki_cells.as_slice()).await.unwrap();
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
@@ -107,7 +142,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    await_consistency(10, [&alice, &bobbo, &carol])
+    await_consistency(20, [&alice, &bobbo, &carol])
         .await
         .unwrap();
 
@@ -131,6 +166,13 @@ async fn multi_conductor() -> anyhow::Result<()> {
     // See if we can fetch network stats from bobbo
     let stats = conductors[1].dump_network_stats().await?;
     tracing::info!(target: "TEST", "@!@! - stats: {stats}");
+
+    let stats: tx5::stats::Stats = serde_json::from_str(&stats).unwrap();
+
+    // make sure that, by this point, we have upgraded connections to webrtc
+    for con in stats.connection_list {
+        assert!(con.is_webrtc);
+    }
 
     Ok(())
 }
@@ -221,23 +263,20 @@ async fn private_entries_dont_leak() {
                 .map_err(Into::into)
         });
 
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.0).await;
     let dnas = vec![dna_file];
 
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
-
     let ((alice,), (bobbo,)) = apps.into_tuples();
-
-    conductors.exchange_peer_info().await;
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    await_consistency(60, [&alice, &bobbo]).await.unwrap();
+    await_consistency(10, [&alice, &bobbo]).await.unwrap();
 
     let entry_hash =
         EntryHash::with_data_sync(&Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap());
@@ -261,7 +300,7 @@ async fn private_entries_dont_leak() {
     let bob_hash: ActionHash = conductors[1]
         .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
-    await_consistency(60, [&alice, &bobbo]).await.unwrap();
+    await_consistency(10, [&alice, &bobbo]).await.unwrap();
 
     check_all_gets_for_private_entry(
         &conductors[0],
@@ -299,7 +338,7 @@ async fn private_entries_dont_leak() {
     check_for_private_entries(conductors[1].get_cache_db(bobbo.cell_id()).await.unwrap()).await;
 }
 
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 async fn check_for_private_entries<Kind: DbKindT>(env: DbWrite<Kind>) {
     let count: usize = env.read_async(move |txn| -> DatabaseResult<usize> {
         Ok(txn.query_row(

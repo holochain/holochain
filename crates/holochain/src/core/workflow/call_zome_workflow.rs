@@ -1,12 +1,12 @@
 use super::app_validation_workflow;
 use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
-use super::app_validation_workflow::ValidationDependencies;
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::ConductorHandle;
+use crate::core::check_dpki_agent_validity_for_record;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
@@ -17,13 +17,12 @@ use crate::core::workflow::WorkflowError;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::prelude::IncompleteCommitReason;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use holochain_zome_types::record::Record;
-use parking_lot::Mutex;
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use tracing::instrument;
 
 #[cfg(test)]
 mod validation_test;
@@ -40,14 +39,17 @@ pub struct CallZomeWorkflowArgs<RibosomeT> {
     pub cell_id: CellId,
 }
 
-#[instrument(skip(
-    workspace,
-    network,
-    keystore,
-    args,
-    trigger_publish_dht_ops,
-    trigger_integrate_dht_ops
-))]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(
+        workspace,
+        network,
+        keystore,
+        args,
+        trigger_publish_dht_ops,
+        trigger_integrate_dht_ops
+    ))
+)]
 pub async fn call_zome_workflow<Ribosome>(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
@@ -63,6 +65,12 @@ where
         .ribosome
         .dna_def()
         .get_coordinator_zome(args.invocation.zome.zome_name())
+        .or_else(|_| {
+            args.ribosome
+                .dna_def()
+                .get_integrity_zome(args.invocation.zome.zome_name())
+                .map(CoordinatorZome::from)
+        })
         .ok();
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
@@ -70,7 +78,6 @@ where
     let result =
         call_zome_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
-
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
@@ -122,7 +129,6 @@ where
             }
         }
     };
-
     Ok(result)
 }
 
@@ -164,6 +170,8 @@ where
 
     // If the validation failed remove any active chain lock that matches the
     // entry that failed validation.
+    // Note that missing dependencies will not produce an `InvalidCommit` but an `IncompleteCommit`
+    // so that the commit can be retried later without terminating the countersigning session.
     if matches!(
         validation_result,
         Err(WorkflowError::SourceChainError(
@@ -206,11 +214,8 @@ where
 {
     match invocation.is_authorized(&host_access).await? {
         ZomeCallAuthorization::Authorized => {
-            tokio::task::spawn_blocking(|| {
-                let r = ribosome.call_zome_function(host_access, invocation);
-                Ok((ribosome, r))
-            })
-            .await?
+            let r = ribosome.call_zome_function(host_access, invocation).await;
+            Ok((ribosome, r))
         }
         not_authorized_reason => Ok((
             ribosome,
@@ -240,9 +245,28 @@ where
         Arc::new(network.clone()),
     ));
 
-    let to_app_validate = {
+    let scratch_records = workspace.source_chain().scratch_records()?;
+
+    if let Some(dpki) = conductor_handle.running_services().dpki.clone() {
+        // Don't check DPKI validity on DPKI itself!
+        if !dpki.is_deepkey_dna(workspace.source_chain().cell_id().dna_hash()) {
+            // Check the validity of the author as-at the first and the last record to be committed.
+            // If these are valid, then the author is valid for the entire commit.
+            let first = scratch_records.first();
+            let last = scratch_records.last();
+            if let Some(r) = first {
+                check_dpki_agent_validity_for_record(&dpki, r).await?;
+            }
+            if let Some(r) = last {
+                if first != last {
+                    check_dpki_agent_validity_for_record(&dpki, r).await?;
+                }
+            }
+        }
+    }
+
+    let records = {
         // collect all the records we need to validate in wasm
-        let scratch_records = workspace.source_chain().scratch_records()?;
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
         // Loop forwards through all the new records
         for record in scratch_records {
@@ -250,33 +274,35 @@ where
                 .await
                 // If the was en error exit
                 // If the validation failed, exit with an InvalidCommit
+                // If the validation failed with a retryable error, exit with an IncompleteCommit
                 // If it was ok continue
-                .or_else(|outcome_or_err| outcome_or_err.invalid_call_zome_commit())?;
+                .or_else(|outcome_or_err| outcome_or_err.into_workflow_error())?;
             to_app_validate.push(record);
         }
 
         to_app_validate
     };
 
-    for mut chain_record in to_app_validate {
+    let dpki = conductor_handle.running_services().dpki;
+
+    for mut chain_record in records {
         for op_type in action_to_op_types(chain_record.action()) {
-            let op =
+            let outcome =
                 app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;
 
-            let (op, dht_op_hash, omitted_entry) = match op {
+            let (op, _, omitted_entry) = match outcome {
                 Ok(op) => op,
                 Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
             };
-            let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
 
             let outcome = app_validation_workflow::validate_op(
                 &op,
-                &dht_op_hash,
                 workspace.clone().into(),
                 &network,
                 &ribosome,
                 &conductor_handle,
-                validation_dependencies.clone(),
+                dpki.clone(),
+                true, // is_inline
             )
             .await;
             let outcome = outcome.or_else(Outcome::try_from);
@@ -324,26 +350,27 @@ fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     }
 }
 
-fn map_outcome(
-    outcome: Result<app_validation_workflow::Outcome, AppValidationError>,
-) -> WorkflowResult<()> {
+fn map_outcome(outcome: Result<Outcome, AppValidationError>) -> WorkflowResult<()> {
     match outcome.map_err(SourceChainError::other)? {
         app_validation_workflow::Outcome::Accepted => {}
         app_validation_workflow::Outcome::Rejected(reason) => {
-            return Err(SourceChainError::InvalidCommit(reason).into());
-        }
-        // when the wasm is being called directly in a zome invocation any
-        // state other than valid is not allowed for new entries
-        // e.g. we require that all dependencies are met when committing an
-        // entry to a local source chain
-        // this is different to the case where we are validating data coming in
-        // from the network where unmet dependencies would need to be
-        // rescheduled to attempt later due to partitions etc.
-        app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
             return Err(SourceChainError::InvalidCommit(format!(
-                "Awaiting deps {:?} but this is not allowed when committing entries to the source chain",
-                hashes
+                "Validation failed while committing: {reason}"
             ))
+            .into());
+        }
+        // When the wasm is being called directly in a zome invocation, any state other than valid
+        // is not allowed for new entries. E.g. we require that all dependencies are met when
+        // committing an entry to a local source chain.
+        // This is different to the case where we are validating data coming in from the network
+        // where unmet dependencies would be rescheduled to attempt later due to partitions etc.
+        // To allow the client to decide whether to retry later, we return a different error
+        // variant here. This indicates that the validation did not fail because the data is
+        // definitely invalid, but because validation could not make a decision yet.
+        Outcome::AwaitingDeps(hashes) => {
+            return Err(SourceChainError::IncompleteCommit(
+                IncompleteCommitReason::DepMissingFromDht(hashes),
+            )
             .into());
         }
     }

@@ -249,6 +249,7 @@ impl ShardedGossip {
         Ok(AgentInfoSession::new(local_agents, all_agents))
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
         let (cert, how, gossip) = outgoing;
         match self.gossip.gossip_type {
@@ -297,6 +298,7 @@ impl ShardedGossip {
             }
             HowToConnect::Url(url) => self.ep_hnd.get_connection(url, timeout).await?,
         };
+
         // Wait for enough available outgoing bandwidth here before
         // actually sending the gossip.
         con.notify(&wire, timeout).await?;
@@ -325,7 +327,12 @@ impl ShardedGossip {
         };
 
         if let Some(msg) = outgoing.as_ref() {
-            tracing::debug!(
+            let remote_url = match &msg.1 {
+                HowToConnect::Con(_, url) => url.clone(),
+                HowToConnect::Url(url) => url.clone(),
+            };
+            tracing::trace!(
+                target: "NETAUDIT",
                 "OUTGOING GOSSIP [{}]  => {:17} ({:10}) : this -> {:?} [{}]",
                 gossip_type_char,
                 msg.2
@@ -333,7 +340,7 @@ impl ShardedGossip {
                     .to_string()
                     .replace("ShardedGossipWire::", ""),
                 msg.2.encode_vec().expect("can't encode msg").len(),
-                &msg.0,
+                remote_url,
                 self.gossip
                     .inner
                     .share_mut(|s, _| Ok(s.round_map.current_rounds().len()))
@@ -354,12 +361,13 @@ impl ShardedGossip {
                 .await
             {
                 Ok(r) => {
-                    tracing::debug!(
+                    tracing::trace!(
+                        target: "NETAUDIT",
                         "INCOMING GOSSIP [{}] <=  {:17} ({:10}) : {:?} -> this [{}]",
                         gossip_type_char,
                         variant_type,
                         len,
-                        con.peer_id(),
+                        remote_url,
                         self.gossip
                             .inner
                             .share_mut(|s, _| Ok(s.round_map.current_rounds().len()))

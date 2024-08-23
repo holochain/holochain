@@ -19,6 +19,9 @@ pub enum SourceChainError {
     #[error("The source chain is empty, but is expected to have been initialized")]
     ChainEmpty,
 
+    #[error("Agent key {0} invalid in cell {1}")]
+    InvalidAgentKey(AgentPubKey, CellId),
+
     #[error(
         "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {2:?}, Current head: {3:?}"
     )]
@@ -81,6 +84,9 @@ pub enum SourceChainError {
 
     #[error("InvalidCommit error: {0}")]
     InvalidCommit(String),
+
+    #[error("The commit could not be completed but may be retried: {0:?}")]
+    IncompleteCommit(IncompleteCommitReason),
 
     #[error("InvalidLink error: {0}")]
     InvalidLink(String),
@@ -162,6 +168,19 @@ pub enum ChainInvalidReason {
 
     #[error("Content was expected to definitely exist at this address, but didn't: {0}")]
     MissingData(EntryHash),
+}
+
+/// The reason that a commit could not be completed.
+///
+/// These errors are required to be retryable. They may not succeed in the future, so it is up to
+/// the caller to decide whether to retry, but they are not fatal errors.
+#[derive(Debug)]
+pub enum IncompleteCommitReason {
+    /// Inline validation failed because of missing dependencies.
+    ///
+    /// This may happen if you depend on something that has been created but not widely published
+    /// yet, so that doing a `get` for it might miss it.
+    DepMissingFromDht(Vec<AnyDhtHash>),
 }
 
 pub type SourceChainResult<T> = Result<T, SourceChainError>;

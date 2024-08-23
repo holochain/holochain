@@ -1,6 +1,7 @@
 //! Displays a table of info about each gossip round a node has participated in.
 
-use crate::dht::prelude::RegionData;
+use kitsune_p2p::{dht::region::RegionData, GossipModuleType};
+
 use std::fmt::Display;
 
 use super::*;

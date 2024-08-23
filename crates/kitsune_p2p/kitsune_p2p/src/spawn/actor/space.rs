@@ -172,6 +172,14 @@ impl ghost_actor::GhostHandler<SpaceInternal> for Space {}
 
 impl SpaceInternalHandler for Space {
     fn handle_new_address(&mut self, local_url: String) -> SpaceInternalHandlerResult<()> {
+        // shut down open gossip rounds, since we will
+        // now be identified differently
+        for agent in self.local_joined_agents.keys() {
+            for module in self.gossip_mod.values() {
+                module.local_agent_leave(agent.clone());
+                module.local_agent_join(agent.clone());
+            }
+        }
         *self.ro_inner.local_url.lock().unwrap() = Some(local_url);
         self.handle_update_agent_info()
     }
@@ -360,6 +368,7 @@ impl SpaceInternalHandler for Space {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_incoming_delegate_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -570,6 +579,7 @@ impl SpaceInternalHandler for Space {
         .into())
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_notify(&mut self, to_agent: KAgent, data: wire::Wire) -> InternalHandlerResult<()> {
         let ro_inner = self.ro_inner.clone();
         let timeout = ro_inner.config.tuning_params.implicit_timeout();
@@ -823,9 +833,21 @@ impl KitsuneP2pHandler for Space {
         initial_arq: Option<Arq>,
     ) -> KitsuneP2pHandlerResult<()> {
         tracing::debug!(?space, ?agent, ?initial_arq, "handle_join");
-        if let Some(initial_arq) = initial_arq {
-            self.agent_arqs.insert(agent.clone(), initial_arq);
+
+        match initial_arq {
+            // This agent has been on the network before and has an arc stored on the Kitsune host.
+            // Respect the current storage settings and apply this arc.
+            Some(initial_arq) => {
+                self.agent_arqs.insert(agent.clone(), initial_arq);
+            }
+            // This agent is new to the network and has no arc stored on the Kitsune host.
+            // Get a default arc for the agent
+            None => {
+                self.agent_arqs
+                    .insert(agent.clone(), self.default_arc_for_agent(agent.clone()));
+            }
         }
+
         self.local_joined_agents
             .insert(agent.clone(), maybe_agent_info);
         for module in self.gossip_mod.values() {
@@ -975,6 +997,7 @@ impl KitsuneP2pHandler for Space {
         Ok(fut.boxed().into())
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -1131,6 +1154,7 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_targeted_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -1608,15 +1632,25 @@ impl Space {
         // In the case an initial_arc is passed into the join request,
         // handle_join will initialize this agent_arcs map to that value.
         self.agent_arqs.get(agent).cloned().unwrap_or_else(|| {
-            let dim = SpaceDimension::standard();
-            match self.config.tuning_params.arc_clamping() {
-                Some(ArqClamping::Empty) => Arq::new_empty(dim, agent.get_loc()),
-                Some(ArqClamping::Full) | None => {
-                    let strat = self.config.tuning_params.to_arq_strat();
-                    Arq::new_full_max(dim, &strat, agent.get_loc())
-                }
-            }
+            tracing::warn!("Using default arc for agent, this should be configured by the host or initialised on network join");
+            self.default_arc_for_agent((*agent).clone())
         })
+    }
+
+    /// Get the default arc for an agent.
+    ///
+    /// The default arc depends on the Kitsune tuning parameters.
+    /// - Either arc clamping is set to empty and the arc is empty, or
+    /// - The arc clamping is set to full or not set, in which cases the arc is full.
+    fn default_arc_for_agent(&self, agent: Arc<KitsuneAgent>) -> Arq {
+        let dim = SpaceDimension::standard();
+        match self.config.tuning_params.arc_clamping() {
+            Some(ArqClamping::Empty) => Arq::new_empty(dim, agent.get_loc()),
+            Some(ArqClamping::Full) | None => {
+                let strat = self.config.tuning_params.to_arq_strat();
+                Arq::new_full_max(dim, &strat, agent.get_loc())
+            }
+        }
     }
 }
 

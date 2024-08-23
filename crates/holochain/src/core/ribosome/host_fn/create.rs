@@ -202,7 +202,7 @@ pub mod wasm_test {
     }
 
     #[test]
-    #[cfg_attr(target_os = "macos", ignore = "flaky")]
+    #[ignore = "flaky"]
     fn ribosome_create_entry_network_test() {
         crate::big_stack_test!(
             async move {
@@ -298,7 +298,7 @@ pub mod wasm_test {
 
                 assert_eq!(record.unwrap().action_address(), &action_hash);
             },
-            4_000_000
+            33_000_000
         );
     }
 

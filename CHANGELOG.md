@@ -14,6 +14,729 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240823.100115
+
+## [hc\_service\_check-0.1.0-dev.16](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.16)
+
+## [hcterm-0.4.0-dev.20](crates/hcterm/CHANGELOG.md#0.4.0-dev.20)
+
+## [holochain\_cli-0.4.0-dev.20](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.20)
+
+## [holochain-0.4.0-dev.20](crates/holochain/CHANGELOG.md#0.4.0-dev.20)
+
+- **BREAKING\!** Enables dynamic database encryption. (as opposed to the hard-coded key that was previously being used.) NOTE - this is incompatible with all previous holochain databases, they will not open, and must be deleted. NOTE - this is incompatible with all previous lair databases, they will not open and must be deleted. [\#4198](https://github.com/holochain/holochain/pull/4198)
+
+## [holochain\_cli\_bundle-0.4.0-dev.20](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.20)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.15](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.20](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.20)
+
+## [holochain\_cascade-0.4.0-dev.20](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.20)
+
+## [holochain\_conductor\_api-0.4.0-dev.20](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.20)
+
+## [holochain\_conductor\_services-0.3.0-dev.20](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.20)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.14](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.20](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.20)
+
+## [holochain\_websocket-0.4.0-dev.20](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.20)
+
+## [holochain\_state-0.4.0-dev.20](crates/holochain_state/CHANGELOG.md#0.4.0-dev.20)
+
+## [holochain\_p2p-0.4.0-dev.20](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.20)
+
+## [hc\_sleuth-0.4.0-dev.20](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.20)
+
+## [aitia-0.3.0-dev.5](crates/aitia/CHANGELOG.md#0.3.0-dev.5)
+
+## [holochain\_state\_types-0.4.0-dev.12](crates/holochain_state_types/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_types-0.4.0-dev.20](crates/holochain_types/CHANGELOG.md#0.4.0-dev.20)
+
+## [kitsune\_p2p-0.4.0-dev.19](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.19)
+
+## [hc\_deepkey\_sdk-0.7.0-dev.3](crates/hc_deepkey_sdk/CHANGELOG.md#0.7.0-dev.3)
+
+## [holochain\_keystore-0.4.0-dev.18](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_sqlite-0.4.0-dev.18](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.18)
+
+## [kitsune\_p2p\_bootstrap\_client-0.4.0-dev.13](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.4.0-dev.13)
+
+## [kitsune\_p2p\_fetch-0.4.0-dev.12](crates/kitsune_p2p_fetch/CHANGELOG.md#0.4.0-dev.12)
+
+## [kitsune\_p2p\_proxy-0.4.0-dev.12](crates/kitsune_p2p_proxy/CHANGELOG.md#0.4.0-dev.12)
+
+## [mr\_bundle-0.4.0-dev.7](crates/mr_bundle/CHANGELOG.md#0.4.0-dev.7)
+
+## [hc\_deepkey\_types-0.8.0-dev.3](crates/hc_deepkey_types/CHANGELOG.md#0.8.0-dev.3)
+
+## [hdk-0.4.0-dev.14](crates/hdk/CHANGELOG.md#0.4.0-dev.14)
+
+## [kitsune\_p2p\_bootstrap-0.3.0-dev.13](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.3.0-dev.13)
+
+## [hdi-0.5.0-dev.12](crates/hdi/CHANGELOG.md#0.5.0-dev.12)
+
+## [holochain\_zome\_types-0.4.0-dev.14](crates/holochain_zome_types/CHANGELOG.md#0.4.0-dev.14)
+
+## [kitsune\_p2p\_types-0.4.0-dev.12](crates/kitsune_p2p_types/CHANGELOG.md#0.4.0-dev.12)
+
+## [hdk\_derive-0.4.0-dev.12](crates/hdk_derive/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_nonce-0.4.0-dev.6](crates/holochain_nonce/CHANGELOG.md#0.4.0-dev.6)
+
+## [kitsune\_p2p\_block-0.4.0-dev.11](crates/kitsune_p2p_block/CHANGELOG.md#0.4.0-dev.11)
+
+## [kitsune\_p2p\_dht-0.4.0-dev.9](crates/kitsune_p2p_dht/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_integrity\_types-0.4.0-dev.12](crates/holochain_integrity_types/CHANGELOG.md#0.4.0-dev.12)
+
+## [kitsune\_p2p\_bin\_data-0.4.0-dev.11](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.4.0-dev.11)
+
+## [holo\_hash-0.4.0-dev.11](crates/holo_hash/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_util-0.4.0-dev.4](crates/holochain_util/CHANGELOG.md#0.4.0-dev.4)
+
+## [kitsune\_p2p\_dht\_arc-0.4.0-dev.9](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_trace-0.4.0-dev.5](crates/holochain_trace/CHANGELOG.md#0.4.0-dev.5)
+
+## [kitsune\_p2p\_timestamp-0.4.0-dev.4](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.4.0-dev.4)
+
+# 20240819.140303
+
+## [hc\_service\_check-0.1.0-dev.15](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.15)
+
+## [hcterm-0.4.0-dev.19](crates/hcterm/CHANGELOG.md#0.4.0-dev.19)
+
+## [holochain\_cli-0.4.0-dev.19](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.19)
+
+## [holochain-0.4.0-dev.19](crates/holochain/CHANGELOG.md#0.4.0-dev.19)
+
+- Adds DPKI support. This is not fully hooked up, so the main implication for this particular implementation is that you must be using the same DPKI implementation as all other nodes on the network that you wish to talk to. If the DPKI version mismatches, you cannot establish connections, and will see so as an error in the logs. This work is in preparation for future work which will make it possible to restore your keys if you lose your device, and to revoke and replace your keys if your device is stolen or compromised.
+- Add feature to revoke agent keys. A new call `AdminRequest::RevokeAgentKey` is exposed on the Admin API. Revoking a key for an app will render the key invalid from that moment on and make the source chain of all cells of the app read-only. The key is revoked in the Deepkey service if installed and deleted on all cells’ source chains. No more actions can be written to any of these source chains. Further it will fail to clone a cell of the app.
+- App validation workflow: Remove tracking of missing dependencies. Tracking them introduces higher complexity and the possibility of ops under validation to be stuck. The delay before re-triggering app validation is increased to 100-3000 ms, giving the background task that fetches missing dependencies a chance to complete.
+
+## [holochain\_cli\_bundle-0.4.0-dev.19](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.19)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.14](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.19](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.19)
+
+## [holochain\_cascade-0.4.0-dev.19](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.19)
+
+## [holochain\_conductor\_api-0.4.0-dev.19](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.19)
+
+- BREAKING: In the `InstallApp` request, the `agent_key` is now optional. When not specified, an agent key will be provided. This is especially applicable when using DPKI, which requires that all keys are generated rather than externally provided.
+
+## [holochain\_conductor\_services-0.3.0-dev.19](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.19)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.13](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.19](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.19)
+
+## [holochain\_websocket-0.4.0-dev.19](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.19)
+
+## [hdk-0.4.0-dev.13](crates/hdk/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_state-0.4.0-dev.19](crates/holochain_state/CHANGELOG.md#0.4.0-dev.19)
+
+## [hdi-0.5.0-dev.11](crates/hdi/CHANGELOG.md#0.5.0-dev.11)
+
+## [holochain\_p2p-0.4.0-dev.19](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.19)
+
+## [hc\_sleuth-0.4.0-dev.19](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.19)
+
+## [hdk\_derive-0.4.0-dev.11](crates/hdk_derive/CHANGELOG.md#0.4.0-dev.11)
+
+## [aitia-0.3.0-dev.4](crates/aitia/CHANGELOG.md#0.3.0-dev.4)
+
+## [holochain\_state\_types-0.4.0-dev.11](crates/holochain_state_types/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_types-0.4.0-dev.19](crates/holochain_types/CHANGELOG.md#0.4.0-dev.19)
+
+- `AppRoleAssignment::base_cell_id` has become `AppRoleAssignment::base_dna_hash`, because the agent key will always be the same for every cell in the app, so it’s redundant to include a CellId which contains the same agent key as the app.
+
+## [kitsune\_p2p-0.4.0-dev.18](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_keystore-0.4.0-dev.17](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_sqlite-0.4.0-dev.17](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.17)
+
+## [kitsune\_p2p\_bootstrap\_client-0.4.0-dev.12](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.4.0-dev.12)
+
+## [kitsune\_p2p\_fetch-0.4.0-dev.11](crates/kitsune_p2p_fetch/CHANGELOG.md#0.4.0-dev.11)
+
+## [kitsune\_p2p\_proxy-0.4.0-dev.11](crates/kitsune_p2p_proxy/CHANGELOG.md#0.4.0-dev.11)
+
+## [mr\_bundle-0.4.0-dev.6](crates/mr_bundle/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_zome\_types-0.4.0-dev.13](crates/holochain_zome_types/CHANGELOG.md#0.4.0-dev.13)
+
+- **BREAKING**: `CloneCellId::CellId` has become `CloneCellId::DnaHash`. Now that it’s required that all cells in an app be installed under the same agent key, and because we don’t yet support sharing cells across apps, the DnaHash is sufficient to identify a clone cell within an app. If we allow cell sharing, this may change.
+
+## [kitsune\_p2p\_bootstrap-0.3.0-dev.12](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.3.0-dev.12)
+
+## [holochain\_integrity\_types-0.4.0-dev.11](crates/holochain_integrity_types/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_nonce-0.4.0-dev.5](crates/holochain_nonce/CHANGELOG.md#0.4.0-dev.5)
+
+## [kitsune\_p2p\_block-0.4.0-dev.10](crates/kitsune_p2p_block/CHANGELOG.md#0.4.0-dev.10)
+
+## [kitsune\_p2p\_types-0.4.0-dev.11](crates/kitsune_p2p_types/CHANGELOG.md#0.4.0-dev.11)
+
+## [holo\_hash-0.4.0-dev.10](crates/holo_hash/CHANGELOG.md#0.4.0-dev.10)
+
+## [kitsune\_p2p\_bin\_data-0.4.0-dev.10](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.4.0-dev.10)
+
+## [kitsune\_p2p\_dht-0.4.0-dev.8](crates/kitsune_p2p_dht/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_util-0.4.0-dev.3](crates/holochain_util/CHANGELOG.md#0.4.0-dev.3)
+
+## [kitsune\_p2p\_dht\_arc-0.4.0-dev.8](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_trace-0.4.0-dev.4](crates/holochain_trace/CHANGELOG.md#0.4.0-dev.4)
+
+## [kitsune\_p2p\_timestamp-0.4.0-dev.3](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.4.0-dev.3)
+
+# 20240815.102626
+
+## [hc\_service\_check-0.1.0-dev.14](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.14)
+
+## [hcterm-0.4.0-dev.18](crates/hcterm/CHANGELOG.md#0.4.0-dev.18)
+
+- Adds a new `hcterm` landing screen to show what args have been provided and how to use the app.
+- Fixes the network info screen of `hcterm` to not fetch network info on every render. Instead, it uses a 10s automatic refresh to fetch the network info.
+
+## [holochain\_cli-0.4.0-dev.18](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain-0.4.0-dev.18](crates/holochain/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_cli\_bundle-0.4.0-dev.18](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.13](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.18](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_cascade-0.4.0-dev.18](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_conductor\_api-0.4.0-dev.18](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_conductor\_services-0.3.0-dev.18](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.18)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.18](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_websocket-0.4.0-dev.18](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_state-0.4.0-dev.18](crates/holochain_state/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_p2p-0.4.0-dev.18](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.18)
+
+## [hc\_sleuth-0.4.0-dev.18](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_types-0.4.0-dev.18](crates/holochain_types/CHANGELOG.md#0.4.0-dev.18)
+
+## [kitsune\_p2p-0.4.0-dev.17](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.17)
+
+- minor sbd rate limiting fix - tx5 webrtc buffer size fix - tx5 webrtc connection close fix - better tx5 connection tracing [\#4184](https://github.com/holochain/holochain/pull/4184)
+
+## [holochain\_sqlite-0.4.0-dev.16](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.16)
+
+# 20240814.004012
+
+## [hcterm-0.4.0-dev.17](crates/hcterm/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_cli-0.4.0-dev.17](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain-0.4.0-dev.17](crates/holochain/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_cli\_bundle-0.4.0-dev.17](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.17](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_cascade-0.4.0-dev.17](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_conductor\_api-0.4.0-dev.17](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_conductor\_services-0.3.0-dev.17](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.17)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.17](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_websocket-0.4.0-dev.17](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_state-0.4.0-dev.17](crates/holochain_state/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_p2p-0.4.0-dev.17](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.17)
+
+## [hc\_sleuth-0.4.0-dev.17](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_types-0.4.0-dev.17](crates/holochain_types/CHANGELOG.md#0.4.0-dev.17)
+
+## [kitsune\_p2p-0.4.0-dev.16](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.16)
+
+## [holochain\_keystore-0.4.0-dev.16](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.16)
+
+# 20240807.004831
+
+## [hcterm-0.4.0-dev.16](crates/hcterm/CHANGELOG.md#0.4.0-dev.16)
+
+## [holochain\_cli-0.4.0-dev.16](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.16)
+
+## [holochain-0.4.0-dev.16](crates/holochain/CHANGELOG.md#0.4.0-dev.16)
+
+- App manifest field `membrane_proofs_deferred` renamed to `allow_deferred_memproofs`, and the semantics are changed accordingly: if this field is set and memproofs are not provided at installation time (i.e. None is used), then the app will go into the deferred memproof state. Otherwise, if the field is set and memproofs are provided, installation will proceed as if the field were not set.
+- Adds the [`UseExisting`](https://github.com/holochain/holochain/blob/293d6e775b3f02285b831626c9911802207a8d85/crates/holochain_types/src/app/app_manifest/app_manifest_v1.rs#L155-L165) cell provisioning strategy, an alternative to `Create`, allowing an app to depend on a cell from another installed app. Read the rustdocs for more info on this new type of provisioning.
+- New protections are put in place for apps which are depended upon by other apps via `UseExisting`. Any “protected” inter-app dependency will prevent a dependency app from being uninstalled until the dependent app is also uninstalled, or if the `force` parameter is set to true in the `UninstallApp` call.
+- CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the
+- *BREAKING* Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies. \#4129
+- Based on the change above, about adding `IncompleteCommit`, a countersigning session will no longer terminate on missing dependencies. You may retry committing the countersigned entry if you get this error. \#4129
+- *BREAKING* CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry. This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded. \#4124
+
+## [holochain\_cli\_bundle-0.4.0-dev.16](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.16)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.16](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.16)
+
+## [holochain\_cascade-0.4.0-dev.16](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.16)
+
+## [holochain\_conductor\_api-0.4.0-dev.16](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.16)
+
+## [holochain\_conductor\_services-0.3.0-dev.16](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.16)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.12](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.16](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.16)
+
+## [holochain\_websocket-0.4.0-dev.16](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.16)
+
+## [hdk-0.4.0-dev.12](crates/hdk/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_state-0.4.0-dev.16](crates/holochain_state/CHANGELOG.md#0.4.0-dev.16)
+
+## [holochain\_p2p-0.4.0-dev.16](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.16)
+
+## [hc\_sleuth-0.4.0-dev.16](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.16)
+
+## [holochain\_types-0.4.0-dev.16](crates/holochain_types/CHANGELOG.md#0.4.0-dev.16)
+
+## [kitsune\_p2p-0.4.0-dev.15](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_keystore-0.4.0-dev.15](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_sqlite-0.4.0-dev.15](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_zome\_types-0.4.0-dev.12](crates/holochain_zome_types/CHANGELOG.md#0.4.0-dev.12)
+
+# 20240731.003232
+
+## [hc\_service\_check-0.1.0-dev.13](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.13)
+
+## [hcterm-0.4.0-dev.15](crates/hcterm/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_cli-0.4.0-dev.15](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain-0.4.0-dev.15](crates/holochain/CHANGELOG.md#0.4.0-dev.15)
+
+- *BREAKING* Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies. \#4129
+- Based on the change above, about adding `IncompleteCommit`, a countersigning session will no longer terminate on missing dependencies. You may retry committing the countersigned entry if you get this error. \#4129
+- *BREAKING* CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry. This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded. \#4124
+
+## [holochain\_cli\_bundle-0.4.0-dev.15](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.15](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_cascade-0.4.0-dev.15](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_conductor\_api-0.4.0-dev.15](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_conductor\_services-0.3.0-dev.15](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.15)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.15](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_websocket-0.4.0-dev.15](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_state-0.4.0-dev.15](crates/holochain_state/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_p2p-0.4.0-dev.15](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.15)
+
+## [hc\_sleuth-0.4.0-dev.15](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_types-0.4.0-dev.15](crates/holochain_types/CHANGELOG.md#0.4.0-dev.15)
+
+## [kitsune\_p2p-0.4.0-dev.14](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.14)
+
+# 20240724.004744
+
+## [hc\_service\_check-0.1.0-dev.12](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.12)
+
+## [hcterm-0.4.0-dev.14](crates/hcterm/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_cli-0.4.0-dev.14](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain-0.4.0-dev.14](crates/holochain/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_cli\_bundle-0.4.0-dev.14](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.14](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_cascade-0.4.0-dev.14](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_conductor\_api-0.4.0-dev.14](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_conductor\_services-0.3.0-dev.14](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.14)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.14](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_websocket-0.4.0-dev.14](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_state-0.4.0-dev.14](crates/holochain_state/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_p2p-0.4.0-dev.14](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.14)
+
+## [hc\_sleuth-0.4.0-dev.14](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_types-0.4.0-dev.14](crates/holochain_types/CHANGELOG.md#0.4.0-dev.14)
+
+## [kitsune\_p2p-0.4.0-dev.13](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_keystore-0.4.0-dev.14](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_sqlite-0.4.0-dev.14](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.14)
+
+# 20240717.004654
+
+## [hc\_service\_check-0.1.0-dev.11](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.11)
+
+## [hcterm-0.4.0-dev.13](crates/hcterm/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_cli-0.4.0-dev.13](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain-0.4.0-dev.13](crates/holochain/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_cli\_bundle-0.4.0-dev.13](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.12](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.13](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_cascade-0.4.0-dev.13](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_conductor\_api-0.4.0-dev.13](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_conductor\_services-0.3.0-dev.13](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.13)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.11](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.13](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_websocket-0.4.0-dev.13](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.13)
+
+## [hdk-0.4.0-dev.11](crates/hdk/CHANGELOG.md#0.4.0-dev.11)
+
+- Added a new HDK function `get_validation_receipts` which can be used to look up validation receipts for an action that you have authored.
+
+## [holochain\_state-0.4.0-dev.13](crates/holochain_state/CHANGELOG.md#0.4.0-dev.13)
+
+## [hdi-0.5.0-dev.10](crates/hdi/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_p2p-0.4.0-dev.13](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.13)
+
+## [hc\_sleuth-0.4.0-dev.13](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.13)
+
+## [hdk\_derive-0.4.0-dev.10](crates/hdk_derive/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_state\_types-0.4.0-dev.10](crates/holochain_state_types/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_types-0.4.0-dev.13](crates/holochain_types/CHANGELOG.md#0.4.0-dev.13)
+
+## [kitsune\_p2p-0.4.0-dev.12](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_keystore-0.4.0-dev.13](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.13)
+
+## [holochain\_sqlite-0.4.0-dev.13](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.13)
+
+- **Breaking**: Shorten paths to database files by removing the name prefix where that prefix matches the directory name. The file extensions have also been removed. For example, an authored database would have been stored at `<root-dir>/authored/authored-<dna-hash>-<agent-key>.sqlite` and will now be stored at `<root-dir>/authored/<dna-hash>-<agent-key>`. This also affects the DHT, cache, agent store and metrics databases. You can work around this being a breaking change by renaming your database files to match the new expected names.
+
+## [kitsune\_p2p\_bootstrap\_client-0.4.0-dev.11](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.4.0-dev.11)
+
+## [kitsune\_p2p\_fetch-0.4.0-dev.10](crates/kitsune_p2p_fetch/CHANGELOG.md#0.4.0-dev.10)
+
+## [kitsune\_p2p\_proxy-0.4.0-dev.10](crates/kitsune_p2p_proxy/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_zome\_types-0.4.0-dev.11](crates/holochain_zome_types/CHANGELOG.md#0.4.0-dev.11)
+
+## [kitsune\_p2p\_bootstrap-0.3.0-dev.11](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.3.0-dev.11)
+
+## [holochain\_integrity\_types-0.4.0-dev.10](crates/holochain_integrity_types/CHANGELOG.md#0.4.0-dev.10)
+
+## [kitsune\_p2p\_block-0.4.0-dev.9](crates/kitsune_p2p_block/CHANGELOG.md#0.4.0-dev.9)
+
+## [kitsune\_p2p\_types-0.4.0-dev.10](crates/kitsune_p2p_types/CHANGELOG.md#0.4.0-dev.10)
+
+## [holo\_hash-0.4.0-dev.9](crates/holo_hash/CHANGELOG.md#0.4.0-dev.9)
+
+## [kitsune\_p2p\_bin\_data-0.4.0-dev.9](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.4.0-dev.9)
+
+## [fixt-0.4.0-dev.3](crates/fixt/CHANGELOG.md#0.4.0-dev.3)
+
+# 20240710.004628
+
+## [hc\_service\_check-0.1.0-dev.10](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.10)
+
+## [hcterm-0.4.0-dev.12](crates/hcterm/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_cli-0.4.0-dev.12](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain-0.4.0-dev.12](crates/holochain/CHANGELOG.md#0.4.0-dev.12)
+
+- When uninstalling an app or removing a clone cell, only some of the data used by that cell was deleted. Now all data is deleted, freeing up disk space.
+- Adds a new `DisabledAppReason::NotStartedAfterProvidingMemproofs` variant which effectively allows a new app status, corresponding to the specific state where a UI has just called `AppRequest::ProvideMemproofs`, but the app has not yet been Enabled for the first time.
+- Adds a new app interface method `AppRequest::EnableAfterMemproofsProvided`, which allows enabling an app only if the app is in the `AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs)` state. Attempting to enable the app from other states (other than Running) will fail.
+- Adds a `lineage` field to the DNA manifest, which declares forward compatibility for any hash in that list with this DNA
+- Adds a `AdminRequest::GetCompatibleCells` method which returns CellId for all installed cells which use a DNA that is forward-compatible with a given DNA hash. This can be used to find a compatible cell for use with the `UseExisting` cell provisioning method (still to be implemented)
+
+## [holochain\_cli\_bundle-0.4.0-dev.12](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.11](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.12](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_cascade-0.4.0-dev.12](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_conductor\_api-0.4.0-dev.12](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_conductor\_services-0.3.0-dev.12](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.12)
+
+## [holochain\_metrics-0.4.0-dev.4](crates/holochain_metrics/CHANGELOG.md#0.4.0-dev.4)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.10](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.12](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_websocket-0.4.0-dev.12](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.12)
+
+## [hdk-0.4.0-dev.10](crates/hdk/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_state-0.4.0-dev.12](crates/holochain_state/CHANGELOG.md#0.4.0-dev.12)
+
+## [hdi-0.5.0-dev.9](crates/hdi/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_p2p-0.4.0-dev.12](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.12)
+
+## [hc\_sleuth-0.4.0-dev.12](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.12)
+
+## [hdk\_derive-0.4.0-dev.9](crates/hdk_derive/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_state\_types-0.4.0-dev.9](crates/holochain_state_types/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_types-0.4.0-dev.12](crates/holochain_types/CHANGELOG.md#0.4.0-dev.12)
+
+## [kitsune\_p2p-0.4.0-dev.11](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_keystore-0.4.0-dev.12](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_sqlite-0.4.0-dev.12](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.12)
+
+## [kitsune\_p2p\_bootstrap\_client-0.4.0-dev.10](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.4.0-dev.10)
+
+## [kitsune\_p2p\_fetch-0.4.0-dev.9](crates/kitsune_p2p_fetch/CHANGELOG.md#0.4.0-dev.9)
+
+## [kitsune\_p2p\_proxy-0.4.0-dev.9](crates/kitsune_p2p_proxy/CHANGELOG.md#0.4.0-dev.9)
+
+## [mr\_bundle-0.4.0-dev.5](crates/mr_bundle/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_zome\_types-0.4.0-dev.10](crates/holochain_zome_types/CHANGELOG.md#0.4.0-dev.10)
+
+## [kitsune\_p2p\_bootstrap-0.3.0-dev.10](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.3.0-dev.10)
+
+## [holochain\_integrity\_types-0.4.0-dev.9](crates/holochain_integrity_types/CHANGELOG.md#0.4.0-dev.9)
+
+## [kitsune\_p2p\_block-0.4.0-dev.8](crates/kitsune_p2p_block/CHANGELOG.md#0.4.0-dev.8)
+
+## [kitsune\_p2p\_types-0.4.0-dev.9](crates/kitsune_p2p_types/CHANGELOG.md#0.4.0-dev.9)
+
+## [holo\_hash-0.4.0-dev.8](crates/holo_hash/CHANGELOG.md#0.4.0-dev.8)
+
+## [kitsune\_p2p\_bin\_data-0.4.0-dev.8](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_util-0.4.0-dev.2](crates/holochain_util/CHANGELOG.md#0.4.0-dev.2)
+
+# 20240703.004549
+
+## [hcterm-0.4.0-dev.11](crates/hcterm/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_cli-0.4.0-dev.11](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain-0.4.0-dev.11](crates/holochain/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_cli\_bundle-0.4.0-dev.11](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.11](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_cascade-0.4.0-dev.11](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_conductor\_api-0.4.0-dev.11](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_conductor\_services-0.3.0-dev.11](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.11)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.11](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_websocket-0.4.0-dev.11](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_state-0.4.0-dev.11](crates/holochain_state/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_p2p-0.4.0-dev.11](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.11)
+
+## [hc\_sleuth-0.4.0-dev.11](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_types-0.4.0-dev.11](crates/holochain_types/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_keystore-0.4.0-dev.11](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_sqlite-0.4.0-dev.11](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.11)
+
+# 20240626.004529
+
+## [hc\_service\_check-0.1.0-dev.9](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.9)
+
+## [hcterm-0.4.0-dev.10](crates/hcterm/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_cli-0.4.0-dev.10](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain-0.4.0-dev.10](crates/holochain/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_cli\_bundle-0.4.0-dev.10](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.10](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.10](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_cascade-0.4.0-dev.10](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_conductor\_api-0.4.0-dev.10](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_conductor\_services-0.3.0-dev.10](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.10)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.9](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.10](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_websocket-0.4.0-dev.10](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.10)
+
+## [hdk-0.4.0-dev.9](crates/hdk/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_state-0.4.0-dev.10](crates/holochain_state/CHANGELOG.md#0.4.0-dev.10)
+
+## [hdi-0.5.0-dev.8](crates/hdi/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_p2p-0.4.0-dev.10](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.10)
+
+## [hc\_sleuth-0.4.0-dev.10](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.10)
+
+## [hdk\_derive-0.4.0-dev.8](crates/hdk_derive/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_state\_types-0.4.0-dev.8](crates/holochain_state_types/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_types-0.4.0-dev.10](crates/holochain_types/CHANGELOG.md#0.4.0-dev.10)
+
+## [kitsune\_p2p-0.4.0-dev.10](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_keystore-0.4.0-dev.10](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_sqlite-0.4.0-dev.10](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.10)
+
+## [kitsune\_p2p\_bootstrap\_client-0.4.0-dev.9](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.4.0-dev.9)
+
+## [kitsune\_p2p\_fetch-0.4.0-dev.8](crates/kitsune_p2p_fetch/CHANGELOG.md#0.4.0-dev.8)
+
+## [kitsune\_p2p\_proxy-0.4.0-dev.8](crates/kitsune_p2p_proxy/CHANGELOG.md#0.4.0-dev.8)
+
+## [mr\_bundle-0.4.0-dev.4](crates/mr_bundle/CHANGELOG.md#0.4.0-dev.4)
+
+## [holochain\_zome\_types-0.4.0-dev.9](crates/holochain_zome_types/CHANGELOG.md#0.4.0-dev.9)
+
+## [kitsune\_p2p\_bootstrap-0.3.0-dev.9](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.3.0-dev.9)
+
+## [holochain\_integrity\_types-0.4.0-dev.8](crates/holochain_integrity_types/CHANGELOG.md#0.4.0-dev.8)
+
+## [kitsune\_p2p\_block-0.4.0-dev.7](crates/kitsune_p2p_block/CHANGELOG.md#0.4.0-dev.7)
+
+## [kitsune\_p2p\_types-0.4.0-dev.8](crates/kitsune_p2p_types/CHANGELOG.md#0.4.0-dev.8)
+
+## [holo\_hash-0.4.0-dev.7](crates/holo_hash/CHANGELOG.md#0.4.0-dev.7)
+
+## [kitsune\_p2p\_bin\_data-0.4.0-dev.7](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.4.0-dev.7)
+
+## [kitsune\_p2p\_dht-0.4.0-dev.7](crates/kitsune_p2p_dht/CHANGELOG.md#0.4.0-dev.7)
+
+## [kitsune\_p2p\_dht\_arc-0.4.0-dev.7](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.4.0-dev.7)
+
+# 20240619.004549
+
+## [hc\_service\_check-0.1.0-dev.8](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.8)
+
+## [hcterm-0.4.0-dev.9](crates/hcterm/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_cli-0.4.0-dev.9](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain-0.4.0-dev.9](crates/holochain/CHANGELOG.md#0.4.0-dev.9)
+
+- Warrants: When an authority rejects another agent’s authored data, that authority creates a Warrant which is gossiped to the offending agent’s Agent Activity Authority, who then serves that warrant along with any `get_agent_activity` request.
+- The `warrants` field of `AgentActivity` is now populated with warrants for that agent.
+- Authorities author ChainFork warrants when detecting two actions by the same author with the same `prev_action`
+
+## [holochain\_cli\_bundle-0.4.0-dev.9](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.9](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.9](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.9)
+
+- Add `dump-network-metrics` and `dump-network-stats` to the sandbox admin calls.
+
+## [holochain\_cascade-0.4.0-dev.9](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_conductor\_api-0.4.0-dev.9](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_conductor\_services-0.3.0-dev.9](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.9)
+
+## [holochain\_metrics-0.4.0-dev.3](crates/holochain_metrics/CHANGELOG.md#0.4.0-dev.3)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.8](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.9](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_websocket-0.4.0-dev.9](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.9)
+
+## [hdk-0.4.0-dev.8](crates/hdk/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_state-0.4.0-dev.9](crates/holochain_state/CHANGELOG.md#0.4.0-dev.9)
+
+## [hdi-0.5.0-dev.7](crates/hdi/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_p2p-0.4.0-dev.9](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.9)
+
+## [hc\_sleuth-0.4.0-dev.9](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.9)
+
+## [hdk\_derive-0.4.0-dev.7](crates/hdk_derive/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_state\_types-0.4.0-dev.7](crates/holochain_state_types/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_types-0.4.0-dev.9](crates/holochain_types/CHANGELOG.md#0.4.0-dev.9)
+
+## [kitsune\_p2p-0.4.0-dev.9](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.9)
+
+- Change the default `DbSyncStrategy` from `Fast` to `Resilient` which should reduce database corruptions. You can override this setting in your conductor config if you wish to go faster and are willing to rebuild your database if it gets corrupted. \#4010
+
+## [holochain\_keystore-0.4.0-dev.9](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_sqlite-0.4.0-dev.9](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_zome\_types-0.4.0-dev.8](crates/holochain_zome_types/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_integrity\_types-0.4.0-dev.7](crates/holochain_integrity_types/CHANGELOG.md#0.4.0-dev.7)
+
 # 20240612.004512
 
 ## [hc\_service\_check-0.1.0-dev.7](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.7)
@@ -109,8 +832,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [holochain-0.4.0-dev.7](crates/holochain/CHANGELOG.md#0.4.0-dev.7)
 
 - App manifest now includes a new `membrane_proofs_deferred: bool` field, which allows the membrane proofs for the app’s cells to be provided at a time after installation, allowing the app’s UI to guide the process of creating membrane proofs.
-- Adds new `AppStatus::AwaitingMemproofs` to indicate an app which was installed with `MemproofProvisioning::Deferred`
-- Adds new app websocket method `ProvideMemproofs` for use with `MemproofProvisioning::Deferred`
+- Adds new `AppStatus::AwaitingMemproofs` to indicate an app which was installed with `membrane_proofs_deferred`
+- Adds new app websocket method `ProvideMemproofs` for use with `membrane_proofs_deferred`
 
 ## [holochain\_cli\_bundle-0.4.0-dev.7](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.7)
 

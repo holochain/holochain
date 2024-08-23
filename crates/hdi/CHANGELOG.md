@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.5.0-dev.12
+
+## 0.5.0-dev.11
+
+## 0.5.0-dev.10
+
+## 0.5.0-dev.9
+
+## 0.5.0-dev.8
+
+## 0.5.0-dev.7
+
 ## 0.5.0-dev.6
 
 ## 0.5.0-dev.5

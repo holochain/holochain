@@ -17,6 +17,7 @@ use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
 use holochain_conductor_api::{AdminRequest, AppInterfaceInfo};
+use holochain_types::app::AppManifest;
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::Timestamp;
@@ -183,6 +184,15 @@ pub struct InstallApp {
 pub struct UninstallApp {
     /// The InstalledAppId to uninstall.
     pub app_id: String,
+
+    /// Force uninstallation of the app even if there are any protections in place.
+    ///
+    /// Possible protections:
+    /// - Another app depends on a cell in the app you are trying to uninstall.
+    ///
+    /// Please check that you understand the consequences of forcing the uninstall before using this option.
+    #[arg(long, default_value_t = false)]
+    pub force: bool,
 }
 
 /// Calls AdminRequest::EnableApp
@@ -525,18 +535,13 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         network_seed,
     } = args;
 
-    let agent_key = match agent_key {
-        Some(agent) => agent,
-        None => generate_agent_pub_key(cmd).await?,
-    };
-
     let payload = InstallAppPayload {
         installed_app_id: app_id,
         agent_key,
         source: AppBundleSource::Path(path),
         membrane_proofs: Default::default(),
+        existing_cells: Default::default(),
         network_seed,
-        #[cfg(feature = "chc")]
         ignore_genesis_failure: false,
     };
 
@@ -544,13 +549,21 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
     let installed_app = cmd.command(r).await?;
     let installed_app =
         expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
-    enable_app(
-        cmd,
-        EnableApp {
-            app_id: installed_app.installed_app_id.clone(),
-        },
-    )
-    .await?;
+
+    match &installed_app.manifest {
+        AppManifest::V1(manifest) => {
+            if !manifest.allow_deferred_memproofs {
+                enable_app(
+                    cmd,
+                    EnableApp {
+                        app_id: installed_app.installed_app_id.clone(),
+                    },
+                )
+                .await?
+            }
+        }
+    }
+
     Ok(installed_app)
 }
 
@@ -559,6 +572,7 @@ pub async fn uninstall_app(cmd: &mut CmdRunner, args: UninstallApp) -> anyhow::R
     let resp = cmd
         .command(AdminRequest::UninstallApp {
             installed_app_id: args.app_id,
+            force: args.force,
         })
         .await?;
 

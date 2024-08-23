@@ -1,6 +1,5 @@
 //! # Validation Database Types
 
-use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::rusqlite::ToSql;
 
@@ -10,11 +9,11 @@ pub enum ValidationStage {
     /// Is awaiting to be system validated
     Pending,
     /// Is waiting for dependencies so the op can proceed to system validation
-    AwaitingSysDeps(AnyDhtHash),
+    AwaitingSysDeps,
     /// Is awaiting to be app validated
     SysValidated,
     /// Is waiting for dependencies so the op can proceed to app validation
-    AwaitingAppDeps(Vec<AnyDhtHash>),
+    AwaitingAppDeps,
     /// Is awaiting to be integrated.
     AwaitingIntegration,
 }
@@ -25,9 +24,9 @@ impl ToSql for ValidationStage {
     ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
         let stage = match self {
             ValidationStage::Pending => None,
-            ValidationStage::AwaitingSysDeps(_) => Some(0),
+            ValidationStage::AwaitingSysDeps => Some(0),
             ValidationStage::SysValidated => Some(1),
-            ValidationStage::AwaitingAppDeps(_) => Some(2),
+            ValidationStage::AwaitingAppDeps => Some(2),
             ValidationStage::AwaitingIntegration => Some(3),
         };
         Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Owned(

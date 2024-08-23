@@ -78,19 +78,29 @@ pub enum AppRequest {
     ListWasmHostFunctions,
 
     /// Provide the membrane proofs for this app, if this app was installed
-    /// using [`MemproofProvisioning::Deferred`].
+    /// using `allow_deferred_memproofs` and memproofs were not provided at
+    /// installation time.
     ///
     /// # Returns
     ///
     /// [`AppResponse::Ok`]
     ProvideMemproofs(MemproofMap),
+
+    /// Enable the app, only in special circumstances.
+    /// Can only be called while the app is in the `Disabled(NotStartedAfterProvidingMemproofs)` state.
+    /// Cannot be used to enable the app if it's in any other state, or Disabled for any other reason.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::Ok`]
+    EnableApp,
     //
     // TODO: implement after DPKI lands
     // /// Replace the agent key associated with this app with a new one.
     // /// The new key will be created using the same method which is used
     // /// when installing an app with no agent key provided.
     // ///
-    // /// This method is only available if this app was installed using [`MemproofProvisioning::Deferred`],
+    // /// This method is only available if this app was installed using `allow_deferred_memproofs`,
     // /// and can only be called before [`AppRequest::ProvideMemproofs`] has been called.
     // /// Until then, it can be called as many times as needed.
     // ///
@@ -336,11 +346,13 @@ impl AppInfo {
             let mut cell_info_for_role: Vec<CellInfo> = Vec::new();
 
             // push the base cell to the vector of cell infos
-            if let Some(provisioned_cell) = role_assignment.provisioned_cell() {
-                if let Some(dna_def) = dna_definitions.get(provisioned_cell) {
+            if let Some(provisioned_dna_hash) = role_assignment.provisioned_dna_hash() {
+                let provisioned_cell_id =
+                    CellId::new(provisioned_dna_hash.clone(), agent_pub_key.clone());
+                if let Some(dna_def) = dna_definitions.get(&provisioned_cell_id) {
                     // TODO: populate `enabled` with cell state once it is implemented for a base cell
                     let cell_info = CellInfo::new_provisioned(
-                        provisioned_cell.clone(),
+                        provisioned_cell_id.clone(),
                         dna_def.modifiers.to_owned(),
                         dna_def.name.to_owned(),
                     );
@@ -357,7 +369,10 @@ impl AppInfo {
                         }
                     }
                 } else {
-                    tracing::error!("no DNA definition found for cell id {}", provisioned_cell);
+                    tracing::error!(
+                        "no DNA definition found for cell id {}",
+                        provisioned_cell_id
+                    );
                 }
             } else {
                 // no provisioned cell, thus there must be a deferred cell
@@ -367,10 +382,10 @@ impl AppInfo {
 
             // push enabled clone cells to the vector of cell infos
             if let Some(clone_cells) = app.clone_cells_for_role_name(role_name) {
-                clone_cells.iter().for_each(|(clone_id, cell_id)| {
-                    if let Some(dna_def) = dna_definitions.get(cell_id) {
+                clone_cells.for_each(|(clone_id, cell_id)| {
+                    if let Some(dna_def) = dna_definitions.get(&cell_id) {
                         let cell_info = CellInfo::new_cloned(
-                            cell_id.to_owned(),
+                            cell_id,
                             clone_id.to_owned(),
                             dna_def.hash.to_owned(),
                             dna_def.modifiers.to_owned(),
@@ -386,10 +401,10 @@ impl AppInfo {
 
             // push disabled clone cells to the vector of cell infos
             if let Some(clone_cells) = app.disabled_clone_cells_for_role_name(role_name) {
-                clone_cells.iter().for_each(|(clone_id, cell_id)| {
-                    if let Some(dna_def) = dna_definitions.get(cell_id) {
+                clone_cells.for_each(|(clone_id, cell_id)| {
+                    if let Some(dna_def) = dna_definitions.get(&cell_id) {
                         let cell_info = CellInfo::new_cloned(
-                            cell_id.to_owned(),
+                            cell_id,
                             clone_id.to_owned(),
                             dna_def.hash.to_owned(),
                             dna_def.modifiers.to_owned(),
@@ -414,6 +429,13 @@ impl AppInfo {
             manifest,
         }
     }
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+/// The parameters to revoke an agent for an app.
+pub struct RevokeAgentKeyPayload {
+    pub agent_key: AgentPubKey,
+    pub app_id: InstalledAppId,
 }
 
 /// A flat, slightly more API-friendly representation of [`AppInfo`]
@@ -463,12 +485,10 @@ pub enum ScottyPanel {
     GossipInfo { last_round: Option<Timestamp> },
 }
 
-// once this is in stable, replace the pinned version in the URL by `latest``
-/// The request payload that should be sent in a [`WireMessage::Authenticate`](https://docs.rs/holochain_websocket/0.3.0-beta-dev.22/holochain_websocket/enum.WireMessage.html#variant.Authenticate) message.
+/// The request payload that should be sent in a [`holochain_websocket::WireMessage::Authenticate`]
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppAuthenticationRequest {
-    // once this is in stable, replace the pinned version in the URL by `latest``
-    /// The authentication token that was provided by the conductor when [`AdminRequest::IssueAppInterfaceToken`](https://docs.rs/holochain_conductor_api/0.3.0-beta-dev.47/holochain_conductor_api/enum.AdminRequest.html#variant.IssueAppAuthenticationToken) was called.
+    /// The authentication token that was provided by the conductor when [`AdminRequest::IssueAppInterfaceToken`] was called.
     pub token: AppAuthenticationToken,
 }
 

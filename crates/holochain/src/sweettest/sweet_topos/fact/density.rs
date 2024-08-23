@@ -93,43 +93,40 @@ pub mod test {
 
     #[test]
     fn test_sweet_topos_dense_network() {
-        crate::big_stack_test!(
-            async move {
-                let mut g = unstructured_noise().into();
-                let mut size_fact = SizedNetworkFact {
-                    nodes: 12,
-                    agents: 1..=2,
-                };
-                let mut density_fact = DenseNetworkFact { density: 0.3 };
-                let mut graph = NetworkTopology::default();
-                graph = size_fact.mutate(&mut g, graph).unwrap();
-                tracing::info!(
-                    "{:?}",
-                    Dot::with_config(graph.as_ref(), &[Config::NodeNoLabel, Config::EdgeNoLabel,],)
-                );
-                graph = density_fact.mutate(&mut g, graph).unwrap();
-                tracing::info!(
-                    "{:?}",
-                    Dot::with_config(graph.as_ref(), &[Config::NodeNoLabel, Config::EdgeNoLabel,],)
-                );
-                let mut partition_fact = StrictlyPartitionedNetworkFact {
-                    partitions: 1,
-                    efficiency: 1.0,
-                };
-                graph = partition_fact.mutate(&mut g, graph).unwrap();
-                tracing::info!(
-                    "{:?}",
-                    Dot::with_config(
-                        graph.as_ref(),
-                        &[
-                            //     Config::GraphContentOnly,
-                            Config::NodeNoLabel,
-                            Config::EdgeNoLabel,
-                        ],
-                    )
-                );
-            },
-            3_000_000
-        );
+        crate::big_stack_test!(async move {
+            let mut g = unstructured_noise().into();
+            let mut size_fact = SizedNetworkFact {
+                nodes: 12,
+                agents: 1..=2,
+            };
+            let mut density_fact = DenseNetworkFact { density: 0.3 };
+            let mut graph = NetworkTopology::default();
+            graph = size_fact.mutate(&mut g, graph).unwrap();
+            tracing::info!(
+                "{:?}",
+                Dot::with_config(graph.as_ref(), &[Config::NodeNoLabel, Config::EdgeNoLabel,],)
+            );
+            graph = density_fact.mutate(&mut g, graph).unwrap();
+            tracing::info!(
+                "{:?}",
+                Dot::with_config(graph.as_ref(), &[Config::NodeNoLabel, Config::EdgeNoLabel,],)
+            );
+            let mut partition_fact = StrictlyPartitionedNetworkFact {
+                partitions: 1,
+                efficiency: 1.0,
+            };
+            graph = partition_fact.mutate(&mut g, graph).unwrap();
+            tracing::info!(
+                "{:?}",
+                Dot::with_config(
+                    graph.as_ref(),
+                    &[
+                        //     Config::GraphContentOnly,
+                        Config::NodeNoLabel,
+                        Config::EdgeNoLabel,
+                    ],
+                )
+            );
+        });
     }
 }

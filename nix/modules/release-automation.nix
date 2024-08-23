@@ -8,7 +8,7 @@
         version = "1.77.2";
       };
 
-      craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
+      craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
 
       commonArgs = {
         pname = "release-automation";
@@ -118,6 +118,7 @@
             export HOME="$(mktemp -d)"
             export TEST_WORKSPACE="''${HOME:?}/src"
 
+            git config --global --add safe.directory ${inputs.repo-git}
             git clone --single-branch ${inputs.repo-git} ''${TEST_WORKSPACE}
 
             cd ''${TEST_WORKSPACE:?}

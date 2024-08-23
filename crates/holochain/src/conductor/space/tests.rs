@@ -42,7 +42,9 @@ async fn test_region_queries() {
             ..Default::default()
         }
         .into(),
+        sodoken::BufRead::new_no_lock(b"passphrase"),
     )
+    .await
     .unwrap();
     let keystore = test_keystore();
     let agent = keystore.new_sign_keypair_random().await.unwrap();

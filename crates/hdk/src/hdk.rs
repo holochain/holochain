@@ -99,6 +99,11 @@ pub trait HdkT: HdiT {
     // Migrate DNA
     fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
     fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
+    // Validation receipts
+    fn get_validation_receipts(
+        &self,
+        input: GetValidationReceiptsInput,
+    ) -> ExternResult<Vec<ValidationReceiptSet>>;
 }
 
 #[cfg(feature = "mock")]
@@ -182,6 +187,7 @@ mockall::mock! {
         fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()>;
         fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
         fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
+        fn get_validation_receipts(&self, input: GetValidationReceiptsInput) -> ExternResult<Vec<ValidationReceiptSet>>;
     }
 
     impl HdiT for HdkT {
@@ -218,6 +224,7 @@ mockall::mock! {
             &self,
             ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
         ) -> ExternResult<XSalsa20Poly1305Data>;
+        fn is_same_agent(&self, key1: AgentPubKey, key2: AgentPubKey) -> ExternResult<bool>;
     }
 
 }
@@ -269,6 +276,10 @@ impl HdiT for ErrHdk {
         &self,
         _: MustGetAgentActivityInput,
     ) -> ExternResult<Vec<RegisterAgentActivity>> {
+        Self::err()
+    }
+
+    fn is_same_agent(&self, _: AgentPubKey, _: AgentPubKey) -> ExternResult<bool> {
         Self::err()
     }
 
@@ -469,6 +480,14 @@ impl HdkT for ErrHdk {
     fn open_chain(&self, _input: OpenChainInput) -> ExternResult<ActionHash> {
         Self::err()
     }
+
+    // Validation receipts
+    fn get_validation_receipts(
+        &self,
+        _input: GetValidationReceiptsInput,
+    ) -> ExternResult<Vec<ValidationReceiptSet>> {
+        Self::err()
+    }
 }
 
 /// The HDK implemented as externs provided by the host.
@@ -511,6 +530,9 @@ impl HdiT for HostHdk {
     }
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
         HostHdi::new().zome_info(())
+    }
+    fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool> {
+        HostHdi::new().is_same_agent(key_1, key_2)
     }
     fn trace(&self, m: TraceMsg) -> ExternResult<()> {
         HostHdi::new().trace(m)
@@ -722,6 +744,16 @@ impl HdkT for HostHdk {
 
     fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash> {
         host_call::<OpenChainInput, ActionHash>(__hc__open_chain_1, input)
+    }
+
+    fn get_validation_receipts(
+        &self,
+        input: GetValidationReceiptsInput,
+    ) -> ExternResult<Vec<ValidationReceiptSet>> {
+        host_call::<GetValidationReceiptsInput, Vec<ValidationReceiptSet>>(
+            __hc__get_validation_receipts_1,
+            input,
+        )
     }
 }
 

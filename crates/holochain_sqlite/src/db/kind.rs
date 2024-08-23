@@ -8,21 +8,23 @@ use std::sync::Arc;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 pub enum DbKind {
     /// Specifies the environment used for authoring data by all cells on the same [`DnaHash`].
-    #[display(fmt = "authored-{:?}-{:?}", "_0.dna_hash()", "_0.agent_pubkey()")]
+    #[display(fmt = "{:?}-{:?}", "_0.dna_hash()", "_0.agent_pubkey()")]
     Authored(Arc<CellId>),
     /// Specifies the environment used for dht data by all cells on the same [`DnaHash`].
-    #[display(fmt = "dht-{:?}", "_0")]
+    #[display(fmt = "{:?}", "_0")]
     Dht(Arc<DnaHash>),
     /// Specifies the environment used by each Cache (one per dna).
-    #[display(fmt = "cache-{:?}", "_0")]
+    #[display(fmt = "{:?}", "_0")]
     Cache(Arc<DnaHash>),
     /// Specifies the environment used by a Conductor
     Conductor,
     /// Specifies the environment used to save wasm
     Wasm,
     /// State of the p2p network (one per space).
+    #[display(fmt = "agent_store-{:?}", "_0")]
     P2pAgentStore(Arc<KitsuneSpace>),
     /// Metrics for peers on p2p network (one per space).
+    #[display(fmt = "metrics-{:?}", "_0")]
     P2pMetrics(Arc<KitsuneSpace>),
     #[cfg(feature = "test_utils")]
     Test(String),
@@ -31,11 +33,9 @@ pub enum DbKind {
 pub trait DbKindT: Clone + std::fmt::Debug + Send + Sync + 'static {
     fn kind(&self) -> DbKind;
 
-    /// Constuct a partial Path based on the kind
+    /// Construct a partial Path based on the kind
     fn filename(&self) -> PathBuf {
-        let mut path = self.filename_inner();
-        path.set_extension("sqlite3");
-        path
+        self.filename_inner()
     }
 
     /// The above provided `filename` method attaches the .sqlite3 extension.
@@ -87,7 +87,7 @@ impl DbKindT for DbKindAuthored {
     fn filename_inner(&self) -> PathBuf {
         [
             "authored",
-            &format!("authored-{}-{}", self.0.dna_hash(), self.0.agent_pubkey()),
+            &format!("{}-{}", self.0.dna_hash(), self.0.agent_pubkey()),
         ]
         .iter()
         .collect()
@@ -112,7 +112,7 @@ impl DbKindT for DbKindDht {
     }
 
     fn filename_inner(&self) -> PathBuf {
-        ["dht", &format!("dht-{}", self.0)].iter().collect()
+        ["dht", &self.0.to_string()].iter().collect()
     }
 
     fn if_corrupt_wipe(&self) -> bool {
@@ -137,7 +137,7 @@ impl DbKindT for DbKindCache {
     }
 
     fn filename_inner(&self) -> PathBuf {
-        ["cache", &format!("cache-{}", self.0)].iter().collect()
+        ["cache", &self.0.to_string()].iter().collect()
     }
 
     fn if_corrupt_wipe(&self) -> bool {
@@ -190,9 +190,7 @@ impl DbKindT for DbKindP2pAgents {
     }
 
     fn filename_inner(&self) -> PathBuf {
-        ["p2p", &format!("p2p_agent_store-{}", self.0)]
-            .iter()
-            .collect()
+        ["p2p", &format!("agent_store-{}", self.0)].iter().collect()
     }
 
     fn if_corrupt_wipe(&self) -> bool {
@@ -206,7 +204,7 @@ impl DbKindT for DbKindP2pMetrics {
     }
 
     fn filename_inner(&self) -> PathBuf {
-        ["p2p", &format!("p2p_metrics-{}", self.0)].iter().collect()
+        ["p2p", &format!("metrics-{}", self.0)].iter().collect()
     }
 
     fn if_corrupt_wipe(&self) -> bool {

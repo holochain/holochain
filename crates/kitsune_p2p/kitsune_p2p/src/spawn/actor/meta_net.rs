@@ -421,6 +421,7 @@ impl MetaNetCon {
         }
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn notify(&self, payload: &wire::Wire, timeout: KitsuneTimeout) -> KitsuneResult<()> {
         let start = std::time::Instant::now();
         let msg_id = next_msg_id();
@@ -972,6 +973,7 @@ impl MetaNet {
             tracing_enabled: tuning_params.tx5_backend_tracing_enabled,
             ephemeral_udp_port_min: tuning_params.tx5_min_ephemeral_udp_port,
             ephemeral_udp_port_max: tuning_params.tx5_max_ephemeral_udp_port,
+            ..Default::default()
         })
         .set_as_global_default()
         {

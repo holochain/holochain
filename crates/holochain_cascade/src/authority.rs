@@ -13,11 +13,10 @@ use super::error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_state::query::link::GetLinksQuery;
-use holochain_state::query::Query;
 use holochain_state::query::Txn;
+use holochain_state::query::{Query, Store};
 use holochain_types::prelude::*;
 use holochain_zome_types::agent_activity::DeterministicGetAgentActivityFilter;
-use tracing::*;
 
 #[cfg(test)]
 mod test;
@@ -28,7 +27,7 @@ pub(crate) mod get_links_ops_query;
 pub(crate) mod get_record_query;
 
 /// Handler for get_entry query to an Entry authority
-#[instrument(skip(db))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(db)))]
 pub async fn handle_get_entry(
     db: DbRead<DbKindDht>,
     hash: EntryHash,
@@ -40,7 +39,7 @@ pub async fn handle_get_entry(
 }
 
 /// Handler for get_record query to a Record authority
-#[tracing::instrument(skip(env))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(env)))]
 pub async fn handle_get_record(
     env: DbRead<DbKindDht>,
     hash: ActionHash,
@@ -54,22 +53,30 @@ pub async fn handle_get_record(
 }
 
 /// Handler for get_agent_activity query to an Activity authority
-#[instrument(skip(env))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(env)))]
 pub async fn handle_get_agent_activity(
     env: DbRead<DbKindDht>,
     agent: AgentPubKey,
     query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
 ) -> CascadeResult<AgentActivityResponse<ActionHash>> {
-    let query = GetAgentActivityQuery::new(agent, query, options);
+    let query = GetAgentActivityQuery::new(agent.clone(), query, options);
     let results = env
-        .read_async(move |txn| query.run(Txn::from(&txn)))
+        .read_async(move |txn| {
+            let txn = Txn::from(&txn);
+            let warrants = txn.get_warrants_for_basis(&AnyLinkableHash::from(agent), true)?;
+            let mut r = query.run(txn)?;
+            if !warrants.is_empty() {
+                r.warrants = warrants.into_iter().map(|w| w.into_warrant()).collect();
+            }
+            CascadeResult::Ok(r)
+        })
         .await?;
     Ok(results)
 }
 
 /// Handler for must_get_agent_activity query to an Activity authority
-#[instrument(skip(env))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(env)))]
 pub async fn handle_must_get_agent_activity(
     env: DbRead<DbKindDht>,
     author: AgentPubKey,
@@ -79,7 +86,7 @@ pub async fn handle_must_get_agent_activity(
 }
 
 /// Handler for get_agent_activity_deterministic query to an Activity authority
-#[instrument(skip(env))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(env)))]
 pub async fn handle_get_agent_activity_deterministic(
     env: DbRead<DbKindDht>,
     agent: AgentPubKey,
@@ -94,7 +101,7 @@ pub async fn handle_get_agent_activity_deterministic(
 }
 
 /// Handler for get_links query to a Record/Entry authority
-#[instrument(skip(env, _options))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(env, _options)))]
 pub async fn handle_get_links(
     env: DbRead<DbKindDht>,
     link_key: WireLinkKey,
@@ -108,7 +115,7 @@ pub async fn handle_get_links(
 }
 
 /// Handler for querying links
-#[instrument(skip(db))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(db)))]
 pub async fn handle_get_links_query(
     db: DbRead<DbKindDht>,
     query: WireLinkQuery,

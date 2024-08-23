@@ -7,13 +7,12 @@ use test_case::test_case;
 #[test_case(2)]
 #[test_case(4)]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn conductors_call_remote(num_conductors: usize) {
     holochain_trace::test_run();
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-    let config = SweetConductorConfig::standard();
+    let config = SweetConductorConfig::rendezvous(true);
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(num_conductors, config).await;
 
@@ -23,8 +22,6 @@ async fn conductors_call_remote(num_conductors: usize) {
         .into_iter()
         .map(|c| c.into_cells().into_iter().next().unwrap())
         .collect();
-
-    conductors.exchange_peer_info().await;
 
     // Make sure that genesis records are integrated now that conductors have discovered each other. This makes it
     // more likely that Kitsune knows about all the agents in the network to be able to make remote calls to them.
@@ -418,7 +415,7 @@ async fn check_gossip(
     }
 }
 
-#[tracing::instrument(skip(envs))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(envs)))]
 async fn check_peers(envs: Vec<DbWrite<DbKindP2pAgents>>) {
     for (i, a) in envs.iter().enumerate() {
         let peers = all_agent_infos(a.clone().into()).await.unwrap();

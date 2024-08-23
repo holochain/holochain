@@ -164,6 +164,9 @@ host_fn_api_impls! {
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
+    // Check if agent key 2 is of the same lineage as agent key 2.
+    fn is_same_agent ((AgentPubKey, AgentPubKey)) -> bool;
+
     // Retreive a record from the DHT or short circuit.
     fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> Record;
 
@@ -236,4 +239,7 @@ host_fn_api_impls! {
 
     // Open your chain, pointing to the previous DNA
     fn open_chain(zt::chain::OpenChainInput) -> holo_hash::ActionHash;
+
+    // Get validation receipts for an action
+    fn get_validation_receipts(zt::validate::GetValidationReceiptsInput) -> Vec<zt::validate::ValidationReceiptSet>;
 }
