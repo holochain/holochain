@@ -288,14 +288,13 @@ async fn refresh_workspace_state(
             .authored_dbs
             .lock()
             .keys()
-            .into_iter()
             .cloned()
             .collect::<Vec<_>>()
     };
 
     let mut locked_for_agents = HashSet::new();
     for agent in agents {
-        if let Some(authored_db) = space.get_or_create_authored_db(agent.clone()).ok() {
+        if let Ok(authored_db) = space.get_or_create_authored_db(agent.clone()) {
             let lock = authored_db
                 .read_async({
                     let agent = agent.clone();
