@@ -110,11 +110,7 @@ impl DpkiState for DeepkeyState {
     ) -> DpkiServiceResult<Vec<AgentPubKey>> {
         self.call_deepkey_zome("get_key_lineage", agent_key.get_raw_32())
             .await
-            .map(|keys: Vec<Vec<u8>>| {
-                keys.into_iter()
-                    .map(|key| AgentPubKey::from_raw_32(key))
-                    .collect()
-            })
+            .map(|keys: Vec<Vec<u8>>| keys.into_iter().map(AgentPubKey::from_raw_32).collect())
     }
 
     async fn is_same_agent(
