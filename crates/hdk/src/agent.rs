@@ -5,6 +5,8 @@
 //! invalidates the current key and generates a new key. Both the invalidated key and the new key
 //! belong to the same agent. Keys of the same agent are called a key lineage.
 
+// Tests are located under conductor::conductor::tests::agent_lineage and core::ribosome::host_fn::get_agent_key_lineage::test.
+
 use crate::prelude::*;
 
 /// Queries a complete lineage of agent keys.
