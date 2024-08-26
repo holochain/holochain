@@ -58,6 +58,7 @@ mod check_clone_access;
 
 use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
+use crate::conductor::api::DpkiApi;
 use crate::conductor::api::ZomeCall;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
@@ -80,7 +81,6 @@ use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use holo_hash::AgentPubKey;
 use holochain_conductor_services::DpkiImpl;
-use holochain_conductor_services::DpkiService;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::*;
 use holochain_p2p::HolochainP2pDna;
@@ -193,7 +193,7 @@ impl HostContext {
     }
 
     /// Get the DPKI service if installed.
-    pub fn maybe_dpki(&self) -> Option<Arc<DpkiService>> {
+    pub fn maybe_dpki(&self) -> DpkiApi {
         match self.clone() {
             Self::ZomeCall(ZomeCallHostAccess { dpki, .. }) => dpki,
             _ => None,

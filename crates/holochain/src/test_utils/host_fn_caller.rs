@@ -17,7 +17,7 @@ use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
-use holochain_conductor_services::DpkiService;
+use holochain_conductor_services::DpkiImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::HolochainP2pRefToDna;
@@ -90,7 +90,7 @@ pub struct HostFnCaller {
     pub dht_db: DbWrite<DbKindDht>,
     pub dht_db_cache: DhtDbQueryCache,
     pub cache: DbWrite<DbKindCache>,
-    pub dpki: Option<Arc<DpkiService>>,
+    pub dpki: Option<DpkiImpl>,
     pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
     pub network: HolochainP2pDna,

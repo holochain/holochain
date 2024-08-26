@@ -5,6 +5,7 @@ use super::error::WorkflowResult;
 use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
+use crate::conductor::api::DpkiApi;
 use crate::conductor::ConductorHandle;
 use crate::core::check_dpki_agent_validity_for_record;
 use crate::core::queue_consumer::TriggerSender;
@@ -14,7 +15,6 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::WorkflowError;
-use holochain_conductor_services::DpkiService;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
@@ -141,7 +141,7 @@ where
 
 async fn call_zome_workflow_inner<Ribosome>(
     workspace: SourceChainWorkspace,
-    dpki: Option<Arc<DpkiService>>,
+    dpki: DpkiApi,
     network: HolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome>,
