@@ -268,13 +268,13 @@ impl SourceChain {
             .await
             .map_err(SourceChainError::other)?;
 
-            if let Err(err @ ChcError::InvalidChain(_, _)) = chc.add_records_request(payload).await
-            {
-                return Err(SourceChainError::ChcHeadMoved(
+            match chc.add_records_request(payload).await {
+                Err(e @ ChcError::InvalidChain(_, _)) => Err(SourceChainError::ChcHeadMoved(
                     "SourceChain::flush".into(),
-                    err,
-                ));
-            }
+                    e,
+                )),
+                e => e.map_err(SourceChainError::other),
+            }?;
         }
 
         let maybe_countersigned_entry = entries

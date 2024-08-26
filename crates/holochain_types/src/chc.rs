@@ -53,7 +53,8 @@ pub trait ChainHeadCoordinatorExt:
         .into()
     }
 
-    /// More convenient way to call `get_record_data_request`
+    /// More convenient way to call the low-level CHC API method `get_record_data_request`.
+    /// This method actually decodes and assembles those results into a list of `Record`s.
     fn get_record_data(
         self: Arc<Self>,
         since_hash: Option<ActionHash>,
@@ -126,7 +127,6 @@ pub struct AddRecordPayload {
 impl AddRecordPayload {
     /// Create a payload from a list of records.
     /// This performs the necessary signing and encryption the CHC requires.
-
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(keystore, records)))]
     pub async fn from_records(
         keystore: MetaLairClient,
