@@ -352,6 +352,8 @@ fixturator!(
     ZomeCallHostAccess;
     curve Empty ZomeCallHostAccess {
         workspace: HostFnWorkspaceFixturator::new(Empty).next().unwrap(),
+        // No DPKI fixturator
+        dpki: None,
         keystore: MetaLairClientFixturator::new(Empty).next().unwrap(),
         network: HolochainP2pDnaFixturator::new(Empty).next().unwrap(),
         signal_tx: broadcast::channel(50).0,
@@ -359,6 +361,8 @@ fixturator!(
     };
     curve Unpredictable ZomeCallHostAccess {
         workspace: HostFnWorkspaceFixturator::new(Unpredictable).next().unwrap(),
+        // No DPKI fixturator
+        dpki: None,
         keystore: MetaLairClientFixturator::new(Unpredictable).next().unwrap(),
         network: HolochainP2pDnaFixturator::new(Unpredictable).next().unwrap(),
         signal_tx: broadcast::channel(50).0,
@@ -368,6 +372,8 @@ fixturator!(
         workspace: HostFnWorkspaceFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
+        // No DPKI fixturator
+        dpki: None,
         keystore: MetaLairClientFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),

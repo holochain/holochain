@@ -79,6 +79,8 @@ use guest_callback::migrate_agent::MigrateAgentHostAccess;
 use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use holo_hash::AgentPubKey;
+use holochain_conductor_services::DpkiImpl;
+use holochain_conductor_services::DpkiService;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::*;
 use holochain_p2p::HolochainP2pDna;
@@ -186,6 +188,14 @@ impl HostContext {
             | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
             | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => Some(workspace.into()),
             Self::Validate(ValidateHostAccess { workspace, .. }) => Some(workspace),
+            _ => None,
+        }
+    }
+
+    /// Get the DPKI service if installed.
+    pub fn maybe_dpki(&self) -> Option<Arc<DpkiService>> {
+        match self.clone() {
+            Self::ZomeCall(ZomeCallHostAccess { dpki, .. }) => dpki,
             _ => None,
         }
     }
@@ -595,6 +605,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
 #[derive(Clone, Constructor)]
 pub struct ZomeCallHostAccess {
     pub workspace: HostFnWorkspace,
+    pub dpki: Option<DpkiImpl>,
     pub keystore: MetaLairClient,
     pub network: HolochainP2pDna,
     pub signal_tx: broadcast::Sender<Signal>,
