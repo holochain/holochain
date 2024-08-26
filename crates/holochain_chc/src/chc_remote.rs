@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use holo_hash::{ActionHash, AgentPubKey};
 use holochain_keystore::MetaLairClient;
 use holochain_types::chc::{ChainHeadCoordinator, ChcError, ChcResult};
 use holochain_types::prelude::*;
@@ -66,7 +65,7 @@ impl ChainHeadCoordinator for ChcRemote {
 }
 
 impl ChainHeadCoordinatorExt for ChcRemote {
-    fn signing_info(&self) -> (MetaLairClient, holo_hash::AgentPubKey) {
+    fn signing_info(&self) -> (MetaLairClient, AgentPubKey) {
         (self.keystore.clone(), self.agent.clone())
     }
 }
@@ -127,7 +126,7 @@ fn extract_string(e: reqwest::Error) -> ChcError {
 mod tests {
 
     use super::*;
-    use crate::test_utils::valid_arbitrary_chain;
+    use holochain_types::test_utils::valid_arbitrary_chain;
     use pretty_assertions::assert_eq;
 
     #[tokio::test(flavor = "multi_thread")]

@@ -106,6 +106,7 @@ impl ChainHeadCoordinatorExt for ChcLocal {
 #[cfg(test)]
 mod tests {
     use holochain_conductor_api::conductor::ConductorConfig;
+    use holochain_types::test_utils::valid_arbitrary_chain;
     use holochain_wasm_test_utils::TestWasm;
 
     use crate::{
@@ -115,7 +116,6 @@ mod tests {
             error::ConductorError,
         },
         sweettest::*,
-        test_utils::valid_arbitrary_chain,
     };
 
     use super::*;

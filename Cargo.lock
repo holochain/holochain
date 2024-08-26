@@ -2918,6 +2918,7 @@ dependencies = [
  "holo_hash",
  "holochain",
  "holochain_cascade",
+ "holochain_chc",
  "holochain_conductor_api",
  "holochain_conductor_services",
  "holochain_deepkey_dna",
@@ -3029,6 +3030,23 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "holochain_chc"
+version = "0.1.0-dev.1"
+dependencies = [
+ "async-trait",
+ "fixt",
+ "holochain_keystore",
+ "holochain_serialized_bytes",
+ "holochain_types",
+ "pretty_assertions",
+ "reqwest 0.12.5",
+ "serde",
+ "tokio",
+ "url",
+ "url2",
 ]
 
 [[package]]

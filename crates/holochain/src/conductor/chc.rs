@@ -10,8 +10,7 @@ use url::Url;
 mod chc_local;
 pub use chc_local::*;
 
-mod chc_remote;
-pub use chc_remote::*;
+pub use holochain_chc::*;
 
 /// Storage for the local CHC implementations
 pub static CHC_LOCAL_MAP: Lazy<parking_lot::Mutex<HashMap<CellId, Arc<ChcLocal>>>> =
