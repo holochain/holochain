@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use holochain_chc::*;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 

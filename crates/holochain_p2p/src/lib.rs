@@ -2,6 +2,7 @@
 //! holochain specific wrapper around more generic p2p module
 
 use holo_hash::*;
+use holochain_chc::ChcImpl;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
@@ -182,9 +183,6 @@ impl From<HolochainP2pDna> for GenericNetwork {
         Arc::new(value)
     }
 }
-
-/// A CHC implementation
-pub type ChcImpl = Arc<dyn 'static + Send + Sync + ChainHeadCoordinatorExt>;
 
 #[async_trait::async_trait]
 impl HolochainP2pDnaT for HolochainP2pDna {

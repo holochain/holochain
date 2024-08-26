@@ -1,4 +1,4 @@
-use holochain_p2p::ChcImpl;
+use holochain_chc::ChcImpl;
 
 use super::*;
 

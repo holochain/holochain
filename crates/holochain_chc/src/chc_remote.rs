@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 
+use super::ChainHeadCoordinatorExt;
+use super::*;
 use holochain_keystore::MetaLairClient;
-use holochain_types::chc::{ChainHeadCoordinator, ChcError, ChcResult};
-use holochain_types::prelude::*;
 use url::Url;
 
 /// An HTTP client which can talk to a remote CHC implementation

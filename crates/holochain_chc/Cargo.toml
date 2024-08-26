@@ -11,16 +11,28 @@ edition = "2021"
 # reminder - do not use workspace deps
 [dependencies]
 async-trait = "0.1"
+derive_more = "0.99"
+futures = "0.3"
+getrandom = "0.2.7"
 holochain_keystore = { version = "^0.4.0-dev.18", path = "../holochain_keystore", default-features = false }
+holochain_nonce = { version = "^0.4.0-dev.6", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.55"
 holochain_types = { path = "../holochain_types", version = "^0.4.0-dev.20" }
+one_err = "0.0.8"
+must_future = "0.1.1"
 reqwest = { version = "0.12", features = ["json", "native-tls-vendored"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_bytes = "0.11.12"
+serde_json = { version = "1.0.51", features = ["preserve_order"] }
+thiserror = "1.0.22"
+tracing = "0.1"
 url = "2.4"
 url2 = "0.0.6"
 
 
 [dev-dependencies]
+holochain_chc = { path = ".", features = ["test_utils"] }
+
 fixt = { version = "^0.4.0-dev.3", path = "../fixt" }
 pretty_assertions = "1.4"
 tokio = { version = "1.36.0", features = ["full"] }
@@ -29,3 +41,4 @@ tokio = { version = "1.36.0", features = ["full"] }
 workspace = true
 
 [features]
+test_utils = ["holochain_types/test_utils"]

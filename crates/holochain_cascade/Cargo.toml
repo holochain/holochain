@@ -15,6 +15,7 @@ futures = "0.3"
 holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash", features = [
   "full",
 ] }
+holochain_chc = { version = "^0.1.0-dev.1", path = "../holochain_chc" }
 holochain_sqlite = { version = "^0.4.0-dev.18", path = "../holochain_sqlite" }
 holochain_p2p = { version = "^0.4.0-dev.20", path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.55"
@@ -49,8 +50,9 @@ default = []
 
 test_utils = [
   "mockall",
-  "holochain_types/test_utils",
+  "holochain_chc/test_utils",
   "holochain_p2p/test_utils",
+  "holochain_types/test_utils",
   "holochain_state/test_utils",
 ]
 
