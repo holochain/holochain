@@ -16,7 +16,7 @@ async fn async_read_respects_reader_permit_limits() {
     set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
-    let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
+    let db_handle = DbWrite::test(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
 
     let num_readers = num_read_threads();
 
@@ -88,7 +88,7 @@ async fn get_read_txn_respects_reader_permit_limits() {
     set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
-    let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
+    let db_handle = DbWrite::test(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
 
     let num_readers = num_read_threads();
 
@@ -159,7 +159,7 @@ async fn read_async_releases_permits() {
     set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
-    let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
+    let db_handle = DbWrite::test(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
 
     let num_readers = num_read_threads();
 
@@ -190,7 +190,7 @@ async fn write_permits_can_be_released() {
     set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
-    let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
+    let db_handle = DbWrite::test(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
 
     let ran_count = Arc::new(AtomicUsize::new(0));
     for _ in 0..3 {

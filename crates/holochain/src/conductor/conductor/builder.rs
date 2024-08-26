@@ -34,6 +34,12 @@ pub struct ConductorBuilder {
 
     /// Skip printing setup info to stdout
     pub no_print_setup: bool,
+
+    /// WARNING!! DANGER!! This exposes your database decryption secrets!
+    /// Print the database decryption secrets to stderr.
+    /// With these PRAGMA commands, you'll be able to run sqlcipher
+    /// directly to manipulate holochain databases.
+    pub danger_print_db_secrets: bool,
 }
 
 impl ConductorBuilder {
@@ -62,6 +68,15 @@ impl ConductorBuilder {
         self
     }
 
+    /// WARNING!! DANGER!! This exposes your database decryption secrets!
+    /// Print the database decryption secrets to stderr.
+    /// With these PRAGMA commands, you'll be able to run sqlcipher
+    /// directly to manipulate holochain databases.
+    pub fn danger_print_db_secrets(mut self, v: bool) -> Self {
+        self.danger_print_db_secrets = v;
+        self
+    }
+
     /// Set the data root path for the conductor that will be built.
     pub fn with_data_root_path(mut self, data_root_path: DataRootPath) -> Self {
         self.config.data_root_path = Some(data_root_path);
@@ -72,6 +87,11 @@ impl ConductorBuilder {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope)))]
     pub async fn build(self) -> ConductorResult<ConductorHandle> {
         tracing::debug!(?self.config);
+
+        let passphrase = match &self.passphrase {
+            Some(p) => p.clone(),
+            None => sodoken::BufRead::new_no_lock(&[]),
+        };
 
         let keystore = if let Some(keystore) = self.keystore {
             keystore
@@ -149,7 +169,8 @@ impl ConductorBuilder {
 
         let ribosome_store = RwShare::new(ribosome_store);
 
-        let spaces = Spaces::new(config.clone())?;
+        crate::conductor::space::set_danger_print_db_secrets(self.danger_print_db_secrets);
+        let spaces = Spaces::new(config.clone(), passphrase).await?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();
@@ -423,7 +444,8 @@ impl ConductorBuilder {
             .unwrap_or_else(holochain_keystore::test_keystore);
 
         let config = Arc::new(self.config);
-        let spaces = Spaces::new(config.clone())?;
+        let spaces =
+            Spaces::new(config.clone(), sodoken::BufRead::new_no_lock(b"passphrase")).await?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();

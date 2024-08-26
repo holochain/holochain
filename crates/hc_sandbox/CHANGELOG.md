@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Add `no-dpki` subcommand flag to the sandbox `generate` and `create` calls.
+
+## 0.4.0-dev.20
+
 ## 0.4.0-dev.19
 
 ## 0.4.0-dev.18
