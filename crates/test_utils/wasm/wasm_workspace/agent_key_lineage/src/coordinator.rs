@@ -4,6 +4,20 @@ use hdk::{agent::get_agent_key_lineage, prelude::*};
 use crate::integrity::{EntryTypes, SomeEntry};
 
 #[hdk_extern]
+fn init() -> ExternResult<InitCallbackResult> {
+    // Make sure key lineage can be gotten from init host context.
+    let agent_key = agent_info()?.agent_initial_pubkey;
+    get_agent_key_lineage(agent_key)?;
+    Ok(InitCallbackResult::Pass)
+}
+
+#[hdk_extern]
+fn no_op_init() -> ExternResult<()> {
+    // Only used to trigger init.
+    Ok(())
+}
+
+#[hdk_extern]
 fn create_entry_if_keys_of_same_lineage(
     agent_keys: (AgentPubKey, AgentPubKey),
 ) -> ExternResult<ActionHash> {
