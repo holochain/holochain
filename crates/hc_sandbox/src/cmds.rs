@@ -40,7 +40,7 @@ pub struct Create {
     #[arg(long)]
     pub in_process_lair: bool,
 
-    /// Launch Holochain without a dpki instance.
+    /// Launch Holochain with the DPKI service disabled.
     #[arg(long, action = ArgAction::SetFalse)]
     pub no_dpki: bool,
 }
