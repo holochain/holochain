@@ -125,7 +125,28 @@ async fn is_same_agent() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn agent_key_lineage_without_dpki() {
+async fn get_agent_key_lineage_without_dpki() {
+    let mut conductor =
+        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
+        .await
+        .0;
+    let app = conductor.setup_app("", &[dna_file]).await.unwrap();
+    let agent_key = app.agent().clone();
+    let zome = app.cells()[0].zome(TestWasm::AgentKeyLineage.coordinator_zome_name());
+
+    // Without DPKI, the lineage should just be the one agent key.
+    let response: Vec<AgentPubKey> = conductor
+        .call(&zome, "get_lineage_of_agent_keys", agent_key.clone())
+        .await;
+    assert_eq!(response, vec![agent_key.clone()]);
+
+    // TODO: When adding a function to update an agent key to DPKI service, append to this test
+    // a key update and make sure `create_entry_if_keys_of_same_lineage` succeeds for new agent key.
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn get_agent_key_lineage() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
         .await
@@ -134,46 +155,11 @@ async fn agent_key_lineage_without_dpki() {
     let agent_key = app.agent().clone();
     let zome = app.cells()[0].zome(TestWasm::AgentKeyLineage.coordinator_zome_name());
 
-    // Creating an entry with the two identical keys should succeed.
+    // At first the lineage should just be the initial agent key.
     let response: Vec<AgentPubKey> = conductor
-        .call(
-            &zome,
-            "get_lineage_of_agent_keys",
-            (agent_key.clone(), agent_key.clone()),
-        )
+        .call(&zome, "get_lineage_of_agent_keys", agent_key.clone())
         .await;
     assert_eq!(response, vec![agent_key.clone()]);
-
-    // Creating an entry with the valid agent key and a fake agent key should fail, because the
-    // fake key is not of the agent's key lineage.
-    // let response: Result<ActionHash, _> = conductor
-    //     .call_fallible(
-    //         &zome,
-    //         "create_entry_if_keys_of_same_lineage",
-    //         (agent_key.clone(), ::fixt::fixt!(AgentPubKey)),
-    //     )
-    //     .await;
-    // if let Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) = response {
-    //     assert_matches!(*workflow_error, WorkflowError::SourceChainError(_));
-    // } else {
-    //     panic!("expected workflow error");
-    // }
-
-    // // Creating an entry with a fake agent key twice should fail, because the
-    // // fake key is not registered in DPKI.
-    // let fake_agent_key = ::fixt::fixt!(AgentPubKey);
-    // let response: Result<ActionHash, _> = conductor
-    //     .call_fallible(
-    //         &zome,
-    //         "create_entry_if_keys_of_same_lineage",
-    //         (fake_agent_key.clone(), fake_agent_key.clone()),
-    //     )
-    //     .await;
-    // if let Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) = response {
-    //     assert_matches!(*workflow_error, WorkflowError::SourceChainError(_));
-    // } else {
-    //     panic!("expected workflow error");
-    // }
 
     // TODO: When adding a function to update an agent key to DPKI service, append to this test
     // a key update and make sure `create_entry_if_keys_of_same_lineage` succeeds for new agent key.
