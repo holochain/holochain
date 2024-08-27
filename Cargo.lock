@@ -3049,6 +3049,7 @@ dependencies = [
  "holochain_types",
  "must_future",
  "one_err",
+ "parking_lot 0.12.3",
  "pretty_assertions",
  "reqwest 0.12.5",
  "serde",
