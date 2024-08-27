@@ -16,12 +16,10 @@ futures = "0.3"
 getrandom = "0.2.7"
 holochain_keystore = { version = "^0.4.0-dev.18", path = "../holochain_keystore", default-features = false }
 holochain_nonce = { version = "^0.4.0-dev.6", path = "../holochain_nonce" }
-holochain_serialized_bytes = "=0.0.55"
 holochain_types = { path = "../holochain_types", version = "^0.4.0-dev.20" }
 one_err = "0.0.8"
 must_future = "0.1.1"
 parking_lot = "0.12"
-reqwest = { version = "0.12", features = ["json", "native-tls-vendored"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11.12"
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
@@ -29,6 +27,12 @@ thiserror = "1.0.22"
 tracing = "0.1"
 url = "2.4"
 url2 = "0.0.6"
+
+holochain_serialized_bytes = { version = "=0.0.55", optional = true }
+reqwest = { version = "0.12", features = [
+  "json",
+  "native-tls-vendored",
+], optional = true }
 
 
 [dev-dependencies]
@@ -42,4 +46,8 @@ tokio = { version = "1.36.0", features = ["full"] }
 workspace = true
 
 [features]
+default = ["http"]
+
 test_utils = ["holochain_types/test_utils"]
+
+http = ["holochain_serialized_bytes", "reqwest"]

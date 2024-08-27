@@ -6,7 +6,9 @@ use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};
 use url::Url;
 
-pub use holochain_chc::{chc_http::*, chc_local::*, *};
+use chc_local::ChcLocal;
+
+pub use holochain_chc::*;
 
 /// Storage for the local CHC implementations
 pub static CHC_LOCAL_MAP: Lazy<parking_lot::Mutex<HashMap<CellId, Arc<ChcLocal>>>> =
@@ -26,27 +28,33 @@ pub fn build_chc(url: Option<&Url>, keystore: MetaLairClient, cell_id: &CellId) 
     let is_holo_agent = true;
     if is_holo_agent {
         url.map(|url| {
-            if url.as_str() == CHC_LOCAL_MAGIC_URL {
-                chc_local(keystore, cell_id.clone())
-            } else {
-                chc_remote(url.clone(), keystore, cell_id)
+            #[cfg(feature = "chc")]
+            {
+                fn chc_local(keystore: MetaLairClient, cell_id: CellId) -> ChcImpl {
+                    let agent = cell_id.agent_pubkey().clone();
+                    let mut m = CHC_LOCAL_MAP.lock();
+                    m.entry(cell_id)
+                        .or_insert_with(|| Arc::new(chc_local::ChcLocal::new(keystore, agent)))
+                        .clone()
+                }
+
+                fn chc_remote(url: Url, keystore: MetaLairClient, cell_id: &CellId) -> ChcImpl {
+                    Arc::new(chc_http::ChcHttp::new(url, keystore, cell_id))
+                }
+
+                if url.as_str() == CHC_LOCAL_MAGIC_URL {
+                    chc_local(keystore, cell_id.clone())
+                } else {
+                    chc_remote(url.clone(), keystore, cell_id)
+                }
             }
+
+            #[cfg(not(feature = "chc"))]
+            panic!("CHC is not enabled in this build. Rebuild with the `chc` feature enabled.")
         })
     } else {
         None
     }
-}
-
-fn chc_local(keystore: MetaLairClient, cell_id: CellId) -> ChcImpl {
-    let agent = cell_id.agent_pubkey().clone();
-    let mut m = CHC_LOCAL_MAP.lock();
-    m.entry(cell_id)
-        .or_insert_with(|| Arc::new(ChcLocal::new(keystore, agent)))
-        .clone()
-}
-
-fn chc_remote(url: Url, keystore: MetaLairClient, cell_id: &CellId) -> ChcImpl {
-    Arc::new(ChcHttp::new(url, keystore, cell_id))
 }
 
 #[cfg(test)]

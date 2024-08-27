@@ -56,8 +56,10 @@ use must_future::MustBoxFuture;
 
 use holochain_types::chain::ChainItem;
 
-pub mod chc_http;
 pub mod chc_local;
+
+#[cfg(feature = "http")]
+pub mod chc_http;
 
 /// The API which a Chain Head Coordinator service must implement.
 #[async_trait::async_trait]
