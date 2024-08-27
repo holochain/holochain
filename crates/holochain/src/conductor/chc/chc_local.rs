@@ -189,8 +189,10 @@ mod tests {
     async fn simple_chc_sync() {
         use holochain::test_utils::inline_zomes::simple_crud_zome;
 
-        let mut config = ConductorConfig::default();
-        config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
+        let config = ConductorConfig {
+            chc_url: Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL)),
+            ..Default::default()
+        };
         let mut conductor = SweetConductor::from_config(config).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -205,10 +207,7 @@ mod tests {
         let agent = cell_id.agent_pubkey().clone();
 
         let top_hash = {
-            let mut dump = conductor
-                .dump_full_cell_state(&cell_id, None)
-                .await
-                .unwrap();
+            let mut dump = conductor.dump_full_cell_state(cell_id, None).await.unwrap();
             assert_eq!(dump.source_chain_dump.records.len(), 3);
             dump.source_chain_dump.records.pop().unwrap().action_address
         };
@@ -229,7 +228,7 @@ mod tests {
         {
             // add some data to the local CHC
             let m = CHC_LOCAL_MAP.lock();
-            let chc = m.get(&cell_id).unwrap();
+            let chc = m.get(cell_id).unwrap();
             let records = chc.clone().get_record_data(None).await.unwrap();
             assert_eq!(records.len(), 3);
             chc.clone().add_records(vec![new_record]).await.unwrap();
@@ -242,10 +241,7 @@ mod tests {
             .await
             .unwrap();
 
-        let dump = conductor
-            .dump_full_cell_state(&cell_id, None)
-            .await
-            .unwrap();
+        let dump = conductor.dump_full_cell_state(cell_id, None).await.unwrap();
         assert_eq!(dump.source_chain_dump.records.len(), 4);
         assert_eq!(
             dump.source_chain_dump
@@ -370,7 +366,7 @@ mod tests {
         ));
 
         let dump1 = conductors[1]
-            .dump_full_cell_state(&cell_id, None)
+            .dump_full_cell_state(cell_id, None)
             .await
             .unwrap();
 
@@ -418,15 +414,15 @@ mod tests {
             .unwrap();
 
         let dump0 = conductors[0]
-            .dump_full_cell_state(&cell_id, None)
+            .dump_full_cell_state(cell_id, None)
             .await
             .unwrap();
         let dump1 = conductors[1]
-            .dump_full_cell_state(&cell_id, None)
+            .dump_full_cell_state(cell_id, None)
             .await
             .unwrap();
         let dump2 = conductors[2]
-            .dump_full_cell_state(&cell_id, None)
+            .dump_full_cell_state(cell_id, None)
             .await
             .unwrap();
 
