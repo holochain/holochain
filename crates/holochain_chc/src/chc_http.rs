@@ -1,6 +1,61 @@
 //! Defines a client for use with a remote HTTP-based CHC.
 //!
-//! In order to
+//! The server must implement the following endpoints:
+//!
+//! ## `POST /add_records/{dna_hash}/{agent_pubkey}`
+//!
+//! Adds a list of records to the CHC.
+//!
+//! The CHC state will only be altered if a 200 status code is returned, which requires that:
+//! - the new records are valid
+//! - the signature matches the agent pubkey
+//!
+//! If the new records would cause a fork of the CHC chain but are otherwise valid, a 409 status code is returned
+//! along with the sequence number and hash of the fork point. This code indicates to the client that the local
+//! state should be synchronized with the CHC state before attempting to add the records again.
+//! (by calling `get_record_data` and then "grafting" the records onto the local chain).
+//!
+//! If there is some other problem with the input record data which prevents it from being added to the CHC state,
+//! e.g. the new records themselves do not constitute a valid hash chain, or the signature does not match,
+//! a 498 status code may be returned to indicate that the input is bad and must be fixed.
+//!
+//! Any other error code can be returned to indicate a server error.
+//!
+//! Body: msgpack-encoded [`AddRecordsRequest`]
+//! Response:
+//! - 200: (no data)
+//! - 409: msgpack-encoded `(u32, ActionHash)` (seq number and hash of fork point)
+//! - 498: msgpack-encoded `u32` (seq number of last record in the CHC chain)
+//! - other: error message as plaintext string
+//!
+//! ## `POST /get_record_data/{dna_hash}/{agent_pubkey}`
+//!
+//! Returns CHC data starting from the record *after* the given hash.
+//!
+//! If the given hash is not present in CHC state, Error code 498 should be returned with no data.
+//!
+//! A nonce must be provided in the request body to prevent replay attacks. The nonce need
+//! not be truly random, just unique.
+//!
+//! **NOTE**: the `EncryptedEntry` data is not currently encrypted. Encryption is a TODO!
+//!
+//! Body: msgpack-encoded [`GetRecordsRequest`]
+//! Response:
+//! - 200: msgpack-encoded `Vec<(SignedActionHashed, Option<(Arc<EncryptedEntry>, Signature)>)>`
+//! - 498: (no data)
+//! - other: error message as plaintext string
+//!
+//! ## Notes (for both endpoints)
+//!
+//! The `{dna_hash}` and `{agent_pubkey}` in the URL are base64-encoded in the standard way.
+//! (See the `Display` impl for `DnaHash` and `AgentPubKey`.)
+//!
+//! The request body is serialized using [`holochain_serialized_bytes::encode`] and can be deserialized using any
+//! msgpack decoder.
+//!
+//! Any msgpack-encoded response must be encoded in a way that can deserialized by [`holochain_serialized_bytes::decode`].
+//! Most standard msgpack encoders should work just fine for the return types being used here.
+//!
 
 use std::sync::Arc;
 

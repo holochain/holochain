@@ -7,7 +7,8 @@
 //!
 //! This crate introduces a [`ChainHeadCoordinator`] trait which defines the interface that Holochain
 //! weaves into its logic to make use of a CHC service. Currently, the only Holochain-supported implementation
-//! of this trait is [`ChcHttp`], which makes HTTP requests to a remote server and returns the responses.
+//! of this trait is [`ChcHttp`][chc_http::ChcHttp], which makes HTTP requests to a remote server and returns the responses.
+//! There is also a [`ChcLocal`][chc_local::ChcLocal] reference implementation which is used for testing.
 //! Other implementations can be written as needed, including alternate implementations of a HTTP client,
 //! or also other kinds of clients using other protocols.
 //!
