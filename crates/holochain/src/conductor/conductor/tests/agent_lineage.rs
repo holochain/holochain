@@ -135,7 +135,7 @@ async fn get_agent_key_lineage_during_init_without_dpki() {
     let zome = app.cells()[0].zome(TestWasm::AgentKeyLineage.coordinator_zome_name());
 
     // Call a no op function that will only trigger init. Init gets key lineage and returns `Pass`
-    // if successful and otherwise `Fail`.
+    // if successful and otherwise returns an error.
     let _: () = conductor.call(&zome, "no_op_init", ()).await;
 }
 
@@ -152,7 +152,7 @@ async fn get_agent_key_lineage_during_init() {
     // returns two keys.
 
     // Call a no op function that will only trigger init. Init gets key lineage and returns `Pass`
-    // if successful and otherwise `Fail`.
+    // if successful and otherwise returns an error.
     let _: () = conductor.call(&zome, "no_op_init", ()).await;
 }
 
@@ -176,8 +176,7 @@ async fn get_agent_key_lineage_without_dpki() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_key_lineage() {
-    let mut conductor =
-        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
+    let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
         .await
         .0;
