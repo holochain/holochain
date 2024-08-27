@@ -3,7 +3,7 @@
 //! An agent can update their key. This is helpful in cases where a the private key of their key pair
 //! has been leaked or becomes unusable in some other way. The agent key can be updated, which
 //! invalidates the current key and generates a new key. Both the invalidated key and the new key
-//! belong to the same agent. Keys of the same agent are called a key lineage.
+//! belong to the same agent. A sequence of keys belonging to the same agent form a key lineage.
 
 // Tests are located under conductor::conductor::tests::agent_lineage and core::ribosome::host_fn::get_agent_key_lineage::test.
 
