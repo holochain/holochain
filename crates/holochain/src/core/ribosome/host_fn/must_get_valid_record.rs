@@ -69,7 +69,6 @@ pub fn must_get_valid_record(
                         HostContext::EntryDefs(_)
                         | HostContext::GenesisSelfCheckV1(_)
                         | HostContext::GenesisSelfCheckV2(_)
-                        | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(
                             format!("Failed to get Record {}", action_hash)
