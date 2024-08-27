@@ -20,7 +20,7 @@ pub use chain_item::*;
 /// Helpers for constructing AgentActivity
 pub trait AgentActivityExt {
     /// Create an empty chain status
-    fn empty<T>(agent: &AgentPubKey) -> AgentActivityResponse<T> {
+    fn empty<T>(agent: &AgentPubKey) -> AgentActivityResponse {
         AgentActivityResponse {
             agent: agent.clone(),
             valid_activity: ChainItems::NotRequested,

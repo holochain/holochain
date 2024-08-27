@@ -568,7 +568,7 @@ impl CascadeImpl {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
-    ) -> CascadeResult<Vec<AgentActivityResponse<ActionHash>>> {
+    ) -> CascadeResult<Vec<AgentActivityResponse>> {
         let network = some_or_return!(self.network.as_ref(), Vec::with_capacity(0));
         Ok(network.get_agent_activity(agent, query, options).await?)
     }
@@ -1021,37 +1021,40 @@ impl CascadeImpl {
         }
     }
 
+    /// Get agent activity from agent activity authorities.
+    ///
+    /// Hashes are requested from the authority and cache for valid chains.
+    ///
+    /// Query:
+    /// - [include_entries](ChainQueryFilter::include_entries) will also fetch the entries in parallel (requires include_full_actions)
+    /// - [sequence_range](ChainQueryFilter::sequence_range) will get all the activity in the exclusive range
+    /// - [action_type](ChainQueryFilter::action_type) and [entry_type](ChainQueryFilter::entry_type) will filter the activity (requires include_full_actions)
+    ///
+    /// Options:
+    /// - [include_valid_activity](GetActivityOptions::include_valid_activity) will include the valid chain hashes.
+    /// - [include_rejected_activity](GetActivityOptions::include_rejected_activity) will include the invalid chain hashes.
+    /// - [include_warrants](GetActivityOptions::include_warrants) will include the warrants for this agent.
+    /// - [include_full_actions](GetActivityOptions::include_full_actions) will fetch the valid actions in parallel (requires include_valid_activity)
     #[cfg_attr(
         feature = "instrument",
         tracing::instrument(skip(self, agent, query, options))
     )]
-    /// Get agent activity from agent activity authorities.
-    /// Hashes are requested from the authority and cache for valid chains.
-    /// Options:
-    /// - include_valid_activity will include the valid chain hashes.
-    /// - include_rejected_activity will include the invalid chain hashes.
-    /// - include_full_actions will fetch the valid actions in parallel (requires include_valid_activity)
-    /// Query:
-    /// - include_entries will also fetch the entries in parallel (requires include_full_actions)
-    /// - sequence_range will get all the activity in the exclusive range
-    /// - action_type and entry_type will filter the activity (requires include_full_actions)
     pub async fn get_agent_activity(
         &self,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
-    ) -> CascadeResult<AgentActivityResponse<Record>> {
-        let status_only = !options.include_rejected_activity && !options.include_valid_activity;
-        // DESIGN: Evaluate if it's ok to **not** go to another authority for agent activity?
+    ) -> CascadeResult<AgentActivityResponse> {
+        let status_only = !(options.include_valid_activity || options.include_rejected_activity);
+
+        // If we're an authority then we allow local queries. This means we consider ourselves an authority
+        // for the agent in question. If the options specify network, for example because we are looking for
+        // warrants we don't know about or for countersigning actions, then we will go to the network
+        // regardless of authority status.
         let authority = self.am_i_an_authority(agent.clone().into()).await?;
-        let merged_response = if !authority {
-            let results = self
-                .fetch_agent_activity(agent.clone(), query.clone(), options.clone())
-                .await?;
-            let merged_response: AgentActivityResponse<ActionHash> =
-                agent_activity::merge_activities(agent.clone(), &options, results)?;
-            merged_response
-        } else {
+        
+        let merged_response = if authority && options.get_options.strategy == GetStrategy::Local {
+            tracing::info!("Executing locally");
             match self.dht.clone() {
                 Some(vault) => {
                     authority::handle_get_agent_activity(
@@ -1060,7 +1063,7 @@ impl CascadeImpl {
                         query.clone(),
                         (&options).into(),
                     )
-                    .await?
+                        .await?
                 }
                 None => agent_activity::merge_activities(
                     agent.clone(),
@@ -1068,6 +1071,15 @@ impl CascadeImpl {
                     Vec::with_capacity(0),
                 )?,
             }
+        } else {
+            let results = self
+                .fetch_agent_activity(agent.clone(), query.clone(), options.clone())
+                .await?;
+            tracing::info!("Fetched results from network {:?}", results);
+            let merged_response: AgentActivityResponse =
+                agent_activity::merge_activities(agent.clone(), &options, results)?;
+            tracing::info!("Merged results {:?}", merged_response);
+            merged_response
         };
 
         // If the response is empty we can finish.
@@ -1077,12 +1089,8 @@ impl CascadeImpl {
 
         // If the request is just for the status then return.
         if status_only {
+            tracing::info!("Status only");
             return Ok(AgentActivityResponse::status_only(merged_response));
-        }
-
-        // If they don't want the full actions then just return the hashes.
-        if !options.include_full_actions {
-            return Ok(AgentActivityResponse::hashes_only(merged_response));
         }
 
         // If they need the full actions then we will do concurrent gets.
@@ -1094,51 +1102,55 @@ impl CascadeImpl {
             highest_observed,
             warrants,
         } = merged_response;
+
+        // TODO Update this to only fetch missing entries
         let valid_activity = match valid_activity {
-            ChainItems::Hashes(hashes) => {
-                // If we can't get one of the actions then don't return any.
-                // DESIGN: Is this the correct choice?
-                let maybe_chain: Option<Vec<_>> = self
-                    .get_concurrent(
-                        hashes.into_iter().map(|(_, h)| h.into()),
-                        GetOptions::local(),
-                    )
-                    .await?
-                    .into_iter()
-                    .collect();
-                match maybe_chain {
-                    Some(mut chain) => {
-                        chain.sort_unstable_by_key(|el| el.action().action_seq());
-                        ChainItems::Full(chain)
-                    }
-                    None => ChainItems::Full(Vec::with_capacity(0)),
-                }
-            }
-            ChainItems::Full(_) => ChainItems::Full(Vec::with_capacity(0)),
-            ChainItems::NotRequested => ChainItems::NotRequested,
+            // ChainItems::Hashes(_hashes) => {
+            //     // If we can't get one of the actions then don't return any.
+            //     // DESIGN: Is this the correct choice?
+            //     let maybe_chain: Option<Vec<_>> = self
+            //         .get_concurrent(
+            //             hashes.into_iter().map(|(_, h)| h.into()),
+            //             GetOptions::local(),
+            //         )
+            //         .await?
+            //         .into_iter()
+            //         .collect();
+            //     match maybe_chain {
+            //         Some(mut chain) => {
+            //             chain.sort_unstable_by_key(|el| el.action().action_seq());
+            //             ChainItems::FullRecords(chain)
+            //         }
+            //         None => ChainItems::FullActions(Vec::with_capacity(0)),
+            //     }
+            // }
+            // ChainItems::FullRecords(_) => ChainItems::FullRecords(Vec::with_capacity(0)),
+            // ChainItems::FullActions(_) => ChainItems::FullActions(Vec::with_capacity(0)),
+            other => other,
         };
         let rejected_activity = match rejected_activity {
-            ChainItems::Hashes(hashes) => {
-                // If we can't get one of the actions then don't return any.
-                // DESIGN: Is this the correct choice?
-                let maybe_chain: Option<Vec<_>> = self
-                    .get_concurrent(
-                        hashes.into_iter().map(|(_, h)| h.into()),
-                        GetOptions::local(),
-                    )
-                    .await?
-                    .into_iter()
-                    .collect();
-                match maybe_chain {
-                    Some(mut chain) => {
-                        chain.sort_unstable_by_key(|el| el.action().action_seq());
-                        ChainItems::Full(chain)
-                    }
-                    None => ChainItems::Full(Vec::with_capacity(0)),
-                }
-            }
-            ChainItems::Full(_) => ChainItems::Full(Vec::with_capacity(0)),
-            ChainItems::NotRequested => ChainItems::NotRequested,
+            // ChainItems::Hashes(hashes) => {
+            //     // If we can't get one of the actions then don't return any.
+            //     // DESIGN: Is this the correct choice?
+            //     let maybe_chain: Option<Vec<_>> = self
+            //         .get_concurrent(
+            //             hashes.into_iter().map(|(_, h)| h.into()),
+            //             GetOptions::local(),
+            //         )
+            //         .await?
+            //         .into_iter()
+            //         .collect();
+            //     match maybe_chain {
+            //         Some(mut chain) => {
+            //             chain.sort_unstable_by_key(|el| el.action().action_seq());
+            //             ChainItems::FullRecords(chain)
+            //         }
+            //         None => ChainItems::FullActions(Vec::with_capacity(0)),
+            //     }
+            // }
+            // ChainItems::FullRecords(_) => ChainItems::FullRecords(Vec::with_capacity(0)),
+            // ChainItems::FullActions(_) => ChainItems::FullActions(Vec::with_capacity(0)),
+            other => other,
         };
 
         let r = AgentActivityResponse {

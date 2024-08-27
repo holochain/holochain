@@ -20,9 +20,9 @@ pub struct ActivityTestData {
     /// The author of the chain
     pub agent: AgentPubKey,
     /// The expected hash return values
-    pub valid_hashes: ChainItems<ActionHash>,
+    pub valid_hashes: ChainItems,
     /// The expected record return values
-    pub valid_records: ChainItems<Record>,
+    pub valid_records: ChainItems,
     /// The head of the chain produced
     pub chain_head: ChainHead,
     /// Same as the chain_head
@@ -145,7 +145,7 @@ impl ActivityTestData {
             chain_head,
             noise_ops,
             store_ops,
-            valid_records: ChainItems::Full(valid_records),
+            valid_records: ChainItems::FullRecords(valid_records),
         }
     }
 }

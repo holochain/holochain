@@ -73,8 +73,11 @@ pub struct GetActivityOptions {
     pub include_rejected_activity: bool,
     /// Include warrants in the response.
     pub include_warrants: bool,
-    /// Include the full signed actions and hashes in the response
-    /// instead of just the hashes.
+    /// Include the full records, instead of just the hashes.
+    ///
+    /// Setting this will make the [GetActivityOptions::include_full_actions] field to be ignored.
+    pub include_full_records: bool,
+    /// Include the full signed actions in the response, instead of just the hashes.
     pub include_full_actions: bool,
 }
 
@@ -85,6 +88,7 @@ impl Default for GetActivityOptions {
             include_warrants: true,
             include_rejected_activity: false,
             include_full_actions: false,
+            include_full_records: false,
         }
     }
 }
@@ -96,6 +100,7 @@ impl From<&actor::GetActivityOptions> for GetActivityOptions {
             include_warrants: a.include_warrants,
             include_rejected_activity: a.include_rejected_activity,
             include_full_actions: a.include_full_actions,
+            include_full_records: a.include_full_records,
         }
     }
 }
@@ -234,7 +239,7 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> AgentActivityResponse<ActionHash>;
+        ) -> AgentActivityResponse;
 
         /// A remote node is requesting agent activity from us.
         fn must_get_agent_activity(

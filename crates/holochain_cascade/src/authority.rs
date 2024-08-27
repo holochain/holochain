@@ -1,6 +1,6 @@
 //! Functions for the various authorities to handle queries
 
-use self::get_agent_activity_query::hashes::GetAgentActivityQuery;
+use self::get_agent_activity_query::actions::GetAgentActivityActionsQuery;
 use self::get_agent_activity_query::must_get_agent_activity::must_get_agent_activity;
 use self::get_entry_ops_query::GetEntryOpsQuery;
 use self::get_links_ops_query::GetLinksOpsQuery;
@@ -10,6 +10,8 @@ use self::{
 };
 
 use super::error::CascadeResult;
+use crate::authority::get_agent_activity_query::hashes::GetAgentActivityHashesQuery;
+use crate::authority::get_agent_activity_query::records::GetAgentActivityRecordsQuery;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_state::query::link::GetLinksQuery;
@@ -52,26 +54,43 @@ pub async fn handle_get_record(
     Ok(results)
 }
 
-/// Handler for get_agent_activity query to an Activity authority
+/// Handler for get_agent_activity query to an Activity authority.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(env)))]
 pub async fn handle_get_agent_activity(
     env: DbRead<DbKindDht>,
     agent: AgentPubKey,
     query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
-) -> CascadeResult<AgentActivityResponse<ActionHash>> {
-    let query = GetAgentActivityQuery::new(agent.clone(), query, options);
+) -> CascadeResult<AgentActivityResponse> {
     let results = env
-        .read_async(move |txn| {
+        .read_async(move |txn| -> CascadeResult<AgentActivityResponse> {
             let txn = Txn::from(&txn);
-            let warrants = txn.get_warrants_for_basis(&AnyLinkableHash::from(agent), true)?;
-            let mut r = query.run(txn)?;
+
+            let warrants =
+                txn.get_warrants_for_basis(&AnyLinkableHash::from(agent.clone()), true)?;
+
+            let mut activity_response = if options.include_full_records {
+                // If the caller wanted records, prioritise giving those back.
+                GetAgentActivityRecordsQuery::new(agent, query, options).run(txn)?
+            } else if options.include_full_actions {
+                // Otherwise, if the caller requested actions, give those back.
+                GetAgentActivityActionsQuery::new(agent, query, options).run(txn)?
+            } else {
+                // Otherwise, just give back the hashes.
+                GetAgentActivityHashesQuery::new(agent, query, options).run(txn)?
+            };
+
+            tracing::info!("Got activity response: {:?}", activity_response);
+
             if !warrants.is_empty() {
-                r.warrants = warrants.into_iter().map(|w| w.into_warrant()).collect();
+                // TODO why did we retrieve warrants in the activity query if we're going to overwrite them here?
+                activity_response.warrants = warrants.into_iter().map(|w| w.into_warrant()).collect();
             }
-            CascadeResult::Ok(r)
+
+            Ok(activity_response)
         })
         .await?;
+
     Ok(results)
 }
 

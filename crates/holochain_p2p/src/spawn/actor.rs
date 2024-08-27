@@ -244,7 +244,7 @@ impl WrapEvtSender {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: event::GetActivityOptions,
-    ) -> impl Future<Output = HolochainP2pResult<AgentActivityResponse<ActionHash>>> + 'static + Send
+    ) -> impl Future<Output = HolochainP2pResult<AgentActivityResponse>> + 'static + Send
     {
         timing_trace!(
             true,
@@ -1549,9 +1549,9 @@ impl HolochainP2pHandler for HolochainP2pActor {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse<ActionHash>>> {
+    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse>> {
         let space = dna_hash.into_kitsune();
-        // Convert the agent key to an any dht hash so it can be used
+        // Convert the agent key to an any dht hash so that it can be used
         // as the basis for sending this request
         let agent_hash: AnyDhtHash = agent.clone().into();
         let basis = agent_hash.to_kitsune();

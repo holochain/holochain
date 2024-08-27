@@ -36,7 +36,7 @@ async fn get_activity() {
     let options = holochain_p2p::actor::GetActivityOptions {
         include_valid_activity: true,
         include_rejected_activity: false,
-        include_full_actions: true,
+        include_full_records: true,
         ..Default::default()
     };
 
@@ -59,6 +59,17 @@ async fn get_activity() {
         status: ChainStatus::Valid(td.chain_head.clone()),
         highest_observed: Some(td.highest_observed.clone()),
     };
+    assert_eq!(r.agent, expected.agent);
+    match (&r.valid_activity, &expected.valid_activity) {
+        (ChainItems::FullRecords(r), ChainItems::FullRecords(e)) => {
+            assert_eq!(r.len(), e.len());
+            for (i, (r, e)) in r.iter().zip(e.iter()).enumerate() {
+                assert_eq!(r, e, "Not equal at index {}", i);
+            }
+        }
+        _ => unreachable!(),
+    }
+    assert_eq!(r.valid_activity, expected.valid_activity);
     assert_eq!(r, expected);
 }
 
@@ -107,7 +118,7 @@ async fn get_activity_with_warrants() {
     let options = holochain_p2p::actor::GetActivityOptions {
         include_valid_activity: true,
         include_rejected_activity: false,
-        include_full_actions: true,
+        include_full_actions: false,
         ..Default::default()
     };
 
