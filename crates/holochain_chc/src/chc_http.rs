@@ -1,4 +1,6 @@
 //! Defines a client for use with a remote HTTP-based CHC.
+//!
+//! In order to
 
 use std::sync::Arc;
 
@@ -8,14 +10,14 @@ use holochain_keystore::MetaLairClient;
 use url::Url;
 
 /// An HTTP client which can talk to a remote CHC implementation
-pub struct ChcRemote {
-    client: ChcRemoteClient,
+pub struct ChcHttp {
+    client: ChcHttpClient,
     keystore: MetaLairClient,
     agent: AgentPubKey,
 }
 
 #[async_trait::async_trait]
-impl ChainHeadCoordinator for ChcRemote {
+impl ChainHeadCoordinator for ChcHttp {
     type Item = SignedActionHashed;
 
     async fn add_records_request(&self, request: AddRecordsRequest) -> ChcResult<()> {
@@ -64,16 +66,16 @@ impl ChainHeadCoordinator for ChcRemote {
     }
 }
 
-impl ChainHeadCoordinatorExt for ChcRemote {
+impl ChainHeadCoordinatorExt for ChcHttp {
     fn signing_info(&self) -> (MetaLairClient, AgentPubKey) {
         (self.keystore.clone(), self.agent.clone())
     }
 }
 
-impl ChcRemote {
+impl ChcHttp {
     /// Constructor
     pub fn new(base_url: Url, keystore: MetaLairClient, cell_id: &CellId) -> Self {
-        let client = ChcRemoteClient {
+        let client = ChcHttpClient {
             base_url: base_url
                 .join(&format!(
                     "{}/{}/",
@@ -91,11 +93,11 @@ impl ChcRemote {
 }
 
 /// Client for a single CHC server
-pub struct ChcRemoteClient {
+pub struct ChcHttpClient {
     base_url: url::Url,
 }
 
-impl ChcRemoteClient {
+impl ChcHttpClient {
     fn url(&self, path: &str) -> String {
         assert!(!path.starts_with('/'));
         self.base_url.join(path).expect("invalid URL").to_string()
@@ -135,7 +137,7 @@ mod tests {
         let keystore = holochain_keystore::test_keystore();
         let agent = fake_agent_pubkey_1();
         let cell_id = CellId::new(::fixt::fixt!(DnaHash), agent.clone());
-        let chc = Arc::new(ChcRemote::new(
+        let chc = Arc::new(ChcHttp::new(
             url::Url::parse("http://127.0.0.1:40845/").unwrap(),
             // url::Url::parse("https://chc.dev.holotest.net/v1/").unwrap(),
             keystore.clone(),

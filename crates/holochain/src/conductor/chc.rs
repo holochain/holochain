@@ -49,5 +49,5 @@ fn chc_local(keystore: MetaLairClient, cell_id: CellId) -> ChcImpl {
 }
 
 fn chc_remote(url: Url, keystore: MetaLairClient, cell_id: &CellId) -> ChcImpl {
-    Arc::new(ChcRemote::new(url, keystore, cell_id))
+    Arc::new(ChcHttp::new(url, keystore, cell_id))
 }
