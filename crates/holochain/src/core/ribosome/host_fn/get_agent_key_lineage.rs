@@ -6,8 +6,7 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-#[allow(clippy::extra_unused_lifetimes)]
-pub fn get_agent_key_lineage<'a>(
+pub fn get_agent_key_lineage(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: AgentPubKey,
