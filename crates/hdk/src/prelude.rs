@@ -146,6 +146,7 @@ macro_rules! holochain_externs {
             must_get_valid_record:1,
             must_get_action:1,
             accept_countersigning_preflight_request:1,
+            get_agent_key_lineage:1,
             query:1,
             call_remote:1,
             block_agent:1,

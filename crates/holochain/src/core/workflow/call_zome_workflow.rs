@@ -5,6 +5,7 @@ use super::error::WorkflowResult;
 use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
+use crate::conductor::api::DpkiApi;
 use crate::conductor::ConductorHandle;
 use crate::core::check_dpki_agent_validity_for_record;
 use crate::core::queue_consumer::TriggerSender;
@@ -74,10 +75,16 @@ where
         .ok();
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
+    let maybe_dpki = args.conductor_handle.running_services().dpki;
     let signal_tx = args.signal_tx.clone();
-    let result =
-        call_zome_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
-            .await?;
+    let result = call_zome_workflow_inner(
+        workspace.clone(),
+        maybe_dpki,
+        network.clone(),
+        keystore.clone(),
+        args,
+    )
+    .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
@@ -134,6 +141,7 @@ where
 
 async fn call_zome_workflow_inner<Ribosome>(
     workspace: SourceChainWorkspace,
+    dpki: DpkiApi,
     network: HolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome>,
@@ -157,6 +165,7 @@ where
     let host_access = ZomeCallHostAccess::new(
         workspace.clone().into(),
         keystore,
+        dpki,
         network.clone(),
         signal_tx,
         call_zome_handle,

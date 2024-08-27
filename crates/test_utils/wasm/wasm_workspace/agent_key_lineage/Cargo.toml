@@ -1,14 +1,14 @@
 [package]
-name = "agent_lineage"
+name = "agent_key_lineage"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "test_wasm_agent_lineage"
+name = "test_wasm_agent_key_lineage"
 crate-type = ["cdylib", "rlib"]
 
 [[example]]
-name = "integrity_test_wasm_agent_lineage"
+name = "integrity_test_wasm_agent_key_lineage"
 path = "src/integrity.rs"
 crate-type = ["cdylib", "rlib"]
 
