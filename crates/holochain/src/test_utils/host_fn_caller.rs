@@ -197,8 +197,8 @@ impl HostFnCaller {
         .unwrap();
         let host_access = ZomeCallHostAccess::new(
             workspace.clone().into(),
-            dpki,
             keystore,
+            dpki,
             network,
             signal_tx,
             call_zome_handle,

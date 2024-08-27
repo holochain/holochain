@@ -196,7 +196,10 @@ impl HostContext {
     pub fn maybe_dpki(&self) -> DpkiApi {
         match self.clone() {
             Self::ZomeCall(ZomeCallHostAccess { dpki, .. }) => dpki,
-            _ => None,
+            Self::Init(InitHostAccess { dpki, .. }) => dpki,
+            _ => {
+                panic!("Gave access to a host function that accesses DPKI without providing DPKI.")
+            }
         }
     }
 
@@ -605,8 +608,8 @@ impl From<ZomeCallInvocation> for ZomeCall {
 #[derive(Clone, Constructor)]
 pub struct ZomeCallHostAccess {
     pub workspace: HostFnWorkspace,
-    pub dpki: Option<DpkiImpl>,
     pub keystore: MetaLairClient,
+    pub dpki: Option<DpkiImpl>,
     pub network: HolochainP2pDna,
     pub signal_tx: broadcast::Sender<Signal>,
     pub call_zome_handle: CellConductorReadHandle,

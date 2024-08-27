@@ -125,6 +125,38 @@ async fn is_same_agent() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn get_agent_key_lineage_during_init_without_dpki() {
+    let mut conductor =
+        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
+        .await
+        .0;
+    let app = conductor.setup_app("", &[dna_file]).await.unwrap();
+    let zome = app.cells()[0].zome(TestWasm::AgentKeyLineage.coordinator_zome_name());
+
+    // Call a no op function that will only trigger init. Init gets key lineage and returns `Pass`
+    // if successful and otherwise `Fail`.
+    let _: () = conductor.call(&zome, "no_op_init", ()).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn get_agent_key_lineage_during_init() {
+    let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
+        .await
+        .0;
+    let app = conductor.setup_app("", &[dna_file]).await.unwrap();
+    let zome = app.cells()[0].zome(TestWasm::AgentKeyLineage.coordinator_zome_name());
+
+    // TODO: Update key first before calling init to make sure that get lineage call used DPKI and
+    // returns two keys.
+
+    // Call a no op function that will only trigger init. Init gets key lineage and returns `Pass`
+    // if successful and otherwise `Fail`.
+    let _: () = conductor.call(&zome, "no_op_init", ()).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn get_agent_key_lineage_without_dpki() {
     let mut conductor =
         SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
@@ -143,33 +175,21 @@ async fn get_agent_key_lineage_without_dpki() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn get_agent_key_lineage_during_init_without_dpki() {
+async fn get_agent_key_lineage() {
     let mut conductor =
         SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
         .await
         .0;
     let app = conductor.setup_app("", &[dna_file]).await.unwrap();
+    let agent_key = app.agent().clone();
     let zome = app.cells()[0].zome(TestWasm::AgentKeyLineage.coordinator_zome_name());
 
-    // Call a no op function that will only trigger init. Init gets key lineage and returns `Pass`
-    // if successful and otherwise `Fail`.
-    let _: () = conductor.call(&zome, "no_op_init", ()).await;
-}
+    // The lineage should just be the one agent key.
+    let response: Vec<AgentPubKey> = conductor
+        .call(&zome, "get_lineage_of_agent_keys", agent_key.clone())
+        .await;
+    assert_eq!(response, vec![agent_key.clone()]);
 
-#[tokio::test(flavor = "multi_thread")]
-async fn get_agent_key_lineage() {
-    let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
-    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
-        .await
-        .0;
-    let app = conductor.setup_app("", &[dna_file]).await.unwrap();
-    let zome = app.cells()[0].zome(TestWasm::AgentKeyLineage.coordinator_zome_name());
-
-    // TODO: Update key first before calling init to make sure that get lineage call used DPKI and
-    // returns two keys.
-
-    // Call a no op function that will only trigger init. Init gets key lineage and returns `Pass`
-    // if successful and otherwise `Fail`.
-    let _: () = conductor.call(&zome, "no_op_init", ()).await;
+    // TODO: Update key and call get lineage of keys again.
 }

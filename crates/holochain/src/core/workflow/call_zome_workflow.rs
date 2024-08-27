@@ -164,8 +164,8 @@ where
     tracing::trace!("Before zome call");
     let host_access = ZomeCallHostAccess::new(
         workspace.clone().into(),
-        dpki,
         keystore,
+        dpki,
         network.clone(),
         signal_tx,
         call_zome_handle,
