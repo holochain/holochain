@@ -844,8 +844,6 @@ impl RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
-                    let instance = instance_with_store.instance.clone();
-
                     #[cfg(feature = "wasmer_sys")]
                     {
                         let mut store_lock = instance_with_store.store.lock();

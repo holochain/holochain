@@ -10,7 +10,6 @@ use mr_bundle::RawBundle;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
-use tracing::info;
 
 /// Unpack a bundle into a working directory, returning the directory path used.
 pub async fn unpack<M: Manifest>(
