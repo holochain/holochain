@@ -58,6 +58,7 @@ mod check_clone_access;
 
 use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
+use crate::conductor::api::DpkiApi;
 use crate::conductor::api::ZomeCall;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
@@ -76,6 +77,7 @@ use guest_callback::init::InitHostAccess;
 use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use holo_hash::AgentPubKey;
+use holochain_conductor_services::DpkiImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::*;
 use holochain_p2p::HolochainP2pDna;
@@ -181,6 +183,17 @@ impl HostContext {
             | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => Some(workspace.into()),
             Self::Validate(ValidateHostAccess { workspace, .. }) => Some(workspace),
             _ => None,
+        }
+    }
+
+    /// Get the DPKI service if installed.
+    pub fn maybe_dpki(&self) -> DpkiApi {
+        match self.clone() {
+            Self::ZomeCall(ZomeCallHostAccess { dpki, .. }) => dpki,
+            Self::Init(InitHostAccess { dpki, .. }) => dpki,
+            _ => {
+                panic!("Gave access to a host function that accesses DPKI without providing DPKI.")
+            }
         }
     }
 
@@ -589,6 +602,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
 pub struct ZomeCallHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
+    pub dpki: Option<DpkiImpl>,
     pub network: HolochainP2pDna,
     pub signal_tx: broadcast::Sender<Signal>,
     pub call_zome_handle: CellConductorReadHandle,

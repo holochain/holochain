@@ -1,0 +1,32 @@
+[package]
+name = "hc_deepkey_types"
+version = "0.8.0-dev.4"
+authors = ["Matthew Brisebois <matthew.brisebois@holo.host>"]
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/hc_deepkey_types"
+description = "Definitions used by the Deepkey DNA Zomes"
+readme = "README.md"
+
+[dependencies]
+# TODO: remove path designation to allow this crate to trail behind the current monorepo version
+hdi = { version = "^0.5.0-dev.13", path = "../hdi" }
+holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash", features = [
+  "hashing",
+  "encoding",
+] }
+holochain_integrity_types = { version = "^0.4.0-dev.12", path = "../holochain_integrity_types" }
+rmpv = { version = "1", features = ["with-serde"] }
+serde = "1"
+
+arbitrary = { version = "1.0", features = ["derive"], optional = true }
+
+
+[features]
+fuzzing = [
+  "arbitrary",
+  "hdi/fuzzing",
+  "holochain_integrity_types/fuzzing",
+  "holo_hash/fuzzing",
+]

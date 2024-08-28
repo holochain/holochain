@@ -94,6 +94,7 @@
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
 
+use crate::conductor::api::DpkiApi;
 use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::Conductor;
 use crate::conductor::ConductorHandle;
@@ -110,7 +111,6 @@ use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
 
 pub use error::*;
-use holochain_conductor_services::DpkiService;
 pub use types::Outcome;
 
 use holo_hash::DhtOpHash;
@@ -160,7 +160,6 @@ mod types;
         conductor_handle,
         network,
         dht_query_cache,
-        validation_dependencies,
     ))
 )]
 #[allow(clippy::too_many_arguments)]
@@ -197,7 +196,7 @@ pub async fn app_validation_workflow(
         // If not all ops have been validated, trigger app validation workflow again.
         if outcome_summary.validated < outcome_summary.ops_to_validate {
             // Trigger app validation workflow again in 100-3000 milliseconds.
-            let interval = 3000u64.saturating_sub(outcome_summary.missing as u64 * 100) + 100;
+            let interval = 2900u64.saturating_sub(outcome_summary.missing as u64 * 100) + 100;
             WorkComplete::Incomplete(Some(Duration::from_millis(interval)))
         } else {
             WorkComplete::Complete
@@ -416,8 +415,6 @@ pub async fn record_to_op(
     op_type: ChainOpType,
     cascade: Arc<impl Cascade>,
 ) -> AppValidationOutcome<(Op, DhtOpHash, Option<Entry>)> {
-    use ChainOpType::*;
-
     // Hide private data where appropriate
     let (record, mut hidden_entry) = if matches!(op_type, ChainOpType::StoreEntry) {
         // We don't want to hide private data for a StoreEntry, because when doing
@@ -436,7 +433,7 @@ pub async fn record_to_op(
     let action = sah.into();
     // Register agent activity doesn't store the entry so we need to
     // save it so we can reconstruct the record later.
-    if matches!(op_type, RegisterAgentActivity) {
+    if matches!(op_type, ChainOpType::RegisterAgentActivity) {
         hidden_entry = entry.take().or(hidden_entry);
     }
     let chain_op = ChainOp::from_type(op_type, action, entry)?;
@@ -554,7 +551,7 @@ pub async fn validate_op(
     network: &HolochainP2pDna,
     ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
-    dpki: Option<Arc<DpkiService>>,
+    dpki: DpkiApi,
     is_inline: bool,
 ) -> AppValidationOutcome<Outcome> {
     check_entry_def(op, &network.dna_hash(), conductor_handle)
@@ -759,7 +756,7 @@ async fn run_validation_callback(
     ribosome: &impl RibosomeT,
     workspace: HostFnWorkspaceRead,
     network: GenericNetwork,
-    dpki: Option<Arc<DpkiService>>,
+    dpki: DpkiApi,
     is_inline: bool,
 ) -> AppValidationResult<Outcome> {
     let validate_result = ribosome

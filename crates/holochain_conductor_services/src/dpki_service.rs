@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-pub use holochain_deepkey_dna::types::*;
+pub use hc_deepkey_sdk::*;
 use holochain_types::prelude::*;
 use holochain_util::timed;
 
@@ -110,6 +110,9 @@ pub trait DpkiState: Send + Sync {
         key: AgentPubKey,
         timestamp: Timestamp,
     ) -> DpkiServiceResult<KeyState>;
+
+    /// Get lineage of all keys of an agent, ordered by timestamp.
+    async fn get_agent_key_lineage(&self, key: AgentPubKey) -> DpkiServiceResult<Vec<AgentPubKey>>;
 
     /// Check if the two provided agent keys belong to the same agent.
     async fn is_same_agent(

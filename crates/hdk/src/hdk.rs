@@ -41,6 +41,8 @@ pub trait HdkT: HdiT {
         &self,
         preflight_request: PreflightRequest,
     ) -> ExternResult<PreflightRequestAcceptance>;
+    // DPKI
+    fn get_agent_key_lineage(&self, agent_key: AgentPubKey) -> ExternResult<Vec<AgentPubKey>>;
     // Info
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
     fn call_info(&self, call_info_input: ()) -> ExternResult<CallInfo>;
@@ -224,6 +226,7 @@ mockall::mock! {
             &self,
             ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
         ) -> ExternResult<XSalsa20Poly1305Data>;
+        fn is_same_agent(&self, key1: AgentPubKey, key2: AgentPubKey) -> ExternResult<bool>;
     }
 
 }
@@ -356,6 +359,10 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     fn call_info(&self, _: ()) -> ExternResult<CallInfo> {
+        Self::err()
+    }
+    // DPKI
+    fn get_agent_key_lineage(&self, _: AgentPubKey) -> ExternResult<Vec<AgentPubKey>> {
         Self::err()
     }
     // Link
@@ -604,6 +611,10 @@ impl HdkT for HostHdk {
             __hc__accept_countersigning_preflight_request_1,
             preflight_request,
         )
+    }
+    // DPKI
+    fn get_agent_key_lineage(&self, agent_key: AgentPubKey) -> ExternResult<Vec<AgentPubKey>> {
+        host_call::<AgentPubKey, Vec<AgentPubKey>>(__hc__get_agent_key_lineage_1, agent_key)
     }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
         host_call::<(), AgentInfo>(__hc__agent_info_1, ())

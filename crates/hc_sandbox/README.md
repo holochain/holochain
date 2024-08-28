@@ -107,7 +107,12 @@ Finally, you can specify the type of network transport the sandboxes will use to
 hc sandbox generate network quic
 ```
 
-You can also generate and run in the same command using the `--run` option. The argument passed to `-r` is a comma-separated list of ports to bind the sandboxes' app API WebSockets to, with `0` indicating that a port should be auto-selected. Once again, make sure the number of ports matches the number of sandboxes to be run; if not enough ports are specified, the remaining sandboxes won't be run.
+You can also generate sandboxes with the underlying dpki service disabled by passing in the `--no-dpki` flag.
+```shell
+hc sandbox generate --no-dpki
+```
+
+You can generate and run in the same command using the `--run` option. The argument passed to `-r` is a comma-separated list of ports to bind the sandboxes' app API WebSockets to, with `0` indicating that a port should be auto-selected. Once again, make sure the number of ports matches the number of sandboxes to be run; if not enough ports are specified, the remaining sandboxes won't be run.
 
 ```shell
 hc sandbox generate --num-sandboxes 5 --run 0,9500,9501,0,0 ./elemental-chat.happ
@@ -115,7 +120,7 @@ hc sandbox generate --num-sandboxes 5 --run 0,9500,9501,0,0 ./elemental-chat.hap
 
 As a full example, this will generate and run five named sandboxes in a subdirectory called `my-sandboxes`, with app IDs set to `my-app`
 using the `elemental-chat.happ` from the current directory with a QUIC
-network configured to use `localhost`.
+network configured to use `localhost` and full use of the DPKI service.
 
 _You don't need to specify the filename of the hApp when there's only one in your current working directory._
 

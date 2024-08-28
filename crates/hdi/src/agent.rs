@@ -5,6 +5,8 @@
 //! invalidates the current key and generates a new key. Both the invalidated key and the new key
 //! belong to the same agent. Keys of the same agent are called a key lineage.
 
+// Tests are located under conductor::conductor::tests::agent_lineage.
+
 use crate::prelude::*;
 use holo_hash::AgentPubKey;
 

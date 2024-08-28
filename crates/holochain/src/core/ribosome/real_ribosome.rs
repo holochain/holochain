@@ -7,6 +7,7 @@ use super::host_fn::delete_clone_cell::delete_clone_cell;
 use super::host_fn::disable_clone_cell::disable_clone_cell;
 use super::host_fn::enable_clone_cell::enable_clone_cell;
 use super::host_fn::get_agent_activity::get_agent_activity;
+use super::host_fn::get_agent_key_lineage::get_agent_key_lineage;
 use super::host_fn::HostFnApi;
 use super::HostContext;
 use super::ZomeCallHostAccess;
@@ -534,6 +535,11 @@ impl RealRibosome {
                 accept_countersigning_preflight_request,
             )
             .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
+            .with_host_function(
+                &mut ns,
+                "__hc__get_agent_key_lineage_1",
+                get_agent_key_lineage,
+            )
             .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
             .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
             .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
@@ -1347,6 +1353,7 @@ pub mod wasm_test {
                 "__hc__enable_clone_cell_1",
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
+                "__hc__get_agent_key_lineage_1",
                 "__hc__get_details_1",
                 "__hc__get_link_details_1",
                 "__hc__get_links_1",

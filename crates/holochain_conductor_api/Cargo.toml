@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_api"
-version = "0.4.0-dev.18"
+version = "0.4.0-dev.21"
 description = "Message types for Holochain admin and app interface protocols"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -11,29 +11,29 @@ edition = "2021"
 # reminder - do not use workspace deps
 [dependencies]
 derive_more = "0.99"
-kitsune_p2p_types = { version = "^0.4.0-dev.10", path = "../kitsune_p2p/types" }
-kitsune_p2p_bin_data = { version = "^0.4.0-dev.9", path = "../kitsune_p2p/bin_data" }
-holo_hash = { version = "^0.4.0-dev.9", path = "../holo_hash", features = [
+kitsune_p2p_types = { version = "^0.4.0-dev.12", path = "../kitsune_p2p/types" }
+kitsune_p2p_bin_data = { version = "^0.4.0-dev.11", path = "../kitsune_p2p/bin_data" }
+holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash", features = [
   "full",
 ] }
-holochain_state_types = { version = "^0.4.0-dev.10", path = "../holochain_state_types" }
+holochain_state_types = { version = "^0.4.0-dev.12", path = "../holochain_state_types" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_types = { version = "^0.4.0-dev.18", path = "../holochain_types" }
-holochain_zome_types = { version = "^0.4.0-dev.12", path = "../holochain_zome_types" }
+holochain_types = { version = "^0.4.0-dev.21", path = "../holochain_types" }
+holochain_zome_types = { version = "^0.4.0-dev.15", path = "../holochain_zome_types" }
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 tracing = "0.1.26"
 thiserror = "1.0.22"
 url2 = "0.0.6"
-holochain_keystore = { version = "^0.4.0-dev.16", path = "../holochain_keystore" }
+holochain_keystore = { version = "^0.4.0-dev.19", path = "../holochain_keystore" }
 shrinkwraprs = "0.3.0"
 
 [dev-dependencies]
 serde_json = "1.0"
 rmp-serde = "1.3"
 matches = { version = "0.1.8" }
-holochain_trace = { version = "^0.4.0-dev.3", path = "../holochain_trace" }
-kitsune_p2p = { version = "^0.4.0-dev.17", path = "../kitsune_p2p/kitsune_p2p" }
+holochain_trace = { version = "^0.4.0-dev.5", path = "../holochain_trace" }
+kitsune_p2p = { version = "^0.4.0-dev.19", path = "../kitsune_p2p/kitsune_p2p" }
 
 [lints]
 workspace = true

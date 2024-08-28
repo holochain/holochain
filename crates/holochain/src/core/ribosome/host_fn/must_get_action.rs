@@ -9,12 +9,11 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-#[allow(clippy::extra_unused_lifetimes)]
 #[cfg_attr(
     feature = "instrument",
     tracing::instrument(skip(_ribosome, call_context))
 )]
-pub fn must_get_action<'a>(
+pub fn must_get_action(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: MustGetActionInput,
