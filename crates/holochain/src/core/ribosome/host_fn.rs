@@ -152,6 +152,9 @@ host_fn_api_impls! {
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
+    // Query agent key lineage for the provided key.
+    fn get_agent_key_lineage (AgentPubKey) -> Vec<AgentPubKey>;
+
     fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
 
     // Get links by entry hash from the cascade.
