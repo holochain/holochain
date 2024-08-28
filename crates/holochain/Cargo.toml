@@ -93,9 +93,13 @@ url2 = "0.0.6"
 uuid = { version = "1.8", features = ["serde", "v4"] }
 holochain_wasm_test_utils = { version = "^0.4.0-dev.21", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
-wasmer = { git = "https://github.com/wasmerio/wasmer.git", branch = "wamr", package = "wasmer", default-features = false }
-wasmer-middlewares = { git = "https://github.com/wasmerio/wasmer.git", branch = "wamr", package = "wasmer-middlewares", optional = true }
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
+
+# Temporarily include a fork of wasmer from the git branch 'wamr', until it is officially released in wasmer v5
+hc-wasmer = { version="=4.3.6-hc.1", optional = true, default-features = false }
+hc-wasmer-middlewares = { version="=4.3.6-hc.1", optional = true, default-features = false }
+wasmer = { version = "=4.3.6", optional = true, default-feature = false }
+wasmer-middlewares = { version = "=4.3.6", optional = true, default-feature = false }
 
 # Dependencies for test_utils
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
@@ -280,11 +284,20 @@ wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
 
 # Enable wasm compiler
 # Incompatible with "wasmer_wamr"
-wasmer_sys = ["wasmer-middlewares", "wasmer/default", "holochain_wasmer_host/wasmer_sys"]
+wasmer_sys = [
+  "dep:wasmer",
+  "dep:wasmer-middlewares",
+  "wasmer/default", 
+  "holochain_wasmer_host/wasmer_sys"
+]
 
 # Enable wasm interpreter
 # Incompatible with "wasmer_sys"
-wasmer_wamr = ["wasmer/wamr", "holochain_wasmer_host/wasmer_wamr"]
+wasmer_wamr = [
+  "dep:hc-wasmer",
+  "hc-wasmer/wamr",
+  "holochain_wasmer_host/wasmer_wamr"
+]
 
 # Enable chain head coordination
 chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_types/chc"]

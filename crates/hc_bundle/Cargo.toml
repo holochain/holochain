@@ -25,7 +25,6 @@ path = "src/bin/hc-dna.rs"
 # reminder - do not use workspace deps
 [dependencies]
 holochain_wasmer_host = { git = "https://github.com/mattyg/holochain-wasmer.git", branch = "feat/wasmer-wamr-integration", package = "holochain_wasmer_host", default-features = false }
-wasmer = { git = "https://github.com/wasmerio/wasmer.git", branch = "wamr", package = "wasmer", default-features = false }
 futures = "0.3"
 anyhow = "1.0"
 clap = { version = "4.0", features = ["derive"] }
@@ -39,6 +38,10 @@ serde_yaml = "0.9"
 thiserror = "1.0.22"
 tracing = "0.1"
 tokio = { version = "1.27", features = ["full"] }
+
+# Temporarily include a fork of wasmer from the git branch 'wamr', until it is officially released in wasmer v5
+hc-wasmer = { version="=4.3.6-hc.1", optional = true, default-features = false }
+wasmer = { version = "=4.3.6", optional = true, default-feature = false }
 
 [dev-dependencies]
 assert_cmd = "2.0"
@@ -58,5 +61,13 @@ default = ["wasmer_sys"]
 sqlite-encrypted = ["holochain_types/sqlite-encrypted"]
 sqlite = ["holochain_types/sqlite"]
 
-wasmer_sys = ["holochain_wasmer_host/wasmer_sys", "wasmer/default"]
-wasmer_wamr = ["holochain_wasmer_host/wasmer_wamr", "wasmer/wamr"]
+wasmer_sys = [
+  "dep:wasmer",
+  "wasmer/default",
+  "holochain_wasmer_host/wasmer_sys",
+]
+wasmer_wamr = [
+  "dep:hc-wasmer",
+  "hc-wasmer/wamr",
+  "holochain_wasmer_host/wasmer_wamr"
+]
