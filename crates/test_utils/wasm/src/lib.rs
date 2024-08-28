@@ -49,8 +49,6 @@ pub enum TestWasm {
     InitFail,
     InitPass,
     Link,
-    MigrateAgentFail,
-    MigrateAgentPass,
     MigrateInitial,
     MigrateNew,
     MultipleCalls,
@@ -161,8 +159,6 @@ impl From<TestWasm> for ZomeName {
             TestWasm::InitFail => "init_fail",
             TestWasm::InitPass => "init_pass",
             TestWasm::Link => "link",
-            TestWasm::MigrateAgentFail => "migrate_agent_fail",
-            TestWasm::MigrateAgentPass => "migrate_agent_pass",
             TestWasm::MigrateInitial => "migrate_initial",
             TestWasm::MigrateNew => "migrate_new",
             TestWasm::MultipleCalls => "multiple_calls",
@@ -248,12 +244,6 @@ impl From<TestWasm> for PathBuf {
             TestWasm::InitFail => "wasm32-unknown-unknown/release/test_wasm_init_fail.wasm",
             TestWasm::InitPass => "wasm32-unknown-unknown/release/test_wasm_init_pass.wasm",
             TestWasm::Link => "wasm32-unknown-unknown/release/test_wasm_link.wasm",
-            TestWasm::MigrateAgentFail => {
-                "wasm32-unknown-unknown/release/test_wasm_migrate_agent_fail.wasm"
-            }
-            TestWasm::MigrateAgentPass => {
-                "wasm32-unknown-unknown/release/test_wasm_migrate_agent_pass.wasm"
-            }
             TestWasm::MigrateInitial => {
                 "wasm32-unknown-unknown/release/test_wasm_migrate_initial.wasm"
             }
