@@ -37,6 +37,7 @@ impl Query for GetLiveEntryQuery {
         "
         .into()
     }
+
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
             ":create_type": ChainOpType::StoreEntry,

@@ -196,7 +196,7 @@ impl AsRef<SignedActionHashed> for SignedActionHashed {
 
 impl ActionHashedContainer for SignedActionHashed {
     fn action(&self) -> &Action {
-        &self.action()
+        self.action()
     }
 
     fn action_hash(&self) -> &ActionHash {

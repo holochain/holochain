@@ -198,10 +198,10 @@ async fn get_agent_activity() {
 
     let td = ActivityTestData::valid_chain_scenario();
 
-    for hash_op in td.hash_ops.iter().cloned() {
+    for hash_op in td.agent_activity_ops.iter().cloned() {
         fill_db(&db.to_db(), hash_op).await;
     }
-    for hash_op in td.noise_ops.iter().cloned() {
+    for hash_op in td.noise_agent_activity_ops.iter().cloned() {
         fill_db(&db.to_db(), hash_op).await;
     }
 

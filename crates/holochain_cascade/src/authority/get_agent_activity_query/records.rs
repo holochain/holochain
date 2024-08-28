@@ -62,14 +62,15 @@ impl Query for GetAgentActivityRecordsQuery {
     }
 
     fn params(&self) -> Vec<holochain_state::query::Params> {
-        named_params! {
+        let params = named_params! {
             ":author": self.agent,
             ":author_basis": self.agent_basis,
             ":chain_op_type": ChainOpType::RegisterAgentActivity,
             ":warrant_op_type": WarrantOpType::ChainIntegrityWarrant,
             ":valid_status": ValidationStatus::Valid,
-        }
-        .to_vec()
+        };
+
+        params.to_vec()
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {

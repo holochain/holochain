@@ -1,15 +1,16 @@
-use std::sync::Arc;
-
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
+use holochain_cascade::error::CascadeResult;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::CascadeImpl;
+use holochain_p2p::actor::GetActivityOptions;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::db::DbKindCache;
 use holochain_sqlite::db::DbKindDht;
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::prelude::*;
 use holochain_types::test_utils::chain::*;
+use std::sync::Arc;
 use test_case::test_case;
 
 macro_rules! assert_agent_activity_responses_eq {
@@ -45,68 +46,171 @@ macro_rules! assert_agent_activity_responses_eq {
     };
 }
 
+/// A simple test that we can get the activity for an agent
 #[tokio::test(flavor = "multi_thread")]
 async fn get_activity() {
     holochain_trace::test_run();
 
-    // Environments
-    let cache = test_cache_db();
-    let authority = test_dht_db();
+    let test_data = ActivityTestData::valid_chain_scenario();
 
-    // Data
-    let td = ActivityTestData::valid_chain_scenario();
+    let scenario = GetActivityTestScenario::new(test_data.clone())
+        .include_agent_activity_ops_in_dht_db()
+        .await
+        .include_store_entry_ops_in_dht_db()
+        .await
+        .include_agent_activity_noise_ops_in_dht_db()
+        .await
+        .include_store_entry_ops_in_cache_db()
+        .await;
 
-    for hash_op in td.hash_ops.iter().cloned() {
-        fill_db(&authority.to_db(), hash_op).await;
-    }
-    for hash_op in td.noise_ops.iter().cloned() {
-        fill_db(&authority.to_db(), hash_op).await;
-    }
-    for hash_op in td.store_ops.iter().cloned() {
-        fill_db(&cache.to_db(), hash_op).await;
-    }
-    match td.valid_records {
-        ChainItems::FullRecords(ref record) => {
-            fill_db_entries(
-                &authority.to_db(),
-                record
-                    .into_iter()
-                    .filter_map(|r| match &r.entry {
-                        RecordEntry::Present(e) => Some(EntryHashed::from_content_sync(e.clone())),
-                        _ => None,
-                    })
-                    .collect(),
-            )
-            .await;
-        }
-        _ => unreachable!(),
-    }
+    let options = GetActivityOptions {
+        include_valid_activity: true,
+        include_rejected_activity: false,
+        ..Default::default()
+    };
 
-    let options = holochain_p2p::actor::GetActivityOptions {
+    let r = scenario.query_authority(options).await.unwrap();
+
+    let expected = AgentActivityResponse {
+        agent: test_data.agent.clone(),
+        valid_activity: test_data.valid_hashes.clone(),
+        rejected_activity: ChainItems::NotRequested,
+        warrants: vec![],
+        status: ChainStatus::Valid(test_data.chain_head.clone()),
+        highest_observed: Some(test_data.highest_observed.clone()),
+    };
+
+    assert_agent_activity_responses_eq!(expected, r);
+}
+
+/// Check that the different options for getting chain items will return the same records
+#[tokio::test(flavor = "multi_thread")]
+async fn get_activity_chain_items_parity() {
+    holochain_trace::test_run();
+
+    let test_data = ActivityTestData::valid_chain_scenario();
+
+    let scenario = GetActivityTestScenario::new(test_data.clone())
+        .include_agent_activity_ops_in_dht_db()
+        .await
+        .include_store_entry_ops_in_dht_db()
+        .await
+        .include_agent_activity_noise_ops_in_dht_db()
+        .await;
+
+    let options = GetActivityOptions {
+        include_valid_activity: true,
+        include_rejected_activity: false,
+        ..Default::default()
+    };
+
+    let with_hashes = scenario.query_authority(options.clone()).await.unwrap();
+
+    assert_agent_activity_responses_eq!(
+        AgentActivityResponse {
+            agent: test_data.agent.clone(),
+            valid_activity: test_data.valid_hashes.clone(),
+            rejected_activity: ChainItems::NotRequested,
+            warrants: vec![],
+            status: ChainStatus::Valid(test_data.chain_head.clone()),
+            highest_observed: Some(test_data.highest_observed.clone()),
+        },
+        with_hashes
+    );
+
+    let options = GetActivityOptions {
+        include_valid_activity: true,
+        include_rejected_activity: false,
+        include_full_actions: true,
+        ..Default::default()
+    };
+
+    let with_actions = scenario.query_authority(options.clone()).await.unwrap();
+
+    assert_agent_activity_responses_eq!(
+        AgentActivityResponse {
+            agent: test_data.agent.clone(),
+            valid_activity: test_data.valid_actions.clone(),
+            rejected_activity: ChainItems::NotRequested,
+            warrants: vec![],
+            status: ChainStatus::Valid(test_data.chain_head.clone()),
+            highest_observed: Some(test_data.highest_observed.clone()),
+        },
+        with_actions
+    );
+
+    let options = GetActivityOptions {
         include_valid_activity: true,
         include_rejected_activity: false,
         include_full_records: true,
         ..Default::default()
     };
 
-    // Network
-    let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
+    let with_records = scenario.query_authority(options.clone()).await.unwrap();
 
-    // Cascade
-    let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
+    assert_agent_activity_responses_eq!(
+        AgentActivityResponse {
+            agent: test_data.agent.clone(),
+            valid_activity: test_data.valid_records.clone(),
+            rejected_activity: ChainItems::NotRequested,
+            warrants: vec![],
+            status: ChainStatus::Valid(test_data.chain_head.clone()),
+            highest_observed: Some(test_data.highest_observed.clone()),
+        },
+        with_records
+    );
 
-    let r = cascade
-        .get_agent_activity(td.agent.clone(), ChainQueryFilter::new(), options)
+    let hashes_from_hashes: Vec<ActionHash> = match with_hashes.valid_activity {
+        ChainItems::Hashes(h) => h.into_iter().map(|(_, h)| h).collect(),
+        _ => unreachable!(),
+    };
+    let hashes_from_actions: Vec<ActionHash> = match with_actions.valid_activity {
+        ChainItems::FullActions(a) => a.into_iter().map(|a| a.action_hash().clone()).collect(),
+        _ => unreachable!(),
+    };
+    let hashes_from_records: Vec<ActionHash> = match with_records.valid_activity {
+        ChainItems::FullRecords(r) => r.into_iter().map(|r| r.action_hash().clone()).collect(),
+        _ => unreachable!(),
+    };
+
+    assert_eq!(hashes_from_hashes, hashes_from_actions);
+    assert_eq!(hashes_from_hashes, hashes_from_records);
+}
+
+/// When an AAA doesn't have the entries for the requested records, then the cascade should try to
+/// retrieve the entries from either the cache or the network. In this test we check that it's
+/// possible to retrieve entries from the cache.
+#[tokio::test(flavor = "multi_thread")]
+async fn fill_records_entries() {
+    holochain_trace::test_run();
+
+    let test_data = ActivityTestData::valid_chain_scenario();
+
+    let scenario = GetActivityTestScenario::new(test_data.clone())
+        .include_agent_activity_ops_in_dht_db()
         .await
-        .unwrap();
+        .include_agent_activity_noise_ops_in_dht_db()
+        .await
+        .include_store_entry_ops_in_cache_db()
+        .await;
+
+    let options = GetActivityOptions {
+        include_valid_activity: true,
+        include_rejected_activity: false,
+        include_full_records: true,
+        get_options: GetOptions::local(),
+        ..Default::default()
+    };
+
+    let r = scenario.query_authority(options).await.unwrap();
 
     let expected = AgentActivityResponse {
-        agent: td.agent.clone(),
-        valid_activity: td.valid_records.clone(),
+        agent: test_data.agent.clone(),
+        valid_activity: test_data.valid_records.clone(),
         rejected_activity: ChainItems::NotRequested,
         warrants: vec![],
-        status: ChainStatus::Valid(td.chain_head.clone()),
-        highest_observed: Some(td.highest_observed.clone()),
+        status: ChainStatus::Valid(test_data.chain_head.clone()),
+        highest_observed: Some(test_data.highest_observed.clone()),
     };
     assert_agent_activity_responses_eq!(expected, r);
 }
@@ -122,36 +226,20 @@ async fn get_activity_with_warrants() {
     // Data
     let td = ActivityTestData::valid_chain_scenario();
 
-    for hash_op in td.hash_ops.iter().cloned() {
+    for hash_op in td.agent_activity_ops.iter().cloned() {
         fill_db(&dht.to_db(), hash_op).await;
     }
-    for hash_op in td.noise_ops.iter().cloned() {
+    for hash_op in td.noise_agent_activity_ops.iter().cloned() {
         fill_db(&dht.to_db(), hash_op).await;
     }
-    for hash_op in td.store_ops.iter().cloned() {
+    for hash_op in td.store_entry_ops.iter().cloned() {
         fill_db(&cache.to_db(), hash_op).await;
-    }
-    match td.valid_records {
-        ChainItems::FullRecords(ref record) => {
-            fill_db_entries(
-                &dht.to_db(),
-                record
-                    .into_iter()
-                    .filter_map(|r| match &r.entry {
-                        RecordEntry::Present(e) => Some(EntryHashed::from_content_sync(e.clone())),
-                        _ => None,
-                    })
-                    .collect(),
-            )
-            .await;
-        }
-        _ => unreachable!(),
     }
 
     let warrant = {
         let action_pair = (
-            (td.hash_ops[0].action().to_hash(), ::fixt::fixt!(Signature)),
-            (td.hash_ops[1].action().to_hash(), ::fixt::fixt!(Signature)),
+            (td.agent_activity_ops[0].action().to_hash(), ::fixt::fixt!(Signature)),
+            (td.agent_activity_ops[1].action().to_hash(), ::fixt::fixt!(Signature)),
         );
         let p = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
             chain_author: td.agent.clone(),
@@ -244,6 +332,75 @@ fn warrant(author: u8, action: u8) -> WarrantOp {
     });
     let warrant = Warrant::new(p, AgentPubKey::from_raw_36(vec![255; 36]), Timestamp::now());
     WarrantOp::from(SignedWarrant::new(warrant, ::fixt::fixt!(Signature)))
+}
+
+struct GetActivityTestScenario {
+    dht: TestDb<DbKindDht>,
+    cache: TestDb<DbKindCache>,
+    test_data: ActivityTestData,
+}
+
+impl GetActivityTestScenario {
+    fn new(test_data: ActivityTestData) -> Self {
+        let dht = test_dht_db();
+        let cache = test_cache_db();
+
+        Self {
+            dht,
+            cache,
+            test_data,
+        }
+    }
+
+    async fn include_agent_activity_ops_in_dht_db(self) -> Self {
+        for hash_op in self.test_data.agent_activity_ops.iter().cloned() {
+            fill_db(&self.dht.to_db(), hash_op).await;
+        }
+
+        self
+    }
+
+    async fn include_agent_activity_noise_ops_in_dht_db(self) -> Self {
+        for hash_op in self.test_data.noise_agent_activity_ops.iter().cloned() {
+            fill_db(&self.dht.to_db(), hash_op).await;
+        }
+
+        self
+    }
+
+    async fn include_store_entry_ops_in_dht_db(self) -> Self {
+        for hash_op in self.test_data.store_entry_ops.iter().cloned() {
+            fill_db(&self.dht.to_db(), hash_op).await;
+        }
+
+        self
+    }
+
+    async fn include_store_entry_ops_in_cache_db(self) -> Self {
+        for hash_op in self.test_data.store_entry_ops.iter().cloned() {
+            fill_db(&self.cache.to_db(), hash_op).await;
+        }
+
+        self
+    }
+
+    async fn query_authority(
+        &self,
+        options: GetActivityOptions,
+    ) -> CascadeResult<AgentActivityResponse> {
+        let network =
+            PassThroughNetwork::authority_for_nothing(vec![self.dht.to_db().clone().into()]);
+
+        let cascade = CascadeImpl::empty().with_network(network, self.cache.to_db());
+
+        cascade
+            .get_agent_activity(
+                self.test_data.agent.clone(),
+                ChainQueryFilter::new(),
+                options,
+            )
+            .await
+    }
 }
 
 #[test_case(
