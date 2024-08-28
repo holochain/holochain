@@ -187,12 +187,21 @@ impl SweetConductor {
             config.data_root_path = Some(dir.as_ref().to_path_buf().into());
         }
 
-        let handle = Self::handle_from_existing(
-            keystore.unwrap_or_else(holochain_keystore::test_keystore),
-            &config,
-            &[],
-        )
-        .await;
+        let keystore = keystore.unwrap_or_else(holochain_keystore::test_keystore);
+
+        // We always want there to be a device seed in lair, so if one isn't specified,
+        // create a throwaway one.
+        if config.device_seed_lair_tag.is_none() {
+            let tag = format!("_hc_sweet_conductor_{}", nanoid::nanoid!());
+            keystore
+                .lair_client()
+                .new_seed(tag.clone().into(), None, false)
+                .await
+                .unwrap();
+            config.device_seed_lair_tag = Some(tag);
+        }
+
+        let handle = Self::handle_from_existing(keystore, &config, &[]).await;
 
         Self::new(handle, dir, Arc::new(config), rendezvous).await
     }

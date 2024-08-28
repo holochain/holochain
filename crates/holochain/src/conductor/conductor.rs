@@ -2575,15 +2575,12 @@ mod service_impls {
 
             self.register_dna(dna.clone()).await?;
 
-            // FIXME: This "device seed" should be derived from the master seed and passed in here,
-            //        not just generated like this. This is a placeholder.
-            let device_seed_lair_tag = {
-                let tag = format!("_hc_dpki_device_{}", nanoid::nanoid!());
-                self.keystore()
-                    .lair_client()
-                    .new_seed(tag.clone().into(), None, false)
-                    .await?;
+            let device_seed_lair_tag = if let Some(tag) =
+                self.get_config().device_seed_lair_tag.clone()
+            {
                 tag
+            } else {
+                return Err(ConductorError::other("DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config. If using DPKI, a device seed must be created in lair, and the tag specified in the conductor config."));
             };
 
             let derivation_path = [0].into();
