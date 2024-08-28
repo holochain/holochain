@@ -65,11 +65,9 @@ impl DeepkeyState {
 impl DpkiState for DeepkeyState {
     async fn next_derivation_details(
         &self,
-        agent_key: Option<AgentPubKey>,
+        agent_key: AgentPubKey,
     ) -> DpkiServiceResult<DerivationDetails> {
-        let payload = agent_key.map(|agent_key| {
-            serde_bytes::ByteArray::<32>::new(agent_key.get_raw_32().try_into().unwrap())
-        });
+        let payload = serde_bytes::ByteArray::<32>::new(agent_key.get_raw_32().try_into().unwrap());
         self.call_deepkey_zome("next_derivation_details", payload)
             .await
     }

@@ -1482,25 +1482,38 @@ mod app_impls {
             let dpki = self.running_services().dpki.clone();
 
             // if dpki is installed, load dpki state
-            let mut dpki = if let Some(d) = dpki.as_ref() {
+            let dpki = if let Some(d) = dpki.as_ref() {
                 let lock = d.state().await;
                 Some((d.clone(), lock))
             } else {
                 None
             };
 
+            let (_, app_index) = self
+                .update_state_prime(|mut state| {
+                    let index = state.cumulative_app_installation_count;
+                    state.cumulative_app_installation_count += 1;
+                    Ok((state, index))
+                })
+                .await?;
+
             let (agent_key, derivation_details): (AgentPubKey, Option<DerivationDetailsInput>) =
                 if let Some(agent_key) = agent_key {
                     if dpki.is_some() {
                         // dpki installed, agent key given
+
+                        // TODO: replace with something like this https://github.com/holochain/deepkey/pull/35/commits/8169fa6a55ef538a7b1968b62491bb236faef1f9
                         tracing::warn!("App is being installed with an existing agent key: DPKI will not be used to manage keys for this app.");
                     }
                     (agent_key, None)
-                } else if let Some((dpki, state)) = &mut dpki {
+                } else if let Some(lair_tag) = self.get_config().device_seed_lair_tag.clone() {
                     // dpki installed, no agent key given
 
                     // register a new key derivation for this app
-                    let derivation_details = state.next_derivation_details(None).await?;
+                    let derivation_details = DerivationDetails {
+                        app_index,
+                        key_index: 0,
+                    };
 
                     let dst_tag = format!(
                         "DPKI-{:04}-{:04}",
@@ -1517,14 +1530,14 @@ mod app_impls {
                         .keystore
                         .lair_client()
                         .derive_seed(
-                            dpki.device_seed_lair_tag.clone().into(),
+                            lair_tag.into(),
                             None,
                             dst_tag.into(),
                             None,
                             derivation_path.into_boxed_slice(),
                         )
-                        .await
-                        .map_err(|e| DpkiServiceError::Lair(e.into()))?;
+                        .await?;
+                    // .map_err(|e| DpkiServiceError::Lair(e.into()))?;
                     let seed = info.ed25519_pub_key.0.to_vec();
 
                     let derivation = DerivationDetailsInput {
@@ -1536,8 +1549,7 @@ mod app_impls {
 
                     (AgentPubKey::from_raw_32(seed), Some(derivation))
                 } else {
-                    // dpki not installed, no agent key given
-                    (self.keystore.new_sign_keypair_random().await?, None)
+                    return Err(ConductorError::other("Unable to install app. If `device_seed_lair_tag` is not specified in config, an agent key must be provided when installing an app."));
                 };
 
             let cells_to_create = ops.cells_to_create(agent_key.clone());
