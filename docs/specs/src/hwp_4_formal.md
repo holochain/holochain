@@ -30,16 +30,14 @@ formal state model.
 
 In Holochain every app defines a distinct, peer-to-peer, encrypted network where one set of rules is mutually enforced by all users. This network consists of the peers running the app, who participate in routing messages to each other and validating and storing redundant copies of the application's database.
 
-Holochain operates different sub-systems, each of which functions on separate workflows and change models. Even though Holochain functions as a common underlying database on the back-end, the workflows in each sub-system each have different input channels which trigger different transformational processes. Each workflow has distinct structural bottlenecks and security constraints.
+Holochain operates different sub-systems, each of which functions on separate workflows and change models. Even though Holochain functions as a common underlying database on the back-end, the workflows in each sub-system each have different input channels which trigger different transformational processes. Each workflow has distinct structural bottlenecks and security constraints, which permits parallel execution of workflows within each subsystem, even in subsystems which define workflows that cannot be parallelized.
 
-Discrete Workflows in separate sub-systems:
+1. **Local Agent State:** Represented as changes to an agent's state by signing new records with their private key, and committing them to a local hash chain of their action history called a Source Chain. Initial chain genesis happens upon installation/activation, and all following changes result from "zome calls" into the app code.
+2. **Global Visibility of Local State Changes:** After data has been signed to a Source Chain it gets published to a Graphing DHT (Distributed Hash Table) where it is validated by the peers who will store and serve it. The DHT is continually balanced and healed by gossip among the peers.
+3. **Network Protocols:** Holochain instantiates the execution of app DNA on each node under the agency identified by the public key, transforming code into a collective networked organism. An agent's public key ***is*** their network address, and is used as the to/from target for remote zome calls, signals, publishing, and gossip. Holochain is transport-agnostic, and can operate on any network transport protocol which a node has installed for routing, bootstrapping, or proxying connections through NAT and firewalls.
+1. **Distributed Application:** Apps are compiled and distributed into WebAssembly (WASM) code bundles which we call a DNA. Data integrity is enforced by the validation defined in an app's DNA, which is composed of data structures, functions, and callbacks packaged in Zomes (short for chromosome) which function as reusable modules. Installation and activation state of these bundles is managed by a runtime container.
 
-1. **Distributed Application:** Apps are compiled and distributed into WebAssembly (WASM) code bundles which we call a DNA. Data integrity is enforced by the validation defined in an app's DNA, which is composed of data structures, functions, and callbacks packaged in Zomes (short for chromosome) which function as reusable modules.
-3. **Local Agent State:** Represented as changes to an agent's state by signing new records, using their private key, to a local hash chain of their action history called a Source Chain. Initial chain genesis happens upon installation/activation, and all following changes result from "zome calls" into the app code.
-4. **Global Visibility of Local State Changes:** After data has been signed to a Source Chain it gets published to a Graphing DHT (Distributed Hash Table) where it is validated by the peers who will store and serve it. The DHT is continually balanced and healed by gossip among the peers.
-5. **Network Protocols:** Holochain instantiates the execution of app DNA on each node under the agency identified by the public key, transforming code into a collective networked organism. An agent's public key ***is*** their network address, and is used as the to/from target for remote zome calls, signals, publishing, and gossip. Holochain is transport-agnostic, and can operate on any network transport protocol which a node has installed for routing, bootstrapping, or proxying connections through NAT and firewalls.
-
-### Some notes on terminology:
+### Some notes on terminology
 
 #### Biological Language
 
@@ -242,30 +240,7 @@ Here is a high-level summary of how a countersigning session flows:
 5. The session completer reveals all the signed headers as a complete set, sending it back to all parties.
 6. Each signer can check for themselves that the set is valid simply by comparing against the session entry and preflight info. They do not have to rerun validation; they only need to check signatures, integrity, and completeness of the header set data.
 7. All counterparties now proceed to write the completed action to their source chain and publish its data to the DHT.
-6. The DHT authorities validate and store the action and entry data as normal.
-
-### Natural Architectural Constraints in Source Chain Workflow
-
-[WP-TODO: ACB, should we really have this section here, or should it be in the implementation doc.]
-
-Since we can only have one open write handle to a file or a single write transaction committing to the database, the step where these kinds of final state changes are written serves as a natural bottleneck to concurrency. However, there are other things (such as read access, network connections, UI requests) which can safely happen in parallel. We address these patterns of linearity and concurrency here.
-
-**Inputs:** Queue requests with a tokio thread pool to service them. Requests always happen through an authenticated connection with the conductor and may originate from these sources:
-
-1. Clients via Conductor app interfaces (bound to localhost)
-2. Bridged calls from other DNAs
-3. Remote calls and messages sent/received via the network
-4. The Conductor's admin port/UI
-5. Scheduled tasks (which run under the agency of the agent that scheduled the task)
-
-**Outputs:** Zome calls which update state must finalize state changes via the linear process of validating all the commits queued in the scratch space which checks that validation passes and $C_n$ / "as at" constraints are enforced before producing an ACID database transaction of the bundled changes. Zome calls which simply read information are not bottlenecked by this constraint and return their results without "as at" constraints.
-
-**Concurrency:** For performance, Holochain's linear write queue must not block read-only calls and operations which will return results based on the *Context* in which they executed.
-
-There is no need for a global context where Zome calls being processed should need to know about other Zome calls in process. And the Source Chain authoring workflow should be completely segregated from other workflows such as updating the DHT, network peering data, or ephemeral caching. (In other words, there is no need for a global state across all these activites.)
-
-![](workflows.png)
-[*Note: this diagram shows separate databases where tables may be used.*](/GUQFez2MQSaHB-t4knDH1w)
+8. The DHT authorities validate and store the action and entry data as normal.
 
 ## Graph DHT: Formal State Model
 
