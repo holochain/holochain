@@ -75,11 +75,12 @@ async fn get_agent_activity_test() {
 
     let get_expected = || {
         let mut activity = get_expected_full();
-        let valid_activity = unwrap_to::unwrap_to!(activity.valid_activity => ChainItems::FullActions)
-            .clone()
-            .into_iter()
-            .map(|shh| (shh.action().action_seq(), shh.action_address().clone()))
-            .collect();
+        let valid_activity =
+            unwrap_to::unwrap_to!(activity.valid_activity => ChainItems::FullActions)
+                .clone()
+                .into_iter()
+                .map(|shh| (shh.action().action_seq(), shh.action_address().clone()))
+                .collect();
         activity.valid_activity = ChainItems::Hashes(valid_activity);
         activity
     };

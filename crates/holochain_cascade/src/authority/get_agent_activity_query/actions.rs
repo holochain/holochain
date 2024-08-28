@@ -1,10 +1,10 @@
+use crate::authority::get_agent_activity_query::{fold, render, Item, State};
 use holo_hash::*;
 use holochain_p2p::event::GetActivityOptions;
 use holochain_sqlite::rusqlite::*;
 use holochain_state::{prelude::*, query::QueryData};
 use std::fmt::Debug;
 use std::sync::Arc;
-use crate::authority::get_agent_activity_query::{fold, render, Item, State};
 
 #[derive(Debug, Clone)]
 pub struct GetAgentActivityActionsQuery {

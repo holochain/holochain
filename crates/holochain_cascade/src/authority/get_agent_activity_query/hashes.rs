@@ -1,4 +1,5 @@
-use std::sync::Arc;
+use crate::authority::get_agent_activity_query::actions::GetAgentActivityActionsQuery;
+use crate::authority::get_agent_activity_query::{fold, render, Item, State};
 use holo_hash::{ActionHash, AgentPubKey, WarrantHash};
 use holochain_p2p::dht::op::Timestamp;
 use holochain_p2p::event::GetActivityOptions;
@@ -8,9 +9,10 @@ use holochain_state::query::QueryData;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::judged::Judged;
-use holochain_zome_types::prelude::{ChainQueryFilter, SignedAction, SignedWarrant, ValidationStatus};
-use crate::authority::get_agent_activity_query::{fold, render, Item, State};
-use crate::authority::get_agent_activity_query::actions::GetAgentActivityActionsQuery;
+use holochain_zome_types::prelude::{
+    ChainQueryFilter, SignedAction, SignedWarrant, ValidationStatus,
+};
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct GetAgentActivityHashesQuery {
@@ -20,7 +22,7 @@ pub struct GetAgentActivityHashesQuery {
 impl GetAgentActivityHashesQuery {
     pub fn new(agent: AgentPubKey, filter: ChainQueryFilter, options: GetActivityOptions) -> Self {
         Self {
-            actions_query: GetAgentActivityActionsQuery::new(agent, filter, options)
+            actions_query: GetAgentActivityActionsQuery::new(agent, filter, options),
         }
     }
 }
@@ -82,8 +84,13 @@ impl Query for GetAgentActivityHashesQuery {
 
     fn render<S>(&self, state: Self::State, _stores: S) -> StateQueryResult<Self::Output>
     where
-        S: Store
+        S: Store,
     {
-        render(state, self.actions_query.agent.clone(), &self.actions_query.filter, &self.actions_query.options)
+        render(
+            state,
+            self.actions_query.agent.clone(),
+            &self.actions_query.filter,
+            &self.actions_query.options,
+        )
     }
 }

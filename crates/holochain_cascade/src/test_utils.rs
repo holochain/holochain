@@ -290,6 +290,18 @@ pub async fn fill_db<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed
     .unwrap();
 }
 
+/// Insert entries, expected to be associated with record ops that have already been inserted.
+pub async fn fill_db_entries(db: &DbWrite<DbKindDht>, ops: Vec<EntryHashed>) {
+    db.write_async(move |txn| -> DatabaseResult<()> {
+        for op in ops {
+            insert_entry(txn, &op.hash, &op.content).unwrap();
+        }
+        Ok(())
+    })
+    .await
+    .unwrap();
+}
+
 /// Insert ops directly into the database and mark integrated as rejected
 pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed) {
     db.write_async(move |txn| -> DatabaseResult<()> {

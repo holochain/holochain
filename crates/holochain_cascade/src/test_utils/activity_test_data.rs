@@ -39,12 +39,10 @@ impl ActivityTestData {
         let entry = Entry::App(fixt!(AppEntryBytes));
         let entry_hash = EntryHash::with_data_sync(&entry);
 
-        let to_op = |h| {
-            ChainOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(fixt!(Signature), h))
-        };
+        let to_op =
+            |h, sig| ChainOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(sig, h));
 
-        let to_record_and_op = |h: Action| {
-            let sig = fixt!(Signature);
+        let to_record_and_op = |h: Action, sig: Signature| {
             // let e = Entry::App(fixt!(AppEntryBytes));
             let op = ChainOpHashed::from_content_sync(ChainOp::StoreRecord(
                 sig.clone(),
@@ -55,8 +53,7 @@ impl ActivityTestData {
             (Record::new(shh, Some(entry.clone())), op)
         };
 
-        let to_record_dna_op = |a: Action| {
-            let sig = fixt!(Signature);
+        let to_record_dna_op = |a: Action, sig: Signature| {
             let op = ChainOpHashed::from_content_sync(ChainOp::StoreRecord(
                 sig.clone(),
                 a.clone(),
@@ -89,10 +86,11 @@ impl ActivityTestData {
         let dna = Action::Dna(dna);
 
         // Insert the dna
-        let (el, op) = to_record_dna_op(dna.clone());
+        let dna_sig = fixt!(Signature);
+        let (el, op) = to_record_dna_op(dna.clone(), dna_sig.clone());
         valid_records.push(el);
         store_ops.push(op);
-        hash_ops.push(to_op(dna.clone()));
+        hash_ops.push(to_op(dna.clone(), dna_sig));
 
         let creates: Vec<_> = CreateFixturator::new(Unpredictable)
             .enumerate()
@@ -106,13 +104,19 @@ impl ActivityTestData {
             create.action_seq = action_seq;
             create.prev_action = prev_hash.clone();
             create.entry_hash = entry_hash.clone();
+            create.entry_type = EntryType::App(AppEntryDef::new(
+                1.into(),
+                1.into(),
+                EntryVisibility::Public,
+            ));
             let action = Action::Create(create);
+            let sig = fixt!(Signature);
             prev_hash = ActionHash::with_data_sync(&action);
-            hash_ops.push(to_op(action.clone()));
+            hash_ops.push(to_op(action.clone(), sig.clone()));
 
             valid_hashes.push((action_seq, prev_hash.clone()));
 
-            let (el, op) = to_record_and_op(action);
+            let (el, op) = to_record_and_op(action, sig);
             valid_records.push(el);
             store_ops.push(op);
         }
@@ -131,10 +135,10 @@ impl ActivityTestData {
             hash: vec![last.1.clone()],
         };
 
-        // Finally add some random noise so we know we are getting the correct items.
+        // Finally add some random noise, so we know we are getting the correct items.
         let noise_ops = ActionFixturator::new(Unpredictable)
             .take(50)
-            .map(to_op)
+            .map(|a| to_op(a, fixt!(Signature)))
             .collect();
 
         Self {

@@ -1034,6 +1034,7 @@ impl CascadeImpl {
     /// - [include_valid_activity](GetActivityOptions::include_valid_activity) will include the valid chain hashes.
     /// - [include_rejected_activity](GetActivityOptions::include_rejected_activity) will include the invalid chain hashes.
     /// - [include_warrants](GetActivityOptions::include_warrants) will include the warrants for this agent.
+    /// - [include_full_records](GetActivityOptions::include_full_records) will also fetch the entries in parallel (requires include_full_actions)
     /// - [include_full_actions](GetActivityOptions::include_full_actions) will fetch the valid actions in parallel (requires include_valid_activity)
     #[cfg_attr(
         feature = "instrument",
@@ -1052,9 +1053,8 @@ impl CascadeImpl {
         // warrants we don't know about or for countersigning actions, then we will go to the network
         // regardless of authority status.
         let authority = self.am_i_an_authority(agent.clone().into()).await?;
-        
+
         let merged_response = if authority && options.get_options.strategy == GetStrategy::Local {
-            tracing::info!("Executing locally");
             match self.dht.clone() {
                 Some(vault) => {
                     authority::handle_get_agent_activity(
@@ -1063,7 +1063,7 @@ impl CascadeImpl {
                         query.clone(),
                         (&options).into(),
                     )
-                        .await?
+                    .await?
                 }
                 None => agent_activity::merge_activities(
                     agent.clone(),
@@ -1075,10 +1075,8 @@ impl CascadeImpl {
             let results = self
                 .fetch_agent_activity(agent.clone(), query.clone(), options.clone())
                 .await?;
-            tracing::info!("Fetched results from network {:?}", results);
             let merged_response: AgentActivityResponse =
                 agent_activity::merge_activities(agent.clone(), &options, results)?;
-            tracing::info!("Merged results {:?}", merged_response);
             merged_response
         };
 
@@ -1089,7 +1087,6 @@ impl CascadeImpl {
 
         // If the request is just for the status then return.
         if status_only {
-            tracing::info!("Status only");
             return Ok(AgentActivityResponse::status_only(merged_response));
         }
 

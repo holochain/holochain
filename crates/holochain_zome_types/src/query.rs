@@ -268,7 +268,9 @@ impl ChainQueryFilter {
             ChainQueryFilterRange::Unbounded => actions,
             ChainQueryFilterRange::ActionSeqRange(start, end) => actions
                 .into_iter()
-                .filter(|action| *start <= action.action().action_seq() && action.action().action_seq() <= *end)
+                .filter(|action| {
+                    *start <= action.action().action_seq() && action.action().action_seq() <= *end
+                })
                 .collect(),
             ChainQueryFilterRange::ActionHashRange(start, end) => {
                 let mut action_hashmap = actions

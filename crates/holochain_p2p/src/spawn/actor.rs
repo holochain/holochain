@@ -244,8 +244,7 @@ impl WrapEvtSender {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: event::GetActivityOptions,
-    ) -> impl Future<Output = HolochainP2pResult<AgentActivityResponse>> + 'static + Send
-    {
+    ) -> impl Future<Output = HolochainP2pResult<AgentActivityResponse>> + 'static + Send {
         timing_trace!(
             true,
             {

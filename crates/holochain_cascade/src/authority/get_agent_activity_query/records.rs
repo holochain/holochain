@@ -1,10 +1,10 @@
+use crate::authority::get_agent_activity_query::{fold, render, Item, State};
 use holo_hash::*;
 use holochain_p2p::event::GetActivityOptions;
 use holochain_sqlite::rusqlite::*;
 use holochain_state::{prelude::*, query::QueryData};
 use std::fmt::Debug;
 use std::sync::Arc;
-use crate::authority::get_agent_activity_query::{fold, render, Item, State};
 
 #[derive(Debug, Clone)]
 pub struct GetAgentActivityRecordsQuery {
@@ -90,7 +90,10 @@ impl Query for GetAgentActivityRecordsQuery {
             // This code is intended to run on an agent authority which may not be an entry authority
             // for all the relevant entries. The caller will need to handle any missing entries that
             // they care about.
-            let maybe_entry = row.get::<_, Option<Vec<u8>>>("entry_blob")?.map(from_blob).transpose()?;
+            let maybe_entry = row
+                .get::<_, Option<Vec<u8>>>("entry_blob")?
+                .map(from_blob)
+                .transpose()?;
 
             match op_type {
                 DhtOpType::Chain(_) => {

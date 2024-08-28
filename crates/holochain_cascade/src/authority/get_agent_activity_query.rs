@@ -1,13 +1,15 @@
+use crate::agent_activity::compute_chain_status;
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_p2p::event::GetActivityOptions;
 use holochain_state::prelude::ActionSequenceAndHash;
 use holochain_state::query::StateQueryResult;
-use holochain_types::prelude::{ActionHashedContainer, AgentActivityResponse, ChainItems, ChainItemsSource};
+use holochain_types::prelude::{
+    ActionHashedContainer, AgentActivityResponse, ChainItems, ChainItemsSource,
+};
 use holochain_zome_types::prelude::{
     ChainFork, ChainHead, ChainQueryFilter, ChainStatus, HasValidationStatus, HighestObserved,
     Judged, ValidationStatus, Warrant,
 };
-use crate::agent_activity::compute_chain_status;
 
 pub mod actions;
 pub mod deterministic;
@@ -52,16 +54,13 @@ fn fold<T: ActionHashedContainer>(
         (Some(ValidationStatus::Valid), Item::Integrated(action)) => {
             let seq = action.action().action_seq();
             if state.status.is_none() {
-                let fork =
-                    state.valid.last().and_then(
-                        |v| {
-                            if seq == v.action().action_seq() {
-                                Some(v)
-                            } else {
-                                None
-                            }
-                        },
-                    );
+                let fork = state.valid.last().and_then(|v| {
+                    if seq == v.action().action_seq() {
+                        Some(v)
+                    } else {
+                        None
+                    }
+                });
                 if let Some(fork) = fork {
                     state.status = Some(ChainStatus::Forked(ChainFork {
                         fork_seq: seq,
@@ -142,7 +141,10 @@ where
 {
     let highest_observed = compute_highest_observed(&state);
 
-    let (status, valid, rejected) = compute_chain_status(state.valid.clone().into_iter(), state.rejected.clone().into_iter());
+    let (status, valid, rejected) = compute_chain_status(
+        state.valid.clone().into_iter(),
+        state.rejected.clone().into_iter(),
+    );
 
     let valid_activity = if options.include_valid_activity {
         let valid = filter.filter_actions(valid);

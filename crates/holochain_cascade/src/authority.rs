@@ -80,11 +80,10 @@ pub async fn handle_get_agent_activity(
                 GetAgentActivityHashesQuery::new(agent, query, options).run(txn)?
             };
 
-            tracing::info!("Got activity response: {:?}", activity_response);
-
             if !warrants.is_empty() {
                 // TODO why did we retrieve warrants in the activity query if we're going to overwrite them here?
-                activity_response.warrants = warrants.into_iter().map(|w| w.into_warrant()).collect();
+                activity_response.warrants =
+                    warrants.into_iter().map(|w| w.into_warrant()).collect();
             }
 
             Ok(activity_response)

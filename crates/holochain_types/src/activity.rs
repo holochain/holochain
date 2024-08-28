@@ -97,6 +97,42 @@ pub enum ChainItems {
     NotRequested,
 }
 
+impl From<AgentActivityResponse> for AgentActivity {
+    fn from(a: AgentActivityResponse) -> Self {
+        let valid_activity = match a.valid_activity {
+            ChainItems::FullRecords(records) => records
+                .into_iter()
+                .map(|el| (el.action().action_seq(), el.action_address().clone()))
+                .collect(),
+            ChainItems::FullActions(actions) => actions
+                .into_iter()
+                .map(|el| (el.action().action_seq(), el.as_hash().clone()))
+                .collect(),
+            ChainItems::Hashes(h) => h,
+            ChainItems::NotRequested => Vec::new(),
+        };
+        let rejected_activity = match a.rejected_activity {
+            ChainItems::FullRecords(records) => records
+                .into_iter()
+                .map(|el| (el.action().action_seq(), el.action_address().clone()))
+                .collect(),
+            ChainItems::FullActions(actions) => actions
+                .into_iter()
+                .map(|el| (el.action().action_seq(), el.as_hash().clone()))
+                .collect(),
+            ChainItems::Hashes(h) => h,
+            ChainItems::NotRequested => Vec::new(),
+        };
+        Self {
+            valid_activity,
+            rejected_activity,
+            status: a.status,
+            highest_observed: a.highest_observed,
+            warrants: a.warrants,
+        }
+    }
+}
+
 /// A helper trait to allow [Record]s, [SignedActionHashed]s, and [ActionHashed]s to be converted into [ChainItems]
 /// without needing to know which source type is being operated on.
 pub trait ChainItemsSource {
@@ -123,5 +159,11 @@ impl ChainItemsSource for Vec<ActionHashed> {
                 .map(|a| (a.action_seq(), a.as_hash().clone()))
                 .collect(),
         )
+    }
+}
+
+impl ChainItemsSource for Vec<(u32, ActionHash)> {
+    fn to_chain_items(self) -> ChainItems {
+        ChainItems::Hashes(self)
     }
 }

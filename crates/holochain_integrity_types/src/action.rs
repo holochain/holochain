@@ -1,6 +1,3 @@
-use std::borrow::Borrow;
-use std::fmt::{Display, Formatter};
-use std::hash::Hash;
 use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::link::LinkType;
@@ -17,6 +14,9 @@ use holo_hash::EntryHash;
 use holo_hash::HashableContent;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
+use std::borrow::Borrow;
+use std::fmt::{Display, Formatter};
+use std::hash::Hash;
 
 pub mod builder;
 pub mod conversions;

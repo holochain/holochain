@@ -12,6 +12,39 @@ use holochain_state::prelude::*;
 use holochain_types::test_utils::chain::*;
 use test_case::test_case;
 
+macro_rules! assert_agent_activity_responses_eq {
+    ($expected:expr, $actual:expr) => {
+        assert_eq!($expected.agent, $actual.agent);
+        match (&$expected.valid_activity, &$actual.valid_activity) {
+            (ChainItems::FullRecords(e), ChainItems::FullRecords(a)) => {
+                assert_eq!(e.len(), a.len());
+                for (i, (e, a)) in e.iter().zip(a.iter()).enumerate() {
+                    assert_eq!(e, a, "Not equal at index {}", i);
+                }
+            }
+            (ChainItems::FullActions(e), ChainItems::FullActions(a)) => {
+                assert_eq!(e.len(), a.len());
+                for (i, (e, a)) in e.iter().zip(a.iter()).enumerate() {
+                    assert_eq!(e, a, "Not equal at index {}", i);
+                }
+            }
+            (ChainItems::Hashes(e), ChainItems::Hashes(a)) => {
+                assert_eq!(e.len(), a.len());
+                for (i, (e, a)) in e.iter().zip(a.iter()).enumerate() {
+                    assert_eq!(e, a, "Not equal at index {}", i);
+                }
+            }
+            (ChainItems::NotRequested, ChainItems::NotRequested) => {}
+            (l, r) => panic!("Not equal: {:?} != {:?}", l, r),
+        }
+        assert_eq!($expected.valid_activity, $actual.valid_activity);
+        assert_eq!($expected.rejected_activity, $actual.rejected_activity);
+        assert_eq!($expected.warrants, $actual.warrants);
+        assert_eq!($expected.status, $actual.status);
+        assert_eq!($expected.highest_observed, $actual.highest_observed);
+    };
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn get_activity() {
     holochain_trace::test_run();
@@ -31,6 +64,22 @@ async fn get_activity() {
     }
     for hash_op in td.store_ops.iter().cloned() {
         fill_db(&cache.to_db(), hash_op).await;
+    }
+    match td.valid_records {
+        ChainItems::FullRecords(ref record) => {
+            fill_db_entries(
+                &authority.to_db(),
+                record
+                    .into_iter()
+                    .filter_map(|r| match &r.entry {
+                        RecordEntry::Present(e) => Some(EntryHashed::from_content_sync(e.clone())),
+                        _ => None,
+                    })
+                    .collect(),
+            )
+            .await;
+        }
+        _ => unreachable!(),
     }
 
     let options = holochain_p2p::actor::GetActivityOptions {
@@ -59,18 +108,7 @@ async fn get_activity() {
         status: ChainStatus::Valid(td.chain_head.clone()),
         highest_observed: Some(td.highest_observed.clone()),
     };
-    assert_eq!(r.agent, expected.agent);
-    match (&r.valid_activity, &expected.valid_activity) {
-        (ChainItems::FullRecords(r), ChainItems::FullRecords(e)) => {
-            assert_eq!(r.len(), e.len());
-            for (i, (r, e)) in r.iter().zip(e.iter()).enumerate() {
-                assert_eq!(r, e, "Not equal at index {}", i);
-            }
-        }
-        _ => unreachable!(),
-    }
-    assert_eq!(r.valid_activity, expected.valid_activity);
-    assert_eq!(r, expected);
+    assert_agent_activity_responses_eq!(expected, r);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -92,6 +130,22 @@ async fn get_activity_with_warrants() {
     }
     for hash_op in td.store_ops.iter().cloned() {
         fill_db(&cache.to_db(), hash_op).await;
+    }
+    match td.valid_records {
+        ChainItems::FullRecords(ref record) => {
+            fill_db_entries(
+                &dht.to_db(),
+                record
+                    .into_iter()
+                    .filter_map(|r| match &r.entry {
+                        RecordEntry::Present(e) => Some(EntryHashed::from_content_sync(e.clone())),
+                        _ => None,
+                    })
+                    .collect(),
+            )
+            .await;
+        }
+        _ => unreachable!(),
     }
 
     let warrant = {
@@ -118,7 +172,7 @@ async fn get_activity_with_warrants() {
     let options = holochain_p2p::actor::GetActivityOptions {
         include_valid_activity: true,
         include_rejected_activity: false,
-        include_full_actions: false,
+        include_full_records: true,
         ..Default::default()
     };
 
@@ -142,7 +196,7 @@ async fn get_activity_with_warrants() {
         .await
         .unwrap();
 
-    assert_eq!(r1, expected);
+    assert_agent_activity_responses_eq!(expected, r1);
 
     // If the warrant is validated, it will be returned
     dht.test_write({
