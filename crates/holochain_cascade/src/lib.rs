@@ -1166,10 +1166,11 @@ impl CascadeImpl {
             let entry_lookup = maybe_provided_entry_records
                 .iter()
                 .filter_map(|r| match r {
-                    Some(r) => match r.signed_action().action().entry_hash() {
-                        Some(entry_hash) => Some((entry_hash, &r.entry)),
-                        None => None,
-                    },
+                    Some(r) => r
+                        .signed_action()
+                        .action()
+                        .entry_hash()
+                        .map(|entry_hash| (entry_hash, &r.entry)),
                     None => None,
                 })
                 .collect::<HashMap<_, _>>();

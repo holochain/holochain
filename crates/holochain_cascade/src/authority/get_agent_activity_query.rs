@@ -38,7 +38,7 @@ impl<T> Default for State<T> {
     }
 }
 
-#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum Item<T> {
     Integrated(T),
     Pending(T),

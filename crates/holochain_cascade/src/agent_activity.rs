@@ -1,6 +1,7 @@
 use super::*;
 use holochain_p2p::actor::GetActivityOptions;
 
+#[allow(clippy::result_large_err)]
 pub(crate) fn merge_activities(
     agent: AgentPubKey,
     options: &GetActivityOptions,
@@ -273,8 +274,8 @@ pub(crate) fn compute_chain_status<T: ActionSequenceAndHash>(
     let mut rejected: Vec<_> = rejected.collect();
 
     // Sort ascending.
-    valid.sort_unstable_by(|a, b| a.action_seq().cmp(&b.action_seq()));
-    rejected.sort_unstable_by(|a, b| a.action_seq().cmp(&b.action_seq()));
+    valid.sort_unstable_by_key(|a| a.action_seq());
+    rejected.sort_unstable_by_key(|a| a.action_seq());
 
     let mut valid_out = Vec::with_capacity(valid.len());
     let mut status = None;

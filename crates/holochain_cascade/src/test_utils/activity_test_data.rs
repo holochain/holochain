@@ -51,7 +51,7 @@ impl ActivityTestData {
                     Action::Create(ref c) => NewEntryAction::Create(c.clone()),
                     _ => unreachable!(),
                 },
-                entry.clone().into(),
+                entry.clone(),
             ));
             let shh = SignedActionHashed::with_presigned(ActionHashed::from_content_sync(a), sig);
             (Record::new(shh, Some(entry.clone())), op)
