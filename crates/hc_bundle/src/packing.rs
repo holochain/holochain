@@ -10,6 +10,8 @@ use mr_bundle::RawBundle;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
+#[cfg(feature = "wasmer_sys")]
+use tracing::info;
 
 /// Unpack a bundle into a working directory, returning the directory path used.
 pub async fn unpack<M: Manifest>(
@@ -74,7 +76,7 @@ fn bundle_path_to_dir(path: &Path, extension: &'static str) -> HcBundleResult<Pa
 
 #[cfg(feature = "wasmer_sys")]
 async fn build_preserialized_wasm<M: Manifest>(
-    target_path: &PathBuf,
+    target_path: &Path,
     bundle: &Bundle<M>,
 ) -> Result<(), HcBundleError> {
     let target_path_folder = target_path
@@ -149,7 +151,7 @@ pub async fn pack<M: Manifest>(
     };
     bundle.write_to_file(&target_path).await?;
     if serialize_wasm {
-        let _ = build_preserialized_wasm(&target_path, &bundle).await?;
+        build_preserialized_wasm(&target_path, &bundle).await?;
     }
 
     Ok((target_path, bundle))

@@ -844,7 +844,7 @@ impl RealRibosome {
                         let mut store_mut = store_lock.as_store_mut();
                         set_remaining_points(
                             &mut store_mut,
-                            instance.as_ref(),
+                            instance_with_store.instance.as_ref(),
                             WASM_METERING_LIMIT,
                         );
                     }
@@ -864,11 +864,13 @@ impl RealRibosome {
                     {
                         let mut store_lock = instance_with_store.store.lock();
                         let mut store_mut = store_lock.as_store_mut();
-                        let points_used =
-                            match get_remaining_points(&mut store_mut, instance.as_ref()) {
-                                MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
-                                MeteringPoints::Exhausted => WASM_METERING_LIMIT,
-                            };
+                        let points_used = match get_remaining_points(
+                            &mut store_mut,
+                            instance_with_store.instance.as_ref(),
+                        ) {
+                            MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
+                            MeteringPoints::Exhausted => WASM_METERING_LIMIT,
+                        };
                         self.usage_meter.add(points_used, &otel_info);
                     }
 
