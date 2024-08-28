@@ -167,11 +167,10 @@ mod tests {
 
         {
             // add some data to the local CHC
-            let m = CHC_LOCAL_MAP.lock();
-            let chc = m.get(cell_id).unwrap();
+            let chc = CHC_LOCAL_MAP.lock().get(cell_id).unwrap().clone();
             let records = chc.clone().get_record_data(None).await.unwrap();
             assert_eq!(records.len(), 3);
-            chc.clone().add_records(vec![new_record]).await.unwrap();
+            chc.add_records(vec![new_record]).await.unwrap();
         }
 
         // Check that a sync picks up the new action
