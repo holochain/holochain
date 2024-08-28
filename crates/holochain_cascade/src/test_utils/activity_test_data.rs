@@ -33,7 +33,7 @@ pub struct ActivityTestData {
 
 impl ActivityTestData {
     /// Construct a set of test fixtures representing a valid source chain
-    pub fn valid_chain_scenario() -> Self {
+    pub fn valid_chain_scenario(private_entries: bool) -> Self {
         // The agent we are querying.
         let agent = fixt!(AgentPubKey);
 
@@ -111,7 +111,11 @@ impl ActivityTestData {
             create.entry_type = EntryType::App(AppEntryDef::new(
                 1.into(),
                 1.into(),
-                EntryVisibility::Public,
+                if private_entries {
+                    EntryVisibility::Private
+                } else {
+                    EntryVisibility::Public
+                },
             ));
             let action = Action::Create(create);
             let sig = fixt!(Signature);

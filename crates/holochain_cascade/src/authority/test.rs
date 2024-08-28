@@ -196,7 +196,7 @@ async fn get_agent_activity() {
     holochain_trace::test_run();
     let db = test_dht_db();
 
-    let td = ActivityTestData::valid_chain_scenario();
+    let td = ActivityTestData::valid_chain_scenario(false);
 
     for hash_op in td.agent_activity_ops.iter().cloned() {
         fill_db(&db.to_db(), hash_op).await;

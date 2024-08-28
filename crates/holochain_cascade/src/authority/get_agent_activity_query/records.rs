@@ -35,6 +35,7 @@ impl Query for GetAgentActivityRecordsQuery {
             SELECT
             Action.hash,
             Action.blob AS action_blob,
+            Action.private_entry,
             DhtOp.type AS dht_type,
             DhtOp.validation_status,
             DhtOp.when_integrated,
@@ -95,6 +96,7 @@ impl Query for GetAgentActivityRecordsQuery {
                 .get::<_, Option<Vec<u8>>>("entry_blob")?
                 .map(from_blob)
                 .transpose()?;
+            let private_entry: Option<bool> = row.get("private_entry")?;
 
             match op_type {
                 DhtOpType::Chain(_) => {
@@ -104,7 +106,11 @@ impl Query for GetAgentActivityRecordsQuery {
                             hashed: ActionHashed::with_pre_hashed(action.action().clone(), hash),
                             signature: action.signature().clone(),
                         };
-                        let record = Record::new(action, maybe_entry);
+                        let record = Record::new(action, if let Some(true) = private_entry {
+                            None
+                        } else {
+                            maybe_entry
+                        });
                         let item = if integrated.is_some() {
                             Item::Integrated(record)
                         } else {

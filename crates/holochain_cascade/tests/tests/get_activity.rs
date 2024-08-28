@@ -51,7 +51,7 @@ macro_rules! assert_agent_activity_responses_eq {
 async fn get_activity() {
     holochain_trace::test_run();
 
-    let test_data = ActivityTestData::valid_chain_scenario();
+    let test_data = ActivityTestData::valid_chain_scenario(false);
 
     let scenario = GetActivityTestScenario::new(test_data.clone())
         .include_agent_activity_ops_in_dht_db()
@@ -88,7 +88,7 @@ async fn get_activity() {
 async fn get_activity_chain_items_parity() {
     holochain_trace::test_run();
 
-    let test_data = ActivityTestData::valid_chain_scenario();
+    let test_data = ActivityTestData::valid_chain_scenario(false);
 
     let scenario = GetActivityTestScenario::new(test_data.clone())
         .include_agent_activity_ops_in_dht_db()
@@ -184,7 +184,7 @@ async fn get_activity_chain_items_parity() {
 async fn fill_records_entries() {
     holochain_trace::test_run();
 
-    let test_data = ActivityTestData::valid_chain_scenario();
+    let test_data = ActivityTestData::valid_chain_scenario(false);
 
     let scenario = GetActivityTestScenario::new(test_data.clone())
         .include_agent_activity_ops_in_dht_db()
@@ -221,7 +221,7 @@ async fn fill_records_entries() {
 async fn fetch_routes_parity() {
     holochain_trace::test_run();
 
-    let test_data = ActivityTestData::valid_chain_scenario();
+    let test_data = ActivityTestData::valid_chain_scenario(false);
 
     let scenario = GetActivityTestScenario::new(test_data.clone())
         .include_agent_activity_ops_in_dht_db()
@@ -266,6 +266,55 @@ async fn fetch_routes_parity() {
     assert_agent_activity_responses_eq!(local_with_remote_authority, remote_as_self_authority);
 }
 
+/// Check that getting activity with records will not server private entries
+#[tokio::test(flavor = "multi_thread")]
+async fn record_activity_does_not_serve_private_entries() {
+    holochain_trace::test_run();
+
+    let mut test_data = ActivityTestData::valid_chain_scenario(true);
+
+    // Wipe out the private entries in the expected response
+    match &mut test_data.valid_records {
+        ChainItems::FullRecords(records) => {
+            // Skip 1 to leave the DNA entry as `NA` rather than `Hidden`
+            records.iter_mut().skip(1).for_each(|r| {
+                r.entry = RecordEntry::Hidden;
+            })
+        },
+        _ => unreachable!(),
+    }
+
+    let scenario = GetActivityTestScenario::new(test_data.clone())
+        .include_agent_activity_ops_in_dht_db()
+        .await
+        .include_store_entry_ops_in_dht_db()
+        .await
+        .include_agent_activity_noise_ops_in_dht_db()
+        .await;
+
+    let options = GetActivityOptions {
+        include_valid_activity: true,
+        include_rejected_activity: false,
+        include_full_records: true,
+        get_options: GetOptions::local(),
+        ..Default::default()
+    };
+
+    let r = scenario.query_authority(options).await.unwrap();
+
+    let expected = AgentActivityResponse {
+        agent: test_data.agent.clone(),
+        valid_activity: test_data.valid_records.clone(),
+        rejected_activity: ChainItems::NotRequested,
+        warrants: vec![],
+        status: ChainStatus::Valid(test_data.chain_head.clone()),
+        highest_observed: Some(test_data.highest_observed.clone()),
+    };
+
+    assert_agent_activity_responses_eq!(expected, r);
+}
+
+
 #[tokio::test(flavor = "multi_thread")]
 async fn get_activity_with_warrants() {
     holochain_trace::test_run();
@@ -275,7 +324,7 @@ async fn get_activity_with_warrants() {
     let dht = test_dht_db();
 
     // Data
-    let td = ActivityTestData::valid_chain_scenario();
+    let td = ActivityTestData::valid_chain_scenario(false);
 
     for hash_op in td.agent_activity_ops.iter().cloned() {
         fill_db(&dht.to_db(), hash_op).await;
