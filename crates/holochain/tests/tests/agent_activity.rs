@@ -37,7 +37,7 @@ async fn get_agent_activity() {
 
     // TODO No way to force a network call to get the agent activity, so we have to wait for a sync
     //      first and then check the agent activity
-    await_consistency(std::time::Duration::from_secs(15), [alice_cell, bob_cell])
+    await_consistency(std::time::Duration::from_secs(60), [alice_cell, bob_cell])
         .await
         .unwrap();
 
