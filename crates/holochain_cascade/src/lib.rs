@@ -1133,7 +1133,7 @@ impl CascadeImpl {
     /// from either our cache when [GetOptions::local] is specified, or from the network when
     /// [GetOptions::network] is specified.
     ///
-    /// Note that this will only take any action for [ChainItems::FullRecords]. For other
+    /// Note that this will only take any action for [ChainItems::Full]. For other
     /// [ChainItems] variants, the function will just return its input.
     async fn fill_missing_chain_item_entries(
         &self,
@@ -1141,7 +1141,7 @@ impl CascadeImpl {
         get_options: GetOptions,
     ) -> CascadeResult<ChainItems> {
         let missing_entry_hashes = match &chain_items {
-            ChainItems::FullRecords(records) => records
+            ChainItems::Full(records) => records
                 .iter()
                 .filter_map(|r| match r.entry {
                     RecordEntry::NotStored => r.action().entry_hash().map(|h| h.clone().into()),
@@ -1176,7 +1176,7 @@ impl CascadeImpl {
                 .collect::<HashMap<_, _>>();
 
             match &mut chain_items {
-                ChainItems::FullRecords(records) => {
+                ChainItems::Full(records) => {
                     for record in records.iter_mut() {
                         if let RecordEntry::NotStored = record.entry {
                             if let Some(entry_hash) = record.action().entry_hash() {

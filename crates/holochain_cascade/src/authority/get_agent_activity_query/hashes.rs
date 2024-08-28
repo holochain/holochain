@@ -1,13 +1,13 @@
-use crate::authority::get_agent_activity_query::actions::GetAgentActivityActionsQuery;
 use crate::authority::get_agent_activity_query::{fold, render, Item, State};
-use holo_hash::{ActionHash, AgentPubKey, WarrantHash};
+use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, WarrantHash};
 use holochain_p2p::dht::op::Timestamp;
 use holochain_p2p::event::GetActivityOptions;
-use holochain_sqlite::rusqlite::Row;
-use holochain_state::prelude::{from_blob, ActionHashed, Params, Query, StateQueryResult, Store};
+use holochain_sqlite::rusqlite::{named_params, Row};
+use holochain_state::prelude::{from_blob, ActionHashed, Query, StateQueryResult, Store};
 use holochain_state::query::QueryData;
 use holochain_types::activity::AgentActivityResponse;
-use holochain_types::dht_op::DhtOpType;
+use holochain_types::dht_op::{ChainOpType, DhtOpType};
+use holochain_types::prelude::WarrantOpType;
 use holochain_zome_types::judged::Judged;
 use holochain_zome_types::prelude::{
     ChainQueryFilter, SignedAction, SignedWarrant, ValidationStatus,
@@ -16,13 +16,19 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct GetAgentActivityHashesQuery {
-    actions_query: GetAgentActivityActionsQuery,
+    pub(super) agent: AgentPubKey,
+    pub(super) agent_basis: AnyLinkableHash,
+    pub(super) filter: ChainQueryFilter,
+    pub(super) options: GetActivityOptions,
 }
 
 impl GetAgentActivityHashesQuery {
     pub fn new(agent: AgentPubKey, filter: ChainQueryFilter, options: GetActivityOptions) -> Self {
         Self {
-            actions_query: GetAgentActivityActionsQuery::new(agent, filter, options),
+            agent_basis: agent.clone().into(),
+            agent,
+            filter,
+            options,
         }
     }
 }
@@ -33,11 +39,44 @@ impl Query for GetAgentActivityHashesQuery {
     type Output = AgentActivityResponse;
 
     fn query(&self) -> String {
-        self.actions_query.query()
+        "
+            SELECT
+            Action.hash,
+            Action.blob AS action_blob,
+            DhtOp.type AS dht_type,
+            DhtOp.validation_status,
+            DhtOp.when_integrated
+            FROM Action
+            JOIN DhtOp ON DhtOp.action_hash = Action.hash
+            WHERE
+            (
+                -- is an action authored by this agent
+                Action.author = :author
+                AND DhtOp.type = :chain_op_type
+            )
+            OR
+            (
+                -- is an integrated, valid warrant
+                DhtOp.basis_hash = :author_basis
+                AND DhtOp.type = :warrant_op_type
+                AND DhtOp.validation_status = :valid_status
+                AND DhtOp.when_integrated IS NOT NULL
+            )
+            ORDER BY Action.seq ASC
+        "
+        .to_string()
     }
 
-    fn params(&self) -> Vec<Params> {
-        self.actions_query.params()
+    fn params(&self) -> Vec<holochain_state::query::Params> {
+        let params = named_params! {
+            ":author": self.agent,
+            ":author_basis": self.agent_basis,
+            ":chain_op_type": ChainOpType::RegisterAgentActivity,
+            ":warrant_op_type": WarrantOpType::ChainIntegrityWarrant,
+            ":valid_status": ValidationStatus::Valid,
+        };
+
+        params.to_vec()
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
@@ -86,11 +125,6 @@ impl Query for GetAgentActivityHashesQuery {
     where
         S: Store,
     {
-        render(
-            state,
-            self.actions_query.agent.clone(),
-            &self.actions_query.filter,
-            &self.actions_query.options,
-        )
+        render(state, self.agent.clone(), &self.filter, &self.options)
     }
 }

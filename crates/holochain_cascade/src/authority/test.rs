@@ -256,7 +256,7 @@ async fn get_agent_activity() {
     let options = actor::GetActivityOptions {
         include_valid_activity: true,
         include_rejected_activity: false,
-        include_full_actions: false,
+        include_full_records: false,
         ..Default::default()
     };
 

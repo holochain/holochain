@@ -21,8 +21,6 @@ pub struct ActivityTestData {
     pub agent: AgentPubKey,
     /// The expected hash return values
     pub valid_hashes: ChainItems,
-    /// The expected action return values
-    pub valid_actions: ChainItems,
     /// The expected record return values
     pub valid_records: ChainItems,
     /// The head of the chain produced
@@ -155,13 +153,7 @@ impl ActivityTestData {
             store_entry_ops,
             agent,
             valid_hashes: ChainItems::Hashes(valid_hashes),
-            valid_actions: ChainItems::FullActions(
-                valid_records
-                    .iter()
-                    .map(|r| r.signed_action.clone())
-                    .collect(),
-            ),
-            valid_records: ChainItems::FullRecords(valid_records),
+            valid_records: ChainItems::Full(valid_records),
             highest_observed,
             chain_head,
         }

@@ -11,7 +11,6 @@ use holochain_zome_types::prelude::{
     Judged, ValidationStatus, Warrant,
 };
 
-pub mod actions;
 pub mod deterministic;
 pub mod hashes;
 pub mod must_get_agent_activity;

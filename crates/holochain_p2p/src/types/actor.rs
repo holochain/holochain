@@ -233,11 +233,7 @@ pub struct GetActivityOptions {
     /// Include warrants for this agent
     pub include_warrants: bool,
     /// Include the full signed records in the response, instead of just the hashes.
-    ///
-    /// Setting this will make the [GetActivityOptions::include_full_actions] field to be ignored.
     pub include_full_records: bool,
-    /// Include the full signed actions in the response instead of just the hashes.
-    pub include_full_actions: bool,
     /// Configure how the data should be fetched.
     pub get_options: holochain_zome_types::entry::GetOptions,
 }
@@ -251,7 +247,6 @@ impl Default for GetActivityOptions {
             include_rejected_activity: false,
             include_warrants: true,
             include_full_records: false,
-            include_full_actions: false,
             get_options: Default::default(),
         }
     }

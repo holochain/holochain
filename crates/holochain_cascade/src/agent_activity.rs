@@ -24,9 +24,7 @@ fn merge_activity_responses(
     let mut status = ChainStatus::Empty;
     let mut valid = if options.include_valid_activity {
         if options.include_full_records {
-            ChainItems::FullRecords(Vec::new())
-        } else if options.include_full_actions {
-            ChainItems::FullActions(Vec::new())
+            ChainItems::Full(Vec::new())
         } else {
             ChainItems::Hashes(Vec::new())
         }
@@ -35,9 +33,7 @@ fn merge_activity_responses(
     };
     let mut rejected = if options.include_rejected_activity {
         if options.include_full_records {
-            ChainItems::FullRecords(Vec::new())
-        } else if options.include_full_actions {
-            ChainItems::FullActions(Vec::new())
+            ChainItems::Full(Vec::new())
         } else {
             ChainItems::Hashes(Vec::new())
         }
@@ -76,24 +72,11 @@ fn merge_activity_responses(
         let (s, v, r) = if options.include_valid_activity && options.include_rejected_activity {
             match (valid, rejected, valid_activity, rejected_activity) {
                 (
-                    ChainItems::FullRecords(mut v),
-                    ChainItems::FullRecords(mut r),
-                    ChainItems::FullRecords(valid),
-                    ChainItems::FullRecords(rejected),
+                    ChainItems::Full(mut v),
+                    ChainItems::Full(mut r),
+                    ChainItems::Full(valid),
+                    ChainItems::Full(rejected),
                 ) if options.include_full_records => {
-                    v.extend(valid);
-                    r.extend(rejected);
-                    let (status, valid, rejected) =
-                        compute_chain_status(v.into_iter(), r.into_iter());
-
-                    (status, valid.to_chain_items(), rejected.to_chain_items())
-                }
-                (
-                    ChainItems::FullActions(mut v),
-                    ChainItems::FullActions(mut r),
-                    ChainItems::FullActions(valid),
-                    ChainItems::FullActions(rejected),
-                ) if options.include_full_actions => {
                     v.extend(valid);
                     r.extend(rejected);
                     let (status, valid, rejected) =
@@ -125,25 +108,8 @@ fn merge_activity_responses(
             }
         } else if options.include_valid_activity {
             match (valid, rejected, valid_activity, rejected_activity) {
-                (ChainItems::FullRecords(mut v), _, ChainItems::FullRecords(valid), _)
+                (ChainItems::Full(mut v), _, ChainItems::Full(valid), _)
                     if options.include_full_records =>
-                {
-                    v.extend(valid);
-                    let (status, valid, rejected) =
-                        compute_chain_status(v.into_iter(), Vec::with_capacity(0).into_iter());
-
-                    (
-                        status,
-                        valid.to_chain_items(),
-                        if rejected.is_empty() {
-                            ChainItems::NotRequested
-                        } else {
-                            rejected.to_chain_items()
-                        },
-                    )
-                }
-                (ChainItems::FullActions(mut v), _, ChainItems::FullActions(valid), _)
-                    if options.include_full_actions =>
                 {
                     v.extend(valid);
                     let (status, valid, rejected) =
@@ -185,25 +151,8 @@ fn merge_activity_responses(
             }
         } else if options.include_rejected_activity {
             match (valid, rejected, valid_activity, rejected_activity) {
-                (_, ChainItems::FullRecords(mut r), _, ChainItems::FullRecords(rejected))
+                (_, ChainItems::Full(mut r), _, ChainItems::Full(rejected))
                     if options.include_full_records =>
-                {
-                    r.extend(rejected);
-                    let (status, valid, rejected) =
-                        compute_chain_status(Vec::with_capacity(0).into_iter(), r.into_iter());
-
-                    (
-                        status,
-                        if valid.is_empty() {
-                            ChainItems::NotRequested
-                        } else {
-                            valid.to_chain_items()
-                        },
-                        rejected.to_chain_items(),
-                    )
-                }
-                (_, ChainItems::FullActions(mut r), _, ChainItems::FullActions(rejected))
-                    if options.include_full_actions =>
                 {
                     r.extend(rejected);
                     let (status, valid, rejected) =

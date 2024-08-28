@@ -74,11 +74,7 @@ pub struct GetActivityOptions {
     /// Include warrants in the response.
     pub include_warrants: bool,
     /// Include the full records, instead of just the hashes.
-    ///
-    /// Setting this will make the [GetActivityOptions::include_full_actions] field to be ignored.
     pub include_full_records: bool,
-    /// Include the full signed actions in the response, instead of just the hashes.
-    pub include_full_actions: bool,
 }
 
 impl Default for GetActivityOptions {
@@ -87,7 +83,6 @@ impl Default for GetActivityOptions {
             include_valid_activity: true,
             include_warrants: true,
             include_rejected_activity: false,
-            include_full_actions: false,
             include_full_records: false,
         }
     }
@@ -99,7 +94,6 @@ impl From<&actor::GetActivityOptions> for GetActivityOptions {
             include_valid_activity: a.include_valid_activity,
             include_warrants: a.include_warrants,
             include_rejected_activity: a.include_rejected_activity,
-            include_full_actions: a.include_full_actions,
             include_full_records: a.include_full_records,
         }
     }

@@ -17,13 +17,7 @@ macro_rules! assert_agent_activity_responses_eq {
     ($expected:expr, $actual:expr) => {
         assert_eq!($expected.agent, $actual.agent);
         match (&$expected.valid_activity, &$actual.valid_activity) {
-            (ChainItems::FullRecords(e), ChainItems::FullRecords(a)) => {
-                assert_eq!(e.len(), a.len());
-                for (i, (e, a)) in e.iter().zip(a.iter()).enumerate() {
-                    assert_eq!(e, a, "Not equal at index {}", i);
-                }
-            }
-            (ChainItems::FullActions(e), ChainItems::FullActions(a)) => {
+            (ChainItems::Full(e), ChainItems::Full(a)) => {
                 assert_eq!(e.len(), a.len());
                 for (i, (e, a)) in e.iter().zip(a.iter()).enumerate() {
                     assert_eq!(e, a, "Not equal at index {}", i);
@@ -121,27 +115,6 @@ async fn get_activity_chain_items_parity() {
     let options = GetActivityOptions {
         include_valid_activity: true,
         include_rejected_activity: false,
-        include_full_actions: true,
-        ..Default::default()
-    };
-
-    let with_actions = scenario.query_authority(options.clone()).await.unwrap();
-
-    assert_agent_activity_responses_eq!(
-        AgentActivityResponse {
-            agent: test_data.agent.clone(),
-            valid_activity: test_data.valid_actions.clone(),
-            rejected_activity: ChainItems::NotRequested,
-            warrants: vec![],
-            status: ChainStatus::Valid(test_data.chain_head.clone()),
-            highest_observed: Some(test_data.highest_observed.clone()),
-        },
-        with_actions
-    );
-
-    let options = GetActivityOptions {
-        include_valid_activity: true,
-        include_rejected_activity: false,
         include_full_records: true,
         ..Default::default()
     };
@@ -164,16 +137,11 @@ async fn get_activity_chain_items_parity() {
         ChainItems::Hashes(h) => h.into_iter().map(|(_, h)| h).collect(),
         _ => unreachable!(),
     };
-    let hashes_from_actions: Vec<ActionHash> = match with_actions.valid_activity {
-        ChainItems::FullActions(a) => a.into_iter().map(|a| a.action_hash().clone()).collect(),
-        _ => unreachable!(),
-    };
     let hashes_from_records: Vec<ActionHash> = match with_records.valid_activity {
-        ChainItems::FullRecords(r) => r.into_iter().map(|r| r.action_hash().clone()).collect(),
+        ChainItems::Full(r) => r.into_iter().map(|r| r.action_hash().clone()).collect(),
         _ => unreachable!(),
     };
 
-    assert_eq!(hashes_from_hashes, hashes_from_actions);
     assert_eq!(hashes_from_hashes, hashes_from_records);
 }
 
@@ -275,12 +243,12 @@ async fn record_activity_does_not_serve_private_entries() {
 
     // Wipe out the private entries in the expected response
     match &mut test_data.valid_records {
-        ChainItems::FullRecords(records) => {
+        ChainItems::Full(records) => {
             // Skip 1 to leave the DNA entry as `NA` rather than `Hidden`
             records.iter_mut().skip(1).for_each(|r| {
                 r.entry = RecordEntry::Hidden;
             })
-        },
+        }
         _ => unreachable!(),
     }
 
@@ -314,6 +282,56 @@ async fn record_activity_does_not_serve_private_entries() {
     assert_agent_activity_responses_eq!(expected, r);
 }
 
+/// Checks that actions can be requested with a chain query filter that drops entries
+#[tokio::test(flavor = "multi_thread")]
+async fn filter_out_entries_with_chain_query() {
+    holochain_trace::test_run();
+
+    let mut test_data = ActivityTestData::valid_chain_scenario(false);
+
+    // Wipe out the entries in the expected response
+    match &mut test_data.valid_records {
+        ChainItems::Full(records) => {
+            // Skip 1 to leave the DNA entry as `NA` rather than `NotStored`
+            records.iter_mut().skip(1).for_each(|r| {
+                r.entry = RecordEntry::NotStored;
+            })
+        }
+        _ => unreachable!(),
+    }
+
+    let filter = ChainQueryFilter::new().include_entries(false);
+
+    let scenario = GetActivityTestScenario::new(test_data.clone())
+        .with_chain_filter(filter)
+        .include_agent_activity_ops_in_dht_db()
+        .await
+        .include_store_entry_ops_in_dht_db()
+        .await
+        .include_agent_activity_noise_ops_in_dht_db()
+        .await;
+
+    let options = GetActivityOptions {
+        include_valid_activity: true,
+        include_rejected_activity: false,
+        include_full_records: true,
+        get_options: GetOptions::local(),
+        ..Default::default()
+    };
+
+    let r = scenario.query_authority(options).await.unwrap();
+
+    let expected = AgentActivityResponse {
+        agent: test_data.agent.clone(),
+        valid_activity: test_data.valid_records.clone(),
+        rejected_activity: ChainItems::NotRequested,
+        warrants: vec![],
+        status: ChainStatus::Valid(test_data.chain_head.clone()),
+        highest_observed: Some(test_data.highest_observed.clone()),
+    };
+
+    assert_agent_activity_responses_eq!(expected, r);
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_activity_with_warrants() {
@@ -444,6 +462,7 @@ struct GetActivityTestScenario {
     dht: TestDb<DbKindDht>,
     cache: TestDb<DbKindCache>,
     test_data: ActivityTestData,
+    chain_filter: ChainQueryFilter,
 }
 
 impl GetActivityTestScenario {
@@ -455,6 +474,7 @@ impl GetActivityTestScenario {
             dht,
             cache,
             test_data,
+            chain_filter: ChainQueryFilter::new(),
         }
     }
 
@@ -487,6 +507,11 @@ impl GetActivityTestScenario {
             fill_db(&self.cache.to_db(), hash_op).await;
         }
 
+        self
+    }
+
+    fn with_chain_filter(mut self, chain_filter: ChainQueryFilter) -> Self {
+        self.chain_filter = chain_filter;
         self
     }
 
@@ -523,7 +548,7 @@ impl GetActivityTestScenario {
         cascade
             .get_agent_activity(
                 self.test_data.agent.clone(),
-                ChainQueryFilter::new(),
+                self.chain_filter.clone(),
                 options,
             )
             .await

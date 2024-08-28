@@ -83,6 +83,7 @@ impl Query for GetAgentActivityRecordsQuery {
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
+        let include_entries = self.filter.include_entries;
         Arc::new(move |row| {
             let op_type: DhtOpType = row.get("dht_type")?;
             let validation_status: Option<ValidationStatus> = row.get("validation_status")?;
@@ -92,11 +93,16 @@ impl Query for GetAgentActivityRecordsQuery {
             // This code is intended to run on an agent authority which may not be an entry authority
             // for all the relevant entries. The caller will need to handle any missing entries that
             // they care about.
-            let maybe_entry = row
-                .get::<_, Option<Vec<u8>>>("entry_blob")?
-                .map(from_blob)
-                .transpose()?;
-            let private_entry: Option<bool> = row.get("private_entry")?;
+            let private_entry = row
+                .get::<_, Option<bool>>("private_entry")?
+                .unwrap_or(false);
+            let maybe_entry = if !private_entry && include_entries {
+                row.get::<_, Option<Vec<u8>>>("entry_blob")?
+                    .map(from_blob)
+                    .transpose()?
+            } else {
+                None
+            };
 
             match op_type {
                 DhtOpType::Chain(_) => {
@@ -106,11 +112,7 @@ impl Query for GetAgentActivityRecordsQuery {
                             hashed: ActionHashed::with_pre_hashed(action.action().clone(), hash),
                             signature: action.signature().clone(),
                         };
-                        let record = Record::new(action, if let Some(true) = private_entry {
-                            None
-                        } else {
-                            maybe_entry
-                        });
+                        let record = Record::new(action, maybe_entry);
                         let item = if integrated.is_some() {
                             Item::Integrated(record)
                         } else {

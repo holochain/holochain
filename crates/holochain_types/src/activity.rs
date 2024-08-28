@@ -28,8 +28,7 @@ impl AgentActivityResponse {
     /// Convert an empty response to a different type.
     pub fn from_empty(other: AgentActivityResponse) -> Self {
         let convert_activity = |items: &ChainItems| match items {
-            ChainItems::FullRecords(_) => ChainItems::FullRecords(Vec::with_capacity(0)),
-            ChainItems::FullActions(_) => ChainItems::FullActions(Vec::with_capacity(0)),
+            ChainItems::Full(_) => ChainItems::Full(Vec::with_capacity(0)),
             ChainItems::Hashes(_) => ChainItems::Hashes(Vec::with_capacity(0)),
             ChainItems::NotRequested => ChainItems::NotRequested,
         };
@@ -58,16 +57,10 @@ impl AgentActivityResponse {
     /// Convert to a [ChainItems::Hashes] response.
     pub fn hashes_only(other: AgentActivityResponse) -> Self {
         let convert_activity = |items: ChainItems| match items {
-            ChainItems::FullRecords(records) => ChainItems::Hashes(
+            ChainItems::Full(records) => ChainItems::Hashes(
                 records
                     .into_iter()
                     .map(|r| (r.action().action_seq(), r.address().clone()))
-                    .collect(),
-            ),
-            ChainItems::FullActions(actions) => ChainItems::Hashes(
-                actions
-                    .into_iter()
-                    .map(|a| (a.action().action_seq(), a.as_hash().clone()))
                     .collect(),
             ),
             ChainItems::Hashes(h) => ChainItems::Hashes(h),
@@ -88,9 +81,7 @@ impl AgentActivityResponse {
 /// The type of agent activity returned in this request
 pub enum ChainItems {
     /// The full records
-    FullRecords(Vec<Record>),
-    /// The full actions
-    FullActions(Vec<SignedActionHashed>),
+    Full(Vec<Record>),
     /// Just the hashes
     Hashes(Vec<(u32, ActionHash)>),
     /// Activity was not requested
@@ -100,25 +91,17 @@ pub enum ChainItems {
 impl From<AgentActivityResponse> for AgentActivity {
     fn from(a: AgentActivityResponse) -> Self {
         let valid_activity = match a.valid_activity {
-            ChainItems::FullRecords(records) => records
+            ChainItems::Full(records) => records
                 .into_iter()
                 .map(|el| (el.action().action_seq(), el.action_address().clone()))
-                .collect(),
-            ChainItems::FullActions(actions) => actions
-                .into_iter()
-                .map(|el| (el.action().action_seq(), el.as_hash().clone()))
                 .collect(),
             ChainItems::Hashes(h) => h,
             ChainItems::NotRequested => Vec::new(),
         };
         let rejected_activity = match a.rejected_activity {
-            ChainItems::FullRecords(records) => records
+            ChainItems::Full(records) => records
                 .into_iter()
                 .map(|el| (el.action().action_seq(), el.action_address().clone()))
-                .collect(),
-            ChainItems::FullActions(actions) => actions
-                .into_iter()
-                .map(|el| (el.action().action_seq(), el.as_hash().clone()))
                 .collect(),
             ChainItems::Hashes(h) => h,
             ChainItems::NotRequested => Vec::new(),
@@ -142,13 +125,7 @@ pub trait ChainItemsSource {
 
 impl ChainItemsSource for Vec<Record> {
     fn to_chain_items(self) -> ChainItems {
-        ChainItems::FullRecords(self)
-    }
-}
-
-impl ChainItemsSource for Vec<SignedActionHashed> {
-    fn to_chain_items(self) -> ChainItems {
-        ChainItems::FullActions(self)
+        ChainItems::Full(self)
     }
 }
 

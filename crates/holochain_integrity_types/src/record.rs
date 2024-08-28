@@ -194,26 +194,6 @@ impl AsRef<SignedActionHashed> for SignedActionHashed {
     }
 }
 
-impl ActionHashedContainer for SignedActionHashed {
-    fn action(&self) -> &Action {
-        self.action()
-    }
-
-    fn action_hash(&self) -> &ActionHash {
-        self.as_hash()
-    }
-}
-
-impl ActionSequenceAndHash for SignedActionHashed {
-    fn action_seq(&self) -> u32 {
-        self.action().action_seq()
-    }
-
-    fn address(&self) -> &ActionHash {
-        self.as_hash()
-    }
-}
-
 #[derive(Clone, Debug, Eq, Serialize, Deserialize)]
 /// Any content that has been hashed and signed.
 pub struct SignedHashed<T>
