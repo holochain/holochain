@@ -1065,11 +1065,14 @@ impl CascadeImpl {
                     )
                     .await?
                 }
-                None => agent_activity::merge_activities(
-                    agent.clone(),
-                    &options,
-                    Vec::with_capacity(0),
-                )?,
+                None => {
+                    info!("Unable to get agent activity because this cascade does not have DHT access");
+                    agent_activity::merge_activities(
+                        agent.clone(),
+                        &options,
+                        Vec::with_capacity(0),
+                    )?
+                }
             }
         } else {
             let results = self

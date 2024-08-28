@@ -215,6 +215,57 @@ async fn fill_records_entries() {
     assert_agent_activity_responses_eq!(expected, r);
 }
 
+/// Try fetching locally and remotely, and forced remotely to check that all routes return the same
+/// result
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_routes_parity() {
+    holochain_trace::test_run();
+
+    let test_data = ActivityTestData::valid_chain_scenario();
+
+    let scenario = GetActivityTestScenario::new(test_data.clone())
+        .include_agent_activity_ops_in_dht_db()
+        .await
+        .include_store_entry_ops_in_dht_db()
+        .await
+        .include_agent_activity_noise_ops_in_dht_db()
+        .await
+        .include_store_entry_ops_in_cache_db()
+        .await;
+
+    let options = GetActivityOptions {
+        include_valid_activity: true,
+        include_rejected_activity: false,
+        include_full_records: true,
+        get_options: GetOptions::local(),
+        ..Default::default()
+    };
+
+    // Note that we're actually sharing one dht+cache database here so the local and remote
+    // aren't quite accurate here. But the point is to exercise the code paths and not to test
+    // that local and remote data are actually merged correctly.
+
+    let local_with_remote_authority = scenario.query_authority(options.clone()).await.unwrap();
+
+    let local_as_self_authority = scenario.query_self(options.clone()).await.unwrap();
+
+    let options = GetActivityOptions {
+        include_valid_activity: true,
+        include_rejected_activity: false,
+        include_full_records: true,
+        get_options: GetOptions::network(),
+        ..Default::default()
+    };
+
+    let remote_with_remote_authority = scenario.query_authority(options.clone()).await.unwrap();
+
+    let remote_as_self_authority = scenario.query_self(options.clone()).await.unwrap();
+
+    assert_agent_activity_responses_eq!(local_with_remote_authority, local_as_self_authority);
+    assert_agent_activity_responses_eq!(local_with_remote_authority, remote_with_remote_authority);
+    assert_agent_activity_responses_eq!(local_with_remote_authority, remote_as_self_authority);
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn get_activity_with_warrants() {
     holochain_trace::test_run();
@@ -399,6 +450,27 @@ impl GetActivityTestScenario {
 
         let cascade = CascadeImpl::empty().with_network(network, self.cache.to_db());
 
+        self.query(cascade, options).await
+    }
+
+    async fn query_self(
+        &self,
+        options: GetActivityOptions,
+    ) -> CascadeResult<AgentActivityResponse> {
+        let network = PassThroughNetwork::authority_for_all(vec![self.dht.to_db().clone().into()]);
+
+        let cascade = CascadeImpl::empty()
+            .with_network(network, self.cache.to_db())
+            .with_dht(self.dht.clone().into());
+
+        self.query(cascade, options).await
+    }
+
+    async fn query(
+        &self,
+        cascade: CascadeImpl,
+        options: GetActivityOptions,
+    ) -> CascadeResult<AgentActivityResponse> {
         cascade
             .get_agent_activity(
                 self.test_data.agent.clone(),
