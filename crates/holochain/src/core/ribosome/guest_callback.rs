@@ -1,7 +1,6 @@
 pub mod entry_defs;
 pub mod genesis_self_check;
 pub mod init;
-pub mod migrate_agent;
 pub mod post_commit;
 pub mod validate;
 use std::collections::VecDeque;

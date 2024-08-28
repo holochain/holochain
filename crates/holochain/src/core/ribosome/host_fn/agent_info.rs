@@ -7,8 +7,7 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-#[allow(clippy::extra_unused_lifetimes)]
-pub fn agent_info<'a>(
+pub fn agent_info(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
