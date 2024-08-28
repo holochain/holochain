@@ -6,12 +6,10 @@ use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};
 use url::Url;
 
-use chc_local::ChcLocal;
-
 pub use holochain_chc::*;
 
 /// Storage for the local CHC implementations
-pub static CHC_LOCAL_MAP: Lazy<parking_lot::Mutex<HashMap<CellId, Arc<ChcLocal>>>> =
+pub static CHC_LOCAL_MAP: Lazy<parking_lot::Mutex<HashMap<CellId, ChcImpl>>> =
     Lazy::new(|| parking_lot::Mutex::new(HashMap::new()));
 
 /// The URL which indicates that the fake local CHC service should be used,
@@ -60,12 +58,19 @@ pub fn build_chc(url: Option<&Url>, keystore: MetaLairClient, cell_id: &CellId) 
 #[cfg(test)]
 mod tests {
 
+    use std::sync::atomic::Ordering::SeqCst;
+    use std::sync::{atomic::AtomicBool, Arc};
+
     use hdk::prelude::*;
     use holochain_chc::*;
-    use holochain_conductor_api::conductor::ConductorConfig;
+    use holochain_conductor_api::conductor::{ConductorConfig, DpkiConfig};
+    use holochain_keystore::MetaLairClient;
+    use holochain_state::prelude::SourceChainError;
     use holochain_types::record::SignedActionHashedExt;
     use holochain_wasm_test_utils::TestWasm;
 
+    use crate::conductor::CellError;
+    use crate::core::workflow::WorkflowError;
     use crate::{
         conductor::{
             api::error::ConductorApiError,
@@ -74,6 +79,43 @@ mod tests {
         },
         sweettest::*,
     };
+
+    /// A CHC implementation that can be set up to error
+    struct FlakyChc {
+        chc: chc_local::ChcLocal,
+        pub fail: AtomicBool,
+    }
+
+    #[async_trait::async_trait]
+    impl ChainHeadCoordinator for FlakyChc {
+        type Item = SignedActionHashed;
+
+        async fn add_records_request(&self, request: AddRecordsRequest) -> ChcResult<()> {
+            if self.fail.load(SeqCst) {
+                Err(ChcError::Other("bad".to_string()))
+            } else {
+                self.chc.add_records_request(request).await
+            }
+        }
+
+        async fn get_record_data_request(
+            &self,
+            request: GetRecordsRequest,
+        ) -> ChcResult<Vec<(SignedActionHashed, Option<(Arc<EncryptedEntry>, Signature)>)>>
+        {
+            if self.fail.load(SeqCst) {
+                Err(ChcError::Other("bad".to_string()))
+            } else {
+                self.chc.get_record_data_request(request).await
+            }
+        }
+    }
+
+    impl ChainHeadCoordinatorExt for FlakyChc {
+        fn signing_info(&self) -> (MetaLairClient, AgentPubKey) {
+            unimplemented!()
+        }
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn simple_chc_sync() {
@@ -140,6 +182,68 @@ mod tests {
                 .unwrap()
                 .action_address,
             new_action_hash,
+        );
+    }
+
+    /// Test that general CHC failures prevent chain writes
+    #[tokio::test(flavor = "multi_thread")]
+    async fn simple_chc_error_prevents_write() {
+        use holochain::test_utils::inline_zomes::simple_crud_zome;
+
+        let config = ConductorConfig {
+            chc_url: Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL)),
+            dpki: DpkiConfig::disabled(),
+            ..Default::default()
+        };
+        let mut conductor = SweetConductor::from_config(config).await;
+
+        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+        let agent = SweetAgents::alice();
+        let cell_id = CellId::new(dna_file.dna_hash().clone(), agent.clone());
+
+        let flaky_chc = Arc::new(FlakyChc {
+            chc: chc_local::ChcLocal::new(conductor.keystore(), agent.clone()),
+            fail: true.into(),
+        });
+
+        // Set up the flaky CHC ahead of time
+        CHC_LOCAL_MAP
+            .lock()
+            .insert(cell_id.clone(), flaky_chc.clone());
+
+        // The app can't be installed, because of a CHC error during genesis
+        let err = conductor
+            .setup_app_for_agent("app", agent.clone(), [&dna_file])
+            .await
+            .unwrap_err();
+        matches::assert_matches!(
+            err,
+            ConductorApiError::ConductorError(ConductorError::GenesisFailed { .. })
+        );
+
+        // Make the CHC work again
+        flaky_chc.fail.store(false, SeqCst);
+
+        // Genesis can now complete
+        let (cell,) = conductor
+            .setup_app_for_agent("app", agent.clone(), [&dna_file])
+            .await
+            .unwrap()
+            .into_tuple();
+
+        // Make the CHC fail again
+        flaky_chc.fail.store(true, SeqCst);
+
+        // A zome call can't be made, because of a CHC error
+        let err = conductor
+            .call_fallible::<_, ActionHash>(&cell.zome("coordinator"), "create_unit", ())
+            .await
+            .unwrap_err();
+
+        matches::assert_matches!(
+            err,
+            ConductorApiError::CellError(CellError::WorkflowError(we))
+            if matches!(*we, WorkflowError::SourceChainError(SourceChainError::Other(_)))
         );
     }
 
