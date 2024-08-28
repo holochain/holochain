@@ -15,7 +15,7 @@ edition = "2021"
 hdi = { version = "=0.5.0-dev.13", path = "../hdi", features = ["trace"] }
 hdk_derive = { version = "^0.4.0-dev.12", path = "../hdk_derive" }
 holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash" }
-holochain_wasmer_guest = { git = "https://github.com/mattyg/holochain-wasmer.git", branch = "feat/wasmer-wamr-integration", package = "holochain_wasmer_guest" }
+holochain_wasmer_guest = "0.0.96"
 # it's important that we depend on holochain_zome_types with no default
 # features, both here AND in hdk_derive, to reduce code bloat
 holochain_zome_types = { version = "^0.4.0-dev.15", path = "../holochain_zome_types", default-features = false }

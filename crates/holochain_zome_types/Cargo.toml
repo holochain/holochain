@@ -28,7 +28,7 @@ serde_yaml = { version = "0.9", optional = true }
 subtle = "2"
 thiserror = "1.0.22"
 tracing = "0.1"
-holochain_wasmer_common = { git = "https://github.com/mattyg/holochain-wasmer.git", branch = "feat/wasmer-wamr-integration", package = "holochain_wasmer_common" }
+holochain_wasmer_common = "0.0.96"
 derive_more = "0.99"
 
 # fixturator dependencies

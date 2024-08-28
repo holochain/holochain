@@ -42,7 +42,7 @@ holochain_serialized_bytes = "=0.0.55"
 holochain_state = { version = "^0.4.0-dev.21", path = "../holochain_state" }
 holochain_types = { version = "^0.4.0-dev.21", path = "../holochain_types" }
 holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util" }
-holochain_wasmer_host = { git = "https://github.com/mattyg/holochain-wasmer.git", branch = "feat/wasmer-wamr-integration", package = "holochain_wasmer_host", default-features = false, features = ["error_as_host"] }
+holochain_wasmer_host = { version = "0.0.96", default-features = false, features = ["error_as_host"] }
 holochain_websocket = { version = "^0.4.0-dev.21", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.4.0-dev.15", path = "../holochain_zome_types", features = [
   "full",
