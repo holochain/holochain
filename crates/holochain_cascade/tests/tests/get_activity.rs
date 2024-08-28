@@ -238,8 +238,14 @@ async fn get_activity_with_warrants() {
 
     let warrant = {
         let action_pair = (
-            (td.agent_activity_ops[0].action().to_hash(), ::fixt::fixt!(Signature)),
-            (td.agent_activity_ops[1].action().to_hash(), ::fixt::fixt!(Signature)),
+            (
+                td.agent_activity_ops[0].action().to_hash(),
+                ::fixt::fixt!(Signature),
+            ),
+            (
+                td.agent_activity_ops[1].action().to_hash(),
+                ::fixt::fixt!(Signature),
+            ),
         );
         let p = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
             chain_author: td.agent.clone(),

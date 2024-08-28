@@ -1149,7 +1149,10 @@ impl CascadeImpl {
         };
 
         if !missing_entry_hashes.is_empty() {
-            trace!("There are {} missing entries to fetch", missing_entry_hashes.len());
+            trace!(
+                "There are {} missing entries to fetch",
+                missing_entry_hashes.len()
+            );
 
             let maybe_provided_entry_records = self
                 .get_concurrent(missing_entry_hashes, get_options)
