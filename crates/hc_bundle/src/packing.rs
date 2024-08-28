@@ -73,7 +73,10 @@ fn bundle_path_to_dir(path: &Path, extension: &'static str) -> HcBundleResult<Pa
 }
 
 #[cfg(feature = "wasmer_sys")]
-async fn build_preserialized_wasm<M: Manifest>(target_path: &PathBuf, bundle: &Bundle<M>) -> Result<(), HcBundleError> {
+async fn build_preserialized_wasm<M: Manifest>(
+    target_path: &PathBuf,
+    bundle: &Bundle<M>,
+) -> Result<(), HcBundleError> {
     let target_path_folder = target_path
         .parent()
         .expect("target_path should have a parent folder");
@@ -115,9 +118,11 @@ async fn build_preserialized_wasm<M: Manifest>(target_path: &PathBuf, bundle: &B
     Ok(())
 }
 
-
 #[cfg(feature = "wasmer_wamr")]
-async fn build_preserialized_wasm<M: Manifest>(_target_path: &PathBuf, _bundle: &Bundle<M>) -> Result<(), HcBundleError> {
+async fn build_preserialized_wasm<M: Manifest>(
+    _target_path: &PathBuf,
+    _bundle: &Bundle<M>,
+) -> Result<(), HcBundleError> {
     unimplemented!("The feature flag 'wasmer_sys' must be enabled to support compiling wasm");
 }
 

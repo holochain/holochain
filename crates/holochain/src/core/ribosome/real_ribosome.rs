@@ -394,22 +394,16 @@ impl RealRibosome {
     }
 
     #[cfg(feature = "wasmer_sys")]
-    pub fn preserialized_module(
-        &self,
-        path: &PathBuf
-    ) -> RibosomeResult<Arc<Module>> {
+    pub fn preserialized_module(&self, path: &PathBuf) -> RibosomeResult<Arc<Module>> {
         let module = holochain_wasmer_host::module::get_ios_module_from_file(path)?;
         Ok(Arc::new(module))
     }
 
     #[cfg(feature = "wasmer_wamr")]
-    pub fn preserialized_module(
-        &self,
-        _path: &PathBuf
-    ) -> RibosomeResult<Arc<Module>> {
+    pub fn preserialized_module(&self, _path: &PathBuf) -> RibosomeResult<Arc<Module>> {
         unimplemented!("The feature flag 'wasmer_sys' must be enabled to support compiling wasm");
     }
-    
+
     // Create a key for module cache.
     // Format: [WasmHash] as bytes
     // watch out for cache misses in the tests that make things slooow if you change this!
