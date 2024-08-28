@@ -9,8 +9,7 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-#[allow(clippy::extra_unused_lifetimes)]
-pub fn get_details<'a>(
+pub fn get_details(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetInput>,

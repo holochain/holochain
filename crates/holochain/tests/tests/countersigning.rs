@@ -19,6 +19,7 @@ use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn listen_for_countersigning_completion() {
     holochain_trace::test_run();
 

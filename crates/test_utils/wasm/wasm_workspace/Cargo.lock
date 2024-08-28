@@ -3,7 +3,7 @@
 version = 3
 
 [[package]]
-name = "agent_lineage"
+name = "agent_key_lineage"
 version = "0.1.0"
 dependencies = [
  "hdi",
@@ -594,7 +594,7 @@ checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
 name = "hdi"
-version = "0.5.0-dev.12"
+version = "0.5.0-dev.13"
 dependencies = [
  "getrandom",
  "hdk_derive",
@@ -610,7 +610,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.4.0-dev.14"
+version = "0.4.0-dev.15"
 dependencies = [
  "getrandom",
  "hdi",
@@ -758,7 +758,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.4.0-dev.14"
+version = "0.4.0-dev.15"
 dependencies = [
  "hdk",
  "serde",
@@ -803,7 +803,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.4.0-dev.14"
+version = "0.4.0-dev.15"
 dependencies = [
  "derive_builder",
  "derive_more",
@@ -2024,22 +2024,6 @@ dependencies = [
  "hdi",
  "hdk",
  "holochain_test_wasm_common",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_migrate_agent_fail"
-version = "0.0.1"
-dependencies = [
- "hdk",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_migrate_agent_pass"
-version = "0.0.1"
-dependencies = [
- "hdk",
  "serde",
 ]
 

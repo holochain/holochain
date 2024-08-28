@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
+use super::DpkiApi;
 use crate::conductor::conductor::ConductorServices;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::ConductorHandle;
@@ -13,7 +14,6 @@ use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_conductor_api::ZomeCall;
-use holochain_conductor_services::DpkiService;
 use holochain_keystore::MetaLairClient;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::WitnessNonceResult;
@@ -186,7 +186,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Call into DPKI
-    fn get_dpki(&self) -> Option<Arc<DpkiService>>;
+    fn get_dpki(&self) -> DpkiApi;
 
     /// Try to put the nonce from a calling agent in the db. Fails with a stale result if a newer nonce exists.
     async fn witness_nonce_from_calling_agent(
@@ -272,7 +272,7 @@ impl CellConductorReadHandleT for CellConductorApi {
         CellConductorApiT::get_entry_def(self, key)
     }
 
-    fn get_dpki(&self) -> Option<Arc<DpkiService>> {
+    fn get_dpki(&self) -> DpkiApi {
         CellConductorApiT::conductor_services(self).dpki
     }
 

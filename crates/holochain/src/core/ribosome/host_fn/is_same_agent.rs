@@ -8,8 +8,7 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-#[allow(clippy::extra_unused_lifetimes)]
-pub fn is_same_agent<'a>(
+pub fn is_same_agent(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: (AgentPubKey, AgentPubKey),

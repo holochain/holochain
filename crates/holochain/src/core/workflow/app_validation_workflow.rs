@@ -94,6 +94,7 @@
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
 
+use crate::conductor::api::DpkiApi;
 use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::Conductor;
 use crate::conductor::ConductorHandle;
@@ -110,7 +111,6 @@ use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
 
 pub use error::*;
-use holochain_conductor_services::DpkiService;
 pub use types::Outcome;
 
 use holo_hash::DhtOpHash;
@@ -196,7 +196,7 @@ pub async fn app_validation_workflow(
         // If not all ops have been validated, trigger app validation workflow again.
         if outcome_summary.validated < outcome_summary.ops_to_validate {
             // Trigger app validation workflow again in 100-3000 milliseconds.
-            let interval = 3000u64.saturating_sub(outcome_summary.missing as u64 * 100) + 100;
+            let interval = 2900u64.saturating_sub(outcome_summary.missing as u64 * 100) + 100;
             WorkComplete::Incomplete(Some(Duration::from_millis(interval)))
         } else {
             WorkComplete::Complete
@@ -551,7 +551,7 @@ pub async fn validate_op(
     network: &HolochainP2pDna,
     ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
-    dpki: Option<Arc<DpkiService>>,
+    dpki: DpkiApi,
     is_inline: bool,
 ) -> AppValidationOutcome<Outcome> {
     check_entry_def(op, &network.dna_hash(), conductor_handle)
@@ -756,7 +756,7 @@ async fn run_validation_callback(
     ribosome: &impl RibosomeT,
     workspace: HostFnWorkspaceRead,
     network: GenericNetwork,
-    dpki: Option<Arc<DpkiService>>,
+    dpki: DpkiApi,
     is_inline: bool,
 ) -> AppValidationResult<Outcome> {
     let validate_result = ribosome
