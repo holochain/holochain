@@ -21,11 +21,15 @@ pub const CHC_LOCAL_MAGIC_URL: &str = "local:";
 /// In particular, if the url is the magic string "local:", then a [`ChcLocal`]
 /// implementation will be used. Otherwise, if the url is set, and the CellId
 /// is "CHC-enabled", then a [`ChcRemote`] will be produced.
-pub fn build_chc(url: Option<&Url>, keystore: MetaLairClient, cell_id: &CellId) -> Option<ChcImpl> {
+pub fn build_chc(
+    base_url: Option<&Url>,
+    keystore: MetaLairClient,
+    cell_id: &CellId,
+) -> Option<ChcImpl> {
     // TODO: check if the agent key is Holo-hosted, otherwise return none
     let is_holo_agent = true;
     if is_holo_agent {
-        url.map(|url| {
+        base_url.map(|url| {
             #[cfg(feature = "chc")]
             {
                 fn chc_local(keystore: MetaLairClient, cell_id: CellId) -> ChcImpl {
@@ -36,8 +40,12 @@ pub fn build_chc(url: Option<&Url>, keystore: MetaLairClient, cell_id: &CellId) 
                         .clone()
                 }
 
-                fn chc_remote(url: Url, keystore: MetaLairClient, cell_id: &CellId) -> ChcImpl {
-                    Arc::new(chc_http::ChcHttp::new(url, keystore, cell_id))
+                fn chc_remote(
+                    base_url: Url,
+                    keystore: MetaLairClient,
+                    cell_id: &CellId,
+                ) -> ChcImpl {
+                    Arc::new(chc_http::ChcHttp::new(base_url, keystore, cell_id))
                 }
 
                 if url.as_str() == CHC_LOCAL_MAGIC_URL {

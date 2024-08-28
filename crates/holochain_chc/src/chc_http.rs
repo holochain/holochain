@@ -138,6 +138,7 @@ impl ChcHttp {
                     cell_id.agent_pubkey()
                 ))
                 .expect("invalid URL"),
+            client: reqwest::Client::new(),
         };
         Self {
             client,
@@ -150,6 +151,7 @@ impl ChcHttp {
 /// Client for a single CHC server
 pub struct ChcHttpClient {
     base_url: url::Url,
+    client: reqwest::Client,
 }
 
 impl ChcHttpClient {
@@ -162,10 +164,10 @@ impl ChcHttpClient {
     where
         T: serde::Serialize + std::fmt::Debug,
     {
-        let client = reqwest::Client::new();
         let url = self.url(path);
         let body = holochain_serialized_bytes::encode(body)?;
-        let res: reqwest::Response = client
+        let res: reqwest::Response = self
+            .client
             .post(url.clone())
             .body(body)
             .send()
