@@ -3,8 +3,11 @@
 # the gha workflow sets this globally
 # set this also for local executions so we get the same results
 F=RUSTFLAGS="-Dwarnings"
-A=slow_tests,build_wasms,sqlite-encrypted,chc,wasmer_sys
-B=slow_tests,build_wasms,sqlite-encrypted,chc,wasmer_wamr
+
+# All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
+DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,chc,build_demo
+A=$(DEFAULT_FEATURES),wasmer_sys
+B=$(DEFAULT_FEATURES),wasmer_wamr
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
