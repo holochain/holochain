@@ -15,10 +15,12 @@ runs:
 
     - name: install llvm & clang (ubuntu-latest)
       if: matrix.os == 'ubuntu-latest'
+      shell: bash
       run: sudo apt install -y build-essential cmake g++-multilib libgcc-11-dev lib32gcc-11-dev ccache
 
     - name: install llvm & clang (macos-latest & macos-13)
       if: matrix.os == 'macos-latest' || matrix.os == 'macos-13'
+      shell: bash
       run: brew install cmake
 
     - name: install llvm & clang (windows-latest)
