@@ -45,7 +45,6 @@ build-workspace-wasmer_sys:
 	$(F) cargo build \
 		--workspace \
 		--locked \
-		--exclude hdk_derive \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys --all-targets
 
@@ -53,7 +52,6 @@ build-workspace-wasmer_wamr:
 	$(F) cargo build \
 		--workspace \
 		--locked \
-		--exclude hdk_derive \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr --all-targets
 
