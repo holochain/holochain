@@ -13,10 +13,24 @@ runs:
       with:
         go-version: '=1.20.0'
 
-    - name: install llvm & clang
+    - name: install llvm & clang (windows-latest & ubuntu-latest)
+      if: matrix.os == 'windows-latest' || matrix.os == 'ubuntu-latest'
       uses: KyleMayes/install-llvm-action@v2
       with:
-        version: "17.0"
+        version: "18"
+
+    - name: install llvm & clang (macos-latest)
+      if: matrix.os == 'macos-latest'
+      uses: KyleMayes/install-llvm-action@v2
+      with:
+        version: "17"
+
+    - name: install llvm & clang (macos-13)
+      if: matrix.os == 'macos-13'
+      uses: KyleMayes/install-llvm-action@v2
+      with:
+        version: "15"
+
 
     - name: rust cache
       uses: Swatinem/rust-cache@v2
