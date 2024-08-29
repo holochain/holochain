@@ -42,7 +42,9 @@ holochain_serialized_bytes = "=0.0.55"
 holochain_state = { version = "^0.4.0-dev.21", path = "../holochain_state" }
 holochain_types = { version = "^0.4.0-dev.21", path = "../holochain_types" }
 holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util" }
-holochain_wasmer_host = { version = "0.0.96", default-features = false, features = ["error_as_host"] }
+holochain_wasmer_host = { version = "0.0.96", default-features = false, features = [
+  "error_as_host",
+] }
 holochain_websocket = { version = "^0.4.0-dev.21", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.4.0-dev.15", path = "../holochain_zome_types", features = [
   "full",
@@ -96,8 +98,8 @@ tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
 # Temporarily include a fork of wasmer from the git branch 'wamr', until it is officially released in wasmer v5
-hc-wasmer = { version="=4.3.6-hc.1", optional = true, default-features = false }
-hc-wasmer-middlewares = { version="=4.3.6-hc.1", optional = true, default-features = false }
+hc-wasmer = { version = "=4.3.6-hc.1", optional = true, default-features = false }
+hc-wasmer-middlewares = { version = "=4.3.6-hc.1", optional = true, default-features = false }
 wasmer = { version = "=4.3.6", optional = true, default-feature = false }
 wasmer-middlewares = { version = "=4.3.6", optional = true, default-feature = false }
 
@@ -287,8 +289,8 @@ wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
 wasmer_sys = [
   "dep:wasmer",
   "dep:wasmer-middlewares",
-  "wasmer/default", 
-  "holochain_wasmer_host/wasmer_sys"
+  "wasmer/default",
+  "holochain_wasmer_host/wasmer_sys",
 ]
 
 # Enable wasm interpreter
@@ -296,7 +298,7 @@ wasmer_sys = [
 wasmer_wamr = [
   "dep:hc-wasmer",
   "hc-wasmer/wamr",
-  "holochain_wasmer_host/wasmer_wamr"
+  "holochain_wasmer_host/wasmer_wamr",
 ]
 
 # Enable chain head coordination
