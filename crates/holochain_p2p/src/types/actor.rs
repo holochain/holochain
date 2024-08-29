@@ -3,6 +3,7 @@
 
 use crate::event::GetRequest;
 use crate::*;
+use holochain_chc::ChcImpl;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::prelude::ValidationReceiptBundle;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext;

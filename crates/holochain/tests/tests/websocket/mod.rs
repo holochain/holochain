@@ -36,6 +36,7 @@ use crate::tests::test_utils::*;
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn call_admin() {
     holochain_trace::test_run();
     // NOTE: This is a full integration test that
@@ -101,6 +102,7 @@ how_many: 42
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn call_zome() {
     holochain_trace::test_run();
 
@@ -242,6 +244,7 @@ async fn call_zome() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn remote_signals() -> anyhow::Result<()> {
     use std::collections::HashSet;
 

@@ -10,8 +10,7 @@ use wasmer::RuntimeError;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 
-#[allow(clippy::extra_unused_lifetimes)]
-pub fn update<'a>(
+pub fn update(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: UpdateInput,

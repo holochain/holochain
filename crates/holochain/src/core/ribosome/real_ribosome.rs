@@ -1,13 +1,13 @@
 use super::guest_callback::call_stream;
 use super::guest_callback::entry_defs::EntryDefsHostAccess;
 use super::guest_callback::init::InitHostAccess;
-use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
 use super::guest_callback::post_commit::PostCommitHostAccess;
 use super::guest_callback::validate::ValidateHostAccess;
 use super::host_fn::delete_clone_cell::delete_clone_cell;
 use super::host_fn::disable_clone_cell::disable_clone_cell;
 use super::host_fn::enable_clone_cell::enable_clone_cell;
 use super::host_fn::get_agent_activity::get_agent_activity;
+use super::host_fn::get_agent_key_lineage::get_agent_key_lineage;
 use super::host_fn::HostFnApi;
 use super::HostContext;
 use super::ZomeCallHostAccess;
@@ -23,8 +23,6 @@ use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckI
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
@@ -537,6 +535,11 @@ impl RealRibosome {
                 accept_countersigning_preflight_request,
             )
             .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
+            .with_host_function(
+                &mut ns,
+                "__hc__get_agent_key_lineage_1",
+                get_agent_key_lineage,
+            )
             .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
             .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
             .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
@@ -1120,14 +1123,6 @@ impl RibosomeT for RealRibosome {
         do_callback!(self, host_access, invocation, EntryDefsCallbackResult)
     }
 
-    async fn run_migrate_agent(
-        &self,
-        host_access: MigrateAgentHostAccess,
-        invocation: MigrateAgentInvocation,
-    ) -> RibosomeResult<MigrateAgentResult> {
-        do_callback!(self, host_access, invocation, MigrateAgentCallbackResult)
-    }
-
     fn zome_types(&self) -> &Arc<GlobalZomeTypes> {
         &self.zome_types
     }
@@ -1358,6 +1353,7 @@ pub mod wasm_test {
                 "__hc__enable_clone_cell_1",
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
+                "__hc__get_agent_key_lineage_1",
                 "__hc__get_details_1",
                 "__hc__get_link_details_1",
                 "__hc__get_links_1",

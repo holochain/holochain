@@ -15,8 +15,8 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
+use holochain_chc::*;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::params;
 use holochain_sqlite::rusqlite::Transaction;
@@ -268,13 +268,13 @@ impl SourceChain {
             .await
             .map_err(SourceChainError::other)?;
 
-            if let Err(err @ ChcError::InvalidChain(_, _)) = chc.add_records_request(payload).await
-            {
-                return Err(SourceChainError::ChcHeadMoved(
+            match chc.add_records_request(payload).await {
+                Err(e @ ChcError::InvalidChain(_, _)) => Err(SourceChainError::ChcHeadMoved(
                     "SourceChain::flush".into(),
-                    err,
-                ));
-            }
+                    e,
+                )),
+                e => e.map_err(SourceChainError::other),
+            }?;
         }
 
         let maybe_countersigned_entry = entries

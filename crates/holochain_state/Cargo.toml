@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state"
-version = "0.4.0-dev.20"
+version = "0.4.0-dev.21"
 description = "Holochain persisted state datatypes and functions"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -18,17 +18,18 @@ chrono = { version = "0.4.22", default-features = false, features = [
   "serde",
 ] }
 derive_more = "0.99"
-holochain_sqlite = { version = "^0.4.0-dev.18", path = "../holochain_sqlite" }
+holochain_sqlite = { version = "^0.4.0-dev.19", path = "../holochain_sqlite" }
 holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash", features = [
   "full",
 ] }
 fallible-iterator = "0.3.0"
-hc_sleuth = { version = "^0.4.0-dev.20", path = "../hc_sleuth" }
-holochain_keystore = { version = "^0.4.0-dev.18", path = "../holochain_keystore" }
+hc_sleuth = { version = "^0.4.0-dev.21", path = "../hc_sleuth" }
+holochain_chc = { version = "^0.1.0-dev.1", path = "../holochain_chc" }
+holochain_keystore = { version = "^0.4.0-dev.19", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_p2p = { version = "^0.4.0-dev.20", path = "../holochain_p2p" }
-holochain_types = { version = "^0.4.0-dev.20", path = "../holochain_types" }
-holochain_zome_types = { version = "^0.4.0-dev.14", path = "../holochain_zome_types", features = [
+holochain_p2p = { version = "^0.4.0-dev.21", path = "../holochain_p2p" }
+holochain_types = { version = "^0.4.0-dev.21", path = "../holochain_types" }
+holochain_zome_types = { version = "^0.4.0-dev.15", path = "../holochain_zome_types", features = [
   "full",
 ] }
 kitsune_p2p = { version = "^0.4.0-dev.19", path = "../kitsune_p2p/kitsune_p2p" }
@@ -79,6 +80,7 @@ default = []
 fuzzing = ["holochain_types/fuzzing", "holochain_zome_types/fuzzing"]
 
 test_utils = [
+  "holochain_chc/test_utils",
   "holochain_keystore/test_utils",
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",

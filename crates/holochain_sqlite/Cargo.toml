@@ -1,6 +1,6 @@
 [package]
 name = "holochain_sqlite"
-version = "0.4.0-dev.18"
+version = "0.4.0-dev.19"
 description = "Abstractions for persistence of Holochain state via SQLite"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -22,7 +22,7 @@ holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util", feature
   "backtrace",
   "time",
 ], optional = true }
-holochain_zome_types = { version = "^0.4.0-dev.14", path = "../holochain_zome_types" }
+holochain_zome_types = { version = "^0.4.0-dev.15", path = "../holochain_zome_types" }
 holochain_nonce = { version = "^0.4.0-dev.6", path = "../holochain_nonce" }
 kitsune_p2p_bin_data = { version = "^0.4.0-dev.11", path = "../kitsune_p2p/bin_data" }
 kitsune_p2p_dht_arc = { version = "^0.4.0-dev.9", path = "../kitsune_p2p/dht_arc" }
