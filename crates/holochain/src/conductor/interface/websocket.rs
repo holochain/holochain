@@ -563,6 +563,7 @@ pub mod test {
             existing_cells: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
+allow_throwaway_random_agent_key: true,
         }));
         let response: AdminResponse = admin_tx.request(request).await.unwrap();
         let app_info = match response {

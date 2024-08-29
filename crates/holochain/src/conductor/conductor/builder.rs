@@ -123,7 +123,7 @@ impl ConductorBuilder {
         };
 
         let keystore = if let Some(keystore) = builder.keystore.clone() {
-            keystore
+            keystore.clone()
         } else {
             pub(crate) fn warn_no_encryption() {
                 #[cfg(not(feature = "sqlite-encrypted"))]

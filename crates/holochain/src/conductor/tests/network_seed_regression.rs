@@ -68,6 +68,7 @@ async fn network_seed_regression() {
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -82,6 +83,7 @@ async fn network_seed_regression() {
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -309,6 +311,7 @@ impl TestCase {
                 membrane_proofs: Default::default(),
                 existing_cells: Default::default(),
                 ignore_genesis_failure: false,
+                allow_throwaway_random_agent_key: true,
             })
             .await
             .unwrap();

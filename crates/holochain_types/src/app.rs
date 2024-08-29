@@ -166,6 +166,15 @@ pub struct InstallAppPayload {
     /// This can be useful for using `graft_records_onto_source_chain`, or for diagnostics.
     #[serde(default)]
     pub ignore_genesis_failure: bool,
+
+    /// By default, if an agent key is not specified, the conductor will generate a new one by
+    /// deriving a key from the device seed specified in the config. If the device seed is not set,
+    /// app installation will fail. If this flag is set, a random key will be created if no device
+    /// seed is present. This is a risky decision, because it will mean that if you lose control of
+    /// this device, you will not be able to regenerate your agent key from the device seed.
+    /// Use only in situations where you know that this is a throwaway key!
+    #[serde(default)]
+    pub allow_throwaway_random_agent_key: bool,
 }
 
 /// Alias

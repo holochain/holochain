@@ -282,6 +282,7 @@ pub async fn register_and_install_dna_named(
         membrane_proofs: Default::default(),
         existing_cells: Default::default(),
         ignore_genesis_failure: false,
+        allow_throwaway_random_agent_key: true,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);

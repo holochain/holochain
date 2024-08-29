@@ -1463,7 +1463,15 @@ mod app_impls {
             };
 
             let app = self
-                .install_app_common(installed_app_id, manifest, agent.clone(), false, ops, false)
+                .install_app_common(
+                    installed_app_id,
+                    manifest,
+                    agent.clone(),
+                    false,
+                    ops,
+                    false,
+                    true,
+                )
                 .await?;
 
             Ok(app.agent_key().clone())
@@ -1478,6 +1486,8 @@ mod app_impls {
             defer_memproofs: bool,
             ops: AppRoleResolution,
             ignore_genesis_failure: bool,
+
+            allow_throwaway_random_agent_key: bool,
         ) -> ConductorResult<InstalledApp> {
             let dpki = self.running_services().dpki.clone();
 
@@ -1543,6 +1553,8 @@ mod app_impls {
                     };
 
                     (AgentPubKey::from_raw_32(seed), Some(derivation))
+                } else if allow_throwaway_random_agent_key {
+                    (self.keystore.new_sign_keypair_random().await?, None)
                 } else {
                     return Err(ConductorError::other("Unable to install app. If `device_seed_lair_tag` is not specified in config, an agent key must be provided when installing an app."));
                 };
@@ -1665,8 +1677,6 @@ mod app_impls {
             self: Arc<Self>,
             payload: InstallAppPayload,
         ) -> ConductorResult<InstalledApp> {
-            let ignore_genesis_failure = payload.ignore_genesis_failure;
-
             let InstallAppPayload {
                 source,
                 agent_key,
@@ -1674,7 +1684,8 @@ mod app_impls {
                 membrane_proofs,
                 existing_cells,
                 network_seed,
-                ..
+                ignore_genesis_failure,
+                allow_throwaway_random_agent_key,
             } = payload;
 
             let bundle = {
@@ -1729,6 +1740,7 @@ mod app_impls {
                     defer_memproofs,
                     ops,
                     ignore_genesis_failure,
+                    allow_throwaway_random_agent_key,
                 )
                 .await
         }

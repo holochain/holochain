@@ -54,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
             existing_cells: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
+allow_throwaway_random_agent_key: true,
         };
 
         let r = AdminRequest::InstallApp(Box::new(payload));
