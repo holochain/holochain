@@ -1024,7 +1024,7 @@ impl CascadeImpl {
     /// Hashes are requested from the authority and cache for valid chains.
     ///
     /// Query:
-    /// - [include_entries](ChainQueryFilter::include_entries) will also fetch the entries in parallel (requires include_full_actions)
+    /// - [include_entries](ChainQueryFilter::include_entries) will also fetch the entries in parallel (requires include_full_records)
     /// - [sequence_range](ChainQueryFilter::sequence_range) will get all the activity in the exclusive range
     /// - [action_type](ChainQueryFilter::action_type) and [entry_type](ChainQueryFilter::entry_type) will filter the activity (requires include_full_actions)
     ///
@@ -1032,8 +1032,9 @@ impl CascadeImpl {
     /// - [include_valid_activity](GetActivityOptions::include_valid_activity) will include the valid chain hashes.
     /// - [include_rejected_activity](GetActivityOptions::include_rejected_activity) will include the invalid chain hashes.
     /// - [include_warrants](GetActivityOptions::include_warrants) will include the warrants for this agent.
-    /// - [include_full_records](GetActivityOptions::include_full_records) will also fetch the entries in parallel (requires include_full_actions)
-    /// - [include_full_actions](GetActivityOptions::include_full_actions) will fetch the valid actions in parallel (requires include_valid_activity)
+    /// - [include_full_records](GetActivityOptions::include_full_records) will fetch the full records for each action matching the query.
+    ///   This is only effective if [include_valid_activity](GetActivityOptions::include_valid_activity) or [include_rejected_activity](GetActivityOptions::include_rejected_activity) is true.
+    ///   Even when this is set, entries will only be fetched if [include_entries](ChainQueryFilter::include_entries) is also true.
     #[cfg_attr(
         feature = "instrument",
         tracing::instrument(skip(self, agent, query, options))
@@ -1103,7 +1104,7 @@ impl CascadeImpl {
         // If records were requested then the activity authority might not have had all the entries.
         // That becomes more likely for new records as the number of agents on a network increases.
         // So we need to fill in the missing entries.
-        if options.include_full_records {
+        if options.include_full_records && query.include_entries {
             tracing::debug!("Trying to fill missing entries for agent activity");
             valid_activity = self
                 .fill_missing_chain_item_entries(valid_activity, options.get_options.clone())
