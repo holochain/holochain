@@ -1,6 +1,7 @@
 // use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use holo_hash::ActionHash;
 use holo_hash::EntryHash;
+use holochain_chc::ChcError;
 use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::error::DatabaseError;

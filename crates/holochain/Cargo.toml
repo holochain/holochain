@@ -33,6 +33,7 @@ holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash", features = [
   "full",
 ] }
 holochain_cascade = { version = "^0.4.0-dev.21", path = "../holochain_cascade" }
+holochain_chc = { version = "^0.1.0-dev.1", path = "../holochain_chc", default-features = false }
 holochain_conductor_api = { version = "^0.4.0-dev.21", path = "../holochain_conductor_api" }
 holochain_deepkey_dna = "0.0.8-dev.1"
 holochain_keystore = { version = "^0.4.0-dev.19", path = "../holochain_keystore", default-features = false }
@@ -85,7 +86,7 @@ thiserror = "1.0.22"
 tokio = { version = "1.36.0", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["sync", "net"] }
 task-motel = "0.1.0"
-tracing = "0.1.37"
+tracing = "0.1"
 tracing-futures = "0.2.5"
 tracing-subscriber = "0.3.16"
 url = "2.4"
@@ -97,7 +98,7 @@ wasmer = "=4.3.1"
 wasmer-middlewares = "=4.3.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-# Dependencies for test_utils
+# Dependencies for test_utils / other optional deps
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
 contrafact = { version = "0.2.0-rc.1", optional = true }
 diff = { version = "0.1", optional = true }
@@ -188,7 +189,7 @@ path = "src/bin/holochain/main.rs"
 workspace = true
 
 [features]
-default = ["sqlite-encrypted", "tx2", "tx5", "metrics_influxive"]
+default = ["chc", "sqlite-encrypted", "tx2", "tx5", "metrics_influxive"]
 
 tx2 = ["kitsune_p2p/tx2"]
 tx5 = ["kitsune_p2p/tx5", "tx5-go-pion-turn"]
@@ -279,7 +280,7 @@ sqlite = [
 wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
 
 # Enable chain head coordination
-chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_types/chc"]
+chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_chc/http"]
 
 # Transitional feature flag for code that is only ready when DPKI integration lands.
 dpki = []

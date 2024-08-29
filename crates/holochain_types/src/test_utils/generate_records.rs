@@ -1,8 +1,7 @@
+use crate::prelude::*;
 use contrafact::Fact;
 use holo_hash::{AgentPubKey, EntryHash};
 use holochain_keystore::MetaLairClient;
-use holochain_types::record::SignedActionHashedExt;
-use holochain_zome_types::prelude::*;
 
 /// Generate a chain of Records which constitutes a valid source chain:
 /// - Each action will refer to the one prior

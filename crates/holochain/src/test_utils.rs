@@ -67,8 +67,6 @@ pub use wait_for::*;
 
 mod big_stack_test;
 
-mod generate_records;
-pub use generate_records::*;
 use holochain_types::websocket::AllowedOrigins;
 
 use self::consistency::request_published_ops;

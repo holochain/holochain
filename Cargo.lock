@@ -2918,6 +2918,7 @@ dependencies = [
  "holo_hash",
  "holochain",
  "holochain_cascade",
+ "holochain_chc",
  "holochain_conductor_api",
  "holochain_conductor_services",
  "holochain_deepkey_dna",
@@ -3010,6 +3011,7 @@ dependencies = [
  "futures",
  "holo_hash",
  "holochain_cascade",
+ "holochain_chc",
  "holochain_nonce",
  "holochain_p2p",
  "holochain_serialized_bytes",
@@ -3029,6 +3031,34 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "holochain_chc"
+version = "0.1.0-dev.1"
+dependencies = [
+ "async-trait",
+ "derive_more",
+ "fixt",
+ "futures",
+ "getrandom 0.2.15",
+ "holochain_chc",
+ "holochain_keystore",
+ "holochain_nonce",
+ "holochain_serialized_bytes",
+ "holochain_types",
+ "must_future",
+ "one_err",
+ "parking_lot 0.12.3",
+ "pretty_assertions",
+ "reqwest 0.12.5",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "url",
 ]
 
 [[package]]
@@ -3094,6 +3124,7 @@ dependencies = [
  "chrono",
  "clap 4.5.9",
  "futures",
+ "holochain_chc",
  "holochain_conductor_api",
  "holochain_p2p",
  "holochain_trace",
@@ -3275,6 +3306,7 @@ dependencies = [
  "ghost_actor",
  "hc_sleuth",
  "holo_hash",
+ "holochain_chc",
  "holochain_keystore",
  "holochain_nonce",
  "holochain_p2p",
@@ -3395,6 +3427,7 @@ dependencies = [
  "fixt",
  "hc_sleuth",
  "holo_hash",
+ "holochain_chc",
  "holochain_keystore",
  "holochain_nonce",
  "holochain_p2p",

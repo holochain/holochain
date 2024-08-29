@@ -1,22 +1,78 @@
 //! Defines a client for use with a remote HTTP-based CHC.
+//!
+//! The server must implement the following endpoints:
+//!
+//! ## `POST /add_records/{dna_hash}/{agent_pubkey}`
+//!
+//! Adds a list of records to the CHC.
+//!
+//! The CHC state will only be altered if a 200 status code is returned, which requires that:
+//! - the new records are valid
+//! - the signature matches the agent pubkey
+//!
+//! If the new records would cause a fork of the CHC chain but are otherwise valid, a 409 status code is returned
+//! along with the sequence number and hash of the fork point. This code indicates to the client that the local
+//! state should be synchronized with the CHC state before attempting to add the records again.
+//! (by calling `get_record_data` and then "grafting" the records onto the local chain).
+//!
+//! If there is some other problem with the input record data which prevents it from being added to the CHC state,
+//! e.g. the new records themselves do not constitute a valid hash chain, or the signature does not match,
+//! a 498 status code may be returned to indicate that the input is bad and must be fixed.
+//!
+//! Any other error code can be returned to indicate a server error.
+//!
+//! Body: msgpack-encoded [`AddRecordsRequest`]
+//! Response:
+//! - 200: (no data)
+//! - 409: msgpack-encoded `(u32, ActionHash)` (seq number and hash of fork point)
+//! - 498: msgpack-encoded `u32` (seq number of last record in the CHC chain)
+//! - other: error message as plaintext string
+//!
+//! ## `POST /get_record_data/{dna_hash}/{agent_pubkey}`
+//!
+//! Returns CHC data starting from the record *after* the given hash.
+//!
+//! If the given hash is not present in CHC state, Error code 498 should be returned with no data.
+//!
+//! A nonce must be provided in the request body to prevent replay attacks. The nonce need
+//! not be truly random, just unique.
+//!
+//! **NOTE**: the `EncryptedEntry` data is not currently encrypted. Encryption is a TODO!
+//!
+//! Body: msgpack-encoded [`GetRecordsRequest`]
+//! Response:
+//! - 200: msgpack-encoded `Vec<(SignedActionHashed, Option<(Arc<EncryptedEntry>, Signature)>)>`
+//! - 498: (no data)
+//! - other: error message as plaintext string
+//!
+//! ## Notes (for both endpoints)
+//!
+//! The `{dna_hash}` and `{agent_pubkey}` in the URL are base64-encoded in the standard way.
+//! (See the `Display` impl for `DnaHash` and `AgentPubKey`.)
+//!
+//! The request body is serialized using [`holochain_serialized_bytes::encode`] and can be deserialized using any
+//! msgpack decoder.
+//!
+//! Any msgpack-encoded response must be encoded in a way that can deserialized by [`holochain_serialized_bytes::decode`].
+//! Most standard msgpack encoders should work just fine for the return types being used here.
+//!
 
 use std::sync::Arc;
 
-use holo_hash::{ActionHash, AgentPubKey};
+use super::ChainHeadCoordinatorExt;
+use super::*;
 use holochain_keystore::MetaLairClient;
-use holochain_types::chc::{ChainHeadCoordinator, ChcError, ChcResult};
-use holochain_types::prelude::*;
 use url::Url;
 
 /// An HTTP client which can talk to a remote CHC implementation
-pub struct ChcRemote {
-    client: ChcRemoteClient,
+pub struct ChcHttp {
+    client: ChcHttpClient,
     keystore: MetaLairClient,
     agent: AgentPubKey,
 }
 
 #[async_trait::async_trait]
-impl ChainHeadCoordinator for ChcRemote {
+impl ChainHeadCoordinator for ChcHttp {
     type Item = SignedActionHashed;
 
     async fn add_records_request(&self, request: AddRecordsRequest) -> ChcResult<()> {
@@ -65,16 +121,16 @@ impl ChainHeadCoordinator for ChcRemote {
     }
 }
 
-impl ChainHeadCoordinatorExt for ChcRemote {
-    fn signing_info(&self) -> (MetaLairClient, holo_hash::AgentPubKey) {
+impl ChainHeadCoordinatorExt for ChcHttp {
+    fn signing_info(&self) -> (MetaLairClient, AgentPubKey) {
         (self.keystore.clone(), self.agent.clone())
     }
 }
 
-impl ChcRemote {
+impl ChcHttp {
     /// Constructor
     pub fn new(base_url: Url, keystore: MetaLairClient, cell_id: &CellId) -> Self {
-        let client = ChcRemoteClient {
+        let client = ChcHttpClient {
             base_url: base_url
                 .join(&format!(
                     "{}/{}/",
@@ -82,6 +138,7 @@ impl ChcRemote {
                     cell_id.agent_pubkey()
                 ))
                 .expect("invalid URL"),
+            client: reqwest::Client::new(),
         };
         Self {
             client,
@@ -92,11 +149,12 @@ impl ChcRemote {
 }
 
 /// Client for a single CHC server
-pub struct ChcRemoteClient {
+pub struct ChcHttpClient {
     base_url: url::Url,
+    client: reqwest::Client,
 }
 
-impl ChcRemoteClient {
+impl ChcHttpClient {
     fn url(&self, path: &str) -> String {
         assert!(!path.starts_with('/'));
         self.base_url.join(path).expect("invalid URL").to_string()
@@ -106,10 +164,10 @@ impl ChcRemoteClient {
     where
         T: serde::Serialize + std::fmt::Debug,
     {
-        let client = reqwest::Client::new();
         let url = self.url(path);
         let body = holochain_serialized_bytes::encode(body)?;
-        let res: reqwest::Response = client
+        let res: reqwest::Response = self
+            .client
             .post(url.clone())
             .body(body)
             .send()
@@ -127,7 +185,7 @@ fn extract_string(e: reqwest::Error) -> ChcError {
 mod tests {
 
     use super::*;
-    use crate::test_utils::valid_arbitrary_chain;
+    use holochain_types::test_utils::valid_arbitrary_chain;
     use pretty_assertions::assert_eq;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -136,7 +194,7 @@ mod tests {
         let keystore = holochain_keystore::test_keystore();
         let agent = fake_agent_pubkey_1();
         let cell_id = CellId::new(::fixt::fixt!(DnaHash), agent.clone());
-        let chc = Arc::new(ChcRemote::new(
+        let chc = Arc::new(ChcHttp::new(
             url::Url::parse("http://127.0.0.1:40845/").unwrap(),
             // url::Url::parse("https://chc.dev.holotest.net/v1/").unwrap(),
             keystore.clone(),

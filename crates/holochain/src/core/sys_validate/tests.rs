@@ -33,9 +33,6 @@ use crate::core::workflow::sys_validation_workflow::sys_validate_record;
 use crate::sweettest::SweetAgents;
 use crate::sweettest::SweetConductor;
 use crate::test_utils::fake_genesis_for_agent;
-use crate::test_utils::rebuild_record;
-use crate::test_utils::sign_record;
-use crate::test_utils::valid_arbitrary_chain;
 use ::fixt::prelude::*;
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
@@ -55,6 +52,9 @@ use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
+use holochain_types::test_utils::rebuild_record;
+use holochain_types::test_utils::sign_record;
+use holochain_types::test_utils::valid_arbitrary_chain;
 use holochain_zome_types::facts::ActionRefMut;
 use holochain_zome_types::Action;
 use matches::assert_matches;
@@ -758,10 +758,10 @@ fn valid_chain_test() {
         let err = validate_chain(fork.iter(), &None).expect_err("Forked chain");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::HashMismatch(_),
                 ..
-            }))
+            }
         );
 
         // Test a chain with the wrong seq.
@@ -770,12 +770,10 @@ fn valid_chain_test() {
         let err = validate_chain(wrong_seq.iter(), &None).expect_err("Wrong seq");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::InvalidSeq(_, _),
                 ..
             }
-
-            ))
         );
 
         // Test a wrong root gets rejected.
@@ -787,12 +785,10 @@ fn valid_chain_test() {
         let err = validate_chain(wrong_root.iter(), &None).expect_err("Wrong root");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::InvalidRoot,
                 ..
             }
-
-            ))
         );
 
         // Test without dna at root gets rejected.
@@ -803,12 +799,10 @@ fn valid_chain_test() {
         let err = validate_chain(dna_not_at_root.iter(), &None).expect_err("Dna not at root");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::MissingPrev,
                 ..
             }
-
-            ))
         );
 
         // Test if there is a existing head that a dna in the new chain is rejected.
@@ -816,12 +810,10 @@ fn valid_chain_test() {
         let err = validate_chain(actions.iter(), &Some((hash, 0))).expect_err("Dna not at root");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::MissingPrev,
                 ..
             }
-
-            ))
         );
 
         // Check a sequence that is broken gets rejected.
@@ -836,12 +828,10 @@ fn valid_chain_test() {
         .expect_err("Wrong seq");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::InvalidSeq(_, _),
                 ..
             }
-
-            ))
         );
 
         // Check the correct sequence gets accepted with a root.
@@ -856,12 +846,12 @@ fn valid_chain_test() {
         let err = validate_chain(correct_seq.iter(), &Some((hash, 0))).expect_err("Hash is wrong");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::HashMismatch(_),
                 ..
             }
 
-            ))
+
         );
     });
 }
