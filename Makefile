@@ -41,7 +41,7 @@ static-doc:
 # but also ensures targets like benchmarks remain buildable.
 # NOTE: excludes must match test-workspace nextest params,
 #       otherwise some rebuilding will occur due to resolver = "2"
-build-workspace-wasmer_sys
+build-workspace-wasmer_sys:
 	$(F) cargo build \
 		--workspace \
 		--locked \
@@ -49,7 +49,7 @@ build-workspace-wasmer_sys
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys --all-targets
 
-build-workspace-wasmer_wamr
+build-workspace-wasmer_wamr:
 	$(F) cargo build \
 		--workspace \
 		--locked \
