@@ -3,7 +3,8 @@
 # the gha workflow sets this globally
 # set this also for local executions so we get the same results
 F=RUSTFLAGS="-Dwarnings"
-A=slow_tests,build_wasms,sqlite-encrypted,chc
+A=slow_tests,build_wasms,sqlite-encrypted,chc,wasmer_sys
+B=slow_tests,build_wasms,sqlite-encrypted,chc,wasmer_wamr
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
@@ -45,6 +46,11 @@ build-workspace:
 		--locked \
 		--exclude hdk_derive \
 		--features $(A) --all-targets
+	$(F) cargo build \
+		--workspace \
+		--locked \
+		--exclude hdk_derive \
+		--features $(B) --all-targets
 
 # execute tests on all creates
 test-workspace:
@@ -54,6 +60,11 @@ test-workspace:
 		--exclude hdk_derive \
 		--locked \
 		--features $(A)
+	$(F) RUST_BACKTRACE=1 cargo nextest run \
+		--workspace \
+		--exclude hdk_derive \
+		--locked \
+		--features $(B)
 	# hdk_derive cannot currently be tested via nextest
 	# https://github.com/nextest-rs/nextest/issues/267
 	$(F) cargo build \
