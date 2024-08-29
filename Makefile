@@ -45,11 +45,13 @@ build-workspace:
 		--workspace \
 		--locked \
 		--exclude hdk_derive \
+		--no-default-features \
 		--features $(A) --all-targets
 	$(F) cargo build \
 		--workspace \
 		--locked \
 		--exclude hdk_derive \
+		--no-default-features \
 		--features $(B) --all-targets
 
 # execute tests on all creates
@@ -59,11 +61,13 @@ test-workspace:
 		--workspace \
 		--exclude hdk_derive \
 		--locked \
+		--no-default-features \
 		--features $(A)
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--exclude hdk_derive \
 		--locked \
+		--no-default-features \
 		--features $(B)
 	# hdk_derive cannot currently be tested via nextest
 	# https://github.com/nextest-rs/nextest/issues/267
