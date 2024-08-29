@@ -5,9 +5,7 @@
 F=RUSTFLAGS="-Dwarnings"
 
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
-DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,chc,build_demo
-A=$(DEFAULT_FEATURES),wasmer_sys
-B=$(DEFAULT_FEATURES),wasmer_wamr
+DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,chc,hc_demo_cli/build_demo
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
@@ -43,42 +41,35 @@ static-doc:
 # but also ensures targets like benchmarks remain buildable.
 # NOTE: excludes must match test-workspace nextest params,
 #       otherwise some rebuilding will occur due to resolver = "2"
-build-workspace:
+build-workspace-wasmer_sys
 	$(F) cargo build \
 		--workspace \
 		--locked \
 		--exclude hdk_derive \
 		--no-default-features \
-		--features $(A) --all-targets
+		--features $(DEFAULT_FEATURES),wasmer_sys --all-targets
+
+build-workspace-wasmer_wamr
 	$(F) cargo build \
 		--workspace \
 		--locked \
 		--exclude hdk_derive \
 		--no-default-features \
-		--features $(B) --all-targets
+		--features $(DEFAULT_FEATURES),wasmer_wamr --all-targets
 
 # execute tests on all creates
-test-workspace:
+test-workspace-wasmer_sys:
 	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
-		--exclude hdk_derive \
 		--locked \
 		--no-default-features \
-		--features $(A)
+		--features $(DEFAULT_FEATURES),wasmer_sys
+
+test-workspace-wasmer_wamr:
+	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
-		--exclude hdk_derive \
 		--locked \
 		--no-default-features \
-		--features $(B)
-	# hdk_derive cannot currently be tested via nextest
-	# https://github.com/nextest-rs/nextest/issues/267
-	$(F) cargo build \
-		--manifest-path crates/hdk_derive/Cargo.toml \
-		--locked \
-		--all-features --all-targets
-	$(F) RUST_BACKTRACE=1 cargo test \
-		--manifest-path crates/hdk_derive/Cargo.toml \
-		--locked \
-		--all-features
+		--features $(DEFAULT_FEATURES),wasmer_wamr

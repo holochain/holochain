@@ -20,9 +20,6 @@ jobs:
     name: static
     runs-on: macos-latest # currently faster than ubuntu-latest
     steps:
-      - name: checkout
-        uses: actions/checkout@v4
-
       - name: 'Common Test Setup Actions'
         uses: ./.github/actions/common-pre
 
@@ -53,6 +50,10 @@ jobs:
           macos-13,
           windows-latest,
         ]
+        wasmer-feature: [
+          wasmer_sys,
+          wasmer_wamr
+        ]
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -66,11 +67,11 @@ jobs:
           $env:OPENSSL_NO_VENDOR="1"
           $env:OPENSSL_DIR="$(pwd)\vcpkg\packages\openssl_x64-windows-release"
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
-          make build-workspace
+          make build-workspace-${{ matrix.wasmer-feature }}
 
       - name: build
         if: matrix.os != 'windows-latest'
-        run: make build-workspace
+        run: make build-workspace-${{ matrix.wasmer-feature }}
 
       - name: test windows
         if: matrix.os == 'windows-latest'
@@ -78,11 +79,11 @@ jobs:
           $env:OPENSSL_NO_VENDOR="1"
           $env:OPENSSL_DIR="$(pwd)\vcpkg\packages\openssl_x64-windows-release"
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
-          make test-workspace
+          make test-workspace-${{ matrix.wasmer-feature }}
 
       - name: test
         if: matrix.os != 'windows-latest'
-        run: make test-workspace
+        run: make test-workspace-${{ matrix.wasmer-feature }}
 
       - name: 'Common Test Teardown Actions'
         uses: ./.github/actions/common-post
