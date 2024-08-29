@@ -1,8 +1,8 @@
 use crate::error::HcBundleError;
 use holochain_util::ffs;
+use holochain_wasmer_host::module::build_ios_module;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
-use holochain_wasmer_host::module::build_ios_module;
 use tracing::info;
 
 pub(super) async fn build_preserialized_wasm<M: Manifest>(
