@@ -23,10 +23,6 @@
 //!
 #![warn(missing_docs)]
 
-use std::collections::HashSet;
-use std::sync::Arc;
-use std::time::Instant;
-
 use error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -55,14 +51,16 @@ use holochain_state::query::PrivateDataQuery;
 use holochain_state::scratch::SyncScratch;
 use metrics::create_cascade_duration_metric;
 use metrics::CascadeDurationMetric;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
+use std::time::Instant;
 use tracing::*;
 
 #[cfg(feature = "test_utils")]
 use kitsune_p2p::dependencies::kitsune_p2p_types::box_fut_plain;
 #[cfg(feature = "test_utils")]
 use kitsune_p2p::dependencies::kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
-#[cfg(feature = "test_utils")]
-use std::collections::HashMap;
 
 pub mod authority;
 pub mod error;
