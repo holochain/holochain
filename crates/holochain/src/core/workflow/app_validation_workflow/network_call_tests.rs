@@ -65,7 +65,7 @@ async fn get_agent_activity_test() {
         });
 
         AgentActivityResponse {
-            valid_activity: ChainItems::FullActions(valid_activity),
+            valid_activity: ChainItems::Full(valid_activity),
             rejected_activity: ChainItems::NotRequested,
             status,
             highest_observed,
@@ -76,7 +76,7 @@ async fn get_agent_activity_test() {
     let get_expected = || {
         let mut activity = get_expected_full();
         let valid_activity =
-            unwrap_to::unwrap_to!(activity.valid_activity => ChainItems::FullActions)
+            unwrap_to::unwrap_to!(activity.valid_activity => ChainItems::Full)
                 .clone()
                 .into_iter()
                 .map(|shh| (shh.action().action_seq(), shh.action_address().clone()))
@@ -88,7 +88,7 @@ async fn get_agent_activity_test() {
     // Helper closure for changing to AgentActivityResponse<Record> type
     let get_expected_cascade = |activity: AgentActivityResponse| {
         let valid_activity = match activity.valid_activity {
-            ChainItems::FullActions(actions) => ChainItems::FullActions(
+            ChainItems::Full(actions) => ChainItems::Full(
                 actions
                     .into_iter()
                     .map(|shh| Record::new(shh, None))
@@ -98,7 +98,7 @@ async fn get_agent_activity_test() {
             ChainItems::NotRequested => ChainItems::NotRequested,
         };
         let rejected_activity = match activity.rejected_activity {
-            ChainItems::FullActions(actions) => ChainItems::FullActions(
+            ChainItems::Full(actions) => ChainItems::Full(
                 actions
                     .into_iter()
                     .map(|shh| Record::new(shh, None))
@@ -206,11 +206,11 @@ async fn get_agent_activity_test() {
         )
         .await
         .expect("Failed to get any activity from alice");
-    let agent_activity = unwrap_to::unwrap_to!(r.valid_activity => ChainItems::FullActions).clone();
+    let agent_activity = unwrap_to::unwrap_to!(r.valid_activity => ChainItems::Full).clone();
 
     let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
     let expected_activity: Vec<_> =
-        unwrap_to::unwrap_to!(get_expected_full().valid_activity => ChainItems::FullActions)
+        unwrap_to::unwrap_to!(get_expected_full().valid_activity => ChainItems::Full)
             .into_iter()
             .cloned()
             // We are expecting the full records with entries
@@ -299,7 +299,7 @@ async fn get_agent_activity_test() {
     // This time we expect only activity that matches the entry type
     let mut expected_activity = get_expected_cascade(get_expected_full());
     let activity: Vec<_> =
-        unwrap_to::unwrap_to!(expected_activity.valid_activity => ChainItems::FullActions)
+        unwrap_to::unwrap_to!(expected_activity.valid_activity => ChainItems::Full)
             .into_iter()
             .filter(|a| {
                 a.action()
@@ -310,7 +310,7 @@ async fn get_agent_activity_test() {
             .cloned()
             // We are expecting the full records with entries
             .collect();
-    expected_activity.valid_activity = ChainItems::FullActions(activity);
+    expected_activity.valid_activity = ChainItems::Full(activity);
 
     assert_eq!(agent_activity, expected_activity);
 
