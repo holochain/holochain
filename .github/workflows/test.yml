@@ -20,6 +20,9 @@ jobs:
     name: static
     runs-on: macos-latest # currently faster than ubuntu-latest
     steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
       - name: 'Common Test Setup Actions'
         uses: ./.github/actions/common-pre
 
