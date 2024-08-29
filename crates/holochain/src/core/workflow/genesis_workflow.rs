@@ -16,7 +16,7 @@ use crate::core::ribosome::guest_callback::genesis_self_check::{
 };
 use crate::{conductor::api::CellConductorApiT, core::ribosome::RibosomeT};
 use derive_more::Constructor;
-use holochain_p2p::ChcImpl;
+use holochain_chc::ChcImpl;
 use holochain_sqlite::prelude::*;
 use holochain_state::source_chain;
 use holochain_state::workspace::WorkspaceResult;

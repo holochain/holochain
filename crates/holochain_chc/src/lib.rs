@@ -1,16 +1,65 @@
-//! Defines the Chain Head Coordination API.
+//! Defines the Chain Head Coordination API and an HTTP client for talking to a remote CHC server.
+//!
+//! A Chain Head Coordinator (CHC) is an external service which Holochain can communicate with.
+//! A CHC is used in situations where it is desirable to run the same Holochain Cell (source chain)
+//! on multiple different conductors. The CHC ensures that these multiple devices don't inadvertently
+//! create a fork of the source chain by doing simultaneous uncoordinated writes.
+//!
+//! This crate introduces a [`ChainHeadCoordinator`] trait which defines the interface that Holochain
+//! weaves into its logic to make use of a CHC service. Currently, the only Holochain-supported implementation
+//! of this trait is [`ChcHttp`][chc_http::ChcHttp], which makes HTTP requests to a remote server and returns the responses.
+//! There is also a [`ChcLocal`][chc_local::ChcLocal] reference implementation which is used for testing.
+//! Other implementations can be written as needed, including alternate implementations of a HTTP client,
+//! or also other kinds of clients using other protocols.
+//!
+//! Holochain specifies an optional `chc_url` field in its configuration which can point to an HTTP
+//! server that implements the CHC interface.
+//! See the [`chc_http`] module docs for specs on how to set up a remote CHC HTTP server that
+//! Holochain can talk to using the provided [`ChcHttp`] implementation.
+//!
+//! The CHC trait contains two methods, and Holochain actually only uses one of them:
+//! Every time Holochain is about to commit some records to a source chain, it first calls
+//! [add_records_request][`ChainHeadCoordinator::add_records_request`]
+//! to request that the CHC store those new records.
+//! The CHC must be written so that it recognizes that the new records being added are a valid
+//! extension of the existing chain of stored records, i.e. that the first record being pushed has a
+//! [`Action::prev_action`] field which matches the hash of the last record already stored,
+//! and additionally that the new records also form a valid hash chain (via `prev_action`).
+//! If the new records are valid, they are added to CHC's chain, and an Ok result is returned.
+//!
+//! If these criteria for valid new records are not met, the CHC must return [`ChcError::InvalidChain`],
+//! which lets the client know that the local chain is out of sync with CHC's version,
+//! due to some other conductor having updated its own chain. In this case, the user (the driver
+//! of the conductor) should call the other CHC method,
+//! [get_record_data_request][`ChainHeadCoordinator::get_record_data_request`],
+//! which will return the diff of records that CHC has that the local conductor does not.
+//! Then, the Holochain admin method `GraftRecords` can be called to "stitch" these records onto the
+//! existing chain, removing any fork if necessary.
+//!
+//! Note that currently, [get_record_data_request][`ChainHeadCoordinator::get_record_data_request`]
+//! is never called directly by Holochain, but it might be in the future.
+//!
+//! Note also that when a CHC is used, the CHC is always considered the authoritative source of truth.
+//! If a local conductor's state for whatever reason contradicts the CHC in any way, whether the local
+//! chain contains different data altogether or is strictly ahead of the CHC, the CHC's version is always
+//! considered correct and the local chain should always be modified to match the CHC's state.
+//!
 
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use futures::FutureExt;
-use holo_hash::{ActionHash, AgentPubKey, EntryHash};
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_nonce::Nonce256Bits;
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_zome_types::prelude::*;
+use holochain_types::prelude::*;
 use must_future::MustBoxFuture;
 
-use crate::chain::ChainItem;
+use holochain_types::chain::ChainItem;
+
+pub mod chc_local;
+
+#[cfg(feature = "http")]
+pub mod chc_http;
 
 /// The API which a Chain Head Coordinator service must implement.
 #[async_trait::async_trait]
@@ -53,7 +102,8 @@ pub trait ChainHeadCoordinatorExt:
         .into()
     }
 
-    /// More convenient way to call `get_record_data_request`
+    /// More convenient way to call the low-level CHC API method `get_record_data_request`.
+    /// This method actually decodes and assembles those results into a list of `Record`s.
     fn get_record_data(
         self: Arc<Self>,
         since_hash: Option<ActionHash>,
@@ -96,6 +146,9 @@ pub trait ChainHeadCoordinatorExt:
     }
 }
 
+/// A CHC implementation
+pub type ChcImpl = Arc<dyn 'static + Send + Sync + ChainHeadCoordinatorExt>;
+
 /// A Record to be added to the CHC.
 ///
 /// The SignedActionHashed is constructed as usual.
@@ -126,7 +179,6 @@ pub struct AddRecordPayload {
 impl AddRecordPayload {
     /// Create a payload from a list of records.
     /// This performs the necessary signing and encryption the CHC requires.
-
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(keystore, records)))]
     pub async fn from_records(
         keystore: MetaLairClient,

@@ -30,6 +30,7 @@ chrono = { version = "0.4.22", default-features = false, features = [
 ] }
 clap = { version = "4.0", features = ["derive", "env"] }
 futures = "0.3"
+holochain_chc = { version = "^0.1.0-dev.1", path = "../holochain_chc", optional = true }
 holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.4.0-dev.21", features = [
   "sqlite",
 ] }
@@ -63,4 +64,4 @@ workspace = true
 
 [features]
 
-chc = ["holochain_types/chc", "holochain_conductor_api/chc"]
+chc = ["holochain_chc", "holochain_conductor_api/chc"]

@@ -13,7 +13,6 @@ pub use crate::activity::*;
 pub use crate::app::*;
 pub use crate::autonomic::*;
 pub use crate::chain::*;
-pub use crate::chc::*;
 pub use crate::combinators::*;
 pub use crate::db::*;
 pub use crate::db_cache::*;
