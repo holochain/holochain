@@ -4,14 +4,20 @@
 
 use crate::error::{HcBundleError, HcBundleResult};
 use holochain_util::ffs;
-#[cfg(feature = "wasmer_sys")]
-use holochain_wasmer_host::module::build_ios_module;
 use mr_bundle::RawBundle;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
+
 #[cfg(feature = "wasmer_sys")]
-use tracing::info;
+mod wasmer_sys;
+#[cfg(feature = "wasmer_sys")]
+use wasmer_sys::*;
+
+#[cfg(feature = "wasmer_wamr")]
+mod wasmer_wamr;
+#[cfg(feature = "wasmer_wamr")]
+use wasmer_wamr::*;
 
 /// Unpack a bundle into a working directory, returning the directory path used.
 pub async fn unpack<M: Manifest>(
@@ -72,60 +78,6 @@ fn bundle_path_to_dir(path: &Path, extension: &'static str) -> HcBundleResult<Pa
         .parent()
         .expect("file path should have parent")
         .join(stem))
-}
-
-#[cfg(feature = "wasmer_sys")]
-async fn build_preserialized_wasm<M: Manifest>(
-    target_path: &Path,
-    bundle: &Bundle<M>,
-) -> Result<(), HcBundleError> {
-    let target_path_folder = target_path
-        .parent()
-        .expect("target_path should have a parent folder");
-    let _write_serialized_result =
-        futures::future::join_all(bundle.bundled_resources().iter().map(
-            |(relative_path, bytes)| async move {
-                // only pre-serialize wasm resources
-                if relative_path.extension() == Some(std::ffi::OsStr::new("wasm")) {
-                    let ios_folder_path = target_path_folder.join("ios");
-                    let mut resource_path_adjoined = ios_folder_path.join(
-                        relative_path
-                            .file_name()
-                            .expect("wasm resource should have a filename"),
-                    );
-                    // see this code for rationale
-                    // https://github.com/wasmerio/wasmer/blob/447c2e3a152438db67be9ef649327fabcad6f5b8/lib/engine-dylib/src/artifact.rs#L722-L756
-                    resource_path_adjoined.set_extension("dylib");
-                    ffs::create_dir_all(ios_folder_path).await?;
-                    ffs::write(&resource_path_adjoined, vec![].as_slice()).await?;
-                    let resource_path = ffs::canonicalize(resource_path_adjoined).await?;
-                    match build_ios_module(bytes.as_slice()) {
-                        Ok(module) => match module.serialize_to_file(resource_path.clone()) {
-                            Ok(()) => {
-                                info!("wrote ios dylib to {:?}", resource_path);
-                                Ok(())
-                            }
-                            Err(e) => Err(HcBundleError::SerializedModuleError(e)),
-                        },
-                        Err(e) => Err(HcBundleError::ModuleCompileError(e)),
-                    }
-                } else {
-                    Ok(())
-                }
-            },
-        ))
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(())
-}
-
-#[cfg(feature = "wasmer_wamr")]
-async fn build_preserialized_wasm<M: Manifest>(
-    _target_path: &PathBuf,
-    _bundle: &Bundle<M>,
-) -> Result<(), HcBundleError> {
-    unimplemented!("The feature flag 'wasmer_sys' must be enabled to support compiling wasm");
 }
 
 /// Pack a directory containing a YAML manifest (DNA, hApp, Web hApp) into a bundle, returning
