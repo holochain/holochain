@@ -20,7 +20,7 @@ documentclass: 'revtex4-1'
 
 ## Preamble
 
-The alpha version of the [[Holochain white paper]{.underline}](https://github.com/holochain/holochain-proto/blob/whitepaper/holochain.pdf)\cite{xxx} took a very formal approach to describing generalized distributed computation schemes and carefully compared the approach taken by Blockchain-based systems with the approach taken by Holochain as well as providing formal reasoning for the benefits of Holochain's agent-centric approach.
+The alpha version of the [Holochain white paper](https://github.com/holochain/holochain-proto/blob/whitepaper/holochain.pdf) took a very formal approach to describing generalized distributed computation schemes and carefully compared the approach taken by Blockchain-based systems with the approach taken by Holochain as well as providing formal reasoning for the benefits of Holochain's agent-centric approach.
 
 In this second version, we describe Holochain on its own terms by first providing the highest level view of our approach and our starting axioms. Then, at the next level of detail we provide an informal system description using the metaphor of games. Then we dive into deeper detail with a formal system description including the specific context and assumptions we come from, the integrity guarantees Holochain offers, and a formal state model and discussion of security and safety concerns. Finally, at the most detailed level, we provide an implementation specification in Appendix A.
 
