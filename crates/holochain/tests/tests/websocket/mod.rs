@@ -440,7 +440,11 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
-    let conductor_handle = Conductor::builder().config(config).build().await?;
+    let conductor_handle = Conductor::builder()
+        .config(config)
+        .with_test_device_seed()
+        .build()
+        .await?;
     let (client, rx) = websocket_client(&conductor_handle).await?;
     let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
@@ -467,7 +471,11 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
-    let conductor_handle = Conductor::builder().config(config).build().await?;
+    let conductor_handle = Conductor::builder()
+        .config(config)
+        .with_test_device_seed()
+        .build()
+        .await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
     let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
@@ -512,7 +520,11 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
-    let conductor_handle = Conductor::builder().config(config).build().await?;
+    let conductor_handle = Conductor::builder()
+        .config(config)
+        .with_test_device_seed()
+        .build()
+        .await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
     let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
@@ -579,7 +591,12 @@ async fn connection_limit_is_respected() {
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
-    let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
+    let conductor_handle = Conductor::builder()
+        .config(config)
+        .with_test_device_seed()
+        .build()
+        .await
+        .unwrap();
     let port = admin_port(&conductor_handle).await;
 
     let addr = format!("localhost:{port}")
