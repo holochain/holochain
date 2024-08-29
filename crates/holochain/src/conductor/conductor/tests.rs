@@ -1219,7 +1219,7 @@ async fn test_deferred_memproof_provisioning() {
             existing_cells: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
-allow_throwaway_random_agent_key: true,
+            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -1348,7 +1348,7 @@ async fn test_deferred_memproof_provisioning_uninstall() {
             existing_cells: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
-allow_throwaway_random_agent_key: true,
+            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
