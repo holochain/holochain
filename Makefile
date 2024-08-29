@@ -5,7 +5,7 @@
 F=RUSTFLAGS="-Dwarnings"
 
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
-DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,chc,hc_demo_cli/build_demo
+DEFAULT_FEATURES=chc,slow_tests,build_wasms,sqlite-encrypted,chc,hc_demo_cli/build_demo
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
