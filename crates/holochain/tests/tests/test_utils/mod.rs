@@ -5,6 +5,7 @@ use arbitrary::Arbitrary;
 use ed25519_dalek::{Signer, SigningKey};
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::DataRootPath;
+use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::FullStateDump;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
@@ -342,6 +343,7 @@ pub async fn check_started(holochain: &mut Child) {
     }
 }
 
+/// Create test config with test keystore and DPKI disabled
 pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig {
     ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -352,6 +354,7 @@ pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig
         }]),
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,
+        dpki: DpkiConfig::disabled(),
         ..Default::default()
     }
 }
