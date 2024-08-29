@@ -1499,12 +1499,7 @@ mod app_impls {
 
             let (agent_key, derivation_details): (AgentPubKey, Option<DerivationDetailsInput>) =
                 if let Some(agent_key) = agent_key {
-                    if dpki.is_some() {
-                        // dpki installed, agent key given
-
-                        // TODO: replace with something like this https://github.com/holochain/deepkey/pull/35/commits/8169fa6a55ef538a7b1968b62491bb236faef1f9
-                        tracing::warn!("App is being installed with an existing agent key: DPKI will not be used to manage keys for this app.");
-                    }
+                    // Key doesn't need to be generated: it will be registered later
                     (agent_key, None)
                 } else if let Some(lair_tag) = self.get_config().device_seed_lair_tag.clone() {
                     // dpki installed, no agent key given
@@ -1623,10 +1618,8 @@ mod app_impls {
             };
 
             if app_result.is_ok() {
-                // Register the key in DPKI
-
-                // Register initial agent key in Deepkey
-                if let (Some((dpki, state)), Some(derivation)) = (dpki, derivation_details) {
+                // Register initial agent key in DPKI
+                if let Some((dpki, state)) = dpki {
                     let dpki_agent = dpki.cell_id.agent_pubkey();
 
                     // This is the signature Deepkey requires
@@ -1655,7 +1648,7 @@ mod app_impls {
                             dna_hashes,
                             metadata: Default::default(), // TODO: pass in necessary metadata
                         },
-                        derivation_details: Some(derivation),
+                        derivation_details,
                         create_only: false,
                     };
 
