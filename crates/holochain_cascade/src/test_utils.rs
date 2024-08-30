@@ -142,7 +142,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         agent: AgentPubKey,
         query: QueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>> {
         let mut out = Vec::new();
         for db in &self.envs {
             let r = authority::handle_get_agent_activity(

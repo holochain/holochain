@@ -1,6 +1,3 @@
-use std::borrow::Borrow;
-use std::fmt::{Display, Formatter};
-
 use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::link::LinkType;
@@ -17,6 +14,9 @@ use holo_hash::EntryHash;
 use holo_hash::HashableContent;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
+use std::borrow::Borrow;
+use std::fmt::{Display, Formatter};
+use std::hash::Hash;
 
 pub mod builder;
 pub mod conversions;
@@ -111,6 +111,26 @@ pub(crate) enum ActionRef<'a> {
 }
 
 pub type ActionHashed = HoloHashed<Action>;
+
+impl ActionHashedContainer for ActionHashed {
+    fn action(&self) -> &Action {
+        self.as_content()
+    }
+
+    fn action_hash(&self) -> &ActionHash {
+        &self.hash
+    }
+}
+
+impl ActionSequenceAndHash for ActionHashed {
+    fn action_seq(&self) -> u32 {
+        self.content.action_seq()
+    }
+
+    fn address(&self) -> &ActionHash {
+        &self.hash
+    }
+}
 
 /// a utility wrapper to write intos for our data types
 macro_rules! write_into_action {
@@ -867,5 +887,26 @@ impl std::ops::Deref for ZomeIndex {
 impl Borrow<u8> for ZomeIndex {
     fn borrow(&self) -> &u8 {
         &self.0
+    }
+}
+
+pub trait ActionHashedContainer: ActionSequenceAndHash {
+    fn action(&self) -> &Action;
+
+    fn action_hash(&self) -> &ActionHash;
+}
+
+pub trait ActionSequenceAndHash {
+    fn action_seq(&self) -> u32;
+    fn address(&self) -> &ActionHash;
+}
+
+impl ActionSequenceAndHash for (u32, ActionHash) {
+    fn action_seq(&self) -> u32 {
+        self.0
+    }
+
+    fn address(&self) -> &ActionHash {
+        &self.1
     }
 }

@@ -23,10 +23,6 @@
 //!
 #![warn(missing_docs)]
 
-use std::collections::HashSet;
-use std::sync::Arc;
-use std::time::Instant;
-
 use error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -55,14 +51,16 @@ use holochain_state::query::PrivateDataQuery;
 use holochain_state::scratch::SyncScratch;
 use metrics::create_cascade_duration_metric;
 use metrics::CascadeDurationMetric;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
+use std::time::Instant;
 use tracing::*;
 
 #[cfg(feature = "test_utils")]
 use kitsune_p2p::dependencies::kitsune_p2p_types::box_fut_plain;
 #[cfg(feature = "test_utils")]
 use kitsune_p2p::dependencies::kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
-#[cfg(feature = "test_utils")]
-use std::collections::HashMap;
 
 pub mod authority;
 pub mod error;
@@ -568,7 +566,7 @@ impl CascadeImpl {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
-    ) -> CascadeResult<Vec<AgentActivityResponse<ActionHash>>> {
+    ) -> CascadeResult<Vec<AgentActivityResponse>> {
         let network = some_or_return!(self.network.as_ref(), Vec::with_capacity(0));
         Ok(network.get_agent_activity(agent, query, options).await?)
     }
@@ -1021,37 +1019,41 @@ impl CascadeImpl {
         }
     }
 
+    /// Get agent activity from agent activity authorities.
+    ///
+    /// Hashes are requested from the authority and cache for valid chains.
+    ///
+    /// Query:
+    /// - [include_entries](ChainQueryFilter::include_entries) will also fetch the entries in parallel (requires include_full_records)
+    /// - [sequence_range](ChainQueryFilter::sequence_range) will get all the activity in the exclusive range
+    /// - [action_type](ChainQueryFilter::action_type) and [entry_type](ChainQueryFilter::entry_type) will filter the activity (requires include_full_actions)
+    ///
+    /// Options:
+    /// - [include_valid_activity](GetActivityOptions::include_valid_activity) will include the valid chain hashes.
+    /// - [include_rejected_activity](GetActivityOptions::include_rejected_activity) will include the invalid chain hashes.
+    /// - [include_warrants](GetActivityOptions::include_warrants) will include the warrants for this agent.
+    /// - [include_full_records](GetActivityOptions::include_full_records) will fetch the full records for each action matching the query.
+    ///   This is only effective if [include_valid_activity](GetActivityOptions::include_valid_activity) or [include_rejected_activity](GetActivityOptions::include_rejected_activity) is true.
+    ///   Even when this is set, entries will only be fetched if [include_entries](ChainQueryFilter::include_entries) is also true.
     #[cfg_attr(
         feature = "instrument",
         tracing::instrument(skip(self, agent, query, options))
     )]
-    /// Get agent activity from agent activity authorities.
-    /// Hashes are requested from the authority and cache for valid chains.
-    /// Options:
-    /// - include_valid_activity will include the valid chain hashes.
-    /// - include_rejected_activity will include the invalid chain hashes.
-    /// - include_full_actions will fetch the valid actions in parallel (requires include_valid_activity)
-    /// Query:
-    /// - include_entries will also fetch the entries in parallel (requires include_full_actions)
-    /// - sequence_range will get all the activity in the exclusive range
-    /// - action_type and entry_type will filter the activity (requires include_full_actions)
     pub async fn get_agent_activity(
         &self,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
-    ) -> CascadeResult<AgentActivityResponse<Record>> {
-        let status_only = !options.include_rejected_activity && !options.include_valid_activity;
-        // DESIGN: Evaluate if it's ok to **not** go to another authority for agent activity?
+    ) -> CascadeResult<AgentActivityResponse> {
+        let status_only = !(options.include_valid_activity || options.include_rejected_activity);
+
+        // If we're an authority then we allow local queries. This means we consider ourselves an authority
+        // for the agent in question. If the options specify network, for example because we are looking for
+        // warrants we don't know about or for countersigning actions, then we will go to the network
+        // regardless of authority status.
         let authority = self.am_i_an_authority(agent.clone().into()).await?;
-        let merged_response = if !authority {
-            let results = self
-                .fetch_agent_activity(agent.clone(), query.clone(), options.clone())
-                .await?;
-            let merged_response: AgentActivityResponse<ActionHash> =
-                agent_activity::merge_activities(agent.clone(), &options, results)?;
-            merged_response
-        } else {
+
+        let merged_response = if authority && options.get_options.strategy == GetStrategy::Local {
             match self.dht.clone() {
                 Some(vault) => {
                     authority::handle_get_agent_activity(
@@ -1062,12 +1064,22 @@ impl CascadeImpl {
                     )
                     .await?
                 }
-                None => agent_activity::merge_activities(
-                    agent.clone(),
-                    &options,
-                    Vec::with_capacity(0),
-                )?,
+                None => {
+                    info!("Unable to get agent activity because this cascade does not have DHT access");
+                    agent_activity::merge_activities(
+                        agent.clone(),
+                        &options,
+                        Vec::with_capacity(0),
+                    )?
+                }
             }
+        } else {
+            let results = self
+                .fetch_agent_activity(agent.clone(), query.clone(), options.clone())
+                .await?;
+            let merged_response: AgentActivityResponse =
+                agent_activity::merge_activities(agent.clone(), &options, results)?;
+            merged_response
         };
 
         // If the response is empty we can finish.
@@ -1080,66 +1092,27 @@ impl CascadeImpl {
             return Ok(AgentActivityResponse::status_only(merged_response));
         }
 
-        // If they don't want the full actions then just return the hashes.
-        if !options.include_full_actions {
-            return Ok(AgentActivityResponse::hashes_only(merged_response));
-        }
-
-        // If they need the full actions then we will do concurrent gets.
         let AgentActivityResponse {
             agent,
-            valid_activity,
-            rejected_activity,
+            mut valid_activity,
+            mut rejected_activity,
             status,
             highest_observed,
             warrants,
         } = merged_response;
-        let valid_activity = match valid_activity {
-            ChainItems::Hashes(hashes) => {
-                // If we can't get one of the actions then don't return any.
-                // DESIGN: Is this the correct choice?
-                let maybe_chain: Option<Vec<_>> = self
-                    .get_concurrent(
-                        hashes.into_iter().map(|(_, h)| h.into()),
-                        GetOptions::local(),
-                    )
-                    .await?
-                    .into_iter()
-                    .collect();
-                match maybe_chain {
-                    Some(mut chain) => {
-                        chain.sort_unstable_by_key(|el| el.action().action_seq());
-                        ChainItems::Full(chain)
-                    }
-                    None => ChainItems::Full(Vec::with_capacity(0)),
-                }
-            }
-            ChainItems::Full(_) => ChainItems::Full(Vec::with_capacity(0)),
-            ChainItems::NotRequested => ChainItems::NotRequested,
-        };
-        let rejected_activity = match rejected_activity {
-            ChainItems::Hashes(hashes) => {
-                // If we can't get one of the actions then don't return any.
-                // DESIGN: Is this the correct choice?
-                let maybe_chain: Option<Vec<_>> = self
-                    .get_concurrent(
-                        hashes.into_iter().map(|(_, h)| h.into()),
-                        GetOptions::local(),
-                    )
-                    .await?
-                    .into_iter()
-                    .collect();
-                match maybe_chain {
-                    Some(mut chain) => {
-                        chain.sort_unstable_by_key(|el| el.action().action_seq());
-                        ChainItems::Full(chain)
-                    }
-                    None => ChainItems::Full(Vec::with_capacity(0)),
-                }
-            }
-            ChainItems::Full(_) => ChainItems::Full(Vec::with_capacity(0)),
-            ChainItems::NotRequested => ChainItems::NotRequested,
-        };
+
+        // If records were requested then the activity authority might not have had all the entries.
+        // That becomes more likely for new records as the number of agents on a network increases.
+        // So we need to fill in the missing entries.
+        if options.include_full_records && query.include_entries {
+            tracing::debug!("Trying to fill missing entries for agent activity");
+            valid_activity = self
+                .fill_missing_chain_item_entries(valid_activity, options.get_options.clone())
+                .await?;
+            rejected_activity = self
+                .fill_missing_chain_item_entries(rejected_activity, options.get_options)
+                .await?;
+        }
 
         let r = AgentActivityResponse {
             agent,
@@ -1149,7 +1122,78 @@ impl CascadeImpl {
             highest_observed,
             warrants,
         };
+
         Ok(r)
+    }
+
+    /// Looks through a [ChainItems] object and fills in any missing entry data.
+    ///
+    /// For any [RecordEntry::NotStored] entries, this function will attempt to fetch the entry data
+    /// from either our cache when [GetOptions::local] is specified, or from the network when
+    /// [GetOptions::network] is specified.
+    ///
+    /// Note that this will only take any action for [ChainItems::Full]. For other
+    /// [ChainItems] variants, the function will just return its input.
+    async fn fill_missing_chain_item_entries(
+        &self,
+        mut chain_items: ChainItems,
+        get_options: GetOptions,
+    ) -> CascadeResult<ChainItems> {
+        let missing_entry_hashes = match &chain_items {
+            ChainItems::Full(records) => records
+                .iter()
+                .filter_map(|r| match r.entry {
+                    RecordEntry::NotStored => r.action().entry_hash().map(|h| h.clone().into()),
+                    _ => None,
+                })
+                .collect(),
+            _ => Vec::with_capacity(0),
+        };
+
+        if !missing_entry_hashes.is_empty() {
+            trace!(
+                "There are {} missing entries to fetch",
+                missing_entry_hashes.len()
+            );
+
+            let maybe_provided_entry_records = self
+                .get_concurrent(missing_entry_hashes, get_options)
+                .await?;
+
+            trace!("Got {:?} entries", maybe_provided_entry_records.len());
+
+            let entry_lookup = maybe_provided_entry_records
+                .iter()
+                .filter_map(|r| match r {
+                    Some(r) => r
+                        .signed_action()
+                        .action()
+                        .entry_hash()
+                        .map(|entry_hash| (entry_hash, &r.entry)),
+                    None => None,
+                })
+                .collect::<HashMap<_, _>>();
+
+            match &mut chain_items {
+                ChainItems::Full(records) => {
+                    for record in records.iter_mut() {
+                        if let RecordEntry::NotStored = record.entry {
+                            if let Some(entry_hash) = record.action().entry_hash() {
+                                if let Some(entry) = entry_lookup.get(entry_hash) {
+                                    record.entry = (*entry).clone();
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    // Because of the match above, the valid activity should always be FullRecords
+                    unreachable!()
+                }
+            }
+        }
+
+        Ok(chain_items)
     }
 
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
