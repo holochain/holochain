@@ -1542,7 +1542,6 @@ mod app_impls {
                             derivation_path.into_boxed_slice(),
                         )
                         .await?;
-                    // .map_err(|e| DpkiServiceError::Lair(e.into()))?;
                     let seed = info.ed25519_pub_key.0.to_vec();
 
                     let derivation = DerivationDetailsInput {

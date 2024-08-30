@@ -119,18 +119,39 @@ pub struct DeleteCloneCellPayload {
     pub clone_cell_id: CloneCellId,
 }
 
-/// An [AppBundle] along with an [AgentPubKey] and optional [InstalledAppId]
+/// All the information necessary to install an app
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppPayload {
-    /// The unique identifier for an installed app in this conductor.
+    /// Where to obtain the AppBundle, which contains the app manifest and DNA bundles
+    /// to be installed. This is the main payload of app installation.
+    ///
+    /// Since this field uses `#[serde(flatten)]`, when using other serialized data formats
+    /// like JSON or YAML, this field will actually show up as one of the variants of
+    /// `AppBundleSource` (e.g. `bundle` or `path`), rather than as a `source` field.
     #[serde(flatten)]
     pub source: AppBundleSource,
 
     /// The agent to use when creating Cells for this App.
-    /// If None, a new agent key will be generated.
+    /// If None, a new agent key will be generated in the right circumstances (read on).
     ///
-    /// If a DPKI service is initialized at installation time, this field will
-    /// be ignored and a properly derived key will be used instead.
+    /// It's always OK to provide a pregenerated agent key here, but there is at least one
+    /// major benefit to letting to letting Holochain generate keys for you (other than
+    /// the sheer convenience of not having to generate your own):
+    ///
+    /// If you are using a device seed in your conductor config, the agent key will be derived
+    /// from that seed using a sensible scheme based on the total number of app installations
+    /// in this conductor, which means you can fairly easily regenerate all of your auto-generated
+    /// agent keys if you lose access to the device with your conductor data
+    /// (as long as you retain exclusive access to the device seed of course).
+    ///
+    /// Holochain will only generate an agent key for you if [`ConductorConfig::device_seed_lair_tag`]
+    /// is set and pointing to a seed present in lair. If this config is not set, installation
+    /// will fail if no agent key is provided. This safety mechanism can however be overridden
+    /// by setting the `allow_throwaway_random_agent_key` flag on this payload, which will cause
+    /// Holochain to generate a totally random (non-recoverable) agent key.
+    ///
+    /// If you are not using a device seed, or if you app has special requirements for agent keys,
+    /// you can always provide your own here, no matter what setting you're using.
     #[serde(default)]
     pub agent_key: Option<AgentPubKey>,
 
