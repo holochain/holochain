@@ -90,7 +90,8 @@ async fn get_activity_chain_items_parity() {
         .include_store_entry_ops_in_dht_db()
         .await
         .include_agent_activity_noise_ops_in_dht_db()
-        .await;
+        .await
+        .with_chain_filter(ChainQueryFilter::new().include_entries(true));
 
     let options = GetActivityOptions {
         include_valid_activity: true,
@@ -160,7 +161,8 @@ async fn fill_records_entries() {
         .include_agent_activity_noise_ops_in_dht_db()
         .await
         .include_store_entry_ops_in_cache_db()
-        .await;
+        .await
+        .with_chain_filter(ChainQueryFilter::new().include_entries(true));
 
     let options = GetActivityOptions {
         include_valid_activity: true,
@@ -377,11 +379,11 @@ async fn get_activity_with_warrants() {
     dht.test_write({
         let op = DhtOp::from(warrant.clone()).into_hashed();
         move |txn| {
-            holochain_state::mutations::insert_op(txn, &op).unwrap();
+            insert_op(txn, &op).unwrap();
         }
     });
 
-    let options = holochain_p2p::actor::GetActivityOptions {
+    let options = GetActivityOptions {
         include_valid_activity: true,
         include_rejected_activity: false,
         include_full_records: true,
@@ -404,7 +406,11 @@ async fn get_activity_with_warrants() {
     };
 
     let r1 = cascade
-        .get_agent_activity(td.agent.clone(), ChainQueryFilter::new(), options.clone())
+        .get_agent_activity(
+            td.agent.clone(),
+            ChainQueryFilter::new().include_entries(true),
+            options.clone(),
+        )
         .await
         .unwrap();
 
@@ -427,7 +433,11 @@ async fn get_activity_with_warrants() {
     });
 
     let r2 = cascade
-        .get_agent_activity(td.agent.clone(), ChainQueryFilter::new(), options)
+        .get_agent_activity(
+            td.agent.clone(),
+            ChainQueryFilter::new().include_entries(true),
+            options,
+        )
         .await
         .unwrap();
 
