@@ -236,7 +236,7 @@ async fn fetch_routes_parity() {
     assert_agent_activity_responses_eq!(local_with_remote_authority, remote_as_self_authority);
 }
 
-/// Check that getting activity with records will not server private entries
+/// Check that getting activity with records will not serve private entries
 #[tokio::test(flavor = "multi_thread")]
 async fn record_activity_does_not_serve_private_entries() {
     holochain_trace::test_run();
