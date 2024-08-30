@@ -1229,12 +1229,15 @@ pub fn chain_head_db_nonempty(
     chain_head_db(txn, author)?.ok_or(SourceChainError::ChainEmpty)
 }
 
+pub type CurrentCountersigningSessionOpt =
+    Option<(SignedActionHashed, EntryHash, CounterSigningSessionData)>;
+
 /// Check if there is a current countersigning session and if so, return the
 /// session data and the entry hash.
 pub fn current_countersigning_session(
     txn: &Transaction<'_>,
     author: Arc<AgentPubKey>,
-) -> SourceChainResult<Option<(Action, EntryHash, CounterSigningSessionData)>> {
+) -> SourceChainResult<CurrentCountersigningSessionOpt> {
     match chain_head_db(txn, author) {
         // We haven't done genesis so no session can be active.
         Err(e) => Err(e),
@@ -1249,7 +1252,7 @@ pub fn current_countersigning_session(
             let (sah, ee) = record.into_inner();
             Ok(match (sah.action().entry_hash(), ee.into_option()) {
                 (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
-                    Some((sah.action().clone(), entry_hash.clone(), *cs))
+                    Some((sah.clone(), entry_hash.clone(), *cs))
                 }
                 _ => None,
             })
