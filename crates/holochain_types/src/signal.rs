@@ -36,13 +36,9 @@ impl Signal {
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub enum SystemSignal {
     /// A countersigning session has successfully completed.
-    SuccessfulCountersigning(holo_hash::EntryHash),
+    SuccessfulCountersigning(EntryHash),
     /// A countersigning session has been abandoned.
-    ///
-    /// The countersigning session is identified by `CellId` for the DNA and agent where the
-    /// session was initiated. The countersigning entry might not exist when this signal is emitted
-    /// so we can't use the entry hash to identify the session.
-    AbandonedCountersigning(CellId),
+    AbandonedCountersigning(EntryHash),
 }
 
 impl_from! {

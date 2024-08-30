@@ -3,7 +3,6 @@ use holo_hash::{ActionHash, EntryHash};
 use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};
 use holochain::conductor::CellError;
 use holochain::core::workflow::WorkflowError;
-use holochain::prelude::Timestamp;
 use holochain::sweettest::{
     await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
 };
@@ -12,13 +11,12 @@ use holochain_types::app::DisabledAppReason;
 use holochain_types::prelude::Signal;
 use holochain_types::signal::SystemSignal;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::cell::CellId;
 use holochain_zome_types::countersigning::Role;
 use holochain_zome_types::prelude::{
     ActivityRequest, AgentActivity, ChainQueryFilter, GetAgentActivityInput,
 };
-use std::ops::Add;
-use std::time::{Duration, Instant};
+use matches::assert_matches;
+use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -414,10 +412,12 @@ async fn signature_bundle_noise() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn ruin_the_day_of_a_peer() {
+async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true);
+    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|c| {
+        c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
+    });
     let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -524,39 +524,52 @@ async fn ruin_the_day_of_a_peer() {
     // Bob's session should time out and be abandoned
     wait_for_abandoned(
         conductors[1].subscribe_to_app_signals("app".into()),
-        bob.cell_id(),
+        preflight_request.app_entry_hash.clone(),
     )
     .await;
 
     tracing::info!("Session abandoned for bob");
 
-    // Let's wait for the session to time out and see how badly this ends for Alice
-    // let end = Instant::now().add(
-    //     (preflight_request.session_times.end - Timestamp::now())
-    //         .unwrap()
-    //         .to_std()
-    //         .unwrap(),
-    // );
-    // tokio::time::sleep_until(end.into()).await;
+    // Alice's chain is still locked though
+    let err = conductors[0]
+        .call_fallible::<_, ActionHash>(&alice_zome, "create_a_thing", ())
+        .await
+        .unwrap_err();
 
-    // Okay, so the chain lock has timed out and Alice should be able to commit now
+    match err {
+        ConductorApiError::CellError(CellError::WorkflowError(e)) => {
+            assert_matches!(
+                *e,
+                WorkflowError::SourceChainError(SourceChainError::ChainLocked)
+            );
+        }
+        e => panic!("Expected ChainLocked error, got: {:?}", e),
+    }
+
+    // Alice is stuck for now. But it's not all over for her. She can either wait for Bob to commit
+    // something, or force unlock the chain (not possible yet!). For now, let's have Bob commit
+    // something and then kick alice's countersigning workflow off again.
+
+    let _: ActionHash = conductors[1]
+        .call_fallible(&bob_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+
+    // Alice session should now get abandoned
+    wait_for_abandoned(
+        conductors[0].subscribe_to_app_signals("app".into()),
+        preflight_request.app_entry_hash.clone(),
+    )
+    .await;
+
+    // Alice will now be allowed to commit other entries
     let _: ActionHash = conductors[0]
         .call_fallible(&alice_zome, "create_a_thing", ())
         .await
         .unwrap();
 
-    // But her countersigning entry is still on her authored chain. It's not published though
-    // because the session didn't complete. So now validation won't be able to proceed for AAAs.
-    // The thing we just created is the next action sequence along from the countersigning entry
-    // so... goodnight Alice. Bob's evil plan has succeeded.
-    await_consistency(30, vec![alice, bob, carol])
-        .await
-        .unwrap();
-
-    // Alice continues to exist on the network and see other people's data. Sadly her future actions
-    // effectively go into limbo because they can't be validated.
-
-    // Alice begins plotting her revenge against Bob.
+    // Everyone's DHT should sync
+    await_consistency(60, [alice, bob, &carol]).await.unwrap();
 }
 
 async fn wait_for_completion(mut signal_rx: Receiver<Signal>, expected_hash: EntryHash) {
@@ -577,14 +590,14 @@ async fn wait_for_completion(mut signal_rx: Receiver<Signal>, expected_hash: Ent
     }
 }
 
-async fn wait_for_abandoned(mut signal_rx: Receiver<Signal>, expected_cell_id: &CellId) {
+async fn wait_for_abandoned(mut signal_rx: Receiver<Signal>, expected_hash: EntryHash) {
     let signal = tokio::time::timeout(std::time::Duration::from_secs(30), signal_rx.recv())
         .await
         .unwrap()
         .unwrap();
     match signal {
-        Signal::System(SystemSignal::AbandonedCountersigning(ref cell_id)) => {
-            assert_eq!(expected_cell_id, cell_id);
+        Signal::System(SystemSignal::AbandonedCountersigning(hash)) => {
+            assert_eq!(expected_hash, hash);
         }
         _ => {
             panic!(
