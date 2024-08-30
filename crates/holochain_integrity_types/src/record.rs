@@ -8,8 +8,8 @@ use crate::action::CreateLink;
 use crate::action::DeleteLink;
 use crate::entry_def::EntryVisibility;
 use crate::signature::Signature;
-use crate::Action;
 use crate::Entry;
+use crate::{Action, ActionHashedContainer, ActionSequenceAndHash};
 use holo_hash::ActionHash;
 use holo_hash::HasHash;
 use holo_hash::HashableContent;
@@ -36,6 +36,26 @@ pub struct Record<A = SignedActionHashed> {
 impl<A> AsRef<A> for Record<A> {
     fn as_ref(&self) -> &A {
         &self.signed_action
+    }
+}
+
+impl ActionHashedContainer for Record {
+    fn action(&self) -> &Action {
+        self.action()
+    }
+
+    fn action_hash(&self) -> &ActionHash {
+        self.action_address()
+    }
+}
+
+impl ActionSequenceAndHash for Record {
+    fn action_seq(&self) -> u32 {
+        self.action().action_seq()
+    }
+
+    fn address(&self) -> &ActionHash {
+        self.action_address()
     }
 }
 

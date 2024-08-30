@@ -726,7 +726,7 @@ impl Cell {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
-    ) -> CellResult<AgentActivityResponse<ActionHash>> {
+    ) -> CellResult<AgentActivityResponse> {
         let db = self.space.dht_db.clone();
         authority::handle_get_agent_activity(db.into(), agent, query, options)
             .await

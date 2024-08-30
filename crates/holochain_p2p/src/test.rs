@@ -129,7 +129,7 @@ impl HolochainP2pHandler for StubNetwork {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse<ActionHash>>> {
+    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse>> {
         Err("stub".into())
     }
 
