@@ -17,6 +17,12 @@ pub fn valid_chain_op(
 ) -> impl Fact<'static, ChainOp> {
     facts![
         brute(
+            "Action is not CloseChain or OpenChain",
+            move |op: &ChainOp| {
+                !matches!(op.action(), Action::CloseChain(_) | Action::OpenChain(_))
+            }
+        ),
+        brute(
             "Action type matches Entry existence, and is public if exists",
             move |op: &ChainOp| {
                 let action = op.action();
@@ -223,7 +229,14 @@ mod tests {
 
         let e = Entry::arbitrary(g).unwrap();
 
-        let mut a0 = facts::is_not_entry_action().build(g);
+        let mut a0 = contrafact::facts![
+            facts::is_not_entry_action(),
+            brute("is not close or open", move |a: &Action| !matches!(
+                a,
+                Action::OpenChain(_) | Action::CloseChain(_)
+            ))
+        ]
+        .build(g);
         *a0.author_mut() = agent.clone();
 
         let mut a1 = facts::is_new_entry_action().build(g);

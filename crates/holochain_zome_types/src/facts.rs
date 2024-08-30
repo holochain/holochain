@@ -59,6 +59,11 @@ pub fn valid_chain_action<'a>(author: AgentPubKey) -> impl Fact<'a, Action> {
         "valid_chain_action",
         ValidChainFactState::default(),
         move |g, s, mut action: Action| {
+            while matches!(action, Action::CloseChain(_) | Action::OpenChain(_)) {
+                action = g.arbitrary(|| {
+                    "valid_chain_action cannot handle CloseChain or OpenChain".to_string()
+                })?;
+            }
             match (s.hash.as_ref(), action.prev_action_mut()) {
                 (Some(stored), Some(prev)) => {
                     let p = prev.clone();

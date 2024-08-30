@@ -1,3 +1,5 @@
+use holochain_integrity_types::MigrationTarget;
+
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -151,19 +153,22 @@ pub enum OpActivity<UnitType, LT> {
     },
     /// This operation registers the [`Action`] for an
     /// [`Action::OpenChain`] to the author's chain
-    /// and contains the previous chains's [`DnaHash`].
+    /// and contains the previous chains's [`MigrationTarget`].
     OpenChain {
-        /// Hash of the prevous DNA that we are migrating from
-        previous_dna_hash: DnaHash,
+        /// Target for the previous chain that we are migrating from
+        previous_target: MigrationTarget,
+        /// Hash of the corresponding CloseChain.
+        close_hash: ActionHash,
         /// The [`OpenChain`] action
         action: OpenChain,
     },
     /// This operation registers the [`Action`] for an
     /// [`Action::CloseChain`] to the author's chain
-    /// and contains the new chains's [`DnaHash`].
+    /// and contains the new chains's [`MigrationTarget`]
+    /// if applicable.
     CloseChain {
-        /// Hash of the new DNA that we are migrating to
-        new_dna_hash: DnaHash,
+        /// Target for the new chain that we are migrating to
+        new_target: Option<MigrationTarget>,
         /// The [`CloseChain`] action
         action: CloseChain,
     },
@@ -182,4 +187,23 @@ pub enum OpActivity<UnitType, LT> {
         /// The [`InitZomesComplete`] action
         action: InitZomesComplete,
     },
+}
+
+impl<UnitType, LT> OpActivity<UnitType, LT> {
+    /// DRY constructor
+    pub fn open_chain(action: OpenChain) -> Self {
+        Self::OpenChain {
+            previous_target: action.prev_target.clone(),
+            close_hash: action.close_hash.clone(),
+            action,
+        }
+    }
+
+    /// DRY constructor
+    pub fn close_chain(action: CloseChain) -> Self {
+        Self::CloseChain {
+            new_target: action.new_target.clone(),
+            action,
+        }
+    }
 }
