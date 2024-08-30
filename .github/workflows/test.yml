@@ -69,28 +69,28 @@ jobs:
         shell: bash
         run: sudo apt install -y build-essential cmake g++-multilib libgcc-11-dev lib32gcc-11-dev ccache libclang-dev
 
-      - name: install llvm & clang (windows-latest)
+      - name: install llvm & clang (windows-latest, wasmer_wamr)
         if: matrix.os == 'windows-latest' && matrix.wasmer-feature == 'wasmer_wamr'
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: "17"
 
-      - name: install msvc (windows-latest)
+      - name: install msvc (windows-latest, wasmer_wamr)
         if: matrix.os == 'windows-latest' && matrix.wasmer-feature == 'wasmer_wamr'
         uses: ilammy/msvc-dev-cmd@v1.4.1
 
-      - name: install python windows
+      - name: install python (windows-latest, wasmer_wamr)
         if: matrix.os == 'windows-latest' && matrix.wasmer-feature == 'wasmer_wamr'
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
           cache: 'pip' # caching pip dependencies
 
-      - name: install dlib windows
+      - name: install dlib (windows-latest, wasmer_wamr)
         if: matrix.os == 'windows-latest' && matrix.wasmer-feature == 'wasmer_wamr'
-        run: pip install dlib
+        run: pip install -g dlib
 
-      - name: build windows
+      - name: build (windows-latest)
         if: matrix.os == 'windows-latest'
         run: |-
           $env:OPENSSL_NO_VENDOR="1"
@@ -102,7 +102,7 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: make build-workspace-${{ matrix.wasmer-feature }}
 
-      - name: test windows
+      - name: test (windows-latest)
         if: matrix.os == 'windows-latest'
         run: |-
           $env:OPENSSL_NO_VENDOR="1"

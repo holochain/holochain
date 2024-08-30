@@ -13,7 +13,7 @@ runs:
       with:
         go-version: '=1.20.0'
 
-    - name: install llvm & clang (macos-latest & macos-13)
+    - name: install llvm & clang (macos-latest / macos-13)
       if: matrix.os == 'macos-latest' || matrix.os == 'macos-13'
       shell: bash
       run: brew install cmake
