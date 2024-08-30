@@ -190,6 +190,7 @@ mockall::mock! {
         fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
         fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
         fn get_validation_receipts(&self, input: GetValidationReceiptsInput) -> ExternResult<Vec<ValidationReceiptSet>>;
+        fn get_agent_key_lineage(&self, agent_key: AgentPubKey) -> ExternResult<Vec<AgentPubKey>>;
     }
 
     impl HdiT for HdkT {
