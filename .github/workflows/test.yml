@@ -64,11 +64,11 @@ jobs:
       - name: 'Common Test Setup Actions'
         uses: ./.github/actions/common-pre
 
-      - name: install cmake (windows-latest, wasmer_wamr)
+      - name: install cmake & llvm (windows-latest, wasmer_wamr)
         if: matrix.os == 'windows-latest' && matrix.wasmer-feature == 'wasmer_wamr'
         uses: MinoruSekine/setup-scoop@v4
         with:
-          apps: main/cmake
+          apps: main/cmake main/llvm
 
       - name: install llvm & clang (ubuntu-latest, wasmer_wamr)
         if: matrix.os == 'ubuntu-latest' && matrix.wasmer-feature == 'wasmer_wamr'
