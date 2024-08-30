@@ -73,7 +73,7 @@ jobs:
 
       - name: install dlib (windows-latest, wasmer_wamr)
         if: matrix.os == 'windows-latest' && matrix.wasmer-feature == 'wasmer_wamr'
-        run: pip install -g dlib
+        run: pip install dlib
 
       - name: install llvm & clang (ubuntu-latest, wasmer_wamr)
         if: matrix.os == 'ubuntu-latest' && matrix.wasmer-feature == 'wasmer_wamr'
