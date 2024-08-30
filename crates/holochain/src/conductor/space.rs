@@ -392,6 +392,7 @@ impl Spaces {
                     hash_map::Entry::Vacant(entry) => {
                         let space = Space::new(
                             Arc::new(dna_hash.clone()),
+                            self.config.clone(),
                             self.db_dir.to_path_buf(),
                             self.config.db_sync_strategy,
                             self.db_key.clone(),
@@ -745,6 +746,7 @@ impl Spaces {
 impl Space {
     fn new(
         dna_hash: Arc<DnaHash>,
+        config: Arc<ConductorConfig>,
         root_db_dir: PathBuf,
         db_sync_strategy: DbSyncStrategy,
         db_key: DbKey,
@@ -807,7 +809,11 @@ impl Space {
         ));
         let p2p_batch_sender = tx;
 
-        let countersigning_workspace = CountersigningWorkspace::default();
+        let countersigning_workspace = CountersigningWorkspace::new(
+            config
+                .conductor_tuning_params()
+                .countersigning_resolution_retry_delay(),
+        );
         let witnessing_workspace = WitnessingWorkspace::default();
         let incoming_op_hashes = IncomingOpHashes::default();
         let incoming_ops_batch = IncomingOpsBatch::default();
@@ -972,6 +978,7 @@ impl TestSpace {
         Self {
             space: Space::new(
                 Arc::new(dna_hash),
+                Arc::new(ConductorConfig::default()),
                 temp_dir.path().to_path_buf(),
                 Default::default(),
                 Default::default(),

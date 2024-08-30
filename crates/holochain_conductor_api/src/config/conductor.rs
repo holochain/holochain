@@ -211,8 +211,16 @@ impl ConductorConfig {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ConductorTuningParams {
     /// The delay between retries of sys validation when there are missing dependencies waiting to be found on the DHT.
+    ///
     /// Default: 10 seconds
     pub sys_validation_retry_delay: Option<std::time::Duration>,
+    /// The delay between retries attempts at resolving failed countersigning sessions.
+    ///
+    /// This is potentially a very heavy operation because it has to gather information from the network,
+    /// so it is recommended not to set this too low.
+    ///
+    /// Default: 5 minutes
+    pub countersigning_resolution_retry_delay: Option<std::time::Duration>,
 }
 
 impl ConductorTuningParams {
@@ -220,6 +228,7 @@ impl ConductorTuningParams {
     pub fn new() -> Self {
         Self {
             sys_validation_retry_delay: None,
+            countersigning_resolution_retry_delay: None,
         }
     }
 
@@ -228,6 +237,12 @@ impl ConductorTuningParams {
         self.sys_validation_retry_delay
             .unwrap_or_else(|| std::time::Duration::from_secs(10))
     }
+
+    /// Get the current value of `countersigning_resolution_retry_delay` or its default value.
+    pub fn countersigning_resolution_retry_delay(&self) -> std::time::Duration {
+        self.countersigning_resolution_retry_delay
+            .unwrap_or_else(|| std::time::Duration::from_secs(60 * 5))
+    }
 }
 
 impl Default for ConductorTuningParams {
@@ -235,6 +250,9 @@ impl Default for ConductorTuningParams {
         let empty = Self::new();
         Self {
             sys_validation_retry_delay: Some(empty.sys_validation_retry_delay()),
+            countersigning_resolution_retry_delay: Some(
+                empty.countersigning_resolution_retry_delay(),
+            ),
         }
     }
 }
