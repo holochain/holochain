@@ -135,7 +135,7 @@ pub struct InstallAppPayload {
     /// If None, a new agent key will be generated in the right circumstances (read on).
     ///
     /// It's always OK to provide a pregenerated agent key here, but there is at least one
-    /// major benefit to letting to letting Holochain generate keys for you (other than
+    /// major benefit to letting Holochain generate keys for you (other than
     /// the sheer convenience of not having to generate your own):
     ///
     /// If you are using a device seed in your conductor config, the agent key will be derived
@@ -150,7 +150,7 @@ pub struct InstallAppPayload {
     /// by setting the `allow_throwaway_random_agent_key` flag on this payload, which will cause
     /// Holochain to generate a totally random (non-recoverable) agent key.
     ///
-    /// If you are not using a device seed, or if you app has special requirements for agent keys,
+    /// If you are not using a device seed, or if your app has special requirements for agent keys,
     /// you can always provide your own here, no matter what setting you're using.
     #[serde(default)]
     pub agent_key: Option<AgentPubKey>,
