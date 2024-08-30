@@ -35,7 +35,7 @@ pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Verify the signature for this action
 pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysValidationResult<()> {
-    if action.author().verify_signature(sig, action).await? {
+    if action.signer().verify_signature(sig, action).await? {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
@@ -293,27 +293,7 @@ pub fn check_agent_validation_pkg_predecessor(
 
 /// Check that the author didn't change between actions
 pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
-    // Agent updates will be valid when DPKI support lands
-    let a1: AgentPubKey = if let Action::Update(
-        u @ Update {
-            entry_type: EntryType::AgentPubKey,
-            ..
-        },
-    ) = prev_action
-    {
-        #[cfg(feature = "dpki")]
-        {
-            u.entry_hash.clone().into()
-        }
-
-        #[cfg(not(feature = "dpki"))]
-        {
-            u.author.clone()
-        }
-    } else {
-        prev_action.author().clone()
-    };
-
+    let a1 = prev_action.author().clone();
     let a2 = action.author();
     if a1 == *a2 {
         Ok(())
