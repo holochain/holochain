@@ -14,6 +14,7 @@ use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
+use holochain_state::chain_lock::get_chain_lock;
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::mutations;
 use holochain_state::prelude::*;
@@ -29,7 +30,6 @@ use tokio::sync::broadcast::Sender;
 mod accept;
 
 pub(crate) use accept::accept_countersigning_request;
-use holochain_state::chain_lock::get_chain_lock;
 
 /// Countersigning workspace to hold session state.
 #[derive(Clone, Default)]
@@ -53,7 +53,38 @@ enum SessionState {
     /// In most cases, we do know how we got into this state, but we treat it as unknown because
     /// we want to always go through the same checks when leaving a countersigning session in any
     /// way that is not a successful completion.
-    Unknown,
+    Unknown(Option<SessionResolutionSummary>),
+}
+
+/// Summary of the workflow's attempts to resolve the outcome a failed countersigning session.
+///
+/// This tracks the numbers of attempts and the outcome of the most recent attempt.
+#[derive(Debug)]
+struct SessionResolutionSummary {
+    /// How many attempts have been made to resolve the session.
+    ///
+    /// Attempts are made according to the frequency specified by [RETRY_UNKNOWN_SESSION_STATE_DELAY].
+    ///
+    /// This count is only correct for the current run of the Holochain conductor. If the conductor
+    /// is restarted then this counter is also reset.
+    pub attempts: usize,
+    /// The time of the last attempt to resolve the session.
+    pub last_attempt_at: Timestamp,
+    /// The outcome of the most recent attempt to resolve the session.
+    pub outcomes: Vec<SessionResolutionOutcome>,
+}
+
+/// The outcome for a single agent who participated in a countersigning session.
+///
+/// [NUM_AUTHORITIES_TO_QUERY] authorities are made to agent activity authorities for each agent,
+/// and the decisions are collected into [SessionResolutionOutcome::decisions].
+#[derive(Debug)]
+struct SessionResolutionOutcome {
+    /// The agent who participated in the countersigning session and is the subject of this
+    /// resolution outcome.
+    pub agent: AgentPubKey,
+    /// The resolved decision for each authority for the subject agent.
+    pub decisions: Vec<SessionCompletionDecision>,
 }
 
 const NUM_AUTHORITIES_TO_QUERY: usize = 3;
@@ -105,7 +136,7 @@ pub(crate) async fn countersigning_workflow(
                 .for_each(|(author, session_state)| {
                     if let SessionState::Accepted(request) = session_state {
                         if request.session_times.end < Timestamp::now() {
-                            *session_state = SessionState::Unknown;
+                            *session_state = SessionState::Unknown(None);
                         }
                     }
                 });
@@ -123,7 +154,7 @@ pub(crate) async fn countersigning_workflow(
                 .sessions
                 .iter()
                 .filter_map(|(author, session_state)| match session_state {
-                    SessionState::Unknown => Some(author.clone()),
+                    SessionState::Unknown(_) => Some(author.clone()),
                     _ => None,
                 })
                 .collect::<Vec<_>>())
@@ -352,7 +383,7 @@ async fn refresh_workspace_state(
                         inner
                             .sessions
                             .entry(agent.clone())
-                            .or_insert(SessionState::Unknown);
+                            .or_insert(SessionState::Unknown(None));
 
                         Ok(())
                     })
@@ -662,7 +693,11 @@ pub(crate) async fn countersigning_success(
                         SessionState::SignaturesCollected(sigs) => {
                             sigs.push(signed_actions);
                         }
-                        SessionState::Unknown => {
+                        // TODO Could we handle this state transition by checking if the signatures
+                        //      are valid for the unresolved session? That would allow signatures
+                        //      to be received late. We don't really want that happening but if it
+                        //      solves a problem for the current agent then that is a good thing.
+                        SessionState::Unknown(_) => {
                             // If the session is in a bad state when we receive signatures then
                             // we can't do anything with them.
                             tracing::warn!("Countersigning session success received but the the session is in an unknown state for agent: {:?}", author);
