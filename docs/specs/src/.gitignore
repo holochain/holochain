@@ -1,3 +1,4 @@
+!*.svg
 *.fdb_latexmk
 *.synctex.gz
 *.pdf
