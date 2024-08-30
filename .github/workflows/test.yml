@@ -69,7 +69,7 @@ jobs:
         uses: MinoruSekine/setup-scoop@v4
         with:
           buckets: main
-          apps: mingw-winlibs-llvm main/cmake main/rust-msvc
+          apps: main/cmake main/rust-msvc
 
       - name: install llvm & clang (ubuntu-latest, wasmer_wamr)
         if: matrix.os == 'ubuntu-latest' && matrix.wasmer-feature == 'wasmer_wamr'
