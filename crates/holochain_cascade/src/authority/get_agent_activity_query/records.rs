@@ -1,28 +1,20 @@
 use crate::authority::get_agent_activity_query::{fold, render, Item, State};
-use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, WarrantHash};
-use holochain_p2p::dht::op::Timestamp;
+use holo_hash::*;
 use holochain_p2p::event::GetActivityOptions;
-use holochain_sqlite::rusqlite::{named_params, Row};
-use holochain_state::prelude::{from_blob, ActionHashed, Query, StateQueryResult, Store};
-use holochain_state::query::QueryData;
-use holochain_types::activity::AgentActivityResponse;
-use holochain_types::dht_op::{ChainOpType, DhtOpType};
-use holochain_types::prelude::WarrantOpType;
-use holochain_zome_types::judged::Judged;
-use holochain_zome_types::prelude::{
-    ChainQueryFilter, SignedAction, SignedWarrant, ValidationStatus,
-};
+use holochain_sqlite::rusqlite::*;
+use holochain_state::{prelude::*, query::QueryData};
+use std::fmt::Debug;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
-pub struct GetAgentActivityHashesQuery {
+pub struct GetAgentActivityRecordsQuery {
     pub(super) agent: AgentPubKey,
     pub(super) agent_basis: AnyLinkableHash,
     pub(super) filter: ChainQueryFilter,
     pub(super) options: GetActivityOptions,
 }
 
-impl GetAgentActivityHashesQuery {
+impl GetAgentActivityRecordsQuery {
     pub fn new(agent: AgentPubKey, filter: ChainQueryFilter, options: GetActivityOptions) -> Self {
         Self {
             agent_basis: agent.clone().into(),
@@ -33,9 +25,9 @@ impl GetAgentActivityHashesQuery {
     }
 }
 
-impl Query for GetAgentActivityHashesQuery {
-    type State = State<ActionHashed>;
-    type Item = Judged<Item<ActionHashed>>;
+impl Query for GetAgentActivityRecordsQuery {
+    type State = State<Record>;
+    type Item = Judged<Item<Record>>;
     type Output = AgentActivityResponse;
 
     fn query(&self) -> String {
@@ -43,11 +35,14 @@ impl Query for GetAgentActivityHashesQuery {
             SELECT
             Action.hash,
             Action.blob AS action_blob,
+            Action.private_entry,
             DhtOp.type AS dht_type,
             DhtOp.validation_status,
-            DhtOp.when_integrated
+            DhtOp.when_integrated,
+            Entry.blob AS entry_blob
             FROM Action
             JOIN DhtOp ON DhtOp.action_hash = Action.hash
+            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
             WHERE
             (
                 -- is an action authored by this agent
@@ -88,20 +83,40 @@ impl Query for GetAgentActivityHashesQuery {
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
+        let include_entries = self.filter.include_entries;
         Arc::new(move |row| {
             let op_type: DhtOpType = row.get("dht_type")?;
             let validation_status: Option<ValidationStatus> = row.get("validation_status")?;
             let integrated: Option<Timestamp> = row.get("when_integrated")?;
 
+            // Note that even if an entry is expected, it might not be present.
+            // This code is intended to run on an agent authority which may not be an entry authority
+            // for all the relevant entries. The caller will need to handle any missing entries that
+            // they care about.
+            let private_entry = row
+                .get::<_, Option<bool>>("private_entry")?
+                .unwrap_or(false);
+            let maybe_entry = if !private_entry && include_entries {
+                row.get::<_, Option<Vec<u8>>>("entry_blob")?
+                    .map(from_blob)
+                    .transpose()?
+            } else {
+                None
+            };
+
             match op_type {
                 DhtOpType::Chain(_) => {
                     let hash: ActionHash = row.get("hash")?;
                     from_blob::<SignedAction>(row.get("action_blob")?).map(|action| {
-                        let action = ActionHashed::with_pre_hashed(action.into_data(), hash);
+                        let action = SignedHashed {
+                            hashed: ActionHashed::with_pre_hashed(action.action().clone(), hash),
+                            signature: action.signature().clone(),
+                        };
+                        let record = Record::new(action, maybe_entry);
                         let item = if integrated.is_some() {
-                            Item::Integrated(action)
+                            Item::Integrated(record)
                         } else {
-                            Item::Pending(action)
+                            Item::Pending(record)
                         };
                         Judged::raw(item, validation_status)
                     })
@@ -117,8 +132,8 @@ impl Query for GetAgentActivityHashesQuery {
         })
     }
 
-    fn fold(&self, state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
-        fold(state, data)
+    fn fold(&self, state: Self::State, item: Self::Item) -> StateQueryResult<Self::State> {
+        fold(state, item)
     }
 
     fn render<S>(&self, state: Self::State, _stores: S) -> StateQueryResult<Self::Output>

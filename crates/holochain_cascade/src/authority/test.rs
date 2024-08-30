@@ -196,12 +196,12 @@ async fn get_agent_activity() {
     holochain_trace::test_run();
     let db = test_dht_db();
 
-    let td = ActivityTestData::valid_chain_scenario();
+    let td = ActivityTestData::valid_chain_scenario(false);
 
-    for hash_op in td.hash_ops.iter().cloned() {
+    for hash_op in td.agent_activity_ops.iter().cloned() {
         fill_db(&db.to_db(), hash_op).await;
     }
-    for hash_op in td.noise_ops.iter().cloned() {
+    for hash_op in td.noise_agent_activity_ops.iter().cloned() {
         fill_db(&db.to_db(), hash_op).await;
     }
 
@@ -256,7 +256,7 @@ async fn get_agent_activity() {
     let options = actor::GetActivityOptions {
         include_valid_activity: true,
         include_rejected_activity: false,
-        include_full_actions: false,
+        include_full_records: false,
         ..Default::default()
     };
 

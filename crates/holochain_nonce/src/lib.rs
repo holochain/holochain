@@ -16,6 +16,13 @@ impl Nonce256Bits {
 /// Rather arbitrary but we expire nonces after 5 mins.
 pub const FRESH_NONCE_EXPIRES_AFTER: Duration = Duration::from_secs(60 * 5);
 
+/// Generate a fresh nonce.
+///
+/// The nonce will be valid from the given `now` timestamp until `now` + [FRESH_NONCE_EXPIRES_AFTER].
+/// A new nonce and the expiry are returned as a tuple.
+///
+/// Note: the expiry isn't managed by this function. It's up to the caller to enforce the expiry
+/// time of the nonce.
 pub fn fresh_nonce(
     now: Timestamp,
 ) -> Result<(Nonce256Bits, Timestamp), Box<dyn Error + std::marker::Send + Sync>> {

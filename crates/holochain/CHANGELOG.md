@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `allow_throwaway_random_agent_key` can be set in the `InstallAppPayload` to override the aforementioned behavior, allowing an agent key to not be specified even if a device seed is not specified in the conductor. This is a safety mechanism, and should only be used in test situations where the generated agent key is a throwaway and will never need to be recovered.
 - Holochain now actually makes use of the device seed, which was previously ignored
 - Holochain now makes sure to properly register in DPKI any pregenerated agent key which is provided in app installation, when DPKI is enabled.
+- Internal rework of `get_agent_activity`. This is not a breaking change for the HDK function of the same name, but it
+  is a breaking change to the previous version of Holochain because the network response for agent activity has been changed.
+  A future change will be made to the HDK function to expose the new functionality. #4221
 
 ## 0.4.0-dev.21
 

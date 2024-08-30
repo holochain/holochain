@@ -119,7 +119,7 @@ mod unit_tests;
 #[cfg(test)]
 mod validate_op_tests;
 
-/// The sys validation worfklow. It is described in the module level documentation.
+/// The sys validation workflow. It is described in the module level documentation.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 #[allow(clippy::too_many_arguments)]
 pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
