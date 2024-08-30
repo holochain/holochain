@@ -68,8 +68,7 @@ jobs:
         if: matrix.os == 'windows-latest' && matrix.wasmer-feature == 'wasmer_wamr'
         uses: MinoruSekine/setup-scoop@v4
         with:
-          buckets: main
-          apps: main/cmake main/rust-msvc
+          apps: main/cmake main/rust
 
       - name: install llvm & clang (ubuntu-latest, wasmer_wamr)
         if: matrix.os == 'ubuntu-latest' && matrix.wasmer-feature == 'wasmer_wamr'
