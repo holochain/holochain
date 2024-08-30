@@ -1423,6 +1423,17 @@ mod network_impls {
     }
 }
 
+/// Flags for [`Conductor::install_app_common`]
+#[derive(Default)]
+pub struct InstallAppCommonFlags {
+    /// From [`AppManifestV1::defer_memproofs`]
+    pub defer_memproofs: bool,
+    /// From [`InstallAppPayload::ignore_genesis_failure`]
+    pub ignore_genesis_failure: bool,
+    /// From [`InstallAppPayload::allow_throwaway_random_agent_key`]
+    pub allow_throwaway_random_agent_key: bool,
+}
+
 /// Methods related to app installation and management
 mod app_impls {
     use holochain_types::deepkey_roundtrip_backward;
@@ -1467,10 +1478,12 @@ mod app_impls {
                     installed_app_id,
                     manifest,
                     agent.clone(),
-                    false,
                     ops,
-                    false,
-                    true,
+                    InstallAppCommonFlags {
+                        defer_memproofs: false,
+                        ignore_genesis_failure: false,
+                        allow_throwaway_random_agent_key: true,
+                    },
                 )
                 .await?;
 
@@ -1483,11 +1496,8 @@ mod app_impls {
             installed_app_id: InstalledAppId,
             manifest: AppManifest,
             agent_key: Option<AgentPubKey>,
-            defer_memproofs: bool,
             ops: AppRoleResolution,
-            ignore_genesis_failure: bool,
-
-            allow_throwaway_random_agent_key: bool,
+            flags: InstallAppCommonFlags,
         ) -> ConductorResult<InstalledApp> {
             let dpki = self.running_services().dpki.clone();
 
@@ -1499,20 +1509,20 @@ mod app_impls {
                 None
             };
 
-            let (_, app_index) = self
-                .update_state_prime(|mut state| {
-                    let index = state.cumulative_app_installation_count;
-                    state.cumulative_app_installation_count += 1;
-                    Ok((state, index))
-                })
-                .await?;
-
             let (agent_key, derivation_details): (AgentPubKey, Option<DerivationDetailsInput>) =
                 if let Some(agent_key) = agent_key {
                     // Key doesn't need to be generated: it will be registered later
                     (agent_key, None)
                 } else if let Some(lair_tag) = self.get_config().device_seed_lair_tag.clone() {
-                    // dpki installed, no agent key given
+                    // no agent key given, we must derive a new one
+
+                    let (_, app_index) = self
+                        .update_state_prime(|mut state| {
+                            let index = state.derived_agent_key_count;
+                            state.derived_agent_key_count += 1;
+                            Ok((state, index))
+                        })
+                        .await?;
 
                     // register a new key derivation for this app
                     let derivation_details = DerivationDetails {
@@ -1552,7 +1562,8 @@ mod app_impls {
                     };
 
                     (AgentPubKey::from_raw_32(seed), Some(derivation))
-                } else if allow_throwaway_random_agent_key {
+                } else if flags.allow_throwaway_random_agent_key {
+                    // no agent key given, we generate a random throwaway one
                     (self.keystore.new_sign_keypair_random().await?, None)
                 } else {
                     return Err(ConductorError::other("Unable to install app. If `device_seed_lair_tag` is not specified in config, an agent key must be provided when installing an app."));
@@ -1585,7 +1596,7 @@ mod app_impls {
                 .map(|(cell_id, _)| cell_id.clone())
                 .collect();
 
-            let app_result = if defer_memproofs {
+            let app_result = if flags.defer_memproofs {
                 let roles = ops.role_assignments;
                 let app = InstalledAppCommon::new(
                     installed_app_id.clone(),
@@ -1605,7 +1616,7 @@ mod app_impls {
                 let genesis_result =
                     crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
 
-                if genesis_result.is_ok() || ignore_genesis_failure {
+                if genesis_result.is_ok() || flags.ignore_genesis_failure {
                     let roles = ops.role_assignments;
                     let app = InstalledAppCommon::new(
                         installed_app_id.clone(),
@@ -1706,6 +1717,12 @@ mod app_impls {
                 AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.is_none(),
             };
 
+            let flags = InstallAppCommonFlags {
+                defer_memproofs,
+                ignore_genesis_failure,
+                allow_throwaway_random_agent_key,
+            };
+
             let membrane_proofs = membrane_proofs.unwrap_or_default();
 
             let installed_app_id =
@@ -1732,15 +1749,7 @@ mod app_impls {
                 .await?;
 
             self.clone()
-                .install_app_common(
-                    installed_app_id,
-                    manifest,
-                    agent_key,
-                    defer_memproofs,
-                    ops,
-                    ignore_genesis_failure,
-                    allow_throwaway_random_agent_key,
-                )
+                .install_app_common(installed_app_id, manifest, agent_key, ops, flags)
                 .await
         }
 
