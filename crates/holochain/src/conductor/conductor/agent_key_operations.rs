@@ -123,19 +123,9 @@ impl Conductor {
         let all_cells: Vec<CellId> = app.all_cells().collect();
         let delete_agent_key_of_all_cells = all_cells.clone().into_iter().map(|cell_id| {
             let conductor = conductor.clone();
-            let agent_key = agent_key.clone();
             async move {
                 // Instantiate source chain
-                let source_chain = SourceChain::new(
-                    conductor.get_or_create_authored_db(cell_id.dna_hash(), agent_key.clone())?,
-                    conductor.get_or_create_dht_db(cell_id.dna_hash())?,
-                    conductor
-                        .get_or_create_space(cell_id.dna_hash())?
-                        .dht_query_cache,
-                    conductor.keystore().clone(),
-                    agent_key.clone(),
-                )
-                .await?;
+                let source_chain = conductor.get_source_chain(&cell_id).await?;
 
                 // Insert `Delete` action of agent pub key into source chain
                 source_chain.delete_valid_agent_pub_key().await?;

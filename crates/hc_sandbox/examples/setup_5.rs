@@ -6,8 +6,10 @@ use hc_sandbox::CmdRunner;
 use holochain_cli_sandbox as hc_sandbox;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
+use holochain_types::app::AppBundle;
 use holochain_types::prelude::AppBundleSource;
 use holochain_types::prelude::InstallAppPayload;
+use holochain_util::ffs;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 use clap::Parser;
@@ -43,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
         let (mut cmd, _conductor_guard) =
             CmdRunner::from_sandbox_with_bin_path(&input.holochain_path, path.clone()).await?;
 
-        let bundle = AppBundleSource::Path(happ.clone()).resolve().await?;
+        let bundle = AppBundle::decode(&ffs::read(&*path).await?)?;
 
         // Create the raw InstallAppPayload request.
         let payload = InstallAppPayload {

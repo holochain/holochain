@@ -90,7 +90,7 @@ pub fn must_get_action(action_hash: ActionHash) -> ExternResult<SignedActionHash
 ///
 /// `must_get_valid_record` is available in contexts such as validation where both determinism and network access is desirable.
 ///
-/// An `Record` will not be returned if:
+/// A `Record` will not be returned if:
 ///
 /// - @TODO It is WITHDRAWN by the author
 /// - @TODO The Entry is PURGED by the community
@@ -98,7 +98,7 @@ pub fn must_get_action(action_hash: ActionHash) -> ExternResult<SignedActionHash
 /// - If ANY authority (1 of N trust) OR ourselves (0 of N trust) believes it INVALID
 /// - Nobody knows about it on the visible network
 ///
-/// If an `Record` fails to be returned:
+/// If a `Record` fails to be returned:
 ///
 /// - Callbacks will return early with `UnresolvedDependencies`
 /// - Zome calls will receive a `WasmError` from the host

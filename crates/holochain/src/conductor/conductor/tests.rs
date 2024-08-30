@@ -29,6 +29,7 @@ mod agent_key_revocation;
 // Module with tests related to an agent's key lineage. Agents can update their key. Both old and new
 // key belong to the same key lineage, they belong to the same agent.
 pub mod agent_lineage;
+mod migration;
 mod test_dpki;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1358,4 +1359,10 @@ async fn test_deferred_memproof_provisioning_uninstall() {
         .await
         .unwrap();
     assert_eq!(conductor.list_apps(None).await.unwrap().len(), 0);
+}
+
+/// After installing an app bundle, we can get it back
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_app_bundle() {
+    todo!("rebuild bundle from installed app")
 }

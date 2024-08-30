@@ -1673,7 +1673,7 @@ mod app_impls {
             } = payload;
 
             let bundle = {
-                let original_bundle = source.resolve().await?;
+                let original_bundle = source.resolve(&*self).await?;
                 if let Some(network_seed) = network_seed {
                     let mut manifest = original_bundle.manifest().to_owned();
                     manifest.set_network_seed(network_seed);
@@ -2072,6 +2072,79 @@ mod cell_impls {
                 })
                 .collect())
         }
+
+        /// Convenience for constructing a [`SourceChain`] from a [`CellId`]
+        pub async fn get_source_chain(&self, cell_id: &CellId) -> ConductorResult<SourceChain> {
+            let (dna_hash, agent_key) = cell_id.to_dna_and_agent();
+            Ok(SourceChain::new(
+                self.get_or_create_authored_db(dna_hash, agent_key.clone())?,
+                self.get_or_create_dht_db(dna_hash)?,
+                self.get_or_create_space(dna_hash)?.dht_query_cache,
+                self.keystore().clone(),
+                agent_key.clone(),
+            )
+            .await?)
+        }
+
+        /// Given two existing cells, write a CloseChain on the old one and an OpenChain on the new one
+        pub(crate) async fn migrate_cell(
+            &self,
+            old_cell_id: &CellId,
+            new_cell_id: &CellId,
+        ) -> ConductorResult<(ActionHash, ActionHash)> {
+            let (backward, forward) = match (old_cell_id, new_cell_id) {
+                (CellId(dna1, agent1), CellId(dna2, agent2))
+                    if dna1 == dna2 && agent1 != agent2 =>
+                {
+                    (
+                        MigrationTarget::Agent(agent1.clone()),
+                        MigrationTarget::Agent(agent2.clone()),
+                    )
+                }
+                (CellId(dna1, agent1), CellId(dna2, agent2))
+                    if dna1 != dna2 && agent1 == agent2 =>
+                {
+                    (
+                        MigrationTarget::Dna(dna1.clone()),
+                        MigrationTarget::Dna(dna2.clone()),
+                    )
+                }
+                _ => todo!(
+                    "not valid migration targets: {:?} -> {:?}",
+                    old_cell_id,
+                    new_cell_id
+                ),
+            };
+            let old_chain = self.get_source_chain(old_cell_id).await?;
+            let close_hash = old_chain
+                .put_weightless(
+                    hdk::prelude::builder::CloseChain::new(Some(forward)),
+                    None,
+                    ChainTopOrdering::Strict,
+                )
+                .await?;
+            {
+                let old_cell = self.cell_by_id(old_cell_id).await?;
+                let old_network = old_cell.holochain_p2p_dna();
+                old_chain.flush(old_network).await?;
+            }
+
+            let new_chain = self.get_source_chain(new_cell_id).await?;
+            let open_hash = new_chain
+                .put_weightless(
+                    hdk::prelude::builder::OpenChain::new(backward, close_hash.clone()),
+                    None,
+                    ChainTopOrdering::Strict,
+                )
+                .await?;
+            {
+                let new_cell = self.cell_by_id(new_cell_id).await?;
+                let new_network = new_cell.holochain_p2p_dna();
+                new_chain.flush(new_network).await?;
+            }
+
+            Ok((close_hash, open_hash))
+        }
     }
 }
 
@@ -2126,15 +2199,8 @@ mod clone_cell_impls {
                 }
 
                 // Check source chain if agent key is valid
-                let source_chain = SourceChain::new(
-                    self.get_or_create_authored_db(app_role.dna_hash(), app.agent_key().clone())?,
-                    self.get_or_create_dht_db(app_role.dna_hash())?,
-                    self.get_or_create_space(app_role.dna_hash())?
-                        .dht_query_cache,
-                    self.keystore.clone(),
-                    app.agent_key().clone(),
-                )
-                .await?;
+                let cell_id = CellId::new(app_role.dna_hash().clone(), app.agent_key().clone());
+                let source_chain = self.get_source_chain(&cell_id).await?;
                 source_chain.valid_create_agent_key_action().await?;
             }
 
@@ -2779,18 +2845,7 @@ mod misc_impls {
             let cell = self.cell_by_id(&cell_id).await?;
             cell.check_or_run_zome_init().await?;
 
-            let source_chain = SourceChain::new(
-                self.get_or_create_authored_db(
-                    cell_id.dna_hash(),
-                    cell.id().agent_pubkey().clone(),
-                )?,
-                self.get_or_create_dht_db(cell_id.dna_hash())?,
-                self.get_or_create_space(cell_id.dna_hash())?
-                    .dht_query_cache,
-                self.keystore.clone(),
-                cell_id.agent_pubkey().clone(),
-            )
-            .await?;
+            let source_chain = self.get_source_chain(&cell_id).await?;
 
             let cap_grant_entry = Entry::CapGrant(cap_grant);
             let entry_hash = EntryHash::with_data_sync(&cap_grant_entry);
@@ -3174,6 +3229,34 @@ mod authenticate_token_impls {
                 app_connection_auth.authenticate_token(token, app_id)
             })
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl AppBundleStore for Conductor {
+    async fn get_app_bundle(&self, app_id: &InstalledAppId) -> AppBundleResult<AppBundle> {
+        let state = self
+            .get_state()
+            .await
+            .map_err(|e| AppBundleError::AppBundleMissing(app_id.clone(), e.to_string()))?;
+        let app = state
+            .get_app(app_id)
+            .map_err(|e| AppBundleError::AppBundleMissing(app_id.clone(), e.to_string()))?;
+        match &app.manifest {
+            AppManifest::V1(m) => {
+                let installed_hashes_set =
+                    m.roles.iter().all(|role| role.dna.installed_hash.is_some());
+                assert!(
+                    installed_hashes_set,
+                    "All installed_hash fields must be set in an installed app's manifest"
+                );
+            }
+        }
+
+        // We don't have to include the DNA resources because they are already installed
+        // in the conductor, and the manifest already points to them.
+        // When this bare manifest is installed, it will pull the existing installed DNAs.
+        AppBundle::new(app.manifest.clone(), vec![], PathBuf::from(".")).await
     }
 }
 
