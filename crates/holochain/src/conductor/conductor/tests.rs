@@ -389,12 +389,13 @@ async fn test_reconciliation_idempotency() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_signing_error_during_genesis() {
     holochain_trace::test_run();
-    let bad_keystore = spawn_crude_mock_keystore(|| "test error".into()).await;
+    let bad_keystore = spawn_crude_mock_keystore(|| "spawn_crude_mock_keystore error".into()).await;
 
     let db_dir = test_db_dir();
     let config = ConductorConfig {
         data_root_path: Some(db_dir.path().to_path_buf().into()),
         dpki: DpkiConfig::disabled(),
+        device_seed_lair_tag: Some("nonexistent-tag".to_string()),
         ..Default::default()
     };
     let mut conductor = SweetConductor::new(
