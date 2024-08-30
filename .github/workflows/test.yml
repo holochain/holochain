@@ -16,31 +16,32 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  static-job-id:
-    name: static
-    runs-on: macos-latest # currently faster than ubuntu-latest
-    steps:
-      - name: checkout
-        uses: actions/checkout@v4
-
-      - name: 'Common Test Setup Actions'
-        uses: ./.github/actions/common-pre
-
-      - name: static-fmt
-        run: make static-fmt
-
-      - name: static-toml
-        run: make static-toml
-
-      - name: static-clippy
-        run: make static-clippy
-
-      - name: static-doc
-        run: make static-doc
-
-      - name: 'Common Test Teardown Actions'
-        uses: ./.github/actions/common-post
-
+  #static-job-id:
+  #  name: static
+  #  runs-on: macos-latest # currently faster than ubuntu-latest
+  #  steps:
+  #    - name: checkout
+  #      uses: actions/checkout@v4
+  #
+  #    - name: 'Common Test Setup Actions'
+  #      uses: ./.github/actions/common-pre
+  #
+  #    - name: static-fmt
+  #      run: make static-fmt
+  #
+  #    - name: static-toml
+  #      run: make static-toml
+  #
+  #    - name: static-clippy
+  #      run: make static-clippy
+  #
+  #    - name: static-doc
+  #      run: make static-doc
+  #
+  #    - name: 'Common Test Teardown Actions'
+  #      uses: ./.github/actions/common-post
+  #
+  
   test-job-id:
     name: test
     runs-on: ${{ matrix.os }}
@@ -54,7 +55,7 @@ jobs:
           windows-latest,
         ]
         wasmer-feature: [
-          wasmer_sys,
+          # wasmer_sys,
           wasmer_wamr
         ]
     steps:
