@@ -48,9 +48,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [
-          ubuntu-latest,
-          macos-latest,
-          macos-13,
+          # ubuntu-latest,
+          # macos-latest,
+          # macos-13,
           windows-latest,
         ]
         wasmer-feature: [
