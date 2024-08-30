@@ -64,6 +64,32 @@ jobs:
       - name: 'Common Test Setup Actions'
         uses: ./.github/actions/common-pre
 
+      - name: install llvm & clang (ubuntu-latest, wasmer_wamr)
+        if: matrix.os == 'ubuntu-latest' && matrix.wasmer-feature == 'wasmer_wamr'
+        shell: bash
+        run: sudo apt install -y build-essential cmake g++-multilib libgcc-11-dev lib32gcc-11-dev ccache libclang-dev
+
+      - name: install llvm & clang (windows-latest)
+        if: matrix.os == 'windows-latest' && matrix.wasmer-feature == 'wasmer_wamr'
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "17"
+
+      - name: install msvc (windows-latest)
+        if: matrix.os == 'windows-latest' && matrix.wasmer-feature == 'wasmer_wamr'
+        uses: ilammy/msvc-dev-cmd@v1.4.1
+
+      - name: install python windows
+        if: matrix.os == 'windows-latest' && matrix.wasmer-feature == 'wasmer_wamr'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          cache: 'pip' # caching pip dependencies
+
+      - name: install dlib windows
+        if: matrix.os == 'windows-latest' && matrix.wasmer-feature == 'wasmer_wamr'
+        run: pip install dlib
+
       - name: build windows
         if: matrix.os == 'windows-latest'
         run: |-
