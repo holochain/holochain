@@ -1,4 +1,5 @@
 use crate::core::ribosome::error::RibosomeResult;
+use holochain_wasmer_host::module::InstanceWithStore;
 use std::path::PathBuf;
 use std::sync::Arc;
 use wasmer::Module;
