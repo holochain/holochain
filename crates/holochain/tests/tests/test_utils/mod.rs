@@ -31,6 +31,7 @@ use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::InterfaceDriver;
 use matches::assert_matches;
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::time::Duration;
 use std::{path::PathBuf, process::Stdio};
@@ -117,16 +118,18 @@ pub async fn grant_zome_call_capability(
     Ok(cap_secret)
 }
 
-pub async fn call_zome_fn<S>(
+pub async fn call_zome_fn<I, O>(
     app_tx: &WebsocketSender,
     cell_id: CellId,
     signing_keypair: &SigningKey,
     cap_secret: CapSecret,
     zome_name: ZomeName,
     fn_name: FunctionName,
-    input: &S,
-) where
-    S: Serialize + std::fmt::Debug,
+    input: &I,
+) -> O
+where
+    I: Serialize + std::fmt::Debug,
+    O: DeserializeOwned + std::fmt::Debug,
 {
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
     let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
@@ -155,8 +158,10 @@ pub async fn call_zome_fn<S>(
     let request = AppRequest::CallZome(Box::new(call));
     let response = app_tx.request(request);
     let call_response = check_timeout(response, 6000).await.unwrap();
-    trace!(?call_response);
-    assert_matches!(call_response, AppResponse::ZomeCalled(_));
+    match call_response {
+        AppResponse::ZomeCalled(response) => response.decode().unwrap(),
+        _ => panic!("unexpected zome call response"),
+    }
 }
 
 pub async fn attach_app_interface(client: &mut WebsocketSender, port: Option<u16>) -> u16 {
