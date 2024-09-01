@@ -2633,42 +2633,10 @@ dependencies = [
  "cfg-if 1.0.0",
  "cmake",
  "derivative",
- "hc-wasmer-compiler 4.3.6-hc.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "hc-wasmer-derive 4.3.6-hc.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "hc-wasmer-types 4.3.6-hc.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "hc-wasmer-vm 4.3.6-hc.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "indexmap 1.9.3",
- "js-sys",
- "more-asserts",
- "rustc-demangle",
- "serde",
- "serde-wasm-bindgen",
- "shared-buffer",
- "target-lexicon",
- "thiserror",
- "tracing",
- "ureq",
- "wasm-bindgen",
- "wasmparser",
- "wat",
- "windows-sys 0.59.0",
- "zip 2.2.0",
-]
-
-[[package]]
-name = "hc-wasmer"
-version = "4.3.6-hc.1"
-source = "git+https://github.com/holochain/wasmer?branch=fix/win32-build#864327df021e4bec0ad1cb1bab1077a7aa486e0d"
-dependencies = [
- "bindgen",
- "bytes",
- "cfg-if 1.0.0",
- "cmake",
- "derivative",
- "hc-wasmer-compiler 4.3.6-hc.1 (git+https://github.com/holochain/wasmer?branch=fix/win32-build)",
- "hc-wasmer-derive 4.3.6-hc.1 (git+https://github.com/holochain/wasmer?branch=fix/win32-build)",
- "hc-wasmer-types 4.3.6-hc.1 (git+https://github.com/holochain/wasmer?branch=fix/win32-build)",
- "hc-wasmer-vm 4.3.6-hc.1 (git+https://github.com/holochain/wasmer?branch=fix/win32-build)",
+ "hc-wasmer-compiler",
+ "hc-wasmer-derive",
+ "hc-wasmer-types",
+ "hc-wasmer-vm",
  "indexmap 1.9.3",
  "js-sys",
  "more-asserts",
@@ -2698,35 +2666,8 @@ dependencies = [
  "cfg-if 1.0.0",
  "enum-iterator",
  "enumset",
- "hc-wasmer-types 4.3.6-hc.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "hc-wasmer-vm 4.3.6-hc.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "lazy_static",
- "leb128",
- "libc",
- "memmap2 0.5.10",
- "more-asserts",
- "region",
- "rkyv",
- "self_cell",
- "shared-buffer",
- "smallvec 1.13.2",
- "thiserror",
- "windows-sys 0.59.0",
- "xxhash-rust",
-]
-
-[[package]]
-name = "hc-wasmer-compiler"
-version = "4.3.6-hc.1"
-source = "git+https://github.com/holochain/wasmer?branch=fix/win32-build#864327df021e4bec0ad1cb1bab1077a7aa486e0d"
-dependencies = [
- "backtrace",
- "bytes",
- "cfg-if 1.0.0",
- "enum-iterator",
- "enumset",
- "hc-wasmer-types 4.3.6-hc.1 (git+https://github.com/holochain/wasmer?branch=fix/win32-build)",
- "hc-wasmer-vm 4.3.6-hc.1 (git+https://github.com/holochain/wasmer?branch=fix/win32-build)",
+ "hc-wasmer-types",
+ "hc-wasmer-vm",
  "lazy_static",
  "leb128",
  "libc",
@@ -2755,40 +2696,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "hc-wasmer-derive"
-version = "4.3.6-hc.1"
-source = "git+https://github.com/holochain/wasmer?branch=fix/win32-build#864327df021e4bec0ad1cb1bab1077a7aa486e0d"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "hc-wasmer-types"
 version = "4.3.6-hc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7832ae1364df93ef680b31523c348204f25810e513b66dfd99d406d985d3e0e5"
-dependencies = [
- "bytecheck",
- "enum-iterator",
- "enumset",
- "getrandom 0.2.15",
- "hex",
- "indexmap 1.9.3",
- "more-asserts",
- "rkyv",
- "sha2",
- "target-lexicon",
- "thiserror",
- "xxhash-rust",
-]
-
-[[package]]
-name = "hc-wasmer-types"
-version = "4.3.6-hc.1"
-source = "git+https://github.com/holochain/wasmer?branch=fix/win32-build#864327df021e4bec0ad1cb1bab1077a7aa486e0d"
 dependencies = [
  "bytecheck",
  "enum-iterator",
@@ -2819,34 +2730,7 @@ dependencies = [
  "derivative",
  "enum-iterator",
  "fnv",
- "hc-wasmer-types 4.3.6-hc.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "indexmap 1.9.3",
- "lazy_static",
- "libc",
- "mach2",
- "memoffset 0.9.1",
- "more-asserts",
- "region",
- "scopeguard",
- "thiserror",
- "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "hc-wasmer-vm"
-version = "4.3.6-hc.1"
-source = "git+https://github.com/holochain/wasmer?branch=fix/win32-build#864327df021e4bec0ad1cb1bab1077a7aa486e0d"
-dependencies = [
- "backtrace",
- "cc",
- "cfg-if 1.0.0",
- "corosensei",
- "crossbeam-queue",
- "dashmap 6.0.1",
- "derivative",
- "enum-iterator",
- "fnv",
- "hc-wasmer-types 4.3.6-hc.1 (git+https://github.com/holochain/wasmer?branch=fix/win32-build)",
+ "hc-wasmer-types",
  "indexmap 1.9.3",
  "lazy_static",
  "libc",
@@ -3180,7 +3064,7 @@ dependencies = [
  "get_if_addrs",
  "getrandom 0.2.15",
  "ghost_actor",
- "hc-wasmer 4.3.6-hc.1 (git+https://github.com/holochain/wasmer?branch=fix/win32-build)",
+ "hc-wasmer",
  "hc_deepkey_sdk",
  "hc_sleuth",
  "hdk",
@@ -3352,7 +3236,7 @@ dependencies = [
  "assert_cmd",
  "clap 4.5.6",
  "futures",
- "hc-wasmer 4.3.6-hc.1 (git+https://github.com/holochain/wasmer?branch=fix/win32-build)",
+ "hc-wasmer",
  "holochain_serialized_bytes",
  "holochain_types",
  "holochain_util",
@@ -3888,7 +3772,7 @@ checksum = "cf87b72bbdc589f1859f385b25e3951e2a41cd7cc19ece3a2ad41009e8b1516c"
 dependencies = [
  "bimap",
  "bytes",
- "hc-wasmer 4.3.6-hc.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hc-wasmer",
  "hex",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",

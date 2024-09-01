@@ -40,8 +40,7 @@ tracing = "0.1"
 tokio = { version = "1.27", features = ["full"] }
 
 # Temporarily include a fork of wasmer from the git branch 'wamr', until it is officially released in wasmer v5
-#hc-wasmer = { version = "=4.3.6-hc.1", optional = true, default-features = false }
-hc-wasmer = { git = "https://github.com/holochain/wasmer", branch = "fix/win32-build", optional = true, default-features = false }
+hc-wasmer = { version = "=4.3.6-hc.1", optional = true, default-features = false }
 wasmer = { version = "=4.3.6", optional = true, default-feature = false }
 
 [dev-dependencies]

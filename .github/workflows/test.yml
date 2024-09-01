@@ -22,26 +22,25 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v4
-  
+
       - name: 'Common Test Setup Actions'
         uses: ./.github/actions/common-pre
-  
+
       - name: static-fmt
         run: make static-fmt
-  
+
       - name: static-toml
         run: make static-toml
-  
+
       - name: static-clippy
         run: make static-clippy
-  
+
       - name: static-doc
         run: make static-doc
-  
+
       - name: 'Common Test Teardown Actions'
         uses: ./.github/actions/common-post
-  
-  
+
   test-job-id:
     name: test
     runs-on: ${{ matrix.os }}
