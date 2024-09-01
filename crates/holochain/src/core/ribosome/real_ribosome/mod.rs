@@ -399,7 +399,6 @@ impl RealRibosome {
         preserialized_module(path)
     }
 
-
     // Create a key for module cache.
     // Format: [WasmHash] as bytes
     // watch out for cache misses in the tests that make things slooow if you change this!
@@ -834,6 +833,7 @@ impl RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
+                    // Reset available metering points to the maximum allowed per zome call
                     reset_metering_points(instance_with_store.clone());
 
                     // be aware of this clone!
@@ -847,6 +847,7 @@ impl RealRibosome {
                     })
                     .await?;
 
+                    // Get metering points consumed in zome call and save to usage_meter
                     let points_used = get_used_metering_points(instance_with_store.clone());
                     self.usage_meter.add(points_used, &otel_info);
 

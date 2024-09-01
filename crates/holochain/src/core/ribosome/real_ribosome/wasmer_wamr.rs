@@ -1,7 +1,7 @@
+use crate::core::ribosome::error::RibosomeResult;
 use std::path::PathBuf;
 use std::sync::Arc;
 use wasmer::Module;
-use crate::core::ribosome::error::RibosomeResult;
 
 pub fn preserialized_module(_path: &PathBuf) -> RibosomeResult<Arc<Module>> {
     unimplemented!("The feature flag 'wasmer_sys' must be enabled to support compiling wasm");
