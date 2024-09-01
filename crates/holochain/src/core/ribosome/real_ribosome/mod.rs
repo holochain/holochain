@@ -108,8 +108,6 @@ use crate::core::ribosome::host_fn::close_chain::close_chain;
 use crate::core::ribosome::host_fn::count_links::count_links;
 use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
 use crate::core::ribosome::host_fn::open_chain::open_chain;
-#[cfg(feature = "wasmer_sys")]
-use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
@@ -120,12 +118,16 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+
 #[cfg(feature = "wasmer_sys")]
-use wasmer_middlewares::metering::get_remaining_points;
+mod wasmer_sys;
 #[cfg(feature = "wasmer_sys")]
-use wasmer_middlewares::metering::set_remaining_points;
-#[cfg(feature = "wasmer_sys")]
-use wasmer_middlewares::metering::MeteringPoints;
+use wasmer_sys::*;
+
+#[cfg(feature = "wasmer_wamr")]
+mod wasmer_wamr;
+#[cfg(feature = "wasmer_wamr")]
+use wasmer_wamr::*;
 
 pub(crate) type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
 
@@ -393,16 +395,10 @@ impl RealRibosome {
         .await?
     }
 
-    #[cfg(feature = "wasmer_sys")]
     pub fn preserialized_module(&self, path: &PathBuf) -> RibosomeResult<Arc<Module>> {
-        let module = holochain_wasmer_host::module::get_ios_module_from_file(path)?;
-        Ok(Arc::new(module))
+        preserialized_module(path)
     }
 
-    #[cfg(feature = "wasmer_wamr")]
-    pub fn preserialized_module(&self, _path: &PathBuf) -> RibosomeResult<Arc<Module>> {
-        unimplemented!("The feature flag 'wasmer_sys' must be enabled to support compiling wasm");
-    }
 
     // Create a key for module cache.
     // Format: [WasmHash] as bytes
@@ -838,16 +834,7 @@ impl RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
-                    #[cfg(feature = "wasmer_sys")]
-                    {
-                        let mut store_lock = instance_with_store.store.lock();
-                        let mut store_mut = store_lock.as_store_mut();
-                        set_remaining_points(
-                            &mut store_mut,
-                            instance_with_store.instance.as_ref(),
-                            WASM_METERING_LIMIT,
-                        );
-                    }
+                    reset_metering_points(instance_with_store.clone());
 
                     // be aware of this clone!
                     // the whole invocation is cloned!
@@ -860,19 +847,8 @@ impl RealRibosome {
                     })
                     .await?;
 
-                    #[cfg(feature = "wasmer_sys")]
-                    {
-                        let mut store_lock = instance_with_store.store.lock();
-                        let mut store_mut = store_lock.as_store_mut();
-                        let points_used = match get_remaining_points(
-                            &mut store_mut,
-                            instance_with_store.instance.as_ref(),
-                        ) {
-                            MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
-                            MeteringPoints::Exhausted => WASM_METERING_LIMIT,
-                        };
-                        self.usage_meter.add(points_used, &otel_info);
-                    }
+                    let points_used = get_used_metering_points(instance_with_store.clone());
+                    self.usage_meter.add(points_used, &otel_info);
 
                     // remove context from map after call
                     {
