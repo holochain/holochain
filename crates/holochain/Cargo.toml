@@ -43,7 +43,7 @@ holochain_serialized_bytes = "=0.0.55"
 holochain_state = { version = "^0.4.0-dev.21", path = "../holochain_state" }
 holochain_types = { version = "^0.4.0-dev.21", path = "../holochain_types" }
 holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util" }
-holochain_wasmer_host = { version = "0.0.96", default-features = false, features = [
+holochain_wasmer_host = { version = "=0.0.96", default-features = false, features = [
   "error_as_host",
 ] }
 holochain_websocket = { version = "^0.4.0-dev.21", path = "../holochain_websocket" }
