@@ -16,31 +16,31 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  #static-job-id:
-  #  name: static
-  #  runs-on: macos-latest # currently faster than ubuntu-latest
-  #  steps:
-  #    - name: checkout
-  #      uses: actions/checkout@v4
-  #
-  #    - name: 'Common Test Setup Actions'
-  #      uses: ./.github/actions/common-pre
-  #
-  #    - name: static-fmt
-  #      run: make static-fmt
-  #
-  #    - name: static-toml
-  #      run: make static-toml
-  #
-  #    - name: static-clippy
-  #      run: make static-clippy
-  #
-  #    - name: static-doc
-  #      run: make static-doc
-  #
-  #    - name: 'Common Test Teardown Actions'
-  #      uses: ./.github/actions/common-post
-  #
+  static-job-id:
+    name: static
+    runs-on: macos-latest # currently faster than ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+  
+      - name: 'Common Test Setup Actions'
+        uses: ./.github/actions/common-pre
+  
+      - name: static-fmt
+        run: make static-fmt
+  
+      - name: static-toml
+        run: make static-toml
+  
+      - name: static-clippy
+        run: make static-clippy
+  
+      - name: static-doc
+        run: make static-doc
+  
+      - name: 'Common Test Teardown Actions'
+        uses: ./.github/actions/common-post
+  
   
   test-job-id:
     name: test
@@ -49,13 +49,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [
-          # ubuntu-latest,
-          # macos-latest,
-          # macos-13,
+          ubuntu-latest,
+          macos-latest,
+          macos-13,
           windows-latest,
         ]
         wasmer-feature: [
-          # wasmer_sys,
+          wasmer_sys,
           wasmer_wamr
         ]
     steps:
@@ -65,13 +65,12 @@ jobs:
       - name: 'Common Test Setup Actions'
         uses: ./.github/actions/common-pre
 
-      - name: install cmake & llvm (windows-latest, wasmer_wamr)
-        if: matrix.os == 'windows-latest' && matrix.wasmer-feature == 'wasmer_wamr'
-        uses: MinoruSekine/setup-scoop@v4
-        with:
-          apps: main/cmake main/llvm
-
-      - name: install llvm & clang (ubuntu-latest, wasmer_wamr)
+      - name: install build dependencies (macos-latest | macos-13, wasmer_wamr)
+        if: (matrix.os == 'macos-latest' || matrix.os == 'macos-13') && matrix.wasmer-feature == 'wasmer_wamr'
+        shell: bash
+        run: brew install cmake
+    
+      - name: install build dependencies (ubuntu-latest, wasmer_wamr)
         if: matrix.os == 'ubuntu-latest' && matrix.wasmer-feature == 'wasmer_wamr'
         shell: bash
         run: sudo apt install -y build-essential cmake g++-multilib libgcc-11-dev lib32gcc-11-dev ccache libclang-dev
@@ -88,8 +87,10 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: make build-workspace-${{ matrix.wasmer-feature }}
 
-      - name: test (windows-latest)
-        if: matrix.os == 'windows-latest'
+      - name: test (windows-latest) 
+        # TODO Building with wasmer_wamr feature flag on windows is not currently working.
+        # See https://github.com/holochain/holochain-wasmer/issues/117
+        if: matrix.os == 'windows-latest' && matrix.wasmer-feature != 'wasmer_wamr'
         run: |-
           $env:OPENSSL_NO_VENDOR="1"
           $env:OPENSSL_DIR="$(pwd)\vcpkg\packages\openssl_x64-windows-release"
