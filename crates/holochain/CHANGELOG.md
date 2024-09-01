@@ -7,8 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Update to latest holochain_wasmer_* crates with support for wasmer interpreter feature.
-- Add feature flags `wasmer_sys` and `wasmer_wamr` to toggle between using the current wasm compiler and the new, experimental wasm interpreter.
+- **BREAKING:** Modifies `Action::CloseChain` and `Action::OpenChain` to be able to represent both DNA migrations and Agent migrations:
+  - CloseChain can be used on its own, with no forward reference, to make a chain read-only.
+  - CloseChain can include a forward reference to either a new AgentPubKey or a new DNA hash, which represent a migration to a new chain. The new chain is expected to begin with a corresponding OpenChain which has a backward reference to the CloseChain action. (This will become a validation rule in future work.)
+- Internal rework of `get_agent_activity`. This is not a breaking change for the HDK function of the same name, but it
+  is a breaking change to the previous version of Holochain because the network response for agent activity has been changed.
+  A future change will be made to the HDK function to expose the new functionality. #4221
+- Add feature flags `wasmer_sys` and `wasmer_wamr` to toggle between using the current wasm compiler and the new, experimental wasm interpreter. Include `wasmer_sys` in default features to preserve existing behavior.
 - CI testing against both `wasmer_sys` and `wasmer_wamr` features.
 
 ## 0.4.0-dev.21

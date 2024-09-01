@@ -1,3 +1,4 @@
+mod agent_activity;
 mod agent_scaling;
 mod app_interface_security;
 mod authored_test;

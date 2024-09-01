@@ -232,9 +232,10 @@ pub struct GetActivityOptions {
     pub include_rejected_activity: bool,
     /// Include warrants for this agent
     pub include_warrants: bool,
-    /// Include the full signed actions and hashes in the response
-    /// instead of just the hashes.
-    pub include_full_actions: bool,
+    /// Include the full signed records in the response, instead of just the hashes.
+    pub include_full_records: bool,
+    /// Configure how the data should be fetched.
+    pub get_options: holochain_zome_types::entry::GetOptions,
 }
 
 impl Default for GetActivityOptions {
@@ -245,7 +246,8 @@ impl Default for GetActivityOptions {
             include_valid_activity: true,
             include_rejected_activity: false,
             include_warrants: true,
-            include_full_actions: false,
+            include_full_records: false,
+            get_options: Default::default(),
         }
     }
 }
@@ -345,7 +347,7 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> Vec<AgentActivityResponse<ActionHash>>;
+        ) -> Vec<AgentActivityResponse>;
 
         /// A remote node is requesting agent activity from us.
         fn must_get_agent_activity(

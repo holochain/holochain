@@ -1,6 +1,3 @@
-use std::borrow::Borrow;
-use std::fmt::{Display, Formatter};
-
 use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::link::LinkType;
@@ -17,6 +14,9 @@ use holo_hash::EntryHash;
 use holo_hash::HashableContent;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
+use std::borrow::Borrow;
+use std::fmt::{Display, Formatter};
+use std::hash::Hash;
 
 pub mod builder;
 pub mod conversions;
@@ -111,6 +111,26 @@ pub(crate) enum ActionRef<'a> {
 }
 
 pub type ActionHashed = HoloHashed<Action>;
+
+impl ActionHashedContainer for ActionHashed {
+    fn action(&self) -> &Action {
+        self.as_content()
+    }
+
+    fn action_hash(&self) -> &ActionHash {
+        &self.hash
+    }
+}
+
+impl ActionSequenceAndHash for ActionHashed {
+    fn action_seq(&self) -> u32 {
+        self.content.action_seq()
+    }
+
+    fn address(&self) -> &ActionHash {
+        &self.hash
+    }
+}
 
 /// a utility wrapper to write intos for our data types
 macro_rules! write_into_action {
@@ -285,9 +305,30 @@ impl Action {
         self.into()
     }
 
-    /// returns the public key of the agent who signed this action.
+    /// Returns the public key of the agent who "authored" this action.
+    /// NOTE: This is not necessarily the agent who signed the action.
     pub fn author(&self) -> &AgentPubKey {
         match_action!(self => |i| { &i.author })
+    }
+
+    /// Returns the public key of the agent who signed this action.
+    /// NOTE: this is not necessarily the agent who "authored" the action.
+    pub fn signer(&self) -> &AgentPubKey {
+        match self {
+            // NOTE: We make an awkward special case for CloseChain actions during agent migrations,
+            // signing using the updated key rather than the author key. There are several reasons for this:
+            // - In order for CloseChain to be effective at all, the new key must be known, because the new key is pointed to from the CloseChain. A good way to prove that the forward reference is correct is to sign it with the forward reference.
+            // - We know that if the user is going to revoke/update their key in DPKI, it's likely that they don't even have access to their app chain, so they will want to revoke in DPKI before even modifying the app chain, especially if they're in a race with an attacker
+            // - Moreover, we don't want an attacker to close the chain on behalf of the user, because they would be pointing to some key that doesn't match the DPKI state.
+            // - We should let the author be the old key and make a special case for the signature check, because that prevents special cases in other areas, such as determining the agent activity basis hash (should be the old key), running sys validation for prev_action (prev and next author must match) and probably more.
+            Action::CloseChain(CloseChain {
+                new_target: Some(MigrationTarget::Agent(agent)),
+                ..
+            }) => agent,
+
+            // For all other actions, the signer is always the "author"
+            _ => self.author(),
+        }
     }
 
     /// returns the timestamp of when the action was created
@@ -554,8 +595,44 @@ pub struct DeleteLink {
     pub link_add_address: ActionHash,
 }
 
+/// Description of how to find the previous or next CellId in a migration.
+/// In a migration, of the two components of the CellId (dna and agent),
+/// always one stays fixed while the other one changes.
+/// This enum represents the component that changed.
+///
+/// When used in CloseChain, this contains the new DNA hash or Agent key.
+/// When used in OpenChain, this contains the previous DNA hash or Agent key.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
+pub enum MigrationTarget {
+    /// Represents a DNA migration, and contains the new or previous DNA hash.
+    Dna(DnaHash),
+    /// Represents an Agent migration, and contains the new or previous Agent key.
+    Agent(AgentPubKey),
+}
+
+impl From<DnaHash> for MigrationTarget {
+    fn from(dna: DnaHash) -> Self {
+        MigrationTarget::Dna(dna)
+    }
+}
+
+impl From<AgentPubKey> for MigrationTarget {
+    fn from(agent: AgentPubKey) -> Self {
+        MigrationTarget::Agent(agent)
+    }
+}
+
 /// When migrating to a new version of a DNA, this action is committed to the
-/// old chain to declare the migration path taken.
+/// old chain to declare the migration path taken. This action can also be taken
+/// to simply close down a chain with no forward reference to a migration.
+///
+/// Note that if `MigrationTarget::Agent` is used, this action will be signed with
+/// that key rather than the authoring key, so that new key must be a valid keypair
+/// that you control in the keystore, so that the action can be signed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(
     feature = "fuzzing",
@@ -567,7 +644,7 @@ pub struct CloseChain {
     pub action_seq: u32,
     pub prev_action: ActionHash,
 
-    pub new_dna_hash: DnaHash,
+    pub new_target: Option<MigrationTarget>,
 }
 
 /// When migrating to a new version of a DNA, this action is committed to the
@@ -583,7 +660,10 @@ pub struct OpenChain {
     pub action_seq: u32,
     pub prev_action: ActionHash,
 
-    pub prev_dna_hash: DnaHash,
+    pub prev_target: MigrationTarget,
+    /// The hash of the `CloseChain` action on the old chain, to establish chain continuity
+    /// and disallow backlinks to multiple forks on the old chain.
+    pub close_hash: ActionHash,
 }
 
 /// An action which "speaks" Entry content into being. The same content can be
@@ -807,5 +887,26 @@ impl std::ops::Deref for ZomeIndex {
 impl Borrow<u8> for ZomeIndex {
     fn borrow(&self) -> &u8 {
         &self.0
+    }
+}
+
+pub trait ActionHashedContainer: ActionSequenceAndHash {
+    fn action(&self) -> &Action;
+
+    fn action_hash(&self) -> &ActionHash;
+}
+
+pub trait ActionSequenceAndHash {
+    fn action_seq(&self) -> u32;
+    fn address(&self) -> &ActionHash;
+}
+
+impl ActionSequenceAndHash for (u32, ActionHash) {
+    fn action_seq(&self) -> u32 {
+        self.0
+    }
+
+    fn address(&self) -> &ActionHash {
+        &self.1
     }
 }

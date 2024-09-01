@@ -904,6 +904,7 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
 
         Ok(Self { stmt, query })
     }
+
     fn iter(&'iter mut self) -> StateQueryResult<StmtIter<'iter, Q::Item>> {
         let map_fn = self.query.as_map();
         let iter = Self::new_iter(&self.query.params(), self.stmt.as_mut(), map_fn.clone())?;

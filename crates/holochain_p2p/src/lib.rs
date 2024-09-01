@@ -133,7 +133,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>>;
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>>;
 
     /// Get agent activity deterministically from the DHT.
     async fn must_get_agent_activity(
@@ -359,7 +359,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>> {
         self.sender
             .get_agent_activity((*self.dna_hash).clone(), agent, query, options)
             .await

@@ -97,16 +97,21 @@ impl OpHelper for Op {
                         }
                     }
                     Action::OpenChain(action) => {
-                        let OpenChain { prev_dna_hash, .. } = action;
+                        let OpenChain {
+                            prev_target,
+                            close_hash,
+                            ..
+                        } = action;
                         OpRecord::OpenChain {
-                            previous_dna_hash: prev_dna_hash.clone(),
+                            previous_target: prev_target.clone(),
+                            close_hash: close_hash.clone(),
                             action: action.clone(),
                         }
                     }
                     Action::CloseChain(action) => {
-                        let CloseChain { new_dna_hash, .. } = action;
+                        let CloseChain { new_target, .. } = action;
                         OpRecord::CloseChain {
-                            new_dna_hash: new_dna_hash.clone(),
+                            new_target: new_target.clone(),
                             action: action.clone(),
                         }
                     }
@@ -352,16 +357,21 @@ impl OpHelper for Op {
                         action: action.clone(),
                     },
                     Action::OpenChain(action) => {
-                        let OpenChain { prev_dna_hash, .. } = action;
+                        let OpenChain {
+                            prev_target,
+                            close_hash,
+                            ..
+                        } = action;
                         OpActivity::OpenChain {
-                            previous_dna_hash: prev_dna_hash.clone(),
+                            previous_target: prev_target.clone(),
+                            close_hash: close_hash.clone(),
                             action: action.clone(),
                         }
                     }
                     Action::CloseChain(action) => {
-                        let CloseChain { new_dna_hash, .. } = action;
+                        let CloseChain { new_target, .. } = action;
                         OpActivity::CloseChain {
-                            new_dna_hash: new_dna_hash.clone(),
+                            new_target: new_target.clone(),
                             action: action.clone(),
                         }
                     }
