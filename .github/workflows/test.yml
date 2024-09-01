@@ -57,6 +57,11 @@ jobs:
           wasmer_sys,
           wasmer_wamr
         ]
+        exclude:
+          # TODO Building with wasmer_wamr feature flag on windows is not currently working.
+          # See https://github.com/holochain/holochain-wasmer/issues/117
+          - os: windows-latest
+            wasmer-feature: wasmer_wamr
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -86,10 +91,8 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: make build-workspace-${{ matrix.wasmer-feature }}
 
-      - name: test (windows-latest) 
-        # TODO Building with wasmer_wamr feature flag on windows is not currently working.
-        # See https://github.com/holochain/holochain-wasmer/issues/117
-        if: matrix.os == 'windows-latest' && matrix.wasmer-feature != 'wasmer_wamr'
+      - name: test (windows-latest)
+        if: matrix.os == 'windows-latest'
         run: |-
           $env:OPENSSL_NO_VENDOR="1"
           $env:OPENSSL_DIR="$(pwd)\vcpkg\packages\openssl_x64-windows-release"
