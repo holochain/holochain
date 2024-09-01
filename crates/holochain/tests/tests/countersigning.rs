@@ -19,6 +19,8 @@ use matches::assert_matches;
 use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 
+mod session_interaction_over_websocket;
+
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn listen_for_countersigning_completion() {
