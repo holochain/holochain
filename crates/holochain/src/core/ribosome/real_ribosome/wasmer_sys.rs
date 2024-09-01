@@ -1,3 +1,5 @@
+#![cfg(feature = "wasmer_sys")]
+
 use crate::core::ribosome::error::RibosomeResult;
 use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 use holochain_wasmer_host::module::InstanceWithStore;

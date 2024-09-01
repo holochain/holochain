@@ -300,7 +300,7 @@ wasmer_sys = [
   "holochain_wasmer_host/wasmer_sys",
 ]
 
-# Enable wasm interpreter
+# Enable wasm interpreter (experimental)
 # Incompatible with "wasmer_sys"
 wasmer_wamr = [
   "dep:hc-wasmer",
