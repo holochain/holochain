@@ -188,7 +188,6 @@ pub async fn spawn_queue_consumer_tasks(
             network.clone(),
             cell_id,
             conductor.clone(),
-            tx_sys.clone(),
             tx_integration.clone(),
             tx_publish.clone(),
         )

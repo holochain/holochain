@@ -11,7 +11,6 @@ pub(crate) fn spawn_countersigning_consumer(
     dna_network: HolochainP2pDna,
     cell_id: CellId,
     conductor: ConductorHandle,
-    trigger_sys: TriggerSender,
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
 ) -> TriggerSender {
@@ -30,7 +29,6 @@ pub(crate) fn spawn_countersigning_consumer(
                 cell_id.clone(),
                 conductor.clone(),
                 self_trigger.clone(),
-                trigger_sys.clone(),
                 integration_trigger.clone(),
                 publish_trigger.clone(),
             )
