@@ -1499,16 +1499,6 @@ mod app_impls {
             ops: AppRoleResolution,
             flags: InstallAppCommonFlags,
         ) -> ConductorResult<InstalledApp> {
-            let dpki = self.running_services().dpki.clone();
-
-            // if dpki is installed, load dpki state
-            let dpki = if let Some(d) = dpki.as_ref() {
-                let lock = d.state().await;
-                Some((d.clone(), lock))
-            } else {
-                None
-            };
-
             let (agent_key, derivation_details): (AgentPubKey, Option<DerivationDetailsInput>) =
                 if let Some(agent_key) = agent_key {
                     // Key doesn't need to be generated: it will be registered later
@@ -1641,7 +1631,7 @@ mod app_impls {
 
             if app_result.is_ok() {
                 // Register initial agent key in DPKI
-                if let Some((dpki, state)) = dpki {
+                if let Some(dpki) = self.running_services().dpki.clone() {
                     let dpki_agent = dpki.cell_id.agent_pubkey();
 
                     // This is the signature Deepkey requires
@@ -1674,7 +1664,7 @@ mod app_impls {
                         create_only: false,
                     };
 
-                    state.register_key(input).await?;
+                    dpki.state().await.register_key(input).await?;
                 }
             }
 
