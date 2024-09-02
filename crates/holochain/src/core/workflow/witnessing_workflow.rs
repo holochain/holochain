@@ -73,6 +73,7 @@ pub(crate) async fn witnessing_workflow(
 
     // For each complete session notify the agents of success.
     for (agents, actions) in notify_agents {
+        tracing::debug!("Witnessing ready, notifying agents {:?}", agents);
         if let Err(e) = network
             .countersigning_session_negotiation(
                 agents,
