@@ -443,32 +443,6 @@ async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
         .await
         .unwrap();
 
-    // Need chain head for each other, so get agent activity before starting a session
-    let _: AgentActivity = conductors[0]
-        .call_fallible(
-            &alice_zome,
-            "get_agent_activity",
-            GetAgentActivityInput {
-                agent_pubkey: bob.agent_pubkey().clone(),
-                chain_query_filter: ChainQueryFilter::new(),
-                activity_request: ActivityRequest::Full,
-            },
-        )
-        .await
-        .unwrap();
-    let _: AgentActivity = conductors[1]
-        .call_fallible(
-            &bob_zome,
-            "get_agent_activity",
-            GetAgentActivityInput {
-                agent_pubkey: alice.agent_pubkey().clone(),
-                chain_query_filter: ChainQueryFilter::new(),
-                activity_request: ActivityRequest::Full,
-            },
-        )
-        .await
-        .unwrap();
-
     // Set up the session and accept it for both agents
     let preflight_request: PreflightRequest = conductors[0]
         .call_fallible(
@@ -557,6 +531,138 @@ async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
 
     // Alice session should now get abandoned
     wait_for_abandoned(
+        conductors[0].subscribe_to_app_signals("app".into()),
+        preflight_request.app_entry_hash.clone(),
+    )
+    .await;
+
+    // Alice will now be allowed to commit other entries
+    let _: ActionHash = conductors[0]
+        .call_fallible(&alice_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+
+    // Everyone's DHT should sync
+    await_consistency(60, [alice, bob, &carol]).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn alice_can_recover_from_a_session_timeout() {
+    holochain_trace::test_run();
+
+    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|c| {
+        c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
+    });
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
+    let apps = conductors.setup_app("app", &[dna]).await.unwrap();
+    let cells = apps.cells_flattened();
+    let alice = &cells[0];
+    let bob = &cells[1];
+    let carol = &cells[2];
+
+    // Need an initialised source chain for countersigning, so commit anything
+    let alice_zome = alice.zome(TestWasm::CounterSigning);
+    let _: ActionHash = conductors[0]
+        .call_fallible(&alice_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+    let bob_zome = bob.zome(TestWasm::CounterSigning);
+    let _: ActionHash = conductors[1]
+        .call_fallible(&bob_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+
+    await_consistency(30, vec![alice, bob, carol])
+        .await
+        .unwrap();
+
+    // Set up the session and accept it for both agents
+    let preflight_request: PreflightRequest = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "generate_countersigning_preflight_request_fast",
+            vec![
+                (alice.agent_pubkey().clone(), vec![Role(0)]),
+                (bob.agent_pubkey().clone(), vec![]),
+            ],
+        )
+        .await
+        .unwrap();
+    let alice_acceptance: PreflightRequestAcceptance = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "accept_countersigning_preflight_request",
+            preflight_request.clone(),
+        )
+        .await
+        .unwrap();
+    let alice_response =
+        if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
+            response
+        } else {
+            unreachable!();
+        };
+    let bob_acceptance: PreflightRequestAcceptance = conductors[1]
+        .call_fallible(
+            &bob_zome,
+            "accept_countersigning_preflight_request",
+            preflight_request.clone(),
+        )
+        .await
+        .unwrap();
+    let bob_response = if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
+        response
+    } else {
+        unreachable!();
+    };
+
+    // Alice makes her commit, but before Bob can do the same, disaster strikes...
+    let (_, _): (ActionHash, EntryHash) = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "create_a_countersigned_thing_with_entry_hash",
+            vec![alice_response.clone(), bob_response.clone()],
+        )
+        .await
+        .unwrap();
+
+    // Give Alice some time to publish her session.
+    // TODO Does Holochain not block on this network operation?
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    conductors[0].shutdown().await;
+
+    // Bob can't know what has happened to Alice and makes his commit
+    let (_, _): (ActionHash, EntryHash) = conductors[1]
+        .call_fallible(
+            &bob_zome,
+            "create_a_countersigned_thing_with_entry_hash",
+            vec![alice_response.clone(), bob_response.clone()],
+        )
+        .await
+        .unwrap();
+
+    tracing::info!("Waiting for Bob completion");
+
+    // Luckily Carol is still online, she should get both Alice and Bob's signatures.
+    // She will send these to Bob, and he can complete his session.
+    // Bob's session should time out and be abandoned
+    wait_for_completion(
+        conductors[1].subscribe_to_app_signals("app".into()),
+        preflight_request.app_entry_hash.clone(),
+    )
+    .await;
+
+    // Alice comes back online, and should be able to recover her session. It will take finding
+    // her session in her source chain and then trying to build a signature bundle from the network.
+    conductors[0].startup().await;
+
+    tracing::warn!("Alice is back online");
+
+    // Alice session should now get completed
+    wait_for_completion(
         conductors[0].subscribe_to_app_signals("app".into()),
         preflight_request.app_entry_hash.clone(),
     )
