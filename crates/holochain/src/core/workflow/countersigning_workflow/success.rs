@@ -1,6 +1,6 @@
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
-use crate::core::workflow::countersigning_workflow::SessionState;
+use crate::core::workflow::countersigning_workflow::CountersigningSessionState;
 use holo_hash::AgentPubKey;
 use holochain_zome_types::prelude::SignedAction;
 
@@ -25,16 +25,16 @@ pub(crate) async fn countersigning_success(
                         // Whether we're awaiting signatures for the first time or trying to recover,
                         // switch to the signatures collected state and add the signatures to the
                         // list of signature bundles to try.
-                        SessionState::Accepted(ref preflight_request) | SessionState::Unknown { ref preflight_request, .. } => {
+                        CountersigningSessionState::Accepted(ref preflight_request) | CountersigningSessionState::Unknown { ref preflight_request, .. } => {
                             tracing::trace!("Received countersigning signature bundle in accepted or unknown state for agent: {:?}", author);
-                            entry.insert(SessionState::SignaturesCollected {
+                            entry.insert(CountersigningSessionState::SignaturesCollected {
                                 preflight_request: preflight_request.clone(),
                                 signature_bundles: vec![signature_bundle],
                             });
                         }
-                        SessionState::SignaturesCollected { preflight_request, signature_bundles} => {
+                        CountersigningSessionState::SignaturesCollected { preflight_request, signature_bundles} => {
                             tracing::trace!("Received another signature bundle for countersigning session for agent: {:?}", author);
-                            entry.insert(SessionState::SignaturesCollected {
+                            entry.insert(CountersigningSessionState::SignaturesCollected {
                                 preflight_request: preflight_request.clone(),
                                 signature_bundles: {
                                     let mut signature_bundles = signature_bundles.clone();
