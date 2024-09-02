@@ -49,22 +49,6 @@
         "type": "github"
       }
     },
-    "crate2nix": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1723311214,
-        "narHash": "sha256-xdGZQBEa1AC2us/sY3igS/CucWY6jErXsAvCFRhB2LI=",
-        "owner": "kolloch",
-        "repo": "crate2nix",
-        "rev": "236f6addfd452a48be805819e3216af79e988fd5",
-        "type": "github"
-      },
-      "original": {
-        "owner": "kolloch",
-        "repo": "crate2nix",
-        "type": "github"
-      }
-    },
     "empty": {
       "flake": false,
       "locked": {
@@ -240,7 +224,6 @@
         "cargo-chef": "cargo-chef",
         "cargo-rdme": "cargo-rdme",
         "crane": "crane",
-        "crate2nix": "crate2nix",
         "empty": "empty",
         "flake-compat": "flake-compat",
         "flake-parts": "flake-parts",
