@@ -146,13 +146,6 @@ pub trait ChainHeadCoordinatorExt:
     }
 }
 
-pub trait ChcSync {
-    /// Attempt to add the given records to the CHC.
-    /// If the CHC is already in sync with the local state, it will accept the new records and return `Ok`.
-    /// If not, the local state will instead be updated, the new records will not be accepted, and an `Err` will be returned.
-    fn sync(&self, new_records: Vec<Record>) -> MustBoxFuture<'static, ChcResult<()>>;
-}
-
 /// A CHC implementation
 pub type ChcImpl = Arc<dyn 'static + Send + Sync + ChainHeadCoordinatorExt>;
 
