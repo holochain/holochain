@@ -108,11 +108,6 @@ pub async fn refresh_workspace_state(space: &Space, cell_id: CellId, signal: Sen
 
                         match maybe_current_session {
                             Some((_, _, session_data)) => {
-                                tracing::info!(
-                                    "Found a countersigning session for agent {:?}",
-                                    agent
-                                );
-
                                 // Any locked chains, that aren't registered in the workspace, need to be added.
                                 // They have to go in as `Unknown` because we don't know the state of the session.
                                 workspace
