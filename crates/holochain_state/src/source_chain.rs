@@ -260,21 +260,9 @@ impl SourceChain {
 
         // Sync with CHC, if CHC is present
         if let Some(chc) = network.chc() {
-            let payload = AddRecordPayload::from_records(
-                self.keystore.clone(),
-                (*self.author).clone(),
-                records,
-            )
-            .await
-            .map_err(SourceChainError::other)?;
-
-            match chc.add_records_request(payload).await {
-                Err(e @ ChcError::InvalidChain(_, _)) => Err(SourceChainError::ChcHeadMoved(
-                    "SourceChain::flush".into(),
-                    e,
-                )),
-                e => e.map_err(SourceChainError::other),
-            }?;
+            self.sync_records(chc, records)
+                .await
+                .map_err(SourceChainError::other)?;
         }
 
         let maybe_countersigned_entry = entries

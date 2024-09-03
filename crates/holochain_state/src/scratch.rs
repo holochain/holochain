@@ -160,6 +160,13 @@ impl Scratch {
         Ok(r)
     }
 
+    pub fn clear(&mut self) {
+        self.actions.clear();
+        self.entries.clear();
+        self.scheduled_fns.clear();
+        self.chain_head = None;
+    }
+
     pub fn drain_scheduled_fns(&mut self) -> impl Iterator<Item = ScheduledFn> + '_ {
         self.scheduled_fns.drain(..)
     }

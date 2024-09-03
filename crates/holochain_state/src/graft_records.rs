@@ -10,7 +10,7 @@ impl SourceChain {
     /// If the CHC is already in sync with the local state, it will accept the new records and return `Ok`.
     /// If not, the local state will instead be updated, the new records will not be accepted, and an `Err` will be returned.
     pub async fn sync_records(
-        self,
+        &self,
         chc: ChcImpl,
         new_records: Vec<Record>,
     ) -> SourceChainResult<()> {
@@ -24,9 +24,13 @@ impl SourceChain {
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn graft_records_onto_source_chain(
-        self,
+        &self,
         records: Vec<Record>,
     ) -> SourceChainResult<Vec<(DhtOpHash, AnyLinkableHash)>> {
+        // Clear the scratch space. There shouldn't be anything in the scratch if this function were
+        // called properly, but if there were, it would be invalid after grafting.
+        self.scratch().apply(|s| s.clear())?;
+
         let existing = self
             .query(ChainQueryFilter::new().descending())
             .await?
