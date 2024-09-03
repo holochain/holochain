@@ -66,10 +66,11 @@ holochain_wasm_test_utils = { path = "../test_utils/wasm", features = [
   "build",
 ] }
 holochain_trace = { version = "^0.4.0-dev.5", path = "../holochain_trace" }
+isotest = "0"
 matches = "0.1.8"
 pretty_assertions = "1.4"
-
 tempfile = "3.3"
+test-case = "3.3"
 
 [lints]
 workspace = true
