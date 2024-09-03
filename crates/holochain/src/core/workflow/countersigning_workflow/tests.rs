@@ -1,14 +1,14 @@
 use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::{TriggerReceiver, TriggerSender};
-use crate::core::workflow::countersigning_workflow::WorkComplete;
+use crate::core::workflow::countersigning_workflow::{countersigning_success, WorkComplete};
 use crate::core::workflow::countersigning_workflow::{
     accept_countersigning_request, countersigning_workflow, CountersigningSessionState,
 };
 use crate::core::workflow::WorkflowResult;
-use crate::prelude::DhtDbQueryCache;
+use crate::prelude::{ActionHashed, CounterSigningAgentState, DhtDbQueryCache, SignedActionHashed};
 use crate::prelude::{ActionBase, PreflightBytes, PreflightRequest, PreflightRequestAcceptance};
 use fixt::prelude::*;
-use hdk::prelude::EntryTypeFixturator;
+use hdk::prelude::{Action, Entry, EntryHashed, EntryTypeFixturator};
 use hdk::prelude::{CounterSigningSessionTimes, Timestamp};
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
@@ -16,7 +16,7 @@ use holo_hash::{AgentPubKey, DnaHash};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::chain_lock::get_chain_lock;
-use holochain_state::prelude::unlock_chain;
+use holochain_state::prelude::{insert_action, insert_entry, insert_op, unlock_chain, CounterSigningSessionData};
 use holochain_state::source_chain;
 use holochain_types::prelude::SystemSignal;
 use holochain_types::signal::Signal;
@@ -26,6 +26,15 @@ use matches::assert_matches;
 use std::ops::Add;
 use std::sync::Arc;
 use tokio::sync::broadcast::{Receiver, Sender};
+use holochain_zome_types::countersigning::PreflightResponse;
+use holo_hash::fixt::ActionHashFixturator;
+use crate::prelude::SignedAction;
+use holochain_types::prelude::SignedActionHashedExt;
+use holochain_state::prelude::AppEntryBytesFixturator;
+use holochain_state::prelude::StateMutationResult;
+use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+use crate::core::ribosome::weigh_placeholder;
+use crate::prelude::SignatureFixturator;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn accept_countersigning_request_creates_state() {
@@ -36,7 +45,7 @@ async fn accept_countersigning_request_creates_state() {
 
     let bob = test_harness.new_remote_agent().await;
 
-    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(60), bob);
+    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(60), &bob);
     test_harness
         .accept_countersigning_request(request)
         .await
@@ -55,7 +64,7 @@ async fn countersigning_session_expiry() {
 
     let bob = test_harness.new_remote_agent().await;
 
-    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), bob);
+    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
     test_harness
         .accept_countersigning_request(request)
         .await
@@ -93,7 +102,7 @@ async fn chain_unlocked_outside_workflow() {
 
     let bob = test_harness.new_remote_agent().await;
 
-    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), bob);
+    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
     test_harness
         .accept_countersigning_request(request)
         .await
@@ -128,7 +137,7 @@ async fn discard_session_with_lock_but_no_state() {
 
     let bob = test_harness.new_remote_agent().await;
 
-    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), bob);
+    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
     test_harness
         .accept_countersigning_request(request)
         .await
@@ -153,6 +162,111 @@ async fn discard_session_with_lock_but_no_state() {
 
     test_harness.expect_empty_workspace();
     test_harness.expect_no_pending_signals();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn receive_signatures_and_complete() {
+    holochain_trace::test_run();
+
+    let dna_hash = fixt!(DnaHash);
+    let mut test_harness = TestHarness::new(dna_hash).await;
+
+    let bob = test_harness.new_remote_agent().await;
+
+    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
+    let my_acceptance = test_harness
+        .accept_countersigning_request(request.clone())
+        .await
+        .unwrap();
+
+    let agent_state = CounterSigningAgentState::new(1, fixt!(ActionHash), 32);
+    let response_data = PreflightResponse::encode_fields_for_signature(&request, &agent_state).unwrap();
+    let bob_signature = test_harness.keystore.sign(bob.agent.clone(), response_data.into()).await.unwrap();
+
+    let bob_acceptance = PreflightRequestAcceptance::Accepted(PreflightResponse::try_new(
+        request.clone(),
+        agent_state,
+        bob_signature,
+    ).unwrap());
+
+    let session_data = CounterSigningSessionData::try_new(
+        request.clone(),
+        vec![my_acceptance, bob_acceptance].into_iter().filter_map(|a| match a {
+            PreflightRequestAcceptance::Accepted(a) => Some((a.agent_state, a.signature)),
+            _ => None,
+        }).collect(),
+        vec![],
+    ).unwrap();
+
+    let entry = Entry::CounterSign(Box::new(session_data.clone()), fixt!(AppEntryBytes));
+    let entry_hashed = EntryHashed::from_content_sync(entry.clone());
+
+    let mut signatures = vec![];
+
+    {
+        let action = Action::from_countersigning_data(
+            entry_hashed.hash.clone(),
+            &session_data,
+            bob.agent.clone(),
+            weigh_placeholder(),
+        ).unwrap();
+
+        let hashed = ActionHashed::from_content_sync(action.clone());
+        let sah = SignedActionHashed::sign(&test_harness.keystore, hashed).await.unwrap();
+
+        let signed = SignedAction::from(sah);
+        signatures.push(signed);
+    }
+
+    {
+        let my_action = Action::from_countersigning_data(
+            entry_hashed.hash.clone(),
+            &session_data,
+            test_harness.author.clone(),
+            weigh_placeholder(),
+        ).unwrap();
+        let hashed = ActionHashed::from_content_sync(my_action.clone());
+        let sah = SignedActionHashed::sign(&test_harness.keystore, hashed).await.unwrap();
+
+        let signed = SignedAction::from(sah.clone());
+        signatures.push(signed);
+
+        let store_entry_op = ChainOp::StoreEntry(fixt!(Signature), my_action.clone().try_into().unwrap(), entry.clone());
+        let dht_op = DhtOp::ChainOp(Box::new(store_entry_op));
+        let dht_op = DhtOpHashed::from_content_sync(dht_op);
+
+        test_harness.test_space.space.get_or_create_authored_db(test_harness.author.clone()).unwrap().write_async(move |txn| -> StateMutationResult<()> {
+            let head: usize = txn.query_row_and_then("select max(seq) from Action", [], |row| row.get(0))?;
+            tracing::info!("Head: {}", head);
+
+            insert_action(txn, &sah)?;
+            insert_entry(txn, &entry_hashed.hash, &entry)?;
+            insert_op(txn, &dht_op)?;
+
+            let head: usize = txn.query_row_and_then("select max(seq) from Action", [], |row| row.get(0))?;
+            tracing::info!("Head: {}", head);
+
+            Ok(())
+        }).await.unwrap();
+    }
+
+    test_harness.reconfigure_network(|mut net| {
+        net.expect_publish_countersign().return_once(|_, _, _| {
+            Ok(())
+        });
+        net
+    });
+
+    countersigning_success(
+        test_harness.test_space.space.clone(),
+        test_harness.author.clone(),
+        signatures,
+        test_harness.countersigning_tx.clone(),
+    ).await;
+
+    test_harness.respond_to_countersigning_workflow_signal().await;
+
+    test_harness.expect_success_signal().await;
 }
 
 struct TestHarness {
@@ -220,6 +334,11 @@ impl TestHarness {
         RemoteAgent {
             agent: self.keystore.new_sign_keypair_random().await.unwrap(),
         }
+    }
+
+    fn reconfigure_network(&mut self, apply: fn(MockHolochainP2pDnaT) -> MockHolochainP2pDnaT) {
+        let network = apply(MockHolochainP2pDnaT::new());
+        self.network = Arc::new(network);
     }
 
     async fn accept_countersigning_request(
@@ -365,6 +484,18 @@ impl TestHarness {
         );
     }
 
+    pub async fn expect_success_signal(&mut self) {
+        let signal = tokio::time::timeout(std::time::Duration::from_secs(1), self.signal_rx.recv())
+            .await
+            .expect("Didn't receive a signal in time")
+            .unwrap();
+
+        assert_matches!(
+            signal,
+            Signal::System(SystemSignal::SuccessfulCountersigning(_))
+        );
+    }
+
     pub fn expect_no_pending_signals(&mut self) {
         let signal = self.signal_rx.try_recv().ok();
         assert!(signal.is_none());
@@ -387,7 +518,7 @@ struct RemoteAgent {
 fn test_preflight_request(
     test_harness: &TestHarness,
     duration: std::time::Duration,
-    other: RemoteAgent,
+    other: &RemoteAgent,
 ) -> PreflightRequest {
     PreflightRequest::try_new(
         fixt!(EntryHash),
