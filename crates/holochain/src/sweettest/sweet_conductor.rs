@@ -604,7 +604,7 @@ impl SweetConductor {
     }
 
     /// Shutdown this conductor.
-    /// This will wait for the conductor to shutdown but
+    /// This will wait for the conductor to shut down but
     /// keep the inner state to restart it.
     ///
     /// Attempting to use this conductor without starting it up again will cause a panic.

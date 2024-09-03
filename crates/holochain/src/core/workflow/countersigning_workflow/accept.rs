@@ -68,6 +68,10 @@ pub async fn accept_countersigning_request(
                 Err(KitsuneError::other("Session already exists"))
             }
             std::collections::hash_map::Entry::Vacant(entry) => {
+                tracing::debug!(
+                    "Storing accepted session in the workspace for agent: {:?}",
+                    author
+                );
                 entry.insert(CountersigningSessionState::Accepted(request.clone()));
                 Ok(())
             }
