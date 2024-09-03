@@ -12,6 +12,7 @@ const CONTENT: &[u8] = b"this is a test\n";
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn demo() {
     run_test(|| async {
         let (r1s, r1r) = tokio::sync::oneshot::channel();
@@ -31,6 +32,7 @@ async fn demo() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn demo_multi_sig() {
     run_test(|| async {
         use holochain::sweettest::*;

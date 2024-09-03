@@ -14,10 +14,6 @@ pub struct DpkiConfig {
     /// Defaults to the built-in Deepkey DNA from the holochain_deepkey_dna crate.
     pub dna_path: Option<PathBuf>,
 
-    /// The lair tag used to refer to the "device seed" which was used to generate
-    /// the AgentPubKey for the DPKI cell
-    pub device_seed_lair_tag: String,
-
     /// For testing only, we can turn off DPKI if needed.
     /// TODO: this can be removed once DPKI is truly optional again.
     #[serde(default)]
@@ -25,10 +21,9 @@ pub struct DpkiConfig {
 }
 
 impl DpkiConfig {
-    pub fn new(dna_path: Option<PathBuf>, device_seed_lair_tag: String) -> Self {
+    pub fn new(dna_path: Option<PathBuf>) -> Self {
         Self {
             dna_path,
-            device_seed_lair_tag,
             no_dpki: false,
         }
     }
@@ -36,7 +31,6 @@ impl DpkiConfig {
     pub fn disabled() -> Self {
         Self {
             dna_path: None,
-            device_seed_lair_tag: "disabled".to_string(),
             no_dpki: true,
         }
     }
@@ -44,6 +38,6 @@ impl DpkiConfig {
 
 impl Default for DpkiConfig {
     fn default() -> Self {
-        DpkiConfig::new(None, "DPKI_DEVICE_SEED".to_string())
+        DpkiConfig::new(None)
     }
 }

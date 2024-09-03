@@ -53,9 +53,11 @@ impl SpaceInternalHandler for SpaceInternalStub {
         if self.respond_with_error {
             self.errored_count += 1;
 
-            Ok(async move { Err(KitsuneP2pError::other("test error")) }
-                .boxed()
-                .into())
+            Ok(
+                async move { Err(KitsuneP2pError::other("SpaceInternalStub error")) }
+                    .boxed()
+                    .into(),
+            )
         } else {
             self.called_count += 1;
 
