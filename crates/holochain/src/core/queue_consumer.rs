@@ -615,6 +615,11 @@ impl TriggerReceiver {
     pub fn is_paused(&self) -> bool {
         self.back_off.as_ref().map_or(false, |b| b.is_paused())
     }
+
+    #[cfg(test)]
+    pub fn try_recv(&mut self) -> Option<&'static &'static str> {
+        self.rx.try_recv().ok()
+    }
 }
 
 /// Create a future that will be ok with either a recv or a lagged.

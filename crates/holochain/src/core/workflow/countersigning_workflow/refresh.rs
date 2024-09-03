@@ -79,7 +79,7 @@ pub async fn refresh_workspace_state(space: &Space, cell_id: CellId, signal: Sen
                         move |txn| -> SourceChainResult<(CurrentCountersigningSessionOpt, bool)> {
                             let maybe_current_session =
                                 current_countersigning_session(txn, Arc::new(agent.clone()))?;
-                            tracing::info!("Found session? {:?}", maybe_current_session);
+                            tracing::info!("Current session: {:?}", maybe_current_session);
 
                             // If we've not made a commit and the entry hasn't been committed then
                             // there is no way to recover the session.
@@ -102,6 +102,8 @@ pub async fn refresh_workspace_state(space: &Space, cell_id: CellId, signal: Sen
                             // Not super important to remove this from the list. We can only get here if
                             // the session was not in the workspace.
                             locked_for_agents.remove(&agent);
+
+                            // Ideally, we'd signal here, but we don't know the app entry hash.
                         }
 
                         match maybe_current_session {

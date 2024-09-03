@@ -2,9 +2,7 @@
 
 use super::error::WorkflowResult;
 use crate::conductor::space::Space;
-use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::{TriggerSender, WorkComplete};
-use crate::core::workflow::WorkflowError;
 use holo_hash::AgentPubKey;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
@@ -13,6 +11,7 @@ use kitsune_p2p_types::tx2::tx2_utils::Share;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::broadcast::Sender;
 
 /// Accept handler for starting countersigning sessions.
 mod accept;
@@ -182,7 +181,7 @@ pub(crate) async fn countersigning_workflow(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,
     cell_id: CellId,
-    conductor: ConductorHandle,
+    signal_tx: Sender<Signal>,
     self_trigger: TriggerSender,
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
@@ -195,11 +194,6 @@ pub(crate) async fn countersigning_workflow(
             .share_ref(|inner| Ok(inner.sessions.len()))
             .unwrap()
     );
-
-    let signal_tx = conductor
-        .get_signal_tx(&cell_id)
-        .await
-        .map_err(WorkflowError::other)?;
 
     refresh::refresh_workspace_state(&space, cell_id.clone(), signal_tx.clone()).await;
 
@@ -401,7 +395,9 @@ pub(crate) async fn countersigning_workflow(
                 .values()
                 .filter_map(|s| {
                     match s {
-                        CountersigningSessionState::Accepted(request) => Some(request.session_times.end),
+                        CountersigningSessionState::Accepted(request) => {
+                            Some(request.session_times.end)
+                        }
                         _ => {
                             // Could be waiting for more signatures, or in an unknown state.
                             None
