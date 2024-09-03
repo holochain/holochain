@@ -1423,6 +1423,17 @@ mod network_impls {
     }
 }
 
+/// Flags for [`Conductor::install_app_common`]
+#[derive(Default)]
+pub struct InstallAppCommonFlags {
+    /// From [`AppManifestV1::defer_memproofs`]
+    pub defer_memproofs: bool,
+    /// From [`InstallAppPayload::ignore_genesis_failure`]
+    pub ignore_genesis_failure: bool,
+    /// From [`InstallAppPayload::allow_throwaway_random_agent_key`]
+    pub allow_throwaway_random_agent_key: bool,
+}
+
 /// Methods related to app installation and management
 mod app_impls {
     use holochain_types::deepkey_roundtrip_backward;
@@ -1463,7 +1474,17 @@ mod app_impls {
             };
 
             let app = self
-                .install_app_common(installed_app_id, manifest, agent.clone(), false, ops, false)
+                .install_app_common(
+                    installed_app_id,
+                    manifest,
+                    agent.clone(),
+                    ops,
+                    InstallAppCommonFlags {
+                        defer_memproofs: false,
+                        ignore_genesis_failure: false,
+                        allow_throwaway_random_agent_key: true,
+                    },
+                )
                 .await?;
 
             Ok(app.agent_key().clone())
@@ -1475,32 +1496,29 @@ mod app_impls {
             installed_app_id: InstalledAppId,
             manifest: AppManifest,
             agent_key: Option<AgentPubKey>,
-            defer_memproofs: bool,
             ops: AppRoleResolution,
-            ignore_genesis_failure: bool,
+            flags: InstallAppCommonFlags,
         ) -> ConductorResult<InstalledApp> {
-            let dpki = self.running_services().dpki.clone();
-
-            // if dpki is installed, load dpki state
-            let mut dpki = if let Some(d) = dpki.as_ref() {
-                let lock = d.state().await;
-                Some((d.clone(), lock))
-            } else {
-                None
-            };
-
             let (agent_key, derivation_details): (AgentPubKey, Option<DerivationDetailsInput>) =
                 if let Some(agent_key) = agent_key {
-                    if dpki.is_some() {
-                        // dpki installed, agent key given
-                        tracing::warn!("App is being installed with an existing agent key: DPKI will not be used to manage keys for this app.");
-                    }
+                    // Key doesn't need to be generated: it will be registered later
                     (agent_key, None)
-                } else if let Some((dpki, state)) = &mut dpki {
-                    // dpki installed, no agent key given
+                } else if let Some(lair_tag) = self.get_config().device_seed_lair_tag.clone() {
+                    // no agent key given, we must derive a new one
+
+                    let (_, app_index) = self
+                        .update_state_prime(|mut state| {
+                            let index = state.derived_agent_key_count;
+                            state.derived_agent_key_count += 1;
+                            Ok((state, index))
+                        })
+                        .await?;
 
                     // register a new key derivation for this app
-                    let derivation_details = state.next_derivation_details(None).await?;
+                    let derivation_details = DerivationDetails {
+                        app_index,
+                        key_index: 0,
+                    };
 
                     let dst_tag = format!(
                         "DPKI-{:04}-{:04}",
@@ -1517,14 +1535,13 @@ mod app_impls {
                         .keystore
                         .lair_client()
                         .derive_seed(
-                            dpki.device_seed_lair_tag.clone().into(),
+                            lair_tag.into(),
                             None,
                             dst_tag.into(),
                             None,
                             derivation_path.into_boxed_slice(),
                         )
-                        .await
-                        .map_err(|e| DpkiServiceError::Lair(e.into()))?;
+                        .await?;
                     let seed = info.ed25519_pub_key.0.to_vec();
 
                     let derivation = DerivationDetailsInput {
@@ -1535,9 +1552,11 @@ mod app_impls {
                     };
 
                     (AgentPubKey::from_raw_32(seed), Some(derivation))
-                } else {
-                    // dpki not installed, no agent key given
+                } else if flags.allow_throwaway_random_agent_key {
+                    // no agent key given, we generate a random throwaway one
                     (self.keystore.new_sign_keypair_random().await?, None)
+                } else {
+                    return Err(ConductorError::other("Unable to install app. If `device_seed_lair_tag` is not specified in config, an agent key must be provided when installing an app."));
                 };
 
             let cells_to_create = ops.cells_to_create(agent_key.clone());
@@ -1567,7 +1586,7 @@ mod app_impls {
                 .map(|(cell_id, _)| cell_id.clone())
                 .collect();
 
-            let app_result = if defer_memproofs {
+            let app_result = if flags.defer_memproofs {
                 let roles = ops.role_assignments;
                 let app = InstalledAppCommon::new(
                     installed_app_id.clone(),
@@ -1587,7 +1606,7 @@ mod app_impls {
                 let genesis_result =
                     crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
 
-                if genesis_result.is_ok() || ignore_genesis_failure {
+                if genesis_result.is_ok() || flags.ignore_genesis_failure {
                     let roles = ops.role_assignments;
                     let app = InstalledAppCommon::new(
                         installed_app_id.clone(),
@@ -1611,10 +1630,8 @@ mod app_impls {
             };
 
             if app_result.is_ok() {
-                // Register the key in DPKI
-
-                // Register initial agent key in Deepkey
-                if let (Some((dpki, state)), Some(derivation)) = (dpki, derivation_details) {
+                // Register initial agent key in DPKI
+                if let Some(dpki) = self.running_services().dpki.clone() {
                     let dpki_agent = dpki.cell_id.agent_pubkey();
 
                     // This is the signature Deepkey requires
@@ -1643,11 +1660,11 @@ mod app_impls {
                             dna_hashes,
                             metadata: Default::default(), // TODO: pass in necessary metadata
                         },
-                        derivation_details: Some(derivation),
+                        derivation_details,
                         create_only: false,
                     };
 
-                    state.register_key(input).await?;
+                    dpki.state().await.register_key(input).await?;
                 }
             }
 
@@ -1660,8 +1677,6 @@ mod app_impls {
             self: Arc<Self>,
             payload: InstallAppPayload,
         ) -> ConductorResult<InstalledApp> {
-            let ignore_genesis_failure = payload.ignore_genesis_failure;
-
             let InstallAppPayload {
                 source,
                 agent_key,
@@ -1669,7 +1684,8 @@ mod app_impls {
                 membrane_proofs,
                 existing_cells,
                 network_seed,
-                ..
+                ignore_genesis_failure,
+                allow_throwaway_random_agent_key,
             } = payload;
 
             let bundle = {
@@ -1689,6 +1705,12 @@ mod app_impls {
             // and the provided memproofs will be used immediately.
             let defer_memproofs = match &manifest {
                 AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.is_none(),
+            };
+
+            let flags = InstallAppCommonFlags {
+                defer_memproofs,
+                ignore_genesis_failure,
+                allow_throwaway_random_agent_key,
             };
 
             let membrane_proofs = membrane_proofs.unwrap_or_default();
@@ -1717,14 +1739,7 @@ mod app_impls {
                 .await?;
 
             self.clone()
-                .install_app_common(
-                    installed_app_id,
-                    manifest,
-                    agent_key,
-                    defer_memproofs,
-                    ops,
-                    ignore_genesis_failure,
-                )
+                .install_app_common(installed_app_id, manifest, agent_key, ops, flags)
                 .await
         }
 
@@ -2575,15 +2590,12 @@ mod service_impls {
 
             self.register_dna(dna.clone()).await?;
 
-            // FIXME: This "device seed" should be derived from the master seed and passed in here,
-            //        not just generated like this. This is a placeholder.
-            let device_seed_lair_tag = {
-                let tag = format!("_hc_dpki_device_{}", nanoid::nanoid!());
-                self.keystore()
-                    .lair_client()
-                    .new_seed(tag.clone().into(), None, false)
-                    .await?;
+            let device_seed_lair_tag = if let Some(tag) =
+                self.get_config().device_seed_lair_tag.clone()
+            {
                 tag
+            } else {
+                return Err(ConductorError::other("DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config. If using DPKI, a device seed must be created in lair, and the tag specified in the conductor config."));
             };
 
             let derivation_path = [0].into();

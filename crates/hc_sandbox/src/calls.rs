@@ -543,6 +543,7 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         existing_cells: Default::default(),
         network_seed,
         ignore_genesis_failure: false,
+        allow_throwaway_random_agent_key: true,
     };
 
     let r = AdminRequest::InstallApp(Box::new(payload));

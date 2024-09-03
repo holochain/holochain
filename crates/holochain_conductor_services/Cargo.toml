@@ -25,7 +25,7 @@ tokio = "1"
 tracing = "0.1"
 
 hc_deepkey_sdk = { version = "^0.7.0-dev.4", path = "../hc_deepkey_sdk" }
-holochain_deepkey_dna = "0.0.8-dev.1"
+holochain_deepkey_dna = "0.0.8-dev.2"
 holochain_keystore = { version = "^0.4.0-dev.19", path = "../holochain_keystore" }
 holochain_types = { version = "^0.4.0-dev.21", path = "../holochain_types" }
 holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util", features = [

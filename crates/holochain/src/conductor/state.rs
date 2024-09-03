@@ -50,6 +50,12 @@ pub struct ConductorState {
     #[serde(default)]
     installed_apps_and_services: InstalledAppMap,
 
+    /// Number of agent keys that have ever been derived from the device seed.
+    /// Only increases, never decreases. Used for deriving reconstructible
+    /// agent keys from the lair "device seed".
+    #[serde(default)]
+    pub derived_agent_key_count: u32,
+
     /// Conductor services that have been installed, to enable initialization
     /// upon restart
     #[serde(default)]

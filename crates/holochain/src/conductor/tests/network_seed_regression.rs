@@ -68,6 +68,7 @@ async fn network_seed_regression() {
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -82,6 +83,7 @@ async fn network_seed_regression() {
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -142,26 +144,33 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
 
     // Populate the groups with all (most) possible combinations of seed values and location specifiers
     for (app_loc, dna_loc) in all_locs {
-        group_0.extend([TestCase(None, None, None, app_loc, dna_loc).install(&c)]);
+        group_0.extend([TestCase(None, None, None, app_loc, dna_loc)
+            .install(&c)
+            .await]);
         group_a.extend([
-            TestCase(A, None, None, app_loc, dna_loc).install(&c),
-            TestCase(None, A, None, app_loc, dna_loc).install(&c),
-            TestCase(None, None, A, app_loc, dna_loc).install(&c),
+            TestCase(A, None, None, app_loc, dna_loc).install(&c).await,
+            TestCase(None, A, None, app_loc, dna_loc).install(&c).await,
+            TestCase(None, None, A, app_loc, dna_loc).install(&c).await,
             //
-            TestCase(A, A, None, app_loc, dna_loc).install(&c),
-            TestCase(A, None, A, app_loc, dna_loc).install(&c),
-            TestCase(None, A, A, app_loc, dna_loc).install(&c),
+            TestCase(A, A, None, app_loc, dna_loc).install(&c).await,
+            TestCase(A, None, A, app_loc, dna_loc).install(&c).await,
+            TestCase(None, A, A, app_loc, dna_loc).install(&c).await,
             //
-            TestCase(A, B, None, app_loc, dna_loc).install(&c),
-            TestCase(A, None, B, app_loc, dna_loc).install(&c),
-            TestCase(None, A, B, app_loc, dna_loc).install(&c),
+            TestCase(A, B, None, app_loc, dna_loc).install(&c).await,
+            TestCase(A, None, B, app_loc, dna_loc).install(&c).await,
+            TestCase(None, A, B, app_loc, dna_loc).install(&c).await,
             //
-            TestCase(A, B, B, app_loc, dna_loc).install(&c),
+            TestCase(A, B, B, app_loc, dna_loc).install(&c).await,
         ]);
     }
 
-    let group_0 = futures::future::join_all(group_0).await;
-    let group_a = futures::future::join_all(group_a).await;
+    // It would be preferable to use join_all here to let all installations happen
+    // in parallel, but it causes timeouts in macos tests. If it's ever determined
+    // that we can parallelize this again, just remove all `.await` in the
+    // above group construction and use join_all here to await them all.
+    //
+    // let group_0 = futures::future::join_all(group_0).await;
+    // let group_a = futures::future::join_all(group_a).await;
 
     let (hash_0, case_0) = &group_0[0];
     let (hash_a, case_a) = &group_a[0];
@@ -309,6 +318,7 @@ impl TestCase {
                 membrane_proofs: Default::default(),
                 existing_cells: Default::default(),
                 ignore_genesis_failure: false,
+                allow_throwaway_random_agent_key: true,
             })
             .await
             .unwrap();

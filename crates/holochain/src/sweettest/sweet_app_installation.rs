@@ -79,5 +79,6 @@ pub async fn get_install_app_payload_from_dnas(
         membrane_proofs,
         existing_cells: Default::default(),
         ignore_genesis_failure: false,
+        allow_throwaway_random_agent_key: false,
     }
 }

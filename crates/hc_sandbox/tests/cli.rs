@@ -13,8 +13,8 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{ChildStdout, Command};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::process::Command;
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -175,8 +175,7 @@ async fn generate_sandbox_and_connect() {
     child_stdin.write_all(b"test-phrase\n").await.unwrap();
     drop(child_stdin);
 
-    let mut stdout = hc_admin.stdout.take().unwrap();
-    let launch_info = get_launch_info(&mut stdout).await;
+    let launch_info = get_launch_info(hc_admin).await;
 
     // - Make a call to list app info to the port
     get_app_info(
@@ -215,8 +214,7 @@ async fn generate_sandbox_and_call_list_dna() {
     child_stdin.write_all(b"test-phrase\n").await.unwrap();
     drop(child_stdin);
 
-    let mut stdout = hc_admin.stdout.take().unwrap();
-    let launch_info = get_launch_info(&mut stdout).await;
+    let launch_info = get_launch_info(hc_admin).await;
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
@@ -261,8 +259,7 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
     child_stdin.write_all(b"test-phrase\n").await.unwrap();
     drop(child_stdin);
 
-    let mut stdout = hc_admin.stdout.take().unwrap();
-    let launch_info = get_launch_info(&mut stdout).await;
+    let launch_info = get_launch_info(hc_admin).await;
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
@@ -308,7 +305,8 @@ fn get_sandbox_command() -> Command {
     Command::new(get_target("hc-sandbox"))
 }
 
-async fn get_launch_info(stdout: &mut ChildStdout) -> LaunchInfo {
+async fn get_launch_info(mut child: tokio::process::Child) -> LaunchInfo {
+    let stdout = child.stdout.take().unwrap();
     let mut lines = BufReader::new(stdout).lines();
     while let Ok(Some(line)) = lines.next_line().await {
         println!("@@@@@-{line}-@@@@@");
@@ -318,7 +316,14 @@ async fn get_launch_info(stdout: &mut ChildStdout) -> LaunchInfo {
         }
     }
 
-    panic!("Unable to find launch info in sandbox output");
+    let mut buf = String::new();
+    BufReader::new(child.stderr.take().unwrap())
+        .read_to_string(&mut buf)
+        .await
+        .unwrap();
+    eprintln!("{buf}");
+
+    panic!("Unable to find launch info in sandbox output. See stderr above.")
 }
 
 struct WsPoll(tokio::task::JoinHandle<()>);
