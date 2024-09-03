@@ -866,7 +866,7 @@ pub struct AppValidationWorkspace {
     dht_db_cache: DhtDbQueryCache,
     cache: DbWrite<DbKindCache>,
     keystore: MetaLairClient,
-    dna_def: Arc<DnaDef>,
+    _dna_def: Arc<DnaDef>,
 }
 
 impl AppValidationWorkspace {
@@ -877,7 +877,7 @@ impl AppValidationWorkspace {
         dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
-        dna_def: Arc<DnaDef>,
+        _dna_def: Arc<DnaDef>,
     ) -> Self {
         Self {
             authored_db,
@@ -885,7 +885,7 @@ impl AppValidationWorkspace {
             dht_db_cache,
             cache,
             keystore,
-            dna_def,
+            _dna_def,
         }
     }
 
