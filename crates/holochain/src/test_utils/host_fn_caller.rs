@@ -191,7 +191,6 @@ impl HostFnCaller {
             cache,
             keystore.clone(),
             cell_id.agent_pubkey().clone(),
-            Arc::new(ribosome.dna_def().as_content().clone()),
         )
         .await
         .unwrap();

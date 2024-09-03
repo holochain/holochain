@@ -146,6 +146,13 @@ pub trait ChainHeadCoordinatorExt:
     }
 }
 
+pub trait ChcSync {
+    /// Attempt to add the given records to the CHC.
+    /// If the CHC is already in sync with the local state, it will accept the new records and return `Ok`.
+    /// If not, the local state will instead be updated, the new records will not be accepted, and an `Err` will be returned.
+    fn sync(&self, new_records: Vec<Record>) -> MustBoxFuture<'static, ChcResult<()>>;
+}
+
 /// A CHC implementation
 pub type ChcImpl = Arc<dyn 'static + Send + Sync + ChainHeadCoordinatorExt>;
 
@@ -309,7 +316,9 @@ pub enum ChcError {
 
     /// The out of sync error only happens when you attempt to add actions
     /// that would cause a fork with respect to the CHC. This can be remedied
-    /// by syncing.
+    /// by syncing, i.e. by grafting the missing records onto the local chain,
+    /// which can be obtained by calling `get_record_data` with the hash provided
+    /// by this error.
     #[error("Local chain is out of sync with the CHC. The CHC head has advanced beyond the first action provided in the `add_records` request. Try calling `get_record_data` from hash {1} (sequence #{0}).")]
     InvalidChain(u32, ActionHash),
 

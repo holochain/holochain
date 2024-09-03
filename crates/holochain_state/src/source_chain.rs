@@ -558,6 +558,14 @@ where
         &self.vault
     }
 
+    pub fn dht_db(&self) -> &DhtDb {
+        &self.dht_db
+    }
+
+    pub fn dht_db_cache(&self) -> &DhtDbQueryCache {
+        &self.dht_db_cache
+    }
+
     /// Take a snapshot of the scratch space that will
     /// not remain in sync with future updates.
     pub fn snapshot(&self) -> SourceChainResult<Scratch> {

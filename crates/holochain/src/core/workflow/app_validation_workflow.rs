@@ -897,7 +897,6 @@ impl AppValidationWorkspace {
             self.cache.clone(),
             self.keystore.clone(),
             None,
-            self.dna_def.clone(),
         )
         .await?)
     }

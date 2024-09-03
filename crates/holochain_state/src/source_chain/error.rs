@@ -40,6 +40,10 @@ pub enum SourceChainError {
     )]
     ChcHeadMoved(String, ChcError),
 
+    /// Unrecoverable CHC error, other than ChcHeadMoved
+    #[error(transparent)]
+    ChcError(#[from] ChcError),
+
     #[error(transparent)]
     TimestampError(#[from] holochain_zome_types::prelude::TimestampError),
 

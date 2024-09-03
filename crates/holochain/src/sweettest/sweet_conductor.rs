@@ -16,7 +16,6 @@ use holochain_conductor_api::{
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_state::prelude::test_db_dir;
-use holochain_state::source_chain::SourceChain;
 use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
@@ -817,24 +816,6 @@ impl SweetConductor {
                 );
             }
         }
-    }
-
-    /// Instantiate a source chain object for the given agent and DNA hash.
-    pub async fn get_agent_source_chain(
-        &self,
-        agent_key: &AgentPubKey,
-        dna_hash: &DnaHash,
-    ) -> SourceChain {
-        SourceChain::new(
-            self.get_or_create_authored_db(dna_hash, agent_key.clone())
-                .unwrap(),
-            self.get_dht_db(dna_hash).unwrap(),
-            self.get_dht_db_cache(dna_hash).unwrap(),
-            self.keystore().clone(),
-            agent_key.clone(),
-        )
-        .await
-        .unwrap()
     }
 
     /// Retries getting a list of peers from the conductor until all the given peers are in the response.

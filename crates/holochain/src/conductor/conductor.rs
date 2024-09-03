@@ -133,8 +133,6 @@ mod builder;
 
 mod chc;
 
-mod graft_records_onto_source_chain;
-
 mod app_auth_token_store;
 
 /// Operations to manipulate agent keys.
@@ -2087,6 +2085,22 @@ mod cell_impls {
                 })
                 .collect())
         }
+
+        /// Instantiate a source chain object for the given agent and DNA hash.
+        pub async fn get_agent_source_chain(
+            &self,
+            CellId(dna_hash, agent_key): &CellId,
+        ) -> SourceChainResult<SourceChain> {
+            SourceChain::new(
+                self.get_or_create_authored_db(dna_hash, agent_key.clone())
+                    .unwrap(),
+                self.get_dht_db(dna_hash).unwrap(),
+                self.get_dht_db_cache(dna_hash).unwrap(),
+                self.keystore().clone(),
+                agent_key.clone(),
+            )
+            .await
+        }
     }
 }
 
@@ -2972,10 +2986,43 @@ mod misc_impls {
             validate: bool,
             records: Vec<Record>,
         ) -> ConductorApiResult<()> {
-            graft_records_onto_source_chain::graft_records_onto_source_chain(
-                self, cell_id, validate, records,
+            let chain = self.get_agent_source_chain(&cell_id).await?;
+
+            let authored = chain.author_db().clone().into();
+            let dht = chain.dht_db().clone();
+            let cache = chain.dht_db_cache().clone();
+
+            let CellId(dna_hash, agent_pubkey) = &cell_id;
+            let ribosome = self.get_ribosome(dna_hash)?;
+            let ops = chain.graft_records_onto_source_chain(records).await?;
+            let space = self.get_or_create_space(dna_hash)?;
+            let workspace = space
+                .source_chain_workspace(self.keystore().clone(), agent_pubkey.clone())
+                .await?;
+            let network = self
+                .holochain_p2p()
+                .clone()
+                .into_dna(dna_hash.clone(), self.get_chc(&cell_id));
+
+            // Validate
+            if validate {
+                // Run the individual record validations.
+                crate::core::workflow::inline_validation(
+                    workspace.clone(),
+                    network.clone(),
+                    self.clone(),
+                    ribosome,
+                )
+                .await?;
+            }
+
+            // Integrate
+            holochain_state::integrate::authored_ops_to_dht_db(
+                &network, ops, authored, dht, &cache,
             )
-            .await
+            .await?;
+
+            Ok(())
         }
 
         /// Update coordinator zomes on an existing dna.
