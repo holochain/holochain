@@ -101,6 +101,15 @@ impl AppInterfaceApi {
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }
+            AppRequest::GetCountersigningSessionState(payload) => {
+                let countersigning_session_state = self
+                    .conductor_handle
+                    .clone()
+                    .get_countersigning_session_state(*payload)
+                    .await?;
+                println!("session_state {session_state:?}");
+                Ok(AppResponse::CountersigningSessionState(Box::new(())))
+            }
             AppRequest::CreateCloneCell(payload) => {
                 let clone_cell = self
                     .conductor_handle

@@ -48,16 +48,26 @@ impl CountersigningWorkspace {
             countersigning_resolution_retry_delay,
         }
     }
+
+    pub async fn get_countersigning_session_state(
+        &self,
+        agent_key: &AgentPubKey,
+    ) -> Result<Option<CountersigningSessionState>, String> {
+        self.inner.share_ref(|inner| {
+            println!("there are {:?} sessions here", inner.sessions.len());
+            Ok(inner.sessions.get(agent_key))
+        })
+    }
 }
 
 /// The inner state of a countersigning workspace.
 #[derive(Default)]
 struct CountersigningWorkspaceInner {
-    sessions: HashMap<AgentPubKey, SessionState>,
+    sessions: HashMap<AgentPubKey, CountersigningSessionState>,
 }
 
 #[derive(Debug)]
-enum SessionState {
+enum CountersigningSessionState {
     /// This is the entry state. Accepting a countersigning session through the HDK will immediately
     /// register the countersigning session in this state, for management by the countersigning workflow.
     Accepted(PreflightRequest),
@@ -96,14 +106,14 @@ enum SessionState {
     },
 }
 
-impl SessionState {
+impl CountersigningSessionState {
     fn session_app_entry_hash(&self) -> &EntryHash {
         let request = match self {
-            SessionState::Accepted(request) => request,
-            SessionState::SignaturesCollected {
+            CountersigningSessionState::Accepted(request) => request,
+            CountersigningSessionState::SignaturesCollected {
                 preflight_request, ..
             } => preflight_request,
-            SessionState::Unknown {
+            CountersigningSessionState::Unknown {
                 preflight_request, ..
             } => preflight_request,
         };
@@ -199,9 +209,9 @@ pub(crate) async fn countersigning_workflow(
                 .sessions
                 .iter_mut()
                 .for_each(|(author, session_state)| {
-                    if let SessionState::Accepted(request) = session_state {
+                    if let CountersigningSessionState::Accepted(request) = session_state {
                         if request.session_times.end < Timestamp::now() {
-                            *session_state = SessionState::Unknown {
+                            *session_state = CountersigningSessionState::Unknown {
                                 preflight_request: request.clone(),
                                 resolution: None,
                             };
@@ -222,7 +232,7 @@ pub(crate) async fn countersigning_workflow(
                 .sessions
                 .iter()
                 .filter_map(|(author, session_state)| match session_state {
-                    SessionState::Unknown {
+                    CountersigningSessionState::Unknown {
                         preflight_request: request,
                         ..
                     } => Some((author.clone(), request.clone())),
@@ -323,7 +333,7 @@ pub(crate) async fn countersigning_workflow(
                 .sessions
                 .iter()
                 .filter_map(|(author, session_state)| match session_state {
-                    SessionState::SignaturesCollected {
+                    CountersigningSessionState::SignaturesCollected {
                         signature_bundles, ..
                     } => Some((author.clone(), signature_bundles.clone())),
                     _ => None,
@@ -394,7 +404,9 @@ pub(crate) async fn countersigning_workflow(
                 .values()
                 .filter_map(|s| {
                     match s {
-                        SessionState::Accepted(request) => Some(request.session_times.end),
+                        CountersigningSessionState::Accepted(request) => {
+                            Some(request.session_times.end)
+                        }
                         state => {
                             // Could be waiting for more signatures, or in an unknown state.
                             None
@@ -483,7 +495,7 @@ async fn refresh_workspace_state(
                             .inner
                             .share_mut(|inner, _| {
                                 inner.sessions.entry(agent.clone()).or_insert(
-                                    SessionState::Unknown {
+                                    CountersigningSessionState::Unknown {
                                         preflight_request: session_data.preflight_request().clone(),
                                         resolution: None,
                                     },
@@ -854,14 +866,14 @@ pub(crate) async fn countersigning_success(
                         // Whether we're awaiting signatures for the first time or trying to recover,
                         // switch to the signatures collected state and add the signatures to the
                         // list of signature bundles to try.
-                        SessionState::Accepted(ref preflight_request) | SessionState::Unknown { ref preflight_request, .. } => {
-                            entry.insert(SessionState::SignaturesCollected {
+                        CountersigningSessionState::Accepted(ref preflight_request) | CountersigningSessionState::Unknown { ref preflight_request, .. } => {
+                            entry.insert(CountersigningSessionState::SignaturesCollected {
                                 preflight_request: preflight_request.clone(),
                                 signature_bundles: vec![signature_bundle],
                             });
                         }
-                        SessionState::SignaturesCollected { preflight_request, signature_bundles} => {
-                            entry.insert(SessionState::SignaturesCollected {
+                        CountersigningSessionState::SignaturesCollected { preflight_request, signature_bundles} => {
+                            entry.insert(CountersigningSessionState::SignaturesCollected {
                                 preflight_request: preflight_request.clone(),
                                 signature_bundles: {
                                     let mut signature_bundles = signature_bundles.clone();

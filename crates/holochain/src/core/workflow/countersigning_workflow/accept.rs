@@ -1,6 +1,6 @@
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
-use crate::core::workflow::countersigning_workflow::SessionState;
+use crate::core::workflow::countersigning_workflow::CountersigningSessionState;
 use crate::core::workflow::{WorkflowError, WorkflowResult};
 use crate::prelude::{PreflightRequest, PreflightRequestAcceptance, PreflightResponse, Signature};
 use holo_hash::AgentPubKey;
@@ -68,7 +68,7 @@ pub async fn accept_countersigning_request(
                 Err(KitsuneError::other("Session already exists"))
             }
             std::collections::hash_map::Entry::Vacant(entry) => {
-                entry.insert(SessionState::Accepted(request.clone()));
+                entry.insert(CountersigningSessionState::Accepted(request.clone()));
                 Ok(())
             }
         })

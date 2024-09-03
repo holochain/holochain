@@ -118,7 +118,7 @@ pub async fn grant_zome_call_capability(
     Ok(cap_secret)
 }
 
-pub async fn call_zome_fn<I, O>(
+pub async fn call_zome_fn<I>(
     app_tx: &WebsocketSender,
     cell_id: CellId,
     signing_keypair: &SigningKey,
@@ -126,10 +126,9 @@ pub async fn call_zome_fn<I, O>(
     zome_name: ZomeName,
     fn_name: FunctionName,
     input: &I,
-) -> O
+) -> ExternIO
 where
     I: Serialize + std::fmt::Debug,
-    O: DeserializeOwned + std::fmt::Debug,
 {
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
     let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
@@ -159,7 +158,7 @@ where
     let response = app_tx.request(request);
     let call_response = check_timeout(response, 6000).await.unwrap();
     match call_response {
-        AppResponse::ZomeCalled(response) => response.decode().unwrap(),
+        AppResponse::ZomeCalled(response) => *response,
         _ => panic!("unexpected zome call response"),
     }
 }

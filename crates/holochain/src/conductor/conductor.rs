@@ -3211,6 +3211,17 @@ mod countersigning_impls {
                 .await?,
             )
         }
+
+        pub(crate) async fn get_countersigning_session_state(
+            &self,
+            cell_id: CellId,
+        ) -> ConductorResult<()> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            space
+                .countersigning_workspace
+                .get_countersigning_session_state(cell_id.agent_pubkey())
+                .await?
+        }
     }
 }
 
