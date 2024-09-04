@@ -37,7 +37,7 @@ holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash", features = [
 holochain_keystore = { version = "^0.4.0-dev.20", path = "../holochain_keystore" }
 holochain_nonce = { version = "^0.4.0-dev.7", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.4.0-dev.20"}
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.4.0-dev.20" }
 holochain_trace = { version = "^0.4.0-dev.5", path = "../holochain_trace" }
 holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util", features = [
   "backtrace",
