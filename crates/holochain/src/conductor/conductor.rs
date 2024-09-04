@@ -3021,6 +3021,10 @@ mod misc_impls {
                 .clone()
                 .into_dna(dna_hash.clone(), self.get_chc(&cell_id));
 
+            todo!("Make sure to implement Relaxed mode, rebasing scratch records onto the grafted data from CHC.
+                This can be more tightly integrated into the chain flush after all.");
+            todo!("Also remember it's OK to not publish grafted records, since they were likely already published.");
+
             // Validate
             if validate {
                 // Run the individual record validations.
