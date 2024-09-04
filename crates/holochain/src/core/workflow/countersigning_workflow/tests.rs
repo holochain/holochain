@@ -1,47 +1,49 @@
 use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::{TriggerReceiver, TriggerSender};
-use crate::core::workflow::countersigning_workflow::{countersigning_success, WorkComplete};
+use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::countersigning_workflow::{
     accept_countersigning_request, countersigning_workflow, CountersigningSessionState,
 };
+use crate::core::workflow::countersigning_workflow::{countersigning_success, WorkComplete};
 use crate::core::workflow::WorkflowResult;
-use crate::prelude::{ActionHashed, CounterSigningAgentState, DhtDbQueryCache, SignedActionHashed};
+use crate::prelude::SignatureFixturator;
+use crate::prelude::SignedAction;
 use crate::prelude::{ActionBase, PreflightBytes, PreflightRequest, PreflightRequestAcceptance};
+use crate::prelude::{ActionHashed, CounterSigningAgentState, DhtDbQueryCache, SignedActionHashed};
 use fixt::prelude::*;
-use hdk::prelude::{Action, Entry, EntryHashed, EntryTypeFixturator};
+use hdk::prelude::{Action, Entry, EntryTypeFixturator};
 use hdk::prelude::{CounterSigningSessionTimes, Timestamp};
+use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
-use holo_hash::{AgentPubKey, DnaHash};
+use holo_hash::{AgentPubKey, DnaHash, EntryHash};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::chain_lock::get_chain_lock;
-use holochain_state::prelude::{insert_action, insert_entry, insert_op, unlock_chain, CounterSigningSessionData};
+use holochain_state::prelude::AppEntryBytesFixturator;
+use holochain_state::prelude::StateMutationResult;
+use holochain_state::prelude::{
+    insert_action, insert_entry, insert_op, unlock_chain, CounterSigningSessionData,
+};
 use holochain_state::source_chain;
+use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
+use holochain_types::prelude::SignedActionHashedExt;
 use holochain_types::prelude::SystemSignal;
 use holochain_types::signal::Signal;
 use holochain_zome_types::cell::CellId;
+use holochain_zome_types::countersigning::PreflightResponse;
 use holochain_zome_types::prelude::CreateBase;
 use matches::assert_matches;
 use std::ops::Add;
 use std::sync::Arc;
 use tokio::sync::broadcast::{Receiver, Sender};
-use holochain_zome_types::countersigning::PreflightResponse;
-use holo_hash::fixt::ActionHashFixturator;
-use crate::prelude::SignedAction;
-use holochain_types::prelude::SignedActionHashedExt;
-use holochain_state::prelude::AppEntryBytesFixturator;
-use holochain_state::prelude::StateMutationResult;
-use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
-use crate::core::ribosome::weigh_placeholder;
-use crate::prelude::SignatureFixturator;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn accept_countersigning_request_creates_state() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -179,93 +181,42 @@ async fn receive_signatures_and_complete() {
         .await
         .unwrap();
 
-    let agent_state = CounterSigningAgentState::new(1, fixt!(ActionHash), 32);
-    let response_data = PreflightResponse::encode_fields_for_signature(&request, &agent_state).unwrap();
-    let bob_signature = test_harness.keystore.sign(bob.agent.clone(), response_data.into()).await.unwrap();
+    let bob_acceptance = bob
+        .accept_preflight_request(request.clone(), test_harness.keystore.clone())
+        .await;
 
-    let bob_acceptance = PreflightRequestAcceptance::Accepted(PreflightResponse::try_new(
-        request.clone(),
-        agent_state,
-        bob_signature,
-    ).unwrap());
+    let (session_data, entry, entry_hash) =
+        test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
 
-    let session_data = CounterSigningSessionData::try_new(
-        request.clone(),
-        vec![my_acceptance, bob_acceptance].into_iter().filter_map(|a| match a {
-            PreflightRequestAcceptance::Accepted(a) => Some((a.agent_state, a.signature)),
-            _ => None,
-        }).collect(),
-        vec![],
-    ).unwrap();
+    let signatures = vec![
+        bob.produce_signature(&session_data, &entry_hash, test_harness.keystore.clone())
+            .await,
+        test_harness
+            .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+            .await,
+    ];
 
-    let entry = Entry::CounterSign(Box::new(session_data.clone()), fixt!(AppEntryBytes));
-    let entry_hashed = EntryHashed::from_content_sync(entry.clone());
-
-    let mut signatures = vec![];
-
-    {
-        let action = Action::from_countersigning_data(
-            entry_hashed.hash.clone(),
-            &session_data,
-            bob.agent.clone(),
-            weigh_placeholder(),
-        ).unwrap();
-
-        let hashed = ActionHashed::from_content_sync(action.clone());
-        let sah = SignedActionHashed::sign(&test_harness.keystore, hashed).await.unwrap();
-
-        let signed = SignedAction::from(sah);
-        signatures.push(signed);
-    }
-
-    {
-        let my_action = Action::from_countersigning_data(
-            entry_hashed.hash.clone(),
-            &session_data,
-            test_harness.author.clone(),
-            weigh_placeholder(),
-        ).unwrap();
-        let hashed = ActionHashed::from_content_sync(my_action.clone());
-        let sah = SignedActionHashed::sign(&test_harness.keystore, hashed).await.unwrap();
-
-        let signed = SignedAction::from(sah.clone());
-        signatures.push(signed);
-
-        let store_entry_op = ChainOp::StoreEntry(fixt!(Signature), my_action.clone().try_into().unwrap(), entry.clone());
-        let dht_op = DhtOp::ChainOp(Box::new(store_entry_op));
-        let dht_op = DhtOpHashed::from_content_sync(dht_op);
-
-        test_harness.test_space.space.get_or_create_authored_db(test_harness.author.clone()).unwrap().write_async(move |txn| -> StateMutationResult<()> {
-            let head: usize = txn.query_row_and_then("select max(seq) from Action", [], |row| row.get(0))?;
-            tracing::info!("Head: {}", head);
-
-            insert_action(txn, &sah)?;
-            insert_entry(txn, &entry_hashed.hash, &entry)?;
-            insert_op(txn, &dht_op)?;
-
-            let head: usize = txn.query_row_and_then("select max(seq) from Action", [], |row| row.get(0))?;
-            tracing::info!("Head: {}", head);
-
-            Ok(())
-        }).await.unwrap();
-    }
-
+    // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
-        net.expect_publish_countersign().return_once(|_, _, _| {
-            Ok(())
-        });
+        net.expect_publish_countersign()
+            .return_once(|_, _, _| Ok(()));
         net
     });
 
+    // Receive the signatures as though they were coming in from a witness.
     countersigning_success(
         test_harness.test_space.space.clone(),
         test_harness.author.clone(),
         signatures,
         test_harness.countersigning_tx.clone(),
-    ).await;
+    )
+    .await;
 
-    test_harness.respond_to_countersigning_workflow_signal().await;
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
 
+    // One run should be enough when we got valid signatures and the session is now completed.
     test_harness.expect_success_signal().await;
 }
 
@@ -283,6 +234,7 @@ struct TestHarness {
     integration_rx: TriggerReceiver,
     publish_tx: TriggerSender,
     publish_rx: TriggerReceiver,
+    remote_agents: usize,
 }
 
 /// Test driver implementation
@@ -327,12 +279,15 @@ impl TestHarness {
             integration_rx: integration_trigger.1,
             publish_tx: publish_trigger.0,
             publish_rx: publish_trigger.1,
+            remote_agents: 0,
         }
     }
 
-    async fn new_remote_agent(&self) -> RemoteAgent {
+    async fn new_remote_agent(&mut self) -> RemoteAgent {
+        self.remote_agents += 1;
         RemoteAgent {
             agent: self.keystore.new_sign_keypair_random().await.unwrap(),
+            agent_index: self.remote_agents,
         }
     }
 
@@ -404,6 +359,75 @@ impl TestHarness {
                 Ok(())
             })
             .unwrap();
+    }
+
+    fn build_session_data(
+        &self,
+        request: PreflightRequest,
+        acceptances: Vec<PreflightRequestAcceptance>,
+    ) -> (CounterSigningSessionData, Entry, EntryHash) {
+        let session_data = CounterSigningSessionData::try_new(
+            request,
+            acceptances
+                .into_iter()
+                .filter_map(|a| match a {
+                    PreflightRequestAcceptance::Accepted(a) => Some((a.agent_state, a.signature)),
+                    _ => None,
+                })
+                .collect(),
+            vec![],
+        )
+        .unwrap();
+
+        let entry = Entry::CounterSign(Box::new(session_data.clone()), fixt!(AppEntryBytes));
+        let entry_hash = EntryHash::with_data_sync(&entry);
+
+        (session_data, entry, entry_hash)
+    }
+
+    async fn commit_countersigning_entry(
+        &self,
+        session_data: &CounterSigningSessionData,
+        entry: Entry,
+        entry_hash: EntryHash,
+    ) -> SignedAction {
+        let my_action = Action::from_countersigning_data(
+            entry_hash.clone(),
+            &session_data,
+            self.author.clone(),
+            weigh_placeholder(),
+        )
+        .unwrap();
+        let hashed = ActionHashed::from_content_sync(my_action.clone());
+        let sah = SignedActionHashed::sign(&self.keystore, hashed)
+            .await
+            .unwrap();
+
+        let signed = SignedAction::from(sah.clone());
+
+        let store_entry_op = ChainOp::StoreEntry(
+            fixt!(Signature),
+            my_action.clone().try_into().unwrap(),
+            entry.clone(),
+        );
+        let dht_op = DhtOp::ChainOp(Box::new(store_entry_op));
+        let dht_op = DhtOpHashed::from_content_sync(dht_op);
+
+        self.test_space
+            .space
+            .get_or_create_authored_db(self.author.clone())
+            .unwrap()
+            .write_async(move |txn| -> StateMutationResult<()> {
+                insert_action(txn, &sah)?;
+                insert_entry(txn, &entry_hash, &entry)?;
+                insert_op(txn, &dht_op)?;
+
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        signed
     }
 }
 
@@ -513,6 +537,48 @@ impl TestHarness {
 
 struct RemoteAgent {
     agent: AgentPubKey,
+    agent_index: usize,
+}
+
+impl RemoteAgent {
+    async fn accept_preflight_request(
+        &self,
+        request: PreflightRequest,
+        keystore: MetaLairClient,
+    ) -> PreflightRequestAcceptance {
+        let agent_state =
+            CounterSigningAgentState::new(self.agent_index as u8, fixt!(ActionHash), 32);
+        let response_data =
+            PreflightResponse::encode_fields_for_signature(&request, &agent_state).unwrap();
+        let signature = keystore
+            .sign(self.agent.clone(), response_data.into())
+            .await
+            .unwrap();
+
+        PreflightRequestAcceptance::Accepted(
+            PreflightResponse::try_new(request.clone(), agent_state, signature).unwrap(),
+        )
+    }
+
+    async fn produce_signature(
+        &self,
+        session_data: &CounterSigningSessionData,
+        entry_hash: &EntryHash,
+        keystore: MetaLairClient,
+    ) -> SignedAction {
+        let action = Action::from_countersigning_data(
+            entry_hash.clone(),
+            &session_data,
+            self.agent.clone(),
+            weigh_placeholder(),
+        )
+        .unwrap();
+
+        let hashed = ActionHashed::from_content_sync(action.clone());
+        let sah = SignedActionHashed::sign(&keystore, hashed).await.unwrap();
+
+        SignedAction::from(sah)
+    }
 }
 
 fn test_preflight_request(
