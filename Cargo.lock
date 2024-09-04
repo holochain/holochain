@@ -2587,7 +2587,7 @@ dependencies = [
 
 [[package]]
 name = "hc_deepkey_sdk"
-version = "0.7.0-dev.4"
+version = "0.7.0-dev.5"
 dependencies = [
  "arbitrary",
  "hc_deepkey_types",
@@ -2598,7 +2598,7 @@ dependencies = [
 
 [[package]]
 name = "hc_deepkey_types"
-version = "0.8.0-dev.4"
+version = "0.8.0-dev.5"
 dependencies = [
  "arbitrary",
  "hdi",
@@ -2671,7 +2671,7 @@ dependencies = [
 
 [[package]]
 name = "hc_sleuth"
-version = "0.4.0-dev.21"
+version = "0.4.0-dev.22"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2695,7 +2695,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.4.0-dev.21"
+version = "0.4.0-dev.22"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2717,7 +2717,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.5.0-dev.13"
+version = "0.5.0-dev.14"
 dependencies = [
  "arbitrary",
  "fixt",
@@ -2738,7 +2738,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.4.0-dev.15"
+version = "0.4.0-dev.16"
 dependencies = [
  "fixt",
  "getrandom 0.2.15",
@@ -2759,7 +2759,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.4.0-dev.12"
+version = "0.4.0-dev.13"
 dependencies = [
  "darling 0.14.4",
  "heck 0.5.0",
@@ -2886,7 +2886,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.4.0-dev.21"
+version = "0.4.0-dev.22"
 dependencies = [
  "aitia",
  "anyhow",
@@ -3004,7 +3004,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.4.0-dev.21"
+version = "0.4.0-dev.22"
 dependencies = [
  "async-trait",
  "fixt",
@@ -3035,7 +3035,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_chc"
-version = "0.1.0-dev.1"
+version = "0.1.0-dev.2"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -3063,7 +3063,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.4.0-dev.21"
+version = "0.4.0-dev.22"
 dependencies = [
  "anyhow",
  "clap 4.5.9",
@@ -3077,7 +3077,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.4.0-dev.21"
+version = "0.4.0-dev.22"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -3117,7 +3117,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.4.0-dev.21"
+version = "0.4.0-dev.22"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3146,7 +3146,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.4.0-dev.21"
+version = "0.4.0-dev.22"
 dependencies = [
  "derive_more",
  "holo_hash",
@@ -3172,7 +3172,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_services"
-version = "0.3.0-dev.21"
+version = "0.3.0-dev.22"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3218,7 +3218,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.4.0-dev.12"
+version = "0.4.0-dev.13"
 dependencies = [
  "arbitrary",
  "derive_builder 0.20.0",
@@ -3240,7 +3240,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.4.0-dev.19"
+version = "0.4.0-dev.20"
 dependencies = [
  "assert_cmd",
  "base64 0.22.1",
@@ -3287,7 +3287,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_nonce"
-version = "0.4.0-dev.6"
+version = "0.4.0-dev.7"
 dependencies = [
  "getrandom 0.2.15",
  "holochain_secure_primitive",
@@ -3296,7 +3296,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.4.0-dev.21"
+version = "0.4.0-dev.22"
 dependencies = [
  "aitia",
  "async-trait",
@@ -3365,7 +3365,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.4.0-dev.19"
+version = "0.4.0-dev.20"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3412,7 +3412,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.4.0-dev.21"
+version = "0.4.0-dev.22"
 dependencies = [
  "aitia",
  "anyhow",
@@ -3457,7 +3457,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state_types"
-version = "0.4.0-dev.12"
+version = "0.4.0-dev.13"
 dependencies = [
  "holo_hash",
  "holochain_integrity_types",
@@ -3466,7 +3466,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.4.0-dev.15"
+version = "0.4.0-dev.16"
 dependencies = [
  "hdk",
  "serde",
@@ -3495,7 +3495,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.4.0-dev.21"
+version = "0.4.0-dev.22"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3573,7 +3573,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.4.0-dev.21"
+version = "0.4.0-dev.22"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -3632,7 +3632,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.4.0-dev.21"
+version = "0.4.0-dev.22"
 dependencies = [
  "async-trait",
  "criterion",
@@ -3649,7 +3649,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.4.0-dev.15"
+version = "0.4.0-dev.16"
 dependencies = [
  "arbitrary",
  "contrafact",
@@ -4353,7 +4353,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.4.0-dev.19"
+version = "0.4.0-dev.20"
 dependencies = [
  "arbitrary",
  "arrayref",
