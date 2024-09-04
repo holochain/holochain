@@ -96,7 +96,9 @@ pub struct ConductorConfig {
     pub data_root_path: Option<DataRootPath>,
 
     /// The lair tag used to refer to the "device seed" which was used to generate
-    /// the AgentPubKey for the DPKI cell
+    /// the AgentPubKey for the DPKI cell.
+    ///
+    /// This must not be changed once the conductor has been started for the first time.
     pub device_seed_lair_tag: Option<String>,
 
     /// If set, and if there is no seed in lair at the tag specified in `device_seed_lair_tag`,
@@ -116,10 +118,7 @@ pub struct ConductorConfig {
     /// started for the first time.
     ///  
     /// If `dna_path` is present, the DNA file at this path will be used to install the DPKI service upon first conductor startup.
-    /// If not present, the Deepkey DNA specified by the `holochain_deepkey_dna` crate will be used instead.
-    ///
-    /// `device_seed_lair_tag` is currently unused but may be required in the future.
-    // TODO: once device seed generation is fully hooked up, make this config required.
+    /// If not present, the Deepkey DNA specified by the `holochain_deepkey_dna` crate and built into Holochain, will be used instead.
     #[serde(default)]
     pub dpki: DpkiConfig,
 
