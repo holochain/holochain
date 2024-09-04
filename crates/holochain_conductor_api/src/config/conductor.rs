@@ -99,6 +99,15 @@ pub struct ConductorConfig {
     /// the AgentPubKey for the DPKI cell
     pub device_seed_lair_tag: Option<String>,
 
+    /// If set, and if there is no seed in lair at the tag specified in `device_seed_lair_tag`,
+    /// the conductor will create a random seed and store it in lair at the specified tag.
+    /// This should only be used for test or throwaway environments, because this device seed
+    /// can never be regenerated, which defeats the purpose of having a device seed in the first place.
+    ///
+    /// If `device_seed_lair_tag` is not set, this setting has no effect.
+    #[serde(default)]
+    pub danger_generate_throwaway_device_seed: bool,
+
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
     pub keystore: KeystoreConfig,
@@ -281,6 +290,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
+                danger_generate_throwaway_device_seed: false,
                 network: Default::default(),
                 dpki: Default::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
@@ -373,6 +383,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
+                danger_generate_throwaway_device_seed: false,
                 dpki: DpkiConfig::new(Some("path/to/dna.dna".into())),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -407,6 +418,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
+                danger_generate_throwaway_device_seed: false,
                 network: Default::default(),
                 dpki: Default::default(),
                 keystore: KeystoreConfig::LairServer {

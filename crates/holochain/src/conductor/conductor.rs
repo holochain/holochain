@@ -1531,17 +1531,44 @@ mod app_impls {
                         .flat_map(|c| c.to_be_bytes())
                         .collect();
 
-                    let info = self
-                        .keystore
-                        .lair_client()
-                        .derive_seed(
-                            lair_tag.into(),
-                            None,
-                            dst_tag.into(),
-                            None,
-                            derivation_path.into_boxed_slice(),
-                        )
-                        .await?;
+                    let derive_seed = {
+                        let keystore = self.keystore.clone();
+                        let lair_tag = lair_tag.clone();
+                        let derivation_path = derivation_path.clone();
+                        move || {
+                            let lair_tag = lair_tag.clone().into();
+                            let dst_tag = dst_tag.clone().into();
+                            let derivation_path = derivation_path.clone().into_boxed_slice();
+                            let keystore = keystore.clone();
+                            keystore.clone().lair_client().derive_seed(
+                                lair_tag,
+                                None,
+                                dst_tag,
+                                None,
+                                derivation_path,
+                            )
+                        }
+                    };
+
+                    let info = match derive_seed().await {
+                        Err(err) => {
+                            // If the seed could not be derived, assume that this is because there was no device seed
+                            // to derive from and attempt to create a throwaway seed if that was set in the config
+                            if self.get_config().danger_generate_throwaway_device_seed {
+                                tracing::info!("Failed to derive seed from lair, falling back to random seed. This is to be expected. Error: {:?}", err);
+                                let lair_tag = lair_tag.clone();
+                                self.keystore()
+                                    .lair_client()
+                                    .new_seed(lair_tag.clone().into(), None, false)
+                                    .await?;
+                                derive_seed().await?
+                            } else {
+                                return Err(err.into());
+                            }
+                        }
+                        Ok(info) => info,
+                    };
+
                     let seed = info.ed25519_pub_key.0.to_vec();
 
                     let derivation = DerivationDetailsInput {
@@ -2636,10 +2663,7 @@ mod service_impls {
                 .get_from_spaces(|s| (*s.dna_hash).clone())
                 .contains(&dna_hash));
 
-            let installation = DeepkeyInstallation {
-                cell_id,
-                device_seed_lair_tag,
-            };
+            let installation = DeepkeyInstallation { cell_id };
             self.update_state(move |mut state| {
                 state.conductor_services.dpki = Some(installation);
                 Ok(state)
