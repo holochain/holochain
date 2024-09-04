@@ -101,7 +101,9 @@ pub(crate) async fn inner_countersigning_session_complete(
     if !i_am_an_author {
         // We're effectively rejecting this signature bundle but communicating that this signature
         // bundle wasn't acceptable so that we can try another one.
-        tracing::info!("I am not an author for this countersigning session, rejecting signature bundle");
+        tracing::info!(
+            "I am not an author for this countersigning session, rejecting signature bundle"
+        );
         return Ok(None);
     }
 
