@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - CloseChain can be used on its own, with no forward reference, to make a chain read-only.
   - CloseChain can include a forward reference to either a new AgentPubKey or a new DNA hash, which represent a migration to a new chain. The new chain is expected to begin with a corresponding OpenChain which has a backward reference to the CloseChain action. (This will become a validation rule in future work.)
 - Internal rework of `get_agent_activity`. This is not a breaking change for the HDK function of the same name, but it is a breaking change to the previous version of Holochain because the network response for agent activity has been changed. A future change will be made to the HDK function to expose the new functionality. \#4221
+- Add `danger_generate_throwaway_device_seed` to allow creation and use of a random device seed for test situations, where a proper device seed is not needed. #4238
 
 ## 0.4.0-dev.21
 
