@@ -14,6 +14,13 @@ pub struct DpkiConfig {
     /// Defaults to the built-in Deepkey DNA from the holochain_deepkey_dna crate.
     pub dna_path: Option<PathBuf>,
 
+    /// Allow the DPKI agent key to be generated randomly in the absence of a
+    /// [`ConductorConfig::device_seed_lair_tag`] setting. This is useful in test
+    /// environments where the device seed is not set and key regeneration is not
+    /// needed. For any real use of Holochain, do not set this to true!
+    #[serde(default)]
+    pub allow_throwaway_random_dpki_agent_key: bool,
+
     /// For testing only, we can turn off DPKI if needed.
     /// TODO: this can be removed once DPKI is truly optional again.
     #[serde(default)]
@@ -24,6 +31,15 @@ impl DpkiConfig {
     pub fn new(dna_path: Option<PathBuf>) -> Self {
         Self {
             dna_path,
+            allow_throwaway_random_dpki_agent_key: false,
+            no_dpki: false,
+        }
+    }
+
+    pub fn test() -> Self {
+        Self {
+            dna_path: None,
+            allow_throwaway_random_dpki_agent_key: true,
             no_dpki: false,
         }
     }
@@ -31,6 +47,7 @@ impl DpkiConfig {
     pub fn disabled() -> Self {
         Self {
             dna_path: None,
+            allow_throwaway_random_dpki_agent_key: false,
             no_dpki: true,
         }
     }

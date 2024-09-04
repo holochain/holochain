@@ -85,6 +85,7 @@ impl SweetConductorConfig {
         // Allow device seed generation to exercise key derivation in sweettests.
         c.device_seed_lair_tag = Some("sweet-conductor-device-seed".to_string());
         c.danger_generate_throwaway_device_seed = true;
+        c
     }
 
     /// Disable DPKI, which is on by default.
