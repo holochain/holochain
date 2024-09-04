@@ -2090,16 +2090,29 @@ mod cell_impls {
         pub async fn get_agent_source_chain(
             &self,
             CellId(dna_hash, agent_key): &CellId,
+            allow_empty: bool,
         ) -> SourceChainResult<SourceChain> {
-            SourceChain::new(
-                self.get_or_create_authored_db(dna_hash, agent_key.clone())
-                    .unwrap(),
-                self.get_dht_db(dna_hash).unwrap(),
-                self.get_dht_db_cache(dna_hash).unwrap(),
-                self.keystore().clone(),
-                agent_key.clone(),
-            )
-            .await
+            if allow_empty {
+                SourceChain::raw_empty(
+                    self.get_or_create_authored_db(dna_hash, agent_key.clone())
+                        .unwrap(),
+                    self.get_dht_db(dna_hash).unwrap(),
+                    self.get_dht_db_cache(dna_hash).unwrap(),
+                    self.keystore().clone(),
+                    agent_key.clone(),
+                )
+                .await
+            } else {
+                SourceChain::new(
+                    self.get_or_create_authored_db(dna_hash, agent_key.clone())
+                        .unwrap(),
+                    self.get_dht_db(dna_hash).unwrap(),
+                    self.get_dht_db_cache(dna_hash).unwrap(),
+                    self.keystore().clone(),
+                    agent_key.clone(),
+                )
+                .await
+            }
         }
     }
 }
@@ -2986,7 +2999,7 @@ mod misc_impls {
             validate: bool,
             records: Vec<Record>,
         ) -> ConductorApiResult<()> {
-            let chain = self.get_agent_source_chain(&cell_id).await?;
+            let chain = self.get_agent_source_chain(&cell_id, true).await?;
 
             let authored = chain.author_db().clone().into();
             let dht = chain.dht_db().clone();
@@ -2994,7 +3007,11 @@ mod misc_impls {
 
             let CellId(dna_hash, agent_pubkey) = &cell_id;
             let ribosome = self.get_ribosome(dna_hash)?;
-            let ops = chain.graft_records_onto_source_chain(records).await?;
+
+            // XXX: probably unnecessary clone
+            let ops = chain
+                .graft_records_onto_source_chain(records.clone())
+                .await?;
             let space = self.get_or_create_space(dna_hash)?;
             let workspace = space
                 .source_chain_workspace(self.keystore().clone(), agent_pubkey.clone())
@@ -3007,11 +3024,12 @@ mod misc_impls {
             // Validate
             if validate {
                 // Run the individual record validations.
-                crate::core::workflow::inline_validation(
+                crate::core::workflow::inline_validate_records(
                     workspace.clone(),
                     network.clone(),
                     self.clone(),
                     ribosome,
+                    records,
                 )
                 .await?;
             }

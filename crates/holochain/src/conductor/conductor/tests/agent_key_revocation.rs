@@ -593,7 +593,7 @@ mod multi_conductor {
 
         // Delete Alice's key on the source chain
         let mut alice_source_chain = conductors[0]
-            .get_agent_source_chain(alice_cell.cell_id())
+            .get_agent_source_chain(alice_cell.cell_id(), false)
             .await
             .unwrap();
         delete_agent_key_from_source_chain(
@@ -674,7 +674,7 @@ mod multi_conductor {
 
         // Delete agent key of cell 1 of the app and publish and integrate ops
         let mut alice_source_chain_1 = conductors[0]
-            .get_agent_source_chain(alice_cell_1.cell_id())
+            .get_agent_source_chain(alice_cell_1.cell_id(), false)
             .await
             .unwrap();
         delete_agent_key_from_source_chain(

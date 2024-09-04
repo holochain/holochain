@@ -4,11 +4,13 @@
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::conductor::api::error::ConductorApiError;
+use holochain::core::SourceChainError;
 use holochain::sweettest::{
     DynSweetRendezvous, SweetConductor, SweetConductorConfig, SweetDnaFile, SweetInlineZomes,
 };
 use holochain::test_utils::inline_zomes::simple_crud_zome;
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::DnaHashExt;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::prelude::{StateMutationError, Store, Txn};
@@ -18,6 +20,7 @@ use rusqlite::Transaction;
 /// Test that records can be manually grafted onto a source chain.
 #[tokio::test(flavor = "multi_thread")]
 async fn grafting() {
+    holochain_trace::test_run();
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let mut config = SweetConductorConfig::standard().no_dpki();
     config.chc_url = Some(url2::Url2::parse(
@@ -28,6 +31,8 @@ async fn grafting() {
 
     let apps = conductor.setup_app("app", [&dna_file]).await.unwrap();
     let (alice,) = apps.into_tuple();
+    dbg!(&alice.dna_hash());
+    dbg!(&alice.dna_hash().to_kitsune());
     let zome = alice.zome(SweetInlineZomes::COORDINATOR);
 
     // Trigger init.
@@ -104,8 +109,8 @@ async fn grafting() {
     // This gets rejected.
     assert!(matches!(
         result,
-        Err(ConductorApiError::StateMutationError(
-            StateMutationError::AuthorsMustMatch
+        Err(ConductorApiError::SourceChainError(
+            SourceChainError::StateMutationError(StateMutationError::AuthorsMustMatch)
         ))
     ));
 

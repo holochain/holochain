@@ -249,20 +249,41 @@ pub async fn inline_validation<Ribosome>(
 where
     Ribosome: RibosomeT + 'static,
 {
+    let scratch_records = workspace.source_chain().scratch_records()?;
+
+    inline_validate_records(
+        workspace,
+        network,
+        conductor_handle,
+        ribosome,
+        scratch_records,
+    )
+    .await
+}
+
+/// Run validation inline and wait for the result.
+pub async fn inline_validate_records<Ribosome>(
+    workspace: SourceChainWorkspace,
+    network: HolochainP2pDna,
+    conductor_handle: ConductorHandle,
+    ribosome: Ribosome,
+    records: Vec<Record>,
+) -> WorkflowResult<()>
+where
+    Ribosome: RibosomeT + 'static,
+{
     let cascade = Arc::new(holochain_cascade::CascadeImpl::from_workspace_and_network(
         &workspace,
         Arc::new(network.clone()),
     ));
-
-    let scratch_records = workspace.source_chain().scratch_records()?;
 
     if let Some(dpki) = conductor_handle.running_services().dpki.clone() {
         // Don't check DPKI validity on DPKI itself!
         if !dpki.is_deepkey_dna(workspace.source_chain().cell_id().dna_hash()) {
             // Check the validity of the author as-at the first and the last record to be committed.
             // If these are valid, then the author is valid for the entire commit.
-            let first = scratch_records.first();
-            let last = scratch_records.last();
+            let first = records.first();
+            let last = records.last();
             if let Some(r) = first {
                 check_dpki_agent_validity_for_record(&dpki, r).await?;
             }
@@ -276,9 +297,9 @@ where
 
     let records = {
         // collect all the records we need to validate in wasm
-        let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
+        let mut to_app_validate: Vec<Record> = Vec::with_capacity(records.len());
         // Loop forwards through all the new records
-        for record in scratch_records {
+        for record in records {
             sys_validate_record(&record, cascade.clone())
                 .await
                 // If the was en error exit

@@ -54,6 +54,7 @@ impl HolochainP2pError {
 impl From<kitsune_p2p::KitsuneP2pError> for HolochainP2pError {
     fn from(e: kitsune_p2p::KitsuneP2pError) -> Self {
         use kitsune_p2p::KitsuneP2pError::*;
+        dbg!(&e);
         match e {
             RoutingSpaceError(space) => {
                 Self::RoutingDnaError(holo_hash::DnaHash::from_kitsune(&space))
