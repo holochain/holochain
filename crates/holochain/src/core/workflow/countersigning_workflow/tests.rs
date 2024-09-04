@@ -6,12 +6,14 @@ use crate::core::workflow::countersigning_workflow::{
 };
 use crate::core::workflow::countersigning_workflow::{countersigning_success, WorkComplete};
 use crate::core::workflow::WorkflowResult;
+use crate::prelude::EntryFixturator;
 use crate::prelude::SignatureFixturator;
 use crate::prelude::SignedAction;
+use crate::prelude::SignedActionHashedFixturator;
 use crate::prelude::{ActionBase, PreflightBytes, PreflightRequest, PreflightRequestAcceptance};
 use crate::prelude::{ActionHashed, CounterSigningAgentState, DhtDbQueryCache, SignedActionHashed};
 use fixt::prelude::*;
-use hdk::prelude::{Action, Entry, EntryTypeFixturator};
+use hdk::prelude::{Action, Entry, EntryTypeFixturator, Record};
 use hdk::prelude::{CounterSigningSessionTimes, Timestamp};
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::DnaHashFixturator;
@@ -26,13 +28,15 @@ use holochain_state::prelude::{
     insert_action, insert_entry, insert_op, unlock_chain, CounterSigningSessionData,
 };
 use holochain_state::source_chain;
+use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
-use holochain_types::prelude::SignedActionHashedExt;
 use holochain_types::prelude::SystemSignal;
+use holochain_types::prelude::{ChainItems, SignedActionHashedExt};
 use holochain_types::signal::Signal;
 use holochain_zome_types::cell::CellId;
 use holochain_zome_types::countersigning::PreflightResponse;
 use holochain_zome_types::prelude::CreateBase;
+use holochain_zome_types::query::{ChainHead, ChainStatus};
 use matches::assert_matches;
 use std::ops::Add;
 use std::sync::Arc;
@@ -175,11 +179,15 @@ async fn receive_signatures_and_complete() {
 
     let bob = test_harness.new_remote_agent().await;
 
-    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
+    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(60), &bob);
     let my_acceptance = test_harness
         .accept_countersigning_request(request.clone())
         .await
         .unwrap();
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
 
     let bob_acceptance = bob
         .accept_preflight_request(request.clone(), test_harness.keystore.clone())
@@ -218,6 +226,92 @@ async fn receive_signatures_and_complete() {
 
     // One run should be enough when we got valid signatures and the session is now completed.
     test_harness.expect_success_signal().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn recover_from_commit_when_other_agent_abandons() {
+    holochain_trace::test_run();
+
+    let dna_hash = fixt!(DnaHash);
+    let mut test_harness = TestHarness::new(dna_hash).await;
+
+    let bob = test_harness.new_remote_agent().await;
+
+    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
+    let my_acceptance = test_harness
+        .accept_countersigning_request(request.clone())
+        .await
+        .unwrap();
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    let bob_acceptance = bob
+        .accept_preflight_request(request.clone(), test_harness.keystore.clone())
+        .await;
+
+    let (session_data, entry, entry_hash) =
+        test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
+
+    test_harness
+        .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+        .await;
+
+    // Do nothing for Bob, he's either not committed or not published a signature. For the purpose
+    // of this test it really doesn't matter what went wrong on his end.
+
+    // Now for the sake of recovery, let's suppose that we can initially find no activity for Bob.
+    let activity_response = bob.no_activity_response();
+    test_harness.reconfigure_network({
+        let activity_response = activity_response.clone();
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity().returning({
+                let activity_response = activity_response.clone();
+                move |_, _, _| Ok(vec![activity_response.clone()])
+            });
+
+            net
+        }
+    });
+
+    // Run our workflow, which should trigger itself to spot the timed out session and move it to
+    // the unknown state for recovery.
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    // This is where we'll stay unless Bob takes some action
+    test_harness.expect_session_in_unknown_state();
+
+    // Now let's help the recovery, Bob publishes some other activity
+    let activity_response = bob.other_activity_response();
+    test_harness.reconfigure_network({
+        let activity_response = activity_response.clone();
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity().returning({
+                let activity_response = activity_response.clone();
+                move |_, _, _| Ok(vec![activity_response.clone()])
+            });
+
+            net
+        }
+    });
+
+    // Run the workflow again, this time we should spot the new activity and abandon the session
+    test_harness.countersigning_tx.trigger(&"test");
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    test_harness.expect_abandoned_signal().await;
+
+    test_harness.expect_no_pending_signals();
+    test_harness.expect_empty_workspace();
 }
 
 struct TestHarness {
@@ -288,10 +382,17 @@ impl TestHarness {
         RemoteAgent {
             agent: self.keystore.new_sign_keypair_random().await.unwrap(),
             agent_index: self.remote_agents,
+            chain_head: ChainHead {
+                action_seq: 32,
+                hash: fixt!(ActionHash),
+            },
         }
     }
 
-    fn reconfigure_network(&mut self, apply: fn(MockHolochainP2pDnaT) -> MockHolochainP2pDnaT) {
+    fn reconfigure_network(
+        &mut self,
+        apply: impl Fn(MockHolochainP2pDnaT) -> MockHolochainP2pDnaT,
+    ) {
         let network = apply(MockHolochainP2pDnaT::new());
         self.network = Arc::new(network);
     }
@@ -433,7 +534,7 @@ impl TestHarness {
 
 /// Assertion query implementation
 impl TestHarness {
-    pub fn expect_empty_workspace(&self) {
+    fn expect_empty_workspace(&self) {
         let count = self
             .test_space
             .space
@@ -445,7 +546,7 @@ impl TestHarness {
         assert_eq!(0, count);
     }
 
-    pub fn expect_session_accepted(&self) {
+    fn expect_session_accepted(&self) {
         let maybe_found = self
             .test_space
             .space
@@ -462,7 +563,24 @@ impl TestHarness {
         }
     }
 
-    pub async fn expect_chain_locked(&self) {
+    fn expect_session_in_unknown_state(&self) {
+        let maybe_found = self
+            .test_space
+            .space
+            .countersigning_workspace
+            .inner
+            .share_ref(|w| Ok(w.sessions.get(&self.author).cloned()))
+            .unwrap();
+
+        assert!(maybe_found.is_some());
+
+        match maybe_found.unwrap() {
+            CountersigningSessionState::Unknown { .. } => {}
+            state => panic!("Session not in unknown state: {:?}", state),
+        }
+    }
+
+    async fn expect_chain_locked(&self) {
         let authored = self
             .test_space
             .space
@@ -520,7 +638,7 @@ impl TestHarness {
         );
     }
 
-    pub fn expect_no_pending_signals(&mut self) {
+    fn expect_no_pending_signals(&mut self) {
         let signal = self.signal_rx.try_recv().ok();
         assert!(signal.is_none());
 
@@ -538,6 +656,7 @@ impl TestHarness {
 struct RemoteAgent {
     agent: AgentPubKey,
     agent_index: usize,
+    chain_head: ChainHead,
 }
 
 impl RemoteAgent {
@@ -546,8 +665,11 @@ impl RemoteAgent {
         request: PreflightRequest,
         keystore: MetaLairClient,
     ) -> PreflightRequestAcceptance {
-        let agent_state =
-            CounterSigningAgentState::new(self.agent_index as u8, fixt!(ActionHash), 32);
+        let agent_state = CounterSigningAgentState::new(
+            self.agent_index as u8,
+            self.chain_head.hash.clone(),
+            self.chain_head.action_seq,
+        );
         let response_data =
             PreflightResponse::encode_fields_for_signature(&request, &agent_state).unwrap();
         let signature = keystore
@@ -578,6 +700,34 @@ impl RemoteAgent {
         let sah = SignedActionHashed::sign(&keystore, hashed).await.unwrap();
 
         SignedAction::from(sah)
+    }
+
+    fn no_activity_response(&self) -> AgentActivityResponse {
+        AgentActivityResponse {
+            agent: self.agent.clone(),
+            valid_activity: ChainItems::Full(vec![]),
+            rejected_activity: ChainItems::NotRequested,
+            status: ChainStatus::Valid(self.chain_head.clone()),
+            highest_observed: None,
+            warrants: vec![],
+        }
+    }
+
+    fn other_activity_response(&self) -> AgentActivityResponse {
+        AgentActivityResponse {
+            agent: self.agent.clone(),
+            valid_activity: ChainItems::Full(vec![Record::new(
+                fixt!(SignedActionHashed),
+                Some(fixt!(Entry)),
+            )]),
+            rejected_activity: ChainItems::NotRequested,
+            status: ChainStatus::Valid(ChainHead {
+                action_seq: self.chain_head.action_seq + 1,
+                hash: fixt!(ActionHash), // Won't match the action activity hash, doesn't matter
+            }),
+            highest_observed: None,
+            warrants: vec![],
+        }
     }
 }
 
