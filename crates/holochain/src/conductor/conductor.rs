@@ -2636,6 +2636,11 @@ mod service_impls {
             dna: DnaFile,
             enable: bool,
         ) -> ConductorResult<()> {
+            // Don't install twice
+            if self.running_services().dpki.is_some() {
+                return Ok(());
+            }
+
             let dna_hash = dna.dna_hash().clone();
 
             self.register_dna(dna.clone()).await?;
