@@ -95,8 +95,6 @@ enum CountersigningSessionState {
     /// without going through this recovery state.
     Unknown {
         preflight_request: PreflightRequest,
-        // Unused until the next PR
-        #[allow(dead_code)]
         resolution: Option<SessionResolutionSummary>,
     },
 }
@@ -128,16 +126,10 @@ struct SessionResolutionSummary {
     ///
     /// This count is only correct for the current run of the Holochain conductor. If the conductor
     /// is restarted then this counter is also reset.
-    // Unused until the next PR
-    #[allow(dead_code)]
     pub attempts: usize,
     /// The time of the last attempt to resolve the session.
-    // Unused until the next PR
-    #[allow(dead_code)]
     pub last_attempt_at: Timestamp,
     /// The outcome of the most recent attempt to resolve the session.
-    // Unused until the next PR
-    #[allow(dead_code)]
     pub outcomes: Vec<SessionResolutionOutcome>,
 }
 
