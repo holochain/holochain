@@ -130,7 +130,10 @@ pub async fn inner_countersigning_session_incomplete(
                             tracing::trace!("Agent {:?} has a valid chain: {:?}", agent, head);
                         }
                         ChainStatus::Empty => {
-                            tracing::debug!("Agent {:?} has not published any further actions yet", agent);
+                            tracing::debug!(
+                                "Agent {:?} has not published any further actions yet",
+                                agent
+                            );
                             authority_decisions.push(SessionCompletionDecision::Indeterminate);
                             continue;
                         }
