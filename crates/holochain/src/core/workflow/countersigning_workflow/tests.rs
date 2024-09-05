@@ -41,6 +41,7 @@ use holochain_zome_types::query::{ChainHead, ChainStatus};
 use matches::assert_matches;
 use std::ops::Add;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 use tokio::sync::broadcast::{Receiver, Sender};
 
 #[tokio::test(flavor = "multi_thread")]
@@ -424,6 +425,168 @@ async fn recover_from_commit_when_other_agent_completes() {
 
     test_harness.expect_no_pending_signals();
     test_harness.expect_empty_workspace();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn stay_in_unknown_state_when_activity_authorities_do_not_agree() {
+    holochain_trace::test_run();
+
+    let dna_hash = fixt!(DnaHash);
+    let mut test_harness = TestHarness::new(dna_hash).await;
+
+    let bob = test_harness.new_remote_agent().await;
+
+    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
+    let my_acceptance = test_harness
+        .accept_countersigning_request(request.clone())
+        .await
+        .unwrap();
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    let bob_acceptance = bob
+        .accept_preflight_request(request.clone(), test_harness.keystore.clone())
+        .await;
+
+    let (session_data, entry, entry_hash) =
+        test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
+
+    test_harness
+        .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+        .await;
+
+    // Simulate mixed responses from AAAs. This is not really expected unless nodes are misbehaving
+    // but if it does happen then we should stay in the unknown state.
+    let assorted_responses = vec![
+        bob.other_activity_response(),
+        bob.complete_session_activity_response(
+            &session_data,
+            entry.clone(),
+            &entry_hash,
+            test_harness.keystore.clone(),
+        )
+        .await,
+    ];
+    test_harness.reconfigure_network({
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            let pick_response = Arc::new(AtomicUsize::new(0));
+            net.expect_get_agent_activity().returning({
+                let pick_response = pick_response.clone();
+                let assorted_responses = assorted_responses.clone();
+                move |_, _, _| {
+                    let pick = pick_response.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % assorted_responses.len();
+                    Ok(vec![assorted_responses[pick].clone()])
+                }
+            });
+
+            net
+        }
+    });
+
+    for i in 1..5 {
+        test_harness
+            .respond_to_countersigning_workflow_signal()
+            .await;
+        test_harness.countersigning_tx.trigger(&"test");
+
+        let resolution = test_harness.expect_session_in_unknown_state();
+        assert!(resolution.is_some());
+
+        let resolution = resolution.unwrap();
+        assert_eq!(i, resolution.attempts);
+
+        let some_complete = resolution.outcomes.iter().all(|o| o.decisions.iter().any(|d| matches!(d, SessionCompletionDecision::Complete(_))));
+        assert!(some_complete);
+        let some_abandoned = resolution.outcomes.iter().all(|o| o.decisions.iter().any(|d| matches!(d, SessionCompletionDecision::Abandoned)));
+        assert!(some_abandoned);
+        let some_indeterminate = resolution.outcomes.iter().any(|o| o.decisions.iter().any(|d| matches!(d, SessionCompletionDecision::Indeterminate)));
+        assert!(!some_indeterminate);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn stay_in_unknown_state_when_activity_authorities_are_missing_data() {
+    holochain_trace::test_run();
+
+    let dna_hash = fixt!(DnaHash);
+    let mut test_harness = TestHarness::new(dna_hash).await;
+
+    let bob = test_harness.new_remote_agent().await;
+
+    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
+    let my_acceptance = test_harness
+        .accept_countersigning_request(request.clone())
+        .await
+        .unwrap();
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    let bob_acceptance = bob
+        .accept_preflight_request(request.clone(), test_harness.keystore.clone())
+        .await;
+
+    let (session_data, entry, entry_hash) =
+        test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
+
+    test_harness
+        .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+        .await;
+
+    // Simulate mixed responses from AAAs. This is not really expected unless nodes are misbehaving
+    // but if it does happen then we should stay in the unknown state.
+    let assorted_responses = vec![
+        bob.no_activity_response(),
+        bob.complete_session_activity_response(
+            &session_data,
+            entry.clone(),
+            &entry_hash,
+            test_harness.keystore.clone(),
+        )
+            .await,
+    ];
+    test_harness.reconfigure_network({
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            let pick_response = Arc::new(AtomicUsize::new(0));
+            net.expect_get_agent_activity().returning({
+                let pick_response = pick_response.clone();
+                let assorted_responses = assorted_responses.clone();
+                move |_, _, _| {
+                    let pick = pick_response.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % assorted_responses.len();
+                    Ok(vec![assorted_responses[pick].clone()])
+                }
+            });
+
+            net
+        }
+    });
+
+    for i in 1..5 {
+        test_harness
+            .respond_to_countersigning_workflow_signal()
+            .await;
+        test_harness.countersigning_tx.trigger(&"test");
+
+        let resolution = test_harness.expect_session_in_unknown_state();
+        assert!(resolution.is_some());
+
+        let resolution = resolution.unwrap();
+        assert_eq!(i, resolution.attempts);
+
+        let some_complete = resolution.outcomes.iter().all(|o| o.decisions.iter().any(|d| matches!(d, SessionCompletionDecision::Complete(_))));
+        assert!(some_complete);
+        let some_abandoned = resolution.outcomes.iter().any(|o| o.decisions.iter().any(|d| matches!(d, SessionCompletionDecision::Abandoned)));
+        assert!(!some_abandoned);
+        let some_indeterminate = resolution.outcomes.iter().all(|o| o.decisions.iter().any(|d| matches!(d, SessionCompletionDecision::Indeterminate)));
+        assert!(some_indeterminate);
+    }
 }
 
 struct TestHarness {
