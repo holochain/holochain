@@ -101,7 +101,7 @@ pub(crate) async fn inner_countersigning_session_complete(
     if !i_am_an_author {
         // We're effectively rejecting this signature bundle but communicating that this signature
         // bundle wasn't acceptable so that we can try another one.
-        tracing::info!(
+        tracing::debug!(
             "I am not an author for this countersigning session, rejecting signature bundle"
         );
         return Ok(None);
@@ -118,14 +118,14 @@ pub(crate) async fn inner_countersigning_session_complete(
     let weight = weigh_placeholder();
     let stored_actions = session_data.build_action_set(entry_hash, weight)?;
     if stored_actions.len() == incoming_actions.len() {
-        tracing::info!("Have the right number of actions");
+        tracing::debug!("Have the right number of actions");
 
         // Check all stored action hashes match an incoming action hash.
         if stored_actions.iter().all(|a| {
             let a = ActionHash::with_data_sync(a);
             incoming_actions.iter().any(|i| *i == a)
         }) {
-            tracing::info!("All hashes are correct");
+            tracing::debug!("All hashes are correct");
             // All checks have passed, proceed to update the session state.
             integrity_check_passed = true;
         }
@@ -133,7 +133,7 @@ pub(crate) async fn inner_countersigning_session_complete(
 
     if !integrity_check_passed {
         // If the integrity check fails then we can't proceed with this signature bundle.
-        tracing::info!("Integrity check failed for countersigning session");
+        tracing::debug!("Integrity check failed for countersigning session");
         return Ok(None);
     }
 
