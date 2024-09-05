@@ -79,7 +79,7 @@ pub async fn refresh_workspace_state(space: &Space, cell_id: CellId, signal: Sen
                         move |txn| -> SourceChainResult<(CurrentCountersigningSessionOpt, bool)> {
                             let maybe_current_session =
                                 current_countersigning_session(txn, Arc::new(agent.clone()))?;
-                            tracing::info!("Current session: {:?}", maybe_current_session);
+                            tracing::trace!("Current session: {:?}", maybe_current_session);
 
                             // If we've not made a commit and the entry hasn't been committed then
                             // there is no way to recover the session.
