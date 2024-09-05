@@ -1,10 +1,13 @@
-use crate::prelude::CreateFixturator;
 use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::{TriggerReceiver, TriggerSender};
 use crate::core::ribosome::weigh_placeholder;
-use crate::core::workflow::countersigning_workflow::{accept_countersigning_request, countersigning_workflow, CountersigningSessionState, SessionCompletionDecision, SessionResolutionSummary};
+use crate::core::workflow::countersigning_workflow::{
+    accept_countersigning_request, countersigning_workflow, CountersigningSessionState,
+    SessionCompletionDecision, SessionResolutionSummary,
+};
 use crate::core::workflow::countersigning_workflow::{countersigning_success, WorkComplete};
 use crate::core::workflow::WorkflowResult;
+use crate::prelude::CreateFixturator;
 use crate::prelude::EntryFixturator;
 use crate::prelude::SignatureFixturator;
 use crate::prelude::SignedAction;
@@ -294,7 +297,10 @@ async fn recover_from_commit_when_other_agent_abandons() {
     let bob_resolution = &resolution.outcomes[0];
     assert_eq!(bob.agent, bob_resolution.agent);
     assert_eq!(3, bob_resolution.decisions.len());
-    assert!(bob_resolution.decisions.iter().all(|d| *d == SessionCompletionDecision::Indeterminate));
+    assert!(bob_resolution
+        .decisions
+        .iter()
+        .all(|d| *d == SessionCompletionDecision::Indeterminate));
 
     // Now let's help the recovery, Bob publishes some other activity
     let activity_response = bob.other_activity_response();
@@ -343,12 +349,16 @@ async fn recover_from_commit_when_other_agent_completes() {
         .respond_to_countersigning_workflow_signal()
         .await;
 
-    let bob_acceptance = bob.accept_preflight_request(request.clone(), test_harness.keystore.clone())
+    let bob_acceptance = bob
+        .accept_preflight_request(request.clone(), test_harness.keystore.clone())
         .await;
 
-    let (session_data, entry, entry_hash) = test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
+    let (session_data, entry, entry_hash) =
+        test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
 
-    test_harness.commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone()).await;
+    test_harness
+        .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+        .await;
 
     // Now we've committed out entry, we are waiting for a signature from Bob. For this test, we're
     // not going to receive it. Wait for the session to time out instead.
@@ -369,7 +379,9 @@ async fn recover_from_commit_when_other_agent_completes() {
         }
     });
 
-    test_harness.respond_to_countersigning_workflow_signal().await;
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
 
     let resolution = test_harness.expect_session_in_unknown_state();
     assert!(resolution.is_some());
@@ -377,7 +389,14 @@ async fn recover_from_commit_when_other_agent_completes() {
     test_harness.expect_session_in_unknown_state();
 
     // Now Bob's completed session shows up with an AAA
-    let activity_response = bob.complete_session_activity_response(&session_data, entry.clone(), &entry_hash, test_harness.keystore.clone()).await;
+    let activity_response = bob
+        .complete_session_activity_response(
+            &session_data,
+            entry.clone(),
+            &entry_hash,
+            test_harness.keystore.clone(),
+        )
+        .await;
     test_harness.reconfigure_network({
         let activity_response = activity_response.clone();
         move |mut net| {
@@ -396,7 +415,9 @@ async fn recover_from_commit_when_other_agent_completes() {
     });
 
     test_harness.countersigning_tx.trigger(&"test");
-    test_harness.respond_to_countersigning_workflow_signal().await;
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
 
     test_harness.expect_success_signal().await;
     test_harness.expect_publish_and_integrate();
@@ -666,9 +687,7 @@ impl TestHarness {
         assert!(maybe_found.is_some());
 
         match maybe_found {
-            Some(CountersigningSessionState::Unknown { resolution, .. }) => {
-                resolution
-            }
+            Some(CountersigningSessionState::Unknown { resolution, .. }) => resolution,
             state => panic!("Session not in unknown state: {:?}", state),
         }
     }
@@ -830,17 +849,25 @@ impl RemoteAgent {
         }
     }
 
-    async fn complete_session_activity_response(&self,  session_data: &CounterSigningSessionData,
-                                                entry: Entry,
-                                          entry_hash: &EntryHash,
-                                          keystore: MetaLairClient,) -> AgentActivityResponse {
-        let signed_action = self.produce_signature(session_data, entry_hash, keystore).await;
+    async fn complete_session_activity_response(
+        &self,
+        session_data: &CounterSigningSessionData,
+        entry: Entry,
+        entry_hash: &EntryHash,
+        keystore: MetaLairClient,
+    ) -> AgentActivityResponse {
+        let signed_action = self
+            .produce_signature(session_data, entry_hash, keystore)
+            .await;
         let signature = signed_action.signature().clone();
 
         AgentActivityResponse {
             agent: self.agent.clone(),
             valid_activity: ChainItems::Full(vec![Record::new(
-                SignedActionHashed::with_presigned(ActionHashed::from_content_sync(signed_action.into_data()), signature),
+                SignedActionHashed::with_presigned(
+                    ActionHashed::from_content_sync(signed_action.into_data()),
+                    signature,
+                ),
                 Some(entry),
             )]),
             rejected_activity: ChainItems::NotRequested,
