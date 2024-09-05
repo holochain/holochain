@@ -45,6 +45,7 @@ pub struct Create {
     pub no_dpki: bool,
 
     /// Set the conductor config CHC (Chain Head Coordinator) URL
+    #[cfg(feature = "chc")]
     #[arg(long, value_parser=try_parse_url2)]
     pub chc_url: Option<Url2>,
 }
@@ -291,6 +292,7 @@ impl Default for Create {
             directories: Vec::with_capacity(0),
             in_process_lair: false,
             no_dpki: false,
+            #[cfg(feature = "chc")]
             chc_url: None,
         }
     }

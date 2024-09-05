@@ -25,13 +25,16 @@ pub fn generate(
     directory: Option<PathBuf>,
     in_process_lair: bool,
     no_dpki: bool,
-    chc_url: Option<url2::Url2>,
+    #[cfg(feature = "chc")] chc_url: Option<url2::Url2>,
 ) -> anyhow::Result<ConfigRootPath> {
     let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
     let mut config = create_config(dir.clone(), con_url)?;
     config.network = network.unwrap_or_default();
-    config.chc_url = chc_url;
+    #[cfg(feature = "chc")]
+    {
+        config.chc_url = chc_url;
+    }
     config.dpki = if no_dpki {
         DpkiConfig::disabled()
     } else {
