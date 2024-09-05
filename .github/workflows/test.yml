@@ -58,9 +58,15 @@ jobs:
           wasmer_wamr
         ]
         exclude:
-          # TODO Building with wasmer_wamr feature flag on windows is not currently working.
+          # Our intended target for wasmer_wamr feature is iOS and Android.
+          # For now, wasmer_wamr tests are only run on macos-latest.
+          # Additionally, building with wasmer_wamr feature flag on windows is not currently working.
           # See https://github.com/holochain/holochain-wasmer/issues/117
           - os: windows-latest
+            wasmer-feature: wasmer_wamr
+          - os: macos-13
+            wasmer-feature: wasmer_wamr
+          - os: ubuntu-latest
             wasmer-feature: wasmer_wamr
     steps:
       - name: checkout
