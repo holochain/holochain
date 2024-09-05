@@ -36,6 +36,7 @@ pub async fn inner_countersigning_session_incomplete(
 ) -> WorkflowResult<(SessionCompletionDecision, Vec<SessionResolutionOutcome>)> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
+    // TODO is this needed
     let maybe_current_session = authored_db
         .write_async({
             let author = author.clone();
@@ -68,6 +69,7 @@ pub async fn inner_countersigning_session_incomplete(
     // We need to find out what state the other signing agents are in.
     // TODO Note that we are ignoring the optional signing agents here - that's something we can figure out later because it's not clear what it means for them
     //      to be optional.
+    //      Possibly get more options for collecting signatures by asking optional signers
     let other_signing_agents = session_data
         .signing_agents()
         .filter(|a| **a != author)

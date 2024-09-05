@@ -148,6 +148,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         }
         let op = ChainOp::RegisterAgentActivity(signature, action);
         let basis = op.dht_basis();
+        // TODO this is what flag is for, whether to witness or store - document and rename me
         if let Err(e) = network.publish_countersign(false, basis, op.into()).await {
             tracing::error!(
                 "Failed to publish to other countersigners agent authorities because of: {:?}",
