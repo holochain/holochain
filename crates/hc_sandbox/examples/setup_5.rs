@@ -35,7 +35,8 @@ async fn main() -> anyhow::Result<()> {
         let app_id = app_id.clone();
 
         // Create a conductor config with the network.
-        let path = hc_sandbox::generate::generate(Some(network.clone()), None, None, false, false)?;
+        let path =
+            hc_sandbox::generate::generate(Some(network.clone()), None, None, false, false, None)?;
 
         // Create a command runner to run admin commands.
         // This runs the conductor in the background and cleans

@@ -65,3 +65,4 @@ workspace = true
 [features]
 
 chc = ["holochain_chc", "holochain_conductor_api/chc"]
+default = ["chc"]
