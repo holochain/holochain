@@ -15,15 +15,8 @@
     nixpkgs.url = "nixpkgs/nixos-unstable";
 
     # lib to build nix packages from rust crates
-    crate2nix = {
-      url = "github:kolloch/crate2nix";
-      flake = false;
-    };
-
-    # lib to build nix packages from rust crates
     crane = {
       url = "github:ipetkov/crane";
-      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # filter out all .nix files to not affect the input hash

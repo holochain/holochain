@@ -187,12 +187,9 @@ impl SweetConductor {
             config.data_root_path = Some(dir.as_ref().to_path_buf().into());
         }
 
-        let handle = Self::handle_from_existing(
-            keystore.unwrap_or_else(holochain_keystore::test_keystore),
-            &config,
-            &[],
-        )
-        .await;
+        let keystore = keystore.unwrap_or_else(holochain_keystore::test_keystore);
+
+        let handle = Self::handle_from_existing(keystore, &config, &[]).await;
 
         Self::new(handle, dir, Arc::new(config), rendezvous).await
     }

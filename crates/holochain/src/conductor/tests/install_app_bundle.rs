@@ -55,6 +55,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
         }
     }
 
@@ -176,6 +177,7 @@ async fn reject_duplicate_app_for_same_agent() {
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -196,6 +198,7 @@ async fn reject_duplicate_app_for_same_agent() {
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
             network_seed: None,
         })
         .await;
@@ -220,6 +223,7 @@ async fn reject_duplicate_app_for_same_agent() {
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
             network_seed: None,
         })
         .await;
@@ -241,6 +245,7 @@ async fn reject_duplicate_app_for_same_agent() {
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
             network_seed: Some("network".into()),
         })
         .await;
@@ -292,6 +297,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -336,6 +342,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -531,6 +538,7 @@ async fn use_existing_integration() {
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -547,6 +555,7 @@ async fn use_existing_integration() {
                 membrane_proofs: Default::default(),
                 existing_cells: Default::default(),
                 ignore_genesis_failure: false,
+                allow_throwaway_random_agent_key: true,
             })
             .await
             .unwrap_err();
@@ -568,6 +577,7 @@ async fn use_existing_integration() {
                 membrane_proofs: Default::default(),
                 existing_cells: Default::default(),
                 ignore_genesis_failure: false,
+                allow_throwaway_random_agent_key: true,
             })
             .await
             .unwrap_err();
@@ -601,6 +611,7 @@ async fn use_existing_integration() {
                 "extant".to_string() => cell_id
             },
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
