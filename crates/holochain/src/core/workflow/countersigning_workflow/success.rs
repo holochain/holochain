@@ -25,6 +25,7 @@ pub(crate) async fn countersigning_success(
                         // Whether we're awaiting signatures for the first time or trying to recover,
                         // switch to the signatures collected state and add the signatures to the
                         // list of signature bundles to try.
+                        // TODO never in unknown here
                         CountersigningSessionState::Accepted(ref preflight_request) | CountersigningSessionState::Unknown { ref preflight_request, .. } => {
                             tracing::trace!("Received countersigning signature bundle in accepted or unknown state for agent: {:?}", author);
                             entry.insert(CountersigningSessionState::SignaturesCollected {
