@@ -1,6 +1,6 @@
 [package]
 name = "hc_deepkey_sdk"
-version = "0.7.0-dev.4"
+version = "0.7.0-dev.5"
 authors = ["Matthew Brisebois <matthew.brisebois@holo.host>"]
 edition = "2021"
 license = "Apache-2.0"
@@ -11,10 +11,10 @@ readme = "README.md"
 
 
 [dependencies]
-hc_deepkey_types = { version = "^0.8.0-dev.4", path = "../hc_deepkey_types" }
+hc_deepkey_types = { version = "^0.8.0-dev.5", path = "../hc_deepkey_types" }
 
 # TODO: remove path designation to allow this crate to trail behind the current monorepo version
-hdk = { version = "^0.4.0-dev.15", path = "../hdk" }
+hdk = { version = "^0.4.0-dev.16", path = "../hdk" }
 serde = "1"
 serde_bytes = "0.11"
 

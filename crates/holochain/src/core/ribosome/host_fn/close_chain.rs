@@ -81,7 +81,7 @@ mod tests {
                 .erase_type();
         let host_access = fixt!(ZomeCallHostAccess, Predictable);
         let mut input = CloseChainInput {
-            new_target: Some(fixt!(MigrationTarget)),
+            new_target: None,
         };
 
         // If this is an agent migration, the agent keypair needs to exist

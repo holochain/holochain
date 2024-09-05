@@ -1,6 +1,8 @@
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
-use crate::core::workflow::countersigning_workflow::success;
+use crate::core::workflow::countersigning_workflow::{
+    success, SessionCompletionDecision, SessionResolutionOutcome, NUM_AUTHORITIES_TO_QUERY,
+};
 use crate::core::workflow::{countersigning_workflow, WorkflowResult};
 use crate::prelude::{Entry, RecordEntry};
 use either::Either;
@@ -13,9 +15,6 @@ use holochain_state::prelude::{
     current_countersigning_session, CurrentCountersigningSessionOpt, SourceChainResult,
 };
 use holochain_types::activity::ChainItems;
-use holochain_types::prelude::{
-    SessionCompletionDecision, SessionResolutionOutcome, NUM_AUTHORITIES_TO_QUERY,
-};
 use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::prelude::{
     ChainQueryFilter, ChainQueryFilterRange, ChainStatus, SignedAction,
@@ -34,7 +33,6 @@ pub async fn inner_countersigning_session_incomplete(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,
     author: AgentPubKey,
-    countersigning_trigger: TriggerSender,
 ) -> WorkflowResult<(SessionCompletionDecision, Vec<SessionResolutionOutcome>)> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
@@ -131,13 +129,21 @@ pub async fn inner_countersigning_session_incomplete(
                         ChainStatus::Valid(ref head) => {
                             tracing::trace!("Agent {:?} has a valid chain: {:?}", agent, head);
                         }
+                        ChainStatus::Empty => {
+                            tracing::debug!(
+                                "Agent {:?} has not published any further actions yet",
+                                agent
+                            );
+                            authority_decisions.push(SessionCompletionDecision::Indeterminate);
+                            continue;
+                        }
                         status => {
                             tracing::info!(
                                 "Agent {:?} has an invalid chain state for resolution: {:?}",
                                 agent,
                                 status
                             );
-                            // Don't try to reason about this agent's state if the chain is invalid.
+                            // Don't try to reason about this agent's state if the chain is invalid or empty.
                             continue;
                         }
                     }
@@ -146,7 +152,7 @@ pub async fn inner_countersigning_session_incomplete(
                         ChainItems::Full(ref items) => {
                             if items.is_empty() {
                                 // The agent has not published any new activity
-                                SessionCompletionDecision::Abandoned
+                                SessionCompletionDecision::Indeterminate
                             } else if items.len() > 1 {
                                 tracing::warn!("Agent authority returned an unexpected response for agent {:?}: {:?}", agent, activity);
                                 // Continue to try a different authority.
@@ -284,7 +290,11 @@ pub async fn inner_countersigning_session_incomplete(
             "Submitting signature bundle to complete countersigning session for agent {:?}",
             author
         );
-        success::countersigning_success(space, author.clone(), signatures, countersigning_trigger)
+
+        // Note that we discard signals here! This function is normally run from a network request
+        // where it will need to trigger the workflow to run after adding signatures into the
+        // workspace state. Here, we've been called by the workflow, so we don't need to trigger.
+        success::countersigning_success(space, author.clone(), signatures, TriggerSender::new().0)
             .await;
 
         // We haven't actually succeeded at this point, because the workflow will need to run again

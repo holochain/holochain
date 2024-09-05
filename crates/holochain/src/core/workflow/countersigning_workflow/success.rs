@@ -1,7 +1,7 @@
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
-use crate::core::workflow::countersigning_workflow::CounterSigningSessionState;
 use holo_hash::AgentPubKey;
+use holochain_types::countersigning::CounterSigningSessionState;
 use holochain_zome_types::prelude::SignedAction;
 
 /// An incoming countersigning session success.

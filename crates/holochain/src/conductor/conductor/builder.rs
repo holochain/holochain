@@ -32,6 +32,12 @@ pub struct ConductorBuilder {
     #[cfg(any(test, feature = "test_utils"))]
     pub dpki: Option<DpkiImpl>,
 
+    /// If specified here and a device seed is not already specified in the config,
+    /// a new seed will be generated in lair with a random unique tag, and the conductor config
+    /// will be updated to use this seed.
+    #[cfg(any(test, feature = "test_utils"))]
+    pub generate_test_device_seed: bool,
+
     /// Skip printing setup info to stdout
     pub no_print_setup: bool,
 
@@ -83,18 +89,41 @@ impl ConductorBuilder {
         self
     }
 
+    /// If a device seed is not already specified in the config, one will
+    /// be generated and used for the test keystore.
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn with_test_device_seed(mut self) -> Self {
+        self.generate_test_device_seed = true;
+        self
+    }
+
+    async fn setup_test_device_seed(mut self, keystore: MetaLairClient) -> ConductorResult<Self> {
+        #[cfg(any(test, feature = "test_utils"))]
+        // Set up device seed if specified
+        if self.generate_test_device_seed && self.config.device_seed_lair_tag.is_none() {
+            let tag = format!("_hc_test_device_seed_{}", nanoid::nanoid!());
+            keystore
+                .lair_client()
+                .new_seed(tag.clone().into(), None, false)
+                .await?;
+            self.config.device_seed_lair_tag = Some(tag);
+        }
+        Ok(self)
+    }
+
     /// Initialize a "production" Conductor
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope)))]
     pub async fn build(self) -> ConductorResult<ConductorHandle> {
-        tracing::debug!(?self.config);
+        let builder = self;
+        tracing::debug!(?builder.config);
 
-        let passphrase = match &self.passphrase {
+        let passphrase = match &builder.passphrase {
             Some(p) => p.clone(),
             None => sodoken::BufRead::new_no_lock(&[]),
         };
 
-        let keystore = if let Some(keystore) = self.keystore {
-            keystore
+        let keystore = if let Some(keystore) = builder.keystore.clone() {
+            keystore.clone()
         } else {
             pub(crate) fn warn_no_encryption() {
                 #[cfg(not(feature = "sqlite-encrypted"))]
@@ -106,14 +135,14 @@ impl ConductorBuilder {
                 }
             }
             let get_passphrase = || -> ConductorResult<sodoken::BufRead> {
-                match self.passphrase {
+                match builder.passphrase.as_ref() {
                     None => Err(
                         one_err::OneErr::new("passphrase required for lair keystore api").into(),
                     ),
-                    Some(p) => Ok(p),
+                    Some(p) => Ok(p.to_owned()),
                 }
             };
-            match &self.config.keystore {
+            match &builder.config.keystore {
                 KeystoreConfig::DangerTestKeystore => {
                     holochain_keystore::spawn_test_keystore().await?
                 }
@@ -133,7 +162,7 @@ impl ConductorBuilder {
 
                     let keystore_root_path: KeystorePath = match lair_root {
                         Some(lair_root) => lair_root.clone(),
-                        None => self
+                        None => builder
                             .config
                             .data_root_path
                             .as_ref()
@@ -159,17 +188,18 @@ impl ConductorBuilder {
 
         info!("Conductor startup: passphrase obtained.");
 
+        let builder = builder.setup_test_device_seed(keystore.clone()).await?;
         let Self {
             ribosome_store,
             config,
             ..
-        } = self;
+        } = builder;
 
         let config = Arc::new(config);
 
         let ribosome_store = RwShare::new(ribosome_store);
 
-        crate::conductor::space::set_danger_print_db_secrets(self.danger_print_db_secrets);
+        crate::conductor::space::set_danger_print_db_secrets(builder.danger_print_db_secrets);
         let spaces = Spaces::new(config.clone(), passphrase).await?;
         let tag = spaces.get_state().await?.tag().clone();
 
@@ -265,7 +295,7 @@ impl ConductorBuilder {
         let shutting_down = conductor.shutting_down.clone();
 
         #[cfg(any(test, feature = "test_utils"))]
-        let conductor = Self::update_fake_state(self.state, conductor).await?;
+        let conductor = Self::update_fake_state(builder.state, conductor).await?;
 
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
@@ -289,7 +319,7 @@ impl ConductorBuilder {
             p2p_evt,
             post_commit_receiver,
             outcome_rx,
-            self.no_print_setup,
+            builder.no_print_setup,
         )
         .await
     }
@@ -439,11 +469,19 @@ impl ConductorBuilder {
     #[cfg(any(test, feature = "test_utils"))]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope)))]
     pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
-        let keystore = self
+        let builder = self;
+
+        let keystore = builder
             .keystore
+            .clone()
             .unwrap_or_else(holochain_keystore::test_keystore);
 
-        let config = Arc::new(self.config);
+        let builder = builder
+            .with_test_device_seed()
+            .setup_test_device_seed(keystore.clone())
+            .await?;
+
+        let config = Arc::new(builder.config);
         let spaces =
             Spaces::new(config.clone(), sodoken::BufRead::new_no_lock(b"passphrase")).await?;
         let tag = spaces.get_state().await?.tag().clone();
@@ -457,7 +495,7 @@ impl ConductorBuilder {
         let network_config = config.network.clone();
         let strat = network_config.tuning_params.to_arq_strat();
 
-        let ribosome_store = RwShare::new(self.ribosome_store);
+        let ribosome_store = RwShare::new(builder.ribosome_store);
         let host = KitsuneHostImpl::new(
             spaces.clone(),
             config.clone(),
@@ -470,7 +508,7 @@ impl ConductorBuilder {
         // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
         let dpki_config = Some(config.dpki.clone());
 
-        let (dpki_uuid, dpki_dna_to_install) = match (&self.dpki, &dpki_config) {
+        let (dpki_uuid, dpki_dna_to_install) = match (&builder.dpki, &dpki_config) {
             // If a DPKI impl was provided to the builder, use that
             (Some(dpki_impl), _) => (Some(dpki_impl.uuid()), None),
 
@@ -517,13 +555,13 @@ impl ConductorBuilder {
             outcome_tx,
         );
 
-        let conductor = Self::update_fake_state(self.state, conductor).await?;
+        let conductor = Self::update_fake_state(builder.state, conductor).await?;
 
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
 
         // Install DPKI from DNA or mock
-        if let Some(dpki_impl) = self.dpki {
+        if let Some(dpki_impl) = builder.dpki {
             // This is a mock DPKI impl, so inject it into the conductor directly
             handle.running_services_mutex().share_mut(|s| {
                 s.dpki = Some(dpki_impl);
@@ -548,7 +586,7 @@ impl ConductorBuilder {
             p2p_evt,
             post_commit_receiver,
             outcome_rx,
-            self.no_print_setup,
+            builder.no_print_setup,
         )
         .await
     }

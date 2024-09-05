@@ -1,11 +1,11 @@
 use crate::conductor::space::Space;
-use crate::core::workflow::countersigning_workflow::CounterSigningSessionState;
 use holochain_sqlite::db::ReadAccess;
 use holochain_state::chain_lock::get_chain_lock;
 use holochain_state::mutations::unlock_chain;
 use holochain_state::prelude::{
     current_countersigning_session, CurrentCountersigningSessionOpt, SourceChainResult,
 };
+use holochain_types::countersigning::CounterSigningSessionState;
 use holochain_types::prelude::{Signal, SystemSignal};
 use holochain_zome_types::cell::CellId;
 use std::collections::{HashMap, HashSet};
@@ -79,7 +79,7 @@ pub async fn refresh_workspace_state(space: &Space, cell_id: CellId, signal: Sen
                         move |txn| -> SourceChainResult<(CurrentCountersigningSessionOpt, bool)> {
                             let maybe_current_session =
                                 current_countersigning_session(txn, Arc::new(agent.clone()))?;
-                            tracing::info!("Found session? {:?}", maybe_current_session);
+                            tracing::trace!("Current session: {:?}", maybe_current_session);
 
                             // If we've not made a commit and the entry hasn't been committed then
                             // there is no way to recover the session.
@@ -102,15 +102,12 @@ pub async fn refresh_workspace_state(space: &Space, cell_id: CellId, signal: Sen
                             // Not super important to remove this from the list. We can only get here if
                             // the session was not in the workspace.
                             locked_for_agents.remove(&agent);
+
+                            // Ideally, we'd signal here, but we don't know the app entry hash.
                         }
 
                         match maybe_current_session {
                             Some((_, _, session_data)) => {
-                                tracing::info!(
-                                    "Found a countersigning session for agent {:?}",
-                                    agent
-                                );
-
                                 // Any locked chains, that aren't registered in the workspace, need to be added.
                                 // They have to go in as `Unknown` because we don't know the state of the session.
                                 workspace

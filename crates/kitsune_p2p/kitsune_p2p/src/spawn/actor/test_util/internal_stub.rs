@@ -81,7 +81,7 @@ impl InternalStub {
             Ordering::SeqCst,
         ) {
             self.respond_with_error_count.fetch_add(1, Ordering::SeqCst);
-            return Err("test error".into());
+            return Err("InternalStub error".into());
         }
 
         Ok(())

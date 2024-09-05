@@ -95,6 +95,10 @@ pub struct ConductorConfig {
     /// The database and compiled wasm directories are derived from this path.
     pub data_root_path: Option<DataRootPath>,
 
+    /// The lair tag used to refer to the "device seed" which was used to generate
+    /// the AgentPubKey for the DPKI cell
+    pub device_seed_lair_tag: Option<String>,
+
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
     pub keystore: KeystoreConfig,
@@ -294,6 +298,7 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
+                device_seed_lair_tag: None,
                 network: Default::default(),
                 dpki: Default::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
@@ -385,7 +390,8 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                dpki: DpkiConfig::new(Some("path/to/dna.dna".into()), "device-seed".into()),
+                device_seed_lair_tag: None,
+                dpki: DpkiConfig::new(Some("path/to/dna.dna".into())),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket {
@@ -418,6 +424,7 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
+                device_seed_lair_tag: None,
                 network: Default::default(),
                 dpki: Default::default(),
                 keystore: KeystoreConfig::LairServer {

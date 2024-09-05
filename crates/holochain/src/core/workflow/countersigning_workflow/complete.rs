@@ -75,7 +75,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         Some(cs) => cs,
         None => {
             // If there is no active session then we can short circuit.
-            tracing::warn!("Received a signature bundle for a session that exists in state but is missing from the database");
+            tracing::info!("Received a signature bundle for a session that exists in state but is missing from the database");
             return Ok(None);
         }
     };
@@ -89,6 +89,7 @@ pub(crate) async fn inner_countersigning_session_complete(
             .verify_signature(sa.signature(), sa.action())
             .await?
         {
+            tracing::info!("Invalid signature found: {:?}", sa);
             return Ok(None);
         }
         if sa.action().author() == &author {
@@ -100,6 +101,9 @@ pub(crate) async fn inner_countersigning_session_complete(
     if !i_am_an_author {
         // We're effectively rejecting this signature bundle but communicating that this signature
         // bundle wasn't acceptable so that we can try another one.
+        tracing::debug!(
+            "I am not an author for this countersigning session, rejecting signature bundle"
+        );
         return Ok(None);
     }
 
@@ -114,11 +118,14 @@ pub(crate) async fn inner_countersigning_session_complete(
     let weight = weigh_placeholder();
     let stored_actions = session_data.build_action_set(entry_hash, weight)?;
     if stored_actions.len() == incoming_actions.len() {
+        tracing::debug!("Have the right number of actions");
+
         // Check all stored action hashes match an incoming action hash.
         if stored_actions.iter().all(|a| {
             let a = ActionHash::with_data_sync(a);
             incoming_actions.iter().any(|i| *i == a)
         }) {
+            tracing::debug!("All hashes are correct");
             // All checks have passed, proceed to update the session state.
             integrity_check_passed = true;
         }
@@ -126,6 +133,7 @@ pub(crate) async fn inner_countersigning_session_complete(
 
     if !integrity_check_passed {
         // If the integrity check fails then we can't proceed with this signature bundle.
+        tracing::debug!("Integrity check failed for countersigning session");
         return Ok(None);
     }
 

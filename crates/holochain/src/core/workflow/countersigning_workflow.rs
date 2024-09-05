@@ -1,11 +1,8 @@
 //! Countersigning workflow to maintain countersigning session state.
 
 use super::error::WorkflowResult;
-use crate::conductor::error::ConductorResult;
 use crate::conductor::space::Space;
-use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::{TriggerSender, WorkComplete};
-use crate::core::workflow::WorkflowError;
 use holo_hash::AgentPubKey;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
@@ -15,6 +12,7 @@ use kitsune_p2p_types::KitsuneResult;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::broadcast::Sender;
 
 /// Accept handler for starting countersigning sessions.
 mod accept;
@@ -76,7 +74,7 @@ pub(crate) async fn countersigning_workflow(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,
     cell_id: CellId,
-    conductor: ConductorHandle,
+    signal_tx: Sender<Signal>,
     self_trigger: TriggerSender,
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
@@ -89,11 +87,6 @@ pub(crate) async fn countersigning_workflow(
             .share_ref(|inner| Ok(inner.sessions.len()))
             .unwrap()
     );
-
-    let signal_tx = conductor
-        .get_signal_tx(&cell_id)
-        .await
-        .map_err(WorkflowError::other)?;
 
     refresh::refresh_workspace_state(&space, cell_id.clone(), signal_tx.clone()).await;
 
@@ -150,7 +143,6 @@ pub(crate) async fn countersigning_workflow(
             space.clone(),
             network.clone(),
             author.clone(),
-            self_trigger.clone(),
         )
         .await
         {
@@ -184,12 +176,44 @@ pub(crate) async fn countersigning_workflow(
                         .ok();
                 }
             }
-            Ok((SessionCompletionDecision::Indeterminate, _)) => {
+            Ok((SessionCompletionDecision::Indeterminate, outcomes)) => {
                 remaining_sessions_in_unknown_state += 1;
                 tracing::info!(
                     "No automated decision could be reached for the current countersigning session: {:?}",
                     author
                 );
+
+                space.countersigning_workspace.inner.share_mut(|inner, _| {
+                    match inner.sessions.entry(cell_id.agent_pubkey().clone()) {
+                        std::collections::hash_map::Entry::Occupied(mut entry) => {
+                            let session_state = entry.get_mut();
+                            if let CounterSigningSessionState::Unknown {
+                                resolution,
+                                ..
+                            } = session_state
+                            {
+                                if let Some(resolution) = resolution {
+                                    resolution.attempts += 1;
+                                    resolution.last_attempt_at = Timestamp::now();
+                                    resolution.outcomes = outcomes;
+                                } else {
+                                    *resolution = Some(SessionResolutionSummary {
+                                        attempts: 1,
+                                        last_attempt_at: Timestamp::now(),
+                                        outcomes,
+                                    });
+                                }
+                            } else {
+                                tracing::error!("Countersigning session for agent {:?} was not in the expected state while trying to resolve it", author);
+                            }
+                        }
+                        std::collections::hash_map::Entry::Vacant(_) => {
+                            tracing::error!("Countersigning session for agent {:?} was removed from the workspace while trying to resolve it", author);
+                        }
+                    };
+
+                    Ok(())
+                }).unwrap();
             }
             Err(e) => {
                 tracing::error!(
