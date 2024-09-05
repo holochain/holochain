@@ -139,16 +139,6 @@ struct SessionResolutionSummary {
     pub outcomes: Vec<SessionResolutionOutcome>,
 }
 
-impl Default for SessionResolutionSummary {
-    fn default() -> Self {
-        Self {
-            attempts: 0,
-            last_attempt_at: Timestamp::now(),
-            outcomes: Vec::new(),
-        }
-    }
-}
-
 /// The outcome for a single agent who participated in a countersigning session.
 ///
 /// [NUM_AUTHORITIES_TO_QUERY] authorities are made to agent activity authorities for each agent,
@@ -250,7 +240,6 @@ pub(crate) async fn countersigning_workflow(
             space.clone(),
             network.clone(),
             author.clone(),
-            self_trigger.clone(),
         )
         .await
         {
@@ -284,12 +273,44 @@ pub(crate) async fn countersigning_workflow(
                         .ok();
                 }
             }
-            Ok((SessionCompletionDecision::Indeterminate, _)) => {
+            Ok((SessionCompletionDecision::Indeterminate, outcomes)) => {
                 remaining_sessions_in_unknown_state += 1;
                 tracing::info!(
                     "No automated decision could be reached for the current countersigning session: {:?}",
                     author
                 );
+
+                space.countersigning_workspace.inner.share_mut(|inner, _| {
+                    match inner.sessions.entry(cell_id.agent_pubkey().clone()) {
+                        std::collections::hash_map::Entry::Occupied(mut entry) => {
+                            let session_state = entry.get_mut();
+                            if let CountersigningSessionState::Unknown {
+                                resolution,
+                                ..
+                            } = session_state
+                            {
+                                if let Some(resolution) = resolution {
+                                    resolution.attempts += 1;
+                                    resolution.last_attempt_at = Timestamp::now();
+                                    resolution.outcomes = outcomes;
+                                } else {
+                                    *resolution = Some(SessionResolutionSummary {
+                                        attempts: 1,
+                                        last_attempt_at: Timestamp::now(),
+                                        outcomes,
+                                    });
+                                }
+                            } else {
+                                tracing::error!("Countersigning session for agent {:?} was not in the expected state while trying to resolve it", author);
+                            }
+                        }
+                        std::collections::hash_map::Entry::Vacant(_) => {
+                            tracing::error!("Countersigning session for agent {:?} was removed from the workspace while trying to resolve it", author);
+                        }
+                    };
+
+                    Ok(())
+                }).unwrap();
             }
             Err(e) => {
                 tracing::error!(
