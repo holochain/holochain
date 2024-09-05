@@ -1,6 +1,6 @@
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
-use crate::core::workflow::countersigning_workflow::CountersigningSessionState;
+use crate::core::workflow::countersigning_workflow::CounterSigningSessionState;
 use crate::core::workflow::{WorkflowError, WorkflowResult};
 use crate::prelude::{PreflightRequest, PreflightRequestAcceptance, PreflightResponse, Signature};
 use holo_hash::AgentPubKey;
@@ -72,7 +72,7 @@ pub async fn accept_countersigning_request(
                     "Storing accepted session in the workspace for agent: {:?}",
                     author
                 );
-                entry.insert(CountersigningSessionState::Accepted(request.clone()));
+                entry.insert(CounterSigningSessionState::Accepted(request.clone()));
                 Ok(())
             }
         })

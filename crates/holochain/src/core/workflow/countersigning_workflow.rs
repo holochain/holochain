@@ -1,6 +1,7 @@
 //! Countersigning workflow to maintain countersigning session state.
 
 use super::error::WorkflowResult;
+use crate::conductor::error::ConductorResult;
 use crate::conductor::space::Space;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::{TriggerSender, WorkComplete};
@@ -10,6 +11,7 @@ use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_state::prelude::*;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
+use kitsune_p2p_types::KitsuneResult;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -54,10 +56,10 @@ impl CountersigningWorkspace {
     pub async fn get_countersigning_session_state(
         &self,
         agent_key: &AgentPubKey,
-    ) -> Result<Option<CountersigningSessionState>, String> {
+    ) -> KitsuneResult<Option<CounterSigningSessionState>> {
         self.inner.share_ref(|inner| {
             println!("there are {:?} sessions here", inner.sessions.len());
-            Ok(inner.sessions.get(agent_key))
+            Ok(inner.sessions.get(agent_key).map(|s| s.clone()))
         })
     }
 }
@@ -65,125 +67,7 @@ impl CountersigningWorkspace {
 /// The inner state of a countersigning workspace.
 #[derive(Default)]
 struct CountersigningWorkspaceInner {
-    sessions: HashMap<AgentPubKey, CountersigningSessionState>,
-}
-
-#[derive(Debug, Clone)]
-enum CountersigningSessionState {
-    /// This is the entry state. Accepting a countersigning session through the HDK will immediately
-    /// register the countersigning session in this state, for management by the countersigning workflow.
-    Accepted(PreflightRequest),
-    /// This is the state where we have collected one or more signatures for a countersigning session.
-    ///
-    /// This state can be entered from the [CountersigningSessionState::Accepted] state, which happens when a witness returns a
-    /// signature bundle to us. While the session has not timed out, we will stay in this state and
-    /// wait until one of the signatures bundles we have received is valid for the session to be
-    /// completed.
-    ///
-    /// This state can also be entered from the [CountersigningSessionState::Unknown] state, which happens when we
-    /// have been able to recover the session from the source chain and have requested signed actions
-    /// from agent authorities to build a signature bundle.
-    ///
-    /// From this state we either complete the session successfully, or we transition to the [CountersigningSessionState::Unknown]
-    /// state if we are unable to complete the session.
-    SignaturesCollected {
-        preflight_request: PreflightRequest,
-        /// Multiple responses in the outer vec, sets of responses in the inner vec
-        signature_bundles: Vec<Vec<SignedAction>>,
-    },
-    /// The session is in an unknown state and needs to be resolved.
-    ///
-    /// In most cases, we do know how we got into this state, but we treat it as unknown because
-    /// we want to always go through the same checks when leaving a countersigning session in any
-    /// way that is not a successful completion.
-    ///
-    /// Note that because the [PreflightRequest] is stored here, we only ever enter the unknown state
-    /// if we managed to keep the preflight request in memory, or if we have been able to recover it
-    /// from the source chain as part of the committed [CounterSigningSessionData]. Otherwise, we
-    /// are unable to discover what session we were participating in, and we must abandon the session
-    /// without going through this recovery state.
-    Unknown {
-        preflight_request: PreflightRequest,
-        // Unused until the next PR
-        #[allow(dead_code)]
-        resolution: Option<SessionResolutionSummary>,
-    },
-}
-
-impl CountersigningSessionState {
-    fn session_app_entry_hash(&self) -> &EntryHash {
-        let request = match self {
-            CountersigningSessionState::Accepted(request) => request,
-            CountersigningSessionState::SignaturesCollected {
-                preflight_request, ..
-            } => preflight_request,
-            CountersigningSessionState::Unknown {
-                preflight_request, ..
-            } => preflight_request,
-        };
-
-        &request.app_entry_hash
-    }
-}
-
-/// Summary of the workflow's attempts to resolve the outcome a failed countersigning session.
-///
-/// This tracks the numbers of attempts and the outcome of the most recent attempt.
-#[derive(Debug, Clone)]
-struct SessionResolutionSummary {
-    /// How many attempts have been made to resolve the session.
-    ///
-    /// Attempts are made according to the frequency specified by [RETRY_UNKNOWN_SESSION_STATE_DELAY].
-    ///
-    /// This count is only correct for the current run of the Holochain conductor. If the conductor
-    /// is restarted then this counter is also reset.
-    // Unused until the next PR
-    #[allow(dead_code)]
-    pub attempts: usize,
-    /// The time of the last attempt to resolve the session.
-    // Unused until the next PR
-    #[allow(dead_code)]
-    pub last_attempt_at: Timestamp,
-    /// The outcome of the most recent attempt to resolve the session.
-    // Unused until the next PR
-    #[allow(dead_code)]
-    pub outcomes: Vec<SessionResolutionOutcome>,
-}
-
-impl Default for SessionResolutionSummary {
-    fn default() -> Self {
-        Self {
-            attempts: 0,
-            last_attempt_at: Timestamp::now(),
-            outcomes: Vec::new(),
-        }
-    }
-}
-
-/// The outcome for a single agent who participated in a countersigning session.
-///
-/// [NUM_AUTHORITIES_TO_QUERY] authorities are made to agent activity authorities for each agent,
-/// and the decisions are collected into [SessionResolutionOutcome::decisions].
-#[derive(Debug, Clone)]
-struct SessionResolutionOutcome {
-    /// The agent who participated in the countersigning session and is the subject of this
-    /// resolution outcome.
-    // Unused until the next PR
-    #[allow(dead_code)]
-    pub agent: AgentPubKey,
-    /// The resolved decision for each authority for the subject agent.
-    // Unused until the next PR
-    #[allow(dead_code)]
-    pub decisions: Vec<SessionCompletionDecision>,
-}
-
-const NUM_AUTHORITIES_TO_QUERY: usize = 3;
-
-#[derive(Clone, Debug, PartialEq)]
-enum SessionCompletionDecision {
-    Complete(Box<SignedActionHashed>),
-    Abandoned,
-    Indeterminate,
+    sessions: HashMap<AgentPubKey, CounterSigningSessionState>,
 }
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
@@ -222,13 +106,13 @@ pub(crate) async fn countersigning_workflow(
                 .sessions
                 .iter_mut()
                 .for_each(|(author, session_state)| {
-                    if let CountersigningSessionState::Accepted(request) = session_state {
+                    if let CounterSigningSessionState::Accepted(request) = session_state {
                         if request.session_times.end < Timestamp::now() {
                             tracing::info!(
                                 "Session for agent {:?} has timed out, moving to unknown state",
                                 author
                             );
-                            *session_state = CountersigningSessionState::Unknown {
+                            *session_state = CounterSigningSessionState::Unknown {
                                 preflight_request: request.clone(),
                                 resolution: None,
                             };
@@ -249,7 +133,7 @@ pub(crate) async fn countersigning_workflow(
                 .sessions
                 .iter()
                 .filter_map(|(author, session_state)| match session_state {
-                    CountersigningSessionState::Unknown { .. } => Some(author.clone()),
+                    CounterSigningSessionState::Unknown { .. } => Some(author.clone()),
                     _ => None,
                 })
                 .collect::<Vec<_>>())
@@ -340,7 +224,7 @@ pub(crate) async fn countersigning_workflow(
                 .sessions
                 .iter()
                 .filter_map(|(author, session_state)| match session_state {
-                    CountersigningSessionState::SignaturesCollected {
+                    CounterSigningSessionState::SignaturesCollected {
                         signature_bundles, ..
                     } => Some((author.clone(), signature_bundles.clone())),
                     _ => None,
@@ -411,7 +295,7 @@ pub(crate) async fn countersigning_workflow(
                 .values()
                 .filter_map(|s| {
                     match s {
-                        CountersigningSessionState::Accepted(request) => {
+                        CounterSigningSessionState::Accepted(request) => {
                             Some(request.session_times.end)
                         }
                         _ => {

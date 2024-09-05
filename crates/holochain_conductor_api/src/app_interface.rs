@@ -140,7 +140,7 @@ pub enum AppResponse {
     ZomeCalled(Box<ExternIO>),
 
     /// The successful response to an [`AppRequest::GetCountersigningSessionState`].
-    CountersigningSessionState(Box<()>),
+    CountersigningSessionState(Box<Option<CounterSigningSessionState>>),
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///

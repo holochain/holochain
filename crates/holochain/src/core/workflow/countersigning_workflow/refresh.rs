@@ -1,5 +1,5 @@
 use crate::conductor::space::Space;
-use crate::core::workflow::countersigning_workflow::CountersigningSessionState;
+use crate::core::workflow::countersigning_workflow::CounterSigningSessionState;
 use holochain_sqlite::db::ReadAccess;
 use holochain_state::chain_lock::get_chain_lock;
 use holochain_state::mutations::unlock_chain;
@@ -117,7 +117,7 @@ pub async fn refresh_workspace_state(space: &Space, cell_id: CellId, signal: Sen
                                     .inner
                                     .share_mut(|inner, _| {
                                         inner.sessions.entry(agent.clone()).or_insert(
-                                            CountersigningSessionState::Unknown {
+                                            CounterSigningSessionState::Unknown {
                                                 preflight_request: session_data
                                                     .preflight_request()
                                                     .clone(),

@@ -3181,7 +3181,7 @@ mod authenticate_token_impls {
 /// Methods for bridging from host calls to workflows for countersigning
 mod countersigning_impls {
     use super::*;
-    use crate::core::workflow;
+    use crate::core::workflow::{self};
 
     impl Conductor {
         /// Accept a countersigning session
@@ -3215,12 +3215,13 @@ mod countersigning_impls {
         pub(crate) async fn get_countersigning_session_state(
             &self,
             cell_id: CellId,
-        ) -> ConductorResult<()> {
+        ) -> ConductorResult<Option<CounterSigningSessionState>> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
             space
                 .countersigning_workspace
                 .get_countersigning_session_state(cell_id.agent_pubkey())
-                .await?
+                .await
+                .map_err(|err| ConductorError::KitsuneP2pError(err.into()))
         }
     }
 }

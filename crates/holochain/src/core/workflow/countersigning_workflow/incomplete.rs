@@ -1,8 +1,6 @@
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
-use crate::core::workflow::countersigning_workflow::{
-    success, SessionCompletionDecision, SessionResolutionOutcome, NUM_AUTHORITIES_TO_QUERY,
-};
+use crate::core::workflow::countersigning_workflow::success;
 use crate::core::workflow::{countersigning_workflow, WorkflowResult};
 use crate::prelude::{Entry, RecordEntry};
 use either::Either;
@@ -15,6 +13,9 @@ use holochain_state::prelude::{
     current_countersigning_session, CurrentCountersigningSessionOpt, SourceChainResult,
 };
 use holochain_types::activity::ChainItems;
+use holochain_types::prelude::{
+    SessionCompletionDecision, SessionResolutionOutcome, NUM_AUTHORITIES_TO_QUERY,
+};
 use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::prelude::{
     ChainQueryFilter, ChainQueryFilterRange, ChainStatus, SignedAction,
