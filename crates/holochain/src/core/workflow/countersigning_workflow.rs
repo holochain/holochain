@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast::Sender;
+use tokio::task::AbortHandle;
 
 /// Accept handler for starting countersigning sessions.
 mod accept;
@@ -55,6 +56,7 @@ impl CountersigningWorkspace {
 #[derive(Default)]
 struct CountersigningWorkspaceInner {
     sessions: HashMap<AgentPubKey, CountersigningSessionState>,
+    next_trigger: Option<NextTrigger>
 }
 
 #[derive(Debug, Clone)]
@@ -429,17 +431,21 @@ pub(crate) async fn countersigning_workflow(
         })
         .unwrap();
 
-    // TODO This risks building up duplicate triggers
     if let Some(earliest_finish) = maybe_earliest_finish {
-        let delay = match (earliest_finish - Timestamp::now()).map(|d| d.to_std()) {
-            Ok(Ok(d)) => d,
-            _ => Duration::from_millis(100),
-        };
-        tracing::debug!("Countersigning workflow will run again in {:?}", delay);
-        tokio::task::spawn(async move {
-            tokio::time::sleep(delay).await;
-            self_trigger.trigger(&"retrigger_expiry_check");
-        });
+        space.countersigning_workspace.inner.share_mut(|inner, _| {
+            if let Some(next_trigger) = &mut inner.next_trigger {
+                next_trigger.replace_if_sooner(earliest_finish, self_trigger.clone());
+            } else {
+                inner.next_trigger = Some(NextTrigger::new(earliest_finish, self_trigger.clone()));
+            }
+
+            Ok(())
+        }).unwrap();
+    } else {
+        space.countersigning_workspace.inner.share_mut(|inner, _| {
+            inner.next_trigger = None;
+            Ok(())
+        }).unwrap();
     }
 
     Ok(WorkComplete::Complete)
@@ -499,4 +505,50 @@ async fn abandon_session(
         .await?;
 
     Ok(())
+}
+
+// TODO unify with the other mechanisms for re-triggering. This is currently working around
+//      a performance issue with WorkComplete::Incomplete but is similar to the loop logic that
+//      other workflows use - the difference being that this workflow varies the loop delay.
+struct NextTrigger {
+    trigger_at: Timestamp,
+    trigger_task: AbortHandle,
+}
+
+impl NextTrigger {
+    fn new(trigger_at: Timestamp, trigger_sender: TriggerSender) -> Self {
+        let delay = Self::calculate_delay(&trigger_at);
+
+        let trigger_task = Self::start_trigger_task(delay, trigger_sender);
+
+        Self {
+            trigger_at,
+            trigger_task,
+        }
+    }
+
+    fn replace_if_sooner(&mut self, trigger_at: Timestamp, trigger_sender: TriggerSender) {
+        // If the current trigger has expired, or the new one is sooner, then replace the
+        // current trigger.
+        if self.trigger_at < Timestamp::now() || trigger_at < self.trigger_at {
+            let new_delay = Self::calculate_delay(&trigger_at);
+            self.trigger_task.abort();
+            self.trigger_at = trigger_at;
+            self.trigger_task = Self::start_trigger_task(new_delay, trigger_sender);
+        }
+    }
+
+    fn calculate_delay(trigger_at: &Timestamp) -> Duration {
+        match trigger_at.checked_difference_signed(&Timestamp::now()).map(|d| d.to_std()) {
+            Some(Ok(d)) => d,
+            _ => Duration::from_millis(100),
+        }
+    }
+
+    fn start_trigger_task(delay: Duration, trigger_sender: TriggerSender) -> AbortHandle {
+        tokio::task::spawn(async move {
+            tokio::time::sleep(delay).await;
+            trigger_sender.trigger(&"next trigger");
+        }).abort_handle()
+    }
 }
