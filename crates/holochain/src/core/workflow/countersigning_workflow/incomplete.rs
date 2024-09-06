@@ -49,7 +49,10 @@ pub async fn inner_countersigning_session_incomplete(
 
     if maybe_current_session.is_none() {
         tracing::error!("Countersigning session was in an unknown state but no session entry was found. Holochain is only meant to enter this state when there is an entry to remove and won't recover: {:?}", author);
-        return Ok((SessionCompletionDecision::Indeterminate, Vec::with_capacity(0)));
+        return Ok((
+            SessionCompletionDecision::Indeterminate,
+            Vec::with_capacity(0),
+        ));
     }
 
     // Now things get more complicated. We have a countersigning entry on our chain but the session
