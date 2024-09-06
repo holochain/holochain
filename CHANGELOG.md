@@ -5,6 +5,8 @@ This file conveniently consolidates all of the crates individual CHANGELOG.md fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 # \[Unreleased\]
+- Added an optional `chc_url` cli argument to `holochain_cli_sandbox` 
+- Made `chc` feature default for `hc-sandbox`
 
 ## Holonix
 
