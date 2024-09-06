@@ -1240,6 +1240,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
     )]
     fn handle_send_remote_signal(
         &mut self,
+        span: tracing::Span,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
         to_agent_list: Vec<(Signature, AgentPubKey)>,
@@ -1275,7 +1276,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         timing_trace_out!(
             async move {
                 kitsune_p2p
-                    .targeted_broadcast(space, to_agents, timeout, req, true)
+                    .targeted_broadcast(span, space, to_agents, timeout, req, true)
                     .await?;
                 Ok(())
             },
@@ -1646,7 +1647,14 @@ impl HolochainP2pHandler for HolochainP2pActor {
         timing_trace_out!(
             async move {
                 kitsune_p2p
-                    .targeted_broadcast(space, vec![to_agent], timeout, req, false)
+                    .targeted_broadcast(
+                        tracing::Span::current(),
+                        space,
+                        vec![to_agent],
+                        timeout,
+                        req,
+                        false,
+                    )
                     .await?;
                 Ok(())
             },
@@ -1710,7 +1718,14 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             kitsune_p2p
-                .targeted_broadcast(space, agents, timeout, payload, false)
+                .targeted_broadcast(
+                    tracing::Span::current(),
+                    space,
+                    agents,
+                    timeout,
+                    payload,
+                    false,
+                )
                 .await?;
             Ok(())
         }

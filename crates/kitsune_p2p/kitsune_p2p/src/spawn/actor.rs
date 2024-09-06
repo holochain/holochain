@@ -767,6 +767,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
 
     fn handle_targeted_broadcast(
         &mut self,
+        span: tracing::Span,
         space: Arc<KitsuneSpace>,
         agents: Vec<Arc<KitsuneAgent>>,
         timeout: KitsuneTimeout,
@@ -780,7 +781,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender
-                .targeted_broadcast(space, agents, timeout, payload, drop_at_limit)
+                .targeted_broadcast(span, space, agents, timeout, payload, drop_at_limit)
                 .await
         }
         .boxed()

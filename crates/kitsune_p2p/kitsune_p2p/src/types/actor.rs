@@ -62,7 +62,7 @@ pub struct RpcMultiResponse {
 }
 
 /// Data to broadcast to the remote.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]
 #[cfg_attr(
     feature = "fuzzing",
@@ -86,6 +86,33 @@ pub enum BroadcastData {
         /// Context associated with this publish.
         context: kitsune_p2p_fetch::FetchContext,
     },
+}
+
+impl std::fmt::Debug for BroadcastData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::User(b) => {
+                let data_len = b.len();
+                f.debug_struct("BroadcastData::User")
+                    .field("data_len", &data_len)
+                    .finish()
+            }
+            Self::AgentInfo(i) => f
+                .debug_struct("BroadcastData::AgentInfo")
+                .field("agent_info", i)
+                .finish(),
+            Self::Publish {
+                source,
+                op_hash_list,
+                context,
+            } => f
+                .debug_struct("BroadcastData::Publish")
+                .field("source", source)
+                .field("op_hash_list", op_hash_list)
+                .field("context", context)
+                .finish(),
+        }
+    }
 }
 
 type KSpace = Arc<super::KitsuneSpace>;
@@ -134,6 +161,7 @@ ghost_actor::ghost_chan! {
         /// An Ok(()) result only means that we were able to establish at
         /// least one connection with a node in the agent set.
         fn targeted_broadcast(
+            span: tracing::Span,
             space: KSpace,
             agents: KAgents,
             timeout: KitsuneTimeout,

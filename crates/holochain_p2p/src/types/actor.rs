@@ -283,6 +283,7 @@ ghost_actor::ghost_chan! {
         /// to forward the signal, but if the conductor network is overworked
         /// it may decide not to deliver some of the signals.
         fn send_remote_signal(
+            span: tracing::Span,
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
             to_agent_list: Vec<(Signature, AgentPubKey)>,
