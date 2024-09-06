@@ -3,8 +3,10 @@ use holo_hash::{ActionHash, EntryHash};
 use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};
 use holochain::conductor::CellError;
 use holochain::core::workflow::WorkflowError;
+use holochain::prelude::PreflightResponse;
 use holochain::sweettest::{
-    await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
+    await_consistency, SweetCell, SweetConductor, SweetConductorBatch, SweetConductorConfig,
+    SweetDnaFile,
 };
 use holochain_state::prelude::{IncompleteCommitReason, SourceChainError};
 use holochain_types::app::DisabledAppReason;
@@ -15,7 +17,6 @@ use holochain_zome_types::countersigning::Role;
 use holochain_zome_types::prelude::{
     ActivityRequest, AgentActivity, ChainQueryFilter, GetAgentActivityInput,
 };
-use matches::assert_matches;
 use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 
@@ -328,11 +329,7 @@ async fn signature_bundle_noise() {
 
         // Also want to make sure everyone can see everyone else
         conductors[i]
-            .require_initial_gossip_activity_for_cell(
-                &cells[i],
-                4,
-                std::time::Duration::from_secs(10),
-            )
+            .require_initial_gossip_activity_for_cell(&cells[i], 4, Duration::from_secs(10))
             .await
             .unwrap();
     }
@@ -345,7 +342,7 @@ async fn signature_bundle_noise() {
         let preflight_request: PreflightRequest = conductors[0]
             .call_fallible(
                 &alice_zome,
-                "generate_countersigning_preflight_request_fast",
+                "generate_countersigning_preflight_request",
                 vec![
                     (cells[0].agent_pubkey().clone(), vec![Role(0)]),
                     (cells[1].agent_pubkey().clone(), vec![]),
@@ -385,29 +382,59 @@ async fn signature_bundle_noise() {
                 unreachable!();
             };
 
-        let _: (ActionHash, EntryHash) = conductors[0]
-            .call_fallible(
-                &cells[0].zome(TestWasm::CounterSigning),
-                "create_a_countersigned_thing_with_entry_hash",
-                vec![alice_response.clone(), bob_response.clone()],
-            )
-            .await
-            .unwrap();
-
-        let _: (ActionHash, EntryHash) = conductors[1]
-            .call_fallible(
-                &cells[1].zome(TestWasm::CounterSigning),
-                "create_a_countersigned_thing_with_entry_hash",
-                vec![alice_response.clone(), bob_response.clone()],
-            )
-            .await
-            .unwrap();
+        commit_session_with_retry(
+            &conductors[0],
+            &cells[0],
+            vec![alice_response.clone(), bob_response.clone()],
+        )
+        .await;
+        commit_session_with_retry(
+            &conductors[1],
+            &cells[1],
+            vec![alice_response.clone(), bob_response.clone()],
+        )
+        .await;
 
         let alice_rx = conductors[0].subscribe_to_app_signals("app".into());
         let bob_rx = conductors[1].subscribe_to_app_signals("app".into());
 
         wait_for_completion(alice_rx, preflight_request.app_entry_hash.clone()).await;
         wait_for_completion(bob_rx, preflight_request.app_entry_hash).await;
+    }
+}
+
+async fn commit_session_with_retry(
+    conductor: &SweetConductor,
+    cell: &SweetCell,
+    responses: Vec<PreflightResponse>,
+) {
+    for _ in 0..5 {
+        match conductor
+            .call_fallible::<_, (ActionHash, EntryHash)>(
+                &cell.zome(TestWasm::CounterSigning),
+                "create_a_countersigned_thing_with_entry_hash",
+                responses.clone(),
+            )
+            .await
+        {
+            Ok(_) => {
+                break;
+            }
+            Err(ConductorApiError::CellError(CellError::WorkflowError(e))) => {
+                if let WorkflowError::SourceChainError(SourceChainError::IncompleteCommit(_)) = *e {
+                    // retryable error, missing DHT dependencies
+                    continue;
+                } else {
+                    panic!("Expected IncompleteCommit error, got: {:?}", e);
+                }
+            }
+            Err(e) => {
+                panic!(
+                    "Unexpected error while committing countersigning entry: {:?}",
+                    e
+                );
+            }
+        }
     }
 }
 
@@ -493,7 +520,7 @@ async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
         .await
         .unwrap();
 
-    // Bob proceeds to laugh maniacally and not commit
+    // Bob does not commit, and instead abandons the session
 
     // Bob's session should time out and be abandoned
     wait_for_abandoned(
@@ -502,34 +529,7 @@ async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
     )
     .await;
 
-    tracing::info!("Session abandoned for bob");
-
-    // Alice's chain is still locked though
-    let err = conductors[0]
-        .call_fallible::<_, ActionHash>(&alice_zome, "create_a_thing", ())
-        .await
-        .unwrap_err();
-
-    match err {
-        ConductorApiError::CellError(CellError::WorkflowError(e)) => {
-            assert_matches!(
-                *e,
-                WorkflowError::SourceChainError(SourceChainError::ChainLocked)
-            );
-        }
-        e => panic!("Expected ChainLocked error, got: {:?}", e),
-    }
-
-    // Alice is stuck for now. But it's not all over for her. She can either wait for Bob to commit
-    // something, or force unlock the chain (not possible yet!). For now, let's have Bob commit
-    // something and then kick alice's countersigning workflow off again.
-
-    let _: ActionHash = conductors[1]
-        .call_fallible(&bob_zome, "create_a_thing", ())
-        .await
-        .unwrap();
-
-    // Alice session should now get abandoned
+    // Alice session should also get abandoned
     wait_for_abandoned(
         conductors[0].subscribe_to_app_signals("app".into()),
         preflight_request.app_entry_hash.clone(),

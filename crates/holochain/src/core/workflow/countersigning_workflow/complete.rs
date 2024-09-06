@@ -89,7 +89,7 @@ pub(crate) async fn inner_countersigning_session_complete(
             .verify_signature(sa.signature(), sa.action())
             .await?
         {
-            tracing::info!("Invalid signature found: {:?}", sa);
+            tracing::warn!("Invalid signature found: {:?}", sa);
             return Ok(None);
         }
         if sa.action().author() == &author {
@@ -151,7 +151,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         // TODO this is what flag is for, whether to witness or store - document and rename me
         if let Err(e) = network.publish_countersign(false, basis, op.into()).await {
             tracing::error!(
-                "Failed to publish to other countersigners agent authorities because of: {:?}",
+                "Failed to publish to other counter-signers agent authorities because of: {:?}",
                 e
             );
         }
