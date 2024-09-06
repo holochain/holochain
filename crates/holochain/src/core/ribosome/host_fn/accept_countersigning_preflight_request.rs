@@ -89,7 +89,7 @@ pub mod wasm_test {
     }
 
     /// Allow LockExpired error, panic on anything else
-    fn expect_chain_lock_expired<T>(result: Result<T, ConductorApiError>)
+    fn expect_error_for_write_without_lock<T>(result: Result<T, ConductorApiError>)
     where
         T: std::fmt::Debug,
     {
@@ -226,7 +226,7 @@ pub mod wasm_test {
                 vec![alice_response.clone(), bob_response.clone()],
             )
             .await;
-        expect_chain_lock_expired(bob_result);
+        expect_error_for_write_without_lock(bob_result);
 
         // At this point Alice's session entry is a liability so can't exist.
         let alice_agent_activity_alice_observed_after: AgentActivity = conductor
@@ -292,6 +292,9 @@ pub mod wasm_test {
         );
 
         // @TODO - the following all pass but perhaps we do NOT want them to?
+        // @TODO updated: You can no longer get these entries after the session has expired but.
+        //       this comment is still relevant during the session, once a commit has been done
+        //       and before the session has timed out.
         // It's not immediately clear what direct requests by hash should do in all cases here.
         //
         // If an author does a must_get during a zome call like we do in this test, should it
@@ -315,28 +318,28 @@ pub mod wasm_test {
         // headers created it?
         //
         // etc. etc. I'm just leaving this commentary here to germinate future headaches and self doubt.
-        let _alice_action: SignedActionHashed = conductor
-            .call(
+        conductor
+            .call_fallible::<_, SignedActionHashed>(
                 &alice,
                 "must_get_action",
                 countersigned_action_hash_alice.clone(),
             )
-            .await;
+            .await.unwrap_err();
 
-        let _alice_record: Record = conductor
-            .call(
+        conductor
+            .call_fallible::<_, Record>(
                 &alice,
                 "must_get_valid_record",
                 countersigned_action_hash_alice.clone(),
             )
-            .await;
-        let _alice_entry: EntryHashed = conductor
-            .call(
+            .await.unwrap_err();
+        conductor
+            .call_fallible::<_, EntryHashed>(
                 &alice,
                 "must_get_entry",
                 countersigned_entry_hash_alice.clone(),
             )
-            .await;
+            .await.unwrap_err();
     }
 
     #[tokio::test(flavor = "multi_thread")]
