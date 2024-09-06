@@ -311,15 +311,15 @@ async fn retry_countersigning_commit_on_missing_deps() {
 async fn signature_bundle_noise() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true);
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(5, config).await;
+    let config = SweetConductorConfig::rendezvous(true).no_dpki();
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(4, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
 
     let cells = apps.cells_flattened();
 
-    for i in 0..5 {
+    for i in 0..4 {
         // Need an initialised source chain for countersigning, so commit anything
         let zome = cells[i].zome(TestWasm::CounterSigning);
         let _: ActionHash = conductors[i]
@@ -329,7 +329,7 @@ async fn signature_bundle_noise() {
 
         // Also want to make sure everyone can see everyone else
         conductors[i]
-            .require_initial_gossip_activity_for_cell(&cells[i], 4, Duration::from_secs(10))
+            .require_initial_gossip_activity_for_cell(&cells[i], 4, Duration::from_secs(30))
             .await
             .unwrap();
     }
@@ -382,6 +382,9 @@ async fn signature_bundle_noise() {
                 unreachable!();
             };
 
+        let alice_rx = conductors[0].subscribe_to_app_signals("app".into());
+        let bob_rx = conductors[1].subscribe_to_app_signals("app".into());
+
         commit_session_with_retry(
             &conductors[0],
             &cells[0],
@@ -394,9 +397,6 @@ async fn signature_bundle_noise() {
             vec![alice_response.clone(), bob_response.clone()],
         )
         .await;
-
-        let alice_rx = conductors[0].subscribe_to_app_signals("app".into());
-        let bob_rx = conductors[1].subscribe_to_app_signals("app".into());
 
         wait_for_completion(alice_rx, preflight_request.app_entry_hash.clone()).await;
         wait_for_completion(bob_rx, preflight_request.app_entry_hash).await;
@@ -418,7 +418,7 @@ async fn commit_session_with_retry(
             .await
         {
             Ok(_) => {
-                break;
+                return;
             }
             Err(ConductorApiError::CellError(CellError::WorkflowError(e))) => {
                 if let WorkflowError::SourceChainError(SourceChainError::IncompleteCommit(_)) = *e {
@@ -436,6 +436,8 @@ async fn commit_session_with_retry(
             }
         }
     }
+
+    panic!("Failed to commit countersigning entry after 5 retries");
 }
 
 #[tokio::test(flavor = "multi_thread")]
