@@ -1497,111 +1497,76 @@ impl HashableContent for Warrant {
 }
 ```
 
-### DHT-Transform-Status Worklow:
+### Transforming States of DHT Content
 
-See workflows with state data across multiple LMDB tables. [WP-TODO: ACB fixme no more LMDB]
+A Holochain DHT exhibits a simple monotonicity; it is an accumulation of transform operations over time. However, in order to become a practical graph database with affordances such as mutability, it also exhibits a _logical monotonicity_[^calm-theorem] -- specifically, it is an operation-based conflict-free replicated data type (CRDT) [^op-crdt] which yields a final state consisting of a hash table of basis hashes containing individual meaningful states which together form such a database. The natural consequence of this property is that any two peers who receive the same set of DHT transform operations will arrive at the same database state without need of a coordination protocol.
 
-```graphviz
+[^calm-theorem]: [Keeping CALM: When Distributed Consistency is Easy](https://arxiv.org/abs/1901.01930), Joseph M Hellerstein and Peter Alvaro.
+
+[^op-crdt]: [Conflict-free Replicated Data Types](https://inria.hal.science/hal-00932836/file/CRDTs_SSS-2011.pdf), Marc Shapiro, Nuno Preguiça, Carlos Baquero, Marek Zawirski. An operation-based CRDT is not necessarily idempotent, which requires that its communications infrastructure make guarantees about uniqueness of delivery and causal ordering for operations. In Holochain, however, these requirements are satisfied by the data structures themselves: hashing of DHT transform operations guarantees uniqueness, while CRUD operations that are order-dependent list their causal dependencies explicitly by hash, which allows the Conductor's integration workflow to integrate operations in the correct order.
+
+#### Validation and Liveness on the DHT
+
+The first task before transforming the DHT to include a new piece of data is to validate the transform according to both system-level and application-specific rules. Additionally, a transform MUST be accompanied by a valid provenance signature that matches the public key of its author.
+
+DHT transforms whose validation process has been abandoned are not gossiped. There are two reasons to abandon validation. Both have to do with consuming too much resources.
+
+1. It has stayed in our validation queue too long without being able to resolve dependencies.
+2. The app validation code used more resources (CPU, memory, bandwidth) than we allocate for validation. This lets us address the halting problem of validation with infinite loops.
+
+```dot
 digraph {
-    node [fontname=Courier] //All nodes
-    edge [color=Blue] //All the line
+    edge [color=Blue]
 
-    Committed->Transformed->Pushing->Published
-    Transformed [label="Locally Transformed to DHTOps & Metadata"]
-    Committed [label="Committed to Local Source Chain"]
-    Pushing [label="Collecting Validation Receipts (Fast Push Phase)"]
-    Published [label="Published to Network (Received R Receipts)"]
-    {rank=same; Published} // Same level
+    Pending -> Valid [label="validation\nsucceeds"]
+    Pending -> Rejected [label="validation\nfails"]
+    Pending -> Abandoned [label="validation has taken\ntoo many resources"]
 }
 ```
 
-### Validation Queue State Graph
+#### Entry Liveness Status
 
-These are the state changes in the validation workflow.
+The 'liveness' status of an Entry at its DHT basis is transformed in the following ways:
 
-**"Subconscious" Validation Rules:** Certain types of validation must be universally enforced by Holochain core rather than application logic. For example, valid state transitions from the graph above...
-
-#### Validation State Diagram
-
-Transforms whose provenance cannot be validated (in other words, they don't have valid signatures or authors) are dropped early in the validation process as counterfeit/garbage/spam data.
-
-[WP-TODO: I don't know what sorts of things this graph is supposed to represent. Most of these identifiers don't appear in the codebase.]
-
-```graphviz
+```dot
 digraph {
-    node [fontname=Courier] //All nodes
-    edge [color=Blue] //All the lines
-    //Queued, SysValidated, AwaitingDeps, SendingReceipts, SendingWarrants, ResourceOverflow
+    edge [color=Blue]
 
-    ValidationStatus[shape=none color=Blue]
-    Pending->{SysValidated Rejected Abandoned}
-    SysValidated->{AwaitingDeps Rejected Abandoned}
-    AwaitingDeps->{Valid Rejected Abandoned}
-
-    {rank=same; ValidationStatus Valid Rejected Abandoned}
+    Pending -> Live [label="validation\nsucceeds"]
+    Pending -> Rejected [label="validation\nfails"]
+    Pending -> Abandoned [label="validation has taken\ntoo many resources"]
+    Live -> Dead [label="RegisterDelete\noperation(s)\nintegrated\nfor all creation actions"]
+    Dead -> Live [label="new StoreEntry\noperation\nintegrated"]
+    Live -> Withdrawn [label="Withdraw\noperation(s)\nintegrated\nfor all creation actions"]
+    Live -> Purged [label="Purge operation\nintegrated"]
 }
 ```
 
-**Abandoned Status:** DHT transforms whose validation process has been abandoned are not gossiped. There are two reasons to abandon validation. Both have to do with consuming too much resources.
+An Entry is considered `Dead` when ALL of the valid creation Actions which created it have been marked as deleted by valid deletion Actions; that is, `Live` entails a non-empty result of a set difference between the creation Action hashes and the `deletes_address` field of the deletion Action hashes stored at the entry's basis.
 
- 1. It has stayed in our validation queue too long without being able to resolve dependencies. That means we've been creating network traffic every few minutes for some long period of time trying to resolve dependencies, and we are no longer going to waste our compute time and generate network noise for this.
- 2. The app validation code used more resources (CPU, memory, bandwidth) than we allocate for validation. This lets us address the halting problem of validation with infinite loops.
+`Withdrawn` and `Purged` are placeholders for possible future features:
 
-#### Integration State Diagram [WP-TODO: ACB ( here in implementation or up in formalization?)]
+* `Withdrawn`: The record has been marked by its author as such, usually to correct an error (such as accidental forking of their chain after an incomplete restoration from a backup). The same set difference rules apply to `Live`/`Withdrawn` as to `Live`/`Dead`.
+* `Purged`: The addressable content has been erased from the CAS database, possibly by collective agreement to drop it -- e.g., for things that may be illegal or unacceptable to hold (e.g., child pornography).
 
-All elements that complete the validation process need to be integrated into the data store with their associated validation result. Note: We do not store or gossip the Entries** which were Abandoned (only the Actions).
+The process of changing data to these two states is unimplemented.
 
-[WP-TODO: This enum doesn't exist anywhere in the codebase. That, or the values `Integrating`, `SendingReceipts`, and `SendingWarrants` don't appear, and it's not clear what `ValidationStatus` is doing there.]
+#### Action Liveness Status
 
-```graphviz
-digraph {
-    node [fontname=Courier] //All nodes
-    edge [color=Blue] //All the lines
+An Action is considered `Dead` only after a `RegisterDeletedBy` operation which references the Action's has has been integrated at the Action's basis.
 
-    ValidationStatus->Integrating
-    Integrating->{Live Rejected Abandoned} [color=Green label="EntryDhtStatus"]
-    Abandoned -> SendingReceipts
-    Live->SendingReceipts
-    Rejected->SendingWarrants
+#### Link Liveness Status
 
-    {rank=same;SendingWarrants SendingReceipts}
-}
-```
+A link is considered `Dead` only after at least one `RegisterDeleteLink` operation which references the `CreateLink` action has been integrated at the link base's basis.
 
-#### Tracking Liveness of Data
+#### Agent Status
 
-You can see these `EntryDhtStatus`es are generated from the validation states above.
+An Agent's status, which can be retrieved from the Agent ID basis (that is, the Agent's public key), is a composite of:
 
-An Entry is considered deleted/not live when ALL of the Actions which created it have been deleted.
-
-[WP-TODO: I'm not clear what's going on in this diagram -- it looks like a state diagram; is it customary to include the things that trigger state changes in diagrams like this? looking at examples online; it does seem like graph edges are labelled with trigger conditions]
-
-```graphviz
-digraph {
-    node [fontname=Courier] //All nodes
-    edge [] //All the lines
-
-    Pending->{Live Rejected Abandoned} [color=Green]
-    Live->{Dead}->Conflict
-    Live->Conflict
-    Conflict->{Live Dead Rejected} [color=Blue]
-
-    Withdrawn [shape="box"]
-    Purged [shape="box"]
-
-    {rank=same;Live Rejected Abandoned}
-    {rank=same; Dead}
-    {rank=same;Conflict Withdrawn Purged}
-}
-```
-
-`Conflict`, `Withdrawn`, and `Purged` are placeholders for possible future features:
-
-* `Conflict`: Two operations that expected to transform state in an exclusive way (such as a theoretical `RegisterRedirect` operation which unambiguously points an old entry to a single new one, as opposed to `Update` which may create a branched history) conflicted with each other when attempting to apply their transform.
-* `Withdrawn`: The record has been marked by its author as such, usually to correct an error (such as accidental forking of their chain after an incomplete restoration from a backup).
-* `Purged`: The adressable content has been erased from the CAS database, possibly by collective agreement to drop it -- e.g., for things that may be illegal or unacceptable to hold (e.g., child pornography).
-
-The process of changing data to these states is TBD.
+* Liveness of `AgentID` Entry, according to the above rules defined in Entry Liveness Status
+* Validity of every Source Chain action (that is, whether all `RegisterAgentActivity` transforms are valid)
+* Linearity of Source Chain (that is, whether there are any branches in the Source chain, also determined during integration of `RegisterAgentActivity` transforms)
+* Presence of valid Warrants received from other authorities via `WarrantOp` DHT transforms
 
 ## P2P Networking
 
