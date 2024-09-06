@@ -454,6 +454,10 @@ async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
     let bob = &cells[1];
     let carol = &cells[2];
 
+    // Subscribe early in the test to avoid missing signals later
+    let alice_signal_rx = conductors[0].subscribe_to_app_signals("app".into());
+    let bob_signal_rx = conductors[1].subscribe_to_app_signals("app".into());
+
     // Need an initialised source chain for countersigning, so commit anything
     let alice_zome = alice.zome(TestWasm::CounterSigning);
     let _: ActionHash = conductors[0]
@@ -523,18 +527,10 @@ async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
     // Bob does not commit, and instead abandons the session
 
     // Bob's session should time out and be abandoned
-    wait_for_abandoned(
-        conductors[1].subscribe_to_app_signals("app".into()),
-        preflight_request.app_entry_hash.clone(),
-    )
-    .await;
+    wait_for_abandoned(bob_signal_rx, preflight_request.app_entry_hash.clone()).await;
 
     // Alice session should also get abandoned
-    wait_for_abandoned(
-        conductors[0].subscribe_to_app_signals("app".into()),
-        preflight_request.app_entry_hash.clone(),
-    )
-    .await;
+    wait_for_abandoned(alice_signal_rx, preflight_request.app_entry_hash.clone()).await;
 
     // Alice will now be allowed to commit other entries
     let _: ActionHash = conductors[0]
