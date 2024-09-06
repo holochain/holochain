@@ -50,10 +50,6 @@ The following are common use cases for countersigning; for a detailed technical 
 
 * **Generalized Micro-Consensus: Entwined multi-agent state change:** Even though Holochain is agent-centric and designed to make only local state changes, the countersigning process may be seen as an implementation of Byzantine consensus applied to specific data elements or situations. Contextual countersigning is exactly what circumvents the need for global consensus in Holochain applications.
 
-```{=html}
-<!-- -->
-```
-
 ### Scaling
 
 Holochain's architecture is specifically designed to maintain resilience and performance as both the number of users and interactions increase. Key factors contributing to its scaling capabilities include:
@@ -125,6 +121,7 @@ For even stricter situations, apps can achieve a "0 of N" trust model, where no 
 #### Consensus​ ​Attacks
 
 This whole category of attack starts from the assumption that consensus is required for distributed systems. Because Holochain doesn't start from that assumption, the attack category really doesn't apply, but it's worth mentioning because there​ ​are​ ​a​ ​number​ ​of​ ​attacks​ ​on​ ​blockchain​ ​which​ threaten confidence in the reliability of the chain data through collusion between some majority of nodes. ​The​ ​usual thinking​ ​is​ ​that​ ​it​ ​takes​ ​a​ ​large​ ​number​ ​of​ ​nodes ​and​ ​massive​ ​amounts​ ​of​ ​computing​ ​power or financial incentives​ ​to prevent​ ​undue​ ​hijacking​ ​of​ ​consensus.​ ​However,​ ​since​ ​Holochain's data coherence doesn't derive from all nodes awaiting consensus,​ ​but​ rather ​on​ deterministic validation, nobody​ ​ever​ ​needs​ ​to​ ​trust​ ​a​ ​consensus​ ​lottery.​
+
 #### Sybil Attacks
 
 Since Holochain does not rely on any kind of majority consensus, it is already less vulnerable to Sybil Attacks, the creation of many fake colluding accounts which are typically used to overwhelm consensus of honest agents. And since Holochain enables "1 of N" and even "0 of N" trust models, Sybils cannot entirely overwhem honest agents' ability to determine the validity of data.

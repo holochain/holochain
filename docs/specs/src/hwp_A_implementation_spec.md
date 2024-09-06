@@ -86,7 +86,7 @@ For any guest functions which are permitted to change source chain state (`init`
 5. Attempt to validate the DHT transforms.
 6. If all the DHT transforms are valid, persist the Actions in the scratch space to the source chain.
 7. If the called function was a zome function, return the zome function call's return value to the caller.
-7. Spawn the `post_commit` callback in the same Coordinator Zome as the called guest function and attempt to publish the DHT transforms to the DHT.
+8. Spawn the `post_commit` callback in the same Coordinator Zome as the called guest function and attempt to publish the DHT transforms to the DHT.
 
 State changes in a scratch space MUST be committed atomically to the source chain; that is, all of them MUST be written or fail as a batch.
 
@@ -1646,7 +1646,9 @@ Note that the `ValidationReceipts` message is sent back to an authoring agent as
 
 The following messages types MUST be implemented. In our implementation, they are all defined as variants of a `WireMessage` enum which are wrapped in lower-level Kitsune messages before being serialized and sent via the network transport implementation.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     CallRemote {
         zome_name: ZomeName,
         fn_name: FunctionName,
@@ -1692,7 +1694,9 @@ The following messages types MUST be implemented. In our implementation, they ar
 
     Implementations SHOULD terminate function execution on the remote node if it has exhausted an execution cost limit, to prevent denial-of-service attacks against the receiver.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     ValidationReceipts {
         receipts: Vec<SignedValidationReceipt>,
     }
@@ -1723,7 +1727,9 @@ The following messages types MUST be implemented. In our implementation, they ar
     }
     ```
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     Get {
         dht_hash: AnyDhtHash,
         options: GetOptions,
@@ -1749,7 +1755,9 @@ The following messages types MUST be implemented. In our implementation, they ar
     }
     ```
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     GetMeta {
         dht_hash: AnyDhtHash,
     }
@@ -1757,7 +1765,9 @@ The following messages types MUST be implemented. In our implementation, they ar
 
     Request all metadata stored at the given basis hash.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     GetLinks {
         query: WireLinkQuery,
     }
@@ -1781,7 +1791,9 @@ The following messages types MUST be implemented. In our implementation, they ar
     }
     ```
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     CountLinks {
         query: WireLinkQuery,
     }
@@ -1789,7 +1801,9 @@ The following messages types MUST be implemented. In our implementation, they ar
 
     Request only the count of _live_ link creation actions, optionally filtered by the query predicate.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     GetAgentActivity {
         agent: AgentPubKey,
         query: ChainQueryFilter,
@@ -1813,7 +1827,9 @@ The following messages types MUST be implemented. In our implementation, they ar
     }
     ```
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     MustGetAgentActivity {
         agent: AgentPubKey,
         filter: ChainFilter,
@@ -1822,7 +1838,9 @@ The following messages types MUST be implemented. In our implementation, they ar
 
     Request a contiguous sequence of agent activity actions for the given agent, bounded by the specified filter, which is defined above in the HDK section.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     CountersigningSessionNegotiation {
         message: CountersigningSessionNegotiationMessage,
     }
@@ -1839,7 +1857,9 @@ The following messages types MUST be implemented. In our implementation, they ar
     }
     ```
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     PublishCountersign {
         is_action_author: bool,
         op: DhtOp,
@@ -1870,7 +1890,9 @@ Messages of both of these classes are sent asynchronously; Request is simply a p
 
 These are the message types that MUST be implemented. They are all defined as variants of a `Wire` enum, which are serialized and sent via the network transport layer.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     Failure {
         reason: String,
     }
@@ -1878,7 +1900,9 @@ These are the message types that MUST be implemented. They are all defined as va
 
     Notify a peer of failure, as a response to a received message that couldn't be handled.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     Call {
         space: KitsuneSpace,
         to_agent: KitsuneAgent,
@@ -1898,7 +1922,9 @@ These are the message types that MUST be implemented. They are all defined as va
 
     The `data` argument holds the input that will be passed to the remote function.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     CallResp {
         data: Vec<u8>,
     }
@@ -1906,7 +1932,9 @@ These are the message types that MUST be implemented. They are all defined as va
 
     Respond to a `Call` message with the output of the called function.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     Broadcast {
         space: KitsuneSpace,
         to_agent: KitsuneAgent,
@@ -1980,7 +2008,9 @@ These are the message types that MUST be implemented. They are all defined as va
     struct FetchContext(u32);
     ```
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     DelegateBroadcast {
         space: KitsuneSpace,
         basis: KitsuneBasis,
@@ -1999,7 +2029,9 @@ These are the message types that MUST be implemented. They are all defined as va
 
     The `data` argument is the data to be psased on to the neighborhood, and is defined above.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     Gossip {
         space: KitsuneSpace,
         data: Vec<u8>,
@@ -2020,7 +2052,9 @@ These are the message types that MUST be implemented. They are all defined as va
 
     The message types that appear in the `data` argument are documented in the following section on [Gossip](#gossip).
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     PeerGet {
         space: KitsuneSpace,
         agent: KitsuneAgent,
@@ -2029,7 +2063,9 @@ These are the message types that MUST be implemented. They are all defined as va
 
     Ask a remote node if they know about a specific agent.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     PeerGetResp {
         agent_info_signed: AgentInfoSigned,
     }
@@ -2037,7 +2073,9 @@ These are the message types that MUST be implemented. They are all defined as va
 
     Respond to a `PeerGet` with information about the requested agent. The `agent_info_signed` field is defined above under `Broadcast`.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     PeerQuery {
         space: KitsuneSpace,
         basis_loc: DhtLocation,
@@ -2046,7 +2084,9 @@ These are the message types that MUST be implemented. They are all defined as va
 
     Query a remote node for peers holding or nearest to holding a `u32` network location.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     PeerQueryResp {
         peer_list: Vec<AgentInfoSigned>,
     }
@@ -2054,7 +2094,9 @@ These are the message types that MUST be implemented. They are all defined as va
 
     Respond to a `PeerQuery`.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     PeerUnsolicited {
         peer_list: Vec<AgentInfoSigned>,
     }
@@ -2062,7 +2104,9 @@ These are the message types that MUST be implemented. They are all defined as va
 
     Send peer information without being asked to. Notably, a node may want to send their own peer info to prevent being inadvertantly blocked.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     FetchOp {
         fetch_list: Vec<(KitsuneSpace, Vec<FetchKey>)>,
     }
@@ -2076,7 +2120,9 @@ These are the message types that MUST be implemented. They are all defined as va
     }
     ```
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     PushOpData {
         op_data_list: Vec<(KitsuneSpace, Vec<PushOpItem>)>,
     }
@@ -2101,7 +2147,9 @@ These are the message types that MUST be implemented. They are all defined as va
     }
     ```
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     MetricExchange {
         space: KitsuneSpace,
         msgs: Vec<MetricExchangeMsg>,
@@ -2132,7 +2180,9 @@ Any gossip algorithm to be used in the Holochain context MUST be able to handle 
 
 We have developed a hybrid gossip implementation that separates DHT transforms into "recent" and "historical", with recent gossip using a Bloom filter and historical gossip using a novel "quantized gossip" algorithm that effeciently shards and redistributes data as nodes come and go on the network. While the full description of that implementation is beyond the scope of this document, we will document the messages that nodes pass:
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     Initiate {
         intervals: Vec<Arq>,
         id: u32,
@@ -2142,7 +2192,9 @@ We have developed a hybrid gossip implementation that separates DHT transforms i
 
     Propose a gossip round, specifying one or more arcs of the location space for which the initiator is an authority. A gossip round can cover more than one agent within a given Space on the initiator's device. The `id` field disambiguates gossip rounds initiated in parallel.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     Accept {
         intervals: Vec<Arq>,
         agent_list: Vec<AgentInfoSigned>,
@@ -2151,7 +2203,9 @@ We have developed a hybrid gossip implementation that separates DHT transforms i
 
     Respond to an `Initiate`, specifying the arcs for which the agents on the acceptor's are authorities. Note that the gossip round, as it goes forward, will concern network locations that are the _set intersection_ of all the network locations covered by all the arcs of both the initiator and the acceptor.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     Agents {
         filter: Option<(usize, Vec<u8>)>,
     }
@@ -2161,7 +2215,9 @@ We have developed a hybrid gossip implementation that separates DHT transforms i
 
     As this uses a Bloom filter, peers may require a few rounds of exchanges before they converge on identical values and are finished synchronizing `AgentInfo` data. Implementations MAY retry on a loop until this condition is satisfied.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     MissingAgents {
         agents: Vec<AgentInfoSigned>,
     }
@@ -2169,7 +2225,9 @@ We have developed a hybrid gossip implementation that separates DHT transforms i
 
     Respond to `Agents`, supplying the `AgentInfo`s for all the agents that did not appear to be included in the Bloom filter.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     OpBloom {
         // The Bloom filter value.
         missing_hashes: EncodedTimedBloomFilter,
@@ -2204,7 +2262,9 @@ We have developed a hybrid gossip implementation that separates DHT transforms i
     }
     ```
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     OpRegions {
         region_set: RegionSetLtcs
     }
@@ -2247,7 +2307,9 @@ We have developed a hybrid gossip implementation that separates DHT transforms i
     }
     ```
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     MissingOpHashes {
         ops: Vec<HashSized>,
         finished: bool;
@@ -2256,7 +2318,9 @@ We have developed a hybrid gossip implementation that separates DHT transforms i
 
     Respond to an `OpBloom` or `OpRegions` message with a list of DHT operation hashes which don't match the sender's Bloom filter. If the list is large, it can be chunked into multiple messages, and the `finished` property in each message indicates whether more chunks will be sent. (Implementations SHOULD automatically send the next chunk without being asked to.) After this, the recipient of this message is expected to retrieve DHT operation data from the sender, not via gossip but via the `FetchOp` notify message.
 
-*   ```rust
+* <!-- -->
+
+    ```rust
     Error { message: String, }
     Busy
     NoAgents
@@ -2529,6 +2593,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             coordinator_zomes: Vec<ZomeName>,
             lineage: HashSet<DnaHash>,
         }
+        ```
 
 * `UpdateCoordinators(UpdateCoordinatorsPayload) -> CoordinatorsUpdated`: Update coordinator zomes for an already installed DNA.
     * **Notes**: This call MUST replace any installed coordinator zomes with the same zome name. If the zome name doesn't exist then the coordinator zome MUST be appended to the current list of coordinator zomes.
@@ -2576,7 +2641,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             ignore_genesis_failure: bool,
         }
         ```
-    **Return Value**: The returned value MUST contain the `AppInfo` data structure (which is also retreivable after installation via the `GetAppInfo` API), and is defined as:
+    * **Return Value**: The returned value MUST contain the `AppInfo` data structure (which is also retreivable after installation via the `GetAppInfo` API), and is defined as:
 
         ```rust
         struct AppInfo {
