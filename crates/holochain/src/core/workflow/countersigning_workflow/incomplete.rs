@@ -10,7 +10,6 @@ use holo_hash::AgentPubKey;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::HolochainP2pDnaT;
-use holochain_state::mutations::unlock_chain;
 use holochain_state::prelude::{
     current_countersigning_session, CurrentCountersigningSessionOpt, SourceChainResult,
 };
@@ -36,7 +35,6 @@ pub async fn inner_countersigning_session_incomplete(
 ) -> WorkflowResult<(SessionCompletionDecision, Vec<SessionResolutionOutcome>)> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
-    // TODO is this needed
     let maybe_current_session = authored_db
         .write_async({
             let author = author.clone();
@@ -44,21 +42,14 @@ pub async fn inner_countersigning_session_incomplete(
                 let maybe_current_session =
                     current_countersigning_session(txn, Arc::new(author.clone()))?;
 
-                // This is the simplest failure case, something has gone wrong but the countersigning entry
-                // hasn't been committed then we can unlock the chain and remove the session.
-                if maybe_current_session.is_none() {
-                    unlock_chain(txn, &author)?;
-                    return Ok(None);
-                }
-
                 Ok(maybe_current_session)
             }
         })
         .await?;
 
     if maybe_current_session.is_none() {
-        tracing::info!("Countersigning session was in an unknown state but no session entry was found, unlocking chain and removing session: {:?}", author);
-        return Ok((SessionCompletionDecision::Abandoned, Vec::with_capacity(0)));
+        tracing::error!("Countersigning session was in an unknown state but no session entry was found. Holochain is only meant to enter this state when there is an entry to remove and won't recover: {:?}", author);
+        return Ok((SessionCompletionDecision::Indeterminate, Vec::with_capacity(0)));
     }
 
     // Now things get more complicated. We have a countersigning entry on our chain but the session
