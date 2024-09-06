@@ -30,7 +30,7 @@ pub async fn refresh_workspace_state(space: &Space, cell_id: CellId, signal: Sen
     );
     let workspace = &space.countersigning_workspace;
 
-    // These are all the agents that the conductor is aware of for this the DNA this workflow is running in.
+    // These are all the agents that the conductor is aware of for the DNA this workflow is running in.
     //
     // We don't want to keep the entire space locked for writes, so just get the agents and release the lock.
     // We can then lock each agent individually.
