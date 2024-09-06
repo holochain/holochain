@@ -185,7 +185,7 @@ async fn apply_success_state_changes(
                 txn.execute(
                     "UPDATE DhtOp SET withhold_publish = NULL WHERE action_hash = :action_hash",
                     named_params! {
-                    ":action_hash": this_cells_action_hash,
+                        ":action_hash": this_cells_action_hash,
                     },
                 )
                 .map_err(holochain_state::prelude::StateMutationError::from)?;
