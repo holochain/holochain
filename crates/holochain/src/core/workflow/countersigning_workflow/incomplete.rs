@@ -244,11 +244,11 @@ pub async fn inner_countersigning_session_incomplete(
             .iter()
             .all(|d| matches!(*d, SessionCompletionDecision::Complete(_)))
         {
-            // Safe to access without bounds check because we've done a size check above.
             tracing::debug!(
                 "Authorities agree that agent {:?} has completed the session",
                 agent
             );
+            // Safe to access without bounds check because we've done a size check above.
             by_agent_decisions.push(authority_decisions[0].clone());
         } else if authority_decisions
             .iter()
