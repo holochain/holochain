@@ -14,9 +14,6 @@ use holochain_types::prelude::Signal;
 use holochain_types::signal::SystemSignal;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::countersigning::Role;
-use holochain_zome_types::prelude::{
-    ActivityRequest, AgentActivity, ChainQueryFilter, GetAgentActivityInput,
-};
 use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 
@@ -47,32 +44,6 @@ async fn listen_for_countersigning_completion() {
         .unwrap();
 
     await_consistency(30, vec![alice, bob]).await.unwrap();
-
-    // Need chain head for each other, so get agent activity before starting a session
-    let _: AgentActivity = conductors[0]
-        .call_fallible(
-            &alice_zome,
-            "get_agent_activity",
-            GetAgentActivityInput {
-                agent_pubkey: bob.agent_pubkey().clone(),
-                chain_query_filter: ChainQueryFilter::new(),
-                activity_request: ActivityRequest::Full,
-            },
-        )
-        .await
-        .unwrap();
-    let _: AgentActivity = conductors[1]
-        .call_fallible(
-            &bob_zome,
-            "get_agent_activity",
-            GetAgentActivityInput {
-                agent_pubkey: alice.agent_pubkey().clone(),
-                chain_query_filter: ChainQueryFilter::new(),
-                activity_request: ActivityRequest::Full,
-            },
-        )
-        .await
-        .unwrap();
 
     // Set up the session and accept it for both agents
     let preflight_request: PreflightRequest = conductors[0]
