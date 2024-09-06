@@ -228,6 +228,8 @@ pub async fn inner_countersigning_session_incomplete(
             // We are requiring all the authorities to agree, so if we don't have enough responses
             // then we can't make a decision.
             // That is likely to make the resolution process slower, but it's more likely to be correct.
+            // NOTE: at the moment, since we're calling `get_agent_activity` without a target,
+            //       all the responses could have come from the same authority.
             tracing::info!(
                 "Not enough responses to make a decision for agent {:?}. Have {}/{}",
                 agent,
