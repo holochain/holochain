@@ -167,6 +167,43 @@ async fn chain_unlocked_outside_workflow() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn chain_unlocked_outside_workflow_then_restart() {
+    holochain_trace::test_run();
+
+    let dna_hash = fixt!(DnaHash);
+    let mut test_harness = TestHarness::new(dna_hash).await;
+
+    let bob = test_harness.new_remote_agent().await;
+
+    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
+    test_harness
+        .accept_countersigning_request(request)
+        .await
+        .unwrap();
+
+    test_harness.expect_session_accepted();
+    test_harness.expect_chain_locked().await;
+
+    // Simulate what would happen on a failed commit, the chain gets unlocked and the countersigning
+    // workflow must be triggered
+    test_harness.unlock_chain().await;
+
+    // Now simulate a restart, to check that Holochain will still recover even if it loses its state
+    // at this point
+    test_harness.clear_workspace_sessions();
+
+    test_harness.countersigning_tx.trigger(&"test");
+    // The refresh should have nothing to find because the lock is gone and nothing has been committed
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    test_harness.expect_empty_workspace();
+    test_harness.expect_no_pending_signals();
+    test_harness.expect_scheduling_complete();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn discard_session_with_lock_but_no_state() {
     holochain_trace::test_run();
 
