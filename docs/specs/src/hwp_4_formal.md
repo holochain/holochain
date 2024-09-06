@@ -329,17 +329,15 @@ Here is a legend of labels and symbols used in the diagrams:
 * A green slash indicates existing data that has been replaced by an update. A green arrow leads from the update header to the data it replaces.
 * A red X indicates existing data that has been _tombstoned_; that is. it is marked as dead. A red arrow leads from the delete header to the data it tombstones.
 
-\newpage
+![Transformations and state changes produced by `create` action](create_ops.svg){#fig:create_ops width=60%}
 
-![Transformations and state changes produced by `create` action](create_ops.svg){#fig:create_ops width=80%}
+![Transformations and state changes produced by `update` action](update_ops.svg){#fig:update_ops width=60%}
 
-![Transformations and state changes produced by `update` action](update_ops.svg){#fig:update_ops width=80%}
+![Transformations and state changes produced by `delete` action](delete_ops.svg){#fig:delete_ops width=60%}
 
-![Transformations and state changes produced by `delete` action](delete_ops.svg){#fig:delete_ops width=80%}
+![Transformations and state changes produced by `create_link` action](create_link_ops.svg){#fig:create_link_ops width=60%}
 
-![Transformations and state changes produced by `create_link` action](create_link_ops.svg){#fig:create_link_ops width=80%}
-
-![Transformations and state changes produced by `delete_link` action](delete_link_ops.svg){#fig:delete_link_ops width=80%}
+![Transformations and state changes produced by `delete_link` action](delete_link_ops.svg){#fig:delete_link_ops width=60%}
 
 \newpage
 

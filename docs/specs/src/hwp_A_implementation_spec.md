@@ -1,3 +1,4 @@
+\newpage
 \onecolumngrid
 # Appendix A: Holochain Implementation Spec v0.3.0 Beta
 

@@ -375,9 +375,9 @@ $if(csl-refs)$
 $endif$
 \usepackage{etoolbox}
 
-\renewenvironment{figure}{\begin{figure*}[ht]}{\end{figure*}}
-
 \usepackage{svg}
+
+\renewenvironment{figure}{\begin{figure*}}{\end{figure*}}
 
 \usepackage{titlesec}
 \titleformat{\section}{\center\normalfont\large\scshape}{\thesection}{1em}{}
