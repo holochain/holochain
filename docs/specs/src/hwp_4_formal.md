@@ -427,7 +427,7 @@ These message types exist at the lower level.
     * **Broadcast** sends a message of one of the following types:
         * **User** contains arbitrary, application-level data. Here, the application in question is Holochain rather than a specific hApp.
         * **AgentInfo** advertises an agent's current storage arc and network transport addresses.
-        * **Publish** advertises that one or more DHT operations are available for retrieval. An arbitrary **context** value indicates the context in which this publish message is being sent; this value typically indicates that it's being [TODO fill this in]
+        * **Publish** advertises that one or more DHT operations are available for retrieval. An arbitrary **context** value indicates the publishing context, which in practice is a bit field that indicates whether it's being published as part of a countersigning session and whether a validation receipt is needed.
     * **DelegateBroadcast** sends a broadcast, but rather than expecting the receiver to do something with it, it expects them to broacast it in turn to the peers in their DHT neighborhood.
     * **FetchOp** requests the data for one or more DHT operations, usually as a follow-up from receiving a **Publish** broadcast message or **MissingOpHashes** gossip message advertising that such operations are available. While it is strictly a notify-class message, it functions similarly to a request-class message in that it anticipates a response in the form of a **PushOpData** message.
     * **PeerUnsolicited** is similar to **PeerQueryResp** below, but is initiated by a node without being prompted.
