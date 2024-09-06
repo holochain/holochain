@@ -1246,54 +1246,31 @@ While a properly defined and implemented Holochain system must necessarily be ro
 
 Hence, we must define an **ontology of workflows**. A Workflow is defined ontologically as a process which:
 
-1. Accesses and potentially transforms a store of cryptographic state,
+1. Accesses and potentially transforms Holochain state,
 2. Receives an ephemeral input context necessary to do its job,
 3. Optionally triggers other workflows to follow up on the newly transformed state, potentially including another iteration of itself, and
 3. Optionally returns a value which can be passed to a waiting receiver.
 
 It is important to note that Workflows are reifications of the inherent physics of Holochain; that is, the concept of a Workflow is demanded by the kinds of state changes a Holochain implementation is expected to make.
 
-The three properties which hold for all Workflows are:
+The properties which hold for all Workflows are:
 
-* A Workflow MUST operate only on a local state store, and SHOULD NOT make assumptions about the value of a state store it does not operate on, whether local or remote.
+* A Workflow MUST operate only on an aspect of local Holochain state, and MUST NOT make assumptions about the value of any aspects of Holochain state it does not operate on, whether local or remote.
 * A Workflow MUST NOT leave the state it operates on in a corrupt condition it fails for any reason, whether the failure is expected (such as validation failure) or unexpected (such as hardware malfunction). This means that it MUST either make an atomic and valid state change or make no state change at all.
-    * Corollary: a Workflow MUST treat the cryptographic state upon which it operates as the ultimate source of truth about itself, which means that any other state it builds up during execution MUST be treated as incidental and disposable; that is, it MUST able to successfully recover from a failure and correctly transform cryptographic state even if incidental state is lost.
+    * Corollary: a Workflow MUST treat the Holochain state upon which it operates as the ultimate source of truth about itself, which means that any other state it builds up during execution MUST be treated as incidental and disposable; that is, it MUST able to successfully recover from a failure and correctly transform cryptographic state even if incidental state is lost.
 * A Workflow MUST have direct access to the state it is manipulating so that it may observe it immediately before transforming it, to avoid race conditions between Workflows that operate on the same state.
-
-Various Workflows also have combinations of the following properties:
-
-* A Workflow SHOULD operate on only one state store. [WP-TODO: MUST, SHOULD, or not true?]
-* If a Workflow operates on a contentious state, it MUST either:
+* A Workflow MUST operate on only one aspect of Holochain state, an aspect being defined as a portion of state which can be changed independently of other aspects.
+* A change to Holochain state MUST be expressed monotonically. (This is merely a restatement of the fact that all changes of Holochain state are by nature monotonic.)
+* If a Workflow operates on a contentious aspect of state, it MUST either:
     * Be a singleton (that is, only one instance of the Workflow is permitted to run at any time), or
-    * Be permitted to run concurrently with another instance of itself and :
-        1. Take a snapshot of the current value of the state store when it begins to build a state change to be written,
-        2. Check the current value of the state store immediately before attempting to write a change, and
-        3. Discard its attempted state change if the value of the state store has changed since the snapshot.
-* If a Workflow operates on a queue or pool of work to be done, such as DHT operations waiting to be validated, and the queue or pool is not emptied due to a condition on which it depends being unsatisifed, it MAY trigger another instance of itself and SHOULD wait for an appropriate period of time for the condition to be satisifed before doing so.
-* A Workflow SHOULD monotonically advance the state on which it operates, although there are certain state stores that it is required to non-monotonically change. [WP-TODO: are there any non-monotonic state changes?]
+    * Be permitted to run concurrently with another instance of itself and:
+        1. Take a snapshot of the current value of the state when it begins to build a state change to be written,
+        2. Check the current value of the state immediately before attempting to write a change, and
+        3. Discard its attempted state change if the value of the state is now different from the snapshot.
 
-We intend to publish an addendum which enumerates the necessary workflows, the states upon which they operate, and the ways in which they operate. In the meantime, the following diagram is a simplified view of them.
+We intend to publish an addendum which enumerates the necessary workflows, the aspects of Holochain state upon which they operate, and the ways in which they operate. In the meantime, the following diagram is a simplified overview.
 
 ![](workflows.png)
-
-### Storage Types
-
-[WP-TODO:
-
-* Is this the right level/format to talk about the kinds of stores that are maintained?
-* And are any of them not really persistent cryptographic state? Looking at `ConductorState` which must prevent identical cells from being created but doesn't actually have a workflow.
-* Are any things missing from this list? I intentionally left off scheduling because it's disposable]
-
-An implementation MUST be able to manage the peristent state of the following data elements:
-
-* `AgentInfo`: Information about a peer in the peer table
-* `DhtOp`: a DHT transform and its hash, dependencies (entries, actions, and contiguous source chain records referenced by hash), validation status and stage, integration, and last published timestamps
-* `Record`: an Action and Entry pair
-* `SignedValidationReceipt`: a proof-of-validation receipt from another node regarding a Record
-* `Warrant`: a proof of invalid action about an Agent.
-* `DnaWasm`: the WASM code of a DNA
-* `DnaDef`: the modifiers that get hashed along with a DNA to create the hash of a specific application instance
-* `ConductorState`: the state of all agent keys and DNAs that the Conductor manages, and the cells from which they are instantiated.
 
 ## Shared Data (rrDHT)
 
