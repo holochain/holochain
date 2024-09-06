@@ -1,0 +1,6 @@
+input-files: ['test/input-no-alt-or-caption.md']
+filters:
+  - diagram.lua
+to: html
+metadata:
+  pagetitle: dot diagram

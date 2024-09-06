@@ -1,0 +1,12 @@
+input-files: ['test/input-dot.md']
+filters:
+  - diagram.lua
+to: html
+metadata:
+  pagetitle: dot diagram
+  diagram:
+    cache: false
+    engine:
+      dot: true
+variables:
+  document-css: false

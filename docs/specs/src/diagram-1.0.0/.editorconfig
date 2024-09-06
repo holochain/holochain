@@ -1,0 +1,25 @@
+# EditorConfig helps developers define and maintain consistent
+# coding styles between different editors and IDEs
+# editorconfig.org
+
+root = true
+
+[*]
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[Makefile]
+indent_style = tab
+
+[*.lua]
+indent_style = space
+indent_size = 2
+# Code should stay below 80 characters per line.
+max_line_length = 80
+
+[*.md]
+# Text with 60 to 66 characters per line is said to be the easiest
+# to read.
+max_line_length = 66

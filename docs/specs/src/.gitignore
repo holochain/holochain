@@ -1,4 +1,5 @@
 !*.svg
+media/*
 *.fdb_latexmk
 *.synctex.gz
 *.pdf

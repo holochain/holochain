@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  # Run on all pull requests that change code.
+  pull_request:
+    paths-ignore:
+      - 'README.md'
+      - LICENSE
+      - .editorconfig
+  # Run every time a code change is pushed.
+  push:
+    paths-ignore:
+      - 'README.md'
+      - LICENSE
+      - .editorconfig
+  # Test if things still work each Tuesday morning.
+  # This way we will catch incompatible pandoc changes in a timely
+  # manner.
+  schedule:
+    # At 4:27am each Tuesday
+    - cron: '27 4 * * 2'
+
+jobs:
+  Asymptote:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        pandoc:
+          - latest
+
+    container:
+      image: pandoc/latex:${{ matrix.pandoc }}-ubuntu
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          apt-get -q --no-allow-insecure-repositories update && \
+          apt-get install --no-install-recommends --assume-yes \
+            make inkscape asymptote
+
+      - name: Test
+        run: 'make test-asymptote'
+
+  GraphViz:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        pandoc:
+          - latest
+
+    container:
+      image: pandoc/core:${{ matrix.pandoc }}-ubuntu
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          apt-get -q --no-allow-insecure-repositories update && \
+          apt-get install --no-install-recommends --assume-yes \
+            make graphviz
+
+      - name: Test
+        run: 'make test-dot test-no-alt-or-caption'
+
+  Mermaid:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        pandoc:
+          - latest
+
+    container:
+      image: pandoc/core:${{ matrix.pandoc }}
+
+    env:
+      MERMAID_BIN: /usr/local/bin/mmdc-test
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium-browser
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        ## We need a little hack to get puppeteer working in the container.
+        run: |
+          apk update && apk add chromium chromium-chromedriver make npm
+          npm install -g @mermaid-js/mermaid-cli
+          printf '{"args":["--no-sandbox","--disable-setuid-sandbox"]}' > \
+              /etc/puppeteer-conf.json
+          printf '#!/bin/sh\nmmdc -p /etc/puppeteer-conf.json $@' > $MERMAID_BIN
+          chmod +x $MERMAID_BIN
+
+      - name: Test
+        run: 'make test-mermaid'
+
+  PlantUML:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        pandoc:
+          - edge
+          - latest
+          # The oldest version that's guaranteed to be supported
+          - '3.0'
+
+    container:
+      image: pandoc/core:${{ matrix.pandoc }}-ubuntu
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          apt-get -q --no-allow-insecure-repositories update && \
+          apt-get install --no-install-recommends --assume-yes \
+            make plantuml
+
+      - name: Test
+        run: make test-plantuml
+
+  TikZ:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        pandoc:
+          - latest
+
+    container:
+      image: pandoc/latex:${{ matrix.pandoc }}-ubuntu
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          tlmgr install pgf standalone
+          apt-get -q --no-allow-insecure-repositories update && \
+          apt-get install --no-install-recommends --assume-yes \
+            make inkscape
+
+      - name: Test
+        run: 'make test-tikz'

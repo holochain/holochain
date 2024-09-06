@@ -1,0 +1,10 @@
+input-files: ['test/input-mermaid.md']
+filters:
+  - diagram.lua
+to: html
+metadata:
+  pagetitle: Mermaid diagram
+  diagram:
+    cache: false
+variables:
+  document-css: false
