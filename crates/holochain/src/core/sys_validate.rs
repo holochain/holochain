@@ -110,6 +110,7 @@ pub async fn check_countersigning_preflight_response_signature(
         .signing_agents
         .get(*preflight_response.agent_state().agent_index() as usize)
         .ok_or_else(|| {
+            tracing::info!("Agent index out of bounds");
             SysValidationError::ValidationOutcome(ValidationOutcome::PreflightResponseSignature(
                 (*preflight_response).clone(),
             ))
@@ -120,6 +121,7 @@ pub async fn check_countersigning_preflight_response_signature(
             preflight_response
                 .encode_for_signature()
                 .map_err(|_| {
+                    tracing::info!("Failed to encode preflight response for signature");
                     SysValidationError::ValidationOutcome(
                         ValidationOutcome::PreflightResponseSignature(
                             (*preflight_response).clone(),
@@ -132,6 +134,7 @@ pub async fn check_countersigning_preflight_response_signature(
     if signature_is_valid {
         Ok(())
     } else {
+        tracing::info!("Invalid signature on preflight response");
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::PreflightResponseSignature((*preflight_response).clone()),
         ))
