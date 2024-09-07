@@ -376,7 +376,7 @@ impl RealRibosome {
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    pub async fn runtime_compiled_module(
+    pub async fn build_module(
         &self,
         zome_name: &ZomeName,
     ) -> RibosomeResult<Arc<Module>> {
@@ -396,7 +396,7 @@ impl RealRibosome {
     }
 
     #[cfg(feature = "wasmer_sys")]
-    pub fn preserialized_module(&self, path: &PathBuf) -> RibosomeResult<Arc<Module>> {
+    pub fn prebuilt_module(&self, path: &PathBuf) -> RibosomeResult<Arc<Module>> {
         let module = holochain_wasmer_host::module::get_ios_module_from_file(path)?;
         Ok(Arc::new(module))
     }
@@ -418,9 +418,9 @@ impl RealRibosome {
         match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
                 if let Some(path) = get_preserialized_path(wasm_zome) {
-                    self.preserialized_module(path)
+                    self.prebuilt_module(path)
                 } else {
-                    self.runtime_compiled_module(zome.zome_name()).await
+                    self.build_module(zome.zome_name()).await
                 }
             }
             _ => RibosomeResult::Err(RibosomeError::DnaError(DnaError::ZomeError(
@@ -926,10 +926,10 @@ impl RibosomeT for RealRibosome {
                 match zome.zome_def() {
                     ZomeDef::Wasm(wasm_zome) => {
                         let module = if let Some(path) = get_preserialized_path(wasm_zome) {
-                            self.preserialized_module(path)?
+                            self.prebuilt_module(path)?
                         } else {
                             tokio_helper::block_forever_on(
-                                self.runtime_compiled_module(zome.zome_name()),
+                                self.build_module(zome.zome_name()),
                             )?
                         };
                         self.get_extern_fns_for_wasm(module.clone())
