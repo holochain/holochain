@@ -59,10 +59,12 @@ pub enum HcDnaBundleSubcommand {
         #[arg(short = 'o', long)]
         output: Option<PathBuf>,
 
-        /// Output shared object "dylib" files
-        /// that can be used to run this happ on iOS
+        /// Output pre-compiled and serialized wasm module as "dylib" file
+        /// that can be included in contexts where JIT compiliation is not allowed (iOS apps for example)
+        /// or to avoid the performance costs of wasm compilation at runtime.
+        /// This requires the feature flag `wasmer_sys`.
         #[arg(long)]
-        dylib_ios: bool,
+        precompile: bool,
     },
 
     /// Unpack parts of the `.dna` bundle file into a specific directory.
@@ -304,11 +306,11 @@ impl HcDnaBundleSubcommand {
             Self::Pack {
                 path,
                 output,
-                dylib_ios,
+                precompile,
             } => {
                 let name = get_dna_name(&path).await?;
                 let (bundle_path, _) =
-                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name, dylib_ios)
+                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name, precompile)
                         .await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
@@ -532,7 +534,7 @@ pub async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()
         HcDnaBundleSubcommand::Pack {
             path: dna_workdir_location,
             output: None,
-            dylib_ios: false,
+            precompile: false,
         }
         .run()
         .await?;

@@ -86,7 +86,7 @@ pub async fn pack<M: Manifest>(
     dir_path: &std::path::Path,
     target_path: Option<PathBuf>,
     name: String,
-    serialize_wasm: bool,
+    precompile: bool,
 ) -> HcBundleResult<(PathBuf, Bundle<M>)> {
     let dir_path = ffs::canonicalize(dir_path).await?;
     let manifest_path = dir_path.join(M::path());
@@ -102,8 +102,8 @@ pub async fn pack<M: Manifest>(
         None => dir_to_bundle_path(&dir_path, name, M::bundle_extension())?,
     };
     bundle.write_to_file(&target_path).await?;
-    if serialize_wasm {
-        build_preserialized_wasm(&target_path, &bundle).await?;
+    if prebuild {
+        precompile_wasm(&target_path, &bundle).await?;
     }
 
     Ok((target_path, bundle))

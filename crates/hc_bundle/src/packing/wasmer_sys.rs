@@ -7,7 +7,7 @@ use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use tracing::info;
 
-pub(super) async fn build_preserialized_wasm<M: Manifest>(
+pub(super) async fn precompile_wasm<M: Manifest>(
     target_path: &Path,
     bundle: &Bundle<M>,
 ) -> Result<(), HcBundleError> {
@@ -19,8 +19,8 @@ pub(super) async fn build_preserialized_wasm<M: Manifest>(
             |(relative_path, bytes)| async move {
                 // only pre-serialize wasm resources
                 if relative_path.extension() == Some(std::ffi::OsStr::new("wasm")) {
-                    let ios_folder_path = target_path_folder.join("ios");
-                    let mut resource_path_adjoined = ios_folder_path.join(
+                    let output_folder_path = target_path_folder.join("precompiled_wasms");
+                    let mut resource_path_adjoined = output_folder_path.join(
                         relative_path
                             .file_name()
                             .expect("wasm resource should have a filename"),
@@ -28,7 +28,7 @@ pub(super) async fn build_preserialized_wasm<M: Manifest>(
                     // see this code for rationale
                     // https://github.com/wasmerio/wasmer/blob/447c2e3a152438db67be9ef649327fabcad6f5b8/lib/engine-dylib/src/artifact.rs#L722-L756
                     resource_path_adjoined.set_extension("dylib");
-                    ffs::create_dir_all(ios_folder_path).await?;
+                    ffs::create_dir_all(output_folder_path).await?;
                     ffs::write(&resource_path_adjoined, vec![].as_slice()).await?;
                     let resource_path = ffs::canonicalize(resource_path_adjoined).await?;
                     match build_ios_module(bytes.as_slice()) {

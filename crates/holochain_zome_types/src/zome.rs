@@ -155,10 +155,11 @@ pub struct WasmZome {
     /// The zome dependencies
     pub dependencies: Vec<ZomeName>,
 
-    /// The path to a preserialized wasmer module used as a "dynamic library" (dylib).
-    /// Useful for iOS and other targets.
+    /// The path to a pre-compliled and seriailized wasmer module used as a "dynamic library" (dylib).
+    /// Useful in contexts where JIT compilation is not allowed (i.e. iOS apps),
+    /// or to avoid the performance cost of compilation at runtime.
     #[serde(default)]
-    pub preserialized_path: Option<PathBuf>,
+    pub precompiled_path: Option<PathBuf>,
 }
 
 /// Just the definition of a Zome, without the name included. This exists
