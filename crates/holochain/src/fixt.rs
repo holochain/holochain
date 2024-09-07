@@ -71,7 +71,7 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
             let mut call_context = CallContextFixturator::new(Empty).next().unwrap();
             call_context.zome = CoordinatorZome::from(zome).erase_type();
             tokio_helper::block_forever_on(
-                ribosome.runtime_compiled_module(call_context.zome.zome_name()),
+                ribosome.build_module(call_context.zome.zome_name()),
             )
             .unwrap();
         }
