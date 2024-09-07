@@ -45,15 +45,17 @@ build-workspace-wasmer_sys:
 	$(F) cargo build \
 		--workspace \
 		--locked \
+		--all-targets \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES),wasmer_sys --all-targets
+		--features $(DEFAULT_FEATURES),wasmer_sys
 
 build-workspace-wasmer_wamr:
 	$(F) cargo build \
 		--workspace \
 		--locked \
+		--all-targets \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES),wasmer_wamr --all-targets
+		--features $(DEFAULT_FEATURES),wasmer_wamr
 
 # execute tests on all creates
 test-workspace-wasmer_sys:
@@ -61,6 +63,7 @@ test-workspace-wasmer_sys:
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
+		--all-targets \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
 
@@ -69,5 +72,6 @@ test-workspace-wasmer_wamr:
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
+		--all-targets \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
