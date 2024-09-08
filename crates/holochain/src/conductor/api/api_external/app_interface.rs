@@ -101,14 +101,14 @@ impl AppInterfaceApi {
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }
-            AppRequest::GetCountersigningSessionState(payload) => {
+            AppRequest::GetCounterSigningSessionState(payload) => {
                 let countersigning_session_state = self
                     .conductor_handle
                     .clone()
                     .get_countersigning_session_state(*payload)
                     .await?;
                 println!("session_state {countersigning_session_state:?}");
-                Ok(AppResponse::CountersigningSessionState(Box::new(
+                Ok(AppResponse::CounterSigningSessionState(Box::new(
                     countersigning_session_state,
                 )))
             }

@@ -32,7 +32,6 @@ use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::InterfaceDriver;
 use matches::assert_matches;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::time::Duration;
 use std::{path::PathBuf, process::Stdio};
@@ -63,6 +62,55 @@ impl Drop for SupervisedChild {
                 .unwrap_or_else(|_| panic!("Failed to kill {}", self.0));
         });
     }
+}
+
+pub async fn start_local_services() -> (
+    SupervisedChild,
+    tokio::sync::oneshot::Receiver<String>,
+    tokio::sync::oneshot::Receiver<String>,
+) {
+    tracing::info!("\n----\nstarting local bootstrap server\n----\n");
+    let cmd = std::process::Command::cargo_bin("hc-run-local-services").unwrap();
+    let mut cmd = Command::from(cmd);
+    cmd.stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    let mut child = cmd.spawn().expect("Failed to spawn local services");
+    let (tx_bootstrap, rx_bootstrap) = tokio::sync::oneshot::channel();
+    let (tx_signal, rx_signal) = tokio::sync::oneshot::channel();
+    if let Some(stdout) = child.stdout.take() {
+        let mut tx_bootstrap = Some(tx_bootstrap);
+        let mut tx_signal = Some(tx_signal);
+        tokio::spawn(async move {
+            let mut reader = BufReader::new(stdout).lines();
+            while let Ok(Some(line)) = reader.next_line().await {
+                println!("hc local services stdout: {line}");
+                if let Some(addr) = line.strip_prefix("# HC BOOTSTRAP - ADDR: ") {
+                    if let Some(sender) = tx_bootstrap.take() {
+                        let _ = sender.send(addr.to_string());
+                    }
+                }
+                if let Some(addr) = line.strip_prefix("# HC SIGNAL - ADDR: ") {
+                    if let Some(sender) = tx_signal.take() {
+                        let _ = sender.send(addr.to_string());
+                    }
+                }
+            }
+        });
+    }
+    if let Some(stderr) = child.stderr.take() {
+        tokio::task::spawn(async move {
+            let mut reader = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = reader.next_line().await {
+                eprintln!("hc local services stderr: {line}");
+            }
+        });
+    }
+    (
+        SupervisedChild("Local Holochain Services".to_string(), child),
+        rx_bootstrap,
+        rx_signal,
+    )
 }
 
 pub async fn start_holochain(
@@ -119,7 +167,7 @@ pub async fn grant_zome_call_capability(
     Ok(cap_secret)
 }
 
-pub async fn call_zome_fn<I>(
+pub async fn call_zome_fn_fallible<I>(
     app_tx: &WebsocketSender,
     cell_id: CellId,
     signing_keypair: &SigningKey,
@@ -127,7 +175,7 @@ pub async fn call_zome_fn<I>(
     zome_name: ZomeName,
     fn_name: FunctionName,
     input: &I,
-) -> ExternIO
+) -> AppResponse
 where
     I: Serialize + std::fmt::Debug,
 {
@@ -157,10 +205,34 @@ where
     };
     let request = AppRequest::CallZome(Box::new(call));
     let response = app_tx.request(request);
-    let call_response = check_timeout(response, 6000).await.unwrap();
+    check_timeout(response, 6000).await.unwrap()
+}
+
+pub async fn call_zome_fn<I>(
+    app_tx: &WebsocketSender,
+    cell_id: CellId,
+    signing_keypair: &SigningKey,
+    cap_secret: CapSecret,
+    zome_name: ZomeName,
+    fn_name: FunctionName,
+    input: &I,
+) -> ExternIO
+where
+    I: Serialize + std::fmt::Debug,
+{
+    let call_response = call_zome_fn_fallible(
+        app_tx,
+        cell_id,
+        signing_keypair,
+        cap_secret,
+        zome_name,
+        fn_name,
+        input,
+    )
+    .await;
     match call_response {
         AppResponse::ZomeCalled(response) => *response,
-        _ => panic!("unexpected zome call response"),
+        _ => panic!("zome call failed {call_response:?}"),
     }
 }
 
