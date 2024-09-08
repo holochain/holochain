@@ -2542,7 +2542,7 @@ mod app_status_impls {
 
 /// Methods related to management of Conductor state
 mod service_impls {
-
+    use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::LairEntryInfo;
     use super::*;
 
     impl Conductor {
@@ -2601,17 +2601,33 @@ mod service_impls {
             let derivation_path = [0].into();
             let dst_tag = format!("{device_seed_lair_tag}.0");
 
-            let seed_info = self
-                .keystore()
-                .lair_client()
-                .derive_seed(
-                    device_seed_lair_tag.clone().into(),
-                    None,
-                    dst_tag.into(),
-                    None,
-                    derivation_path,
-                )
-                .await?;
+            let entry_info = self.keystore().lair_client().get_entry(dst_tag.clone().into()).await;
+            let seed_info = match entry_info {
+                Ok(LairEntryInfo::Seed { seed_info, .. }) => {
+                    // If the seed already exists, we don't need to create it again.
+                    seed_info
+                }
+                Ok(_) => {
+                    return Err(ConductorError::other(
+                        "DPKI could not be installed because the device seed points to an entry in lair that is not a seed.",
+                    ));
+                }
+                // Errors on not found, so try to create the seed and if that fails because there's
+                // some issue connecting to Lair then we'll get the error from trying to derive the seed.
+                Err(_) => {
+                    self
+                        .keystore()
+                        .lair_client()
+                        .derive_seed(
+                            device_seed_lair_tag.clone().into(),
+                            None,
+                            dst_tag.into(),
+                            None,
+                            derivation_path,
+                        )
+                        .await?
+                }
+            };
 
             // The initial agent key is the first derivation from the device seed.
             // Updated DPKI agent keys are sequential derivations from the same device seed.
