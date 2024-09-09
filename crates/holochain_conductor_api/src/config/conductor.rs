@@ -383,7 +383,7 @@ mod tests {
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
                 danger_generate_throwaway_device_seed: false,
-                dpki: DpkiConfig::new(Some("path/to/dna.dna".into())),
+                dpki: DpkiConfig::new_production(Some("path/to/dna.dna".into())),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket {

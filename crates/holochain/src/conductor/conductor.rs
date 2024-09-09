@@ -1452,9 +1452,10 @@ mod app_impls {
             installed_app_id: InstalledAppId,
             agent: Option<AgentPubKey>,
             data: &[(impl DnaWithRole, Option<MembraneProof>)],
+            network_seed: Option<NetworkSeed>,
         ) -> ConductorResult<AgentPubKey> {
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
-            let manifest = app_manifest_from_dnas(&dnas_with_roles, 255, false);
+            let manifest = app_manifest_from_dnas(&dnas_with_roles, 255, false, network_seed);
 
             let (dnas_to_register, role_assignments): (Vec<_>, Vec<_>) = data
                 .iter()
@@ -2678,7 +2679,12 @@ your agent keys if you lose access to your device. This is not recommended!!)
             let cell_id = CellId::new(dna_hash.clone(), agent.clone());
 
             self.clone()
-                .install_app_minimal(DPKI_APP_ID.into(), Some(agent), &[(dna, None)])
+                .install_app_minimal(
+                    DPKI_APP_ID.into(),
+                    Some(agent),
+                    &[(dna, None)],
+                    Some(config.dpki.network_seed.clone()),
+                )
                 .await?;
 
             // In multi-conductor tests, we often want to delay enabling DPKI until all conductors
@@ -3813,13 +3819,15 @@ pub fn app_manifest_from_dnas(
     dnas_with_roles: &[impl DnaWithRole],
     clone_limit: u32,
     memproofs_deferred: bool,
+    network_seed: Option<String>,
 ) -> AppManifest {
     let roles: Vec<_> = dnas_with_roles
         .iter()
         .map(|dr| {
             let dna = dr.dna();
             let path = PathBuf::from(format!("{}", dna.dna_hash()));
-            let modifiers = DnaModifiersOpt::none();
+            let mut modifiers = DnaModifiersOpt::none();
+            modifiers.network_seed = network_seed.clone();
             AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {

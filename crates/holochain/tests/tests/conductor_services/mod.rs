@@ -9,7 +9,7 @@ async fn initialize_dpki() {
     holochain_trace::test_run();
 
     let mut config = SweetConductorConfig::standard();
-    config.dpki = DpkiConfig::new(None);
+    config.dpki = DpkiConfig::new_production(None);
     let mut conductor = SweetConductor::from_config(config).await;
 
     assert!(conductor.running_services().dpki.is_some());

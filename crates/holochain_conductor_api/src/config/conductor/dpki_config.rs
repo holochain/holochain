@@ -14,6 +14,11 @@ pub struct DpkiConfig {
     /// Defaults to the built-in Deepkey DNA from the holochain_deepkey_dna crate.
     pub dna_path: Option<PathBuf>,
 
+    /// DPKI is always installed with a network seed. For tests, a random seed
+    /// should be used, and for the real DPKI network, the known seed specified in
+    /// [`DpkiConfig::new`] should be used.
+    pub network_seed: String,
+
     /// Allow the DPKI agent key to be generated randomly in the absence of a
     /// [`ConductorConfig::device_seed_lair_tag`] setting. This is useful in test
     /// environments where the device seed is not set and key regeneration is not
@@ -28,9 +33,10 @@ pub struct DpkiConfig {
 }
 
 impl DpkiConfig {
-    pub fn new(dna_path: Option<PathBuf>) -> Self {
+    pub fn new_production(dna_path: Option<PathBuf>) -> Self {
         Self {
             dna_path,
+            network_seed: "deepkey-main".to_string(),
             allow_throwaway_random_dpki_agent_key: false,
             no_dpki: false,
         }
@@ -39,6 +45,7 @@ impl DpkiConfig {
     pub fn test() -> Self {
         Self {
             dna_path: None,
+            network_seed: nanoid::nanoid!(),
             allow_throwaway_random_dpki_agent_key: true,
             no_dpki: false,
         }
@@ -47,6 +54,7 @@ impl DpkiConfig {
     pub fn disabled() -> Self {
         Self {
             dna_path: None,
+            network_seed: "".to_string(),
             allow_throwaway_random_dpki_agent_key: false,
             no_dpki: true,
         }
@@ -55,6 +63,6 @@ impl DpkiConfig {
 
 impl Default for DpkiConfig {
     fn default() -> Self {
-        DpkiConfig::new(None)
+        DpkiConfig::new_production(None)
     }
 }
