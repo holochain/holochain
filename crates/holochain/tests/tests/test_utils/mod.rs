@@ -78,34 +78,32 @@ pub async fn start_local_services() -> (
     let mut child = cmd.spawn().expect("Failed to spawn local services");
     let (tx_bootstrap, rx_bootstrap) = tokio::sync::oneshot::channel();
     let (tx_signal, rx_signal) = tokio::sync::oneshot::channel();
-    if let Some(stdout) = child.stdout.take() {
-        let mut tx_bootstrap = Some(tx_bootstrap);
-        let mut tx_signal = Some(tx_signal);
-        tokio::spawn(async move {
-            let mut reader = BufReader::new(stdout).lines();
-            while let Ok(Some(line)) = reader.next_line().await {
-                println!("hc local services stdout: {line}");
-                if let Some(addr) = line.strip_prefix("# HC BOOTSTRAP - ADDR: ") {
-                    if let Some(sender) = tx_bootstrap.take() {
-                        let _ = sender.send(addr.to_string());
-                    }
-                }
-                if let Some(addr) = line.strip_prefix("# HC SIGNAL - ADDR: ") {
-                    if let Some(sender) = tx_signal.take() {
-                        let _ = sender.send(addr.to_string());
-                    }
+    let stdout = child.stdout.take().unwrap();
+    let mut tx_bootstrap = Some(tx_bootstrap);
+    let mut tx_signal = Some(tx_signal);
+    tokio::spawn(async move {
+        let mut reader = BufReader::new(stdout).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            println!("hc local services stdout: {line}");
+            if let Some(addr) = line.strip_prefix("# HC BOOTSTRAP - ADDR: ") {
+                if let Some(sender) = tx_bootstrap.take() {
+                    let _ = sender.send(addr.to_string());
                 }
             }
-        });
-    }
-    if let Some(stderr) = child.stderr.take() {
-        tokio::task::spawn(async move {
-            let mut reader = BufReader::new(stderr).lines();
-            while let Ok(Some(line)) = reader.next_line().await {
-                eprintln!("hc local services stderr: {line}");
+            if let Some(addr) = line.strip_prefix("# HC SIGNAL - ADDR: ") {
+                if let Some(sender) = tx_signal.take() {
+                    let _ = sender.send(addr.to_string());
+                }
             }
-        });
-    }
+        }
+    });
+    let stderr = child.stderr.take().unwrap();
+    tokio::task::spawn(async move {
+        let mut reader = BufReader::new(stderr).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            eprintln!("hc local services stderr: {line}");
+        }
+    });
     (
         SupervisedChild("Local Holochain Services".to_string(), child),
         rx_bootstrap,
@@ -372,33 +370,26 @@ pub async fn register_and_install_dna_named(
 }
 
 pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16> {
-    let stdout = holochain.stdout.take();
-    let stderr = holochain.stderr.take();
+    let stdout = holochain.stdout.take().unwrap();
+    let stderr = holochain.stderr.take().unwrap();
     let (tx, rx) = tokio::sync::oneshot::channel();
+    // Wrap in an Option because it is used in a loop and cannot be cloned.
     let mut tx = Some(tx);
     tokio::task::spawn(async move {
-        if let Some(stdout) = stdout {
-            let mut reader = BufReader::new(stdout).lines();
-            while let Ok(Some(line)) = reader.next_line().await {
-                println!("holochain bin stdout: {}", &line);
-                tx = tx
-                    .take()
-                    .and_then(|tx| match check_line_for_admin_port(&line) {
-                        Some(port) => {
-                            let _ = tx.send(port);
-                            None
-                        }
-                        None => Some(tx),
-                    });
+        let mut reader = BufReader::new(stdout).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            println!("holochain bin stdout: {}", &line);
+            if let Some(port) = check_line_for_admin_port(&line) {
+                if let Some(tx) = tx.take() {
+                    let _ = tx.send(port);
+                }
             }
         }
     });
     tokio::task::spawn(async move {
-        if let Some(stderr) = stderr {
-            let mut reader = BufReader::new(stderr).lines();
-            while let Ok(Some(line)) = reader.next_line().await {
-                eprintln!("holochain bin stderr: {}", &line);
-            }
+        let mut reader = BufReader::new(stderr).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            eprintln!("holochain bin stderr: {}", &line);
         }
     });
     rx
