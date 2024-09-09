@@ -3,7 +3,10 @@ use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest};
 use holochain_types::app::InstalledAppId;
 use holochain_types::prelude::{SerializedBytes, SerializedBytesError};
-use holochain_websocket::{self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult, WebsocketSender};
+use holochain_websocket::{
+    self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
+    WebsocketSender,
+};
 use matches::assert_matches;
 use std::future::Future;
 use std::net::ToSocketAddrs;
