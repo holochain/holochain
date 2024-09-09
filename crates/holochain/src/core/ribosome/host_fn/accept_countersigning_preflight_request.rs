@@ -292,7 +292,7 @@ pub mod wasm_test {
         );
 
         // @TODO - the following all pass but perhaps we do NOT want them to?
-        // @TODO updated: You can no longer get these entries after the session has expired but.
+        // @TODO updated: You can no longer get these entries after the session has expired but
         //       this comment is still relevant during the session, once a commit has been done
         //       and before the session has timed out.
         // It's not immediately clear what direct requests by hash should do in all cases here.
