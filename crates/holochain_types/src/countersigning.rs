@@ -9,35 +9,48 @@ use kitsune_p2p_dht::op::Timestamp;
 use serde::{Deserialize, Serialize};
 
 /// State and data of an ongoing countersigning session.
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum CounterSigningSessionState {
+pub enum CountersigningSessionState {
     /// This is the entry state. Accepting a countersigning session through the HDK will immediately
     /// register the countersigning session in this state, for management by the countersigning workflow.
+    ///
+    /// The session will stay in this state even when the agent commits their countersigning entry and only
+    /// move to the next state when the first signature bundle is received.
     Accepted(PreflightRequest),
     /// This is the state where we have collected one or more signatures for a countersigning session.
     ///
-    /// This state can be entered from the [CountersigningSessionState::Accepted] state, which happens when a witness returns a
-    /// signature bundle to us. While the session has not timed out, we will stay in this state and
-    /// wait until one of the signatures bundles we have received is valid for the session to be
-    /// completed.
+    /// This state can be entered from the [CountersigningSessionState::Accepted] state, which happens
+    /// when a witness returns a signature bundle to us. While the session has not timed out, we will
+    /// stay in this state and wait until one of the signatures bundles we have received is valid for
+    /// the session to be completed.
+    ///
+    /// If we entered this state from the [CountersigningSessionState::Accepted] state, we will either
+    /// complete the session successfully or the session will time out and be abandoned.
     ///
     /// This state can also be entered from the [CountersigningSessionState::Unknown] state, which happens when we
     /// have been able to recover the session from the source chain and have requested signed actions
     /// from agent authorities to build a signature bundle.
     ///
-    /// From this state we either complete the session successfully, or we transition to the [CountersigningSessionState::Unknown]
-    /// state if we are unable to complete the session.
+    /// If we entered this state from the [CountersigningSessionState::Unknown] state, we will either
+    /// complete the session successfully, or if the signatures are invalid, we will return to the
+    /// [CountersigningSessionState::Unknown] state.
     SignaturesCollected {
         /// The preflight request that has been exchanged.
         preflight_request: PreflightRequest,
-        /// Multiple responses in the outer vec, sets of responses in the inner vec.
+        /// Multiple responses in the outer vec, sets of responses in the inner vec
         signature_bundles: Vec<Vec<SignedAction>>,
+        /// This field is set when the signature bundle came from querying agent activity authorities
+        /// in the unknown state. If we started from that state, we should return to it if the
+        /// signature bundle is invalid. Otherwise, stay in this state and wait for more signatures.
+        resolution: Option<SessionResolutionSummary>,
     },
     /// The session is in an unknown state and needs to be resolved.
     ///
-    /// In most cases, we do know how we got into this state, but we treat it as unknown because
-    /// we want to always go through the same checks when leaving a countersigning session in any
-    /// way that is not a successful completion.
+    /// This state is used when we have lost track of the countersigning session. This happens if
+    /// we have got far enough to create the countersigning entry but have crashed or restarted
+    /// before we could complete the session. In this case we need to try to discover what the other
+    /// agent or agents involved in the session have done.
     ///
     /// Note that because the [PreflightRequest] is stored here, we only ever enter the unknown state
     /// if we managed to keep the preflight request in memory, or if we have been able to recover it
@@ -47,21 +60,20 @@ pub enum CounterSigningSessionState {
     Unknown {
         /// The preflight request that has been exchanged.
         preflight_request: PreflightRequest,
-        /// Summary of the resolution of this session.
-        #[allow(dead_code)]
+        /// Summary of the attempts to resolve this session.
         resolution: Option<SessionResolutionSummary>,
     },
 }
 
-impl CounterSigningSessionState {
+impl CountersigningSessionState {
     /// Get app entry hash from preflight request.
     pub fn session_app_entry_hash(&self) -> &EntryHash {
         let request = match self {
-            CounterSigningSessionState::Accepted(request) => request,
-            CounterSigningSessionState::SignaturesCollected {
+            CountersigningSessionState::Accepted(request) => request,
+            CountersigningSessionState::SignaturesCollected {
                 preflight_request, ..
             } => preflight_request,
-            CounterSigningSessionState::Unknown {
+            CountersigningSessionState::Unknown {
                 preflight_request, ..
             } => preflight_request,
         };
@@ -81,25 +93,23 @@ pub struct SessionResolutionSummary {
     ///
     /// This count is only correct for the current run of the Holochain conductor. If the conductor
     /// is restarted then this counter is also reset.
-    // Unused until the next PR
-    #[allow(dead_code)]
     pub attempts: usize,
     /// The time of the last attempt to resolve the session.
-    // Unused until the next PR
-    #[allow(dead_code)]
     pub last_attempt_at: Timestamp,
     /// The outcome of the most recent attempt to resolve the session.
-    // Unused until the next PR
-    #[allow(dead_code)]
     pub outcomes: Vec<SessionResolutionOutcome>,
+    /// If we've tried to complete the session using signatures found with agent activity authorities
+    /// and still not succeeded, then the number of attempts is recorded here.
+    pub completion_attempts: usize,
 }
 
 impl Default for SessionResolutionSummary {
     fn default() -> Self {
         Self {
-            attempts: 0,
+            attempts: 1,
             last_attempt_at: Timestamp::now(),
-            outcomes: Vec::new(),
+            outcomes: Vec::with_capacity(0),
+            completion_attempts: 0,
         }
     }
 }
@@ -121,7 +131,8 @@ pub struct SessionResolutionOutcome {
     pub decisions: Vec<SessionCompletionDecision>,
 }
 
-/// Number of authorities to be queried for agent activity.
+/// Number of authorities to be queried for agent activity, in an attempt to resolve a countersigning
+/// session in an unknown state.
 pub const NUM_AUTHORITIES_TO_QUERY: usize = 3;
 
 /// Decision about an incomplete countersigning session.

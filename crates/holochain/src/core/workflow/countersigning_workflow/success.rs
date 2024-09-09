@@ -1,7 +1,7 @@
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
+use crate::core::workflow::countersigning_workflow::CountersigningSessionState;
 use holo_hash::AgentPubKey;
-use holochain_types::countersigning::CounterSigningSessionState;
 use holochain_zome_types::prelude::SignedAction;
 
 /// An incoming countersigning session success.
@@ -22,25 +22,40 @@ pub(crate) async fn countersigning_success(
             match inner.sessions.entry(author.clone()) {
                 std::collections::hash_map::Entry::Occupied(mut entry) => {
                     match entry.get() {
-                        // Whether we're awaiting signatures for the first time or trying to recover,
-                        // switch to the signatures collected state and add the signatures to the
-                        // list of signature bundles to try.
-                        CounterSigningSessionState::Accepted(ref preflight_request) | CounterSigningSessionState::Unknown { ref preflight_request, .. } => {
-                            tracing::trace!("Received countersigning signature bundle in accepted or unknown state for agent: {:?}", author);
-                            entry.insert(CounterSigningSessionState::SignaturesCollected {
+                        // If we're in the accepted state, then this is the happy path.
+                        // Switch to the signatures collected state.
+                        CountersigningSessionState::Accepted(preflight_request) => {
+                            tracing::trace!("Received countersigning signature bundle in the accepted state for agent: {:?}", author);
+                            entry.insert(CountersigningSessionState::SignaturesCollected {
                                 preflight_request: preflight_request.clone(),
                                 signature_bundles: vec![signature_bundle],
+                                resolution: None,
                             });
                         }
-                        CounterSigningSessionState::SignaturesCollected { preflight_request, signature_bundles} => {
+                        // This could happen but is relatively unlikely. If we've restarted and gone
+                        // into the unknown state, then receive valid signatures, we may as well
+                        // use them. So we'll switch to the signatures collected state.
+                        CountersigningSessionState::Unknown { preflight_request, resolution } => {
+                            tracing::trace!("Received countersigning signature bundle in the unknown state for agent: {:?}", author);
+                            entry.insert(CountersigningSessionState::SignaturesCollected {
+                                preflight_request: preflight_request.clone(),
+                                signature_bundles: vec![signature_bundle],
+                                // We must guarantee that this value is always `Some` before switching
+                                // to signatures collected so that signatures collected knows we
+                                // transitioned from this state.
+                                resolution: Some(resolution.clone().unwrap_or_default()),
+                            });
+                        }
+                        CountersigningSessionState::SignaturesCollected { preflight_request, signature_bundles, resolution} => {
                             tracing::trace!("Received another signature bundle for countersigning session for agent: {:?}", author);
-                            entry.insert(CounterSigningSessionState::SignaturesCollected {
+                            entry.insert(CountersigningSessionState::SignaturesCollected {
                                 preflight_request: preflight_request.clone(),
                                 signature_bundles: {
                                     let mut signature_bundles = signature_bundles.clone();
                                     signature_bundles.push(signature_bundle);
                                     signature_bundles
                                 },
+                                resolution: resolution.clone(),
                             });
                         }
                     }

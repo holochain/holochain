@@ -1,11 +1,11 @@
 use crate::conductor::space::Space;
+use crate::core::workflow::countersigning_workflow::CountersigningSessionState;
 use holochain_sqlite::db::ReadAccess;
 use holochain_state::chain_lock::get_chain_lock;
 use holochain_state::mutations::unlock_chain;
 use holochain_state::prelude::{
     current_countersigning_session, CurrentCountersigningSessionOpt, SourceChainResult,
 };
-use holochain_types::countersigning::CounterSigningSessionState;
 use holochain_types::prelude::{Signal, SystemSignal};
 use holochain_zome_types::cell::CellId;
 use std::collections::{HashMap, HashSet};
@@ -30,7 +30,7 @@ pub async fn refresh_workspace_state(space: &Space, cell_id: CellId, signal: Sen
     );
     let workspace = &space.countersigning_workspace;
 
-    // These are all the agents that the conductor is aware of for this the DNA this workflow is running in.
+    // These are all the agents that the conductor is aware of for the DNA this workflow is running in.
     //
     // We don't want to keep the entire space locked for writes, so just get the agents and release the lock.
     // We can then lock each agent individually.
@@ -114,7 +114,7 @@ pub async fn refresh_workspace_state(space: &Space, cell_id: CellId, signal: Sen
                                     .inner
                                     .share_mut(|inner, _| {
                                         inner.sessions.entry(agent.clone()).or_insert(
-                                            CounterSigningSessionState::Unknown {
+                                            CountersigningSessionState::Unknown {
                                                 preflight_request: session_data
                                                     .preflight_request()
                                                     .clone(),

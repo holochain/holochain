@@ -38,7 +38,7 @@ pub enum AppRequest {
     /// # Returns
     ///
     /// [`AppResponse::CountersigningSessionState`]
-    GetCounterSigningSessionState(Box<CellId>),
+    GetCountersigningSessionState(Box<CellId>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
     ///
@@ -140,7 +140,7 @@ pub enum AppResponse {
     ZomeCalled(Box<ExternIO>),
 
     /// The successful response to an [`AppRequest::GetCountersigningSessionState`].
-    CounterSigningSessionState(Box<Option<CounterSigningSessionState>>),
+    CountersigningSessionState(Box<Option<CountersigningSessionState>>),
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///

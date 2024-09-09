@@ -3227,7 +3227,7 @@ mod countersigning_impls {
         pub(crate) async fn get_countersigning_session_state(
             &self,
             cell_id: CellId,
-        ) -> ConductorResult<Option<CounterSigningSessionState>> {
+        ) -> ConductorResult<Option<CountersigningSessionState>> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
             space
                 .countersigning_workspace

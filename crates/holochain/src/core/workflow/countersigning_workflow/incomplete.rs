@@ -10,7 +10,6 @@ use holo_hash::AgentPubKey;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::HolochainP2pDnaT;
-use holochain_state::mutations::unlock_chain;
 use holochain_state::prelude::{
     current_countersigning_session, CurrentCountersigningSessionOpt, SourceChainResult,
 };
@@ -43,21 +42,17 @@ pub async fn inner_countersigning_session_incomplete(
                 let maybe_current_session =
                     current_countersigning_session(txn, Arc::new(author.clone()))?;
 
-                // This is the simplest failure case, something has gone wrong but the countersigning entry
-                // hasn't been committed then we can unlock the chain and remove the session.
-                if maybe_current_session.is_none() {
-                    unlock_chain(txn, &author)?;
-                    return Ok(None);
-                }
-
                 Ok(maybe_current_session)
             }
         })
         .await?;
 
     if maybe_current_session.is_none() {
-        tracing::info!("Countersigning session was in an unknown state but no session entry was found, unlocking chain and removing session: {:?}", author);
-        return Ok((SessionCompletionDecision::Abandoned, Vec::with_capacity(0)));
+        tracing::error!("Countersigning session was in an unknown state but no session entry was found. Holochain is only meant to enter this state when there is an entry to remove and won't recover: {:?}", author);
+        return Ok((
+            SessionCompletionDecision::Indeterminate,
+            Vec::with_capacity(0),
+        ));
     }
 
     // Now things get more complicated. We have a countersigning entry on our chain but the session
@@ -68,6 +63,7 @@ pub async fn inner_countersigning_session_incomplete(
     // We need to find out what state the other signing agents are in.
     // TODO Note that we are ignoring the optional signing agents here - that's something we can figure out later because it's not clear what it means for them
     //      to be optional.
+    //      Possibly get more options for collecting signatures by asking optional signers
     let other_signing_agents = session_data
         .signing_agents()
         .filter(|a| **a != author)
@@ -226,6 +222,8 @@ pub async fn inner_countersigning_session_incomplete(
             // We are requiring all the authorities to agree, so if we don't have enough responses
             // then we can't make a decision.
             // That is likely to make the resolution process slower, but it's more likely to be correct.
+            // NOTE: at the moment, since we're calling `get_agent_activity` without a target,
+            //       all the responses could have come from the same authority.
             tracing::info!(
                 "Not enough responses to make a decision for agent {:?}. Have {}/{}",
                 agent,
@@ -240,11 +238,11 @@ pub async fn inner_countersigning_session_incomplete(
             .iter()
             .all(|d| matches!(*d, SessionCompletionDecision::Complete(_)))
         {
-            // Safe to access without bounds check because we've done a size check above.
             tracing::debug!(
                 "Authorities agree that agent {:?} has completed the session",
                 agent
             );
+            // Safe to access without bounds check because we've done a size check above.
             by_agent_decisions.push(authority_decisions[0].clone());
         } else if authority_decisions
             .iter()

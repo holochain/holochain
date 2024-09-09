@@ -89,7 +89,7 @@ pub(crate) async fn inner_countersigning_session_complete(
             .verify_signature(sa.signature(), sa.action())
             .await?
         {
-            tracing::info!("Invalid signature found: {:?}", sa);
+            tracing::warn!("Invalid signature found: {:?}", sa);
             return Ok(None);
         }
         if sa.action().author() == &author {
@@ -148,9 +148,10 @@ pub(crate) async fn inner_countersigning_session_complete(
         }
         let op = ChainOp::RegisterAgentActivity(signature, action);
         let basis = op.dht_basis();
+        // TODO this is what flag is for, whether to witness or store - document and rename me
         if let Err(e) = network.publish_countersign(false, basis, op.into()).await {
             tracing::error!(
-                "Failed to publish to other countersigners agent authorities because of: {:?}",
+                "Failed to publish to other counter-signers agent authorities because of: {:?}",
                 e
             );
         }
@@ -184,7 +185,7 @@ async fn apply_success_state_changes(
                 txn.execute(
                     "UPDATE DhtOp SET withhold_publish = NULL WHERE action_hash = :action_hash",
                     named_params! {
-                    ":action_hash": this_cells_action_hash,
+                        ":action_hash": this_cells_action_hash,
                     },
                 )
                 .map_err(holochain_state::prelude::StateMutationError::from)?;

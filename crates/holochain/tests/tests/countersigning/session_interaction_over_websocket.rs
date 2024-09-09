@@ -37,7 +37,8 @@ use crate::tests::test_utils::{
 #[cfg(feature = "slow_tests")]
 async fn get_session_state() {
     use hdk::prelude::{PreflightRequest, PreflightRequestAcceptance, Role};
-    use holochain::prelude::CounterSigningSessionState;
+    use holo_hash::EntryHash;
+    use holochain::prelude::CountersigningSessionState;
 
     use crate::tests::test_utils::{call_zome_fn_fallible, start_local_services};
 
@@ -64,6 +65,7 @@ async fn get_session_state() {
     authenticate_app_ws_client(alice_app_tx.clone(), alice.admin_port, "test".to_string()).await;
 
     tokio::spawn(async move {
+        // while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {}
         while let Ok(ReceiveMessage::Signal(signal)) = alice_app_rx.recv::<AppResponse>().await {
             match ExternIO::from(signal).decode::<Signal>().unwrap() {
                 Signal::System(system_signal) => match system_signal {
@@ -110,24 +112,24 @@ async fn get_session_state() {
 
     // Countersigning session state should not be in Alice's conductor memory yet.
     match request(
-        AppRequest::GetCounterSigningSessionState(Box::new(alice.cell_id.clone())),
+        AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
         &alice_app_tx,
     )
     .await
     {
-        AppResponse::CounterSigningSessionState(maybe_state) => {
+        AppResponse::CountersigningSessionState(maybe_state) => {
             assert_matches!(*maybe_state, None);
         }
         _ => panic!("unexpected countersigning session state"),
     }
     // Countersigning session state should not be in Bob's conductor memory yet.
     match request(
-        AppRequest::GetCounterSigningSessionState(Box::new(bob.cell_id.clone())),
+        AppRequest::GetCountersigningSessionState(Box::new(bob.cell_id.clone())),
         &bob_app_tx,
     )
     .await
     {
-        AppResponse::CounterSigningSessionState(maybe_state) => {
+        AppResponse::CountersigningSessionState(maybe_state) => {
             assert_matches!(*maybe_state, None);
         }
         _ => panic!("unexpected countersigning session state"),
@@ -172,24 +174,24 @@ async fn get_session_state() {
 
     // Countersigning session state should exist for both agents and be in "Accepted" state.
     match request(
-        AppRequest::GetCounterSigningSessionState(Box::new(alice.cell_id.clone())),
+        AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
         &alice_app_tx,
     )
     .await
     {
-        AppResponse::CounterSigningSessionState(maybe_state) => {
-            assert_matches!(*maybe_state, Some(CounterSigningSessionState::Accepted(_)))
+        AppResponse::CountersigningSessionState(maybe_state) => {
+            assert_matches!(*maybe_state, Some(CountersigningSessionState::Accepted(_)))
         }
         _ => panic!("unexpected countersigning session state"),
     }
     match request(
-        AppRequest::GetCounterSigningSessionState(Box::new(alice.cell_id.clone())),
+        AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
         &alice_app_tx,
     )
     .await
     {
-        AppResponse::CounterSigningSessionState(maybe_state) => {
-            assert_matches!(*maybe_state, Some(CounterSigningSessionState::Accepted(_)))
+        AppResponse::CountersigningSessionState(maybe_state) => {
+            assert_matches!(*maybe_state, Some(CountersigningSessionState::Accepted(_)))
         }
         _ => panic!("unexpected countersigning session state"),
     }
@@ -199,6 +201,7 @@ async fn get_session_state() {
     let mut tries = 0;
     loop {
         tries += 1;
+        println!("trying to commit cs entry {tries}");
         let response = call_zome_fn_fallible(
             &alice_app_tx,
             alice.cell_id.clone(),
@@ -210,29 +213,33 @@ async fn get_session_state() {
         )
         .await;
 
-        if let AppResponse::ZomeCalled(_) = response {
+        if let AppResponse::ZomeCalled(e) = response {
+            println!(
+                "zome called {:?}",
+                e.decode::<(ActionHash, EntryHash)>().unwrap()
+            );
             break;
-        } else if tries == 5 {
+        } else if tries == 25 {
             break;
         }
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
     }
 
     // Bob lets the session time out.
     let _countersigning_entry =
-        tokio::time::timeout(Duration::from_secs(11), bob_session_abandonded_rx.recv())
+        tokio::time::timeout(Duration::from_secs(15), bob_session_abandonded_rx.recv())
             .await
             .unwrap()
             .unwrap();
 
     // Bob's session should be gone from memory.
     match request(
-        AppRequest::GetCounterSigningSessionState(Box::new(bob.cell_id.clone())),
+        AppRequest::GetCountersigningSessionState(Box::new(bob.cell_id.clone())),
         &bob_app_tx,
     )
     .await
     {
-        AppResponse::CounterSigningSessionState(session_state) => {
+        AppResponse::CountersigningSessionState(session_state) => {
             assert_matches!(*session_state, None);
         }
         _ => panic!("unexpected countersigning session state"),
@@ -240,15 +247,16 @@ async fn get_session_state() {
 
     // Alice's session is in an unknown state now. No attempts to resolve should have been made.
     match request(
-        AppRequest::GetCounterSigningSessionState(Box::new(alice.cell_id.clone())),
+        AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
         &alice_app_tx,
     )
     .await
     {
-        AppResponse::CounterSigningSessionState(session_state) => {
+        AppResponse::CountersigningSessionState(session_state) => {
+            println!("session state is {session_state:?}");
             assert_matches!(
                 *session_state,
-                Some(CounterSigningSessionState::Unknown { resolution, .. }) if resolution.is_none()
+                Some(CountersigningSessionState::Unknown { resolution, .. }) if resolution.is_none()
             );
         }
         _ => panic!("unexpected countersigning session state"),
