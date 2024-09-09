@@ -1437,6 +1437,7 @@ pub struct InstallAppCommonFlags {
 /// Methods related to app installation and management
 mod app_impls {
     use holochain_types::deepkey_roundtrip_backward;
+    use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::LairEntryInfo;
 
     use crate::conductor::state::is_app;
 
@@ -1452,9 +1453,10 @@ mod app_impls {
             installed_app_id: InstalledAppId,
             agent: Option<AgentPubKey>,
             data: &[(impl DnaWithRole, Option<MembraneProof>)],
+            network_seed: Option<NetworkSeed>,
         ) -> ConductorResult<AgentPubKey> {
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
-            let manifest = app_manifest_from_dnas(&dnas_with_roles, 255, false);
+            let manifest = app_manifest_from_dnas(&dnas_with_roles, 255, false, network_seed);
 
             let (dnas_to_register, role_assignments): (Vec<_>, Vec<_>) = data
                 .iter()
@@ -1520,29 +1522,15 @@ mod app_impls {
                         key_index: 0,
                     };
 
-                    let dst_tag = format!(
-                        "DPKI-{:04}-{:04}",
-                        derivation_details.app_index, derivation_details.key_index
-                    );
-
                     let derivation_path = derivation_details.to_derivation_path();
                     let derivation_bytes = derivation_path
                         .iter()
                         .flat_map(|c| c.to_be_bytes())
                         .collect();
 
-                    let info = self
-                        .keystore
-                        .lair_client()
-                        .derive_seed(
-                            lair_tag.into(),
-                            None,
-                            dst_tag.into(),
-                            None,
-                            derivation_path.into_boxed_slice(),
-                        )
+                    let seed = self
+                        .derive_from_device_seed_and_create_if_allowed(lair_tag, derivation_path)
                         .await?;
-                    let seed = info.ed25519_pub_key.0.to_vec();
 
                     let derivation = DerivationDetailsInput {
                         app_index: derivation_details.app_index,
@@ -1998,6 +1986,90 @@ mod app_impls {
                     Ok(Some(AppInfo::from_installed_app(app, &dna_definitions)))
                 }
             }
+        }
+
+        /// Derive a new key from a device seed, or create a new seed from randomness
+        /// if no device seed is specified and
+        /// [`ConductorConfig::danger_generate_throwaway_device_seed`] is set
+        pub async fn derive_from_device_seed_and_create_if_allowed(
+            &self,
+            lair_tag: String,
+            derivation_path: Vec<u32>,
+        ) -> ConductorResult<Vec<u8>> {
+            let config = self.get_config();
+
+            // if derivation_path is [1, 2, 3], this will be "1.2.3"
+            let dst_tag_suffix = derivation_path
+                .iter()
+                .map(|b| format!("{b}"))
+                .collect::<Vec<String>>()
+                .join(".");
+
+            let dst_tag = format!("{lair_tag}.{dst_tag_suffix}");
+
+            let entry_info = self
+                .keystore()
+                .lair_client()
+                .get_entry(dst_tag.clone().into())
+                .await;
+            let seed_info = match entry_info {
+                Ok(LairEntryInfo::Seed { seed_info, .. }) => {
+                    // If the seed already exists, we don't need to create it again.
+                    seed_info
+                }
+                Ok(_) => {
+                    return Err(ConductorError::other(
+                        "DPKI could not be installed because the device seed points to an entry in lair that is not a seed.",
+                    ));
+                }
+                // Errors on not found, so try to create the seed and if that fails because there's
+                // some issue connecting to Lair then we'll get the error from trying to derive the seed.
+                Err(_) => {
+                    let result = self
+                        .keystore()
+                        .lair_client()
+                        .derive_seed(
+                            lair_tag.clone().into(),
+                            None,
+                            dst_tag.clone().into(),
+                            None,
+                            derivation_path.clone().into_boxed_slice(),
+                        )
+                        .await;
+
+                    match result {
+                        Ok(info) => info,
+                        Err(err) => {
+                            // If the seed could not be derived, assume that this is because there was no device seed
+                            // to derive from and attempt to create a throwaway seed if that was set in the config
+                            if config.danger_generate_throwaway_device_seed {
+                                tracing::info!("Failed to derive seed from lair, falling back to random seed. This is to be expected. Error: {:?}", err);
+
+                                self.keystore()
+                                    .lair_client()
+                                    .new_seed(lair_tag.clone().into(), None, false)
+                                    .await?;
+
+                                self.keystore()
+                                    .lair_client()
+                                    .derive_seed(
+                                        lair_tag.into(),
+                                        None,
+                                        dst_tag.into(),
+                                        None,
+                                        derivation_path.into_boxed_slice(),
+                                    )
+                                    .await?
+                            } else {
+                                return Err(err.into());
+                            }
+                        }
+                    }
+                }
+            };
+
+            let seed = seed_info.ed25519_pub_key.0.to_vec();
+            Ok(seed)
         }
     }
 }
@@ -2542,7 +2614,6 @@ mod app_status_impls {
 
 /// Methods related to management of Conductor state
 mod service_impls {
-    use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::LairEntryInfo;
     use super::*;
 
     impl Conductor {
@@ -2586,56 +2657,54 @@ mod service_impls {
             dna: DnaFile,
             enable: bool,
         ) -> ConductorResult<()> {
+            // Don't install twice
+            if self.running_services().dpki.is_some() {
+                return Ok(());
+            }
+
             let dna_hash = dna.dna_hash().clone();
 
             self.register_dna(dna.clone()).await?;
 
-            let device_seed_lair_tag = if let Some(tag) =
-                self.get_config().device_seed_lair_tag.clone()
-            {
-                tag
+            let config = self.get_config();
+
+            let agent = if let Some(device_seed_lair_tag) = config.device_seed_lair_tag.clone() {
+                // Derive the DPKI agent key from the device seed.
+                // The initial agent key is the first derivation from the device seed.
+                // Updated DPKI agent keys (currently unsupported) would be sequential derivations
+                // from the same device seed.
+                let derivation_path = [0].into();
+
+                let seed = self
+                    .derive_from_device_seed_and_create_if_allowed(
+                        device_seed_lair_tag,
+                        derivation_path,
+                    )
+                    .await?;
+
+                holo_hash::AgentPubKey::from_raw_32(seed)
+            } else if config.dpki.allow_throwaway_random_dpki_agent_key {
+                self.keystore().new_sign_keypair_random().await?
             } else {
-                return Err(ConductorError::other("DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config. If using DPKI, a device seed must be created in lair, and the tag specified in the conductor config."));
+                return Err(ConductorError::other(
+"DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config. 
+If using DPKI, a device seed must be created in lair, and the tag specified in the conductor config.
+
+(If this is a throwaway test environment, you can also set the config `dpki.allow_throwaway_random_dpki_agent_key`
+to `true` instead of instead of setting up a `device_seed_lair_tag`, but then you will lose the ability to recover 
+your agent keys if you lose access to your device. This is not recommended!!)
+"));
             };
 
-            let derivation_path = [0].into();
-            let dst_tag = format!("{device_seed_lair_tag}.0");
-
-            let entry_info = self.keystore().lair_client().get_entry(dst_tag.clone().into()).await;
-            let seed_info = match entry_info {
-                Ok(LairEntryInfo::Seed { seed_info, .. }) => {
-                    // If the seed already exists, we don't need to create it again.
-                    seed_info
-                }
-                Ok(_) => {
-                    return Err(ConductorError::other(
-                        "DPKI could not be installed because the device seed points to an entry in lair that is not a seed.",
-                    ));
-                }
-                // Errors on not found, so try to create the seed and if that fails because there's
-                // some issue connecting to Lair then we'll get the error from trying to derive the seed.
-                Err(_) => {
-                    self
-                        .keystore()
-                        .lair_client()
-                        .derive_seed(
-                            device_seed_lair_tag.clone().into(),
-                            None,
-                            dst_tag.into(),
-                            None,
-                            derivation_path,
-                        )
-                        .await?
-                }
-            };
-
-            // The initial agent key is the first derivation from the device seed.
-            // Updated DPKI agent keys are sequential derivations from the same device seed.
-            let agent = holo_hash::AgentPubKey::from_raw_32(seed_info.ed25519_pub_key.0.to_vec());
             let cell_id = CellId::new(dna_hash.clone(), agent.clone());
 
             self.clone()
-                .install_app_minimal(DPKI_APP_ID.into(), Some(agent), &[(dna, None)])
+                .install_app_minimal(
+                    DPKI_APP_ID.into(),
+                    Some(agent),
+                    &[(dna, None)],
+                    Some(config.dpki.network_seed.clone()),
+                )
                 .await?;
 
             // In multi-conductor tests, we often want to delay enabling DPKI until all conductors
@@ -2652,10 +2721,7 @@ mod service_impls {
                 .get_from_spaces(|s| (*s.dna_hash).clone())
                 .contains(&dna_hash));
 
-            let installation = DeepkeyInstallation {
-                cell_id,
-                device_seed_lair_tag,
-            };
+            let installation = DeepkeyInstallation { cell_id };
             self.update_state(move |mut state| {
                 state.conductor_services.dpki = Some(installation);
                 Ok(state)
@@ -3773,13 +3839,15 @@ pub fn app_manifest_from_dnas(
     dnas_with_roles: &[impl DnaWithRole],
     clone_limit: u32,
     memproofs_deferred: bool,
+    network_seed: Option<String>,
 ) -> AppManifest {
     let roles: Vec<_> = dnas_with_roles
         .iter()
         .map(|dr| {
             let dna = dr.dna();
             let path = PathBuf::from(format!("{}", dna.dna_hash()));
-            let modifiers = DnaModifiersOpt::none();
+            let mut modifiers = DnaModifiersOpt::none();
+            modifiers.network_seed = network_seed.clone();
             AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {

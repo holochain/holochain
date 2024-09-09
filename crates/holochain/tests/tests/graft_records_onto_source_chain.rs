@@ -212,6 +212,7 @@ async fn grafting() {
         "app",
         Some(alice.agent_pubkey().clone()),
         &[(dna_file, None)],
+        None,
     )
     .await;
 

@@ -1207,7 +1207,7 @@ async fn test_deferred_memproof_provisioning() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let app_id = "app-id".to_string();
     let role_name = "role".to_string();
-    let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true).await;
+    let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true, None).await;
 
     //- Install with deferred memproofs
     let app = conductor
@@ -1336,7 +1336,7 @@ async fn test_deferred_memproof_provisioning_uninstall() {
     let conductor = SweetConductor::from_standard_config().await;
     let app_id = "app-id".to_string();
     let role_name = "role".to_string();
-    let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true).await;
+    let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true, None).await;
 
     //- Install with deferred memproofs
     conductor
