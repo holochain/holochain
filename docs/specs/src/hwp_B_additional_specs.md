@@ -1,4 +1,6 @@
-# Additional specifications
+\newpage
+\twocolumngrid
+# Appendix B: Additional Specifications
 
 ## Secure Private Key Management (lair-keystore)
 
@@ -10,7 +12,6 @@ Holochain implementations MUST provide a secure way to create, manage and use pu
 * `VerifySignature(Vec<u8>, PubKey) -> bool`
 * `Encrypt(Vec<u8>, PubKey) -> Vec<u8>`
 * `Decrypt(Vec<u8>, PubKey) -> Vec<u8>`
-
 
 ## External References and Holochain Resource Locators
 

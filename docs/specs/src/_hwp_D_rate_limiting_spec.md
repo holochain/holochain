@@ -1,4 +1,4 @@
-# Appendix C: Rate Limiting
+# Appendix D: Rate Limiting
 
 ## Context
 
