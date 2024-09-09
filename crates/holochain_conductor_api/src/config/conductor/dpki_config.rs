@@ -6,6 +6,12 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde::Serialize;
 
+/// The network seed used in the main "production" DPKI network.
+const DPKI_NETWORK_SEED_MAIN: &str = "deepkey-main";
+
+/// A network seed used for testing.
+const DPKI_NETWORK_SEED_TEST: &str = "deepkey-test";
+
 /// Configure which app instance ID to treat as the DPKI application handler
 /// as well as what parameters to pass it on its initialization.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
@@ -33,19 +39,19 @@ pub struct DpkiConfig {
 }
 
 impl DpkiConfig {
-    pub fn new_production(dna_path: Option<PathBuf>) -> Self {
+    pub fn production(dna_path: Option<PathBuf>) -> Self {
         Self {
             dna_path,
-            network_seed: "deepkey-main".to_string(),
+            network_seed: DPKI_NETWORK_SEED_MAIN.to_string(),
             allow_throwaway_random_dpki_agent_key: false,
             no_dpki: false,
         }
     }
 
-    pub fn test() -> Self {
+    pub fn testing() -> Self {
         Self {
             dna_path: None,
-            network_seed: nanoid::nanoid!(),
+            network_seed: DPKI_NETWORK_SEED_TEST.to_string(),
             allow_throwaway_random_dpki_agent_key: true,
             no_dpki: false,
         }
@@ -63,6 +69,11 @@ impl DpkiConfig {
 
 impl Default for DpkiConfig {
     fn default() -> Self {
-        DpkiConfig::new_production(None)
+        Self {
+            dna_path: None,
+            network_seed: DPKI_NETWORK_SEED_TEST.to_string(),
+            allow_throwaway_random_dpki_agent_key: false,
+            no_dpki: false,
+        }
     }
 }
