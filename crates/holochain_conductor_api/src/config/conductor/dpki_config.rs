@@ -20,9 +20,14 @@ pub struct DpkiConfig {
     /// Defaults to the built-in Deepkey DNA from the holochain_deepkey_dna crate.
     pub dna_path: Option<PathBuf>,
 
-    /// DPKI is always installed with a network seed. For tests, a random seed
-    /// should be used, and for the real DPKI network, the known seed specified in
-    /// [`DpkiConfig::new`] should be used.
+    /// **IMPORTANT!**
+    ///
+    /// For the main DPKI network, this seed must be set to "deepkey-main".
+    /// For hApp unit and integration tests, a random seed should be used.
+    ///
+    /// DPKI is always installed with a network seed.
+    /// Also, any two conductors not using the exact same DPKI service cannot communicate with each other.
+    /// This means that this network seed much match across all conductors in a network!
     pub network_seed: String,
 
     /// Allow the DPKI agent key to be generated randomly in the absence of a

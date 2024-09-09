@@ -317,6 +317,7 @@ mod tests {
 
     dpki:
       dna_path: path/to/dna.dna
+      network_seed: deepkey-test
       device_seed_lair_tag: "device-seed"
 
     admin_interfaces:
