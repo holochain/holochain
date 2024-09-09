@@ -295,6 +295,11 @@ impl WsCoreSync {
 
     fn close_if_err<R>(&self, r: WebsocketResult<R>) -> WebsocketResult<R> {
         match r {
+            Err(e @ WebsocketError::Deserialize { .. }) => {
+                // Don't close the connection on a deserialization error.
+                // That's a client issue and not a connection issue.
+                Err(e)
+            }
             Err(err) => {
                 self.close();
                 Err(err)

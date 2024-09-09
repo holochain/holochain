@@ -170,15 +170,23 @@ pub async fn spawn_app_interface_task(
 async fn recv_incoming_admin_msgs(api: AdminInterfaceApi, rx_from_iface: WebsocketReceiver) {
     use futures::stream::StreamExt;
 
-    tracing::info!("Starting admin listener");
-
     let rx_from_iface =
         futures::stream::unfold(rx_from_iface, move |mut rx_from_iface| async move {
-            match rx_from_iface.recv().await {
-                Ok(r) => Some((r, rx_from_iface)),
-                Err(err) => {
-                    info!(?err);
-                    None
+            loop {
+                match rx_from_iface.recv().await {
+                    Ok(r) => return Some((r, rx_from_iface)),
+                    Err(err) => {
+                        match err {
+                            WebsocketError::Deserialize(_) => {
+                                // No need to log here because `holochain_websocket` logs errors
+                                continue;
+                            }
+                            _ => {
+                                info!(?err);
+                                return None;
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -361,11 +369,21 @@ fn spawn_recv_incoming_app_msgs(
 
     let rx_from_iface =
         futures::stream::unfold(rx_from_iface, move |mut rx_from_iface| async move {
-            match rx_from_iface.recv().await {
-                Ok(r) => Some((r, rx_from_iface)),
-                Err(err) => {
-                    info!(?err);
-                    None
+            loop {
+                match rx_from_iface.recv().await {
+                    Ok(r) => return Some((r, rx_from_iface)),
+                    Err(err) => {
+                        match err {
+                            WebsocketError::Deserialize(_) => {
+                                // No need to log here because `holochain_websocket` logs errors
+                                continue;
+                            }
+                            _ => {
+                                info!(?err);
+                                return None;
+                            }
+                        }
+                    }
                 }
             }
         });
