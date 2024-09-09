@@ -43,7 +43,7 @@ async fn get_session_state() {
 
     holochain_trace::test_run();
 
-    // Start a local bootstrap server.
+    // Start local bootstrap and signal servers.
     let (_local_services, bootstrap_url_recv, signal_url_recv) = start_local_services().await;
     let bootstrap_url = bootstrap_url_recv.await.unwrap();
     let signal_url = signal_url_recv.await.unwrap();
@@ -58,9 +58,8 @@ async fn get_session_state() {
     )
     .await;
 
-    // Alice Attach App Interface
+    // Attach app interface to Alice's conductor.
     let app_port = attach_app_interface(&mut alice.admin_tx, None).await;
-
     let (alice_app_tx, mut alice_app_rx) = websocket_client_by_port(app_port).await.unwrap();
     authenticate_app_ws_client(alice_app_tx.clone(), alice.admin_port, "test".to_string()).await;
 
@@ -82,12 +81,12 @@ async fn get_session_state() {
 
     let mut bob = setup_agent(bootstrap_url, signal_url, network_seed.clone()).await;
 
-    // Bob Attach App Interface
+    // Attach app interface to Bob's conductor.
     let app_port = attach_app_interface(&mut bob.admin_tx, None).await;
-
     let (bob_app_tx, mut bob_app_rx) = websocket_client_by_port(app_port).await.unwrap();
     authenticate_app_ws_client(bob_app_tx.clone(), bob.admin_port, "test".to_string()).await;
 
+    // Spawn task with app socket signal waiting for system signals.
     let (bob_session_abanded_tx, mut bob_session_abandonded_rx) = tokio::sync::mpsc::channel(1);
     tokio::spawn(async move {
         while let Ok(ReceiveMessage::Signal(signal)) = bob_app_rx.recv::<AppResponse>().await {
@@ -103,9 +102,11 @@ async fn get_session_state() {
         }
     });
 
-    // Need an initialised source chain for countersigning, so commit something.
-    // Alice
+    // Initialize Alice's source chain.
     let _: ActionHash = call_zome(&alice, &alice_app_tx, "create_a_thing", &()).await;
+
+    // Initialize Bob's source chain.
+    let _: ActionHash = call_zome(&bob, &bob_app_tx, "create_a_thing", &()).await;
 
     // Countersigning session state should not be in Alice's conductor memory yet.
     match request(
@@ -119,10 +120,6 @@ async fn get_session_state() {
         }
         _ => panic!("unexpected countersigning session state"),
     }
-
-    // Bob
-    let _: ActionHash = call_zome(&bob, &bob_app_tx, "create_a_thing", &()).await;
-
     // Countersigning session state should not be in Bob's conductor memory yet.
     match request(
         AppRequest::GetCounterSigningSessionState(Box::new(bob.cell_id.clone())),
