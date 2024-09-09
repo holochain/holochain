@@ -344,7 +344,10 @@ async fn emit_signals() {
         installed_app_id: "test".to_string(),
     };
     let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await.unwrap();
+    let response = tokio::time::timeout(Duration::from_secs(3), response)
+        .await
+        .expect("Timeout waiting for response")
+        .unwrap();
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair

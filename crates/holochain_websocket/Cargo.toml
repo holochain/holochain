@@ -19,6 +19,7 @@ tokio = { version = "1.36.0", features = ["full"] }
 tokio-tungstenite = "0.21.0"
 tracing = "0.1"
 async-trait = "0.1"
+thiserror = "1"
 
 [dev-dependencies]
 holochain_trace = { version = "^0.4.0-dev.5", path = "../holochain_trace" }

@@ -6,12 +6,11 @@ use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::manager::TaskManagerClient;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::signal::Signal;
-use holochain_websocket::ReceiveMessage;
 use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
-use std::io::ErrorKind;
+use holochain_websocket::{ReceiveMessage, WebsocketError};
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 
 use crate::conductor::api::{AdminInterfaceApi, AppAuthentication, AppInterfaceApi};
@@ -330,7 +329,7 @@ fn spawn_app_signals_handler(
             if let Some(signal) = rx_from_cell.next().await {
                 trace!(msg = "Sending signal!", ?signal);
                 if let Err(err) = tx_to_iface.signal(signal).await {
-                    if err.kind() == ErrorKind::Other && err.to_string() == "WebsocketClosed" {
+                    if let WebsocketError::Close(_) = err {
                         info!(
                             "Client has closed their websocket connection, closing signal handler"
                         );

@@ -57,29 +57,29 @@ pub enum WireMessage {
 
 impl WireMessage {
     /// Deserialize a WireMessage.
-    fn try_from_bytes(b: Vec<u8>) -> Result<Self> {
+    fn try_from_bytes(b: Vec<u8>) -> WebsocketResult<Self> {
         let b = UnsafeBytes::from(b);
         let b = SerializedBytes::from(b);
-        let b: WireMessage = b.try_into().map_err(Error::other)?;
+        let b: WireMessage = b.try_into()?;
         Ok(b)
     }
 
     /// Create a new authenticate message.
-    fn authenticate<S>(s: S) -> Result<Message>
+    fn authenticate<S>(s: S) -> WebsocketResult<Message>
     where
         S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
     {
-        let s1 = SerializedBytes::try_from(s).map_err(Error::other)?;
+        let s1 = SerializedBytes::try_from(s)?;
         let s2 = Self::Authenticate {
             data: UnsafeBytes::from(s1).into(),
         };
-        let s3: SerializedBytes = s2.try_into().map_err(Error::other)?;
+        let s3: SerializedBytes = s2.try_into()?;
         Ok(Message::Binary(UnsafeBytes::from(s3).into()))
     }
 
     /// Create a new request message (with new unique msg id).
-    fn request<S>(s: S) -> Result<(Message, u64)>
+    fn request<S>(s: S) -> WebsocketResult<(Message, u64)>
     where
         S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
@@ -87,42 +87,42 @@ impl WireMessage {
         static ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let id = ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         tracing::trace!(?s, %id, "OutRequest");
-        let s1 = SerializedBytes::try_from(s).map_err(Error::other)?;
+        let s1 = SerializedBytes::try_from(s)?;
         let s2 = Self::Request {
             id,
             data: UnsafeBytes::from(s1).into(),
         };
-        let s3: SerializedBytes = s2.try_into().map_err(Error::other)?;
+        let s3: SerializedBytes = s2.try_into()?;
         Ok((Message::Binary(UnsafeBytes::from(s3).into()), id))
     }
 
     /// Create a new response message.
-    fn response<S>(id: u64, s: S) -> Result<Message>
+    fn response<S>(id: u64, s: S) -> WebsocketResult<Message>
     where
         S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
     {
-        let s1 = SerializedBytes::try_from(s).map_err(Error::other)?;
+        let s1 = SerializedBytes::try_from(s)?;
         let s2 = Self::Response {
             id,
             data: Some(UnsafeBytes::from(s1).into()),
         };
-        let s3: SerializedBytes = s2.try_into().map_err(Error::other)?;
+        let s3: SerializedBytes = s2.try_into()?;
         Ok(Message::Binary(UnsafeBytes::from(s3).into()))
     }
 
     /// Create a new signal message.
-    fn signal<S>(s: S) -> Result<Message>
+    fn signal<S>(s: S) -> WebsocketResult<Message>
     where
         S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
     {
         tracing::trace!(?s, "SendSignal");
-        let s1 = SerializedBytes::try_from(s).map_err(Error::other)?;
+        let s1 = SerializedBytes::try_from(s)?;
         let s2 = Self::Signal {
             data: UnsafeBytes::from(s1).into(),
         };
-        let s3: SerializedBytes = s2.try_into().map_err(Error::other)?;
+        let s3: SerializedBytes = s2.try_into()?;
         Ok(Message::Binary(UnsafeBytes::from(s3).into()))
     }
 }
@@ -175,7 +175,10 @@ impl WebsocketConfig {
 }
 
 struct RMapInner(
-    pub std::collections::HashMap<u64, tokio::sync::oneshot::Sender<Result<SerializedBytes>>>,
+    pub  std::collections::HashMap<
+        u64,
+        tokio::sync::oneshot::Sender<WebsocketResult<SerializedBytes>>,
+    >,
 );
 
 impl Drop for RMapInner {
@@ -187,7 +190,7 @@ impl Drop for RMapInner {
 impl RMapInner {
     fn close(&mut self) {
         for (_, s) in self.0.drain() {
-            let _ = s.send(Err(Error::other("ConnectionClosed")));
+            let _ = s.send(Err(WebsocketError::Close("ConnectionClosed".to_string())));
         }
     }
 }
@@ -210,14 +213,50 @@ impl RMap {
         }
     }
 
-    pub fn insert(&self, id: u64, sender: tokio::sync::oneshot::Sender<Result<SerializedBytes>>) {
+    pub fn insert(
+        &self,
+        id: u64,
+        sender: tokio::sync::oneshot::Sender<WebsocketResult<SerializedBytes>>,
+    ) {
         self.0.lock().unwrap().0.insert(id, sender);
     }
 
-    pub fn remove(&self, id: u64) -> Option<tokio::sync::oneshot::Sender<Result<SerializedBytes>>> {
+    pub fn remove(
+        &self,
+        id: u64,
+    ) -> Option<tokio::sync::oneshot::Sender<WebsocketResult<SerializedBytes>>> {
         self.0.lock().unwrap().0.remove(&id)
     }
 }
+
+/// An error produced when working with websockets.
+///
+/// It is intended to capture all the errors that a caller might want to handle. Other errors that
+/// are unlikely to be recoverable are mapped to [WebsocketError::Other].
+#[derive(thiserror::Error, Debug)]
+pub enum WebsocketError {
+    /// The websocket has been closed by the other side.
+    #[error("Websocket closed: {0}")]
+    Close(String),
+    /// A received messaged did not deserialize to the expected type.
+    #[error("Received a message that did not deserialize: {0}")]
+    Deserialize(#[from] SerializedBytesError),
+    /// A websocket error from the underlying tungstenite library.
+    #[error("Websocket error: {0}")]
+    Websocket(#[from] tokio_tungstenite::tungstenite::Error),
+    /// A timeout occurred.
+    #[error("Timeout")]
+    Timeout(#[from] tokio::time::error::Elapsed),
+    /// An IO error occurred.
+    #[error("IO error: {0}")]
+    Io(#[from] Error),
+    /// Some other error occurred.
+    #[error("Other error: {0}")]
+    Other(String),
+}
+
+/// A result type, with the error type [WebsocketError].
+pub type WebsocketResult<T> = std::result::Result<T, WebsocketError>;
 
 type WsStream = tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>;
 type WsSend =
@@ -254,7 +293,7 @@ impl WsCoreSync {
         }
     }
 
-    fn close_if_err<R>(&self, r: Result<R>) -> Result<R> {
+    fn close_if_err<R>(&self, r: WebsocketResult<R>) -> WebsocketResult<R> {
         match r {
             Err(err) => {
                 self.close();
@@ -264,14 +303,14 @@ impl WsCoreSync {
         }
     }
 
-    pub async fn exec<F, C, R>(&self, c: C) -> Result<R>
+    pub async fn exec<F, C, R>(&self, c: C) -> WebsocketResult<R>
     where
-        F: std::future::Future<Output = Result<R>>,
+        F: std::future::Future<Output = WebsocketResult<R>>,
         C: FnOnce(WsCoreSync, WsCore) -> F,
     {
         let core = match self.0.lock().unwrap().as_ref() {
             Some(core) => core.clone(),
-            None => return Err(Error::other("WebsocketClosed")),
+            None => return Err(WebsocketError::Close("No connection".to_string())),
         };
         self.close_if_err(c(self.clone(), core).await)
     }
@@ -294,7 +333,7 @@ impl std::fmt::Debug for WebsocketRespond {
 
 impl WebsocketRespond {
     /// Respond to an incoming request.
-    pub async fn respond<S>(self, s: S) -> Result<()>
+    pub async fn respond<S>(self, s: S) -> WebsocketResult<()>
     where
         S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
@@ -305,11 +344,10 @@ impl WebsocketRespond {
             .exec(move |_, core| async move {
                 tokio::time::timeout(core.timeout, async {
                     let s = WireMessage::response(self.id, s)?;
-                    core.send.lock().await.send(s).await.map_err(Error::other)?;
+                    core.send.lock().await.send(s).await?;
                     Ok(())
                 })
-                .await
-                .map_err(Error::other)?
+                .await?
             })
             .await
     }
@@ -382,7 +420,7 @@ impl WebsocketReceiver {
     }
 
     /// Receive the next message.
-    pub async fn recv<D>(&mut self) -> Result<ReceiveMessage<D>>
+    pub async fn recv<D>(&mut self) -> WebsocketResult<ReceiveMessage<D>>
     where
         D: std::fmt::Debug,
         SerializedBytes: TryInto<D, Error = SerializedBytesError>,
@@ -396,7 +434,7 @@ impl WebsocketReceiver {
         }
     }
 
-    async fn recv_inner<D>(&mut self) -> Result<ReceiveMessage<D>>
+    async fn recv_inner<D>(&mut self) -> WebsocketResult<ReceiveMessage<D>>
     where
         D: std::fmt::Debug,
         SerializedBytes: TryInto<D, Error = SerializedBytesError>,
@@ -413,25 +451,23 @@ impl WebsocketReceiver {
                         .await
                         .next()
                         .await
-                        .ok_or(Error::other("ReceiverClosed"))?
-                        .map_err(Error::other)?;
+                        .ok_or::<WebsocketError>(WebsocketError::Other(
+                            "ReceiverClosed".to_string(),
+                        ))??;
                     let msg = match msg {
                         Message::Text(s) => s.into_bytes(),
                         Message::Binary(b) => b,
                         Message::Ping(b) => {
-                            core.send
-                                .lock()
-                                .await
-                                .send(Message::Pong(b))
-                                .await
-                                .map_err(Error::other)?;
+                            core.send.lock().await.send(Message::Pong(b)).await?;
                             return Ok(None);
                         }
                         Message::Pong(_) => return Ok(None),
                         Message::Close(frame) => {
-                            return Err(Error::other(format!("ReceivedCloseFrame: {frame:?}")));
+                            return Err(WebsocketError::Close(format!("{frame:?}")));
                         }
-                        Message::Frame(_) => return Err(Error::other("UnexpectedRawFrame")),
+                        Message::Frame(_) => {
+                            return Err(WebsocketError::Other("UnexpectedRawFrame".to_string()))
+                        }
                     };
                     match WireMessage::try_from_bytes(msg)? {
                         WireMessage::Authenticate { data } => {
@@ -442,9 +478,8 @@ impl WebsocketReceiver {
                                 id,
                                 core: core_sync,
                             };
-                            let data: D = SerializedBytes::from(UnsafeBytes::from(data))
-                                .try_into()
-                                .map_err(Error::other)?;
+                            let data: D =
+                                SerializedBytes::from(UnsafeBytes::from(data)).try_into()?;
                             tracing::trace!(?data, %id, "InRequest");
                             Ok(Some(ReceiveMessage::Request(data, resp)))
                         }
@@ -477,7 +512,7 @@ pub struct WebsocketSender(WsCoreSync, std::time::Duration);
 
 impl WebsocketSender {
     /// Authenticate with the remote using the default configured timeout.
-    pub async fn authenticate<S>(&self, s: S) -> Result<()>
+    pub async fn authenticate<S>(&self, s: S) -> WebsocketResult<()>
     where
         S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
@@ -486,7 +521,11 @@ impl WebsocketSender {
     }
 
     /// Authenticate with the remote.
-    pub async fn authenticate_timeout<S>(&self, s: S, timeout: std::time::Duration) -> Result<()>
+    pub async fn authenticate_timeout<S>(
+        &self,
+        s: S,
+        timeout: std::time::Duration,
+    ) -> WebsocketResult<()>
     where
         S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
@@ -496,11 +535,10 @@ impl WebsocketSender {
             .exec(move |_, core| async move {
                 tokio::time::timeout(timeout, async {
                     let s = WireMessage::authenticate(s)?;
-                    core.send.lock().await.send(s).await.map_err(Error::other)?;
+                    core.send.lock().await.send(s).await?;
                     Ok(())
                 })
-                .await
-                .map_err(Error::other)?
+                .await?
             })
             .await
     }
@@ -508,7 +546,7 @@ impl WebsocketSender {
     /// Make a request of the remote using the default configured timeout.
     /// Note, this receiver side must be polled (recv()) for responses to
     /// requests made on this sender to be received.
-    pub async fn request<S, R>(&self, s: S) -> Result<R>
+    pub async fn request<S, R>(&self, s: S) -> WebsocketResult<R>
     where
         S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
@@ -518,7 +556,11 @@ impl WebsocketSender {
     }
 
     /// Make a request of the remote.
-    pub async fn request_timeout<S, R>(&self, s: S, timeout: std::time::Duration) -> Result<R>
+    pub async fn request_timeout<S, R>(
+        &self,
+        s: S,
+        timeout: std::time::Duration,
+    ) -> WebsocketResult<R>
     where
         S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
@@ -552,12 +594,11 @@ impl WebsocketSender {
 
                 tokio::time::timeout_at(timeout_at, async move {
                     // send the actual message
-                    core.send.lock().await.send(s).await.map_err(Error::other)?;
+                    core.send.lock().await.send(s).await?;
 
                     Ok(drop)
                 })
-                .await
-                .map_err(Error::other)?
+                .await?
             })
             .await?;
 
@@ -569,19 +610,18 @@ impl WebsocketSender {
             // await the response
             let resp = resp_r
                 .await
-                .map_err(|_| Error::other("ResponderDropped"))??;
+                .map_err(|_| WebsocketError::Other("ResponderDropped".to_string()))??;
 
             // decode the response
-            let res = decode(&Vec::from(UnsafeBytes::from(resp))).map_err(Error::other)?;
+            let res = decode(&Vec::from(UnsafeBytes::from(resp)))?;
             tracing::trace!(?res, %id, "OutRequestResponse");
             Ok(res)
         })
-        .await
-        .map_err(Error::other)?
+        .await?
     }
 
     /// Send a signal to the remote using the default configured timeout.
-    pub async fn signal<S>(&self, s: S) -> Result<()>
+    pub async fn signal<S>(&self, s: S) -> WebsocketResult<()>
     where
         S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
@@ -590,7 +630,7 @@ impl WebsocketSender {
     }
 
     /// Send a signal to the remote.
-    pub async fn signal_timeout<S>(&self, s: S, timeout: std::time::Duration) -> Result<()>
+    pub async fn signal_timeout<S>(&self, s: S, timeout: std::time::Duration) -> WebsocketResult<()>
     where
         S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
@@ -600,11 +640,10 @@ impl WebsocketSender {
             .exec(move |_, core| async move {
                 tokio::time::timeout(timeout, async {
                     let s = WireMessage::signal(s)?;
-                    core.send.lock().await.send(s).await.map_err(Error::other)?;
+                    core.send.lock().await.send(s).await?;
                     Ok(())
                 })
-                .await
-                .map_err(Error::other)?
+                .await?
             })
             .await
     }
@@ -614,7 +653,7 @@ fn split(
     stream: WsStream,
     timeout: std::time::Duration,
     peer_addr: std::net::SocketAddr,
-) -> Result<(WebsocketSender, WebsocketReceiver)> {
+) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
     let (sink, stream) = futures::stream::StreamExt::split(stream);
 
     // Q: Why do we split the parts only to seemingly put them back together?
@@ -642,7 +681,7 @@ fn split(
 pub async fn connect(
     config: Arc<WebsocketConfig>,
     request: impl Into<ConnectRequest>,
-) -> Result<(WebsocketSender, WebsocketReceiver)> {
+) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
     let request = request.into();
     let stream = tokio::net::TcpStream::connect(request.addr).await?;
     let peer_addr = stream.peer_addr()?;
@@ -651,8 +690,7 @@ pub async fn connect(
         stream,
         Some(config.as_tungstenite()),
     )
-    .await
-    .map_err(Error::other)?;
+    .await?;
     split(stream, config.default_request_timeout, peer_addr)
 }
 
@@ -900,7 +938,7 @@ impl WebsocketListener {
     }
 
     /// Accept an incoming connection.
-    pub async fn accept(&self) -> Result<(WebsocketSender, WebsocketReceiver)> {
+    pub async fn accept(&self) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
         let (stream, addr) = self.listener.accept().await?;
         tracing::debug!(?addr, "Accept Incoming Websocket Connection");
         let stream = tokio_tungstenite::accept_hdr_async_with_config(
