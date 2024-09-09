@@ -6,53 +6,38 @@ use std::collections::BTreeSet;
 use std::time::Duration;
 
 use arbitrary::Arbitrary;
-use ed25519_dalek::ed25519::signature::SignerMut;
 use ed25519_dalek::SigningKey;
 use hdk::prelude::{
-    CapAccess, ExternIO, GrantZomeCallCapabilityPayload, GrantedFunctions, Signature, Timestamp,
-    ZomeCallCapGrant, ZomeCallUnsigned,
+    CapAccess, ExternIO, GrantZomeCallCapabilityPayload, GrantedFunctions, ZomeCallCapGrant,
 };
-use hdk::prelude::{CapSecret, CellId, ChainQueryFilter, FunctionName, ZomeName};
+use hdk::prelude::{CapSecret, CellId, FunctionName};
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain::prelude::{Signal, SystemSignal};
-use holochain::sweettest::{
-    authenticate_app_ws_client, network, websocket_client_by_port, WsPollRecv,
-};
+use holochain::sweettest::{authenticate_app_ws_client, websocket_client_by_port, WsPollRecv};
+use holochain_conductor_api::AppRequest;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppResponse};
-use holochain_conductor_api::{AppRequest, ZomeCall};
 use holochain_types::test_utils::{fake_dna_zomes, write_fake_dna_file};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_wasm_test_utils::TestWasmPair;
-use holochain_websocket::{ReceiveMessage, WebsocketReceiver, WebsocketSender};
+use holochain_websocket::{ReceiveMessage, WebsocketSender};
 use kitsune_p2p_types::config::TransportConfig;
 use matches::assert_matches;
 use rand::rngs::OsRng;
 use serde::{de::DeserializeOwned, Serialize};
 use tempfile::TempDir;
-use tokio::task::JoinHandle;
 use url2::Url2;
 
 use crate::tests::test_utils::SupervisedChild;
 use crate::tests::test_utils::{
-    attach_app_interface, call_zome_fn, check_timeout, create_config, grant_zome_call_capability,
-    register_and_install_dna, start_holochain, write_config,
+    attach_app_interface, call_zome_fn, check_timeout, create_config, register_and_install_dna,
+    start_holochain, write_config,
 };
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn get_session_state() {
-    use std::sync::Arc;
-
-    use hdk::prelude::{
-        ActivityRequest, AgentActivity, GetAgentActivityInput, PreflightRequest,
-        PreflightRequestAcceptance, QueryFilter, Role,
-    };
-    use holo_hash::EntryHash;
+    use hdk::prelude::{PreflightRequest, PreflightRequestAcceptance, Role};
     use holochain::prelude::CounterSigningSessionState;
-    use opentelemetry_api::metrics::Counter;
-    use tokio::sync::Mutex;
-    use url2::Url2;
 
     use crate::tests::test_utils::{call_zome_fn_fallible, start_local_services};
 
@@ -62,8 +47,6 @@ async fn get_session_state() {
     let (_local_services, bootstrap_url_recv, signal_url_recv) = start_local_services().await;
     let bootstrap_url = bootstrap_url_recv.await.unwrap();
     let signal_url = signal_url_recv.await.unwrap();
-    println!("bootstrap url {bootstrap_url}");
-    println!("signal url {signal_url}");
 
     let network_seed = uuid::Uuid::new_v4().to_string();
 
@@ -105,69 +88,65 @@ async fn get_session_state() {
     let (bob_app_tx, mut bob_app_rx) = websocket_client_by_port(app_port).await.unwrap();
     authenticate_app_ws_client(bob_app_tx.clone(), bob.admin_port, "test".to_string()).await;
 
-    let session_abandoned = tokio::spawn(async move {
-        if let Ok(ReceiveMessage::Signal(signal)) = bob_app_rx.recv::<AppResponse>().await {
+    let (bob_session_abanded_tx, mut bob_session_abandonded_rx) = tokio::sync::mpsc::channel(1);
+    tokio::spawn(async move {
+        while let Ok(ReceiveMessage::Signal(signal)) = bob_app_rx.recv::<AppResponse>().await {
             match ExternIO::from(signal).decode::<Signal>().unwrap() {
                 Signal::System(system_signal) => match system_signal {
                     SystemSignal::AbandonedCountersigning(entry) => {
-                        println!("bob received system signal to abandon countersigning with entry {entry:?}");
-                        true
+                        let _ = bob_session_abanded_tx.clone().send(entry).await;
                     }
-                    _ => false,
+                    _ => unreachable!(),
                 },
-                _ => false,
+                _ => unreachable!(),
             }
-        } else {
-            false
         }
     });
 
-    // Need an initialised source chain for countersigning, so commit anything.
+    // Need an initialised source chain for countersigning, so commit something.
     // Alice
-    let result: ActionHash = call_zome(&alice, &alice_app_tx, "create_a_thing", &()).await;
-    println!("result is {result:?}");
+    let _: ActionHash = call_zome(&alice, &alice_app_tx, "create_a_thing", &()).await;
 
     // Countersigning session state should not be in Alice's conductor memory yet.
-    let request = AppRequest::GetCounterSigningSessionState(Box::new(alice.cell_id.clone()));
-    let response = alice_app_tx.request(request);
-    let call_response = check_timeout(response, 6000).await.unwrap();
-    match call_response {
+    match request(
+        AppRequest::GetCounterSigningSessionState(Box::new(alice.cell_id.clone())),
+        &alice_app_tx,
+    )
+    .await
+    {
         AppResponse::CounterSigningSessionState(maybe_state) => {
             assert_matches!(*maybe_state, None);
         }
-        _ => panic!("unexpected countersigning session state response"),
+        _ => panic!("unexpected countersigning session state"),
     }
 
     // Bob
-    let result: ActionHash = call_zome(&bob, &bob_app_tx, "create_a_thing", &()).await;
-    println!("result is {result:?}");
+    let _: ActionHash = call_zome(&bob, &bob_app_tx, "create_a_thing", &()).await;
 
     // Countersigning session state should not be in Bob's conductor memory yet.
-    let request = AppRequest::GetCounterSigningSessionState(Box::new(bob.cell_id.clone()));
-    let response = bob_app_tx.request(request);
-    let call_response = check_timeout(response, 6000).await.unwrap();
-    match call_response {
+    match request(
+        AppRequest::GetCounterSigningSessionState(Box::new(bob.cell_id.clone())),
+        &bob_app_tx,
+    )
+    .await
+    {
         AppResponse::CounterSigningSessionState(maybe_state) => {
             assert_matches!(*maybe_state, None);
         }
-        _ => panic!("unexpected countersigning session state response"),
+        _ => panic!("unexpected countersigning session state"),
     }
-
-    // Await consistency.
-    tokio::time::sleep(Duration::from_secs(5)).await;
 
     // Set up the session and accept it for both agents.
     let preflight_request: PreflightRequest = call_zome(
         &alice,
         &alice_app_tx,
-        "generate_countersigning_preflight_request_fast",
+        "generate_countersigning_preflight_request_fast", // 10 sec timeout
         &[
             (alice.cell_id.agent_pubkey().clone(), vec![Role(0)]),
             (bob.cell_id.agent_pubkey().clone(), vec![]),
         ],
     )
     .await;
-
     let alice_acceptance: PreflightRequestAcceptance = call_zome(
         &alice,
         &alice_app_tx,
@@ -181,19 +160,6 @@ async fn get_session_state() {
         } else {
             unreachable!();
         };
-
-    let request = AppRequest::GetCounterSigningSessionState(Box::new(alice.cell_id.clone()));
-    let response = alice_app_tx.request(request);
-    let call_response = check_timeout(response, 6000).await.unwrap();
-    if let AppResponse::CounterSigningSessionState(session_state) = call_response {
-        assert_matches!(
-            *session_state,
-            Some(CounterSigningSessionState::Accepted(_))
-        );
-    } else {
-        unreachable!();
-    }
-
     let bob_acceptance: PreflightRequestAcceptance = call_zome(
         &bob,
         &bob_app_tx,
@@ -207,24 +173,35 @@ async fn get_session_state() {
         unreachable!();
     };
 
-    let request = AppRequest::GetCounterSigningSessionState(Box::new(bob.cell_id.clone()));
-    let response = bob_app_tx.request(request);
-    let call_response = check_timeout(response, 6000).await.unwrap();
-    println!("call response {call_response:?}\n");
-    if let AppResponse::CounterSigningSessionState(session_state) = call_response {
-        assert_matches!(
-            *session_state,
-            Some(CounterSigningSessionState::Accepted(_))
-        );
-    } else {
-        unreachable!();
+    // Countersigning session state should exist for both agents and be in "Accepted" state.
+    match request(
+        AppRequest::GetCounterSigningSessionState(Box::new(alice.cell_id.clone())),
+        &alice_app_tx,
+    )
+    .await
+    {
+        AppResponse::CounterSigningSessionState(maybe_state) => {
+            assert_matches!(*maybe_state, Some(CounterSigningSessionState::Accepted(_)))
+        }
+        _ => panic!("unexpected countersigning session state"),
+    }
+    match request(
+        AppRequest::GetCounterSigningSessionState(Box::new(alice.cell_id.clone())),
+        &alice_app_tx,
+    )
+    .await
+    {
+        AppResponse::CounterSigningSessionState(maybe_state) => {
+            assert_matches!(*maybe_state, Some(CounterSigningSessionState::Accepted(_)))
+        }
+        _ => panic!("unexpected countersigning session state"),
     }
 
-    // Alice commits the countersigning entry.
+    // Alice commits the countersigning entry. Up to 5 retries in case Bob's chain head can not be fetched
+    // immediately.
     let mut tries = 0;
     loop {
         tries += 1;
-        println!("countersign commit entry try {tries}");
         let response = call_zome_fn_fallible(
             &alice_app_tx,
             alice.cell_id.clone(),
@@ -235,13 +212,8 @@ async fn get_session_state() {
             &[alice_response.clone(), bob_response.clone()],
         )
         .await;
-        println!("countersign commit entry response {response:?}\n");
 
-        if let AppResponse::ZomeCalled(result) = response {
-            println!(
-                "result is {:?}",
-                result.decode::<(ActionHash, EntryHash)>().unwrap()
-            );
+        if let AppResponse::ZomeCalled(_) = response {
             break;
         } else if tries == 5 {
             break;
@@ -249,26 +221,41 @@ async fn get_session_state() {
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
 
-    let request = AppRequest::GetCounterSigningSessionState(Box::new(alice.cell_id.clone()));
-    let response = alice_app_tx.request(request);
-    let call_response: AppResponse = check_timeout(response, 6000).await.unwrap();
-    println!("call response 2 {call_response:?}");
-    if let AppResponse::CounterSigningSessionState(session_state) = call_response {
-        println!("cs state {session_state:?}");
-        assert_matches!(
-            *session_state,
-            Some(CounterSigningSessionState::Accepted(_))
-        );
-    } else {
-        unreachable!();
+    // Bob lets the session time out.
+    let _countersigning_entry =
+        tokio::time::timeout(Duration::from_secs(11), bob_session_abandonded_rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+
+    // Bob's session should be gone from memory.
+    match request(
+        AppRequest::GetCounterSigningSessionState(Box::new(bob.cell_id.clone())),
+        &bob_app_tx,
+    )
+    .await
+    {
+        AppResponse::CounterSigningSessionState(session_state) => {
+            assert_matches!(*session_state, None);
+        }
+        _ => panic!("unexpected countersigning session state"),
     }
 
-    let start = std::time::Instant::now();
-    let val = session_abandoned.await;
-    println!(
-        "it took {:?} for the session to be abandoned {val:?}",
-        start.elapsed()
-    );
+    // Alice's session is in an unknown state now. No attempts to resolve should have been made.
+    match request(
+        AppRequest::GetCounterSigningSessionState(Box::new(alice.cell_id.clone())),
+        &alice_app_tx,
+    )
+    .await
+    {
+        AppResponse::CounterSigningSessionState(session_state) => {
+            assert_matches!(
+                *session_state,
+                Some(CounterSigningSessionState::Unknown { resolution, .. }) if resolution.is_none()
+            );
+        }
+        _ => panic!("unexpected countersigning session state"),
+    }
 }
 
 struct Agent {
@@ -292,7 +279,6 @@ async fn setup_agent(bootstrap_url: String, signal_url: String, network_seed: St
         signal_url,
         webrtc_config: None,
     }];
-    println!("network config {:?}", config.network.is_tx5());
     let config_path = write_config(path, &config);
 
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
@@ -361,6 +347,14 @@ async fn setup_agent(bootstrap_url: String, signal_url: String, network_seed: St
         _admin_rx,
         _holochain,
     }
+}
+
+async fn request<T>(request: AppRequest, app_tx: &WebsocketSender) -> T
+where
+    T: std::fmt::Debug + DeserializeOwned,
+{
+    let response = app_tx.request(request);
+    check_timeout::<T>(response, 6000).await.unwrap()
 }
 
 async fn call_zome<I, O>(
