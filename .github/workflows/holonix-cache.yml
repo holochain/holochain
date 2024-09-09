@@ -56,7 +56,7 @@ jobs:
           # Don't exit if this fails so we can clean up the profile
           total_status=0
           for i in result-*; do
-            if ! grep -t "$i"; then
+            if ! cachix push holochain-ci $i; then
               total_status=$((total_status+1))
             fi
           done
