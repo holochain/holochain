@@ -591,6 +591,7 @@ async fn force_abandon_session(space: Space, author: &AgentPubKey) -> SourceChai
         .await?;
 
     if let Some((cs_action, cs_entry_hash, _)) = session_data {
+        tracing::info!("There is a committed session to remove for: {:?}", author);
         abandon_session(
             authored_db,
             author.clone(),
@@ -599,6 +600,10 @@ async fn force_abandon_session(space: Space, author: &AgentPubKey) -> SourceChai
         )
         .await?;
     } else {
+        tracing::info!(
+            "There is no committed session, just a lock to remove for: {:?}",
+            author
+        );
         authored_db
             .write_async({
                 let author = author.clone();
