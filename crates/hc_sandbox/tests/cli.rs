@@ -4,7 +4,8 @@ use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequ
 use holochain_types::app::InstalledAppId;
 use holochain_types::prelude::{SerializedBytes, SerializedBytesError};
 use holochain_websocket::{
-    self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketSender,
+    self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
+    WebsocketSender,
 };
 use matches::assert_matches;
 use std::future::Future;
@@ -71,7 +72,7 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
     assert_matches!(r, AppResponse::AppInfo(Some(_)));
 }
 
-async fn check_timeout<T>(response: impl Future<Output = std::io::Result<T>>) -> T {
+async fn check_timeout<T>(response: impl Future<Output = WebsocketResult<T>>) -> T {
     match tokio::time::timeout(WEBSOCKET_TIMEOUT, response).await {
         Ok(response) => response.expect("Calling websocket failed"),
         Err(_) => {
