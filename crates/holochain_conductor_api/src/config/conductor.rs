@@ -96,8 +96,19 @@ pub struct ConductorConfig {
     pub data_root_path: Option<DataRootPath>,
 
     /// The lair tag used to refer to the "device seed" which was used to generate
-    /// the AgentPubKey for the DPKI cell
+    /// the AgentPubKey for the DPKI cell.
+    ///
+    /// This must not be changed once the conductor has been started for the first time.
     pub device_seed_lair_tag: Option<String>,
+
+    /// If set, and if there is no seed in lair at the tag specified in `device_seed_lair_tag`,
+    /// the conductor will create a random seed and store it in lair at the specified tag.
+    /// This should only be used for test or throwaway environments, because this device seed
+    /// can never be regenerated, which defeats the purpose of having a device seed in the first place.
+    ///
+    /// If `device_seed_lair_tag` is not set, this setting has no effect.
+    #[serde(default)]
+    pub danger_generate_throwaway_device_seed: bool,
 
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
@@ -107,10 +118,7 @@ pub struct ConductorConfig {
     /// started for the first time.
     ///  
     /// If `dna_path` is present, the DNA file at this path will be used to install the DPKI service upon first conductor startup.
-    /// If not present, the Deepkey DNA specified by the `holochain_deepkey_dna` crate will be used instead.
-    ///
-    /// `device_seed_lair_tag` is currently unused but may be required in the future.
-    // TODO: once device seed generation is fully hooked up, make this config required.
+    /// If not present, the Deepkey DNA specified by the `holochain_deepkey_dna` crate and built into Holochain, will be used instead.
     #[serde(default)]
     pub dpki: DpkiConfig,
 
@@ -281,6 +289,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
+                danger_generate_throwaway_device_seed: false,
                 network: Default::default(),
                 dpki: Default::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
@@ -308,6 +317,7 @@ mod tests {
 
     dpki:
       dna_path: path/to/dna.dna
+      network_seed: "deepkey-main"
       device_seed_lair_tag: "device-seed"
 
     admin_interfaces:
@@ -367,13 +377,14 @@ mod tests {
         tuning_params.tx5_min_ephemeral_udp_port = 40000;
         tuning_params.tx5_max_ephemeral_udp_port = 40255;
         network_config.tuning_params = std::sync::Arc::new(tuning_params);
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
-                dpki: DpkiConfig::new(Some("path/to/dna.dna".into())),
+                danger_generate_throwaway_device_seed: false,
+                dpki: DpkiConfig::production(Some("path/to/dna.dna".into())),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket {
@@ -407,6 +418,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
+                danger_generate_throwaway_device_seed: false,
                 network: Default::default(),
                 dpki: Default::default(),
                 keystore: KeystoreConfig::LairServer {

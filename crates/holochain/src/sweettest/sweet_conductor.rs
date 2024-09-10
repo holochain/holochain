@@ -330,7 +330,7 @@ impl SweetConductor {
         dbg!();
         let agent = self
             .raw_handle()
-            .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof)
+            .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof, None)
             .await?;
 
         dbg!();

@@ -3160,6 +3160,8 @@ dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_types",
  "matches",
+ "nanoid",
+ "pretty_assertions",
  "rmp-serde",
  "serde",
  "serde_json",
