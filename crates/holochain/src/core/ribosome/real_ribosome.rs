@@ -376,10 +376,7 @@ impl RealRibosome {
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    pub async fn build_module(
-        &self,
-        zome_name: &ZomeName,
-    ) -> RibosomeResult<Arc<Module>> {
+    pub async fn build_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
         // When running tests, use cache folder accessible to all tests.
         #[cfg(test)]
@@ -928,9 +925,7 @@ impl RibosomeT for RealRibosome {
                         let module = if let Some(path) = get_preserialized_path(wasm_zome) {
                             self.prebuilt_module(path)?
                         } else {
-                            tokio_helper::block_forever_on(
-                                self.build_module(zome.zome_name()),
-                            )?
+                            tokio_helper::block_forever_on(self.build_module(zome.zome_name()))?
                         };
                         self.get_extern_fns_for_wasm(module.clone())
                     }
