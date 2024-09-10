@@ -200,7 +200,7 @@ where
 
                         // Immediately unlocking the chain is safe because we know that the
                         // countersigning commit hasn't been written to the source chain here.
-                        // We still to clean up the session state in the countersigning workspace
+                        // We still need to clean up the session state in the countersigning workspace
                         // though, so trigger the countersigning workflow and let it figure out
                         // what happened.
                         trigger_countersigning.trigger(&"invalid_countersigning_commit");
