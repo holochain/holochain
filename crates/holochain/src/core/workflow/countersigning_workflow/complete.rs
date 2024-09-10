@@ -3,13 +3,16 @@ use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::{WorkflowError, WorkflowResult};
 use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
-use holochain_keystore::AgentPubKeyExt;
+use holochain_chc::AddRecordPayload;
+use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::db::ReadAccess;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::mutations;
-use holochain_state::prelude::{current_countersigning_session, SourceChainResult, Store};
+use holochain_state::prelude::{
+    current_countersigning_session, SourceChainError, SourceChainResult, Store,
+};
 use holochain_types::dht_op::ChainOp;
 use holochain_zome_types::prelude::SignedAction;
 use kitsune_p2p_types::dht::prelude::Timestamp;
@@ -19,6 +22,7 @@ use std::sync::Arc;
 pub(crate) async fn inner_countersigning_session_complete(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,
+    keystore: MetaLairClient,
     author: AgentPubKey,
     signed_actions: Vec<SignedAction>,
     integration_trigger: TriggerSender,
@@ -46,7 +50,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         let author = author.clone();
         move |txn: Transaction| {
             // This chain lock isn't necessarily for the current session, we can't check that until later.
-            if let Some((_, cs_entry_hash, session_data)) =
+            if let Some((session_record, cs_entry_hash, session_data)) =
                 current_countersigning_session(&txn, Arc::new(author.clone()))?
             {
                 let lock_subject = holo_hash::encode::blake2b_256(
@@ -64,7 +68,7 @@ pub(crate) async fn inner_countersigning_session_complete(
 
                     let transaction: holochain_state::prelude::Txn = (&txn).into();
                     if transaction.contains_entry(&entry_hash)? {
-                        return Ok(Some(session_data));
+                        return Ok(Some((session_record, session_data)));
                     }
                 }
             }
@@ -72,7 +76,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         }
     };
 
-    let session_data = match authored_db.read_async(reader_closure).await? {
+    let (session_record, session_data) = match authored_db.read_async(reader_closure).await? {
         Some(cs) => cs,
         None => {
             // If there is no active session then we can short circuit.
@@ -136,6 +140,24 @@ pub(crate) async fn inner_countersigning_session_complete(
         // If the integrity check fails then we can't proceed with this signature bundle.
         tracing::debug!("Integrity check failed for countersigning session");
         return Ok(None);
+    }
+
+    if let Some(chc) = network.chc() {
+        let payload =
+            AddRecordPayload::from_records(keystore, author.clone(), vec![session_record])
+                .await
+                .map_err(SourceChainError::other)?;
+
+        // This is a serious failure, but we have to continue with the workflow.
+        // It would be worse to not publish the session record than to be out of sync with the CHC.
+        // Being behind the CHC is a recoverable state, or should be at some point. We don't want
+        // to try and figure out a partial publish of the session record from an unknown state.
+        if let Err(e) = chc.add_records_request(payload).await {
+            tracing::error!(
+                "Failed to add countersigning session record to the CHC: {:?}",
+                e
+            );
+        }
     }
 
     apply_success_state_changes(space, &author, this_cells_action_hash, integration_trigger)

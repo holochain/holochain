@@ -58,7 +58,7 @@ pub async fn inner_countersigning_session_incomplete(
     // Now things get more complicated. We have a countersigning entry on our chain but the session
     // is in a bad state. We need to figure out what the session state is and how to resolve it.
 
-    let (cs_action, cs_entry_hash, session_data) = maybe_current_session.unwrap();
+    let (cs_record, cs_entry_hash, session_data) = maybe_current_session.unwrap();
 
     // We need to find out what state the other signing agents are in.
     // TODO Note that we are ignoring the optional signing agents here - that's something we can figure out later because it's not clear what it means for them
@@ -278,7 +278,7 @@ pub async fn inner_countersigning_session_incomplete(
         session_data.preflight_request().signing_agents.len() - 1
     );
 
-    signatures.push(cs_action.clone().into());
+    signatures.push(cs_record.signed_action.clone().into());
 
     if signatures.len() == session_data.preflight_request().signing_agents.len() {
         // We have all the signatures we need to complete the session. We can complete the session
@@ -299,7 +299,7 @@ pub async fn inner_countersigning_session_incomplete(
         // to try and process the new signature bundle. We communicate completion here but the
         // caller must not change the session state based on this response.
         return Ok((
-            SessionCompletionDecision::Complete(cs_action.into()),
+            SessionCompletionDecision::Complete(cs_record.signed_action.clone().into()),
             Vec::with_capacity(0),
         ));
     } else if abandoned.len() == session_data.preflight_request().signing_agents.len() - 1 {
@@ -310,7 +310,7 @@ pub async fn inner_countersigning_session_incomplete(
         countersigning_workflow::abandon_session(
             authored_db,
             author.clone(),
-            cs_action.action().clone(),
+            cs_record.action().clone(),
             cs_entry_hash,
         )
         .await?;
