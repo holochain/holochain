@@ -2993,6 +2993,9 @@ mod misc_impls {
         /// Inject records into a source chain for a cell.
         /// If the records form a chain segment that can be "grafted" onto the existing chain, it will be.
         /// Otherwise, a new chain will be formed using the specified records.
+        //
+        // TODO: could integrate this better with [`SourceChain::flush`] when re-visit our workflows
+        //       and use them more consistently for moving data around
         pub async fn graft_records_onto_source_chain(
             self: Arc<Self>,
             cell_id: CellId,
@@ -3020,10 +3023,6 @@ mod misc_impls {
                 .holochain_p2p()
                 .clone()
                 .into_dna(dna_hash.clone(), self.get_chc(&cell_id));
-
-            todo!("Make sure to implement Relaxed mode, rebasing scratch records onto the grafted data from CHC.
-                This can be more tightly integrated into the chain flush after all.");
-            todo!("Also remember it's OK to not publish grafted records, since they were likely already published.");
 
             // Validate
             if validate {

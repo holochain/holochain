@@ -1107,21 +1107,21 @@ pub async fn genesis(
 
     let mut ops_to_integrate = Vec::new();
 
+    // Sync with CHC, if CHC is present
     if let Some(chc) = chc {
-        let payload = AddRecordPayload::from_records(
-            keystore.clone(),
-            agent_pubkey.clone(),
-            vec![dna_record, agent_validation_record, agent_record],
+        let chain = SourceChain::raw_empty(
+            authored.clone(),
+            dht_db.clone(),
+            dht_db_cache.clone(),
+            keystore,
+            agent_pubkey,
         )
-        .await
-        .map_err(SourceChainError::other)?;
-
-        match chc.add_records_request(payload).await {
-            Err(e @ ChcError::InvalidChain(_, _)) => {
-                Err(SourceChainError::ChcHeadMoved("genesis".into(), e))
-            }
-            e => e.map_err(SourceChainError::other),
-        }?;
+        .await?;
+        let records = vec![dna_record, agent_validation_record, agent_record];
+        chain
+            .sync_records(chc, records)
+            .await
+            .map_err(SourceChainError::other)?;
     }
 
     let ops_to_integrate = authored

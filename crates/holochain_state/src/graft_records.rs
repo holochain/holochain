@@ -9,6 +9,8 @@ impl SourceChain {
     /// Attempt to add the given records to the CHC.
     /// If the CHC is already in sync with the local state, it will accept the new records and return `Ok`.
     /// If not, the local state will instead be updated, the new records will not be accepted, and an `Err` will be returned.
+    //
+    // TODO: add Scratch awareness to this, so that [`ChainTopOrdering::Relaxed`] can be respected.
     pub async fn sync_records(
         &self,
         chc: ChcImpl,
