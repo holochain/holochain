@@ -339,7 +339,7 @@ impl SourceChain {
                             return Err(SourceChainError::ChainLocked);
                         }
                         // If the lock is expired then we can't write this countersigning session.
-                        else if chain_lock.is_expired() {
+                        else if chain_lock.is_expired_at(now) {
                             return Err(SourceChainError::LockExpired);
                         }
 
