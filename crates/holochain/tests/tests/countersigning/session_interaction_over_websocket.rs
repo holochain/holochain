@@ -52,7 +52,7 @@ async fn get_session_state() {
     let network_seed = uuid::Uuid::new_v4().to_string();
 
     // Setup two agents on two conductors.
-    let mut alice = setup_agent(
+    let (_alice_dir, mut alice) = setup_agent(
         bootstrap_url.clone(),
         signal_url.clone(),
         network_seed.clone(),
@@ -81,7 +81,7 @@ async fn get_session_state() {
         }
     });
 
-    let mut bob = setup_agent(bootstrap_url, signal_url, network_seed.clone()).await;
+    let (_bob_dir, mut bob) = setup_agent(bootstrap_url, signal_url, network_seed.clone()).await;
 
     // Attach app interface to Bob's conductor.
     let app_port = attach_app_interface(&mut bob.admin_tx, None).await;
@@ -273,7 +273,7 @@ struct Agent {
     _admin_rx: WsPollRecv,
 }
 
-async fn setup_agent(bootstrap_url: String, signal_url: String, network_seed: String) -> Agent {
+async fn setup_agent(bootstrap_url: String, signal_url: String, network_seed: String) -> (TempDir, Agent) {
     let admin_port = 0;
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
@@ -343,7 +343,7 @@ async fn setup_agent(bootstrap_url: String, signal_url: String, network_seed: St
     let response = check_timeout(response, 3000).await.unwrap();
     assert_matches!(response, AdminResponse::ZomeCallCapabilityGranted);
 
-    Agent {
+    (tmp_dir, Agent {
         admin_tx,
         admin_port,
         cell_id,
@@ -351,7 +351,7 @@ async fn setup_agent(bootstrap_url: String, signal_url: String, network_seed: St
         cap_secret,
         _admin_rx,
         _holochain,
-    }
+    })
 }
 
 async fn request<T>(request: AppRequest, app_tx: &WebsocketSender) -> T
