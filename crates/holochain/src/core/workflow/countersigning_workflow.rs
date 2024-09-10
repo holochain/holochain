@@ -33,6 +33,7 @@ mod success;
 mod tests;
 
 pub(crate) use accept::accept_countersigning_request;
+use holochain_keystore::MetaLairClient;
 pub(crate) use success::countersigning_success;
 
 /// Countersigning workspace to hold session state.
@@ -190,6 +191,7 @@ enum SessionCompletionDecision {
 pub(crate) async fn countersigning_workflow(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,
+    keystore: MetaLairClient,
     cell_id: CellId,
     signal_tx: Sender<Signal>,
     self_trigger: TriggerSender,
@@ -284,6 +286,7 @@ pub(crate) async fn countersigning_workflow(
             match complete::inner_countersigning_session_complete(
                 space.clone(),
                 network.clone(),
+                keystore.clone(),
                 author.clone(),
                 signature_bundle.clone(),
                 integration_trigger.clone(),

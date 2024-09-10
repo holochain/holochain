@@ -1,4 +1,6 @@
-use hdk::prelude::{PreflightRequest, PreflightRequestAcceptance};
+use hdk::prelude::{
+    PreflightRequest, PreflightRequestAcceptance, Signature, SignedActionHashed, Timestamp,
+};
 use holo_hash::{ActionHash, EntryHash};
 use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};
 use holochain::conductor::CellError;
@@ -8,12 +10,14 @@ use holochain::sweettest::{
     await_consistency, SweetCell, SweetConductor, SweetConductorBatch, SweetConductorConfig,
     SweetDnaFile,
 };
+use holochain_nonce::fresh_nonce;
 use holochain_state::prelude::{IncompleteCommitReason, SourceChainError};
 use holochain_types::app::DisabledAppReason;
 use holochain_types::prelude::Signal;
 use holochain_types::signal::SystemSignal;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::countersigning::Role;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 
@@ -665,6 +669,238 @@ async fn wait_for_completion(mut signal_rx: Receiver<Signal>, expected_hash: Ent
     }
 }
 
+#[cfg(feature = "chc")]
+#[tokio::test(flavor = "multi_thread")]
+async fn complete_session_with_chc_enabled() {
+    holochain_trace::test_run();
+
+    let mut config = SweetConductorConfig::rendezvous(true);
+    config.chc_url = Some(url2::Url2::parse(
+        holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
+    ));
+
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
+    let apps = conductors.setup_app("app", &[dna]).await.unwrap();
+    let cells = apps.cells_flattened();
+    let alice = &cells[0];
+    let bob = &cells[1];
+
+    let alice_chc = conductors[0].get_chc(alice.cell_id()).unwrap();
+
+    // Need an initialised source chain for countersigning, so commit anything
+    let alice_zome = alice.zome(TestWasm::CounterSigning);
+    let _: ActionHash = conductors[0]
+        .call_fallible(&alice_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+    let bob_zome = bob.zome(TestWasm::CounterSigning);
+    let _: ActionHash = conductors[1]
+        .call_fallible(&bob_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+
+    await_consistency(30, vec![alice, bob]).await.unwrap();
+
+    // Set up the session and accept it for both agents
+    let preflight_request: PreflightRequest = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "generate_countersigning_preflight_request_fast",
+            vec![
+                (alice.agent_pubkey().clone(), vec![Role(0)]),
+                (bob.agent_pubkey().clone(), vec![]),
+            ],
+        )
+        .await
+        .unwrap();
+    let alice_acceptance: PreflightRequestAcceptance = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "accept_countersigning_preflight_request",
+            preflight_request.clone(),
+        )
+        .await
+        .unwrap();
+    let alice_response =
+        if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
+            response
+        } else {
+            unreachable!();
+        };
+    let bob_acceptance: PreflightRequestAcceptance = conductors[1]
+        .call_fallible(
+            &bob_zome,
+            "accept_countersigning_preflight_request",
+            preflight_request.clone(),
+        )
+        .await
+        .unwrap();
+    let bob_response = if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
+        response
+    } else {
+        unreachable!();
+    };
+
+    let before_chain = get_all_records(&alice_chc).await.unwrap();
+
+    let (_, _): (ActionHash, EntryHash) = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "create_a_countersigned_thing_with_entry_hash",
+            vec![alice_response.clone(), bob_response.clone()],
+        )
+        .await
+        .unwrap();
+
+    let between_chain = get_all_records(&alice_chc).await.unwrap();
+
+    let (_, _): (ActionHash, EntryHash) = conductors[1]
+        .call_fallible(
+            &bob_zome,
+            "create_a_countersigned_thing_with_entry_hash",
+            vec![alice_response.clone(), bob_response.clone()],
+        )
+        .await
+        .unwrap();
+
+    let alice_rx = conductors[0].subscribe_to_app_signals("app".into());
+    let bob_rx = conductors[1].subscribe_to_app_signals("app".into());
+
+    wait_for_completion(alice_rx, preflight_request.app_entry_hash.clone()).await;
+    wait_for_completion(bob_rx, preflight_request.app_entry_hash).await;
+
+    let after_chain = get_all_records(&alice_chc).await.unwrap();
+
+    // Should not appear in the CHC after commit, must wait for publish
+    assert_eq!(before_chain.len(), between_chain.len());
+
+    // Should appear in the CHC after publish
+    assert_eq!(before_chain.len() + 1, after_chain.len());
+}
+
+#[cfg(feature = "chc")]
+#[tokio::test(flavor = "multi_thread")]
+async fn session_rollback_with_chc_enabled() {
+    holochain_trace::test_run();
+
+    let mut config = SweetConductorConfig::rendezvous(true);
+    config.chc_url = Some(url2::Url2::parse(
+        holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
+    ));
+
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
+    let apps = conductors.setup_app("app", &[dna]).await.unwrap();
+    let cells = apps.cells_flattened();
+    let alice = &cells[0];
+    let bob = &cells[1];
+
+    let alice_chc = conductors[0].get_chc(alice.cell_id()).unwrap();
+
+    // Subscribe early in the test to avoid missing signals later
+    let alice_signal_rx = conductors[0].subscribe_to_app_signals("app".into());
+    let bob_signal_rx = conductors[1].subscribe_to_app_signals("app".into());
+
+    // Need an initialised source chain for countersigning, so commit anything
+    let alice_zome = alice.zome(TestWasm::CounterSigning);
+    let _: ActionHash = conductors[0]
+        .call_fallible(&alice_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+    let bob_zome = bob.zome(TestWasm::CounterSigning);
+    let _: ActionHash = conductors[1]
+        .call_fallible(&bob_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+
+    await_consistency(30, vec![alice, bob]).await.unwrap();
+
+    // Set up the session and accept it for both agents
+    let preflight_request: PreflightRequest = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "generate_countersigning_preflight_request_fast",
+            vec![
+                (alice.agent_pubkey().clone(), vec![Role(0)]),
+                (bob.agent_pubkey().clone(), vec![]),
+            ],
+        )
+        .await
+        .unwrap();
+    let alice_acceptance: PreflightRequestAcceptance = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "accept_countersigning_preflight_request",
+            preflight_request.clone(),
+        )
+        .await
+        .unwrap();
+    let alice_response =
+        if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
+            response
+        } else {
+            unreachable!();
+        };
+    let bob_acceptance: PreflightRequestAcceptance = conductors[1]
+        .call_fallible(
+            &bob_zome,
+            "accept_countersigning_preflight_request",
+            preflight_request.clone(),
+        )
+        .await
+        .unwrap();
+    let bob_response = if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
+        response
+    } else {
+        unreachable!();
+    };
+
+    let before_chain = get_all_records(&alice_chc).await.unwrap();
+
+    // Alice goes ahead and commits. This must not go to the CHC yet!
+    let (_, _): (ActionHash, EntryHash) = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "create_a_countersigned_thing_with_entry_hash",
+            vec![alice_response.clone(), bob_response.clone()],
+        )
+        .await
+        .unwrap();
+
+    let between_chain = get_all_records(&alice_chc).await.unwrap();
+
+    // Bob does not commit, and instead abandons the session
+
+    // Bob's session should time out and be abandoned
+    wait_for_abandoned(bob_signal_rx, preflight_request.app_entry_hash.clone()).await;
+
+    // Alice session should also get abandoned
+    wait_for_abandoned(alice_signal_rx, preflight_request.app_entry_hash.clone()).await;
+
+    let after_chain = get_all_records(&alice_chc).await.unwrap();
+
+    // Alice will now be allowed to commit other entries
+    let _: ActionHash = conductors[0]
+        .call_fallible(&alice_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+
+    let future_chain = get_all_records(&alice_chc).await.unwrap();
+
+    // Should not appear in the CHC after commit, must wait for publish
+    assert_eq!(before_chain.len(), between_chain.len());
+    // Publish didn't happen, so should not have been added to the CHC
+    assert_eq!(between_chain.len(), after_chain.len());
+    // Now we've written something new to the chain, so the CHC should have been updated
+    assert_eq!(before_chain.len() + 1, future_chain.len());
+
+    // Everyone's DHT should sync
+    await_consistency(60, [alice, bob]).await.unwrap();
+}
+
 async fn wait_for_abandoned(mut signal_rx: Receiver<Signal>, expected_hash: EntryHash) {
     let signal = tokio::time::timeout(std::time::Duration::from_secs(30), signal_rx.recv())
         .await
@@ -681,4 +917,25 @@ async fn wait_for_abandoned(mut signal_rx: Receiver<Signal>, expected_hash: Entr
             );
         }
     }
+}
+
+#[cfg(feature = "chc")]
+async fn get_all_records(
+    chc: &holochain_chc::ChcImpl,
+) -> holochain_chc::ChcResult<
+    Vec<(
+        SignedActionHashed,
+        Option<(Arc<holochain_chc::EncryptedEntry>, Signature)>,
+    )>,
+> {
+    use holochain_types::fixt::SignatureFixturator;
+
+    chc.get_record_data_request(holochain_chc::GetRecordsRequest {
+        payload: holochain_chc::GetRecordsPayload {
+            since_hash: None,
+            nonce: fresh_nonce(Timestamp::now()).unwrap().0,
+        },
+        signature: fixt::fixt!(Signature),
+    })
+    .await
 }
