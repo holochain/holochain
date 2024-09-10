@@ -29,10 +29,20 @@ pub async fn default_with_network(
         root,
         in_process_lair,
         no_dpki,
+        #[cfg(feature = "chc")]
+        chc_url,
         ..
     } = create;
     let network = Network::to_kitsune(&NetworkCmd::as_inner(&network)).await;
-    let path = crate::generate::generate(network, root, directory, in_process_lair, no_dpki)?;
+    let path = crate::generate::generate(
+        network,
+        root,
+        directory,
+        in_process_lair,
+        no_dpki,
+        #[cfg(feature = "chc")]
+        chc_url,
+    )?;
     let conductor = run_async(holochain_path, path.clone(), None, structured).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
     let install_bundle = InstallApp {
