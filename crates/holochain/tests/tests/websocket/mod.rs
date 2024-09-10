@@ -171,7 +171,7 @@ async fn call_zome() {
     .unwrap();
 
     // Attach App Interface
-    let app_port = attach_app_interface(&mut admin_tx, None).await;
+    let app_port = attach_app_interface(&admin_tx, None).await;
 
     let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
     let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
@@ -344,7 +344,10 @@ async fn emit_signals() {
         installed_app_id: "test".to_string(),
     };
     let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await.unwrap();
+    let response = tokio::time::timeout(Duration::from_secs(3), response)
+        .await
+        .expect("Timeout waiting for response")
+        .unwrap();
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
     // Generate signing key pair
@@ -366,7 +369,7 @@ async fn emit_signals() {
     .unwrap();
 
     // Attach App Interface
-    let app_port = attach_app_interface(&mut admin_tx, None).await;
+    let app_port = attach_app_interface(&admin_tx, None).await;
 
     ///////////////////////////////////////////////////////
     // Emit signals (the real test!)
@@ -1005,4 +1008,88 @@ async fn emit_signal_after_app_connection_closed() {
     // That should not be received because the app interface is disconnected
     // TODO assert that the tasks for this connection were shutdown and removed by this point.
     //      Can't currently do that with TaskMotel which I think is the right thing to query here.
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn filter_messages_that_do_not_deserialize() {
+    holochain_trace::test_run();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+        .await
+        .0;
+
+    conductor.setup_app("app", &[dna_file]).await.unwrap();
+
+    let admin_port = conductor
+        .get_arbitrary_admin_websocket_port()
+        .expect("No admin port open on conductor");
+
+    let mut config = WebsocketConfig::CLIENT_DEFAULT;
+    config.default_request_timeout = Duration::from_secs(1);
+    let config = Arc::new(config);
+
+    let (admin_client, rx) = connect(
+        config.clone(),
+        ConnectRequest::new(
+            format!("localhost:{admin_port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .ok_or_else(|| Error::other("Could not resolve localhost"))
+                .unwrap(),
+        ),
+    )
+    .await
+    .unwrap();
+    let _rx = WsPollRecv::new::<AdminResponse>(rx);
+
+    // Try sending an app request to the admin interface
+    admin_client
+        .request::<_, AppResponse>(AppRequest::AppInfo)
+        .await
+        .unwrap_err();
+
+    // Now the connection should still be usable
+    for _ in 0..5 {
+        let response: AdminResponse = admin_client.request(AdminRequest::ListDnas).await.unwrap();
+        match response {
+            AdminResponse::DnasListed(_) => (),
+            r => panic!("unexpected response: {:?}", r),
+        }
+    }
+
+    let app_port = attach_app_interface(&admin_client, None).await;
+
+    let (app_client, app_rx) = connect(
+        config,
+        ConnectRequest::new(
+            format!("localhost:{app_port}")
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .ok_or_else(|| Error::other("Could not resolve localhost"))
+                .unwrap(),
+        ),
+    )
+    .await
+    .unwrap();
+    let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
+    authenticate_app_ws_client(app_client.clone(), admin_port, "test".to_string()).await;
+
+    // Try sending an admin request to the app interface
+    app_client
+        .request::<_, AdminResponse>(AdminRequest::ListDnas)
+        .await
+        .unwrap_err();
+
+    // Now the connection should still be usable
+    for _ in 0..5 {
+        let response: AppResponse = app_client.request(AppRequest::AppInfo).await.unwrap();
+        match response {
+            AppResponse::AppInfo(_) => (),
+            r => panic!("unexpected response: {:?}", r),
+        }
+    }
 }
