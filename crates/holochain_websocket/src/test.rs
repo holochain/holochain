@@ -92,8 +92,11 @@ async fn blocks_connect_with_mismatched_origin() {
 
         match l.accept().await {
             Ok(_) => panic!("should not have accepted"),
-            Err(e) => {
+            Err(WebsocketError::Io(e)) => {
                 assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
+            }
+            Err(e) => {
+                panic!("unexpected error: {:?}", e);
             }
         }
     });
@@ -110,8 +113,11 @@ async fn blocks_connect_with_mismatched_origin() {
         .await
         {
             Ok(_) => panic!("should not have connected"),
-            Err(e) => {
+            Err(WebsocketError::Websocket(e)) => {
                 assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
+            }
+            Err(e) => {
+                panic!("unexpected error: {:?}", e);
             }
         }
     });
@@ -141,8 +147,11 @@ async fn blocks_connect_without_origin() {
 
         match l.accept().await {
             Ok(_) => panic!("should not have accepted"),
-            Err(e) => {
+            Err(WebsocketError::Io(e)) => {
                 assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
+            }
+            Err(e) => {
+                panic!("unexpected error: {:?}", e);
             }
         }
     });
@@ -157,8 +166,11 @@ async fn blocks_connect_without_origin() {
         .await
         {
             Ok(_) => panic!("should not have connected"),
-            Err(e) => {
+            Err(WebsocketError::Websocket(e)) => {
                 assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
+            }
+            Err(e) => {
+                panic!("unexpected error: {:?}", e);
             }
         }
     });
@@ -357,9 +369,7 @@ async fn handle_client_close() {
                     Ok(_) => {
                         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                     }
-                    Err(e)
-                        if e.kind() == ErrorKind::Other && e.to_string() == "WebsocketClosed" =>
-                    {
+                    Err(WebsocketError::Close(_)) => {
                         break;
                     }
                     Err(e) => {

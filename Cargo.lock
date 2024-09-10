@@ -3644,6 +3644,7 @@ dependencies = [
  "holochain_types",
  "serde",
  "serde_bytes",
+ "thiserror",
  "tokio",
  "tokio-tungstenite",
  "tracing",
