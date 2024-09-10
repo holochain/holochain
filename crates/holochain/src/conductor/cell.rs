@@ -215,7 +215,7 @@ impl Cell {
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
 
-            dbg!();
+        dbg!();
         if let Some(trigger) = conductor_handle
             .get_queue_consumer_workflows()
             .integration_trigger(Arc::new(cell_id.dna_hash().clone()))

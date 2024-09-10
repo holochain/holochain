@@ -3081,10 +3081,13 @@ mod misc_impls {
             let ribosome = self.get_ribosome(dna_hash)?;
 
             // XXX: probably unnecessary clone
-            let ops = chain
-                .graft_records_onto_source_chain(records.clone())
-                .await?;
             let space = self.get_or_create_space(dna_hash)?;
+            let op_hashes = chain
+                .graft_records_onto_source_chain(records.clone())
+                .await?
+                .into_iter()
+                .map(|(hash, _basis)| hash)
+                .collect();
             let workspace = space
                 .source_chain_workspace(self.keystore().clone(), agent_pubkey.clone())
                 .await?;
@@ -3106,9 +3109,13 @@ mod misc_impls {
                 .await?;
             }
 
-            // Integrate
-            holochain_state::integrate::authored_ops_to_dht_db(
-                &network, ops, authored, dht, &cache,
+            // Integrate the ops.
+            // XXX: this is not checking for authorityship and just integrating everything we author,
+            //      which is wasteful of disk space in a sharded network, but not dangerous.
+            //      The reason for doing this is that when doing a CHC sync during genesis, we have not
+            //      yet joined the network, so we can't actually check authorityship at that time.
+            holochain_state::integrate::authored_ops_to_dht_db_without_check(
+                op_hashes, authored, dht, &cache,
             )
             .await?;
 
