@@ -1608,7 +1608,7 @@ mod app_impls {
                 let genesis_result =
                     crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
 
-                    dbg!();
+                dbg!();
                 if genesis_result.is_ok() || flags.ignore_genesis_failure {
                     let roles = ops.role_assignments;
                     let app = InstalledAppCommon::new(
@@ -1643,7 +1643,7 @@ mod app_impls {
                         .await
                         .map_err(|e| DpkiServiceError::Lair(e.into()))?;
 
-                        dbg!();
+                    dbg!();
                     let signature = deepkey_roundtrip_backward!(Signature, &signature);
 
                     dbg!();
@@ -1652,7 +1652,7 @@ mod app_impls {
                         .map(|c| deepkey_roundtrip_backward!(DnaHash, c.dna_hash()))
                         .collect();
 
-                        dbg!();
+                    dbg!();
                     let agent_key = deepkey_roundtrip_backward!(AgentPubKey, &agent_key);
 
                     let input = CreateKeyInput {
@@ -3692,21 +3692,18 @@ mod direct_db_access_impls {
     use super::*;
 
     impl Conductor {
-        pub(crate) fn get_dht_db(
-            &self,
-            dna_hash: &DnaHash,
-        ) -> ConductorApiResult<DbWrite<DbKindDht>> {
+        pub fn get_dht_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>> {
             Ok(self.get_or_create_dht_db(dna_hash)?)
         }
 
-        pub(crate) fn get_dht_db_cache(
+        pub fn get_dht_db_cache(
             &self,
             dna_hash: &DnaHash,
         ) -> ConductorApiResult<holochain_types::db_cache::DhtDbQueryCache> {
             Ok(self.get_or_create_space(dna_hash)?.dht_query_cache)
         }
 
-        pub(crate) async fn get_cache_db(
+        pub async fn get_cache_db(
             &self,
             cell_id: &CellId,
         ) -> ConductorApiResult<DbWrite<DbKindCache>> {
@@ -3714,15 +3711,15 @@ mod direct_db_access_impls {
             Ok(cell.cache().clone())
         }
 
-        pub(crate) fn get_p2p_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pAgents> {
+        pub fn get_p2p_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pAgents> {
             self.p2p_agents_db(space)
         }
 
-        pub(crate) fn get_p2p_metrics_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
+        pub fn get_p2p_metrics_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
             self.p2p_metrics_db(space)
         }
 
-        pub(crate) fn get_spaces(&self) -> Spaces {
+        pub fn get_spaces(&self) -> Spaces {
             self.spaces.clone()
         }
     }
@@ -3786,7 +3783,7 @@ pub(crate) async fn genesis_cells(
                 .get_or_create_space(cell_id_inner.dna_hash())
                 .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))?;
 
-                dbg!();
+            dbg!();
             let authored_db =
                 space.get_or_create_authored_db(cell_id_inner.agent_pubkey().clone())?;
             let dht_db = space.dht_db;
@@ -3796,7 +3793,7 @@ pub(crate) async fn genesis_cells(
                 .get_ribosome(cell_id_inner.dna_hash())
                 .map_err(Box::new)?;
 
-                dbg!();
+            dbg!();
             Cell::genesis(
                 cell_id_inner.clone(),
                 conductor,
