@@ -23,13 +23,8 @@ impl ChainLock {
         &self.subject
     }
 
-    /// Check whether the lock is expired at the current time.
-    pub fn is_expired(&self) -> bool {
-        self.is_expired_at(Timestamp::now())
-    }
-
     /// Check whether the lock is still valid at the given time.
-    fn is_expired_at(&self, timestamp: Timestamp) -> bool {
+    pub fn is_expired_at(&self, timestamp: Timestamp) -> bool {
         timestamp > self.expires_at
     }
 }
@@ -109,7 +104,7 @@ mod tests {
             .await
             .unwrap();
         assert!(lock.is_some());
-        assert!(!lock.as_ref().unwrap().is_expired());
+        assert!(!lock.as_ref().unwrap().is_expired_at(Timestamp::now()));
         assert_eq!(&[1, 2, 3], lock.as_ref().unwrap().subject());
         // In the future, the lock should be expired
         assert!(lock
