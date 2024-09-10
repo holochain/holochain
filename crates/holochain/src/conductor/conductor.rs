@@ -3072,9 +3072,9 @@ mod misc_impls {
             let CellId(dna_hash, agent_pubkey) = &cell_id;
             let ribosome = self.get_ribosome(dna_hash)?;
 
-            // XXX: probably unnecessary clone
             let space = self.get_or_create_space(dna_hash)?;
             let op_hashes = chain
+                // XXX: probably unnecessary clone
                 .graft_records_onto_source_chain(records.clone())
                 .await?
                 .into_iter()

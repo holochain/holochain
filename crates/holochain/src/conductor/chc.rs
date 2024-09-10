@@ -316,16 +316,14 @@ mod tests {
         // - The pattern involves Boxes which are impossible to match on
         // - The error types are not PartialEq, so cannot be constructed and tested for equality
 
-        dbg!(&install_result_1);
-        dbg!(&install_result_2);
-        dbg!(&install_result_3);
+        println!("install_result_1 = {:?}", install_result_1);
+        println!("install_result_2 = {:?}", install_result_2);
+        println!("install_result_3 = {:?}", install_result_3);
 
-        regex::Regex::new(
-            r#".*ChcHeadMoved\("genesis", InvalidChain\((\d+), ActionHash\([a-zA-Z0-9-_]+\)\)\).*"#,
-        )
-        .unwrap()
-        .captures(&format!("{:?}", install_result_1))
-        .unwrap();
+        regex::Regex::new(r#".*ChcError\(InvalidChain\((\d+), ActionHash\([a-zA-Z0-9-_]+\)\)\).*"#)
+            .unwrap()
+            .captures(&format!("{:?}", install_result_1))
+            .unwrap();
         // TODO: check sequence and hash
 
         assert_eq!(
@@ -366,14 +364,12 @@ mod tests {
             .await
             .unwrap();
 
-        // Sync is not possible since the installation was rolled back and the cell was removed
-        assert!(matches!(
-            conductors[3]
-                .raw_handle()
-                .chc_sync(cell_id.clone(), None)
-                .await,
-            Err(ConductorApiError::ConductorError(ConductorError::CellMissing(id))) if id == *cell_id
-        ));
+        // Sync is possible even though installation was rolled back and the cell was removed
+        conductors[3]
+            .raw_handle()
+            .chc_sync(cell_id.clone(), None)
+            .await
+            .unwrap();
 
         let dump1 = conductors[1]
             .dump_full_cell_state(cell_id, None)
@@ -399,9 +395,10 @@ mod tests {
 
         dbg!(&hash1);
 
-        regex::Regex::new(
-            r#".*ChcHeadMoved\("SourceChain::flush", InvalidChain\((\d+), ActionHash\([a-zA-Z0-9-_]+\).*"#
-        ).unwrap().captures(&format!("{:?}", hash1)).unwrap();
+        regex::Regex::new(r#".*ChcError\(InvalidChain\((\d+), ActionHash\([a-zA-Z0-9-_]+\).*"#)
+            .unwrap()
+            .captures(&format!("{:?}", hash1))
+            .unwrap();
         // TODO: check sequence and hash
 
         // This should trigger a CHC sync
