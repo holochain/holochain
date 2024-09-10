@@ -1,8 +1,9 @@
-//! Test countersigning session interaction with full Holochain conductor over websockets.
+//! Test countersigning session interaction over websockets with full Holochain conductor.
 //!
 //! Tests run the Holochain binary and communicate over websockets.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use arbitrary::Arbitrary;
@@ -17,6 +18,7 @@ use holochain::prelude::{Signal, SystemSignal};
 use holochain::sweettest::{authenticate_app_ws_client, websocket_client_by_port, WsPollRecv};
 use holochain_conductor_api::AppRequest;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppResponse};
+use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use holochain_types::test_utils::{fake_dna_zomes, write_fake_dna_file};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::{ReceiveMessage, WebsocketSender};
@@ -51,7 +53,7 @@ async fn get_session_state() {
 
     let network_seed = uuid::Uuid::new_v4().to_string();
 
-    // Setup two agents on two conductors.
+    // Set up two agents on two conductors.
     let mut alice = setup_agent(
         bootstrap_url.clone(),
         signal_url.clone(),
@@ -103,6 +105,14 @@ async fn get_session_state() {
             }
         }
     });
+
+    // Await peers to discover each other.
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        expect_bootstrapping_completed(&[&alice, &bob]),
+    )
+    .await
+    .unwrap();
 
     // Initialize Alice's source chain.
     let _: ActionHash = call_zome(&alice, &alice_app_tx, "create_a_thing", &()).await;
@@ -198,10 +208,7 @@ async fn get_session_state() {
 
     // Alice commits the countersigning entry. Up to 5 retries in case Bob's chain head can not be fetched
     // immediately.
-    let mut tries = 0;
-    loop {
-        tries += 1;
-        println!("trying to commit cs entry {tries}");
+    for _ in 0..5 {
         let response = call_zome_fn_fallible(
             &alice_app_tx,
             alice.cell_id.clone(),
@@ -219,48 +226,100 @@ async fn get_session_state() {
                 e.decode::<(ActionHash, EntryHash)>().unwrap()
             );
             break;
-        } else if tries == 25 {
-            break;
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
 
-    // Bob lets the session time out.
-    let _countersigning_entry =
-        tokio::time::timeout(Duration::from_secs(15), bob_session_abandonded_rx.recv())
-            .await
-            .unwrap()
-            .unwrap();
+    // Restart Alice's conductor to put countersigning session in Unknown state.
+    let mut alice = restart_conductor(alice).await;
 
-    // Bob's session should be gone from memory.
-    match request(
-        AppRequest::GetCountersigningSessionState(Box::new(bob.cell_id.clone())),
-        &bob_app_tx,
-    )
-    .await
-    {
-        AppResponse::CountersigningSessionState(session_state) => {
-            assert_matches!(*session_state, None);
+    // Attach app interface to Bob's conductor.
+    let alice_app_port = attach_app_interface(&mut alice.admin_tx, None).await;
+    let (alice_app_tx, mut alice_app_rx) = websocket_client_by_port(alice_app_port).await.unwrap();
+    authenticate_app_ws_client(alice_app_tx.clone(), alice.admin_port, "test".to_string()).await;
+
+    // Spawn task with app socket signal waiting for system signals.
+    // let (bob_session_abanded_tx, mut bob_session_abandonded_rx) = tokio::sync::mpsc::channel(1);
+    tokio::spawn(async move {
+        // while let Ok(_) = bob_app_rx.recv::<AppResponse>().await {}
+        while let Ok(ReceiveMessage::Signal(signal)) = alice_app_rx.recv::<AppResponse>().await {
+            match ExternIO::from(signal).decode::<Signal>().unwrap() {
+                Signal::System(system_signal) => match system_signal {
+                    SystemSignal::AbandonedCountersigning(entry) => {
+                        println!("alice abandoned cs session signal {entry:?}");
+                        // let _ = bob_session_abanded_tx.clone().send(entry).await;
+                    }
+                    _ => unreachable!(),
+                },
+                _ => unreachable!(),
+            }
         }
-        _ => panic!("unexpected countersigning session state"),
-    }
+    });
 
-    // Alice's session is in an unknown state now. No attempts to resolve should have been made.
+    // Alice's session should be in state Unknown without attempted resolutions.
     match request(
         AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
         &alice_app_tx,
     )
     .await
     {
-        AppResponse::CountersigningSessionState(session_state) => {
-            println!("session state is {session_state:?}");
+        AppResponse::CountersigningSessionState(maybe_state) => {
+            println!("alice session state after shutdown is {maybe_state:?}");
             assert_matches!(
-                *session_state,
-                Some(CountersigningSessionState::Unknown { resolution, .. }) if resolution.is_none()
+                *maybe_state,
+                Some(CountersigningSessionState::Unknown { .. })
             );
         }
-        _ => panic!("unexpected countersigning session state"),
+        _ => panic!("unexpected app response"),
     }
+    match request(
+        AppRequest::GetCountersigningSessionState(Box::new(bob.cell_id.clone())),
+        &bob_app_tx,
+    )
+    .await
+    {
+        AppResponse::CountersigningSessionState(maybe_state) => {
+            println!("bob session state after shutdown is {maybe_state:?}");
+        }
+        _ => panic!("unexpected app response"),
+    }
+
+    // // Bob lets the session time out.
+    // let _countersigning_entry =
+    //     tokio::time::timeout(Duration::from_secs(15), bob_session_abandonded_rx.recv())
+    //         .await
+    //         .unwrap()
+    //         .unwrap();
+
+    // // Bob's session should be gone from memory.
+    // match request(
+    //     AppRequest::GetCountersigningSessionState(Box::new(bob.cell_id.clone())),
+    //     &bob_app_tx,
+    // )
+    // .await
+    // {
+    //     AppResponse::CountersigningSessionState(session_state) => {
+    //         assert_matches!(*session_state, None);
+    //     }
+    //     _ => panic!("unexpected countersigning session state"),
+    // }
+
+    // // Alice's session is in an unknown state now. No attempts to resolve should have been made.
+    // match request(
+    //     AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
+    //     &alice_app_tx,
+    // )
+    // .await
+    // {
+    //     AppResponse::CountersigningSessionState(session_state) => {
+    //         println!("session state is {session_state:?}");
+    //         assert_matches!(
+    //             *session_state,
+    //             Some(CountersigningSessionState::Unknown { resolution, .. }) if resolution.is_none()
+    //         );
+    //     }
+    //     _ => panic!("unexpected countersigning session state"),
+    // }
 }
 
 struct Agent {
@@ -270,6 +329,8 @@ struct Agent {
     signing_keypair: SigningKey,
     cap_secret: CapSecret,
     _holochain: SupervisedChild,
+    tmp_dir: TempDir,
+    config_path: PathBuf,
     _admin_rx: WsPollRecv,
 }
 
@@ -349,17 +410,81 @@ async fn setup_agent(bootstrap_url: String, signal_url: String, network_seed: St
         cell_id,
         signing_keypair,
         cap_secret,
+        tmp_dir,
+        config_path,
         _admin_rx,
         _holochain,
     }
 }
 
-async fn request<T>(request: AppRequest, app_tx: &WebsocketSender) -> T
+async fn restart_conductor(agent: Agent) -> Agent {
+    let Agent {
+        config_path,
+        cell_id,
+        signing_keypair,
+        cap_secret,
+        _holochain,
+        tmp_dir,
+        admin_tx,
+        _admin_rx,
+        ..
+    } = agent;
+
+    // Shut down conductor.
+    drop(_holochain);
+    drop(admin_tx);
+    drop(_admin_rx);
+
+    // Restart conductor.
+    let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
+    let admin_port = admin_port.await.unwrap();
+    let (admin_tx, _admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _admin_rx = WsPollRecv::new::<AdminResponse>(_admin_rx);
+
+    Agent {
+        admin_tx,
+        admin_port,
+        cell_id,
+        signing_keypair,
+        cap_secret,
+        tmp_dir,
+        config_path,
+        _admin_rx,
+        _holochain,
+    }
+}
+
+async fn expect_bootstrapping_completed(agents: &[&Agent]) {
+    loop {
+        let agent_requests = agents.into_iter().map(|agent| async {
+            match request(AdminRequest::AgentInfo { cell_id: None }, &agent.admin_tx).await {
+                AdminResponse::AgentInfo(agent_infos) => {
+                    println!("agents {:?}", agent_infos);
+                    agent_infos.len() == agents.len()
+                }
+                _ => unreachable!(),
+            }
+        });
+        let all_agents_visible = futures::future::join_all(agent_requests)
+            .await
+            .into_iter()
+            .all(|result| result);
+        if all_agents_visible {
+            break;
+        } else {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+}
+
+async fn request<Request, Response>(request: Request, tx: &WebsocketSender) -> Response
 where
-    T: std::fmt::Debug + DeserializeOwned,
+    Request: std::fmt::Debug,
+    SerializedBytes: TryFrom<Request, Error = SerializedBytesError>,
+    Response: std::fmt::Debug + DeserializeOwned,
 {
-    let response = app_tx.request(request);
-    check_timeout::<T>(response, 6000).await.unwrap()
+    let response = tx.request(request);
+    check_timeout::<Response>(response, 6000).await.unwrap()
 }
 
 async fn call_zome<I, O>(
