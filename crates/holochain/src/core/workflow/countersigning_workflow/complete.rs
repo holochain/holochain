@@ -12,6 +12,7 @@ use holochain_state::mutations;
 use holochain_state::prelude::{current_countersigning_session, SourceChainResult, Store};
 use holochain_types::dht_op::ChainOp;
 use holochain_zome_types::prelude::SignedAction;
+use kitsune_p2p_types::dht::prelude::Timestamp;
 use rusqlite::{named_params, Transaction};
 use std::sync::Arc;
 
@@ -159,7 +160,11 @@ pub(crate) async fn inner_countersigning_session_complete(
 
     publish_trigger.trigger(&"publish countersigning_success");
 
-    tracing::info!("Countersigning session complete for agent: {:?}", author);
+    tracing::info!(
+        "Countersigning session complete for agent {:?} in approximately {}ms",
+        author,
+        (Timestamp::now() - session_data.preflight_request.session_times.start).unwrap_or_default().num_milliseconds()
+    );
 
     Ok(Some(session_data.preflight_request.app_entry_hash))
 }
