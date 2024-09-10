@@ -54,11 +54,16 @@ jobs:
             ${{ format(matrix.target, matrix.platform) }}
 
           # Don't exit if this fails so we can clean up the profile
+          total_status=0
           for i in result-*; do
-            cachix push holochain-ci $i || true
+            if ! cachix push holochain-ci $i; then
+              total_status=$((total_status+1))
+            fi
           done
 
           rm result*
+          
+          exit $total_status
   cache-check:
     needs:
       - cache-update
