@@ -52,9 +52,12 @@ async fn countersigning_workflow_fn(
         .await
         .map_err(WorkflowError::other)?;
 
+    let keystore = conductor.keystore().clone();
+
     countersigning_workflow(
         space.clone(),
         dna_network.clone(),
+        keystore,
         cell_id.clone(),
         signal_tx,
         self_trigger.clone(),

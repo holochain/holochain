@@ -1091,6 +1091,7 @@ impl TestHarness {
         let outcome = countersigning_workflow(
             self.test_space.space.clone(),
             self.network.clone(),
+            self.keystore.clone(),
             CellId::new(self.dna_hash.clone(), self.author.clone()),
             self.signal_tx.clone(),
             self.countersigning_tx.clone(),

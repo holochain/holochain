@@ -259,25 +259,6 @@ impl SourceChain {
                 SourceChainResult::Ok((scheduled_fns, actions, ops, entries, records))
             })?;
 
-        // Sync with CHC, if CHC is present
-        if let Some(chc) = network.chc() {
-            let payload = AddRecordPayload::from_records(
-                self.keystore.clone(),
-                (*self.author).clone(),
-                records,
-            )
-            .await
-            .map_err(SourceChainError::other)?;
-
-            match chc.add_records_request(payload).await {
-                Err(e @ ChcError::InvalidChain(_, _)) => Err(SourceChainError::ChcHeadMoved(
-                    "SourceChain::flush".into(),
-                    e,
-                )),
-                e => e.map_err(SourceChainError::other),
-            }?;
-        }
-
         let maybe_countersigned_entry = entries
             .iter()
             .map(|entry| entry.as_content())
@@ -292,6 +273,30 @@ impl SourceChain {
 
         // If the lock isn't empty this is a countersigning session.
         let is_countersigning_session = !lock_subject.is_empty();
+
+        // Sync with CHC, if CHC is present
+        if let Some(chc) = network.chc() {
+            // Skip the CHC sync if this is a countersigning session.
+            // If the session times out, we might roll the chain back to the previous head, and so
+            // we don't want the record to exist remotely.
+            if !is_countersigning_session {
+                let payload = AddRecordPayload::from_records(
+                    self.keystore.clone(),
+                    (*self.author).clone(),
+                    records,
+                )
+                .await
+                .map_err(SourceChainError::other)?;
+
+                match chc.add_records_request(payload).await {
+                    Err(e @ ChcError::InvalidChain(_, _)) => Err(SourceChainError::ChcHeadMoved(
+                        "SourceChain::flush".into(),
+                        e,
+                    )),
+                    e => e.map_err(SourceChainError::other),
+                }?;
+            }
+        }
 
         let ops_to_integrate = ops
             .iter()
@@ -1228,8 +1233,7 @@ pub fn chain_head_db_nonempty(
     chain_head_db(txn, author)?.ok_or(SourceChainError::ChainEmpty)
 }
 
-pub type CurrentCountersigningSessionOpt =
-    Option<(SignedActionHashed, EntryHash, CounterSigningSessionData)>;
+pub type CurrentCountersigningSessionOpt = Option<(Record, EntryHash, CounterSigningSessionData)>;
 
 /// Check if there is a current countersigning session and if so, return the
 /// session data and the entry hash.
@@ -1248,10 +1252,10 @@ pub fn current_countersigning_session(
                 Some(record) => record,
                 None => return Ok(None),
             };
-            let (sah, ee) = record.into_inner();
+            let (sah, ee) = record.clone().into_inner();
             Ok(match (sah.action().entry_hash(), ee.into_option()) {
                 (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
-                    Some((sah.clone(), entry_hash.clone(), *cs))
+                    Some((record, entry_hash.clone(), *cs))
                 }
                 _ => None,
             })
