@@ -1455,7 +1455,6 @@ mod app_impls {
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
             let manifest = app_manifest_from_dnas(&dnas_with_roles, 255, false, network_seed);
 
-            dbg!();
             let (dnas_to_register, role_assignments): (Vec<_>, Vec<_>) = data
                 .iter()
                 .map(|(dr, mp)| {
@@ -1468,7 +1467,6 @@ mod app_impls {
                 })
                 .unzip();
 
-            dbg!();
             let ops = AppRoleResolution {
                 dnas_to_register,
                 role_assignments,
@@ -1488,7 +1486,6 @@ mod app_impls {
                 )
                 .await?;
 
-            dbg!();
             Ok(app.agent_key().clone())
         }
 
@@ -1591,11 +1588,9 @@ mod app_impls {
                     .await?;
                 Ok(app)
             } else {
-                dbg!();
                 let genesis_result =
                     crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
 
-                dbg!();
                 if genesis_result.is_ok() || flags.ignore_genesis_failure {
                     let roles = ops.role_assignments;
                     let app = InstalledAppCommon::new(
@@ -1630,16 +1625,13 @@ mod app_impls {
                         .await
                         .map_err(|e| DpkiServiceError::Lair(e.into()))?;
 
-                    dbg!();
                     let signature = deepkey_roundtrip_backward!(Signature, &signature);
 
-                    dbg!();
                     let dna_hashes = cell_ids
                         .iter()
                         .map(|c| deepkey_roundtrip_backward!(DnaHash, c.dna_hash()))
                         .collect();
 
-                    dbg!();
                     let agent_key = deepkey_roundtrip_backward!(AgentPubKey, &agent_key);
 
                     let input = CreateKeyInput {
@@ -3846,13 +3838,11 @@ pub(crate) async fn genesis_cells(
     let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
         let conductor = conductor.clone();
         let cell_id_inner = cell_id.clone();
-        dbg!();
         tokio::spawn(async move {
             let space = conductor
                 .get_or_create_space(cell_id_inner.dna_hash())
                 .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))?;
 
-            dbg!();
             let authored_db =
                 space.get_or_create_authored_db(cell_id_inner.agent_pubkey().clone())?;
             let dht_db = space.dht_db;
@@ -3862,7 +3852,6 @@ pub(crate) async fn genesis_cells(
                 .get_ribosome(cell_id_inner.dna_hash())
                 .map_err(Box::new)?;
 
-            dbg!();
             Cell::genesis(
                 cell_id_inner.clone(),
                 conductor,

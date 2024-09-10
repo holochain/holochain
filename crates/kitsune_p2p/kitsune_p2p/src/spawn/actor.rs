@@ -717,7 +717,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => {
-                dbg!();
                 tracing::error!(?space, "unhandled space");
                 return Err(KitsuneP2pError::RoutingSpaceError(space));
             }
@@ -741,7 +740,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let space_sender = match self.spaces.get_mut(&input.space) {
             None => {
                 let space = input.space;
-                dbg!();
                 tracing::error!(?space, "unhandled space");
                 return Err(KitsuneP2pError::RoutingSpaceError(space));
             }
@@ -764,7 +762,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     ) -> KitsuneP2pHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => {
-                dbg!();
                 tracing::error!(?space, "unhandled space");
                 return Err(KitsuneP2pError::RoutingSpaceError(space));
             }
@@ -788,7 +785,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     ) -> KitsuneP2pHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => {
-                dbg!();
                 tracing::error!(?space, "unhandled space");
                 return Err(KitsuneP2pError::RoutingSpaceError(space));
             }
@@ -828,7 +824,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     ) -> KitsuneP2pHandlerResult<bool> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => {
-                dbg!();
                 tracing::error!(?space, "unhandled space");
                 return Err(KitsuneP2pError::RoutingSpaceError(space));
             }
@@ -969,7 +964,6 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     ) -> KitsuneP2pHandlerResult<KitsuneDiagnostics> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => {
-                dbg!();
                 tracing::error!(?space, "unhandled space");
                 return Err(KitsuneP2pError::RoutingSpaceError(space));
             }

@@ -50,10 +50,8 @@ impl ChainHeadCoordinator for ChcLocal {
         let records: Vec<_> = request
             .into_iter()
             .map(|r| {
-                dbg!();
                 let signed_action: SignedActionHashed =
                     holochain_serialized_bytes::decode(&r.signed_action_msgpack).unwrap();
-                dbg!();
 
                 RecordItem {
                     action: signed_action,
@@ -63,9 +61,7 @@ impl ChainHeadCoordinator for ChcLocal {
             .collect();
         let actions = records.iter().map(|r| &r.action);
         validate_chain(actions, &head).map_err(|_| {
-            dbg!();
             let (hash, seq) = head.unwrap();
-            dbg!();
             ChcError::InvalidChain(seq, hash)
         })?;
         m.records.extend(records);

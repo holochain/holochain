@@ -327,13 +327,11 @@ impl SweetConductor {
             })
             .collect();
 
-        dbg!();
         let agent = self
             .raw_handle()
             .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof, None)
             .await?;
 
-        dbg!();
         self.raw_handle().enable_app(installed_app_id).await?;
         Ok(agent)
     }
@@ -407,10 +405,8 @@ impl SweetConductor {
             .map(|dr| dr.dna())
             .collect::<Vec<_>>();
 
-        dbg!();
         self.setup_app_1_register_dna(dnas.clone()).await?;
 
-        dbg!();
         let agent = self
             .setup_app_2_install_and_enable(
                 installed_app_id,
@@ -419,7 +415,6 @@ impl SweetConductor {
             )
             .await?;
 
-        dbg!();
         self.raw_handle()
             .reconcile_cell_status_with_app_status()
             .await?;
