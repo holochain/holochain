@@ -163,7 +163,9 @@ pub(crate) async fn inner_countersigning_session_complete(
     tracing::info!(
         "Countersigning session complete for agent {:?} in approximately {}ms",
         author,
-        (Timestamp::now() - session_data.preflight_request.session_times.start).unwrap_or_default().num_milliseconds()
+        (Timestamp::now() - session_data.preflight_request.session_times.start)
+            .unwrap_or_default()
+            .num_milliseconds()
     );
 
     Ok(Some(session_data.preflight_request.app_entry_hash))
