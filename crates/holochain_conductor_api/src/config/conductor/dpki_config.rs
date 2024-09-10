@@ -10,7 +10,7 @@ use serde::Serialize;
 const DPKI_NETWORK_SEED_MAIN: &str = "deepkey-main";
 
 /// A network seed used for testing.
-const DPKI_NETWORK_SEED_TEST: &str = "deepkey-test";
+const DPKI_NETWORK_SEED_TESTING: &str = "deepkey-testing";
 
 /// Configure which app instance ID to treat as the DPKI application handler
 /// as well as what parameters to pass it on its initialization.
@@ -28,6 +28,9 @@ pub struct DpkiConfig {
     /// DPKI is always installed with a network seed.
     /// Also, any two conductors not using the exact same DPKI service cannot communicate with each other.
     /// This means that this network seed much match across all conductors in a network!
+    //
+    // TODO: consider emitting a warning if this is not set to the production value
+    //       in release builds.
     pub network_seed: String,
 
     /// Allow the DPKI agent key to be generated randomly in the absence of a
@@ -56,7 +59,7 @@ impl DpkiConfig {
     pub fn testing() -> Self {
         Self {
             dna_path: None,
-            network_seed: DPKI_NETWORK_SEED_TEST.to_string(),
+            network_seed: DPKI_NETWORK_SEED_TESTING.to_string(),
             allow_throwaway_random_dpki_agent_key: true,
             no_dpki: false,
         }
@@ -76,7 +79,7 @@ impl Default for DpkiConfig {
     fn default() -> Self {
         Self {
             dna_path: None,
-            network_seed: DPKI_NETWORK_SEED_TEST.to_string(),
+            network_seed: DPKI_NETWORK_SEED_TESTING.to_string(),
             allow_throwaway_random_dpki_agent_key: false,
             no_dpki: false,
         }

@@ -35,11 +35,9 @@ pub fn generate(
     {
         config.chc_url = chc_url;
     }
-    config.dpki = if no_dpki {
-        DpkiConfig::disabled()
-    } else {
-        DpkiConfig::default()
-    };
+    if no_dpki {
+        config.dpki = DpkiConfig::disabled();
+    }
     random_admin_port(&mut config);
     let path = write_config(dir.clone(), &config);
     msg!("Config {:?}", config);
