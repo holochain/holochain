@@ -276,6 +276,7 @@ async fn receive_signatures_and_complete() {
 
     // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
+        net.expect_chc().return_once(|| None);
         net.expect_publish_countersign()
             .return_once(|_, _, _| Ok(()));
         net
@@ -365,6 +366,7 @@ async fn receive_valid_and_invalid_signatures_and_complete() {
 
     // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
+        net.expect_chc().return_once(|| None);
         net.expect_publish_countersign()
             .return_once(|_, _, _| Ok(()));
         net
@@ -686,6 +688,8 @@ async fn recover_after_restart_from_commit_when_other_agent_completes() {
                 let activity_response = activity_response.clone();
                 move |_, _, _| Ok(vec![activity_response.clone()])
             });
+
+            net.expect_chc().return_once(|| None);
 
             net.expect_publish_countersign()
                 .return_once(|_, _, _| Ok(()));
