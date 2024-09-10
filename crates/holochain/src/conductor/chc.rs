@@ -91,6 +91,8 @@ mod tests {
     /// A CHC implementation that can be set up to error
     struct FlakyChc {
         chc: chc_local::ChcLocal,
+        agent: AgentPubKey,
+        keystore: MetaLairClient,
         pub fail: AtomicBool,
     }
 
@@ -121,7 +123,7 @@ mod tests {
 
     impl ChainHeadCoordinatorExt for FlakyChc {
         fn signing_info(&self) -> (MetaLairClient, AgentPubKey) {
-            unimplemented!()
+            (self.keystore.clone(), self.agent.clone())
         }
     }
 
@@ -195,6 +197,7 @@ mod tests {
     /// Test that general CHC failures prevent chain writes
     #[tokio::test(flavor = "multi_thread")]
     async fn simple_chc_error_prevents_write() {
+        holochain_trace::test_run();
         use holochain::test_utils::inline_zomes::simple_crud_zome;
 
         let config = ConductorConfig {
@@ -210,6 +213,8 @@ mod tests {
 
         let flaky_chc = Arc::new(FlakyChc {
             chc: chc_local::ChcLocal::new(conductor.keystore(), agent.clone()),
+            keystore: conductor.keystore().clone(),
+            agent: agent.clone(),
             fail: true.into(),
         });
 

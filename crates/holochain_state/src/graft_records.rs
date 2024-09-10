@@ -16,10 +16,15 @@ impl SourceChain {
         chc: ChcImpl,
         new_records: Vec<Record>,
     ) -> SourceChainResult<()> {
+        dbg!();
         let res = chc.clone().add_records(new_records).await;
+        dbg!();
         if let Err(ChcError::InvalidChain(_seq, hash)) = &res {
+            dbg!();
             let records = chc.clone().get_record_data(Some(hash.clone())).await?;
+            dbg!();
             self.graft_records_onto_source_chain(records).await?;
+            dbg!();
         }
         Ok(res?)
     }
@@ -33,6 +38,7 @@ impl SourceChain {
         // called properly, but if there were, it would be invalid after grafting.
         self.scratch().apply(|s| s.clear())?;
 
+        dbg!();
         let existing = self
             .query(ChainQueryFilter::new().descending())
             .await?
@@ -40,6 +46,7 @@ impl SourceChain {
             .map(|r| r.signed_action)
             .collect::<Vec<SignedActionHashed>>();
 
+        dbg!();
         let graft = ChainGraft::new(existing, records).rebalance();
         let chain_top = graft.existing_chain_top();
         let cell_id = self.cell_id();
@@ -60,6 +67,7 @@ impl SourceChain {
             })
             .collect::<StateMutationResult<Vec<_>>>()?;
 
+        dbg!();
         // Commit the records to the source chain.
         let ops_to_integrate = author_db
             .write_async({
@@ -85,6 +93,7 @@ impl SourceChain {
                         .map_err(StateMutationError::from)?;
                     }
 
+                    dbg!();
                     let mut ops_to_integrate = Vec::new();
 
                     // Commit the records and ops to the authored db.
@@ -95,11 +104,13 @@ impl SourceChain {
                             .iter()
                             .map(|op| op.dht_basis().clone())
                             .collect::<Vec<_>>();
+                        dbg!();
                         ops_to_integrate.extend(
                             source_chain::put_raw(txn, sah, ops, entry)?
                                 .into_iter()
                                 .zip(basis.into_iter()),
                         );
+                        dbg!();
                     }
                     SourceChainResult::Ok(ops_to_integrate)
                 }

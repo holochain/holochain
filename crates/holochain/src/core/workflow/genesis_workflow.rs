@@ -117,6 +117,7 @@ where
     // NOTE: we could check the key against DPKI state here, but the key hasn't even been
     //       registered at this point, so we can't.
 
+    dbg!();
     source_chain::genesis(
         workspace.vault.clone(),
         workspace.dht_db.clone(),

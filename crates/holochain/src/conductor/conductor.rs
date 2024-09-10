@@ -1454,6 +1454,7 @@ mod app_impls {
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
             let manifest = app_manifest_from_dnas(&dnas_with_roles, 255, false);
 
+            dbg!();
             let (dnas_to_register, role_assignments): (Vec<_>, Vec<_>) = data
                 .iter()
                 .map(|(dr, mp)| {
@@ -1466,6 +1467,7 @@ mod app_impls {
                 })
                 .unzip();
 
+            dbg!();
             let ops = AppRoleResolution {
                 dnas_to_register,
                 role_assignments,
@@ -1485,6 +1487,7 @@ mod app_impls {
                 )
                 .await?;
 
+            dbg!();
             Ok(app.agent_key().clone())
         }
 
@@ -1601,9 +1604,11 @@ mod app_impls {
                     .await?;
                 Ok(app)
             } else {
+                dbg!();
                 let genesis_result =
                     crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
 
+                    dbg!();
                 if genesis_result.is_ok() || flags.ignore_genesis_failure {
                     let roles = ops.role_assignments;
                     let app = InstalledAppCommon::new(
@@ -1638,13 +1643,16 @@ mod app_impls {
                         .await
                         .map_err(|e| DpkiServiceError::Lair(e.into()))?;
 
+                        dbg!();
                     let signature = deepkey_roundtrip_backward!(Signature, &signature);
 
+                    dbg!();
                     let dna_hashes = cell_ids
                         .iter()
                         .map(|c| deepkey_roundtrip_backward!(DnaHash, c.dna_hash()))
                         .collect();
 
+                        dbg!();
                     let agent_key = deepkey_roundtrip_backward!(AgentPubKey, &agent_key);
 
                     let input = CreateKeyInput {
@@ -2091,28 +2099,27 @@ mod cell_impls {
             &self,
             CellId(dna_hash, agent_key): &CellId,
             allow_empty: bool,
-        ) -> SourceChainResult<SourceChain> {
+        ) -> ConductorApiResult<SourceChain> {
             if allow_empty {
                 SourceChain::raw_empty(
-                    self.get_or_create_authored_db(dna_hash, agent_key.clone())
-                        .unwrap(),
-                    self.get_dht_db(dna_hash).unwrap(),
-                    self.get_dht_db_cache(dna_hash).unwrap(),
+                    self.get_or_create_authored_db(dna_hash, agent_key.clone())?,
+                    self.get_dht_db(dna_hash)?,
+                    self.get_dht_db_cache(dna_hash)?,
                     self.keystore().clone(),
                     agent_key.clone(),
                 )
                 .await
             } else {
                 SourceChain::new(
-                    self.get_or_create_authored_db(dna_hash, agent_key.clone())
-                        .unwrap(),
-                    self.get_dht_db(dna_hash).unwrap(),
-                    self.get_dht_db_cache(dna_hash).unwrap(),
+                    self.get_or_create_authored_db(dna_hash, agent_key.clone())?,
+                    self.get_dht_db(dna_hash)?,
+                    self.get_dht_db_cache(dna_hash)?,
                     self.keystore().clone(),
                     agent_key.clone(),
                 )
                 .await
             }
+            .map_err(Into::into)
         }
     }
 }
@@ -3679,6 +3686,48 @@ impl Conductor {
     }
 }
 
+#[allow(missing_docs)]
+#[allow(dead_code)]
+mod direct_db_access_impls {
+    use super::*;
+
+    impl Conductor {
+        pub(crate) fn get_dht_db(
+            &self,
+            dna_hash: &DnaHash,
+        ) -> ConductorApiResult<DbWrite<DbKindDht>> {
+            Ok(self.get_or_create_dht_db(dna_hash)?)
+        }
+
+        pub(crate) fn get_dht_db_cache(
+            &self,
+            dna_hash: &DnaHash,
+        ) -> ConductorApiResult<holochain_types::db_cache::DhtDbQueryCache> {
+            Ok(self.get_or_create_space(dna_hash)?.dht_query_cache)
+        }
+
+        pub(crate) async fn get_cache_db(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorApiResult<DbWrite<DbKindCache>> {
+            let cell = self.cell_by_id(cell_id).await?;
+            Ok(cell.cache().clone())
+        }
+
+        pub(crate) fn get_p2p_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pAgents> {
+            self.p2p_agents_db(space)
+        }
+
+        pub(crate) fn get_p2p_metrics_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
+            self.p2p_metrics_db(space)
+        }
+
+        pub(crate) fn get_spaces(&self) -> Spaces {
+            self.spaces.clone()
+        }
+    }
+}
+
 /// Methods only available with feature "test_utils"
 #[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
@@ -3696,36 +3745,6 @@ mod test_utils_impls {
             installed_app_id: InstalledAppId,
         ) -> broadcast::Receiver<Signal> {
             self.app_broadcast.subscribe(installed_app_id)
-        }
-
-        pub fn get_dht_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>> {
-            Ok(self.get_or_create_dht_db(dna_hash)?)
-        }
-        pub fn get_dht_db_cache(
-            &self,
-            dna_hash: &DnaHash,
-        ) -> ConductorApiResult<holochain_types::db_cache::DhtDbQueryCache> {
-            Ok(self.get_or_create_space(dna_hash)?.dht_query_cache)
-        }
-
-        pub async fn get_cache_db(
-            &self,
-            cell_id: &CellId,
-        ) -> ConductorApiResult<DbWrite<DbKindCache>> {
-            let cell = self.cell_by_id(cell_id).await?;
-            Ok(cell.cache().clone())
-        }
-
-        pub fn get_p2p_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pAgents> {
-            self.p2p_agents_db(space)
-        }
-
-        pub fn get_p2p_metrics_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
-            self.p2p_metrics_db(space)
-        }
-
-        pub fn get_spaces(&self) -> Spaces {
-            self.spaces.clone()
         }
 
         pub async fn get_cell_triggers(
@@ -3761,11 +3780,13 @@ pub(crate) async fn genesis_cells(
     let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
         let conductor = conductor.clone();
         let cell_id_inner = cell_id.clone();
+        dbg!();
         tokio::spawn(async move {
             let space = conductor
                 .get_or_create_space(cell_id_inner.dna_hash())
                 .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))?;
 
+                dbg!();
             let authored_db =
                 space.get_or_create_authored_db(cell_id_inner.agent_pubkey().clone())?;
             let dht_db = space.dht_db;
@@ -3775,6 +3796,7 @@ pub(crate) async fn genesis_cells(
                 .get_ribosome(cell_id_inner.dna_hash())
                 .map_err(Box::new)?;
 
+                dbg!();
             Cell::genesis(
                 cell_id_inner.clone(),
                 conductor,
@@ -3803,6 +3825,7 @@ pub(crate) async fn genesis_cells(
 
     // If there were errors, cleanup and return the errors
     if !errors.is_empty() {
+        tracing::error!(?errors, "Genesis failed for some cells");
         Err(ConductorError::GenesisFailed { errors })
     } else {
         Ok(())

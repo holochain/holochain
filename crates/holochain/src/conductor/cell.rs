@@ -209,11 +209,13 @@ impl Cell {
             chc,
         );
 
+        dbg!();
         genesis_workflow(workspace, conductor_api, args)
             .await
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
 
+            dbg!();
         if let Some(trigger) = conductor_handle
             .get_queue_consumer_workflows()
             .integration_trigger(Arc::new(cell_id.dna_hash().clone()))

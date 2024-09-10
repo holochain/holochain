@@ -515,12 +515,14 @@ where
     ) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
+        dbg!();
         let head_info = vault
             .read_async({
                 let author = author.clone();
                 move |txn| chain_head_db(&txn, author)
             })
             .await?;
+        dbg!();
         Ok(Self {
             scratch,
             vault,
@@ -1059,6 +1061,7 @@ pub async fn genesis(
     membrane_proof: Option<MembraneProof>,
     chc: Option<ChcImpl>,
 ) -> SourceChainResult<()> {
+    dbg!();
     let dna_action = Action::Dna(Dna {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
@@ -1105,6 +1108,7 @@ pub async fn genesis(
     let (agent_action, agent_entry) = agent_record.clone().into_inner();
     let agent_entry = agent_entry.into_option();
 
+    dbg!();
     let mut ops_to_integrate = Vec::new();
 
     // Sync with CHC, if CHC is present
@@ -1118,12 +1122,14 @@ pub async fn genesis(
         )
         .await?;
         let records = vec![dna_record, agent_validation_record, agent_record];
+        dbg!();
         chain
             .sync_records(chc, records)
             .await
             .map_err(SourceChainError::other)?;
     }
 
+    dbg!();
     let ops_to_integrate = authored
         .write_async(move |txn| {
             ops_to_integrate.extend(source_chain::put_raw(txn, dna_action, dna_ops, None)?);
