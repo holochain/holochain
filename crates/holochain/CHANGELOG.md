@@ -10,7 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - When using a CHC, all syncing now happens under-the-hood, rather than needing to manually call GraftRecords to update the local chain based on the CHC's current state. #4228
 - Add `danger_generate_throwaway_device_seed` to allow creation and use of a random device seed for test situations, where a proper device seed is not needed. #4238
 - Add `allow_throwaway_random_dpki_agent_key` to allow creation of a random (unrecoverable) DPKI agent when a device seed is not specified. #4238
-
+- Fixes issue #3679 where websocket connections would be closed if a message was received that failed to deserialize. 
+  The new behaviour isn't perfect because you will get a timeout instead, but the websocket will remain open and you
+  can continue to send further valid message. There is another issue to track partial deserialization #4251 so we can
+  respond with an error message instead of a timeout. #4252
 
 ## 0.4.0-dev.22
 

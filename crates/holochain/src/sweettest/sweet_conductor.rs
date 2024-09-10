@@ -905,7 +905,9 @@ impl WsPollRecv {
 /// done with a [WsPollRecv].
 /// If this is an app client, you will need to authenticate the connection before you can send any
 /// other requests.
-pub async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, WebsocketReceiver)> {
+pub async fn websocket_client_by_port(
+    port: u16,
+) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
     connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
         ConnectRequest::new(
