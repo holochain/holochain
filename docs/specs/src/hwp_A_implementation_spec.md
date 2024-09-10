@@ -769,8 +769,8 @@ It is the application's responsibility to retrieve a stored capability claim usi
         Valid,
         // The `StoreRecord` operation is invalid.
         Rejected,
-        // Could not validate due to missing data or dependencies,
-        // or an exhausted WASM execution budget.
+        // Could not validate due to missing data or dependencies, or an
+        // exhausted WASM execution budget.
         Abandoned,
         // The action has been withdrawn by its author.
         Withdrawn,
@@ -786,17 +786,22 @@ It is the application's responsibility to retrieve a stored capability claim usi
     }
 
     enum EntryDhtStatus {
-        // At least one `StoreEntry` operation associated with the entry is valid, and at least one entry creation action associated with it has not been deleted.
+        // At least one `StoreEntry` operation associated with the entry is
+        // valid, and at least one entry creation action associated with it has
+        // not been deleted.
         Live,
-        // All entry creation actions associated with the entry have been marked as deleted.
+        // All entry creation actions associated with the entry have been marked
+        // as deleted.
         Dead,
         // All `StoreEntry` operations are waiting validation.
         Pending,
         // All `StoreEntry` operations associated with the entry are invalid.
         Rejected,
-        // All attempts to validate all `StoreEntry` operations associated with the entry hvae been abandoned.
+        // All attempts to validate all `StoreEntry` operations associated with
+        // the entry hvae been abandoned.
         Abandoned,
-        // All entry creation actions associated with the entry have been withdrawn by their authors.
+        // All entry creation actions associated with the entry have been
+        // withdrawn their authors.
         Withdrawn,
         // The entry data has been purged.
         Purged,
@@ -889,8 +894,9 @@ It is the application's responsibility to retrieve a stored capability claim usi
     struct ValidationReceiptSet {
         // The DHT transform hash that this receipt is for.
         op_hash: DhtOpHash,
-        // The type of the op that was validated.
-        // This represents the underlying operation type and does not map one-for-one to the `Op` type used in validation.
+        // The type of the op that was validated. This represents the underlying
+        // operation type and does not map one-for-one to the `Op` type used in
+        // validation.
         op_type: String,
         // Whether this op has received the required number of receipts.
         receipts_complete: bool,
@@ -935,10 +941,12 @@ Zomes are intended to be units of composition for application developers. Thus z
 
     ```rust
     enum CallTargetCell {
-        // Call a function in another cell by its unique conductor-local ID,
-        // a tuple of DNA hash and agent public key.
+        // Call a function in another cell by its unique conductor-local ID, a
+        // tuple of DNA hash and agent public key.
         OtherCell(CellId),
-        // Call a function in another cell by the role name specified in the app manifest. This role name may be qualified to a specific clone of the DNA that fills the role by appending a dot and the clone's index.
+        // Call a function in another cell by the role name specified in the app
+        // manifest. This role name may be qualified to a specific clone of the
+        // DNA that fills the role by appending a dot and the clone's index.
         OtherRole(String),
         // Call a function in the same cell.
         Local,
@@ -958,13 +966,12 @@ The HDK SHOULD implement the ability for cells to modify the running App by addi
         // The ID of the cell to clone.
         cell_id: CellId,
 
-        // Modifiers to set for the new cell.
-        // At least one of the modifiers must be set to obtain a distinct hash for
-        // the clone cell's DNA.
+        // Modifiers to set for the new cell. At least one of the modifiers must
+        // be set to obtain a distinct hash for the clone cell's DNA.
         modifiers: DnaModifiersOpt<YamlProperties>,
         // Optionally set a proof of membership for the clone cell.
         membrane_proof: Option<MembraneProof>,
-        // Optionally a name for the DNA clone
+        // Optionally a name for the DNA clone.
         name: Option<String>,
     }
 
@@ -1013,7 +1020,8 @@ The HDK SHOULD implement the ability for cells to modify the running App by addi
         CellId(CellId),
     }
 
-    // A conductor-local unique identifier for a clone, consisting of the role name from the app manifest and a clone index, delimited by a dot.
+    // A conductor-local unique identifier for a clone, consisting of the role
+    // name from the app manifest and a clone index, delimited by a dot.
     struct CloneID(String);
     ```
 
@@ -1083,19 +1091,28 @@ In order to safely facilitate the peer interaction necessary to complete a count
 
     ```rust
     struct PreflightRequest {
-        // The hash of the app entry, as if it were not countersigned. The final entry hash will include the countersigning session data.
+        // The hash of the app entry, as if it were not countersigned. The final
+        // entry hash will include the countersigning session data.
         app_entry_hash: EntryHash,
         // The agents that are participating in this countersignature session.
         signing_agents: Vec<(AgentHash, Vec<Role>)>,
-        // The optional additional M of N signers. If there are additional signers then M MUST be the majority of N. If there are additional signers then the enzyme MUST be used and is the first signer in BOTH signing_agents and optional_signing_agents.
+        // The optional additional M of N signers. If there are additional
+        // signers then M MUST be the majority of N. If there are additional
+        // signers then the enzyme MUST be used and is the first signer in BOTH
+        // signing_agents and optional_signing_agents.
         optional_signing_agents: Vec<(AgentHash, Vec<Role>)>,
-        // The M in the M of N signers. M MUST be strictly greater than than N / 2 and NOT larger than N.
+        // The M in the M of N signers. M MUST be strictly greater than than
+        // N / 2 and NOT larger than N.
         minimum_optional_signing_agents: u8,
-        // The first signing agent (index 0) is acting as an enzyme. If true AND optional_signing_agents are set then the first agent MUST be the same in both signing_agents and optional_signing_agents.
+        // The first signing agent (index 0) is acting as an enzyme. If true AND
+        // optional_signing_agents are set then the first agent MUST be the same
+        // in both signing_agents and optional_signing_agents.
         enzymatic: bool,
-        // The window in which countersigning must complete. Session actions must all have the same timestamp, which is the session offset.
+        // The window in which countersigning must complete. Session actions
+        // MUST all have the same timestamp, which is the session offset.
         session_times: CounterSigningSessionTimes,
-        // The action information that is shared by all agents. Contents depend on the action type, create, update, etc.
+        // The action information that is shared by all agents. Contents depend
+        // on the action type, create, update, etc.
         action_base: ActionBase,
         // Optional arbitrary bytes that can be agreed to.
         preflight_bytes: PreflightBytes,
@@ -1397,7 +1414,8 @@ To facilitate this, implementations MUST define a reproducible way of hashing DH
 3. Serialize and hash the simplified value.
 
 ```rust
-// Parallels each variant in the `ChainOp` enum, only retaining the minimal data needed to produce a unique operation hash.
+// Parallels each variant in the `ChainOp` enum, only retaining the minimal data
+// needed to produce a unique operation hash.
 enum ChainOpUniqueForm {
     StoreRecord(Action),
     StoreEntry(NewEntryAction),
@@ -1720,8 +1738,9 @@ publish
             creates: Vec<Judged<WireNewEntryAction>>,
             // Any deletes that deleted this entry's creation actions.
             deletes: Vec<Judged<WireDelete>>,
-            // Any updates on this entry's creation actions pointing to new entries.
-            // This is different from updates that created this entry listed in the `creates` field.
+            // Any updates on this entry's creation actions pointing to new
+            // entries. This is different from updates that created this entry
+            // listed in the `creates` field.
             updates: Vec<Judged<WireUpdateRelationship>>,
             // The entry data shared across all actions.
             entry: Option<EntryData>,
@@ -1812,15 +1831,14 @@ publish
 
         ```rust
         struct MetadataSet {
-            // Actions that created or updated an entry.
-            // These are the actions that show the entry exists.
+            // Actions that created or updated an entry. These are the actions
+            // that show the entry exists.
             actions: BTreeSet<TimedActionHash>,
             invalid_actions: BTreeSet<TimedActionHash>,
             deletes: BTreeSet<TimedActionHash>,
             updates: BTreeSet<TimedActionHash>,
-            // The status of an entry from an authority.
-            // This is simply a faster way of determining if
-            // there are any live actions on an entry.
+            // The status of an entry from an authority. This is simply a faster
+            // way of determining if there are any live actions on an entry.
             // If the basis hash is not for an entry, this will be empty.
             entry_dht_status: Option<EntryDhtStatus>,
         }
@@ -1921,9 +1939,10 @@ publish
             // The highest sequence number observed.
             action_seq: u32,
             // Hash(es) of any action(s) claiming to be at this action sequence.
-            // Any vector with a cardinality > 1 indicates a forked chain,
-            // which will be corroborated by the information contained in
-            // `AgentActivityResponse<T>::status` and `AgentActivityResponse<T>::warrants`.
+            // Any vector with a cardinality > 1 indicates a forked chain, which
+            // will be corroborated by the information contained in
+            // `AgentActivityResponse<T>::status` and
+            // `AgentActivityResponse<T>::warrants`.
             hash: Vec<ActionHash>,
         }
         ```
@@ -1969,9 +1988,17 @@ publish
         }
 
         enum CountersigningSessionNegotiationMessage {
-            // Sent by a `StoreEntry` authority or enzyme after they have collected signed actions from all counterparties; the author (the receiver of the message) may now safely proceed to commit their own countersigning entry creation action.
+            // Sent by a `StoreEntry` authority or enzyme after they have
+            // collected signed actions from all counterparties; the author (the
+            // receiver of the message) may now safely proceed to commit their
+            // own countersigning entry creation action.
             AuthorityResponse(Vec<SignedAction>),
-            // Sent by a counterparty to the designated enzyme when they have determined that the countersigned entry creation action is valid from the perspective of all counterparties and they intend to commit their own entry creation action once they have received all signatures from the enzyme. The DhtOp payload is a `StoreEntry`.
+            // Sent by a counterparty to the designated enzyme when they have
+            // determined that the countersigned entry creation action is valid
+            // from the perspective of all counterparties and they intend to
+            // commit their own entry creation action once they have received
+            // all signatures from the enzyme. The `DhtOp` payload is a
+            // `StoreEntry`.
             EnzymePush(DhtOp),
         }
         ```
@@ -2061,9 +2088,10 @@ These are the message types that MUST be implemented. They are all defined as va
             AgentInfo(AgentInfoSigned),
             // Announce that one or more DHT transforms have been published for
             // which the receiver is believed to be an authority; it is expected
-            // that they will follow up by sending `FetchOp` messages to request the
-            // transforms.
-            // Because the remote node may claim authority for a range of basis hashes, multiple operations MUST be permitted to be announced in one message.
+            // that they will follow up by sending `FetchOp` messages to request
+            // the transforms. Because the remote node may claim authority for a
+            // range of basis hashes, multiple operations MUST be permitted to
+            // be announced in one message.
             Publish {
                 source: KitsuneAgent,
                 op_hash_list: Vec<RoughSized<KitsuneOpHash>>,
@@ -2082,13 +2110,14 @@ These are the message types that MUST be implemented. They are all defined as va
             encoded_bytes: [u8],
         }
 
-        // Description of a network location arc over which an agent claims authority.
+        // Description of a network location arc over which an agent claims
+        // authority.
         struct Arq {
             start: DhtLocation,
             // The size of chunks for this arc, as 2^power * 4096.
             power: u8,
-            // The number of chunks in this arc.
-            // Hence, the arc size in terms of is power * count.
+            // The number of chunks in this arc. Hence, the arc size in terms of
+            // network location space is power * count.
             count: u32,
         }
 
@@ -2106,8 +2135,8 @@ These are the message types that MUST be implemented. They are all defined as va
             size: Option<RoughInt>,
         }
 
-        // Positive numbers are an exact size; negative numbers represent a
-        // size of roughly -x * 4096.
+        // Positive numbers are an exact size; negative numbers represent a size
+        // of roughly -x * 4096.
         struct RoughInt(i16);
 
         // Represents a DHT transform hash.
@@ -2156,7 +2185,8 @@ These are the message types that MUST be implemented. They are all defined as va
         enum GossipModuleType {
             // Recent gossip deals with DHT data with a recent timestamp.
             ShardedRecent,
-            // Historical gossip deals with data whose timestamp is older than the recent gossip threshold.
+            // Historical gossip deals with data whose timestamp is older than
+            // the recent gossip threshold.
             ShardedHistorical,
         }
         ```
@@ -2354,19 +2384,17 @@ We have developed a hybrid gossip implementation that separates DHT transforms i
         }
 
         enum EncodedTimedBloomFilter {
-            // I have no overlap with your agents
-            // Please don't send any ops.
+            // I have no overlap with your agents; please don't send any ops.
             NoOverlap,
-            // I have overlap and I have no hashes.
-            // Please send all your ops.
+            // I have overlap and I have no hashes; please send all your ops.
             MissingAllHashes {
                 // The time window that we are missing hashes for.
                 time_window: Range<Timestamp>,
             },
-            // I have overlap and I have some hashes.
-            // Please send any missing ops.
+            // I have overlap and I have some hashes; please send any missing
+            // ops.
             HaveHashes {
-                // The encoded bloom filter.
+                // The encoded Bloom filter.
                 filter: Vec<u8>,
                 // The time window these hashes are for.
                 time_window: Range<Timestamp>,
@@ -2376,7 +2404,7 @@ We have developed a hybrid gossip implementation that separates DHT transforms i
 
 * `OpRegions`: Send a map of quantized region coordinates to XOR fingerprints of the set of DHT operations the sender is holding for that region.
 
-    * **Notes**: Its purpose is to quickly communicate information about the infrequently changing set of _historical_ DHT operations which the sender holds for comparison and synchronization. The recipient is expected to send the DHT operation hashes for all mismatched regions via `MissingOpHashes``.
+    * **Notes**: Its purpose is to quickly communicate information about the infrequently changing set of _historical_ DHT operations which the sender holds for comparison and synchronization. The recipient is expected to send the DHT operation hashes for all mismatched regions via `MissingOpHashes`.
 
 
     * **Payload**: The payload is defined as:
@@ -2387,11 +2415,11 @@ We have developed a hybrid gossip implementation that separates DHT transforms i
         }
 
         struct RegionSetLtcs {
-            // The generator for the coordinates
+            // The generator for the coordinates.
             coords: RegionCoordSetLtcs,
-            // The outermost vec corresponds to arqs in the ArqSet;
-            // the middle vecs correspond to the spatial segments per arq;
-            // the innermost vecs are the time segments per arq.
+            // The outermost vec corresponds to arqs in the `ArqSet`; the
+            // middle vecs correspond to the spatial segments per arq; the
+            // innermost vecs are the time segments per arq.
             data: Vec<Vec<Vec<RegionData>>>,
         }
 
@@ -2402,7 +2430,8 @@ We have developed a hybrid gossip implementation that separates DHT transforms i
 
         struct TelescopingTimes {
             time: TimeQuantum,
-            // MUST be equal to or more recent than the DNA's `origin_time` property.
+            // MUST be equal to or more recent than the DNA's `origin_time`
+            // property.
             limit: Option<u32>,
         }
 
@@ -2452,10 +2481,9 @@ struct DnaManifestV1 {
     name: String,
     integrity: IntegrityManifest,
     coordinator: CoordinatorManifest,
-    // A list of ancestors of this DNA, used for satisfying
-    // dependencies on prior versions of this DNA.
-    // The application's Coordinator interface is expected to be
-    // compatible across the list of ancestors.
+    // A list of ancestors of this DNA, used for satisfying dependencies on
+    // prior versions of this DNA. The application's Coordinator interface is
+    // expected to be compatible across the list of ancestors.
     lineage: Vec<DnaHashB64>,
 }
 
@@ -2467,13 +2495,13 @@ struct IntegrityManifest {
     // They may be accessed by DNA code to affect runtime behavior.
     properties: Option<YamlProperties>,
 
-    // The time used to denote the origin of the network, used to calculate time windows during gossip.
-    // All Action timestamps must come after this time.
+    // The time used to denote the origin of the network, used to calculate time
+    // windows during gossip. All Action timestamps must come after this time.
     origin_time: HumanTimestamp,
 
-    // An array of integrity zome manifests associated with the DNA.
-    // The order is significant: it determines initialization order
-    // and affects the DNA hash.
+    // An array of integrity zome manifests associated with the DNA. The order
+    // is significant: it determines initialization order and affects the DNA
+    // hash.
     zomes: Vec<ZomeManifest>,
 }
 
@@ -2492,8 +2520,8 @@ struct ZomeManifest {
     // The location of the wasm for this zome.
     location: Location,
 
-    // The integrity zomes this zome depends on.
-    // The order of these must match the order the types are used in the zome.
+    // The integrity zomes this zome depends on. The order of these MUST match
+    // the order the types are used in the zome.
     dependencies: Option<Vec<ZomeName>>,
 }
 
@@ -2522,7 +2550,7 @@ There is a number of ways that application developers MUST be able to specify co
 
 ```rust
 struct AppManifestV1 {
-    // User-facing name of the App. This may be used as the installed_app_id
+    // User-facing name of the App. This may be used as the `installed_app_id`
     // in the Admin API.
     name: String,
 
@@ -2532,24 +2560,24 @@ struct AppManifestV1 {
     // The roles that need to be filled (by DNAs) for this app.
     roles: Vec<AppRoleManifest>,
 
-    // If true, the app should be installed without needing to specify
-    // membrane proofs. The app's cells will be in an incompletely
-    // instantiated state until membrane proofs are supplied for each.
+    // If true, the app should be installed without needing to specify membrane
+    // proofs. The app's cells will be in an incompletely instantiated state
+    // until membrane proofs are supplied for each.
     membrane_proofs_deferred: bool,
 }
 
 struct AppRoleManifest {
     // The ID which will be used to refer to:
-    // - this role,
-    // - the DNA which fills it,
-    // - and the cell(s) created from that DNA
+    // * this role,
+    // * the DNA which fills it,
+    // * and the cell(s) created from that DNA
     name: Rolename,
 
     // Determines if, how, and when a Cell will be provisioned.
     provisioning: Option<CellProvisioning>,
 
-    // The location of the DNA bundle resource, and options to modify it
-    // before instantiating in a Cell.
+    // The location of the DNA bundle resource, and options to modify it before
+    // instantiating in a Cell.
     dna: AppRoleDnaManifest,
 }
 
@@ -2560,17 +2588,15 @@ enum CellProvisioning {
     Create { deferred: bool },
 
     // Require that a Cell be already installed which matches the DNA
-    // installed_hash spec, and which has an Agent that's associated with
-    // this App's agent via DPKI. If no such Cell exists, *app installation MUST fail*.
-    // The `protected` flag indicates that the Conductor
-    // SHOULD NOT allow the dependency to be disabled
-    // or uninstalled until all cells using this DNA
-    // are uninstalled.
+    // `installed_hash` spec, and which has an Agent that's associated with
+    // this App's agent via DPKI. If no such Cell exists, *app installation MUST
+    // fail*. The `protected` flag indicates that the Conductor SHOULD NOT allow
+    // the dependency to be disabled or uninstalled until all cells using this
+    // DNA are uninstalled.
     UseExisting { protected: bool },
 
-    // Install or locate the DNA, but do not instantiate a Cell for it.
-    // Clones may be instantiated later. This requires that
-    // clone_limit > 0.
+    // Install or locate the DNA, but do not instantiate a Cell for it. Clones
+    // may be instantiated later. This requires that `clone_limit` > 0.
     CloneOnly,
 }
 
@@ -2578,14 +2604,14 @@ struct AppRoleDnaManifest {
     // Where to find this DNA.
     location: Option<Location>,
 
-    // Optional default modifier values, which override those found
-    // in the DNA manifest and may be overridden during installation.
+    // Optional default modifier values, which override those found in the DNA
+    // manifest and may be overridden during installation.
     modifiers: DnaModifiersOpt<YamlProperties>,
 
     // The expected hash of the DNA's integrity manifest. If specified,
-    // installation MUST fail if the hash does not match this.
-    // Also allows this DNA to be targeted as a dependency in AppRoleManifests
-    // that specify `UseExisting` or `CreateIfNotExists` provisioning strategies.
+    // installation MUST fail if the hash does not match this. Also allows this
+    // DNA to be targeted as a dependency in `AppRoleManifest`s that specify
+    // `UseExisting` or `CreateIfNotExists` provisioning strategies.
     installed_hash: Option<DnaHashB64>,
 
     // Allow up to this many "clones" to be created at runtime.
@@ -2599,7 +2625,7 @@ A `WebAppBundle` combines together a specific user interface together with an `A
 
 ```rust
 struct WebAppManifestV1 {
-    // Name of the App. This may be used as the installed_app_id.
+    // Name of the App. This may be used as the `installed_app_id`.
     name: String,
 
     // Web UI used for this app, packaged in a .zip file.
@@ -2671,8 +2697,8 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
 
         ```rust
         struct RegisterDnaPayload {
-            // Override the DNA modifiers specified in the app and/or
-            // DNA bundle manifest(s).
+            // Override the DNA modifiers specified in the app and/or DNA bundle
+            // manifest(s).
             modifiers: DnaModifiersOpt<YamlProperties>,
             source: DnaSource,
         }
@@ -2680,8 +2706,8 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
         enum DnaSource {
             Path(PathBuf),
             Bundle(DnaBundle),
-            // Register the DNA from an existing DNA registered via
-            // a prior `RegisterDna` call or an `InstallApp` call.
+            // Register the DNA from an existing DNA registered via a prior
+            // `RegisterDna` call or an `InstallApp` call.
             Hash(DnaHash),
         }
         ```
@@ -2729,23 +2755,28 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             agent_key: AgentPubKey,
 
             // The unique identifier for an installed app in this conductor.
-            // If not specified, it will be derived from the app name in the bundle manifest.
+            // If not specified, it will be derived from the app name in the
+            // bundle manifest.
             installed_app_id: Option<String>,
 
-            // Optional proof-of-membrane-membership data for any cells that require it,
-            // keyed by the RoleName specified in the app bundle manifest.
+            // Optional proof-of-membrane-membership data for any cells that
+            // require it, keyed by the `RoleName` specified in the app bundle
+            // manifest.
             membrane_proofs: HashMap<RoleName, MembraneProof>,
 
-            // Optional: overwrites all network seeds for all DNAs of Cells created by this app. This does not affect cells provisioned by the `UseExisting strategy`.
+            // Optional: overwrites all network seeds for all DNAs of Cells
+            // created by this app. This does not affect cells provisioned by
+            // the `UseExisting` strategy.
             network_seed: Option<Vec<u8>>,
 
-            // If app installation fails due to genesis failure, normally
-            // the app will be immediately uninstalled. When this flag is set,
-            // the app is left installed with empty cells intact. This can
-            // be useful for using `GraftRecordsOntoSourceChain` or diagnostics.
+            // If app installation fails due to genesis failure, normally the
+            // app will be immediately uninstalled. When this flag is set, the
+            // app is left installed with empty cells intact. This can be useful
+            // for using `GraftRecordsOntoSourceChain` or diagnostics.
             ignore_genesis_failure: bool,
         }
         ```
+
     * **Return Value**: The returned value MUST contain the `AppInfo` data structure (which is also retreivable after installation via the `GetAppInfo` API), and is defined as:
 
         ```rust
@@ -2760,7 +2791,8 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             Provisioned(ProvisionedCell),
             // Cell created at runtime by cloning a DNA.
             Cloned(ClonedCell),
-            // Potential cell with deferred installation as defined in the bundle.
+            // Potential cell with deferred installation as defined in the
+            // bundle.
             Stem(StemCell),
         }
 
@@ -2775,16 +2807,17 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             original_dna_hash: DnaHash,
             // The DNA modifiers that will be used when instantiating the cell.
             dna_modifiers: DnaModifiers,
-            // An optional name to override the cell's bundle name when instantiating.
+            // An optional name to override the cell's bundle name when
+            // instantiating.
             name: Option<String>,
         }
 
         enum AppInfoStatus {
-            // The app is paused due to a recoverable error.
-            // There is no way to manually pause an app.
+            // The app is paused due to a recoverable error. There is no way to
+            // manually pause an app.
             Paused { reason: PausedAppReason },
-            // The app is disabled, and may be restartable depending
-            // on the reason.
+            // The app is disabled, and may be restartable depending on the
+            // reason.
             Disabled { reason: DisabledAppReason },
             Running,
             AwaitingMemproofs,
@@ -2800,7 +2833,8 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             // The app is fully installed and deferred memproofs have been
             // provided by the UI, but the app has not been started yet.
             NotStartedAfterProvidingMemproofs,
-            // The app has been disabled manually by the user via an admin interface.
+            // The app has been disabled manually by the user via an admin
+            // interface.
             User,
             // The app has been disabled due to an unrecoverable error.
             Error(String),
@@ -2823,14 +2857,16 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
 
         ```rust
         enum AppStatusFilter {
-            // Filter on apps which are Enabled, which can include both Running and Paused apps.
+            // Filter on apps which are Enabled, which can include both Running
+            // and Paused apps.
             Enabled,
             // Filter only on apps which are Disabled.
             Disabled,
-            // Filter on apps which are currently Running (meaning they are also Enabled).
+            // Filter on apps which are currently Running (meaning they are also
+            // Enabled).
             Running,
-            // Filter on apps which are Stopped, i.e. not Running.
-            // This includes apps in the Disabled status, as well as the Paused status.
+            // Filter on apps which are Stopped, i.e. not Running. This includes
+            // apps in the Disabled status, as well as the Paused status.
             Stopped,
             // Filter only on Paused apps.
             Paused,
@@ -2878,7 +2914,8 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
 
             ```rust
             struct FullStateDump {
-                // Information from the Kitsune networking layer about the agent, the DHT space, and their known peers.
+                // Information from the Kitsune networking layer about the
+                // agent, the DHT space, and their known peers.
                 peer_dump: P2pAgentsDump,
                 // The cell's source chain.
                 source_chain_dump: SourceChainDump,
@@ -2889,16 +2926,18 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             struct P2pAgentsDump {
                 // Information about this agent's cell.
                 this_agent_info: Option<AgentInfoDump>,
-                // Information about this DNA itself at the level of Kitsune networking.
+                // Information about this DNA itself at the level of Kitsune
+                // networking.
                 this_dna: Option<(DnaHash, KitsuneSpace)>,
-                // Information about this agent at the level of Kitsune networking.
+                // Information about this agent at the level of Kitsune
+                // networking.
                 this_agent: Option<(AgentPubKey, KitsuneAgent)>,
                 // Information about the agent's known peers.
                 peers: Vec<AgentInfoDump>,
             }
 
-            // Agent info dump with the agent,
-            // space, signed timestamp and expiry of last self-announced info, printed in a pretty way.
+            // Agent info dump with the agent, space, signed timestamp, and
+            // expiry of last self-announced info, printed in a pretty way.
             struct AgentInfoDump {
                 kitsune_agent: KitsuneAgent,
                 kitsune_space: KitsuneSpace,
@@ -2918,17 +2957,15 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             }
 
             struct FullIntegrationStateDump {
-                // Ops in validation limbo awaiting sys
-                // or app validation.
+                // Ops in validation limbo awaiting sys or app validation.
                 validation_limbo: Vec<DhtOp>,
                 // Ops waiting to be integrated.
                 integration_limbo: Vec<DhtOp>,
-                // Ops that are integrated.
-                // This includes rejected.
+                // Ops that are integrated. This includes rejected ops.
                 integrated: Vec<DhtOp>,
                 // Database row ID for the latest DhtOp that we have seen.
-                // Useful for subsequent calls to `FullStateDump`
-                // to return only what they haven't seen.
+                // Useful for subsequent calls to `FullStateDump` to return only
+                // what they haven't seen.
                 dht_ops_cursor: u64,
             }
             ```
@@ -2960,8 +2997,8 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
         struct GrantZomeCallCapabilityPayload {
             // Cell for which to authorize the capability.
             cell_id: CellId,
-            // Specifies the capability, consisting of zomes and functions to allow
-            // signing for as well as access level, secret and assignees.
+            // Specifies the capability, consisting of zomes and functions to
+            // allow signing for as well as access level, secret and assignees.
             cap_grant: ZomeCallCapGrant,
         }
         ```
@@ -2990,18 +3027,19 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             Dna(DnaStorageInfo),
         }
 
-        // All sizes are in bytes.
-        // Fields ending with `_on_disk` contain the actual file size,
-        // inclusive of allocated but empty space in the file.
+        // All sizes are in bytes. Fields ending with `_on_disk` contain the
+        // actual file size, inclusive of allocated but empty space in the file.
         // All other fields contain the space taken up by actual data.
         struct DnaStorageInfo {
             // The size of the source chain data.
             authored_data_size: usize,
             authored_data_size_on_disk: usize,
-            // The size of the DHT shard data for which all local cells are authorities.
+            // The size of the DHT shard data for which all local cells are
+            // authorities.
             dht_data_size: usize,
             dht_data_size_on_disk: usize,
-            // The size of retrieved DHT data for which local cells are not authorities.
+            // The size of retrieved DHT data for which local cells are not
+            // authorities.
             cache_data_size: usize,
             cache_data_size_on_disk: usize,
             // The ID of the app to which the above data applies.
@@ -3024,7 +3062,8 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
         struct IssueAppAuthenticationTokenPayload {
             // The app to bind the token to.
             installed_app_id: InstalledAppID,
-            // MAY be set to a reasonable default such as 30 seconds if not specified; MUST NOT expire if set to 0.
+            // MAY be set to a reasonable default such as 30 seconds if not
+            // specified; MUST NOT expire if set to 0.
             expiry_seconds: u64,
             // MAY default to true.
             single_use: bool,
@@ -3057,7 +3096,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
 
 ```rust
 enum ExternalApiWireError {
-    // Any internal error
+    // Any internal error.
     InternalError(String),
     // The input to the API failed to deseralize.
     Deserialization(String),
@@ -3077,7 +3116,7 @@ enum ExternalApiWireError {
 * `GetAppInfo -> AppInfoReturned(Option<AppInfo>)`: Get info about the app, including info about each cell instantiated by this app. See above for the defintion of `AppInfo`.
 
 * `CallZome(ZomeCall) -> ZomeCalled(ExternIO)`: Call a zome function.
-    * **Notes**: Implementations MUST enforce a valid capability for the function being called. This means that if the function is covered by a transferrable or assigned grant, the secret MUST be provided and valid; and if the function is covered by an assigned grant, the provenance MUST be valid. Regardless of the grant's access type, implementations MUST enforce that the provided signature matches the provided provenance. Implementations also MUST prevent replay attacks by rejecting a call that supplies a nonce that has been seen before or an expiry timestamp that has passed.
+    * **Notes**: Implementations MUST enforce a valid capability for the function being called. This means that if the function is covered by a transferrable or assigned grant, the secret MUST be provided and valid; and if the function is covered by an assigned grant, the provenance MUST be valid. Regardless of the grant's access type, implementations MUST enforce that the provided signature matches the provided provenance. Implementations also MUST prevent replay attacks by rejecting a call that supplies a nonce that has been seen before or an expiry timestamp that has passed. Finally, the provenance (source) of the call MUST match the signature.
     * **Arguments**: The payload is defined as:
 
         ```rust
@@ -3088,18 +3127,17 @@ enum ExternalApiWireError {
             zome_name: ZomeName,
             // The name of the zome function to call.
             fn_name: FunctionName,
-            // The serialized data to pass as an argument to the zome function call.
+            // The serialized data to pass as an argument to the zome function
+            // call.
             payload: ExternIO,
-            // The secret necessary for exercising a claim against the granted capability, if the capability is `CapAccess::Transerable` or `CapAccess::Assigned`.
+            // The secret necessary for exercising a claim against the granted
+            // capability, if the capability is `CapAccess::Transferable` or
+            // `CapAccess::Assigned`.
             cap_secret: Option<CapSecret>,
-            // The provenance (source) of the call
-            // MUST match the signature.
             provenance: AgentPubKey,
             // The signature on a serialized `ZomeCallUnsigned` struct with the same field values as this struct instance, but without the `signature` field. See below.
             signature: Signature,
-            // Implementations MUST reject a zome call made with a nonce that has been seen already.
             nonce: Nonce256Bits,
-            // Implementations MUST reject a zome call made with a timestamp that is in the past.
             expires_at: Timestamp,
         }
         ```
@@ -3120,8 +3158,8 @@ enum ExternalApiWireError {
             // The DNA to clone, by role name.
             role_name: RoleName,
             // Modifiers to set for the new cell.
-            // At least one of the modifiers must be set to obtain a distinct hash for
-            // the clone cell's DNA.
+            // At least one of the modifiers must be set to obtain a distinct
+            // hash for the clone cell's DNA.
             modifiers: DnaModifiersOpt<YamlProperties>,
             // Optionally set a proof of membership for the clone cell.
             membrane_proof: Option<MembraneProof>,
@@ -3172,10 +3210,11 @@ enum ExternalApiWireError {
         ```rust
         struct NetworkInfoRequestPayload {
             // Get gossip info for these DNAs.
-            // Implementations MUST restrict results to DNAs that are part of the app.
+            // Implementations MUST restrict results to DNAs that are part of
+            // the app.
             dnas: Vec<DnaHash>,
-            // Timestamp in milliseconds since which received amount of bytes from peers will
-            // be returned. Defaults to UNIX_EPOCH.
+            // Timestamp in milliseconds since which received amount of bytes
+            // from peers will be returned. Defaults to UNIX_EPOCH.
             last_time_queried: Option<Timestamp>,
         }
         ```
@@ -3192,9 +3231,9 @@ enum ExternalApiWireError {
         }
 
         struct FetchPoolInfo {
-            // Total number of bytes expected to be received through fetches
+            // Total number of bytes expected to be received through fetches.
             op_bytes_to_fetch: usize,
-            // Total number of ops expected to be received through fetches
+            // Total number of ops expected to be received through fetches.
             num_ops_to_fetch: usize,
         }
         ```
