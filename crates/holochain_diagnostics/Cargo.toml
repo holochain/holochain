@@ -29,5 +29,6 @@ tui = "0.19"
 workspace = true
 
 [features]
+default = ["wasmer_sys"]
 wasmer_sys = ["holochain/wasmer_sys"]
 wasmer_wamr = ["holochain/wasmer_wamr"]
