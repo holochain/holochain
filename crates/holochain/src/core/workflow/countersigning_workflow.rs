@@ -394,7 +394,9 @@ async fn try_recover_failed_sessions(
                 .sessions
                 .iter()
                 .filter_map(|(author, session_state)| match session_state {
-                    CountersigningSessionState::Unknown { .. } => Some(author.clone()),
+                    CountersigningSessionState::Unknown {
+                        preflight_request, ..
+                    } => Some((author.clone(), preflight_request.clone())),
                     _ => None,
                 })
                 .collect::<Vec<_>>())
@@ -402,7 +404,7 @@ async fn try_recover_failed_sessions(
         .unwrap();
 
     let mut remaining_sessions_in_unknown_state = 0;
-    for author in sessions_in_unknown_state {
+    for (author, preflight_request) in sessions_in_unknown_state {
         tracing::info!(
             "Countersigning session for agent {:?} is in an unknown state, attempting to resolve",
             author
@@ -411,6 +413,7 @@ async fn try_recover_failed_sessions(
             space.clone(),
             network.clone(),
             author.clone(),
+            preflight_request,
         )
         .await
         {
@@ -595,7 +598,11 @@ async fn apply_timeouts(space: &Space, signal_tx: Sender<Signal>) {
     }
 }
 
-async fn force_abandon_session(space: Space, author: &AgentPubKey, preflight_request: &PreflightRequest) -> SourceChainResult<()> {
+async fn force_abandon_session(
+    space: Space,
+    author: &AgentPubKey,
+    preflight_request: &PreflightRequest,
+) -> SourceChainResult<()> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
     let abandon_fingerprint = preflight_request.fingerprint()?;
@@ -608,7 +615,9 @@ async fn force_abandon_session(space: Space, author: &AgentPubKey, preflight_req
         .await?;
 
     match maybe_session_data {
-        Some((cs_action, cs_entry_hash, x)) if x.preflight_request.fingerprint()? == abandon_fingerprint => {
+        Some((cs_action, cs_entry_hash, x))
+            if x.preflight_request.fingerprint()? == abandon_fingerprint =>
+        {
             tracing::info!("There is a committed session to remove for: {:?}", author);
             abandon_session(
                 authored_db,
@@ -631,7 +640,10 @@ async fn force_abandon_session(space: Space, author: &AgentPubKey, preflight_req
                                 unlock_chain(txn, &author)
                             }
                             _ => {
-                                tracing::warn!("No matching session or lock to remove for: {:?}", author);
+                                tracing::warn!(
+                                    "No matching session or lock to remove for: {:?}",
+                                    author
+                                );
                                 Ok(())
                             }
                         }
