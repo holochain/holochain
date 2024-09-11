@@ -2,7 +2,7 @@
 
 use crate::core::ribosome::error::RibosomeResult;
 use holochain_wasmer_host::module::InstanceWithStore;
-use std::path::PathBuf;
+use holochain_zome_types::prelude::WasmZome;
 use std::sync::Arc;
 use wasmer::Module;
 
@@ -15,6 +15,6 @@ pub fn get_used_metering_points(_instance_with_store: Arc<InstanceWithStore>) ->
 }
 
 // Use of precompiled and serialized modules is not support in wasmer_wamr feature.
-pub fn get_preserialized_path(wasm_zome: &WasmZome) -> Option<&PathBuf> {
-    None
+pub fn get_prebuilt_module(_wasm_zome: &WasmZome) -> RibosomeResult<Option<Arc<Module>>> {
+    Ok(None)
 }

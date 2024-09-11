@@ -392,12 +392,6 @@ impl RealRibosome {
         .await?
     }
 
-    #[cfg(feature = "wasmer_sys")]
-    pub fn prebuilt_module(&self, path: &PathBuf) -> RibosomeResult<Arc<Module>> {
-        let module = holochain_wasmer_host::module::get_ios_module_from_file(path)?;
-        Ok(Arc::new(module))
-    }
-
     // Create a key for module cache.
     // Format: [WasmHash] as bytes
     // watch out for cache misses in the tests that make things slooow if you change this!
@@ -414,8 +408,8 @@ impl RealRibosome {
     pub async fn get_module_for_zome(&self, zome: &Zome<ZomeDef>) -> RibosomeResult<Arc<Module>> {
         match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
-                if let Some(path) = get_preserialized_path(wasm_zome) {
-                    self.prebuilt_module(path)
+                if let Some(module) = get_prebuilt_module(wasm_zome)? {
+                    Ok(module)
                 } else {
                     self.build_module(zome.zome_name()).await
                 }
@@ -922,8 +916,8 @@ impl RibosomeT for RealRibosome {
             extern_fns: {
                 match zome.zome_def() {
                     ZomeDef::Wasm(wasm_zome) => {
-                        let module = if let Some(path) = get_preserialized_path(wasm_zome) {
-                            self.prebuilt_module(path)?
+                        let module = if let Some(module) = get_prebuilt_module(wasm_zome)? {
+                            module
                         } else {
                             tokio_helper::block_forever_on(self.build_module(zome.zome_name()))?
                         };

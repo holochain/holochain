@@ -1,11 +1,12 @@
 #![cfg(feature = "wasmer_sys")]
 
-use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
+use crate::{
+    core::ribosome::error::RibosomeResult, holochain_wasmer_host::module::WASM_METERING_LIMIT,
+};
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_zome_types::prelude::WasmZome;
-use std::path::PathBuf;
 use std::sync::Arc;
-use wasmer::AsStoreMut;
+use wasmer::{AsStoreMut, Module};
 use wasmer_middlewares::metering::{get_remaining_points, set_remaining_points, MeteringPoints};
 
 pub fn reset_metering_points(instance_with_store: Arc<InstanceWithStore>) {
@@ -28,6 +29,12 @@ pub fn get_used_metering_points(instance_with_store: Arc<InstanceWithStore>) -> 
     }
 }
 
-pub fn get_preserialized_path(wasm_zome: &WasmZome) -> Option<&PathBuf> {
-    wasm_zome.preserialized_path.as_ref()
+pub fn get_prebuilt_module(wasm_zome: &WasmZome) -> RibosomeResult<Option<Arc<Module>>> {
+    match &wasm_zome.preserialized_path {
+        Some(path) => {
+            let module = holochain_wasmer_host::module::get_ios_module_from_file(path.as_path())?;
+            Ok(Some(Arc::new(module)))
+        }
+        None => Ok(None),
+    }
 }
