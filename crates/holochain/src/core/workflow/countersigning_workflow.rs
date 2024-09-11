@@ -280,7 +280,7 @@ pub(crate) async fn countersigning_workflow(
         .unwrap();
 
     for (author, signatures) in maybe_completed_sessions {
-        for signature_bundle in signatures {
+        'bundles: for signature_bundle in signatures {
             // Try to complete the session using this signature bundle.
 
             match complete::inner_countersigning_session_complete(
@@ -315,7 +315,7 @@ pub(crate) async fn countersigning_workflow(
                         )))
                         .ok();
 
-                    break;
+                    break 'bundles;
                 }
                 Ok(None) => {
                     tracing::warn!("Rejected signature bundle for countersigning session for agent: {:?}: {:?}", author, signature_bundle);

@@ -931,14 +931,13 @@ pub fn remove_countersigning_session(
         |row| row.get::<_, usize>(0),
     )?;
     if count != 0 {
+        tracing::error!("Cannot remove countersigning session that has been published to the network: {:?}", cs_action);
         return Err(StateMutationError::CannotRemoveFullyPublished);
     }
 
     tracing::info!("Cleaning up authored data for action {:?}", cs_action);
 
     let count = txn.execute("DELETE FROM DhtOp WHERE withhold_publish = 1 AND action_hash = ?", [cs_action.to_hash()])?;
-    tracing::debug!("Removed {} ops from the authored DHT", count);
-    let count = txn.execute("DELETE FROM DhtOp WHERE action_hash = ?", [cs_action.to_hash()])?;
     tracing::debug!("Removed {} ops from the authored DHT", count);
     let count = txn.execute("DELETE FROM Entry WHERE hash = ?", [cs_entry_hash])?;
     tracing::debug!("Removed {} entries", count);
