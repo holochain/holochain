@@ -3455,6 +3455,7 @@ impl Conductor {
             let handle = self.clone();
             let chc = handle.get_chc(cell_id);
             async move {
+                tracing::info!("Creating cell with CH enabled? {:?}", chc.is_some());
                 let holochain_p2p_cell =
                     handle.holochain_p2p.to_dna(cell_id.dna_hash().clone(), chc);
 

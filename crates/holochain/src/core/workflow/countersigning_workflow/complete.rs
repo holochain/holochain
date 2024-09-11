@@ -158,6 +158,8 @@ pub(crate) async fn inner_countersigning_session_complete(
                 e
             );
         }
+    } else {
+        tracing::debug!("No CHC available, skipping CHC publish");
     }
 
     apply_success_state_changes(space, &author, this_cells_action_hash, integration_trigger)
