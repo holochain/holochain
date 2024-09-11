@@ -3193,7 +3193,7 @@ mod authenticate_token_impls {
 /// Methods for bridging from host calls to workflows for countersigning
 mod countersigning_impls {
     use super::*;
-    use crate::core::workflow;
+    use crate::core::workflow::{self, countersigning_workflow::force_abandon_session};
 
     impl Conductor {
         /// Accept a countersigning session
@@ -3234,6 +3234,17 @@ mod countersigning_impls {
                 .get_countersigning_session_state(cell_id.agent_pubkey())
                 .await
                 .map_err(|err| ConductorError::KitsuneP2pError(err.into()))
+        }
+
+        pub(crate) async fn abandon_countersigning_session(
+            &self,
+            cell_id: CellId,
+        ) -> ConductorResult<()> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            force_abandon_session(space.clone(), cell_id.agent_pubkey()).await?;
+            // .map_err(|err| err.into())?;
+            space.countersigning_workspace.refresh_session_state().await;
+            Ok(())
         }
     }
 }

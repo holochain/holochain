@@ -264,7 +264,6 @@ async fn get_session_state() {
     .await
     {
         AppResponse::CountersigningSessionState(maybe_state) => {
-            println!("alice session state after shutdown is {maybe_state:?}");
             assert_matches!(
                 *maybe_state,
                 Some(CountersigningSessionState::Unknown { resolution: Some(SessionResolutionSummary { attempts, completion_attempts, .. }), .. }) if attempts == 1 && completion_attempts == 0
@@ -281,6 +280,46 @@ async fn get_session_state() {
     {
         AppResponse::CountersigningSessionState(maybe_state) => {
             assert_matches!(*maybe_state, Some(CountersigningSessionState::Accepted(_)));
+        }
+        _ => panic!("unexpected app response"),
+    }
+
+    // Alice abandons the session.
+    let a: AppResponse = request(
+        AppRequest::AbandonCountersigningSession(Box::new(alice.cell_id.clone())),
+        &alice_app_tx,
+    )
+    .await;
+    println!("a {a:?}");
+
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    // Alice's session should be in state Unknown with 1 attempted resolution.
+    match request(
+        AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
+        &alice_app_tx,
+    )
+    .await
+    {
+        AppResponse::CountersigningSessionState(maybe_state) => {
+            println!("alice session state after abandoning is {maybe_state:?}");
+            // assert_matches!(
+            //     *maybe_state,
+            //     Some(CountersigningSessionState::Unknown { resolution: Some(SessionResolutionSummary { attempts, completion_attempts, .. }), .. }) if attempts == 1 && completion_attempts == 0
+            // );
+        }
+        _ => panic!("unexpected app response"),
+    }
+    // Bob's session should still be in Accepted state.
+    match request(
+        AppRequest::GetCountersigningSessionState(Box::new(bob.cell_id.clone())),
+        &bob_app_tx,
+    )
+    .await
+    {
+        AppResponse::CountersigningSessionState(maybe_state) => {
+            println!("bob session state after abandoning is {maybe_state:?}");
+            // assert_matches!(*maybe_state, Some(CountersigningSessionState::Accepted(_)));
         }
         _ => panic!("unexpected app response"),
     }

@@ -59,6 +59,10 @@ impl CountersigningWorkspace {
         self.inner
             .share_ref(|inner| Ok(inner.sessions.get(agent_key).map(|s| s.clone())))
     }
+
+    pub async fn refresh_session_state(&self, cell_id: CellId) {
+        refresh::refresh_workspace_state(space, cell_id, signal)
+    }
 }
 
 /// The inner state of a countersigning workspace.
@@ -463,7 +467,10 @@ async fn apply_timeouts(space: &Space, signal_tx: Sender<Signal>) {
     }
 }
 
-async fn force_abandon_session(space: Space, author: &AgentPubKey) -> SourceChainResult<()> {
+pub(crate) async fn force_abandon_session(
+    space: Space,
+    author: &AgentPubKey,
+) -> SourceChainResult<()> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
     let session_data = authored_db
