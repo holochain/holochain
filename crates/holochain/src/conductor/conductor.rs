@@ -3242,8 +3242,16 @@ mod countersigning_impls {
         ) -> ConductorResult<()> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
             force_abandon_session(space.clone(), cell_id.agent_pubkey()).await?;
-            // .map_err(|err| err.into())?;
-            space.countersigning_workspace.refresh_session_state().await;
+            if let None = space
+                .countersigning_workspace
+                .remove_countersigning_session(cell_id.agent_pubkey())
+                .map_err(|err| ConductorError::KitsuneP2pError(err.into()))?
+            {
+                tracing::warn!(
+                    ?cell_id,
+                    "Could not remove countersigning session from workspace after abandoning it."
+                );
+            }
             Ok(())
         }
     }

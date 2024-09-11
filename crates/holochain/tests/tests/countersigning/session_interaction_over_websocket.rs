@@ -285,16 +285,14 @@ async fn get_session_state() {
     }
 
     // Alice abandons the session.
-    let a: AppResponse = request(
+    let response: AppResponse = request(
         AppRequest::AbandonCountersigningSession(Box::new(alice.cell_id.clone())),
         &alice_app_tx,
     )
     .await;
-    println!("a {a:?}");
+    assert_matches!(response, AppResponse::CountersigningSessionAbandoned);
 
-    tokio::time::sleep(Duration::from_secs(1)).await;
-
-    // Alice's session should be in state Unknown with 1 attempted resolution.
+    // Alice's session should be gone.
     match request(
         AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
         &alice_app_tx,
@@ -303,10 +301,7 @@ async fn get_session_state() {
     {
         AppResponse::CountersigningSessionState(maybe_state) => {
             println!("alice session state after abandoning is {maybe_state:?}");
-            // assert_matches!(
-            //     *maybe_state,
-            //     Some(CountersigningSessionState::Unknown { resolution: Some(SessionResolutionSummary { attempts, completion_attempts, .. }), .. }) if attempts == 1 && completion_attempts == 0
-            // );
+            assert_matches!(*maybe_state, None);
         }
         _ => panic!("unexpected app response"),
     }
@@ -318,8 +313,7 @@ async fn get_session_state() {
     .await
     {
         AppResponse::CountersigningSessionState(maybe_state) => {
-            println!("bob session state after abandoning is {maybe_state:?}");
-            // assert_matches!(*maybe_state, Some(CountersigningSessionState::Accepted(_)));
+            assert_matches!(*maybe_state, Some(CountersigningSessionState::Accepted(_)));
         }
         _ => panic!("unexpected app response"),
     }

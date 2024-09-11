@@ -60,8 +60,12 @@ impl CountersigningWorkspace {
             .share_ref(|inner| Ok(inner.sessions.get(agent_key).map(|s| s.clone())))
     }
 
-    pub async fn refresh_session_state(&self, cell_id: CellId) {
-        refresh::refresh_workspace_state(space, cell_id, signal)
+    pub fn remove_countersigning_session(
+        &self,
+        agent_key: &AgentPubKey,
+    ) -> KitsuneResult<Option<CountersigningSessionState>> {
+        self.inner
+            .share_mut(|inner, _| Ok(inner.sessions.remove(agent_key)))
     }
 }
 
