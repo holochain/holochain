@@ -2,7 +2,7 @@
 //!
 //! Tests run the Holochain binary and communicate over websockets.
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -39,8 +39,7 @@ use crate::tests::test_utils::{
 #[cfg(feature = "slow_tests")]
 async fn get_session_state() {
     use hdk::prelude::{PreflightRequest, PreflightRequestAcceptance, Role};
-    use holo_hash::EntryHash;
-    use holochain::prelude::CountersigningSessionState;
+    use holochain::prelude::{CountersigningSessionState, SessionResolutionSummary};
 
     use crate::tests::test_utils::{call_zome_fn_fallible, start_local_services};
 
@@ -119,6 +118,11 @@ async fn get_session_state() {
 
     // Initialize Bob's source chain.
     let _: ActionHash = call_zome(&bob, &bob_app_tx, "create_a_thing", &()).await;
+
+    // Await DHT sync of both agents.
+    tokio::time::timeout(Duration::from_secs(10), await_dht_sync(&[&alice, &bob]))
+        .await
+        .unwrap();
 
     // Countersigning session state should not be in Alice's conductor memory yet.
     match request(
@@ -220,14 +224,10 @@ async fn get_session_state() {
         )
         .await;
 
-        if let AppResponse::ZomeCalled(e) = response {
-            println!(
-                "zome called {:?}",
-                e.decode::<(ActionHash, EntryHash)>().unwrap()
-            );
+        if let AppResponse::ZomeCalled(_) = response {
             break;
         }
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
 
     // Restart Alice's conductor to put countersigning session in Unknown state.
@@ -256,7 +256,7 @@ async fn get_session_state() {
         }
     });
 
-    // Alice's session should be in state Unknown without attempted resolutions.
+    // Alice's session should be in state Unknown with 1 attempted resolution.
     match request(
         AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
         &alice_app_tx,
@@ -267,11 +267,12 @@ async fn get_session_state() {
             println!("alice session state after shutdown is {maybe_state:?}");
             assert_matches!(
                 *maybe_state,
-                Some(CountersigningSessionState::Unknown { .. })
+                Some(CountersigningSessionState::Unknown { resolution: Some(SessionResolutionSummary { attempts, completion_attempts, .. }), .. }) if attempts == 1 && completion_attempts == 0
             );
         }
         _ => panic!("unexpected app response"),
     }
+    // Bob's session should still be in Accepted state.
     match request(
         AppRequest::GetCountersigningSessionState(Box::new(bob.cell_id.clone())),
         &bob_app_tx,
@@ -279,47 +280,10 @@ async fn get_session_state() {
     .await
     {
         AppResponse::CountersigningSessionState(maybe_state) => {
-            println!("bob session state after shutdown is {maybe_state:?}");
+            assert_matches!(*maybe_state, Some(CountersigningSessionState::Accepted(_)));
         }
         _ => panic!("unexpected app response"),
     }
-
-    // // Bob lets the session time out.
-    // let _countersigning_entry =
-    //     tokio::time::timeout(Duration::from_secs(15), bob_session_abandonded_rx.recv())
-    //         .await
-    //         .unwrap()
-    //         .unwrap();
-
-    // // Bob's session should be gone from memory.
-    // match request(
-    //     AppRequest::GetCountersigningSessionState(Box::new(bob.cell_id.clone())),
-    //     &bob_app_tx,
-    // )
-    // .await
-    // {
-    //     AppResponse::CountersigningSessionState(session_state) => {
-    //         assert_matches!(*session_state, None);
-    //     }
-    //     _ => panic!("unexpected countersigning session state"),
-    // }
-
-    // // Alice's session is in an unknown state now. No attempts to resolve should have been made.
-    // match request(
-    //     AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
-    //     &alice_app_tx,
-    // )
-    // .await
-    // {
-    //     AppResponse::CountersigningSessionState(session_state) => {
-    //         println!("session state is {session_state:?}");
-    //         assert_matches!(
-    //             *session_state,
-    //             Some(CountersigningSessionState::Unknown { resolution, .. }) if resolution.is_none()
-    //         );
-    //     }
-    //     _ => panic!("unexpected countersigning session state"),
-    // }
 }
 
 struct Agent {
@@ -458,10 +422,7 @@ async fn expect_bootstrapping_completed(agents: &[&Agent]) {
     loop {
         let agent_requests = agents.into_iter().map(|agent| async {
             match request(AdminRequest::AgentInfo { cell_id: None }, &agent.admin_tx).await {
-                AdminResponse::AgentInfo(agent_infos) => {
-                    println!("agents {:?}", agent_infos);
-                    agent_infos.len() == agents.len()
-                }
+                AdminResponse::AgentInfo(agent_infos) => agent_infos.len() == agents.len(),
                 _ => unreachable!(),
             }
         });
@@ -470,6 +431,36 @@ async fn expect_bootstrapping_completed(agents: &[&Agent]) {
             .into_iter()
             .all(|result| result);
         if all_agents_visible {
+            break;
+        } else {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+}
+
+async fn await_dht_sync(agents: &[&Agent]) {
+    loop {
+        let requests = agents.into_iter().map(|agent| async {
+            match request(
+                AdminRequest::DumpFullState {
+                    cell_id: Box::new(agent.cell_id.clone()),
+                    dht_ops_cursor: None,
+                },
+                &agent.admin_tx,
+            )
+            .await
+            {
+                AdminResponse::FullStateDumped(state) => {
+                    let mut ops = state.integration_dump.integrated;
+                    ops.sort();
+                    ops
+                }
+                _ => unreachable!(),
+            }
+        });
+        let dhts = futures::future::join_all(requests).await;
+        let dhts_synced = dhts.iter().all(|dht| *dht == dhts[0]);
+        if dhts_synced {
             break;
         } else {
             tokio::time::sleep(Duration::from_millis(100)).await;
