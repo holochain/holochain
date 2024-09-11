@@ -27,7 +27,7 @@ pub struct DpkiConfig {
     ///
     /// DPKI is always installed with a network seed.
     /// Also, any two conductors not using the exact same DPKI service cannot communicate with each other.
-    /// This means that this network seed much match across all conductors in a network!
+    /// This means that this network seed must match across all conductors in a network!
     //
     // TODO: consider emitting a warning if this is not set to the production value
     //       in release builds.
