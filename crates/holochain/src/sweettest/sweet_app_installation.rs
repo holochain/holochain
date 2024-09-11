@@ -9,6 +9,7 @@ use crate::conductor::conductor::app_manifest_from_dnas;
 pub async fn app_bundle_from_dnas(
     dnas_with_roles: &[impl DnaWithRole],
     memproofs_deferred: bool,
+    network_seed: Option<NetworkSeed>,
 ) -> AppBundle {
     let (roles, resources): (Vec<_>, Vec<_>) = dnas_with_roles
         .iter()
@@ -48,7 +49,7 @@ pub async fn app_bundle_from_dnas(
 
     debug_assert_eq!(
         manifest,
-        app_manifest_from_dnas(dnas_with_roles, 255, memproofs_deferred),
+        app_manifest_from_dnas(dnas_with_roles, 255, memproofs_deferred, network_seed),
         "app_bundle_from_dnas and app_manifest_from_dnas should produce the same manifest"
     );
 
@@ -62,9 +63,10 @@ pub async fn get_install_app_payload_from_dnas(
     installed_app_id: impl Into<InstalledAppId>,
     agent_key: Option<AgentPubKey>,
     data: &[(impl DnaWithRole, Option<MembraneProof>)],
+    network_seed: Option<NetworkSeed>,
 ) -> InstallAppPayload {
     let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
-    let bundle = app_bundle_from_dnas(&dnas_with_roles, false).await;
+    let bundle = app_bundle_from_dnas(&dnas_with_roles, false, network_seed).await;
     let membrane_proofs = Some(
         data.iter()
             .map(|(dr, memproof)| (dr.role(), memproof.clone().unwrap_or_default()))

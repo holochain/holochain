@@ -324,7 +324,7 @@ pub async fn install_app(
     }
     conductor_handle
         .clone()
-        .install_app_minimal(name.to_string(), Some(agent), data)
+        .install_app_minimal(name.to_string(), Some(agent), data, None)
         .await
         .unwrap();
 
@@ -384,7 +384,7 @@ pub async fn install_app_in_conductor(
 
     let agent = conductor_handle
         .clone()
-        .install_app_minimal(installed_app_id.clone(), agent, dnas_with_proofs)
+        .install_app_minimal(installed_app_id.clone(), agent, dnas_with_proofs, None)
         .await
         .unwrap();
 
