@@ -3231,7 +3231,6 @@ mod accessor_impls {
                 .expect("failed to get p2p_batch_sender")
         }
 
-        #[cfg(feature = "test_utils")]
         pub(crate) fn p2p_metrics_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
             self.spaces
                 .p2p_metrics_db(hash)
