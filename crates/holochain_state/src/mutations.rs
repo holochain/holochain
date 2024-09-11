@@ -926,7 +926,7 @@ pub fn remove_countersigning_session(
     // with signatures published. As soon as the session's ops have been published to the network,
     // it is unacceptable to remove the session from the database.
     let count = txn.query_row(
-        "SELECT count(withhold_publish) FROM DhtOp WHERE withhold_publish IS NULL AND action_hash = ?",
+        "SELECT count(*) FROM DhtOp WHERE withhold_publish IS NULL AND action_hash = ?",
         [cs_action.to_hash()],
         |row| row.get::<_, usize>(0),
     )?;
