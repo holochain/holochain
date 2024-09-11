@@ -35,6 +35,12 @@ use crate::tests::test_utils::{
     start_holochain, write_config,
 };
 
+// Test countersigning interaction calls.
+// - two agents on two conductors
+// - one commits a countersigned entry and then shuts down the conductor (puts session in unresolvable state)
+// - call is made to abandon the session
+// - again one commits a countersigned entry and shuts down conductor (session unresolvable)
+// - call is made to publish entry
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn get_session_state() {
@@ -96,6 +102,7 @@ async fn get_session_state() {
             match ExternIO::from(signal).decode::<Signal>().unwrap() {
                 Signal::System(system_signal) => match system_signal {
                     SystemSignal::AbandonedCountersigning(entry) => {
+                        println!("bob received system signal to abandon countersigning with entry {entry:?}");
                         let _ = bob_session_abanded_tx.clone().send(entry).await;
                     }
                     _ => unreachable!(),
@@ -314,6 +321,25 @@ async fn get_session_state() {
     {
         AppResponse::CountersigningSessionState(maybe_state) => {
             assert_matches!(*maybe_state, Some(CountersigningSessionState::Accepted(_)));
+        }
+        _ => panic!("unexpected app response"),
+    }
+
+    // Await for Bob's session to be abandoned due to timeout.
+    let abandoned_session_entry_hash = bob_session_abandonded_rx.recv().await.unwrap();
+    assert_eq!(
+        abandoned_session_entry_hash,
+        bob_response.request.app_entry_hash
+    );
+    // Bob's session should be gone too.
+    match request(
+        AppRequest::GetCountersigningSessionState(Box::new(bob.cell_id.clone())),
+        &bob_app_tx,
+    )
+    .await
+    {
+        AppResponse::CountersigningSessionState(maybe_state) => {
+            assert_matches!(*maybe_state, None);
         }
         _ => panic!("unexpected app response"),
     }
