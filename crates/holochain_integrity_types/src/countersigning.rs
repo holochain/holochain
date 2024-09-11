@@ -257,6 +257,13 @@ impl PreflightRequest {
         }
         Ok(())
     }
+
+    /// Compute a fingerprint for this preflight request.
+    pub fn fingerprint(&self) -> Result<Vec<u8>, SerializedBytesError> {
+        Ok(holo_hash::encode::blake2b_256(
+            &holochain_serialized_bytes::encode(self)?,
+        ))
+    }
 }
 
 /// Every agent must send back a preflight response.
