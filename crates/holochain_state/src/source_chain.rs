@@ -295,6 +295,8 @@ impl SourceChain {
                     )),
                     e => e.map_err(SourceChainError::other),
                 }?;
+            } else {
+                tracing::info!("Skipping CHC push because this is a countersigning commit: {:?}", entries);
             }
         }
 
