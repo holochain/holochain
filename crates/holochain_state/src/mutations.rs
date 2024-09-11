@@ -926,7 +926,7 @@ pub fn remove_countersigning_session(
     // with signatures published. As soon as the session's ops have been published to the network,
     // it is unacceptable to remove the session from the database.
     let count = txn.query_row(
-        "SELECT count(withhold_publish) FROM DhtOp WHERE withhold_publish != NULL AND action_hash = ?",
+        "SELECT count(withhold_publish) FROM DhtOp WHERE withhold_publish IS NULL AND action_hash = ?",
         [cs_action.to_hash()],
         |row| row.get::<_, usize>(0),
     )?;
@@ -934,8 +934,12 @@ pub fn remove_countersigning_session(
         return Err(StateMutationError::CannotRemoveFullyPublished);
     }
 
-    txn.execute("DELETE FROM Entry WHERE hash = ?", [cs_entry_hash])?;
-    txn.execute("DELETE FROM Action WHERE hash = ?", [cs_action.to_hash()])?;
+    let count = txn.execute("DELETE FROM DhtOp WHERE withhold_publish = 1 AND action_hash = ?", [cs_action.to_hash()])?;
+    tracing::debug!("Removed {} ops from the authored DHT", count);
+    let count = txn.execute("DELETE FROM Entry WHERE hash = ?", [cs_entry_hash])?;
+    tracing::debug!("Removed {} entries", count);
+    let count = txn.execute("DELETE FROM Action WHERE hash = ?", [cs_action.to_hash()])?;
+    tracing::debug!("Removed {} actions", count);
 
     Ok(())
 }
