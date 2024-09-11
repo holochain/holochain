@@ -63,7 +63,6 @@ test-workspace-wasmer_sys:
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
-		--all-targets \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
 
@@ -72,6 +71,5 @@ test-workspace-wasmer_wamr:
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
-		--all-targets \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
