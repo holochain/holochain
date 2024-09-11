@@ -27,7 +27,7 @@ path = "src/lib.rs"
 anyhow = "1.0"
 clap = { version = "4.0", features = ["derive", "cargo"] }
 lazy_static = "1.4"
-holochain_cli_bundle = { path = "../hc_bundle", version = "^0.4.0-dev.22", default-features = false }
+holochain_cli_bundle = { path = "../hc_bundle", version = "^0.4.0-dev.22" }
 holochain_cli_sandbox = { path = "../hc_sandbox", version = "^0.4.0-dev.22" }
 holochain_cli_run_local_services = { path = "../hc_run_local_services", version = "^0.4.0-dev.15" }
 holochain_trace = { version = "^0.4.0-dev.5", path = "../holochain_trace" }
@@ -37,9 +37,4 @@ tokio = { version = "1.36.0", features = ["full"] }
 workspace = true
 
 [features]
-default = ["wasmer_sys"]
-
 chc = ["holochain_cli_sandbox/chc"]
-
-wasmer_sys = ["holochain_cli_bundle/wasmer_sys"]
-wasmer_wamr = ["holochain_cli_bundle/wasmer_wamr"]
