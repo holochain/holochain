@@ -14,7 +14,7 @@ use hdk::prelude::{
 use hdk::prelude::{CapSecret, CellId, FunctionName};
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holochain::prelude::{Signal, SystemSignal};
+use holochain::prelude::{CountersigningSessionState, Signal, SystemSignal};
 use holochain::sweettest::{authenticate_app_ws_client, websocket_client_by_port, WsPollRecv};
 use holochain_conductor_api::AppRequest;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppResponse};
@@ -43,7 +43,7 @@ use crate::tests::test_utils::{
 // - call is made to publish entry
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
-async fn get_session_state() {
+async fn countersigning_session_interaction_calls() {
     use hdk::prelude::{PreflightRequest, PreflightRequestAcceptance, Role};
     use holochain::prelude::{CountersigningSessionState, SessionResolutionSummary};
 
@@ -132,29 +132,9 @@ async fn get_session_state() {
         .unwrap();
 
     // Countersigning session state should not be in Alice's conductor memory yet.
-    match request(
-        AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
-        &alice_app_tx,
-    )
-    .await
-    {
-        AppResponse::CountersigningSessionState(maybe_state) => {
-            assert_matches!(*maybe_state, None);
-        }
-        _ => panic!("unexpected countersigning session state"),
-    }
+    assert_matches!(get_session_state(&alice.cell_id, &alice_app_tx).await, None);
     // Countersigning session state should not be in Bob's conductor memory yet.
-    match request(
-        AppRequest::GetCountersigningSessionState(Box::new(bob.cell_id.clone())),
-        &bob_app_tx,
-    )
-    .await
-    {
-        AppResponse::CountersigningSessionState(maybe_state) => {
-            assert_matches!(*maybe_state, None);
-        }
-        _ => panic!("unexpected countersigning session state"),
-    }
+    assert_matches!(get_session_state(&bob.cell_id, &bob_app_tx).await, None);
 
     // Set up the session and accept it for both agents.
     let preflight_request: PreflightRequest = call_zome(
@@ -194,28 +174,14 @@ async fn get_session_state() {
     };
 
     // Countersigning session state should exist for both agents and be in "Accepted" state.
-    match request(
-        AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
-        &alice_app_tx,
-    )
-    .await
-    {
-        AppResponse::CountersigningSessionState(maybe_state) => {
-            assert_matches!(*maybe_state, Some(CountersigningSessionState::Accepted(_)))
-        }
-        _ => panic!("unexpected countersigning session state"),
-    }
-    match request(
-        AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
-        &alice_app_tx,
-    )
-    .await
-    {
-        AppResponse::CountersigningSessionState(maybe_state) => {
-            assert_matches!(*maybe_state, Some(CountersigningSessionState::Accepted(_)))
-        }
-        _ => panic!("unexpected countersigning session state"),
-    }
+    assert_matches!(
+        get_session_state(&alice.cell_id, &alice_app_tx).await,
+        Some(CountersigningSessionState::Accepted(_))
+    );
+    assert_matches!(
+        get_session_state(&bob.cell_id, &bob_app_tx).await,
+        Some(CountersigningSessionState::Accepted(_))
+    );
 
     // Alice commits the countersigning entry. Up to 5 retries in case Bob's chain head can not be fetched
     // immediately.
@@ -248,48 +214,31 @@ async fn get_session_state() {
     // Spawn task with app socket signal waiting for system signals.
     // let (bob_session_abanded_tx, mut bob_session_abandonded_rx) = tokio::sync::mpsc::channel(1);
     tokio::spawn(async move {
-        // while let Ok(_) = bob_app_rx.recv::<AppResponse>().await {}
-        while let Ok(ReceiveMessage::Signal(signal)) = alice_app_rx.recv::<AppResponse>().await {
-            match ExternIO::from(signal).decode::<Signal>().unwrap() {
-                Signal::System(system_signal) => match system_signal {
-                    SystemSignal::AbandonedCountersigning(entry) => {
-                        println!("alice abandoned cs session signal {entry:?}");
-                        // let _ = bob_session_abanded_tx.clone().send(entry).await;
-                    }
-                    _ => unreachable!(),
-                },
-                _ => unreachable!(),
-            }
-        }
+        while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {}
+        // while let Ok(ReceiveMessage::Signal(signal)) = alice_app_rx.recv::<AppResponse>().await {
+        //     match ExternIO::from(signal).decode::<Signal>().unwrap() {
+        //         Signal::System(system_signal) => match system_signal {
+        //             SystemSignal::AbandonedCountersigning(entry) => {
+        //                 println!("alice abandoned cs session signal {entry:?}");
+        //                 // let _ = bob_session_abanded_tx.clone().send(entry).await;
+        //             }
+        //             _ => unreachable!(),
+        //         },
+        //         _ => unreachable!(),
+        //     }
+        // }
     });
 
     // Alice's session should be in state Unknown with 1 attempted resolution.
-    match request(
-        AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
-        &alice_app_tx,
-    )
-    .await
-    {
-        AppResponse::CountersigningSessionState(maybe_state) => {
             assert_matches!(
-                *maybe_state,
+        get_session_state(&alice.cell_id, &alice_app_tx).await,
                 Some(CountersigningSessionState::Unknown { resolution: Some(SessionResolutionSummary { attempts, completion_attempts, .. }), .. }) if attempts == 1 && completion_attempts == 0
             );
-        }
-        _ => panic!("unexpected app response"),
-    }
     // Bob's session should still be in Accepted state.
-    match request(
-        AppRequest::GetCountersigningSessionState(Box::new(bob.cell_id.clone())),
-        &bob_app_tx,
-    )
-    .await
-    {
-        AppResponse::CountersigningSessionState(maybe_state) => {
-            assert_matches!(*maybe_state, Some(CountersigningSessionState::Accepted(_)));
-        }
-        _ => panic!("unexpected app response"),
-    }
+    assert_matches!(
+        get_session_state(&bob.cell_id, &bob_app_tx).await,
+        Some(CountersigningSessionState::Accepted(_))
+    );
 
     // Alice abandons the session.
     let response: AppResponse = request(
@@ -300,30 +249,12 @@ async fn get_session_state() {
     assert_matches!(response, AppResponse::CountersigningSessionAbandoned);
 
     // Alice's session should be gone.
-    match request(
-        AppRequest::GetCountersigningSessionState(Box::new(alice.cell_id.clone())),
-        &alice_app_tx,
-    )
-    .await
-    {
-        AppResponse::CountersigningSessionState(maybe_state) => {
-            println!("alice session state after abandoning is {maybe_state:?}");
-            assert_matches!(*maybe_state, None);
-        }
-        _ => panic!("unexpected app response"),
-    }
+    assert_matches!(get_session_state(&alice.cell_id, &alice_app_tx).await, None);
     // Bob's session should still be in Accepted state.
-    match request(
-        AppRequest::GetCountersigningSessionState(Box::new(bob.cell_id.clone())),
-        &bob_app_tx,
-    )
-    .await
-    {
-        AppResponse::CountersigningSessionState(maybe_state) => {
-            assert_matches!(*maybe_state, Some(CountersigningSessionState::Accepted(_)));
-        }
-        _ => panic!("unexpected app response"),
-    }
+    assert_matches!(
+        get_session_state(&bob.cell_id, &bob_app_tx).await,
+        Some(CountersigningSessionState::Accepted(_))
+    );
 
     // Await for Bob's session to be abandoned due to timeout.
     let abandoned_session_entry_hash = bob_session_abandonded_rx.recv().await.unwrap();
@@ -332,17 +263,7 @@ async fn get_session_state() {
         bob_response.request.app_entry_hash
     );
     // Bob's session should be gone too.
-    match request(
-        AppRequest::GetCountersigningSessionState(Box::new(bob.cell_id.clone())),
-        &bob_app_tx,
-    )
-    .await
-    {
-        AppResponse::CountersigningSessionState(maybe_state) => {
-            assert_matches!(*maybe_state, None);
-        }
-        _ => panic!("unexpected app response"),
-    }
+    assert_matches!(get_session_state(&bob.cell_id, &bob_app_tx).await, None);
 }
 
 struct Agent {
@@ -535,6 +456,21 @@ where
 {
     let response = tx.request(request);
     check_timeout::<Response>(response, 6000).await.unwrap()
+}
+
+async fn get_session_state(
+    cell_id: &CellId,
+    app_tx: &WebsocketSender,
+) -> Option<CountersigningSessionState> {
+    match request(
+        AppRequest::GetCountersigningSessionState(Box::new(cell_id.clone())),
+        app_tx,
+    )
+    .await
+    {
+        AppResponse::CountersigningSessionState(maybe_state) => *maybe_state,
+        _ => unreachable!(),
+    }
 }
 
 async fn call_zome<I, O>(
