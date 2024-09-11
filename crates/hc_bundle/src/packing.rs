@@ -4,11 +4,11 @@
 
 use crate::error::{HcBundleError, HcBundleResult};
 use holochain_util::ffs;
+use holochain_wasmer_host::module::build_ios_module;
 use mr_bundle::RawBundle;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
-use holochain_wasmer_host::module::build_ios_module;
 use tracing::info;
 
 /// Unpack a bundle into a working directory, returning the directory path used.
