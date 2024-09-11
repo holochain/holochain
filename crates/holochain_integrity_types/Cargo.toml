@@ -11,7 +11,7 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash" }
+holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash", features = ["encoding"] }
 holochain_serialized_bytes = "=0.0.55"
 holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util", default-features = false }
 holochain_secure_primitive = { version = "^0.4.0-dev.1", path = "../holochain_secure_primitive" }

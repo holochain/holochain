@@ -260,7 +260,7 @@ impl PreflightRequest {
 
     /// Compute a fingerprint for this preflight request.
     pub fn fingerprint(&self) -> Result<Vec<u8>, SerializedBytesError> {
-        Ok(blake2b_256(
+        Ok(holo_hash::encode::blake2b_256(
             &holochain_serialized_bytes::encode(self)?,
         ))
     }

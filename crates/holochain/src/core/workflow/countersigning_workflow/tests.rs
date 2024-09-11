@@ -19,15 +19,20 @@ use hdk::prelude::{CounterSigningSessionTimes, Timestamp};
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
+use holo_hash::ActionHash;
 use holo_hash::{AgentPubKey, DnaHash, EntryHash};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::chain_lock::get_chain_lock;
-use holochain_state::prelude::{chain_head_db, remove_countersigning_session, set_withhold_publish, AppEntryBytesFixturator, HeadInfo};
-use holochain_state::prelude::{StateMutationResult, StateMutationError};
+use holochain_state::prelude::{
+    chain_head_db, remove_countersigning_session, set_withhold_publish, AppEntryBytesFixturator,
+    HeadInfo,
+};
 use holochain_state::prelude::{
     insert_action, insert_entry, insert_op, unlock_chain, CounterSigningSessionData,
 };
+use holochain_state::prelude::{StateMutationError, StateMutationResult};
+use holochain_state::query::from_blob;
 use holochain_state::source_chain;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
@@ -43,8 +48,6 @@ use std::ops::Add;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use tokio::sync::broadcast::{Receiver, Sender};
-use holochain_state::query::from_blob;
-use holo_hash::ActionHash;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn accept_countersigning_request_creates_state() {
@@ -1037,7 +1040,7 @@ async fn timeout_during_accept_does_not_interfere_with_previous_session() {
         signatures,
         test_harness.countersigning_tx.clone(),
     )
-        .await;
+    .await;
 
     test_harness
         .respond_to_countersigning_workflow_signal()
@@ -1066,7 +1069,9 @@ async fn timeout_during_accept_does_not_interfere_with_previous_session() {
         .await;
 
     // Now, simulate a timeout
-    test_harness.respond_to_countersigning_workflow_signal().await;
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
 
     // The session should be abandoned
     test_harness.expect_abandoned_signal().await;
@@ -1076,11 +1081,16 @@ async fn timeout_during_accept_does_not_interfere_with_previous_session() {
     // The chain head should not have changed. This is exactly what we'd expect of course, but it's
     // important that the session abandon for the second session didn't mix up the countersigning
     // entry that's still at the chain head from the previous session.
-    assert_eq!(chain_head_after_first_session, chain_head_after_second_session);
+    assert_eq!(
+        chain_head_after_first_session,
+        chain_head_after_second_session
+    );
 
     // Try to force removing the chain head, just to prove that even if we had a bug in the check
     // that prevented the issue above, then we would reject the database mutation.
-    let result = test_harness.try_remove_countersigning_entry(chain_head_after_first_session.action.clone()).await;
+    let result = test_harness
+        .try_remove_countersigning_entry(chain_head_after_first_session.action.clone())
+        .await;
     assert_matches!(result, Err(StateMutationError::CannotRemoveFullyPublished));
 
     test_harness.expect_no_pending_signals();
@@ -1324,7 +1334,10 @@ impl TestHarness {
         chain_head.unwrap()
     }
 
-    async fn try_remove_countersigning_entry(&self, action_hash: ActionHash) -> StateMutationResult<()> {
+    async fn try_remove_countersigning_entry(
+        &self,
+        action_hash: ActionHash,
+    ) -> StateMutationResult<()> {
         let authored = self
             .test_space
             .space
@@ -1333,8 +1346,16 @@ impl TestHarness {
         authored
             .write_async({
                 move |txn| {
-                    let blob: Vec<u8> = txn.query_row("SELECT blob FROM Action WHERE hash = ?", [action_hash], |r| r.get(0))?;
-                    remove_countersigning_session(txn, from_blob::<SignedAction>(blob)?.action().clone(), fixt!(EntryHash))
+                    let blob: Vec<u8> = txn.query_row(
+                        "SELECT blob FROM Action WHERE hash = ?",
+                        [action_hash],
+                        |r| r.get(0),
+                    )?;
+                    remove_countersigning_session(
+                        txn,
+                        from_blob::<SignedAction>(blob)?.action().clone(),
+                        fixt!(EntryHash),
+                    )
                 }
             })
             .await
