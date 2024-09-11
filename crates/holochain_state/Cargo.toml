@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state"
-version = "0.4.0-dev.22"
+version = "0.4.0-dev.23"
 description = "Holochain persisted state datatypes and functions"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -23,12 +23,12 @@ holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash", features = [
   "full",
 ] }
 fallible-iterator = "0.3.0"
-hc_sleuth = { version = "^0.4.0-dev.22", path = "../hc_sleuth" }
-holochain_chc = { version = "^0.1.0-dev.2", path = "../holochain_chc" }
-holochain_keystore = { version = "^0.4.0-dev.20", path = "../holochain_keystore" }
+hc_sleuth = { version = "^0.4.0-dev.23", path = "../hc_sleuth" }
+holochain_chc = { version = "^0.1.0-dev.3", path = "../holochain_chc" }
+holochain_keystore = { version = "^0.4.0-dev.21", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_p2p = { version = "^0.4.0-dev.22", path = "../holochain_p2p" }
-holochain_types = { version = "^0.4.0-dev.22", path = "../holochain_types" }
+holochain_p2p = { version = "^0.4.0-dev.23", path = "../holochain_p2p" }
+holochain_types = { version = "^0.4.0-dev.23", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.4.0-dev.16", path = "../holochain_zome_types", features = [
   "full",
 ] }
