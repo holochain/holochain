@@ -47,8 +47,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: []
-        wasmer-feature: []
         include:
           - os: ubuntu-latest
             wasmer-feature: wasmer_sys
