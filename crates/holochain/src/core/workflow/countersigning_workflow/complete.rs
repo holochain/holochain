@@ -53,9 +53,7 @@ pub(crate) async fn inner_countersigning_session_complete(
             if let Some((session_record, cs_entry_hash, session_data)) =
                 current_countersigning_session(&txn, Arc::new(author.clone()))?
             {
-                let lock_subject = holo_hash::encode::blake2b_256(
-                    &holochain_serialized_bytes::encode(&session_data.preflight_request())?,
-                );
+                let lock_subject = session_data.preflight_request.fingerprint()?;
 
                 let chain_lock = holochain_state::chain_lock::get_chain_lock(&txn, &author)?;
                 if let Some(chain_lock) = chain_lock {

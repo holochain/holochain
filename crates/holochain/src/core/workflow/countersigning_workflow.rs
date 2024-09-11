@@ -34,6 +34,7 @@ mod tests;
 
 pub(crate) use accept::accept_countersigning_request;
 use holochain_keystore::MetaLairClient;
+use holochain_state::chain_lock::get_chain_lock;
 pub(crate) use success::countersigning_success;
 
 /// Countersigning workspace to hold session state.
@@ -113,6 +114,18 @@ enum CountersigningSessionState {
 }
 
 impl CountersigningSessionState {
+    fn preflight_request(&self) -> &PreflightRequest {
+        match self {
+            CountersigningSessionState::Accepted(preflight_request) => preflight_request,
+            CountersigningSessionState::SignaturesCollected {
+                preflight_request, ..
+            } => preflight_request,
+            CountersigningSessionState::Unknown {
+                preflight_request, ..
+            } => preflight_request,
+        }
+    }
+
     fn session_app_entry_hash(&self) -> &EntryHash {
         let request = match self {
             CountersigningSessionState::Accepted(request) => request,
@@ -280,7 +293,7 @@ pub(crate) async fn countersigning_workflow(
         .unwrap();
 
     for (author, signatures) in maybe_completed_sessions {
-        for signature_bundle in signatures {
+        'bundles: for signature_bundle in signatures {
             // Try to complete the session using this signature bundle.
 
             match complete::inner_countersigning_session_complete(
@@ -315,7 +328,7 @@ pub(crate) async fn countersigning_workflow(
                         )))
                         .ok();
 
-                    break;
+                    break 'bundles;
                 }
                 Ok(None) => {
                     tracing::warn!("Rejected signature bundle for countersigning session for agent: {:?}: {:?}", author, signature_bundle);
@@ -381,7 +394,9 @@ async fn try_recover_failed_sessions(
                 .sessions
                 .iter()
                 .filter_map(|(author, session_state)| match session_state {
-                    CountersigningSessionState::Unknown { .. } => Some(author.clone()),
+                    CountersigningSessionState::Unknown {
+                        preflight_request, ..
+                    } => Some((author.clone(), preflight_request.clone())),
                     _ => None,
                 })
                 .collect::<Vec<_>>())
@@ -389,7 +404,7 @@ async fn try_recover_failed_sessions(
         .unwrap();
 
     let mut remaining_sessions_in_unknown_state = 0;
-    for author in sessions_in_unknown_state {
+    for (author, preflight_request) in sessions_in_unknown_state {
         tracing::info!(
             "Countersigning session for agent {:?} is in an unknown state, attempting to resolve",
             author
@@ -398,6 +413,7 @@ async fn try_recover_failed_sessions(
             space.clone(),
             network.clone(),
             author.clone(),
+            preflight_request,
         )
         .await
         {
@@ -537,7 +553,7 @@ async fn apply_timeouts(space: &Space, signal_tx: Sender<Signal>) {
                     };
 
                     if expired {
-                        Some((author.clone(), session.session_app_entry_hash().clone()))
+                        Some((author.clone(), session.preflight_request().clone()))
                     } else {
                         None
                     }
@@ -546,13 +562,13 @@ async fn apply_timeouts(space: &Space, signal_tx: Sender<Signal>) {
         })
         .unwrap();
 
-    for (author, app_entry_hash) in timed_out {
+    for (author, preflight_request) in timed_out {
         tracing::info!(
             "Countersigning session for agent {:?} has timed out, abandoning session",
             author
         );
 
-        match force_abandon_session(space.clone(), &author).await {
+        match force_abandon_session(space.clone(), &author, &preflight_request).await {
             Ok(_) => {
                 // Only once we've managed to remove the session do we remove the state for it.
                 space
@@ -560,7 +576,6 @@ async fn apply_timeouts(space: &Space, signal_tx: Sender<Signal>) {
                     .inner
                     .share_mut(|inner, _| {
                         inner.sessions.remove(&author);
-
                         Ok(())
                     })
                     .unwrap();
@@ -568,7 +583,7 @@ async fn apply_timeouts(space: &Space, signal_tx: Sender<Signal>) {
                 // Then let the client know.
                 signal_tx
                     .send(Signal::System(SystemSignal::AbandonedCountersigning(
-                        app_entry_hash,
+                        preflight_request.app_entry_hash,
                     )))
                     .ok();
             }
@@ -583,36 +598,59 @@ async fn apply_timeouts(space: &Space, signal_tx: Sender<Signal>) {
     }
 }
 
-async fn force_abandon_session(space: Space, author: &AgentPubKey) -> SourceChainResult<()> {
+async fn force_abandon_session(
+    space: Space,
+    author: &AgentPubKey,
+    preflight_request: &PreflightRequest,
+) -> SourceChainResult<()> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
-    let session_data = authored_db
+    let abandon_fingerprint = preflight_request.fingerprint()?;
+
+    let maybe_session_data = authored_db
         .write_async({
             let author = author.clone();
             move |txn| current_countersigning_session(txn, Arc::new(author.clone()))
         })
         .await?;
 
-    if let Some((cs_action, cs_entry_hash, _)) = session_data {
-        tracing::info!("There is a committed session to remove for: {:?}", author);
-        abandon_session(
-            authored_db,
-            author.clone(),
-            cs_action.action().clone(),
-            cs_entry_hash,
-        )
-        .await?;
-    } else {
-        tracing::info!(
-            "There is no committed session, just a lock to remove for: {:?}",
-            author
-        );
-        authored_db
-            .write_async({
-                let author = author.clone();
-                move |txn| unlock_chain(txn, &author)
-            })
+    match maybe_session_data {
+        Some((cs_action, cs_entry_hash, x))
+            if x.preflight_request.fingerprint()? == abandon_fingerprint =>
+        {
+            tracing::info!("There is a committed session to remove for: {:?}", author);
+            abandon_session(
+                authored_db,
+                author.clone(),
+                cs_action.action().clone(),
+                cs_entry_hash,
+            )
             .await?;
+        }
+        _ => {
+            // There is no matching, committed session but there may be a lock to remove
+            authored_db
+                .write_async({
+                    let author = author.clone();
+                    move |txn| {
+                        let chain_lock = get_chain_lock(txn, &author)?;
+
+                        match chain_lock {
+                            Some(lock) if lock.subject() == abandon_fingerprint => {
+                                unlock_chain(txn, &author)
+                            }
+                            _ => {
+                                tracing::warn!(
+                                    "No matching session or lock to remove for: {:?}",
+                                    author
+                                );
+                                Ok(())
+                            }
+                        }
+                    }
+                })
+                .await?;
+        }
     }
 
     Ok(())

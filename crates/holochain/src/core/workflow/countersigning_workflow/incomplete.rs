@@ -6,6 +6,7 @@ use crate::core::workflow::countersigning_workflow::{
 use crate::core::workflow::{countersigning_workflow, WorkflowResult};
 use crate::prelude::{Entry, RecordEntry};
 use either::Either;
+use hdk::prelude::PreflightRequest;
 use holo_hash::AgentPubKey;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::GetActivityOptions;
@@ -32,6 +33,7 @@ pub async fn inner_countersigning_session_incomplete(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,
     author: AgentPubKey,
+    preflight_request: PreflightRequest,
 ) -> WorkflowResult<(SessionCompletionDecision, Vec<SessionResolutionOutcome>)> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
@@ -59,6 +61,16 @@ pub async fn inner_countersigning_session_incomplete(
     // is in a bad state. We need to figure out what the session state is and how to resolve it.
 
     let (cs_record, cs_entry_hash, session_data) = maybe_current_session.unwrap();
+
+    let found_fingerprint = session_data.preflight_request().fingerprint()?;
+    let expected_fingerprint = preflight_request.fingerprint()?;
+    if found_fingerprint != expected_fingerprint {
+        tracing::error!("Countersigning session {:?} was in an unknown state but the session entry found was {:?} which does not match: {:?}", preflight_request, session_data.preflight_request(), author);
+        return Ok((
+            SessionCompletionDecision::Indeterminate,
+            Vec::with_capacity(0),
+        ));
+    }
 
     // We need to find out what state the other signing agents are in.
     // TODO Note that we are ignoring the optional signing agents here - that's something we can figure out later because it's not clear what it means for them
