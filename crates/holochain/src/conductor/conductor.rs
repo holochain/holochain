@@ -3285,15 +3285,7 @@ mod countersigning_impls {
             cell_id: CellId,
             request: PreflightRequest,
         ) -> ConductorResult<PreflightRequestAcceptance> {
-            let countersigning_trigger = match self
-                .get_queue_consumer_workflows()
-                .countersigning_trigger(Arc::new(cell_id.dna_hash().clone()))
-            {
-                Some(trigger) => trigger,
-                None => {
-                    return Err(ConductorError::MissingTrigger("countersigning".to_string()));
-                }
-            };
+            let countersigning_trigger = self.cell_by_id(&cell_id).await?.countersigning_trigger();
 
             Ok(
                 workflow::countersigning_workflow::accept_countersigning_request(
