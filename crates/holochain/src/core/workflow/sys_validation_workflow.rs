@@ -520,6 +520,7 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                 DhtOp::ChainOp(op) => match &**op {
                     ChainOp::StoreRecord(_, action, entry) => {
                         let mut actions = match entry {
+                            // TODO we should be doing something similar to this in app validation!
                             RecordEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
                                 // Discard errors here because we'll check later whether the input is valid. If it's not then it
                                 // won't matter that we've skipped fetching deps for it

@@ -330,7 +330,7 @@ impl SweetConductor {
 
         let agent = self
             .raw_handle()
-            .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof)
+            .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof, None)
             .await?;
 
         self.raw_handle().enable_app(installed_app_id).await?;
@@ -924,7 +924,9 @@ impl WsPollRecv {
 /// done with a [WsPollRecv].
 /// If this is an app client, you will need to authenticate the connection before you can send any
 /// other requests.
-pub async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, WebsocketReceiver)> {
+pub async fn websocket_client_by_port(
+    port: u16,
+) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
     connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
         ConnectRequest::new(

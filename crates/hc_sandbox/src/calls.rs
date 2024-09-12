@@ -37,6 +37,7 @@ use crate::CmdRunner;
 use clap::{Args, Parser, Subcommand};
 use holochain_trace::Output;
 use holochain_types::websocket::AllowedOrigins;
+use holochain_websocket::WebsocketError;
 
 #[doc(hidden)]
 #[derive(Debug, Parser)]
@@ -289,7 +290,7 @@ pub async fn call(
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
             match CmdRunner::try_new(port).await {
                 Ok(cmd) => cmds.push((cmd, None, None)),
-                Err(e) => {
+                Err(WebsocketError::Io(e)) => {
                     if let std::io::ErrorKind::ConnectionRefused
                     | std::io::ErrorKind::AddrNotAvailable = e.kind()
                     {
@@ -303,6 +304,12 @@ pub async fn call(
                         cmds.push((CmdRunner::new(port).await, Some(holochain), Some(lair)));
                         continue;
                     }
+                    bail!(
+                        "Failed to connect to running conductor or start one {:?}",
+                        e
+                    )
+                }
+                Err(e) => {
                     bail!(
                         "Failed to connect to running conductor or start one {:?}",
                         e

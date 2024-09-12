@@ -7,12 +7,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Countersigning sessions no longer unlock at the end time without checking the outcome. There is a new workflow which
+  will take appropriate actions when the session completes or times out. The majority of the logic is unchanged except
+  for timeouts. If a timeout occurs and Holochain has been up throughout the session then the session will be abandoned.
+  If Holochain crashes or is restarted during the session but is able to recover state from the database, it will 
+  attempt to discover what the other participants did. This changes a failure mode that used to be silent to one that
+  will explicitly prevent new writes to your source chain. We are going to provide tooling to resolve this situation in
+  the following change. #4188
 - Internal rework of chain locking logic. This is used when a countersigning session is in progress, to prevent other
   actions from being committed during the session. There was a race condition where two countersigning sessions being
   run one after another could result in responses relevant to the first session accidentally unlocking the new session.
   That effectively meant that on a larger network, countersigning sessions would get cancelled when nothing had actually
   gone wrong. The rework of locking made fixing the bug simpler, but the key to the fix was in the `countersigning_success`
   function. That now checks that incoming signatures are actually for the current session. #4148
+- Add `danger_generate_throwaway_device_seed` to allow creation and use of a random device seed for test situations, where a proper device seed is not needed. #4238
+- Add `allow_throwaway_random_dpki_agent_key` to allow creation of a random (unrecoverable) DPKI agent when a device seed is not specified. #4238
+
+## 0.4.0-dev.23
+
+- Fixes issue \#3679 where websocket connections would be closed if a message was received that failed to deserialize. The new behaviour isn’t perfect because you will get a timeout instead, but the websocket will remain open and you can continue to send further valid message. There is another issue to track partial deserialization \#4251 so we can respond with an error message instead of a timeout. \#4252
 
 ## 0.4.0-dev.22
 

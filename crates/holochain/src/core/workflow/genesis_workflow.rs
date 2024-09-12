@@ -208,11 +208,7 @@ mod tests {
             async move { Ok(KeyState::Valid(action)) }.boxed()
         });
 
-        let dpki = DpkiService::new(
-            ::fixt::fixt!(CellId),
-            "DPKI_DEVICE_SEED".to_string(),
-            mock_dpki,
-        );
+        let dpki = DpkiService::new(::fixt::fixt!(CellId), mock_dpki);
 
         {
             let workspace = GenesisWorkspace::new(vault.clone(), dht_db.to_db()).unwrap();

@@ -6,6 +6,7 @@ use crate::core::workflow::countersigning_workflow::{
 use crate::core::workflow::{countersigning_workflow, WorkflowResult};
 use crate::prelude::{Entry, RecordEntry};
 use either::Either;
+use hdk::prelude::PreflightRequest;
 use holo_hash::AgentPubKey;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::GetActivityOptions;
@@ -32,6 +33,7 @@ pub async fn inner_countersigning_session_incomplete(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,
     author: AgentPubKey,
+    preflight_request: PreflightRequest,
 ) -> WorkflowResult<(SessionCompletionDecision, Vec<SessionResolutionOutcome>)> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
@@ -58,8 +60,20 @@ pub async fn inner_countersigning_session_incomplete(
     // Now things get more complicated. We have a countersigning entry on our chain but the session
     // is in a bad state. We need to figure out what the session state is and how to resolve it.
 
-    let (cs_action, cs_entry_hash, session_data) = maybe_current_session.unwrap();
+    let (cs_record, cs_entry_hash, session_data) = maybe_current_session.unwrap();
 
+    let found_fingerprint = session_data.preflight_request().fingerprint()?;
+    let expected_fingerprint = preflight_request.fingerprint()?;
+    if found_fingerprint != expected_fingerprint {
+        tracing::error!("Countersigning session {:?} was in an unknown state but the session entry found was {:?} which does not match: {:?}", preflight_request, session_data.preflight_request(), author);
+        return Ok((
+            SessionCompletionDecision::Indeterminate,
+            Vec::with_capacity(0),
+        ));
+    }
+
+    // TODO don't need to gather per agent, try each until we can get a session data that contains a
+    //      set of signatures
     // We need to find out what state the other signing agents are in.
     // TODO Note that we are ignoring the optional signing agents here - that's something we can figure out later because it's not clear what it means for them
     //      to be optional.
@@ -72,7 +86,7 @@ pub async fn inner_countersigning_session_incomplete(
     let cascade = CascadeImpl::empty().with_network(network, space.cache_db.clone());
 
     let get_activity_options = GetActivityOptions {
-        include_warrants: true,
+        include_warrants: true, // TODO don't want this, but document that apps should be checking for warrants before completing preflight
         include_valid_activity: true,
         include_full_records: true,
         get_options: GetOptions::network(),
@@ -111,6 +125,7 @@ pub async fn inner_countersigning_session_incomplete(
 
             let decision = match activity_result {
                 Ok(activity) => {
+                    // TODO don't need this
                     if !activity.warrants.is_empty() {
                         // If this agent is warranted then we can't make the decision on our agent's behalf
                         // whether to trust this agent or not.
@@ -179,6 +194,7 @@ pub async fn inner_countersigning_session_incomplete(
                                         );
                                         SessionCompletionDecision::Abandoned
                                     }
+                                    // TODO separate out Hidden with a comment in case somebody runs into this later
                                     RecordEntry::Hidden | RecordEntry::NA => {
                                         // This wouldn't be the case for a countersigning entry so this is evidence that
                                         // the agent has put something else on their chain.
@@ -278,7 +294,7 @@ pub async fn inner_countersigning_session_incomplete(
         session_data.preflight_request().signing_agents.len() - 1
     );
 
-    signatures.push(cs_action.clone().into());
+    signatures.push(cs_record.signed_action.clone().into());
 
     if signatures.len() == session_data.preflight_request().signing_agents.len() {
         // We have all the signatures we need to complete the session. We can complete the session
@@ -299,7 +315,7 @@ pub async fn inner_countersigning_session_incomplete(
         // to try and process the new signature bundle. We communicate completion here but the
         // caller must not change the session state based on this response.
         return Ok((
-            SessionCompletionDecision::Complete(cs_action.into()),
+            SessionCompletionDecision::Complete(cs_record.signed_action.clone().into()),
             Vec::with_capacity(0),
         ));
     } else if abandoned.len() == session_data.preflight_request().signing_agents.len() - 1 {
@@ -310,7 +326,7 @@ pub async fn inner_countersigning_session_incomplete(
         countersigning_workflow::abandon_session(
             authored_db,
             author.clone(),
-            cs_action.action().clone(),
+            cs_record.action().clone(),
             cs_entry_hash,
         )
         .await?;

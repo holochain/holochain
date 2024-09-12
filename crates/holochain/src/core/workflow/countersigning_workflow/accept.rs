@@ -3,8 +3,9 @@ use crate::core::queue_consumer::TriggerSender;
 use crate::core::workflow::countersigning_workflow::CountersigningSessionState;
 use crate::core::workflow::{WorkflowError, WorkflowResult};
 use crate::prelude::{PreflightRequest, PreflightRequestAcceptance, PreflightResponse, Signature};
-use holo_hash::AgentPubKey;
+use holo_hash::{AgentPubKey, DnaHash};
 use holochain_keystore::MetaLairClient;
+use holochain_zome_types::cell::CellId;
 use kitsune_p2p_types::KitsuneError;
 
 /// Accept a countersigning session.
@@ -18,6 +19,23 @@ pub async fn accept_countersigning_request(
     request: PreflightRequest,
     countersigning_trigger: TriggerSender,
 ) -> WorkflowResult<PreflightRequestAcceptance> {
+    let cell_id = CellId::new(
+        DnaHash::from_raw_36(space.dna_hash.get_raw_36().to_vec()),
+        author.clone(),
+    );
+    let workspace = {
+        let guard = space.countersigning_workspaces.lock();
+        guard.get(&cell_id).cloned()
+    };
+
+    if workspace.is_none() {
+        tracing::warn!(
+            "Received countersigning signature bundle for agent: {:?} but no workspace found",
+            author
+        );
+        return Err(WorkflowError::other("Missing workspace"));
+    }
+
     // Find the index of our agent in the list of signing agents.
     let agent_index = match request
         .signing_agents
@@ -60,25 +78,21 @@ pub async fn accept_countersigning_request(
 
     // At this point the chain has been locked, and we are in a countersigning session. Store the
     // session request in the workspace.
-    if space
-        .countersigning_workspace
-        .inner
-        .share_mut(|inner, _| match inner.sessions.entry(author.clone()) {
-            std::collections::hash_map::Entry::Occupied(_) => {
-                Err(KitsuneError::other("Session already exists"))
-            }
-            std::collections::hash_map::Entry::Vacant(entry) => {
-                tracing::debug!(
-                    "Storing accepted session in the workspace for agent: {:?}",
-                    author
-                );
-                entry.insert(CountersigningSessionState::Accepted(request.clone()));
-                Ok(())
-            }
-        })
-        .is_err()
-    {
+    let put_accepted_result = workspace.unwrap().inner.share_mut(|inner, _| {
+        if inner.session.is_some() {
+            return Err(KitsuneError::other("Session already exists"));
+        }
+
+        tracing::debug!(
+            "Storing accepted session in the workspace for agent: {:?}",
+            author
+        );
+        inner.session = Some(CountersigningSessionState::Accepted(request.clone()));
+        Ok(())
+    });
+    if put_accepted_result.is_err() {
         // This really shouldn't happen. The chain lock is the primary state and that should be in place here.
+        tracing::error!("Failed to store accepted session in workspace");
         return Ok(PreflightRequestAcceptance::AnotherSessionIsInProgress);
     };
 

@@ -6,12 +6,11 @@ use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::manager::TaskManagerClient;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::signal::Signal;
-use holochain_websocket::ReceiveMessage;
 use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
-use std::io::ErrorKind;
+use holochain_websocket::{ReceiveMessage, WebsocketError};
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 
 use crate::conductor::api::{AdminInterfaceApi, AppAuthentication, AppInterfaceApi};
@@ -171,15 +170,23 @@ pub async fn spawn_app_interface_task(
 async fn recv_incoming_admin_msgs(api: AdminInterfaceApi, rx_from_iface: WebsocketReceiver) {
     use futures::stream::StreamExt;
 
-    tracing::info!("Starting admin listener");
-
     let rx_from_iface =
         futures::stream::unfold(rx_from_iface, move |mut rx_from_iface| async move {
-            match rx_from_iface.recv().await {
-                Ok(r) => Some((r, rx_from_iface)),
-                Err(err) => {
-                    info!(?err);
-                    None
+            loop {
+                match rx_from_iface.recv().await {
+                    Ok(r) => return Some((r, rx_from_iface)),
+                    Err(err) => {
+                        match err {
+                            WebsocketError::Deserialize(_) => {
+                                // No need to log here because `holochain_websocket` logs errors
+                                continue;
+                            }
+                            _ => {
+                                info!(?err);
+                                return None;
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -330,7 +337,7 @@ fn spawn_app_signals_handler(
             if let Some(signal) = rx_from_cell.next().await {
                 trace!(msg = "Sending signal!", ?signal);
                 if let Err(err) = tx_to_iface.signal(signal).await {
-                    if err.kind() == ErrorKind::Other && err.to_string() == "WebsocketClosed" {
+                    if let WebsocketError::Close(_) = err {
                         info!(
                             "Client has closed their websocket connection, closing signal handler"
                         );
@@ -362,11 +369,21 @@ fn spawn_recv_incoming_app_msgs(
 
     let rx_from_iface =
         futures::stream::unfold(rx_from_iface, move |mut rx_from_iface| async move {
-            match rx_from_iface.recv().await {
-                Ok(r) => Some((r, rx_from_iface)),
-                Err(err) => {
-                    info!(?err);
-                    None
+            loop {
+                match rx_from_iface.recv().await {
+                    Ok(r) => return Some((r, rx_from_iface)),
+                    Err(err) => {
+                        match err {
+                            WebsocketError::Deserialize(_) => {
+                                // No need to log here because `holochain_websocket` logs errors
+                                continue;
+                            }
+                            _ => {
+                                info!(?err);
+                                return None;
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -554,7 +571,7 @@ pub mod test {
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::PostCommitSignal]).await;
-        let app_bundle = app_bundle_from_dnas(&[dna_file.clone()], false).await;
+        let app_bundle = app_bundle_from_dnas(&[dna_file.clone()], false, None).await;
         let request = AdminRequest::InstallApp(Box::new(InstallAppPayload {
             source: AppBundleSource::Bundle(app_bundle),
             agent_key: None,
@@ -685,7 +702,7 @@ pub mod test {
 
         conductor_handle
             .clone()
-            .install_app_minimal("test app".to_string(), Some(agent), &dnas_with_proofs)
+            .install_app_minimal("test app".to_string(), Some(agent), &dnas_with_proofs, None)
             .await
             .unwrap();
 

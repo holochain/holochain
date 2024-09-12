@@ -3,7 +3,7 @@ use crate::core::queue_consumer::{TriggerReceiver, TriggerSender};
 use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::countersigning_workflow::{
     accept_countersigning_request, countersigning_workflow, CountersigningSessionState,
-    SessionCompletionDecision, SessionResolutionSummary,
+    CountersigningWorkspace, SessionCompletionDecision, SessionResolutionSummary,
 };
 use crate::core::workflow::countersigning_workflow::{countersigning_success, WorkComplete};
 use crate::core::workflow::WorkflowResult;
@@ -19,15 +19,20 @@ use hdk::prelude::{CounterSigningSessionTimes, Timestamp};
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
+use holo_hash::ActionHash;
 use holo_hash::{AgentPubKey, DnaHash, EntryHash};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::chain_lock::get_chain_lock;
-use holochain_state::prelude::AppEntryBytesFixturator;
-use holochain_state::prelude::StateMutationResult;
+use holochain_state::prelude::{
+    chain_head_db, remove_countersigning_session, set_withhold_publish, AppEntryBytesFixturator,
+    HeadInfo,
+};
 use holochain_state::prelude::{
     insert_action, insert_entry, insert_op, unlock_chain, CounterSigningSessionData,
 };
+use holochain_state::prelude::{StateMutationError, StateMutationResult};
+use holochain_state::query::from_blob;
 use holochain_state::source_chain;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
@@ -42,6 +47,7 @@ use matches::assert_matches;
 use std::ops::Add;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::broadcast::{Receiver, Sender};
 
 #[tokio::test(flavor = "multi_thread")]
@@ -190,7 +196,7 @@ async fn chain_unlocked_outside_workflow_then_restart() {
 
     // Now simulate a restart, to check that Holochain will still recover even if it loses its state
     // at this point
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     test_harness.countersigning_tx.trigger(&"test");
     // The refresh should have nothing to find because the lock is gone and nothing has been committed
@@ -223,7 +229,7 @@ async fn discard_session_with_lock_but_no_state() {
 
     // Simulate approximately what would happen on a restart. The session is lost from memory but
     // the chain is still locked.
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     // Run the workflow on init
     test_harness.countersigning_tx.trigger(&"init");
@@ -276,6 +282,7 @@ async fn receive_signatures_and_complete() {
 
     // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
+        net.expect_chc().return_once(|| None);
         net.expect_publish_countersign()
             .return_once(|_, _, _| Ok(()));
         net
@@ -365,6 +372,7 @@ async fn receive_valid_and_invalid_signatures_and_complete() {
 
     // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
+        net.expect_chc().return_once(|| None);
         net.expect_publish_countersign()
             .return_once(|_, _, _| Ok(()));
         net
@@ -542,7 +550,7 @@ async fn recover_after_restart_from_commit_when_other_agent_abandons() {
         .await;
 
     // Simulate a restart by wiping the workspace
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     // Now for the sake of recovery, let's suppose that we can initially find no activity for Bob.
     let activity_response = bob.no_activity_response();
@@ -640,7 +648,7 @@ async fn recover_after_restart_from_commit_when_other_agent_completes() {
         .await;
 
     // Simulate a restart by wiping the workspace
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     // Initially, find no data for Bob
     let activity_response = bob.no_activity_response();
@@ -686,6 +694,8 @@ async fn recover_after_restart_from_commit_when_other_agent_completes() {
                 let activity_response = activity_response.clone();
                 move |_, _, _| Ok(vec![activity_response.clone()])
             });
+
+            net.expect_chc().return_once(|| None);
 
             net.expect_publish_countersign()
                 .return_once(|_, _, _| Ok(()));
@@ -738,7 +748,7 @@ async fn stay_in_unknown_state_when_activity_authorities_do_not_agree() {
         .await;
 
     // Simulate a restart to enter the unknown state on the next run.
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     // Simulate mixed responses from AAAs. This is not really expected unless nodes are misbehaving
     // but if it does happen then we should stay in the unknown state.
@@ -836,7 +846,7 @@ async fn stay_in_unknown_state_when_activity_authorities_are_missing_data() {
         .await;
 
     // Simulate a restart to enter the unknown state on the next run.
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     // Simulate mixed responses from AAAs. This is not really expected unless nodes are misbehaving
     // but if it does happen then we should stay in the unknown state.
@@ -934,7 +944,7 @@ async fn stay_in_unknown_state_when_bad_signatures_are_fetched() {
         .await;
 
     // Simulate a restart to enter the unknown state on the next run.
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     // Simulate mixed responses from AAAs. This is not really expected unless nodes are misbehaving
     // but if it does happen then we should stay in the unknown state.
@@ -982,9 +992,117 @@ async fn stay_in_unknown_state_when_bad_signatures_are_fetched() {
     }
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn timeout_during_accept_does_not_interfere_with_previous_session() {
+    holochain_trace::test_run();
+
+    let dna_hash = fixt!(DnaHash);
+    let mut test_harness = TestHarness::new(dna_hash).await;
+
+    let bob = test_harness.new_remote_agent().await;
+
+    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(60), &bob);
+    let my_acceptance = test_harness
+        .accept_countersigning_request(request.clone())
+        .await
+        .unwrap();
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    let bob_acceptance = bob
+        .accept_preflight_request(request.clone(), test_harness.keystore.clone())
+        .await;
+
+    let (session_data, entry, entry_hash) =
+        test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
+
+    let signatures = vec![
+        bob.produce_signature(&session_data, &entry_hash, test_harness.keystore.clone())
+            .await,
+        test_harness
+            .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+            .await,
+    ];
+
+    // Expect to receive a publish event.
+    test_harness.reconfigure_network(|mut net| {
+        net.expect_chc().return_once(|| None);
+        net.expect_publish_countersign()
+            .return_once(|_, _, _| Ok(()));
+        net
+    });
+
+    // Receive the signatures as though they were coming in from a witness.
+    countersigning_success(
+        test_harness.test_space.space.clone(),
+        test_harness.author.clone(),
+        signatures,
+        test_harness.countersigning_tx.clone(),
+    )
+    .await;
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    // One run should be enough when we got valid signatures and the session is now completed.
+    test_harness.expect_success_signal().await;
+    test_harness.expect_publish_and_integrate();
+
+    test_harness.expect_no_pending_signals();
+    test_harness.expect_empty_workspace();
+    test_harness.expect_scheduling_complete();
+
+    let chain_head_after_first_session = test_harness.read_chain_head_hash().await;
+
+    // Now, start a new session
+    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
+    test_harness
+        .accept_countersigning_request(request.clone())
+        .await
+        .unwrap();
+
+    // Run once to schedule the timeout trigger
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    // Now, simulate a timeout
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    // The session should be abandoned
+    test_harness.expect_abandoned_signal().await;
+
+    let chain_head_after_second_session = test_harness.read_chain_head_hash().await;
+
+    // The chain head should not have changed. This is exactly what we'd expect of course, but it's
+    // important that the session abandon for the second session didn't mix up the countersigning
+    // entry that's still at the chain head from the previous session.
+    assert_eq!(
+        chain_head_after_first_session,
+        chain_head_after_second_session
+    );
+
+    // Try to force removing the chain head, just to prove that even if we had a bug in the check
+    // that prevented the issue above, then we would reject the database mutation.
+    let result = test_harness
+        .try_remove_countersigning_entry(chain_head_after_first_session.action.clone())
+        .await;
+    assert_matches!(result, Err(StateMutationError::CannotRemoveFullyPublished));
+
+    test_harness.expect_no_pending_signals();
+    test_harness.expect_empty_workspace();
+    test_harness.expect_scheduling_complete();
+}
+
 struct TestHarness {
     dna_hash: DnaHash,
     test_space: TestSpace,
+    workspace: Arc<CountersigningWorkspace>,
     network: Arc<MockHolochainP2pDnaT>,
     signal_tx: Sender<Signal>,
     signal_rx: Receiver<Signal>,
@@ -1027,9 +1145,18 @@ impl TestHarness {
         .await
         .unwrap();
 
+        let cell_id = CellId::new(dna_hash.clone(), author.clone());
+        let workspace = Arc::new(CountersigningWorkspace::new(Duration::from_secs(3)));
+        test_space
+            .space
+            .countersigning_workspaces
+            .lock()
+            .insert(cell_id.clone(), workspace.clone());
+
         Self {
             dna_hash,
             test_space,
+            workspace,
             network: Arc::new(network),
             signal_tx: signal.0,
             signal_rx: signal.1,
@@ -1090,7 +1217,9 @@ impl TestHarness {
 
         let outcome = countersigning_workflow(
             self.test_space.space.clone(),
+            self.workspace.clone(),
             self.network.clone(),
+            self.keystore.clone(),
             CellId::new(self.dna_hash.clone(), self.author.clone()),
             self.signal_tx.clone(),
             self.countersigning_tx.clone(),
@@ -1118,13 +1247,11 @@ impl TestHarness {
             .unwrap();
     }
 
-    fn clear_workspace_sessions(&self) {
-        self.test_space
-            .space
-            .countersigning_workspace
+    fn clear_workspace_session(&self) {
+        self.workspace
             .inner
             .share_mut(|w, _| {
-                w.sessions.clear();
+                w.session = None;
                 Ok(())
             })
             .unwrap();
@@ -1190,6 +1317,7 @@ impl TestHarness {
                 insert_action(txn, &sah)?;
                 insert_entry(txn, &entry_hash, &entry)?;
                 insert_op(txn, &dht_op)?;
+                set_withhold_publish(txn, &dht_op.hash)?;
 
                 Ok(())
             })
@@ -1198,29 +1326,69 @@ impl TestHarness {
 
         signed
     }
+
+    async fn read_chain_head_hash(&self) -> HeadInfo {
+        let authored = self
+            .test_space
+            .space
+            .get_or_create_authored_db(self.author.clone())
+            .unwrap();
+        let chain_head = authored
+            .read_async({
+                let author = self.author.clone();
+                move |txn| chain_head_db(&txn, Arc::new(author))
+            })
+            .await
+            .unwrap();
+
+        chain_head.unwrap()
+    }
+
+    async fn try_remove_countersigning_entry(
+        &self,
+        action_hash: ActionHash,
+    ) -> StateMutationResult<()> {
+        let authored = self
+            .test_space
+            .space
+            .get_or_create_authored_db(self.author.clone())
+            .unwrap();
+        authored
+            .write_async({
+                move |txn| {
+                    let blob: Vec<u8> = txn.query_row(
+                        "SELECT blob FROM Action WHERE hash = ?",
+                        [action_hash],
+                        |r| r.get(0),
+                    )?;
+                    remove_countersigning_session(
+                        txn,
+                        from_blob::<SignedAction>(blob)?.action().clone(),
+                        fixt!(EntryHash),
+                    )
+                }
+            })
+            .await
+    }
 }
 
 /// Assertion query implementation
 impl TestHarness {
     fn expect_empty_workspace(&self) {
-        let count = self
-            .test_space
-            .space
-            .countersigning_workspace
+        let no_session = self
+            .workspace
             .inner
-            .share_ref(|w| Ok(w.sessions.len()))
+            .share_ref(|w| Ok(w.session.is_none()))
             .unwrap();
 
-        assert_eq!(0, count);
+        assert!(no_session);
     }
 
     fn expect_session_accepted(&self) -> PreflightRequest {
         let maybe_found = self
-            .test_space
-            .space
-            .countersigning_workspace
+            .workspace
             .inner
-            .share_ref(|w| Ok(w.sessions.get(&self.author).cloned()))
+            .share_ref(|w| Ok(w.session.clone()))
             .unwrap();
 
         assert!(maybe_found.is_some());
@@ -1233,11 +1401,9 @@ impl TestHarness {
 
     fn expect_session_in_unknown_state(&self) -> Option<SessionResolutionSummary> {
         let maybe_found = self
-            .test_space
-            .space
-            .countersigning_workspace
+            .workspace
             .inner
-            .share_ref(|w| Ok(w.sessions.get(&self.author).cloned()))
+            .share_ref(|w| Ok(w.session.clone()))
             .unwrap();
 
         assert!(maybe_found.is_some());
@@ -1250,11 +1416,9 @@ impl TestHarness {
 
     fn expect_session_in_signatures_collected(&self) -> Option<SessionResolutionSummary> {
         let maybe_found = self
-            .test_space
-            .space
-            .countersigning_workspace
+            .workspace
             .inner
-            .share_ref(|w| Ok(w.sessions.get(&self.author).cloned()))
+            .share_ref(|w| Ok(w.session.clone()))
             .unwrap();
 
         assert!(maybe_found.is_some());
@@ -1352,9 +1516,7 @@ impl TestHarness {
     }
 
     fn expect_scheduling_complete(&self) {
-        self.test_space
-            .space
-            .countersigning_workspace
+        self.workspace
             .inner
             .share_ref(|inner| {
                 match &inner.next_trigger {

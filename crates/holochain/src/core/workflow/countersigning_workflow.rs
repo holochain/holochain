@@ -34,6 +34,8 @@ mod success;
 mod tests;
 
 pub(crate) use accept::accept_countersigning_request;
+use holochain_keystore::MetaLairClient;
+use holochain_state::chain_lock::get_chain_lock;
 pub(crate) use success::countersigning_success;
 
 /// Countersigning workspace to hold session state.
@@ -72,7 +74,7 @@ impl CountersigningWorkspace {
 /// The inner state of a countersigning workspace.
 #[derive(Default)]
 struct CountersigningWorkspaceInner {
-    sessions: HashMap<AgentPubKey, CountersigningSessionState>,
+    session: Option<CountersigningSessionState>,
     next_trigger: Option<NextTrigger>,
 }
 
@@ -80,7 +82,9 @@ struct CountersigningWorkspaceInner {
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn countersigning_workflow(
     space: Space,
+    workspace: Arc<CountersigningWorkspace>,
     network: Arc<impl HolochainP2pDnaT>,
+    keystore: MetaLairClient,
     cell_id: CellId,
     signal_tx: Sender<Signal>,
     self_trigger: TriggerSender,
@@ -88,17 +92,15 @@ pub(crate) async fn countersigning_workflow(
     publish_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     tracing::debug!(
-        "Starting countersigning workflow, with {} sessions",
-        space
-            .countersigning_workspace
+        "Starting countersigning workflow, with a session? {}",
+        workspace
             .inner
-            .share_ref(|inner| Ok(inner.sessions.len()))
+            .share_ref(|inner| Ok(inner.session.is_some()))
             .unwrap()
     );
 
     // Clear trigger, if we need another one, it will be created later.
-    space
-        .countersigning_workspace
+    workspace
         .inner
         .share_mut(|inner, _| {
             if let Some(next_trigger) = &mut inner.next_trigger {
@@ -110,16 +112,21 @@ pub(crate) async fn countersigning_workflow(
         .unwrap();
 
     // Ensure the workspace state knows about anything in the database on startup.
-    refresh::refresh_workspace_state(&space, cell_id.clone(), signal_tx.clone()).await;
+    refresh::refresh_workspace_state(
+        &space,
+        workspace.clone(),
+        cell_id.clone(),
+        signal_tx.clone(),
+    )
+    .await;
 
     // Abandon any sessions that have timed out.
-    apply_timeouts(&space, signal_tx.clone()).await;
+    apply_timeout(&space, workspace.clone(), &cell_id, signal_tx.clone()).await;
 
-    space
-        .countersigning_workspace
+    workspace
         .inner
         .share_mut(|inner, _| {
-            inner.sessions.iter_mut().for_each(|(_, state)| {
+            inner.session.iter_mut().for_each(|state| {
                 if let CountersigningSessionState::SignaturesCollected {
                     preflight_request,
                     signature_bundles,
@@ -148,34 +155,38 @@ pub(crate) async fn countersigning_workflow(
         })
         .unwrap();
 
-    // Find sessions that are in an unknown state, we need to try to resolve those.
-    try_recover_failed_sessions(&space, &network, cell_id.clone(), &signal_tx, &self_trigger).await;
+    // If the session is in an unknown state, try to recover it.
+    try_recover_failed_session(
+        &space,
+        workspace.clone(),
+        network.clone(),
+        &cell_id,
+        &signal_tx,
+        &self_trigger,
+    )
+    .await;
 
-    let maybe_completed_sessions = space
-        .countersigning_workspace
+    let maybe_completed_session = workspace
         .inner
         .share_mut(|inner, _| {
-            Ok(inner
-                .sessions
-                .iter_mut()
-                .filter_map(|(author, session_state)| match session_state {
-                    CountersigningSessionState::SignaturesCollected {
-                        signature_bundles, ..
-                    } => Some((author.clone(), std::mem::take(signature_bundles))),
-                    _ => None,
-                })
-                .collect::<Vec<_>>())
+            Ok(match &mut inner.session {
+                Some(CountersigningSessionState::SignaturesCollected {
+                    signature_bundles, ..
+                }) => Some(std::mem::take(signature_bundles)),
+                _ => None,
+            })
         })
         .unwrap();
 
-    for (author, signatures) in maybe_completed_sessions {
-        for signature_bundle in signatures {
+    if let Some(signature_bundles) = maybe_completed_session {
+        for signature_bundle in signature_bundles {
             // Try to complete the session using this signature bundle.
 
             match complete::inner_countersigning_session_complete(
                 space.clone(),
                 network.clone(),
-                author.clone(),
+                keystore.clone(),
+                cell_id.agent_pubkey().clone(),
                 signature_bundle.clone(),
                 integration_trigger.clone(),
                 publish_trigger.clone(),
@@ -185,12 +196,11 @@ pub(crate) async fn countersigning_workflow(
                 Ok(Some(cs_entry_hash)) => {
                     // The session completed successfully this bundle, so we can remove the session
                     // from the workspace.
-                    space
-                        .countersigning_workspace
+                    workspace
                         .inner
                         .share_mut(|inner, _| {
-                            tracing::trace!("Countersigning session completed successfully, removing from the workspace for agent: {:?}", author);
-                            inner.sessions.remove(&author);
+                            tracing::trace!("Countersigning session completed successfully, removing from the workspace for agent: {:?}", cell_id.agent_pubkey());
+                            inner.session = None;
                             Ok(())
                         })
                         .unwrap();
@@ -206,12 +216,12 @@ pub(crate) async fn countersigning_workflow(
                     break;
                 }
                 Ok(None) => {
-                    tracing::warn!("Rejected signature bundle for countersigning session for agent: {:?}: {:?}", author, signature_bundle);
+                    tracing::warn!("Rejected signature bundle for countersigning session for agent: {:?}: {:?}", cell_id.agent_pubkey(), signature_bundle);
                 }
                 Err(e) => {
                     tracing::error!(
                         "Error completing countersigning session for agent: {:?}: {:?}",
-                        author,
+                        cell_id.agent_pubkey(),
                         e
                     );
                 }
@@ -219,73 +229,70 @@ pub(crate) async fn countersigning_workflow(
         }
     }
 
-    // At the end of the workflow, if we have any sessions still in progress, then schedule a
-    // workflow run for the one that will finish soonest.
-    let maybe_earliest_finish = space
-        .countersigning_workspace
+    // At the end of the workflow, if we have a session still in progress, then schedule a
+    // workflow run again at the end time.
+    let maybe_end_time = workspace
         .inner
         .share_ref(|inner| {
-            Ok(inner
-                .sessions
-                .values()
-                .filter_map(|s| {
-                    match s {
-                        CountersigningSessionState::Accepted(preflight_request)
-                        | CountersigningSessionState::SignaturesCollected {
-                            preflight_request,
-                            ..
-                        } => Some(preflight_request.session_times.end),
-                        CountersigningSessionState::Unknown { .. } => {
-                            // Don't apply timeouts in the unknown state
-                            None
-                        }
+            Ok(match &inner.session {
+                Some(state) => match state {
+                    CountersigningSessionState::Accepted(preflight_request)
+                    | CountersigningSessionState::SignaturesCollected {
+                        preflight_request, ..
+                    } => Some(preflight_request.session_times.end),
+                    CountersigningSessionState::Unknown { .. } => {
+                        // Don't apply timeouts in the unknown state
+                        None
                     }
-                })
-                .min())
+                },
+                None => None,
+            })
         })
         .unwrap();
 
-    tracing::trace!("Next earliest finish time: {:?}", maybe_earliest_finish);
+    tracing::trace!("End time: {:?}", maybe_end_time);
 
-    if let Some(earliest_finish) = maybe_earliest_finish {
-        reschedule_self(&space, self_trigger, earliest_finish);
+    if let Some(end_time) = maybe_end_time {
+        reschedule_self(workspace, self_trigger, end_time);
     }
 
     Ok(WorkComplete::Complete)
 }
 
-async fn try_recover_failed_sessions(
+async fn try_recover_failed_session(
     space: &Space,
-    network: &Arc<impl HolochainP2pDnaT + Sized>,
-    cell_id: CellId,
+    workspace: Arc<CountersigningWorkspace>,
+    network: Arc<impl HolochainP2pDnaT + Sized>,
+    cell_id: &CellId,
     signal_tx: &Sender<Signal>,
     self_trigger: &TriggerSender,
 ) {
-    let sessions_in_unknown_state = space
-        .countersigning_workspace
+    let maybe_session_in_unknown_state = workspace
         .inner
         .share_ref(|inner| {
             Ok(inner
-                .sessions
-                .iter()
-                .filter_map(|(author, session_state)| match session_state {
-                    CountersigningSessionState::Unknown { .. } => Some(author.clone()),
+                .session
+                .as_ref()
+                .and_then(|session_state| match session_state {
+                    CountersigningSessionState::Unknown {
+                        preflight_request, ..
+                    } => Some(preflight_request.clone()),
                     _ => None,
-                })
-                .collect::<Vec<_>>())
+                }))
         })
         .unwrap();
 
-    let mut remaining_sessions_in_unknown_state = 0;
-    for author in sessions_in_unknown_state {
+    let mut remained_in_unknown_state = false;
+    if let Some(preflight_request) = maybe_session_in_unknown_state {
         tracing::info!(
             "Countersigning session for agent {:?} is in an unknown state, attempting to resolve",
-            author
+            cell_id.agent_pubkey()
         );
         match incomplete::inner_countersigning_session_incomplete(
             space.clone(),
             network.clone(),
-            author.clone(),
+            cell_id.agent_pubkey().clone(),
+            preflight_request.clone(),
         )
         .await
         {
@@ -296,63 +303,55 @@ async fn try_recover_failed_sessions(
             }
             Ok((SessionCompletionDecision::Abandoned, _)) => {
                 // The session state has been resolved, so we can remove it from the workspace.
-                let removed_session = space
-                    .countersigning_workspace
+                workspace
                     .inner
                     .share_mut(|inner, _| {
                         tracing::trace!(
                             "Decision made for incomplete session, removing from workspace: {:?}",
-                            author
+                            cell_id.agent_pubkey()
                         );
-                        let removed_session = inner.sessions.remove(&author);
-                        Ok(removed_session)
+
+                        inner.session = None;
+                        Ok(())
                     })
                     .unwrap();
 
-                if let Some(removed_session) = removed_session {
-                    let entry_hash = removed_session.session_app_entry_hash().clone();
-
-                    signal_tx
-                        .send(Signal::System(SystemSignal::AbandonedCountersigning(
-                            entry_hash,
-                        )))
-                        .ok();
-                }
+                signal_tx
+                    .send(Signal::System(SystemSignal::AbandonedCountersigning(
+                        preflight_request.app_entry_hash.clone(),
+                    )))
+                    .ok();
             }
             Ok((SessionCompletionDecision::Indeterminate, outcomes)) => {
-                remaining_sessions_in_unknown_state += 1;
+                remained_in_unknown_state = true;
                 tracing::info!(
                     "No automated decision could be reached for the current countersigning session: {:?}",
-                    author
+                    cell_id.agent_pubkey()
                 );
 
-                space.countersigning_workspace.inner.share_mut(|inner, _| {
-                    match inner.sessions.entry(cell_id.agent_pubkey().clone()) {
-                        std::collections::hash_map::Entry::Occupied(mut entry) => {
-                            let session_state = entry.get_mut();
-                            if let CountersigningSessionState::Unknown {
-                                resolution,
-                                ..
-                            } = session_state
-                            {
-                                if let Some(resolution) = resolution {
-                                    resolution.attempts += 1;
-                                    resolution.last_attempt_at = Timestamp::now();
-                                    resolution.outcomes = outcomes;
-                                } else {
-                                    *resolution = Some(SessionResolutionSummary {
-                                        outcomes,
-                                        ..Default::default()
-                                    });
-                                }
+                workspace.inner.share_mut(|inner, _| {
+                    if let Some(session_state) = &mut inner.session {
+                        if let CountersigningSessionState::Unknown {
+                            resolution,
+                            ..
+                        } = session_state
+                        {
+                            if let Some(resolution) = resolution {
+                                resolution.attempts += 1;
+                                resolution.last_attempt_at = Timestamp::now();
+                                resolution.outcomes = outcomes;
                             } else {
-                                tracing::error!("Countersigning session for agent {:?} was not in the expected state while trying to resolve it", author);
+                                *resolution = Some(SessionResolutionSummary {
+                                    outcomes,
+                                    ..Default::default()
+                                });
                             }
+                        } else {
+                            tracing::error!("Countersigning session for agent {:?} was not in the expected state while trying to resolve it", cell_id.agent_pubkey());
                         }
-                        std::collections::hash_map::Entry::Vacant(_) => {
-                            tracing::error!("Countersigning session for agent {:?} was removed from the workspace while trying to resolve it", author);
-                        }
-                    };
+                    } else {
+                        tracing::error!("Countersigning session for agent {:?} was removed from the workspace while trying to resolve it", cell_id.agent_pubkey());
+                    }
 
                     Ok(())
                 }).unwrap();
@@ -360,29 +359,28 @@ async fn try_recover_failed_sessions(
             Err(e) => {
                 tracing::error!(
                     "Error cleaning up countersigning session for agent: {:?}: {:?}",
-                    author,
+                    cell_id.agent_pubkey(),
                     e
                 );
             }
         }
     }
 
-    if remaining_sessions_in_unknown_state > 0 {
-        if let Ok(t) = Timestamp::now()
-            + space
-                .countersigning_workspace
-                .countersigning_resolution_retry_delay
-        {
-            reschedule_self(space, self_trigger.clone(), t);
+    if remained_in_unknown_state {
+        if let Ok(t) = Timestamp::now() + workspace.countersigning_resolution_retry_delay {
+            reschedule_self(workspace, self_trigger.clone(), t);
         } else {
             tracing::error!("Failed to calculate next trigger time for countersigning workflow");
         }
     }
 }
 
-fn reschedule_self(space: &Space, self_trigger: TriggerSender, at_timestamp: Timestamp) {
-    space
-        .countersigning_workspace
+fn reschedule_self(
+    workspace: Arc<CountersigningWorkspace>,
+    self_trigger: TriggerSender,
+    at_timestamp: Timestamp,
+) {
+    workspace
         .inner
         .share_mut(|inner, _| {
             if let Some(next_trigger) = &mut inner.next_trigger {
@@ -396,59 +394,57 @@ fn reschedule_self(space: &Space, self_trigger: TriggerSender, at_timestamp: Tim
         .unwrap();
 }
 
-async fn apply_timeouts(space: &Space, signal_tx: Sender<Signal>) {
-    let timed_out = space
-        .countersigning_workspace
+async fn apply_timeout(
+    space: &Space,
+    workspace: Arc<CountersigningWorkspace>,
+    cell_id: &CellId,
+    signal_tx: Sender<Signal>,
+) {
+    let timed_out = workspace
         .inner
         .share_ref(|inner| {
-            Ok(inner
-                .sessions
-                .clone()
-                .iter()
-                .filter_map(|(author, session)| {
-                    let expired = match session {
-                        CountersigningSessionState::Accepted(preflight_request) => {
-                            preflight_request.session_times.end < Timestamp::now()
-                        }
-                        CountersigningSessionState::SignaturesCollected {
-                            preflight_request,
-                            signature_bundles,
-                            resolution,
-                        } => {
-                            // Only time out if all signatures have been tried and this is not a recovery state
-                            // because recovery should be dealt with separately.
-                            preflight_request.session_times.end < Timestamp::now()
-                                && signature_bundles.is_empty()
-                                && resolution.is_none()
-                        }
-                        _ => false,
-                    };
-
-                    if expired {
-                        Some((author.clone(), session.session_app_entry_hash().clone()))
-                    } else {
-                        None
+            Ok(inner.session.as_ref().and_then(|session| {
+                let expired = match session {
+                    CountersigningSessionState::Accepted(preflight_request) => {
+                        preflight_request.session_times.end < Timestamp::now()
                     }
-                })
-                .collect::<Vec<_>>())
+                    CountersigningSessionState::SignaturesCollected {
+                        preflight_request,
+                        signature_bundles,
+                        resolution,
+                    } => {
+                        // Only time out if all signatures have been tried and this is not a recovery state
+                        // because recovery should be dealt with separately.
+                        preflight_request.session_times.end < Timestamp::now()
+                            && signature_bundles.is_empty()
+                            && resolution.is_none()
+                    }
+                    _ => false,
+                };
+
+                if expired {
+                    Some(session.preflight_request().clone())
+                } else {
+                    None
+                }
+            }))
         })
         .unwrap();
 
-    for (author, app_entry_hash) in timed_out {
+    if let Some(preflight_request) = timed_out {
         tracing::info!(
             "Countersigning session for agent {:?} has timed out, abandoning session",
-            author
+            cell_id.agent_pubkey()
         );
 
-        match force_abandon_session(space.clone(), &author).await {
+        match force_abandon_session(space.clone(), cell_id.agent_pubkey(), &preflight_request).await
+        {
             Ok(_) => {
                 // Only once we've managed to remove the session do we remove the state for it.
-                space
-                    .countersigning_workspace
+                workspace
                     .inner
                     .share_mut(|inner, _| {
-                        inner.sessions.remove(&author);
-
+                        inner.session = None;
                         Ok(())
                     })
                     .unwrap();
@@ -456,14 +452,14 @@ async fn apply_timeouts(space: &Space, signal_tx: Sender<Signal>) {
                 // Then let the client know.
                 signal_tx
                     .send(Signal::System(SystemSignal::AbandonedCountersigning(
-                        app_entry_hash,
+                        preflight_request.app_entry_hash,
                     )))
                     .ok();
             }
             Err(e) => {
                 tracing::error!(
                     "Error abandoning countersigning session for agent: {:?}: {:?}",
-                    author,
+                    cell_id.agent_pubkey(),
                     e
                 );
             }
@@ -474,31 +470,56 @@ async fn apply_timeouts(space: &Space, signal_tx: Sender<Signal>) {
 pub(crate) async fn force_abandon_session(
     space: Space,
     author: &AgentPubKey,
+    preflight_request: &PreflightRequest,
 ) -> SourceChainResult<()> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
-    let session_data = authored_db
+    let abandon_fingerprint = preflight_request.fingerprint()?;
+
+    let maybe_session_data = authored_db
         .write_async({
             let author = author.clone();
             move |txn| current_countersigning_session(txn, Arc::new(author.clone()))
         })
         .await?;
 
-    if let Some((cs_action, cs_entry_hash, _)) = session_data {
-        abandon_session(
-            authored_db,
-            author.clone(),
-            cs_action.action().clone(),
-            cs_entry_hash,
-        )
-        .await?;
-    } else {
-        authored_db
-            .write_async({
-                let author = author.clone();
-                move |txn| unlock_chain(txn, &author)
-            })
+    match maybe_session_data {
+        Some((cs_action, cs_entry_hash, x))
+            if x.preflight_request.fingerprint()? == abandon_fingerprint =>
+        {
+            tracing::info!("There is a committed session to remove for: {:?}", author);
+            abandon_session(
+                authored_db,
+                author.clone(),
+                cs_action.action().clone(),
+                cs_entry_hash,
+            )
             .await?;
+        }
+        _ => {
+            // There is no matching, committed session but there may be a lock to remove
+            authored_db
+                .write_async({
+                    let author = author.clone();
+                    move |txn| {
+                        let chain_lock = get_chain_lock(txn, &author)?;
+
+                        match chain_lock {
+                            Some(lock) if lock.subject() == abandon_fingerprint => {
+                                unlock_chain(txn, &author)
+                            }
+                            _ => {
+                                tracing::warn!(
+                                    "No matching session or lock to remove for: {:?}",
+                                    author
+                                );
+                                Ok(())
+                            }
+                        }
+                    }
+                })
+                .await?;
+        }
     }
 
     Ok(())

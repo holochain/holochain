@@ -15,10 +15,6 @@ pub struct DeepkeyInstallation {
     /// Upon installation, the first derivation of the seed is used.
     /// Agent key updates use subsequent derivations.
     pub cell_id: CellId,
-
-    /// The lair tag used to refer to the "device seed" which was used to generate
-    /// the AgentPubKey for the DPKI cell
-    pub device_seed_lair_tag: String,
 }
 
 pub struct DeepkeyState {

@@ -7,8 +7,8 @@ use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::FullStateDump;
-use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
+use holochain_websocket::{WebsocketReceiver, WebsocketResult};
 
 pub async fn admin_port(conductor: &ConductorHandle) -> u16 {
     conductor
@@ -169,7 +169,7 @@ pub async fn grant_zome_call_capability(
     zome_name: ZomeName,
     fn_name: FunctionName,
     signing_key: AgentPubKey,
-) -> std::io::Result<CapSecret> {
+) -> WebsocketResult<CapSecret> {
     let mut fns = BTreeSet::new();
     fns.insert((zome_name, fn_name));
     let functions = GrantedFunctions::Listed(fns);
@@ -266,7 +266,7 @@ where
     }
 }
 
-pub async fn attach_app_interface(client: &mut WebsocketSender, port: Option<u16>) -> u16 {
+pub async fn attach_app_interface(client: &WebsocketSender, port: Option<u16>) -> u16 {
     let request = AdminRequest::AttachAppInterface {
         port,
         allowed_origins: AllowedOrigins::Any,
@@ -306,7 +306,7 @@ pub async fn retry_admin_interface(
 pub async fn generate_agent_pub_key(
     client: &mut WebsocketSender,
     timeout: u64,
-) -> std::io::Result<AgentPubKey> {
+) -> WebsocketResult<AgentPubKey> {
     let request = AdminRequest::GenerateAgentPubKey;
     let response = client
         .request_timeout(request, Duration::from_millis(timeout))
@@ -322,7 +322,7 @@ pub async fn register_and_install_dna(
     properties: Option<YamlProperties>,
     role_name: RoleName,
     timeout: u64,
-) -> std::io::Result<CellId> {
+) -> WebsocketResult<CellId> {
     register_and_install_dna_named(
         client,
         dna_path,
@@ -343,7 +343,7 @@ pub async fn register_and_install_dna_named(
     role_name: RoleName,
     name: String,
     timeout: u64,
-) -> std::io::Result<CellId> {
+) -> WebsocketResult<CellId> {
     let mods = DnaModifiersOpt {
         properties,
         ..Default::default()
@@ -466,24 +466,25 @@ pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(response)))]
 pub async fn check_timeout<T>(
-    response: impl Future<Output = std::io::Result<T>>,
+    response: impl Future<Output = WebsocketResult<T>>,
     timeout_ms: u64,
-) -> std::io::Result<T> {
+) -> WebsocketResult<T> {
     check_timeout_named("<unnamed>", response, timeout_ms).await
 }
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(response)))]
 async fn check_timeout_named<T>(
     name: &'static str,
-    response: impl Future<Output = std::io::Result<T>>,
+    response: impl Future<Output = WebsocketResult<T>>,
     timeout_millis: u64,
-) -> std::io::Result<T> {
+) -> WebsocketResult<T> {
     match tokio::time::timeout(Duration::from_millis(timeout_millis), response).await {
         Ok(response) => response,
         Err(_) => Err(std::io::Error::other(format!(
             "{}: Timed out on request after {}",
             name, timeout_millis
-        ))),
+        ))
+        .into()),
     }
 }
 
@@ -491,7 +492,7 @@ pub async fn dump_full_state(
     client: &mut WebsocketSender,
     cell_id: CellId,
     dht_ops_cursor: Option<u64>,
-) -> std::io::Result<FullStateDump> {
+) -> WebsocketResult<FullStateDump> {
     let request = AdminRequest::DumpFullState {
         cell_id: Box::new(cell_id),
         dht_ops_cursor,
@@ -501,9 +502,6 @@ pub async fn dump_full_state(
 
     match response {
         AdminResponse::FullStateDumped(state) => Ok(state),
-        _ => Err(std::io::Error::other(format!(
-            "DumpFullState failed: {:?}",
-            response
-        ))),
+        _ => Err(std::io::Error::other(format!("DumpFullState failed: {:?}", response)).into()),
     }
 }

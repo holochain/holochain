@@ -109,7 +109,11 @@ pub struct Space {
     pub dht_query_cache: DhtDbQueryCache,
 
     /// Countersigning workspace for session state.
-    pub countersigning_workspace: CountersigningWorkspace,
+    pub countersigning_workspaces:
+        Arc<parking_lot::Mutex<HashMap<CellId, Arc<CountersigningWorkspace>>>>,
+
+    /// Witnessing workspace that is shared across this cell.
+    pub witnessing_workspace: WitnessingWorkspace,
 
     /// Witnessing workspace that is shared across this cell.
     pub witnessing_workspace: WitnessingWorkspace,
@@ -809,11 +813,6 @@ impl Space {
         ));
         let p2p_batch_sender = tx;
 
-        let countersigning_workspace = CountersigningWorkspace::new(
-            config
-                .conductor_tuning_params()
-                .countersigning_resolution_retry_delay(),
-        );
         let witnessing_workspace = WitnessingWorkspace::default();
         let incoming_op_hashes = IncomingOpHashes::default();
         let incoming_ops_batch = IncomingOpsBatch::default();
@@ -826,7 +825,7 @@ impl Space {
             p2p_agents_db,
             p2p_metrics_db,
             p2p_batch_sender,
-            countersigning_workspace,
+            countersigning_workspaces: Default::default(),
             witnessing_workspace,
             incoming_op_hashes,
             incoming_ops_batch,
