@@ -22,7 +22,7 @@ use std::path::Path;
 
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::{AdminRequest, AdminResponse};
-use holochain_websocket::WebsocketSender;
+use holochain_websocket::{WebsocketResult, WebsocketSender};
 use ports::get_admin_api;
 
 pub use ports::force_admin_port;
@@ -75,7 +75,7 @@ impl CmdRunner {
     }
 
     /// Create a new connection for calling admin interface commands.
-    pub async fn try_new(port: u16) -> std::io::Result<Self> {
+    pub async fn try_new(port: u16) -> WebsocketResult<Self> {
         let (client, task) = get_admin_api(port).await?;
         Ok(Self { client, task })
     }

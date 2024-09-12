@@ -317,7 +317,7 @@ mod tests {
 
     dpki:
       dna_path: path/to/dna.dna
-      network_seed: deepkey-test
+      network_seed: "deepkey-main"
       device_seed_lair_tag: "device-seed"
 
     admin_interfaces:
@@ -377,7 +377,7 @@ mod tests {
         tuning_params.tx5_min_ephemeral_udp_port = 40000;
         tuning_params.tx5_max_ephemeral_udp_port = 40255;
         network_config.tuning_params = std::sync::Arc::new(tuning_params);
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,

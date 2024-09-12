@@ -2010,7 +2010,7 @@ mod app_impls {
             let entry_info = self
                 .keystore()
                 .lair_client()
-                .get_entry(dst_tag.clone().into())
+                .get_entry(lair_tag.clone().into())
                 .await;
             let seed_info = match entry_info {
                 Ok(LairEntryInfo::Seed { seed_info, .. }) => {
