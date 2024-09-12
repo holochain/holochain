@@ -36,6 +36,7 @@ use serde::Serialize;
 use std::time::Duration;
 use std::{path::PathBuf, process::Stdio};
 use tokio::io::AsyncBufReadExt;
+use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::process::Child;
 use tokio::process::Command;
@@ -114,18 +115,49 @@ pub async fn start_local_services() -> (
 pub async fn start_holochain(
     config_path: PathBuf,
 ) -> (SupervisedChild, tokio::sync::oneshot::Receiver<u16>) {
+    // tracing::info!("\n\n----\nstarting holochain\n----\n\n");
+    // let cmd = std::process::Command::cargo_bin("holochain").unwrap();
+    // let mut cmd = Command::from(cmd);
+    // let rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
+    // cmd.arg("--structured")
+    //     .arg("--config-path")
+    //     .arg(config_path)
+    //     .env("RUST_LOG", rust_log)
+    //     .stdout(Stdio::piped())
+    //     .stderr(Stdio::piped())
+    //     .kill_on_drop(true);
+    // let mut child = cmd.spawn().expect("Failed to spawn holochain");
+    // let admin_port = spawn_output(&mut child);
+    // check_started(&mut child).await;
+    // (SupervisedChild("Holochain".to_string(), child), admin_port)
+    start_holochain_with_lair(config_path, false).await
+}
+
+pub async fn start_holochain_with_lair(
+    config_path: PathBuf,
+    full_keystore: bool,
+) -> (SupervisedChild, tokio::sync::oneshot::Receiver<u16>) {
     tracing::info!("\n\n----\nstarting holochain\n----\n\n");
     let cmd = std::process::Command::cargo_bin("holochain").unwrap();
     let mut cmd = Command::from(cmd);
     let rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
-    cmd.arg("--structured")
-        .arg("--config-path")
+    cmd.arg("--config-path")
         .arg(config_path)
         .env("RUST_LOG", rust_log)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
+    if full_keystore {
+        cmd.arg("--piped").stdin(Stdio::piped());
+    }
     let mut child = cmd.spawn().expect("Failed to spawn holochain");
+    if full_keystore {
+        // Pass in lair keystore password.
+        let mut stdin = child.stdin.take().unwrap();
+        stdin.write_all("pass".as_bytes()).await.unwrap();
+        stdin.flush().await.unwrap();
+    }
+    // Wait for admin port output.
     let admin_port = spawn_output(&mut child);
     check_started(&mut child).await;
     (SupervisedChild("Holochain".to_string(), child), admin_port)
