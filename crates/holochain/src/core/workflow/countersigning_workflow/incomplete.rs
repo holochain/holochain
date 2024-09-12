@@ -72,6 +72,8 @@ pub async fn inner_countersigning_session_incomplete(
         ));
     }
 
+    // TODO don't need to gather per agent, try each until we can get a session data that contains a
+    //      set of signatures
     // We need to find out what state the other signing agents are in.
     // TODO Note that we are ignoring the optional signing agents here - that's something we can figure out later because it's not clear what it means for them
     //      to be optional.
@@ -84,7 +86,7 @@ pub async fn inner_countersigning_session_incomplete(
     let cascade = CascadeImpl::empty().with_network(network, space.cache_db.clone());
 
     let get_activity_options = GetActivityOptions {
-        include_warrants: true,
+        include_warrants: true, // TODO don't want this, but document that apps should be checking for warrants before completing preflight
         include_valid_activity: true,
         include_full_records: true,
         get_options: GetOptions::network(),
@@ -123,6 +125,7 @@ pub async fn inner_countersigning_session_incomplete(
 
             let decision = match activity_result {
                 Ok(activity) => {
+                    // TODO don't need this
                     if !activity.warrants.is_empty() {
                         // If this agent is warranted then we can't make the decision on our agent's behalf
                         // whether to trust this agent or not.
@@ -191,6 +194,7 @@ pub async fn inner_countersigning_session_incomplete(
                                         );
                                         SessionCompletionDecision::Abandoned
                                     }
+                                    // TODO separate out Hidden with a comment in case somebody runs into this later
                                     RecordEntry::Hidden | RecordEntry::NA => {
                                         // This wouldn't be the case for a countersigning entry so this is evidence that
                                         // the agent has put something else on their chain.

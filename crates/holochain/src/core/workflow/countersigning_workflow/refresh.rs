@@ -1,5 +1,7 @@
 use crate::conductor::space::Space;
-use crate::core::workflow::countersigning_workflow::CountersigningSessionState;
+use crate::core::workflow::countersigning_workflow::{
+    CountersigningSessionState, CountersigningWorkspace,
+};
 use holochain_sqlite::db::ReadAccess;
 use holochain_state::chain_lock::get_chain_lock;
 use holochain_state::mutations::unlock_chain;
@@ -22,12 +24,16 @@ use tokio::sync::broadcast::Sender;
 ///    is still in the workspace.
 /// 3. The countersigning entry has been committed and the chain is still locked, but the conductor
 ///    has restarted, so the session is not in the workspace.
-pub async fn refresh_workspace_state(space: &Space, cell_id: CellId, signal: Sender<Signal>) {
+pub async fn refresh_workspace_state(
+    space: &Space,
+    workspace: Arc<CountersigningWorkspace>,
+    cell_id: CellId,
+    signal: Sender<Signal>,
+) {
     tracing::debug!(
         "Refreshing countersigning workspace state for {:?}",
         cell_id
     );
-    let workspace = &space.countersigning_workspace;
 
     // Whether there is a session currently registered in the workspace.
     let session_registered_for_agent = workspace
