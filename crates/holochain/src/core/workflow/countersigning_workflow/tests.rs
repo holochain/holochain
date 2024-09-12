@@ -195,7 +195,7 @@ async fn chain_unlocked_outside_workflow_then_restart() {
 
     // Now simulate a restart, to check that Holochain will still recover even if it loses its state
     // at this point
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     test_harness.countersigning_tx.trigger(&"test");
     // The refresh should have nothing to find because the lock is gone and nothing has been committed
@@ -228,7 +228,7 @@ async fn discard_session_with_lock_but_no_state() {
 
     // Simulate approximately what would happen on a restart. The session is lost from memory but
     // the chain is still locked.
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     // Run the workflow on init
     test_harness.countersigning_tx.trigger(&"init");
@@ -549,7 +549,7 @@ async fn recover_after_restart_from_commit_when_other_agent_abandons() {
         .await;
 
     // Simulate a restart by wiping the workspace
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     // Now for the sake of recovery, let's suppose that we can initially find no activity for Bob.
     let activity_response = bob.no_activity_response();
@@ -647,7 +647,7 @@ async fn recover_after_restart_from_commit_when_other_agent_completes() {
         .await;
 
     // Simulate a restart by wiping the workspace
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     // Initially, find no data for Bob
     let activity_response = bob.no_activity_response();
@@ -747,7 +747,7 @@ async fn stay_in_unknown_state_when_activity_authorities_do_not_agree() {
         .await;
 
     // Simulate a restart to enter the unknown state on the next run.
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     // Simulate mixed responses from AAAs. This is not really expected unless nodes are misbehaving
     // but if it does happen then we should stay in the unknown state.
@@ -845,7 +845,7 @@ async fn stay_in_unknown_state_when_activity_authorities_are_missing_data() {
         .await;
 
     // Simulate a restart to enter the unknown state on the next run.
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     // Simulate mixed responses from AAAs. This is not really expected unless nodes are misbehaving
     // but if it does happen then we should stay in the unknown state.
@@ -943,7 +943,7 @@ async fn stay_in_unknown_state_when_bad_signatures_are_fetched() {
         .await;
 
     // Simulate a restart to enter the unknown state on the next run.
-    test_harness.clear_workspace_sessions();
+    test_harness.clear_workspace_session();
 
     // Simulate mixed responses from AAAs. This is not really expected unless nodes are misbehaving
     // but if it does happen then we should stay in the unknown state.
@@ -1235,13 +1235,13 @@ impl TestHarness {
             .unwrap();
     }
 
-    fn clear_workspace_sessions(&self) {
+    fn clear_workspace_session(&self) {
         self.test_space
             .space
             .countersigning_workspace
             .inner
             .share_mut(|w, _| {
-                w.sessions.clear();
+                w.session = None;
                 Ok(())
             })
             .unwrap();
@@ -1365,15 +1365,15 @@ impl TestHarness {
 /// Assertion query implementation
 impl TestHarness {
     fn expect_empty_workspace(&self) {
-        let count = self
+        let no_session = self
             .test_space
             .space
             .countersigning_workspace
             .inner
-            .share_ref(|w| Ok(w.sessions.len()))
+            .share_ref(|w| Ok(w.session.is_none()))
             .unwrap();
 
-        assert_eq!(0, count);
+        assert!(no_session);
     }
 
     fn expect_session_accepted(&self) -> PreflightRequest {
@@ -1382,7 +1382,7 @@ impl TestHarness {
             .space
             .countersigning_workspace
             .inner
-            .share_ref(|w| Ok(w.sessions.get(&self.author).cloned()))
+            .share_ref(|w| Ok(w.session.clone()))
             .unwrap();
 
         assert!(maybe_found.is_some());
@@ -1399,7 +1399,7 @@ impl TestHarness {
             .space
             .countersigning_workspace
             .inner
-            .share_ref(|w| Ok(w.sessions.get(&self.author).cloned()))
+            .share_ref(|w| Ok(w.session.clone()))
             .unwrap();
 
         assert!(maybe_found.is_some());
@@ -1416,7 +1416,7 @@ impl TestHarness {
             .space
             .countersigning_workspace
             .inner
-            .share_ref(|w| Ok(w.sessions.get(&self.author).cloned()))
+            .share_ref(|w| Ok(w.session.clone()))
             .unwrap();
 
         assert!(maybe_found.is_some());

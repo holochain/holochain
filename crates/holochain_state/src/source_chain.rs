@@ -279,7 +279,12 @@ impl SourceChain {
             // Skip the CHC sync if this is a countersigning session.
             // If the session times out, we might roll the chain back to the previous head, and so
             // we don't want the record to exist remotely.
-            if !is_countersigning_session {
+            if is_countersigning_session {
+                tracing::debug!(
+                    "Skipping CHC push for countersigning session: {:?}",
+                    records
+                );
+            } else {
                 let payload = AddRecordPayload::from_records(
                     self.keystore.clone(),
                     (*self.author).clone(),
