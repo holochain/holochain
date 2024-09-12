@@ -8,7 +8,6 @@ use tracing::*;
 #[instrument(skip_all)]
 pub(crate) fn spawn_countersigning_consumer(
     space: Space,
-    dna_network: HolochainP2pDna,
     cell_id: CellId,
     conductor: ConductorHandle,
     integration_trigger: TriggerSender,
@@ -17,15 +16,14 @@ pub(crate) fn spawn_countersigning_consumer(
     let (tx, rx) = TriggerSender::new();
 
     let self_trigger = tx.clone();
-    queue_consumer_dna_bound(
+    queue_consumer_cell_bound(
         "countersigning_consumer",
-        space.dna_hash.clone(),
+        cell_id.clone(),
         conductor.task_manager(),
         (tx.clone(), rx),
         move || {
             countersigning_workflow_fn(
                 space.clone(),
-                Arc::new(dna_network.clone()),
                 cell_id.clone(),
                 conductor.clone(),
                 self_trigger.clone(),
@@ -40,7 +38,6 @@ pub(crate) fn spawn_countersigning_consumer(
 
 async fn countersigning_workflow_fn(
     space: Space,
-    dna_network: Arc<impl HolochainP2pDnaT>,
     cell_id: CellId,
     conductor: ConductorHandle,
     self_trigger: TriggerSender,
@@ -52,11 +49,17 @@ async fn countersigning_workflow_fn(
         .await
         .map_err(WorkflowError::other)?;
 
+    let cell = conductor
+        .cell_by_id(&cell_id)
+        .await
+        .map_err(WorkflowError::other)?;
+    let cell_network = cell.holochain_p2p_dna();
+
     let keystore = conductor.keystore().clone();
 
     countersigning_workflow(
         space.clone(),
-        dna_network.clone(),
+        Arc::new(cell_network.clone()),
         keystore,
         cell_id.clone(),
         signal_tx,

@@ -296,7 +296,10 @@ impl SourceChain {
                     e => e.map_err(SourceChainError::other),
                 }?;
             } else {
-                tracing::info!("Skipping CHC push for countersigning session: {:?}", records);
+                tracing::info!(
+                    "Skipping CHC push for countersigning session: {:?}",
+                    records
+                );
             }
         }
 

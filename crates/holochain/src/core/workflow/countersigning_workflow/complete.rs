@@ -141,7 +141,10 @@ pub(crate) async fn inner_countersigning_session_complete(
     }
 
     if let Some(chc) = network.chc() {
-        tracing::info!("Adding countersigning session record to the CHC: {:?}", session_record);
+        tracing::info!(
+            "Adding countersigning session record to the CHC: {:?}",
+            session_record
+        );
         let payload =
             AddRecordPayload::from_records(keystore, author.clone(), vec![session_record])
                 .await
