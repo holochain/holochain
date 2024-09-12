@@ -55,11 +55,7 @@ fn make_mock_dpki_impl(u: &mut Unstructured<'_>, state: DpkiKeyState) -> DpkiImp
     // All share same DNA, but different agent
     let cell_id = CellId::new(DnaHash::from_raw_32(vec![0; 32]), fixt!(AgentPubKey));
 
-    Arc::new(DpkiService::new(
-        cell_id,
-        "MOCK_DEVICE_SEED".to_string(),
-        dpki,
-    ))
+    Arc::new(DpkiService::new(cell_id, dpki))
 }
 
 async fn make_dpki_conductor_builder(

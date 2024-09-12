@@ -20,6 +20,7 @@ holochain_state_types = { version = "^0.4.0-dev.13", path = "../holochain_state_
 holochain_serialized_bytes = "=0.0.55"
 holochain_types = { version = "^0.4.0-dev.23", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.4.0-dev.16", path = "../holochain_zome_types" }
+nanoid = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 tracing = "0.1.26"
@@ -34,6 +35,8 @@ rmp-serde = "1.3"
 matches = { version = "0.1.8" }
 holochain_trace = { version = "^0.4.0-dev.5", path = "../holochain_trace" }
 kitsune_p2p = { version = "^0.4.0-dev.20", path = "../kitsune_p2p/kitsune_p2p" }
+pretty_assertions = "1.4"
+
 
 [lints]
 workspace = true
