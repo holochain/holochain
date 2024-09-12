@@ -76,8 +76,7 @@ pub async fn accept_countersigning_request(
             Ok(())
         })
         .is_err();
-    if put_accepted_result
-    {
+    if put_accepted_result {
         // This really shouldn't happen. The chain lock is the primary state and that should be in place here.
         return Ok(PreflightRequestAcceptance::AnotherSessionIsInProgress);
     };
