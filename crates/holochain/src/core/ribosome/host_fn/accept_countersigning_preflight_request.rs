@@ -533,6 +533,7 @@ pub mod wasm_test {
             bob_pubkey,
             ..
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
+
         let now = Timestamp::now();
         // Before the preflight creation of things should work.
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
@@ -669,7 +670,12 @@ pub mod wasm_test {
                 .unwrap(),
             )
             .await;
+
+        dbg!();
+
         expect_chain_locked(thing_fail_create_bob);
+
+        dbg!();
 
         // Creating the correct countersigned entry will NOT immediately unlock
         // the chain (it needs Bob to countersign).
@@ -705,8 +711,10 @@ pub mod wasm_test {
             .await;
 
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        dbg!();
 
         expect_chain_locked(thing_fail_create_alice);
+        dbg!();
 
         // The countersigned entry does NOT appear in alice's activity yet.
         let alice_activity_pre: AgentActivity = conductor
@@ -745,7 +753,12 @@ pub mod wasm_test {
                 .unwrap(),
             )
             .await;
+
+        dbg!("good");
+
         expect_chain_locked(thing_fail_create_bob);
+
+        dbg!("good");
 
         // After bob commits the same countersigned entry he can unlock his chain.
         let countersigned_action_hash_bob: ActionHash = conductor
@@ -755,8 +768,14 @@ pub mod wasm_test {
                 vec![alice_response, bob_response],
             )
             .await;
+
+        dbg!("good");
+
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
+        dbg!("good");
         let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
+
+        dbg!("bad");
 
         // Action get must not error.
         let countersigned_action_bob: SignedActionHashed = conductor
@@ -773,6 +792,8 @@ pub mod wasm_test {
                 countersigned_action_hash_alice.clone(),
             )
             .await;
+
+        dbg!("bad");
 
         // Entry get must not error.
         if let Some((countersigned_entry_hash_bob, _)) =
@@ -801,16 +822,18 @@ pub mod wasm_test {
                 },
             )
             .await;
-
+        dbg!();
         await_consistency(60, [&alice_cell, &bob_cell])
             .await
             .unwrap();
+        dbg!("bad");
 
         assert_eq!(alice_activity.valid_activity.len(), 7);
         assert_eq!(
             &alice_activity.valid_activity[5].1,
             countersigned_action_alice.action_address(),
         );
+        dbg!();
 
         let bob_activity: AgentActivity = conductor
             .call(
@@ -832,7 +855,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    #[ignore = "countersigning_an_entry_before_bobs_zome_initialized_fails"]
+    #[ignore = "countersigning an entry before bob's zome is initialized fails"]
     async fn lock_chain_failure() {
         use holochain_nonce::fresh_nonce;
         holochain_trace::test_run();
@@ -1314,7 +1337,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    #[ignore = "countersigning_an_entry_before_bobs_zome_initialized_fails"]
+    #[ignore = "countersigning an entry before bob's zome is initialized fails"]
     async fn enzymatic_session_failure() {
         holochain_trace::test_run();
 
