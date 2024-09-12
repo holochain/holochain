@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 description = "Holochain, a framework for distributed applications"
 license = "CAL-1.0"
 repository = "https://github.com/holochain/holochain"
@@ -32,15 +32,15 @@ hc_deepkey_sdk = { version = "^0.7.0-dev.5", path = "../hc_deepkey_sdk" }
 holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash", features = [
   "full",
 ] }
-holochain_cascade = { version = "^0.4.0-dev.23", path = "../holochain_cascade" }
-holochain_chc = { version = "^0.1.0-dev.3", path = "../holochain_chc", default-features = false }
-holochain_conductor_api = { version = "^0.4.0-dev.23", path = "../holochain_conductor_api" }
+holochain_cascade = { version = "^0.4.0-dev.24", path = "../holochain_cascade" }
+holochain_chc = { version = "^0.1.0-dev.4", path = "../holochain_chc", default-features = false }
+holochain_conductor_api = { version = "^0.4.0-dev.24", path = "../holochain_conductor_api" }
 holochain_deepkey_dna = "0.0.8-dev.2"
 holochain_keystore = { version = "^0.4.0-dev.21", path = "../holochain_keystore", default-features = false }
-holochain_p2p = { version = "^0.4.0-dev.23", path = "../holochain_p2p" }
+holochain_p2p = { version = "^0.4.0-dev.24", path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.4.0-dev.20", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_state = { version = "^0.4.0-dev.23", path = "../holochain_state" }
+holochain_state = { version = "^0.4.0-dev.24", path = "../holochain_state" }
 holochain_types = { version = "^0.4.0-dev.23", path = "../holochain_types" }
 holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util" }
 holochain_wasmer_host = "=0.0.95"
@@ -50,7 +50,7 @@ holochain_zome_types = { version = "^0.4.0-dev.16", path = "../holochain_zome_ty
 ] }
 holochain_nonce = { version = "^0.4.0-dev.7", path = "../holochain_nonce" }
 holochain_secure_primitive = { version = "^0.4.0-dev.1", path = "../holochain_secure_primitive" }
-holochain_conductor_services = { version = "^0.3.0-dev.23", path = "../holochain_conductor_services" }
+holochain_conductor_services = { version = "^0.3.0-dev.24", path = "../holochain_conductor_services" }
 human-panic = "2.0"
 itertools = { version = "0.12" }
 kitsune_p2p = { version = "^0.4.0-dev.20", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
