@@ -8,6 +8,7 @@ use tracing::*;
 #[instrument(skip_all)]
 pub(crate) fn spawn_countersigning_consumer(
     space: Space,
+    workspace: Arc<CountersigningWorkspace>,
     cell_id: CellId,
     conductor: ConductorHandle,
     integration_trigger: TriggerSender,
@@ -24,6 +25,7 @@ pub(crate) fn spawn_countersigning_consumer(
         move || {
             countersigning_workflow_fn(
                 space.clone(),
+                workspace.clone(),
                 cell_id.clone(),
                 conductor.clone(),
                 self_trigger.clone(),
@@ -38,6 +40,7 @@ pub(crate) fn spawn_countersigning_consumer(
 
 async fn countersigning_workflow_fn(
     space: Space,
+    workspace: Arc<CountersigningWorkspace>,
     cell_id: CellId,
     conductor: ConductorHandle,
     self_trigger: TriggerSender,
@@ -59,6 +62,7 @@ async fn countersigning_workflow_fn(
 
     countersigning_workflow(
         space.clone(),
+        workspace,
         Arc::new(cell_network.clone()),
         keystore,
         cell_id.clone(),

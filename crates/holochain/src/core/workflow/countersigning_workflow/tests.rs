@@ -3,7 +3,7 @@ use crate::core::queue_consumer::{TriggerReceiver, TriggerSender};
 use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::countersigning_workflow::{
     accept_countersigning_request, countersigning_workflow, CountersigningSessionState,
-    SessionCompletionDecision, SessionResolutionSummary,
+    CountersigningWorkspace, SessionCompletionDecision, SessionResolutionSummary,
 };
 use crate::core::workflow::countersigning_workflow::{countersigning_success, WorkComplete};
 use crate::core::workflow::WorkflowResult;
@@ -47,6 +47,7 @@ use matches::assert_matches;
 use std::ops::Add;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::broadcast::{Receiver, Sender};
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1101,6 +1102,7 @@ async fn timeout_during_accept_does_not_interfere_with_previous_session() {
 struct TestHarness {
     dna_hash: DnaHash,
     test_space: TestSpace,
+    workspace: Arc<CountersigningWorkspace>,
     network: Arc<MockHolochainP2pDnaT>,
     signal_tx: Sender<Signal>,
     signal_rx: Receiver<Signal>,
@@ -1143,9 +1145,18 @@ impl TestHarness {
         .await
         .unwrap();
 
+        let cell_id = CellId::new(dna_hash.clone(), author.clone());
+        let workspace = Arc::new(CountersigningWorkspace::new(Duration::from_secs(3)));
+        test_space
+            .space
+            .countersigning_workspaces
+            .lock()
+            .insert(cell_id.clone(), workspace.clone());
+
         Self {
             dna_hash,
             test_space,
+            workspace,
             network: Arc::new(network),
             signal_tx: signal.0,
             signal_rx: signal.1,
@@ -1206,6 +1217,7 @@ impl TestHarness {
 
         let outcome = countersigning_workflow(
             self.test_space.space.clone(),
+            self.workspace.clone(),
             self.network.clone(),
             self.keystore.clone(),
             CellId::new(self.dna_hash.clone(), self.author.clone()),
@@ -1236,9 +1248,7 @@ impl TestHarness {
     }
 
     fn clear_workspace_session(&self) {
-        self.test_space
-            .space
-            .countersigning_workspace
+        self.workspace
             .inner
             .share_mut(|w, _| {
                 w.session = None;
@@ -1366,9 +1376,7 @@ impl TestHarness {
 impl TestHarness {
     fn expect_empty_workspace(&self) {
         let no_session = self
-            .test_space
-            .space
-            .countersigning_workspace
+            .workspace
             .inner
             .share_ref(|w| Ok(w.session.is_none()))
             .unwrap();
@@ -1378,9 +1386,7 @@ impl TestHarness {
 
     fn expect_session_accepted(&self) -> PreflightRequest {
         let maybe_found = self
-            .test_space
-            .space
-            .countersigning_workspace
+            .workspace
             .inner
             .share_ref(|w| Ok(w.session.clone()))
             .unwrap();
@@ -1395,9 +1401,7 @@ impl TestHarness {
 
     fn expect_session_in_unknown_state(&self) -> Option<SessionResolutionSummary> {
         let maybe_found = self
-            .test_space
-            .space
-            .countersigning_workspace
+            .workspace
             .inner
             .share_ref(|w| Ok(w.session.clone()))
             .unwrap();
@@ -1412,9 +1416,7 @@ impl TestHarness {
 
     fn expect_session_in_signatures_collected(&self) -> Option<SessionResolutionSummary> {
         let maybe_found = self
-            .test_space
-            .space
-            .countersigning_workspace
+            .workspace
             .inner
             .share_ref(|w| Ok(w.session.clone()))
             .unwrap();
@@ -1514,9 +1516,7 @@ impl TestHarness {
     }
 
     fn expect_scheduling_complete(&self) {
-        self.test_space
-            .space
-            .countersigning_workspace
+        self.workspace
             .inner
             .share_ref(|inner| {
                 match &inner.next_trigger {

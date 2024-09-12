@@ -65,6 +65,7 @@ pub(crate) async fn inner_countersigning_session_complete(
                     }
 
                     let transaction: holochain_state::prelude::Txn = (&txn).into();
+                    // TODO already looked up in current_countersigning_session?
                     if transaction.contains_entry(&entry_hash)? {
                         return Ok(Some((session_record, session_data)));
                     }
@@ -150,6 +151,7 @@ pub(crate) async fn inner_countersigning_session_complete(
                 .await
                 .map_err(SourceChainError::other)?;
 
+        // TODO Need to be able to recover from this by pushing when we're behind the CHC.
         // This is a serious failure, but we have to continue with the workflow.
         // It would be worse to not publish the session record than to be out of sync with the CHC.
         // Being behind the CHC is a recoverable state, or should be at some point. We don't want
@@ -165,6 +167,7 @@ pub(crate) async fn inner_countersigning_session_complete(
     apply_success_state_changes(space, &author, this_cells_action_hash, integration_trigger)
         .await?;
 
+    // TODO This should be in the publish workflow
     // Publish other signers agent activity ops to their agent activity authorities.
     for sa in signed_actions {
         let (action, signature) = sa.into();

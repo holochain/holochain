@@ -202,6 +202,7 @@ enum SessionCompletionDecision {
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn countersigning_workflow(
     space: Space,
+    workspace: Arc<CountersigningWorkspace>,
     network: Arc<impl HolochainP2pDnaT>,
     keystore: MetaLairClient,
     cell_id: CellId,
@@ -212,16 +213,14 @@ pub(crate) async fn countersigning_workflow(
 ) -> WorkflowResult<WorkComplete> {
     tracing::debug!(
         "Starting countersigning workflow, with a session? {}",
-        space
-            .countersigning_workspace
+        workspace
             .inner
             .share_ref(|inner| Ok(inner.session.is_some()))
             .unwrap()
     );
 
     // Clear trigger, if we need another one, it will be created later.
-    space
-        .countersigning_workspace
+    workspace
         .inner
         .share_mut(|inner, _| {
             if let Some(next_trigger) = &mut inner.next_trigger {
@@ -233,13 +232,18 @@ pub(crate) async fn countersigning_workflow(
         .unwrap();
 
     // Ensure the workspace state knows about anything in the database on startup.
-    refresh::refresh_workspace_state(&space, cell_id.clone(), signal_tx.clone()).await;
+    refresh::refresh_workspace_state(
+        &space,
+        workspace.clone(),
+        cell_id.clone(),
+        signal_tx.clone(),
+    )
+    .await;
 
     // Abandon any sessions that have timed out.
-    apply_timeout(&space, &cell_id, signal_tx.clone()).await;
+    apply_timeout(&space, workspace.clone(), &cell_id, signal_tx.clone()).await;
 
-    space
-        .countersigning_workspace
+    workspace
         .inner
         .share_mut(|inner, _| {
             inner.session.iter_mut().for_each(|state| {
@@ -272,10 +276,17 @@ pub(crate) async fn countersigning_workflow(
         .unwrap();
 
     // If the session is in an unknown state, try to recover it.
-    try_recover_failed_session(&space, &network, &cell_id, &signal_tx, &self_trigger).await;
+    try_recover_failed_session(
+        &space,
+        workspace.clone(),
+        network.clone(),
+        &cell_id,
+        &signal_tx,
+        &self_trigger,
+    )
+    .await;
 
-    let maybe_completed_session = space
-        .countersigning_workspace
+    let maybe_completed_session = workspace
         .inner
         .share_mut(|inner, _| {
             Ok(match &mut inner.session {
@@ -305,8 +316,7 @@ pub(crate) async fn countersigning_workflow(
                 Ok(Some(cs_entry_hash)) => {
                     // The session completed successfully this bundle, so we can remove the session
                     // from the workspace.
-                    space
-                        .countersigning_workspace
+                    workspace
                         .inner
                         .share_mut(|inner, _| {
                             tracing::trace!("Countersigning session completed successfully, removing from the workspace for agent: {:?}", cell_id.agent_pubkey());
@@ -341,8 +351,7 @@ pub(crate) async fn countersigning_workflow(
 
     // At the end of the workflow, if we have a session still in progress, then schedule a
     // workflow run again at the end time.
-    let maybe_end_time = space
-        .countersigning_workspace
+    let maybe_end_time = workspace
         .inner
         .share_ref(|inner| {
             Ok(match &inner.session {
@@ -364,7 +373,7 @@ pub(crate) async fn countersigning_workflow(
     tracing::trace!("End time: {:?}", maybe_end_time);
 
     if let Some(end_time) = maybe_end_time {
-        reschedule_self(&space, self_trigger, end_time);
+        reschedule_self(workspace, self_trigger, end_time);
     }
 
     Ok(WorkComplete::Complete)
@@ -372,13 +381,13 @@ pub(crate) async fn countersigning_workflow(
 
 async fn try_recover_failed_session(
     space: &Space,
-    network: &Arc<impl HolochainP2pDnaT + Sized>,
+    workspace: Arc<CountersigningWorkspace>,
+    network: Arc<impl HolochainP2pDnaT + Sized>,
     cell_id: &CellId,
     signal_tx: &Sender<Signal>,
     self_trigger: &TriggerSender,
 ) {
-    let maybe_session_in_unknown_state = space
-        .countersigning_workspace
+    let maybe_session_in_unknown_state = workspace
         .inner
         .share_ref(|inner| {
             Ok(inner
@@ -414,8 +423,7 @@ async fn try_recover_failed_session(
             }
             Ok((SessionCompletionDecision::Abandoned, _)) => {
                 // The session state has been resolved, so we can remove it from the workspace.
-                space
-                    .countersigning_workspace
+                workspace
                     .inner
                     .share_mut(|inner, _| {
                         tracing::trace!(
@@ -441,7 +449,7 @@ async fn try_recover_failed_session(
                     cell_id.agent_pubkey()
                 );
 
-                space.countersigning_workspace.inner.share_mut(|inner, _| {
+                workspace.inner.share_mut(|inner, _| {
                     if let Some(session_state) = &mut inner.session {
                         if let CountersigningSessionState::Unknown {
                             resolution,
@@ -479,21 +487,20 @@ async fn try_recover_failed_session(
     }
 
     if remained_in_unknown_state {
-        if let Ok(t) = Timestamp::now()
-            + space
-                .countersigning_workspace
-                .countersigning_resolution_retry_delay
-        {
-            reschedule_self(space, self_trigger.clone(), t);
+        if let Ok(t) = Timestamp::now() + workspace.countersigning_resolution_retry_delay {
+            reschedule_self(workspace, self_trigger.clone(), t);
         } else {
             tracing::error!("Failed to calculate next trigger time for countersigning workflow");
         }
     }
 }
 
-fn reschedule_self(space: &Space, self_trigger: TriggerSender, at_timestamp: Timestamp) {
-    space
-        .countersigning_workspace
+fn reschedule_self(
+    workspace: Arc<CountersigningWorkspace>,
+    self_trigger: TriggerSender,
+    at_timestamp: Timestamp,
+) {
+    workspace
         .inner
         .share_mut(|inner, _| {
             if let Some(next_trigger) = &mut inner.next_trigger {
@@ -507,9 +514,13 @@ fn reschedule_self(space: &Space, self_trigger: TriggerSender, at_timestamp: Tim
         .unwrap();
 }
 
-async fn apply_timeout(space: &Space, cell_id: &CellId, signal_tx: Sender<Signal>) {
-    let timed_out = space
-        .countersigning_workspace
+async fn apply_timeout(
+    space: &Space,
+    workspace: Arc<CountersigningWorkspace>,
+    cell_id: &CellId,
+    signal_tx: Sender<Signal>,
+) {
+    let timed_out = workspace
         .inner
         .share_ref(|inner| {
             Ok(inner.session.as_ref().and_then(|session| {
@@ -550,8 +561,7 @@ async fn apply_timeout(space: &Space, cell_id: &CellId, signal_tx: Sender<Signal
         {
             Ok(_) => {
                 // Only once we've managed to remove the session do we remove the state for it.
-                space
-                    .countersigning_workspace
+                workspace
                     .inner
                     .share_mut(|inner, _| {
                         inner.session = None;
