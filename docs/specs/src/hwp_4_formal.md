@@ -62,7 +62,7 @@ Within the context of the Basic Assumptions and the System Architecture both des
 3. **Self-Validating Keys:** Agents declare their address on the network as their public key. You can confirm any published data or remote call is valid by checking the signature using the from address as the public key.
 4. **Termination of Execution:** No node can be coerced into infinite loops by non-terminating application code in either remote zome call or validation callbacks. Holochain uses WASM metering to guarantee a maximum execution budget to address the the Halting Problem.
 5. **Deterministic Validation:** Ensure that only deterministic behaviors (ones that will always get the same result no matter who calls them on what computer) are available in validation functions. An interim result of "missing dependency" is also acceptable, but final evaluation of valid/invalid status for each datum must be consistent across all nodes and all timespans.
-6. **Strong Eventual Consistency:** Despite network partitions, any nodes who are an authority for a given DHT address (or become one at any point) will eventually converge to the same state for data at that address. This is ensured by the DHT functioning as a conflict-free replicated data type (CRDT).
+6. **Strong Eventual Consistency:** Despite network partitions, all nodes who are authorities for a given DHT address (or become one at any point) will eventually converge to the same state for data at that address. This is ensured by the DHT functioning as a conflict-free replicated data type (CRDT).
 8. **"0 of N" Trust Model:** Holochain is immune to "majority attacks" because any node can always validate data for themselves independent of what any other nodes say. See this [Levels of Trust Diagram](https://miro.medium.com/max/1248/0*k3o00pQovnOWRwtA)
 9. **Data Model Scalability:** Because of the overlapping sharding scheme of DHT storage and valdiation, the total computing power and overall throughput for an application scales linearly as more users join the app.
 10. **Atomic Zome Calls:** Multiple writes in a single zome call will all be committed in a single SQL transaction or all fail together. If they fail the zome call, they will report an error to the caller and the writes will be rolled back.
@@ -527,7 +527,7 @@ Holochain is designed to be used to build micro-services that can be assembled i
 Given the above formal description of our local state model (Source Chain) and shared data model (Graph DHT) we can now present a high-level implementation specification of different components of the Holochain architecture. The components include:
 
 * App Virtual Machine (Ribosome)
-* State Manager
+* State Management (Workflows)
 * P2P Networking (Kitsune and Holochain P2P)
 * Application Interface (Conductor API)
 * Secure Private Key Management (lair-keystore)
