@@ -49,7 +49,7 @@ Applications SHOULD implement anti-sybil measures, but rate limiting is NOT a su
 
 That said, a rate limit coupled with an effective sybil mitigation strategy may mitigate certain damage caused by temporary/limited breakdowns in that defense more effectively than the anti-sybil measure alone.
 
-## Specificaiton
+## Specification
 
 ### Weight
 
@@ -135,7 +135,7 @@ Access control changes are ideally never rate limited:
 
 The _rate_ of cap grants is limited but weight and size (common to all entry headers) are ignored.
 
-As this is entirely a question of network health, a happ should never be intentially (un)limiting access controls. The validation can be done by the system and it is not configurable.
+As this is entirely a question of network health, a happ should never be intentionally (un)limiting access controls. The validation can be done by the system and it is not configurable.
 
 That said, there is diminishing returns in the marginal utility of allowing more cap grants per-agent. As long as an agent can manage their access, headroom adds zero value to users but non-zero additional liability to the network.
 
@@ -148,7 +148,7 @@ Notably the update of CapGrants and CapClaims _is_ rate limited:
 
 **Question: How much is "too much" for access control headers sent to an arbitrary network?**
 
-**Corrolary: How little is "too little" for an arbitrary happ with arbitrary but reasonable requirements?**
+**Corollary: How little is "too little" for an arbitrary happ with arbitrary but reasonable requirements?**
 
 #### C: Low risk: Links
 
@@ -244,7 +244,7 @@ The bucket algorithm is a simple and computationally efficient way to achieve de
 
 There are many buckets available to a happ, each with its own bucket index/position/id.
 
-These are configured with a callback analagous to the entry defs callback.
+These are configured with a callback analogous to the entry defs callback.
 
 ```rust=
 struct RateLimit {
@@ -254,7 +254,7 @@ struct RateLimit {
 }
 
 #[hdk_extern]
-fn rate_limits(_: ()) -> Vec<RateLimit> {
+fn rate_limits() -> Vec<RateLimit> {
  // ...
 }
 ```

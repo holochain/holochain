@@ -2997,7 +2997,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
     * `DumpNetworkStats -> NetwokrStatsDumped(String)`: Dump network statistics from the back-end networking library. This library operates on a lower level than Kitsune and Holochain P2P, translating the P2P messages into protocol communications in a form appropriate for the physical layer. Our implementation currently includes a WebRTC library.
 
 * `AddAgentInfo { agent_infos: Vec<AgentInfoSigned> } -> AgentInfoAdded`: Add a list of agents to this conductor's peer store.
-    * **Notes**: Implementations MAY implement this function. It is intended as a way of shortcutting peer discovery and is useful for testing. It is altoso intended for use cases in which it is important for agent existence to be transmitted out-of-band.
+    * **Notes**: Implementations MAY implement this function. It is intended as a way of shortcutting peer discovery and is useful for testing. It is also intended for use cases in which it is important for agent existence to be transmitted out-of-band.
 
 * `GetAgentInfo { dna_hash: Option<DnaHash> } -> AgentInfoReturned(Vec<AgentInfoSigned>)`: Request information about the agents in this Conductor's peer store; that is, the peers that this Conductor knows about.
     * **Notes**: Implementations MAY implement this function. It is useful for testing across networks. It is also intended for use cases in which it is important for peer info to be transmitted out-of-band.
@@ -3215,7 +3215,7 @@ enum ExternalApiWireError {
         }
         ```
 
-* `EnableCloneCell(EnableCloneCellPayload) -> CloneCellEnamed(ClonedCell)`: Enabled a clone cell that was previously disabled or not yet enabled.
+* `EnableCloneCell(EnableCloneCellPayload) -> CloneCellEnabled(ClonedCell)`: Enabled a clone cell that was previously disabled or not yet enabled.
     * **Notes:** When the clone cell exists, it MUST be enabled, after which any zome calls made to the cell MUST be attempted. Additionally any API functions that return `AppInfo` should show an enabled status for the given cell. If the cell doesn't exist, the call MUST be treated as a no-op.
     * **Arguments:** The payload is defined as:
 

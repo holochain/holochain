@@ -284,7 +284,7 @@ $$
 
 For links, we refer to an address with link metadata as a **Base** and the address that the link points to as a **Target**. The link can also be typed and have an optional ${tag}$ containing arbitrary content.
 
-**Topological Transform Operations:** A source chain is a hashchain of actions with entries, but these are transformed into DHT operations which ask DHT nodes to perform certain validation and storage tasks on the content and metadata at the address, because we are transforming or projecting from authorship history to a distributed graph. Chain entries and actions are straightforwardly stored in the graph as nodes, as $C$ at their hash in the DHT, but more sophisticated operations are also performed on existing DHT entries. For example, when updating/deleting entries, or adding/removing links, additional metadata is registered in parts of the DHT to properly weave a graph.
+**Topological Transform Operations:** A source chain is a hash chain of actions with entries, but these are transformed into DHT operations which ask DHT nodes to perform certain validation and storage tasks on the content and metadata at the address, because we are transforming or projecting from authorship history to a distributed graph. Chain entries and actions are straightforwardly stored in the graph as nodes, as $C$ at their hash in the DHT, but more sophisticated operations are also performed on existing DHT entries. For example, when updating/deleting entries, or adding/removing links, additional metadata is registered in parts of the DHT to properly weave a graph.
 
 ### Graph Transformation
 
@@ -481,7 +481,7 @@ Hence, this approach favors freshness of recent data so that it becomes availabl
 
 ## Security & Safety
 
-Many factors contribute to a system's ability to live up to the varying saftey and security requirements of its users. In general, the approach taken in Holochain is to provide affordances that take into account the many types of real-world costs that result from adding security and safety to systems such that application developers can match the trade-offs of those costs to their application context. The integrity guarantees listed in prior sections detail the fundamental data saftey that Holochain applications provide. Two other important facets of system security and safety come from:
+Many factors contribute to a system's ability to live up to the varying safety and security requirements of its users. In general, the approach taken in Holochain is to provide affordances that take into account the many types of real-world costs that result from adding security and safety to systems such that application developers can match the trade-offs of those costs to their application context. The integrity guarantees listed in prior sections detail the fundamental data safety that Holochain applications provide. Two other important facets of system security and safety come from:
 
 1. Gating access to functions that change state, for which Holochain provides a unified and flexible Object Capabilities model.
 2. Detecting and blocking participation of bad actors, for which Holochain provides the affordances of validation, warranting, and blocking.
@@ -497,7 +497,7 @@ Access is thus mediated by Capability Grants of four types:
 * **Transferrable**: Anybody with the given capability secret can make the zome call. This is equivalent to the common definition of object-capabilities.
 * **Unrestricted**: Anybody can make the zome call (no secret nor proof of authorized key needed to use this capability).
 
-All zome calls must be signed and supply a required capabilty claim argument that MUST be checked by the system receiving the call. Agents record capability grants on their source chains and distribute their associated secrets as necessary according to the application's needs. Receviers of secrets can record them as claims (usually as a private entry) on their chains for later lookup. The "agent" type grant is just the agent's public key.
+All zome calls must be signed and supply a required capability claim argument that MUST be checked by the system receiving the call. Agents record capability grants on their source chains and distribute their associated secrets as necessary according to the application's needs. Receivers of secrets can record them as claims (usually as a private entry) on their chains for later lookup. The "agent" type grant is just the agent's public key.
 
 ### Warrants
 
@@ -519,9 +519,9 @@ There is no global blocking of a bad actor. Each agent must confirm for themselv
 
 Note: Beyond Warrants, blocking can also theoretically be used by apps or agents for whatever reason the application logic or node owner may have to refuse to participate with a node. It allows for local, voluntary self-defense against whatever nodes someone might interpret as malicious, or simply ending communication with peers that are no longer relevant (e.g., a terminated employee).
 
-## Cross-DNA Composibility
+## Cross-DNA Composability
 
-Holochain is designed to be used to build micro-services that can be assembled into applications. We expect DNAs to be written that assume the existence of other long-running DNAs and make calls to them via the agency of a user having installed both DNAs on their node. The Capabilities security model described above makes sure this kind of calling is safe and can only happen when permisions to do so have been explicitly granted in a given context. The HDK `call` function provides an affordance to allow specification of the DNA by hash when making the call, so the Holochain node can make a zome call to that DNA and return the result to the calling node.
+Holochain is designed to be used to build micro-services that can be assembled into applications. We expect DNAs to be written that assume the existence of other long-running DNAs and make calls to them via the agency of a user having installed both DNAs on their node. The Capabilities security model described above makes sure this kind of calling is safe and can only happen when permissions to do so have been explicitly granted in a given context. The HDK `call` function provides an affordance to allow specification of the DNA by hash when making the call, so the Holochain node can make a zome call to that DNA and return the result to the calling node.
 
 ## Holochain Implementation
 
