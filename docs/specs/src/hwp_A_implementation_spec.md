@@ -1054,7 +1054,7 @@ The HDK SHOULD implement the ability for cells to modify the running App by addi
     }
     ```
 
-* `delete_clone_cell(DeleteCloneCellInput) -> ExtermResult<()>`: Delete an existing clone cell in the current app. The input is defined as:
+* `delete_clone_cell(DeleteCloneCellInput) -> ExternResult<()>`: Delete an existing clone cell in the current app. The input is defined as:
 
     ```rust
     struct DeleteCloneCellInput {

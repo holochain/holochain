@@ -1,4 +1,0 @@
-input-files: ['test/input-tikz.md']
-filters:
-  - diagram.lua
-to: html

@@ -1,8 +1,0 @@
-input-files: ['test/input-asymptote.md']
-filters:
-  - diagram.lua
-to: html
-metadata:
-  pagetitle: Asymptote diagram
-variables:
-  document-css: false
