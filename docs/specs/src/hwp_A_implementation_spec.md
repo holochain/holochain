@@ -127,6 +127,9 @@ where T: serde::Serialize {
     signature: Signature,
     data: T,
 }
+
+// A signature is an Ed25519 public-key signature.
+struct Signature([u8; 64]);
 ```
 
 Implementation detail: Theoretically all actions could point via a hash to an entry that would contain the "content" of that action. But because many of the different actions entries are system-defined, and they thus have a known structure, we can reduce unnecessary data elements and gossip by embedding the entry data for system-defined entry types right in the action itself. However, for application-defined entry types, because the structure of the entry is not known at compile time for Holochain, the entry data must be in a separate data structure. Additionally there are a few system entry types (see below) that must be independantly retrieveable from the DHT, and thus have their own separate system-defined variant of the `Entry` enum type.
@@ -613,7 +616,23 @@ The HDK contains all the functions and callbacks needed for Holochain applicatio
 
 #### Initialization
 
-The HDK MUST allow application developers to define an `init() -> ExternResult<InitCallbackResult>` callback in each coordinator zome, which
+The HDK MUST allow application developers to define an `init() -> ExternResult<InitCallbackResult>` callback in each coordinator zome. All `init` callbacks in all coordinator zomes MUST complete successfully, and an `InitZomesComplete` action MUST be written to a cell's source chain, before zome functions (see following section) may be called. Implementations SHOULD allow this to happen lazily; that is, a zome function is permitted to be called before initialization, and the call zome workflow runs the initialization workflow in-process if `InitZomesComplete` does not exist on the source chain yet.
+
+The return value of the callback is defined as:
+
+```rust
+enum InitCallbackResult {
+    Pass,
+    Fail(String),
+    UnresolvedDependencies(UnresolvedDependencies),
+}
+```
+
+If the return value of all `init` callbacks is `Pass`, the actions in the scratch space prepared for the initialization workflow are written to the source chain, followed by the `InitZomesComplete` action, and execution of zome functions in the cell may proceed.
+
+If the return value of at least one `init` callback is `Fail`, the cell is put into a permanently disabled state.
+
+If the return value of at least one `init` callback is `UnresolvedDependencies`, the scratch space prepared for the initialization workflow is discarded, and the initialization workflow will be attempted upon next zome function call. This permits a cell to gracefully handle a temporary poorly connected state on cell instantiation.
 
 #### Arbitrary API Functions (Zome Functions)
 
@@ -916,6 +935,8 @@ It is the application's responsibility to retrieve a stored capability claim usi
         chain_head: (ActionHash, u32, Timestamp),
     }
     ```
+
+    The initial and latest public key may vary throughout the life of the source chain, as an `AgentPubKey` is an entry which may be updated like other entries. Updating a key entry is normally handled through a DPKI implementation (see section above on Human Error).
 
 * `call_info() -> ExternResult<CallInfo>`: Get contextual information about the current zome call, where the return value is defined as:
 

@@ -59,7 +59,7 @@ Within the context of the Basic Assumptions and the System Architecture both des
 
 1. **State:** Agents' actions are unambiguiously ordered from any given action back to genesis, unforgeable, non-repudiable, and immutable (accomplished via local hash chains called a Source Chain, because all data within the network is sourced from these chains.)
 2. **Self-Validating Data:** Because all DHT data is stored at the hash of its content, if the data returned from a request does not hash to the address you requested, you know you've received altered data.
-3. **Self-Validating Keys:** Agents declare their address on the network as their public key. You can confirm any published data or remote call is valid by checking the signature using the from address as the public key.
+3. **Self-Validating Keys:** Agents declare their address on the network as their public key, and key rotation is subject to rules defined by the agent and enforced by their peers. Peers can confirm any published data or remote call is valid by checking the signature using the from address as the public key.
 4. **Termination of Execution:** No node can be coerced into infinite loops by non-terminating application code in either remote zome call or validation callbacks. Holochain uses WASM metering to guarantee a maximum execution budget to address the the Halting Problem.
 5. **Deterministic Validation:** Ensure that only deterministic behaviors (ones that will always get the same result no matter who calls them on what computer) are available in validation functions. An interim result of "missing dependency" is also acceptable, but final evaluation of valid/invalid status for each datum must be consistent across all nodes and all timespans.
 6. **Strong Eventual Consistency:** Despite network partitions, all nodes who are authorities for a given DHT address (or become one at any point) will eventually converge to the same state for data at that address. This is ensured by the DHT functioning as a conflict-free replicated data type (CRDT).
@@ -188,11 +188,12 @@ C _n =
 \end{Bmatrix}
 $$
 
-*If the validation rules fail,* the deltas will be rejected with an error. Also, if the chain state has changed from $C_n$, we can
- 1. return an error (e.g. "Chain head has moved"),
- 2. commit anyway, restarting the validation process at a new "as at" $C_n^\prime$ if the commit is identified as "stateless" in terms of validation dependencies (e.g., a tweet generally isn't valid or invalid because of prior tweets/state changes). We refer to any application entry types that can be committed this way as allowing "relaxed chain ordering".
+*If the validation rules fail,* the deltas will be rejected with an error. Also, if the chain state has changed from $C_n$, we can:
 
-*Note about Action/Entry Pairs: This paired structure of the source chain holds true for all application data. However, certain action types defined by the system integrate what would be entry content as **additional fields inside the action** instead of creating a separate entry which would add unnecessary gossip on the DHT.*
+1. return an error (e.g. "Chain head has moved"),
+2. commit anyway, restarting the validation process at a new "as at" $C_n^\prime$ if the commit is identified as "stateless" in terms of validation dependencies (e.g., a tweet generally isn't valid or invalid because of prior tweets/state changes). We refer to any application entry types that can be committed this way as allowing "relaxed chain ordering".
+
+*Note about Action/Entry Pairs: This paired structure of the source chain holds true for all application data. However, certain action types defined by the system, whose entry payloads are small or require metadata that is additional to primary entry content, integrate what would be entry content as **additional fields inside the action** instead of creating a separate entry which would add unnecessary gossip on the DHT. These types are identified and described in Appendix A, Implementation.*
 
 ### Countersigning
 
