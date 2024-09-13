@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cascade"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 description = "Logic for cascading updates to Holochain state and network interaction"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -15,11 +15,11 @@ futures = "0.3"
 holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash", features = [
   "full",
 ] }
-holochain_chc = { version = "^0.1.0-dev.3", path = "../holochain_chc" }
+holochain_chc = { version = "^0.1.0-dev.4", path = "../holochain_chc" }
 holochain_sqlite = { version = "^0.4.0-dev.20", path = "../holochain_sqlite" }
-holochain_p2p = { version = "^0.4.0-dev.23", path = "../holochain_p2p" }
+holochain_p2p = { version = "^0.4.0-dev.24", path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_state = { version = "^0.4.0-dev.23", path = "../holochain_state" }
+holochain_state = { version = "^0.4.0-dev.24", path = "../holochain_state" }
 holochain_types = { version = "^0.4.0-dev.23", path = "../holochain_types" }
 holochain_trace = { version = "^0.4.0-dev.5", path = "../holochain_trace" }
 holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util" }

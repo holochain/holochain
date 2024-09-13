@@ -2855,7 +2855,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3046,7 +3046,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "aitia",
  "anyhow",
@@ -3165,7 +3165,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "async-trait",
  "fixt",
@@ -3196,7 +3196,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_chc"
-version = "0.1.0-dev.3"
+version = "0.1.0-dev.4"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -3224,7 +3224,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "anyhow",
  "clap 4.5.9",
@@ -3279,7 +3279,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3308,7 +3308,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "derive_more",
  "holo_hash",
@@ -3336,7 +3336,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_services"
-version = "0.3.0-dev.23"
+version = "0.3.0-dev.24"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3460,7 +3460,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "aitia",
  "async-trait",
@@ -3576,7 +3576,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "aitia",
  "anyhow",

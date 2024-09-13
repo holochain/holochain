@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_services"
-version = "0.3.0-dev.23"
+version = "0.3.0-dev.24"
 description = "Holochain Conductor Services types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
