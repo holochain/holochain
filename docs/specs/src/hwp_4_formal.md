@@ -4,7 +4,7 @@ Now we turn to a more formal and detailed presentation of the Holochain
 system, including assumptions, architecture, integrity guarantees, and
 formal state model.
 
-**Purpose of this Section:** To provide an understanding of the functional requirements of Holochain and specify a technical implmentation of the cryptographic state transitions and application processes that enforce Holochain's integrity guarantees.
+**Purpose of this Section:** To provide an understanding of the functional requirements of Holochain and specify a technical implementation of the cryptographic state transitions and application processes that enforce Holochain's integrity guarantees.
 
 ## Definition of Foundational Principles
 
@@ -30,7 +30,7 @@ formal state model.
 
 In Holochain every app defines a distinct, peer-to-peer, encrypted network where one set of rules is mutually enforced by all users. This network consists of the peers running the app, who participate in routing messages to each other and validating and storing redundant copies of the application's database.
 
-Holochain operates different subsystems, each of which functions on separate workflows and change models. Even though Holochain functions as a common underlying database on the back-end, the workflows in each subsystem each have different input channels which trigger different transformational processes. Each workflow has distinct structural bottlenecks and security constraints, which necessitates that execution of workflows is parallelised across subsystems, and sometimes within a subsystem.
+Holochain operates different subsystems, each of which functions on separate workflows and change models. Even though Holochain functions as a common underlying database on the back-end, the workflows in each subsystem each have different input channels which trigger different transformational processes. Each workflow has distinct structural bottlenecks and security constraints, which necessitates that execution of workflows is parallelized across subsystems, and sometimes within a subsystem.
 
 1. **Local Agent State:** Represented as changes to an agent's state by signing new records with their private key, and committing them to a local hash chain of their action history called a Source Chain. Initial chain genesis happens upon installation/activation, and all following changes result from "zome calls" into the app code.
 2. **Global Visibility of Local State Changes:** After data has been signed to a Source Chain it gets published to a Graphing DHT (Distributed Hash Table) where it is validated by the peers who will store and serve it. The DHT is continually balanced and healed by gossip among the peers.
@@ -51,20 +51,20 @@ Students of biology may recognize ways that our language doesn't fully mesh with
 
 #### The Conductor
 
-Much of the discussion below is from the perspective of a single DNA, which is the core unit in Holochain that provides a set of integrity guarantees for binding agents together into a single social context. However, Holochain can also be seen as micro-service provider, with each DNA providing one micro-service. From this perspective, a Holochain node is a running process that manages many connections to many DNAs simultaneously, from user interfaces initiating actions, from other nodes sharing a subset of identical DNAs, and from cells within the same node sharing the same agent ID but bound to different DNAs. Thus, we call a Holochain node the **Conductor** as it manages the information flows from "outside" (UI calls and calls from other local cells) and from "inside" (network interactions) as they flow into and out of the may DNA instances running code. This term was chosen as it suggests the feel of musical cordination of a group, as well as the conduit of an electrical flow. Please see the [Implementation Spec (Appendix A)](hwp_A_implementation_spec.md) for a more detailed on how a complete Holochain Conductor must be built.
+Much of the discussion below is from the perspective of a single DNA, which is the core unit in Holochain that provides a set of integrity guarantees for binding agents together into a single social context. However, Holochain can also be seen as micro-service provider, with each DNA providing one micro-service. From this perspective, a Holochain node is a running process that manages many connections to many DNAs simultaneously, from user interfaces initiating actions, from other nodes sharing a subset of identical DNAs, and from cells within the same node sharing the same agent ID but bound to different DNAs. Thus, we call a Holochain node the **Conductor** as it manages the information flows from "outside" (UI calls and calls from other local cells) and from "inside" (network interactions) as they flow into and out of the may DNA instances running code. This term was chosen as it suggests the feel of musical coordination of a group, as well as the conduit of an electrical flow. Please see the [Implementation Spec (Appendix A)](hwp_A_implementation_spec.md) for a more detailed on how a complete Holochain Conductor must be built.
 
 ## Integrity Guarantees
 
 Within the context of the Basic Assumptions and the System Architecture both described above, the Holochain system makes the following specific integrity guarantees for a given Holochain DNA and network:
 
-1. **State:** Agents' actions are unambiguiously ordered from any given action back to genesis, unforgeable, non-repudiable, and immutable (accomplished via local hash chains called a Source Chain, because all data within the network is sourced from these chains.)
+1. **State:** Agents' actions are unambiguously ordered from any given action back to genesis, unforgeable, non-repudiable, and immutable (accomplished via local hash chains called a Source Chain, because all data within the network is sourced from these chains.)
 2. **Self-Validating Data:** Because all DHT data is stored at the hash of its content, if the data returned from a request does not hash to the address you requested, you know you've received altered data.
 3. **Self-Validating Keys:** Agents declare their address on the network as their public key, and key rotation is subject to rules defined by the agent and enforced by their peers. Peers can confirm any published data or remote call is valid by checking the signature using the from address as the public key.
 4. **Termination of Execution:** No node can be coerced into infinite loops by non-terminating application code in either remote zome call or validation callbacks. Holochain uses WASM metering to guarantee a maximum execution budget to address the the Halting Problem.
-5. **Deterministic Validation:** Ensure that only deterministic behaviors (ones that will always get the same result no matter who calls them on what computer) are available in validation functions. An interim result of "missing dependency" is also acceptable, but final evaluation of valid/invalid status for each datum must be consistent across all nodes and all timespans.
+5. **Deterministic Validation:** Ensure that only deterministic behaviors (ones that will always get the same result no matter who calls them on what computer) are available in validation functions. An interim result of "missing dependency" is also acceptable, but final evaluation of valid/invalid status for each datum must be consistent across all nodes and all time spans.
 6. **Strong Eventual Consistency:** Despite network partitions, all nodes who are authorities for a given DHT address (or become one at any point) will eventually converge to the same state for data at that address. This is ensured by the DHT functioning as a conflict-free replicated data type (CRDT).
 8. **"0 of N" Trust Model:** Holochain is immune to "majority attacks" because any node can always validate data for themselves independent of what any other nodes say. See this [Levels of Trust Diagram](https://miro.medium.com/max/1248/0*k3o00pQovnOWRwtA)
-9. **Data Model Scalability:** Because of the overlapping sharding scheme of DHT storage and valdiation, the total computing power and overall throughput for an application scales linearly as more users join the app.
+9. **Data Model Scalability:** Because of the overlapping sharding scheme of DHT storage and validation, the total computing power and overall throughput for an application scales linearly as more users join the app.
 10. **Atomic Zome Calls:** Multiple writes in a single zome call will all be committed in a single SQL transaction or all fail together. If they fail the zome call, they will report an error to the caller and the writes will be rolled back.
 
 ## Source Chain: Formal State Model
@@ -141,7 +141,7 @@ $$
 
 **Initialization:** After genesis, DNAs may have also provided initialization functions which are all executed the first time an inbound zome call is received and run. This delay in initialization is to allow time for the application to have joined and been validated into the network, just in case initialization functions may need to retrieve some data from the network.
 
-Initialization functions may write entries to the chain, send messages, or perform any variety of actions, but after all coordinator zomes' initialization functions (according to the order they were bundled together) have succesfully completed their initializations, an InitZomesComplete action is written to the source chain, so that it will not re-attempt initialization, thus preventing any redundant side-effects.
+Initialization functions may write entries to the chain, send messages, or perform any variety of actions, but after all coordinator zomes' initialization functions (according to the order they were bundled together) have successfully completed their initializations, an InitZomesComplete action is written to the source chain, so that it will not re-attempt initialization, thus preventing any redundant side-effects.
 
 **Ongoing Operation via Calls to Zome Functions:** All changes following genesis and initialization occur by Zome call to a function contained in a Coordinator Zome in the following form:
 
@@ -197,7 +197,7 @@ $$
 
 ### Countersigning
 
-So far we have discussed individual agents taking Actions and recording them on their Source Chains. It is also desireable for subsets of agents to mutually consent to a single Action by atomically recording the Action to their chains. We acheive this through a process of Countersigning, whereby a session is initiated during which the subset of agents builds an Action that all participating agents sign, and during which all agents promise one another that they will not take some other action in the meantime.
+So far we have discussed individual agents taking Actions and recording them on their Source Chains. It is also desireable for subsets of agents to mutually consent to a single Action by atomically recording the Action to their chains. We achieve this through a process of Countersigning, whereby a session is initiated during which the subset of agents builds an Action that all participating agents sign, and during which all agents promise one another that they will not take some other action in the meantime.
 
 There are two ways of managing the countersigning process:
 
@@ -207,7 +207,7 @@ There are two ways of managing the countersigning process:
 Additionally there are two contexts for making these atomic changes across multiple chains:
 
 1. When the change is about parties who are accountable to the change, i.e., their role is structurally part of the state change, as in spender/receiver of a mutual credit transaction
-2. When the change simply requires witnessing by M of N parties, i.e., all that's needed is a "majority" of a group to agree on the atomicity. This allows a kind of "micro-consensus" to be implemented in parts of an application. It's an affordance for applications to implement a set of "super-nodes" that manage a small bit of consensus. Note that in our current implementation, M of N countersigning allways uses an Enzyme to manage the session completion.
+2. When the change simply requires witnessing by M of N parties, i.e., all that's needed is a "majority" of a group to agree on the atomicity. This allows a kind of "micro-consensus" to be implemented in parts of an application. It's an affordance for applications to implement a set of "super-nodes" that manage a small bit of consensus. Note that in our current implementation, M of N countersigning always uses an Enzyme to manage the session completion.
 
 #### Countersigning Constraints
 
@@ -251,7 +251,7 @@ The Holochain DHT performs a topological transform on the set of the various age
 
 **Structure of GDHT data:** The DHT is a content-addressable space where each piece of content is found at the address which is the hash of its content. In addition, any address in the DHT can have metadata attached to it. This metadata is not part of the content being hashed.
 
-*Note about hashing: Holochain uses 256-bit Blake2b hashes with the exception of one entry type, AgentPubKey, which is a 256-bit Ed25519 public key and uses `equal()` as its hash function. In other words, **the content of the AgentPubKey is identical to its hash**. This preserves content-addressibility but also enables agent keys to function as self-proving identifiers for network transport and cryptographic functions like signing or encryption.*
+*Note about hashing: Holochain uses 256-bit Blake2b hashes with the exception of one entry type, AgentPubKey, which is a 256-bit Ed25519 public key and uses `equal()` as its hash function. In other words, **the content of the AgentPubKey is identical to its hash**. This preserves content-addressability but also enables agent keys to function as self-proving identifiers for network transport and cryptographic functions like signing or encryption.*
 
 **DHT Addresses:** Both Actions and Entries from source chains can be retrieved from the DHT by either the ActionHash or EntryHash. The DHT `get()` function call returns a Record, a tuple containing the most relevant action/entry pair. Structurally, Actions "contain" their referenced entries so that pairing is obvious when a Record is retrieved by ActionHash. However, Actions are also attached as metadata at an EntryHash, and there could be many Actions which have created the same Entry content. A `get()` function called by EntryHash returns the oldest undeleted Action in the pair, while a `get_details()` function call on an EntryHash returns all of the Actions.
 
@@ -411,7 +411,7 @@ When two peers attempt to synchronize the held sets of transforms for the inters
 
 #### DHT Communication Protocols
 
-So far we have described the topological transformation between the agentic holding of state on a source chain into the shape of the shared data for making that state visible via the DHT. Additionally we have described an addressing scheme that makes data deterministically retreivable. Now we must describe the communication protocols that allow agents to come and go on the network while still maintaining the necessary data redundancy.
+So far we have described the topological transformation between the agentic holding of state on a source chain into the shape of the shared data for making that state visible via the DHT. Additionally we have described an addressing scheme that makes data deterministically retrievable. Now we must describe the communication protocols that allow agents to come and go on the network while still maintaining the necessary data redundancy.
 
 Peers conduct all communication with each other using **messages** of various classes and types. There are two levels of abstraction for messages; the lower level establishes peer connections in discrete **network spaces** and defines basic messages for maintaining DHT state and sending arbitrary application messages, while the higher level adapts these basic message types to implement Holochain-specific features.
 
@@ -429,7 +429,7 @@ These message types exist at the lower level.
         * **User** contains arbitrary, application-level data. Here, the application in question is Holochain rather than a specific hApp.
         * **AgentInfo** advertises an agent's current storage arc and network transport addresses.
         * **Publish** advertises that one or more DHT operations are available for retrieval. An arbitrary **context** value indicates the publishing context, which in practice is a bit field that indicates whether it's being published as part of a countersigning session and whether a validation receipt is needed.
-    * **DelegateBroadcast** sends a broadcast, but rather than expecting the receiver to do something with it, it expects them to broacast it in turn to the peers in their DHT neighborhood.
+    * **DelegateBroadcast** sends a broadcast, but rather than expecting the receiver to do something with it, it expects them to broadcast it in turn to the peers in their DHT neighborhood.
     * **FetchOp** requests the data for one or more DHT operations, usually as a follow-up from receiving a **Publish** broadcast message or **MissingOpHashes** gossip message advertising that such operations are available. While it is strictly a notify-class message, it functions similarly to a request-class message in that it anticipates a response in the form of a **PushOpData** message.
     * **PeerUnsolicited** is similar to **PeerQueryResp** below, but is initiated by a node without being prompted.
     * **PushOpData** sends the data for one or more DHT operations as a response to a **FetchOp** message. Each op optionally includes the quantized region it belongs to if it's being pushed as part of a historical sync.
@@ -488,7 +488,7 @@ Many factors contribute to a system's ability to live up to the varying safety a
 
 ### Cryptographic Object Capabilities
 
-To use a Holochain application, end-users must trigger zome calls that effect local state changes on their Source Chains.  Additionally, zome functions can make calls to other zome functions on remote nodes in the same application network, or to other cells runing on the same conductor. All of these calls must happen in the context of some kind of permissioning system. Holochain's security model for calls is based on the [Object-capability](https://en.wikipedia.org/wiki/Object-capability_model) security model, but augmented for a distributed cryptographic context in which we use cryptographic signatures to further prove the necessary agency for taking action and create an additional defense against undesired capability leakage.
+To use a Holochain application, end-users must trigger zome calls that effect local state changes on their Source Chains.  Additionally, zome functions can make calls to other zome functions on remote nodes in the same application network, or to other cells running on the same conductor. All of these calls must happen in the context of some kind of permissioning system. Holochain's security model for calls is based on the [Object-capability](https://en.wikipedia.org/wiki/Object-capability_model) security model, but augmented for a distributed cryptographic context in which we use cryptographic signatures to further prove the necessary agency for taking action and create an additional defense against undesired capability leakage.
 
 Access is thus mediated by Capability Grants of four types:
 
@@ -512,7 +512,7 @@ Each Warrant must be self-proving. It must flag the agent being warranted as a b
 Upon receipt of a Warrant, a node must take three actions:
 
 1. **Determine who is the bad actor.** For any Warrant, someone either performed a bad action, or someone created a false report of bad action. So a node must validate the referenced actions. If they fail validation, then the reported agent is the bad actor. If the actions pass validation, then the Warrant author is the bad actor.
-2. **Block the bad actor.** Add either the warranted agent or the Warrant author to the validating node's peer blocklist. This node will no longer interact with bad actor, and will reject any connection attempts from that agent.
+2. **Block the bad actor.** Add either the warranted agent or the Warrant author to the validating node's peer block list. This node will no longer interact with bad actor, and will reject any connection attempts from that agent.
 3. **Report it to the bad actor's Agent Activity Authorities.** Because nodes expect to be able to find out if an agent is warranted by asking its neighbors who validate its chain activity, those neighbors must be notified of any warrants.
 
 There is no global blocking of a bad actor. Each agent must confirm for themselves whom to block. Warrants and blocking, taken together, enable the network to defend itself from bad actors while preserving individual agency in the warranting process.

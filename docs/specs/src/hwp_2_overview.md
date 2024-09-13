@@ -8,7 +8,7 @@ People define the rules of a *Game* they want to play together. As *Players* joi
 
 [^chess]: You can think of this somewhat like correspondence chess, but with substantially more formality.
 
-The first requirement to create social coherence is ensuring that people are playing the same game; therefore, the very first record in every Agent's history is the rules of the game by which they agree to play. Obviously, Players are not in the same game or able to use the same Game Board if they don't start with the same ruleset. These rules are the actual computer code that is executed in running the Game, making moves and validating the Actions of all Players.
+The first requirement to create social coherence is ensuring that people are playing the same game; therefore, the very first record in every Agent's history is the rules of the game by which they agree to play. Obviously, Players are not in the same game or able to use the same Game Board if they don't start with the same rule set. These rules are the actual computer code that is executed in running the Game, making moves and validating the Actions of all Players.
 
 ## System Description
 
@@ -60,7 +60,7 @@ Actions have these properties:
 
 1. An Action has cryptographic provenance in that it is signed by the Agent that took the Action.
 
-2. Actions are Recorded in a monotonically temporally increasing hash-chain by the Agent that takes the Action. We refer to this as a hash-chain because each Action includes in it the hash of the previous Action, thus creating an untamperable Action history.
+2. Actions are Recorded in a monotonically temporally increasing hash-chain by the Agent that takes the Action. We refer to this as a hash-chain because each Action includes in it the hash of the previous Action, thus creating a tamper-proof Action history.
 
 3. Actions are addressed by the hash of the Action.
 
@@ -70,7 +70,7 @@ Actions have these properties:
 
     2. `AgentValidationPkg`: An action which presents an Agent's Membrane Proof, the data that proves that they have permission to join a Game.
 
-    3. `Create`: An Action for adding new Game-specific content. We call such content an Entry. The Entry may be declared as public, and will thus be published by the Agent to the network, or declared as private, in which case publishing is limited to just the Action data and not the content. Entries are addressed by their hash, and thus for Create Actions, this Entry hash is included in the Action. Thus sometimes the Action may be understood as "meta-data" where the Entry is understood as "data"[^headers]. Note that Actions and Entries are thus independently addressable and retreivable. This is a valuable property of the system. Note also that many actions (for example ones taken by different agents) may create the exact same Entry; e.g., a hash-tag may be its own entry but be created by different people.
+    3. `Create`: An Action for adding new Game-specific content. We call such content an Entry. The Entry may be declared as public, and will thus be published by the Agent to the network, or declared as private, in which case publishing is limited to just the Action data and not the content. Entries are addressed by their hash, and thus for Create Actions, this Entry hash is included in the Action. Thus sometimes the Action may be understood as "meta-data" where the Entry is understood as "data"[^headers]. Note that Actions and Entries are thus independently addressable and retrievable. This is a valuable property of the system. Note also that many actions (for example ones taken by different agents) may create the exact same Entry; e.g., a hash-tag may be its own entry but be created by different people.
 
     4. `Update`: An Action which adds new Game-specific content onto the chain that is intended to update an existing entry creation Action (either a Create or an Update).
 

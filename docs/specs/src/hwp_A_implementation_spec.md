@@ -18,13 +18,13 @@ Given the formal description from that document of our local state model (Source
 
 ## Ribosome: The Application "Virtual Machine"
 
-We use the term **Ribosome** to the name of part of the Holochain system that runs the DNA's application code. Abstractly, a Ribosome could be built for any programming language as long as it's possible to deterministically hash and run the code of the DNA's Integrity Zome such that all agents who possess the same hash can rely on the validation routines and structure desribed by that Integrity Zome operating identically for all. (In our implementation we use WebAssembly (WASM) for DNA code, and [Wasmer](https://wasmer.io/) as the runtime that executes it.)
+We use the term **Ribosome** to the name of part of the Holochain system that runs the DNA's application code. Abstractly, a Ribosome could be built for any programming language as long as it's possible to deterministically hash and run the code of the DNA's Integrity Zome such that all agents who possess the same hash can rely on the validation routines and structure described by that Integrity Zome operating identically for all. (In our implementation we use WebAssembly (WASM) for DNA code, and [Wasmer](https://wasmer.io/) as the runtime that executes it.)
 
 The Ribosome, as an application host, must expose a minimal set of functions to guest applications to allow them to access Holochain functionality, and it should expect that guest applications implement a minimal set of callbacks that allow the guest to define its entry types, link types, validation functions, and lifecycle hooks for both Integrity and Coordinator Zomes. We will call this set of provisions and expectations the Ribosome Host API.
 
 Additionally, it is advantageous to provide software development kits (SDKs) to facilitate the rapid development of Integrity and Coordinator Zomes that consume the Ribosome's host functions and provide the callbacks it expects.
 
-In our implementaion we provide SDKs for Integrity and Coordinator Zomes written in the [Rust programming language](https://rust-lang.org) as Rust crates: the [Holochain Deterministic Integrity (HDI) crate](https://docs.rs/hdi/) facilitates the development of Integrity Zomes, while the [Holochain Development Kit (HDK) crate](https://docs.rs/hdk/) facilitates the development of Coordinator Zomes.
+In our implementation we provide SDKs for Integrity and Coordinator Zomes written in the [Rust programming language](https://rust-lang.org) as Rust crates: the [Holochain Deterministic Integrity (HDI) crate](https://docs.rs/hdi/) facilitates the development of Integrity Zomes, while the [Holochain Development Kit (HDK) crate](https://docs.rs/hdk/) facilitates the development of Coordinator Zomes.
 
 ### Ribosome/Zome Interop ABI
 
@@ -64,7 +64,7 @@ enum WasmErrorInner {
 
 The type `Result<T, WasmError>` is aliased to `ExternResult<T>` for convenience, and will be referred to as such in examples below.
 
-Our implmementation provides a `wasm_error!` macro for the guest that simplifies the construction of an error result with the correct file and line number, along with a `WasmErrorInner::Guest` containing an application-defined error string.
+Our implementation provides a `wasm_error!` macro for the guest that simplifies the construction of an error result with the correct file and line number, along with a `WasmErrorInner::Guest` containing an application-defined error string.
 
 Our implementation also provides various macros to abstract over the mechanics of this process, wrapping host functions and guest callbacks, automatically performing the work of retrieving/deserializing and serializing/storing input and output data, and presenting more ergonomic function signatures (in the case of host functions) or allowing application developers to write more ergonomic function signatures (in the case of guest functions). In particular, the `#[hdk_extern]` procedural macro, when applied to a guest function, handles the conversion of the bytes stored in the memory to a map of arguments, passes those arguments, and handles the conversion of the return value to bytes stored in memory.
 
@@ -93,7 +93,7 @@ State changes in a scratch space MUST be committed atomically to the source chai
 
 ### HDI
 
-The Holochain Deterministic Integrity (HDI) component of the Holochain architecture comprises the functions and capacities that are made available to app aevelopers for building their Integrity Zomes.
+The Holochain Deterministic Integrity (HDI) component of the Holochain architecture comprises the functions and capacities that are made available to app developers for building their Integrity Zomes.
 
 **Integrity Zomes** provide the immutable portion of the app's code that:
 
@@ -132,7 +132,7 @@ where T: serde::Serialize {
 struct Signature([u8; 64]);
 ```
 
-Implementation detail: Theoretically all actions could point via a hash to an entry that would contain the "content" of that action. But because many of the different actions entries are system-defined, and they thus have a known structure, we can reduce unnecessary data elements and gossip by embedding the entry data for system-defined entry types right in the action itself. However, for application-defined entry types, because the structure of the entry is not known at compile time for Holochain, the entry data must be in a separate data structure. Additionally there are a few system entry types (see below) that must be independantly retrieveable from the DHT, and thus have their own separate system-defined variant of the `Entry` enum type.
+Implementation detail: Theoretically all actions could point via a hash to an entry that would contain the "content" of that action. But because many of the different actions entries are system-defined, and they thus have a known structure, we can reduce unnecessary data elements and gossip by embedding the entry data for system-defined entry types right in the action itself. However, for application-defined entry types, because the structure of the entry is not known at compile time for Holochain, the entry data must be in a separate data structure. Additionally there are a few system entry types (see below) that must be independently retrievable from the DHT, and thus have their own separate system-defined variant of the `Entry` enum type.
 
 The action types and their additional data fields necessary are:
 
@@ -165,10 +165,10 @@ The action types and their additional data fields necessary are:
         entry_hash: EntryHash,
     }
 
-    // See the section on Entries for the defintion of `EntryType`.
+    // See the section on Entries for the definition of `EntryType`.
     ```
 
-* `Update`: Mark an existing entry and its creation action as updated by itself. In addition to referencing the new entyr, the action data points to the old action and its entry. As this is an entry creation action like `Create`, it shares many of the same fields.
+* `Update`: Mark an existing entry and its creation action as updated by itself. In addition to referencing the new entry, the action data points to the old action and its entry. As this is an entry creation action like `Create`, it shares many of the same fields.
 
     ```rust
     struct Update {
@@ -290,7 +290,7 @@ enum Entry {
     }
     ```
 
-    Its entry data can be of either `Entry::App` or `Entry::CounterSign`, where the inner data is an aribtrary vector of bytes (typically a serialized data structure). If the data is `Entry::CounterSign`, the bytes are accompanied by a struct that gives the details of the countersigning session (this struct will be dealt with in the section on countersigning).
+    Its entry data can be of either `Entry::App` or `Entry::CounterSign`, where the inner data is an arbitrary vector of bytes (typically a serialized data structure). If the data is `Entry::CounterSign`, the bytes are accompanied by a struct that gives the details of the countersigning session (this struct will be dealt with in the section on countersigning).
 
     Note that in both these cases the data is stored using a serialization that is declared by the `entry_defs()` function of the HDI.
 
@@ -376,7 +376,7 @@ Comparing this structure to a Resource Description Framework (RDF) triple:
 
 ##### The `Op` Data Type
 
-The `Op` types that hold the chain entry transform data that is published to different portions of the DHT (formally described in [section four](hwp_4_formal.md#graph-transformation)) are listed below. The integrity zome defines a validation callback for the entry and link types it defines, and is called with an `Op` enum variant as its single paramater, which indicates the DHT perspective from which to validate the data. Each variant holds a struct containing the DHT operation payload:
+The `Op` types that hold the chain entry transform data that is published to different portions of the DHT (formally described in [section four](hwp_4_formal.md#graph-transformation)) are listed below. The integrity zome defines a validation callback for the entry and link types it defines, and is called with an `Op` enum variant as its single parameter, which indicates the DHT perspective from which to validate the data. Each variant holds a struct containing the DHT operation payload:
 
 * `StoreRecord`: executed by the record (action) authorities to store data. It contains the record to be validated, including the entry if it is public.
 
@@ -608,7 +608,7 @@ Note: `properties` consists of known application-specified data that is specifie
 
 The HDI MUST implement a function that validation code can use to verify cryptographic signatures:
 
-* `verify_signature<I>(AgentPubKey, Signature, I) -> ExternResult<bool> where I: Serialize`: Checks the validity of a signature (a `Vec<u8>` of bytes) upon the data it signs (any type that implements the `Serialize` trait, allowing it to be reproducibly converted into a vector of bytesa, gainst the public key of the agent that is claimed to have signed it.
+* `verify_signature<I>(AgentPubKey, Signature, I) -> ExternResult<bool> where I: Serialize`: Checks the validity of a signature (a `Vec<u8>` of bytes) upon the data it signs (any type that implements the `Serialize` trait, allowing it to be reproducibly converted into a vector of bytes, against the public key of the agent that is claimed to have signed it.
 
 ### HDK
 
@@ -638,7 +638,7 @@ If the return value of at least one `init` callback is `UnresolvedDependencies`,
 
 The HDK MUST allow application developers to define and expose functions in their Coordinator Zomes with arbitrary names, input payloads, and return payloads that serve as the application's API. While the content of the return payload of these functions may be arbitrary data, it MUST be wrapped in a `Result<T, WasmError>`, where `T` is the return payload.
 
-As function calls across the host/guest interface only deal with arbitrary bytes stored in memory address ranges, the HDK SHOULD provide an abstraction to allow developers to define functions in a more natural manner, with typed input and return payloads. We have provided a `#[hdk_extern]` prodecural macro that facilitates this abstraction, wrapping the following function definition with the necessary machinery to load and deserialize the input data and serialize and store the return data.
+As function calls across the host/guest interface only deal with arbitrary bytes stored in memory address ranges, the HDK SHOULD provide an abstraction to allow developers to define functions in a more natural manner, with typed input and return payloads. We have provided a `#[hdk_extern]` procedural macro that facilitates this abstraction, wrapping the following function definition with the necessary machinery to load and deserialize the input data and serialize and store the return data.
 
 The Conductor MUST also receive calls to these zome functions, enforce capability restrictions, dispatch the call to the correct WASM module, and handle side effects, error conditions, and the called function's return value. These calls MAY come from external clients, other zomes in the same cell, other cells in the same application, or other agents in the same DHT.
 
@@ -681,7 +681,7 @@ The HDK MUST implement the following functions that create source chain entries:
 
     The `EntryVisibility` parameter specifies whether the entry is private or should be published to the DHT, and the `ChainTopOrdering` parameter specifies whether the call should fail if some other zome call with chain creation actions completes before this one, or whether it's ok to automatically replay the re-write the action on top of any such chain entries.
 
-    In our implementation, the `create` function accepts any value that can be converted to a `CreateInput`, allowing most of these fields to be populated by data that was generated by the `#[hdk_entry_types]` amcro and other helpers. This is accompanied by convenience functions for `create` that accept app entries, capability grants, or capability claims.
+    In our implementation, the `create` function accepts any value that can be converted to a `CreateInput`, allowing most of these fields to be populated by data that was generated by the `#[hdk_entry_types]` macro and other helpers. This is accompanied by convenience functions for `create` that accept app entries, capability grants, or capability claims.
 
 * `update(UpdateInput) -> ExternResult<ActionHash>`: Records the marking of an existing entry and its creation action as updated. Requires the `ActionHash` that created the original entry to be provided. The `UpdateInput` parameter is defined as:
 
@@ -732,7 +732,7 @@ The HDK MUST implement the following functions that create source chain entries:
     }
     ```
 
-#### Capabilites Management
+#### Capabilities Management
 
 The HDK includes convenience functions over `create`, `update`, and `delete` for operating on capability grants and claims:
 
@@ -817,7 +817,7 @@ It is the application's responsibility to retrieve a stored capability claim usi
         // All `StoreEntry` operations associated with the entry are invalid.
         Rejected,
         // All attempts to validate all `StoreEntry` operations associated with
-        // the entry hvae been abandoned.
+        // the entry have been abandoned.
         Abandoned,
         // All entry creation actions associated with the entry have been
         // withdrawn their authors.
@@ -1216,7 +1216,7 @@ The HDK MUST provide mechanisms for agents to sign and check the signatures of d
 
 * `x_salsa20_poly1305_decrypt(XSalsa20Poly1305KeyRef, XSalsa20Poly1305EncryptedData) -> ExternResult<Option<Vec<u8>>`: Given a reference to a symmetric encryption key, request the decryption of the given bytes with the key.
 
-* `create_x25519_keypair() -> ExternResult<X25519PubKey>`: Create an X25519 keypair suitable for encrypting and decryptiong messages using NaCl's [box](https://nacl.cr.yp.to/box.html) algorithm, and store it in the key-management service. The return value is defined as:
+* `create_x25519_keypair() -> ExternResult<X25519PubKey>`: Create an X25519 key pair suitable for encrypting and decrypting messages using NaCl's [box](https://nacl.cr.yp.to/box.html) algorithm, and store it in the key-management service. The return value is defined as:
 
     ```rust
     struct X25519PubKey([u8; 32]);
@@ -1228,7 +1228,7 @@ The HDK MUST provide mechanisms for agents to sign and check the signatures of d
 
 * `ed_25519_x_salsa20_poly1305_encrypt(AgentPubKey, AgentPubKey, XSalsa20Poly1305Data) -> ExternResult<XSalsa20Poly1305EncryptedData>`: Attempt to encrypt a message using the box algorithm, converting the Ed25519 signing keys of the sender and recipient agents into X25519 encryption keys. This procedure is [not recommended](https://doc.libsodium.org/quickstart#how-can-i-sign-and-encrypt-using-the-same-key-pair) by the developers of libsodium, the NaCl implementation used by Holochain.
 
-* `ed_25519_x_salsa20_poly1305_decrypt(AgentHash, AgentHash, XSalsa20Poly1305EncryptedData) -> ExternResult<XSalsa20Poly1305Data>`: Attempt to decrypt a message using the box algorithm, converting the Ed25519 signing keys of the receipient and sender agents into X22519 encryption keys. This procedure is [not recommended](https://doc.libsodium.org/quickstart#how-can-i-sign-and-encrypt-using-the-same-key-pair) by the developers of libsodium, the NaCl implementation used by Holochain.
+* `ed_25519_x_salsa20_poly1305_decrypt(AgentHash, AgentHash, XSalsa20Poly1305EncryptedData) -> ExternResult<XSalsa20Poly1305Data>`: Attempt to decrypt a message using the box algorithm, converting the Ed25519 signing keys of the recipient and sender agents into X22519 encryption keys. This procedure is [not recommended](https://doc.libsodium.org/quickstart#how-can-i-sign-and-encrypt-using-the-same-key-pair) by the developers of libsodium, the NaCl implementation used by Holochain.
 
 #### User Notification
 
@@ -1238,7 +1238,7 @@ The HDK SHOULD provide a way for zome code to notify the application user of eve
 
 #### Anchors and Paths
 
-A content-addressable store, accessible only by the hashes of stored items, is difficult to search beacuse of the sparse nature of the hashes. Holochain's graph DHT makes it much easier to retrieve related information via the affordance of links that can be retrieved from a given hash address. A powerful pattern that can be built on top of links is what we call anchors and, more generally, paths. These patterns rely on the idea of starting from a known hash value that all parties can compute, and placing links from that hash to relevant entries. So, for example, one could take the hash of the string `#funnycats` and add links on that hash to all posts in a social media app that contain that hashtag. This pattern, the anchor pattern, affords the discovery of arbitray collections or indexes of content-addressed data. The path pattern simply generalizes this to creating an aribrary hierarchical tree of known values off of which to create links in the DHT.
+A content-addressable store, accessible only by the hashes of stored items, is difficult to search because of the sparse nature of the hashes. Holochain's graph DHT makes it much easier to retrieve related information via the affordance of links that can be retrieved from a given hash address. A powerful pattern that can be built on top of links is what we call anchors and, more generally, paths. These patterns rely on the idea of starting from a known hash value that all parties can compute, and placing links from that hash to relevant entries. So, for example, one could take the hash of the string `#funnycats` and add links on that hash to all posts in a social media app that contain that hashtag. This pattern, the anchor pattern, affords the discovery of arbitrary collections or indexes of content-addressed data. The path pattern simply generalizes this to creating an arbitrary hierarchical tree of known values off of which to create links in the DHT.
 
 A note about efficiency: Because every attempt to create an entry or link results in another record that needs to be validated and stored, implementations of this pattern SHOULD attempt to be idempotent when creating anchors or tags; that is, they should check for the prior existence of the links and entries that would be created before attempting to create them. It is both semantically and practically appropriate to hash the anchor or path string in-memory and wrap it in an `ExternalHash` for link bases and targets, as this avoids the the overhead of creating an entry, and the hash, which exists only in memory, can truly be said to be external to the DHT.
 
@@ -2042,9 +2042,9 @@ publish
 
 ### Low-Level Networking (Kitsune P2P)
 
-Kitsune is a P2P library for implementing distributed application messaging needs that delivers dynamic peer address discovery and message routing. It also delivers the necessary affordances for distributed applications to implement sharded DHTs as a content-addressible store, as it groups its messages into `KitsuneSpace`s (which correspond to Holochain's DNA addresses) and `KitsuneAgent`s which are, as in Holochain, the public keys of the agents participating in the space. Kitsune handles the mapping of the `KitsuneAgent` address space to network transport addresses.
+Kitsune is a P2P library for implementing distributed application messaging needs that delivers dynamic peer address discovery and message routing. It also delivers the necessary affordances for distributed applications to implement sharded DHTs as a content-addressable store, as it groups its messages into `KitsuneSpace`s (which correspond to Holochain's DNA addresses) and `KitsuneAgent`s which are, as in Holochain, the public keys of the agents participating in the space. Kitsune handles the mapping of the `KitsuneAgent` address space to network transport addresses.
 
-Kitsune assumes an "implementor" that defines its own higher-level custom message types, and manages persistent storage, and handles key management and message signing. Kitsune sends events to the implementor to retrieve data, and receives messages from the implementor to be delivered to other kitsune nodes.
+Kitsune assumes an "implementor" that defines its own higher-level custom message types, and manages persistent storage, and handles key management and message signing. Kitsune sends events to the implementor to retrieve data, and receives messages from the implementor to be delivered to other Kitsune nodes.
 
 Thus, Holochain implements both its node-to-node messaging and its graph DHT on top of the capabilities provided by Kitsune.
 
@@ -2187,7 +2187,7 @@ These are the message types that MUST be implemented. They are all defined as va
 
         The `mod_cnt` and `mod_idx` fields fields define the scope of the broadcast. Receivers MUST modulo the network locations of candidate authorities in their own peer tables by `mod_cnt`, only re-broadcasting to a peer if the modulo matches `mod_idx`. This avoids two nodes sending the same broadcast message to the same peer.
 
-        The `data` argument is the data to be psased on to the neighborhood, and is defined above under `Broadcast`.
+        The `data` argument is the data to be passed on to the neighborhood, and is defined above under `Broadcast`.
 
 * `Gossip`: Negotiate gossiping of DHT transforms, with an opaque data block to be interpreted by a gossip implementation.
 
@@ -2256,7 +2256,7 @@ These are the message types that MUST be implemented. They are all defined as va
         }
         ```
 
-* `PeerUnsolicited`: Send peer information without being asked to. Notably, a node may want to send their own peer info to prevent being inadvertantly blocked.
+* `PeerUnsolicited`: Send peer information without being asked to. Notably, a node may want to send their own peer info to prevent being inadvertently blocked.
 
     * **Payload**: The payload is defined as:
 
@@ -2333,12 +2333,12 @@ Kitsune MUST provide a way for the DHT data to be gossiped among peers in a spac
 
 Any gossip algorithm to be used in the Holochain context MUST be able to handle the following constraints:
 
-1. A new node coming on to the network, or one returning to the network after a significant changes have occured on the DHT, SHOULD be able to quickly but incrementally synchronize to a state of holding the correct data that it is deemed to be an authority for, while balancing bandwidth limitations of the network it is part of. This requires that the system be resilient to asymmetric upload and download speeds that will vary accross peers, and indicates that nodes that believe they are out of sync with their peers release their authority, and incrementally and conservatively increase it.
+1. A new node coming on to the network, or one returning to the network after a significant changes have occurred on the DHT, SHOULD be able to quickly but incrementally synchronize to a state of holding the correct data that it is deemed to be an authority for, while balancing bandwidth limitations of the network it is part of. This requires that the system be resilient to asymmetric upload and download speeds that will vary across peers, and indicates that nodes that believe they are out of sync with their peers release their authority, and incrementally and conservatively increase it.
 2. Gossiping SHOULD minimize total consumed resources; e.g., by re-transmitting as little data as possible, dynamically adjusting gossip round frequency to levels of activity in the network, or backing off gossip when a peer exhibits backpressure.
 3. Gossip SHOULD prioritize the synchronization of data that is more likely to be in demand; for many common application scenarios, this means that more recently published data should be synchronized sooner and more frequently.
 4. Gossip SHOULD dynamically adapt to changing realities of authority coverage for all basis hashes by communicating individual peer coverage regularly, allowing nodes with sufficient excess capacity to assume greater coverage to compensate for regions with poor coverage, either because peers go offline or their excess capacity is limited.
 
-We have developed a hybrid gossip implementation that separates DHT transforms into "recent" and "historical", with recent gossip using a Bloom filter and historical gossip using a novel "quantized gossip" algorithm that effeciently shards and redistributes data as nodes come and go on the network. While the full description of that implementation is beyond the scope of this document, we will document the messages that nodes pass:
+We have developed a hybrid gossip implementation that separates DHT transforms into "recent" and "historical", with recent gossip using a Bloom filter and historical gossip using a novel "quantized gossip" algorithm that efficiently shards and redistributes data as nodes come and go on the network. While the full description of that implementation is beyond the scope of this document, we will document the messages that nodes pass:
 
 * `Initiate`: Propose a gossip round, specifying one or more arcs of the location space for which the initiator is an authority.
 
@@ -2486,7 +2486,7 @@ We have developed a hybrid gossip implementation that separates DHT transforms i
 
 ## The Conductor
 
-A Holochain Conductor manages runing Holochain applications, which consist of logically related DNAs operating under a single agency. Thus a conductor MUST be able to interpret an application bundle format and instantiate Cells from that format. The bundle format SHOULD store its manifests in a readable format such as YAML, and SHOULD be capable of storing arbitrary resources as streams of bytes. Additionally a Conductor SHOULD cache DNA definitions and WASMs provided (along with WASM instructions compiled to machine instructions, if supported by the architecture) so as to decrease installation time of other instances of the same DNA and not store multiple copies of the same DNA.
+A Holochain Conductor manages running Holochain applications, which consist of logically related DNAs operating under a single agency. Thus a conductor MUST be able to interpret an application bundle format and instantiate Cells from that format. The bundle format SHOULD store its manifests in a readable format such as YAML, and SHOULD be capable of storing arbitrary resources as streams of bytes. Additionally a Conductor SHOULD cache DNA definitions and WASMs provided (along with WASM instructions compiled to machine instructions, if supported by the architecture) so as to decrease installation time of other instances of the same DNA and not store multiple copies of the same DNA.
 
 ### Bundle Formats
 
@@ -2592,7 +2592,7 @@ struct AppRoleManifest {
     // * this role,
     // * the DNA which fills it,
     // * and the cell(s) created from that DNA
-    name: Rolename,
+    name: RoleName,
 
     // Determines if, how, and when a Cell will be provisioned.
     provisioning: Option<CellProvisioning>,
@@ -2669,7 +2669,7 @@ Both response enums MUST define an `Error(e)` variant to communicate error condi
 enum ExternalApiWireError {
     // Any internal error.
     InternalError(String),
-    // The input to the API failed to deseralize.
+    // The input to the API failed to deserialize.
     Deserialization(String),
     // The DNA path provided was invalid.
     DnaReadError(String),
@@ -2798,7 +2798,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
         }
         ```
 
-    * **Return Value**: The returned value MUST contain the `AppInfo` data structure (which is also retreivable after installation via the `GetAppInfo` API), and is defined as:
+    * **Return Value**: The returned value MUST contain the `AppInfo` data structure (which is also retrievable after installation via the `GetAppInfo` API), and is defined as:
 
         ```rust
         struct AppInfo {
@@ -2994,7 +2994,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
     * `DumpNetworkMetrics { dna_hash: Option<DnaHash> } -> NetworkMetricsDumped(String)`: Dump the network metrics tracked by Kitsune.
         * **Arguments**: If the `dna_hash` argument is supplied, the call MUST limit the metrics dumped to a single DNA hash space.
 
-    * `DumpNetworkStats -> NetwokrStatsDumped(String)`: Dump network statistics from the back-end networking library. This library operates on a lower level than Kitsune and Holochain P2P, translating the P2P messages into protocol communications in a form appropriate for the physical layer. Our implementation currently includes a WebRTC library.
+    * `DumpNetworkStats -> NetworkStatsDumped(String)`: Dump network statistics from the back-end networking library. This library operates on a lower level than Kitsune and Holochain P2P, translating the P2P messages into protocol communications in a form appropriate for the physical layer. Our implementation currently includes a WebRTC library.
 
 * `AddAgentInfo { agent_infos: Vec<AgentInfoSigned> } -> AgentInfoAdded`: Add a list of agents to this conductor's peer store.
     * **Notes**: Implementations MAY implement this function. It is intended as a way of shortcutting peer discovery and is useful for testing. It is also intended for use cases in which it is important for agent existence to be transmitted out-of-band.
@@ -3119,7 +3119,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
 enum ExternalApiWireError {
     // Any internal error.
     InternalError(String),
-    // The input to the API failed to deseralize.
+    // The input to the API failed to deserialize.
     Deserialization(String),
     // The DNA path provided was invalid.
     DnaReadError(String),
@@ -3134,7 +3134,7 @@ enum ExternalApiWireError {
 }
 ```
 
-* `GetAppInfo -> AppInfoReturned(Option<AppInfo>)`: Get info about the app, including info about each cell instantiated by this app. See above for the defintion of `AppInfo`.
+* `GetAppInfo -> AppInfoReturned(Option<AppInfo>)`: Get info about the app, including info about each cell instantiated by this app. See above for the definition of `AppInfo`.
 
 * `CallZome(ZomeCall) -> ZomeCalled(ExternIO)`: Call a zome function.
     * **Notes**: Implementations MUST enforce a valid capability for the function being called. This means that if the function is covered by a transferrable or assigned grant, the secret MUST be provided and valid; and if the function is covered by an assigned grant, the provenance MUST be valid. Regardless of the grant's access type, implementations MUST enforce that the provided signature matches the provided provenance. Implementations also MUST prevent replay attacks by rejecting a call that supplies a nonce that has been seen before or an expiry timestamp that has passed. Finally, the provenance (source) of the call MUST match the signature.
@@ -3206,7 +3206,7 @@ enum ExternalApiWireError {
         ```
 
 * `DisableCloneCell(DisableCloneCellPayload) -> CloneCellDisabled`: Disable a clone cell.
-    * **Notes:** When the clone cell exists, it is disabled, after which any zome calls made to the cell MUST fail and functions scheduled by the cell MUST be descheduled. Additionally, any API calls that return `AppInfo` should show a disabled status for the given cell. If the cell doesn't exist or is already disabled, the call MUST be treated as a no-op. Deleting a cloned cell can only be done from the Admin API, and cells MUST be disabled before they can be deleted.
+    * **Notes:** When the clone cell exists, it is disabled, after which any zome calls made to the cell MUST fail and functions scheduled by the cell MUST be unscheduled. Additionally, any API calls that return `AppInfo` should show a disabled status for the given cell. If the cell doesn't exist or is already disabled, the call MUST be treated as a no-op. Deleting a cloned cell can only be done from the Admin API, and cells MUST be disabled before they can be deleted.
     * **Arguments**: The payload is defined as:
 
         ```rust
@@ -3261,7 +3261,7 @@ enum ExternalApiWireError {
 
 * `ListWasmHostFunctions -> ListWasmHostFunctions(Vec<String>)`: List all the host functions supported by this conductor and callable by WASM guests.
 
-* `ProvideMembraneProofs(HashMap<Rolename, MembraneProof) -> Ok`: Provide the deferred membrane proofs that the app is awaiting.
+* `ProvideMembraneProofs(HashMap<RoleName, MembraneProof) -> Ok`: Provide the deferred membrane proofs that the app is awaiting.
     * **Arguments**: The input is supplied as a mapping of role names to the corresponding membrane proofs.
     * **Return value**: Implementations MUST return `AppResponse::Error` with an informative message if the application is already enabled.
 

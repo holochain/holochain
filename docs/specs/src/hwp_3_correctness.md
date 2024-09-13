@@ -1,4 +1,3 @@
-
 # System Correctness: Confidence
 
 In the frame of the Byzantine Generals Problem, the correctness of a distributed coordination system is analyzed through the lens of "fault tolerance". In our frame we take on a broader scope and address the question of the many kinds of confidence necessary for a system's adoption and continued use. We identify and address the following dimensions of confidence:
@@ -124,7 +123,7 @@ This whole category of attack starts from the assumption that consensus is requi
 
 #### Sybil Attacks
 
-Since Holochain does not rely on any kind of majority consensus, it is already less vulnerable to Sybil Attacks, the creation of many fake colluding accounts which are typically used to overwhelm consensus of honest agents. And since Holochain enables "1 of N" and even "0 of N" trust models, Sybils cannot entirely overwhem honest agents' ability to determine the validity of data.
+Since Holochain does not rely on any kind of majority consensus, it is already less vulnerable to Sybil Attacks, the creation of many fake colluding accounts which are typically used to overwhelm consensus of honest agents. And since Holochain enables "1 of N" and even "0 of N" trust models, Sybils cannot entirely overwhelm honest agents' ability to determine the validity of data.
 
 Additionally, since Holochain is a heterogeneous environment in which every app operates on its own isolated network, a Sybil Attack can only be attempted on a single app's network at a time. For each app, an appropriate membrane can be defined on a spectrum from very open and permissive to closed and strict by defining validation rules on a Membrane Proof.
 
@@ -142,11 +141,11 @@ Holochain is not systemically subject to denial-of-service attacks because there
 
 #### Eclipse Attacks
 
-An Eclipse Attack happens when a newly joining node is prevented from ever joining the main/honest networkbecause it initially connects to a dishonest node which only ever shares information about other colluding dishonest nodes. This attack is specific to gossip-based peer-to-peer networks such as Bitcoin, Holochain, and DHTs like IPFS.
+An Eclipse Attack happens when a newly joining node is prevented from ever joining the main/honest network because it initially connects to a dishonest node which only ever shares information about other colluding dishonest nodes. This attack is specific to gossip-based peer-to-peer networks such as Bitcoin, Holochain, and DHTs like IPFS.
 
 Holochain apps bypass the risk of an Eclipse Attacks by providing an address for a bootstrap service which ensures your first connection is to a trusted or honest peer. If an application fails to provide a bootstrap service, nodes will try connecting via https://bootstrap.holochain.org which provides initial trusted peers, if those have been specified. If not specified, the default bootstrap service provides random access to any and all peers using the app, which at least ensures nodes cannot be partitioned from honest peers.
 
-Application developers can take steps to further protect their users by providing in-app methods of exchanging signed pings with known nodes (such as a progenetor, migrator, notary, witness, or initial admin node) so a node can ensure it is not partitioned from the real network.
+Application developers can take steps to further protect their users by providing in-app methods of exchanging signed pings with known nodes (such as a progenitor, migrator, notary, witness, or initial admin node) so a node can ensure it is not partitioned from the real network.
 
 ### Human​ ​Error
 
