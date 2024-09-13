@@ -57,29 +57,6 @@ pub fn generate(
     Ok(dir)
 }
 
-/// Generate a new sandbox from a full config.
-pub fn generate_with_config(
-    config: Option<ConductorConfig>,
-    root: Option<PathBuf>,
-    directory: Option<PathBuf>,
-) -> anyhow::Result<ConfigRootPath> {
-    let (dir, con_url) = generate_directory(root, directory, true)?;
-    let config = match config {
-        Some(config) => config,
-        None => {
-            let mut config = create_config(dir.clone(), con_url.clone())?;
-            config.keystore = KeystoreConfig::LairServer {
-                connection_url: con_url.expect(
-                    "Lair should have been initialised but did not get a connection URL for it",
-                ),
-            };
-            config
-        }
-    };
-    write_config(dir.clone(), &config);
-    Ok(dir)
-}
-
 /// Generate a new directory structure for a sandbox.
 pub fn generate_directory(
     root: Option<PathBuf>,
