@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{ArgAction, Parser};
+use clap::Parser;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::TransportConfig;
 use url2::Url2;
@@ -40,14 +40,10 @@ pub struct Create {
     #[arg(long)]
     pub in_process_lair: bool,
 
-    /// Launch Holochain with the DPKI service disabled.
-    #[arg(long, action = ArgAction::SetFalse)]
-    pub no_dpki: bool,
-
-    /// Set the conductor config CHC (Chain Head Coordinator) URL
-    #[cfg(feature = "chc")]
-    #[arg(long, value_parser=try_parse_url2)]
-    pub chc_url: Option<Url2>,
+    /// Copy the config at the given path into the new sandbox.
+    /// If not specified, a default config will be generated.
+    #[arg(short, long)]
+    pub config_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Parser, Clone)]
@@ -291,9 +287,7 @@ impl Default for Create {
             root: None,
             directories: Vec::with_capacity(0),
             in_process_lair: false,
-            no_dpki: false,
-            #[cfg(feature = "chc")]
-            chc_url: None,
+            config_path: None,
         }
     }
 }

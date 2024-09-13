@@ -199,9 +199,7 @@ impl HcSandbox {
                 root,
                 directories,
                 in_process_lair,
-                no_dpki,
-                #[cfg(feature = "chc")]
-                chc_url,
+                config_path,
             }) => {
                 let mut paths = Vec::with_capacity(num_sandboxes);
                 msg!(
@@ -215,9 +213,7 @@ impl HcSandbox {
                         root.clone(),
                         directories.get(i).cloned(),
                         in_process_lair,
-                        no_dpki,
-                        #[cfg(feature = "chc")]
-                        chc_url.clone(),
+                        config_path.clone(),
                     )?;
                     paths.push(path);
                 }

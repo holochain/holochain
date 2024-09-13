@@ -2,10 +2,10 @@
 
 use std::path::PathBuf;
 
+use holochain_conductor_api::conductor::paths::ConfigFilePath;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::conductor::paths::KeystorePath;
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
@@ -24,23 +24,23 @@ pub fn generate(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
     in_process_lair: bool,
-    no_dpki: bool,
-    #[cfg(feature = "chc")] chc_url: Option<url2::Url2>,
+    config_path: Option<PathBuf>,
 ) -> anyhow::Result<ConfigRootPath> {
     let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
-    let mut config = create_config(dir.clone(), con_url)?;
-    config.network = network.unwrap_or_default();
-    #[cfg(feature = "chc")]
-    {
-        config.chc_url = chc_url;
-    }
-    if no_dpki {
-        config.dpki = DpkiConfig::disabled();
-    }
-    random_admin_port(&mut config);
-    let path = write_config(dir.clone(), &config);
-    msg!("Config {:?}", config);
+    let path = if let Some(path) = config_path {
+        let config_root_path: ConfigRootPath = dir.clone();
+        let config_file_path = ConfigFilePath::from(config_root_path);
+        std::fs::copy(path, config_file_path.as_ref())?;
+        config_file_path
+    } else {
+        let mut config = create_config(dir.clone(), con_url)?;
+        config.network = network.unwrap_or_default();
+        random_admin_port(&mut config);
+        msg!("Config {:?}", config);
+        write_config(dir.clone(), &config)
+    };
+
     msg!(
         "Created directory at: {} {} It has also been saved to a file called `.hc` in your current working directory.",
         ansi_term::Style::new()
