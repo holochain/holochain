@@ -291,7 +291,6 @@ impl SourceChain {
 
         self.vault
             .read_async({
-                let now = now.clone();
                 let author = author.clone();
                 move |txn| {
                     let chain_lock = get_chain_lock(&txn, author.as_ref())?;
