@@ -14,6 +14,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240912.222358
+
+## [hcterm-0.4.0-dev.24](crates/hcterm/CHANGELOG.md#0.4.0-dev.24)
+
+## [holochain\_cli-0.4.0-dev.24](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.24)
+
+## [holochain-0.4.0-dev.24](crates/holochain/CHANGELOG.md#0.4.0-dev.24)
+
+- Add `danger_generate_throwaway_device_seed` to allow creation and use of a random device seed for test situations, where a proper device seed is not needed. \#4238
+- Add `allow_throwaway_random_dpki_agent_key` to allow creation of a random (unrecoverable) DPKI agent when a device seed is not specified. \#4238
+- Fixes issue \#3679 where websocket connections would be closed if a message was received that failed to deserialize. The new behaviour isn’t perfect because you will get a timeout instead, but the websocket will remain open and you can continue to send further valid message. There is another issue to track partial deserialization \#4251 so we can respond with an error message instead of a timeout. \#4252
+
+## [holochain\_cli\_sandbox-0.4.0-dev.24](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.24)
+
+## [holochain\_cascade-0.4.0-dev.24](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.24)
+
+## [holochain\_conductor\_api-0.4.0-dev.24](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.24)
+
+## [holochain\_conductor\_services-0.3.0-dev.24](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.24)
+
+## [holochain\_state-0.4.0-dev.24](crates/holochain_state/CHANGELOG.md#0.4.0-dev.24)
+
+## [holochain\_p2p-0.4.0-dev.24](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.24)
+
+## [holochain\_chc-0.1.0-dev.4](crates/holochain_chc/CHANGELOG.md#0.1.0-dev.4)
+
 # 20240911.004238
 
 - Added an optional `chc_url` cli argument to `holochain_cli_sandbox`
