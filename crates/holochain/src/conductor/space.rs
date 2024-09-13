@@ -115,9 +115,6 @@ pub struct Space {
     /// Witnessing workspace that is shared across this cell.
     pub witnessing_workspace: WitnessingWorkspace,
 
-    /// Witnessing workspace that is shared across this cell.
-    pub witnessing_workspace: WitnessingWorkspace,
-
     /// Incoming op hashes that are queued for processing.
     pub incoming_op_hashes: IncomingOpHashes,
 

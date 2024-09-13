@@ -23,10 +23,11 @@ pub async fn accept_countersigning_request(
         DnaHash::from_raw_36(space.dna_hash.get_raw_36().to_vec()),
         author.clone(),
     );
-    let workspace = {
-        let guard = space.countersigning_workspaces.lock();
-        guard.get(&cell_id).cloned()
-    };
+    let workspace = space
+        .countersigning_workspaces
+        .lock()
+        .get(&cell_id)
+        .cloned();
 
     if workspace.is_none() {
         tracing::warn!(

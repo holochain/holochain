@@ -66,6 +66,19 @@ pub enum CountersigningSessionState {
 }
 
 impl CountersigningSessionState {
+    /// Get preflight request of the countersigning session.
+    pub fn preflight_request(&self) -> &PreflightRequest {
+        match self {
+            CountersigningSessionState::Accepted(preflight_request) => preflight_request,
+            CountersigningSessionState::SignaturesCollected {
+                preflight_request, ..
+            } => preflight_request,
+            CountersigningSessionState::Unknown {
+                preflight_request, ..
+            } => preflight_request,
+        }
+    }
+
     /// Get app entry hash from preflight request.
     pub fn session_app_entry_hash(&self) -> &EntryHash {
         let request = match self {

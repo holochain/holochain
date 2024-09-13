@@ -209,17 +209,6 @@ pub async fn spawn_queue_consumer_tasks(
     let tx_witnessing = queue_consumer_map.spawn_once_witnessing(dna_hash, || {
         spawn_witnessing_consumer(
             space.clone(),
-            network.clone(),
-            cell_id,
-            conductor.clone(),
-            tx_integration.clone(),
-            tx_publish.clone(),
-        )
-    });
-
-    let tx_witnessing = queue_consumer_map.spawn_once_witnessing(dna_hash, || {
-        spawn_witnessing_consumer(
-            space.clone(),
             conductor.task_manager(),
             network.clone(),
             tx_sys.clone(),
@@ -291,13 +280,6 @@ impl QueueConsumerMap {
         S: FnOnce() -> TriggerSender,
     {
         self.spawn_once(QueueEntry(dna_hash, QueueType::AppValidation), spawn)
-    }
-
-    fn spawn_once_witnessing<S>(&self, dna_hash: Arc<DnaHash>, spawn: S) -> TriggerSender
-    where
-        S: FnOnce() -> TriggerSender,
-    {
-        self.spawn_once(QueueEntry(dna_hash, QueueType::Witnessing), spawn)
     }
 
     fn spawn_once_witnessing<S>(&self, dna_hash: Arc<DnaHash>, spawn: S) -> TriggerSender

@@ -47,6 +47,13 @@ pub enum AppRequest {
     /// [`AppResponse::CountersigningSessionAbandoned`]
     AbandonCountersigningSession(Box<CellId>),
 
+    /// Publish an unresolved countersigning session.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CountersigningSessionPublished`]
+    PublishCountersigningSession(Box<CellId>),
+
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
     ///
     /// Using the provided, already-registered DNA, create a new DNA with a unique
@@ -151,6 +158,9 @@ pub enum AppResponse {
 
     /// The successful response to an [`AppRequest::AbandonCountersigningSession`].
     CountersigningSessionAbandoned,
+
+    /// The successful response to an [`AppRequest::PublishCountersigningSession`].
+    CountersigningSessionPublished,
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///

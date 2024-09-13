@@ -228,10 +228,6 @@ async fn countersigning_session_interaction_calls() {
     });
 
     // Alice's session should be in state Unknown.
-    println!(
-        "alice's session state {:?}",
-        get_session_state(&alice.cell_id, &alice_app_tx).await
-    );
     assert_matches!(
         get_session_state(&alice.cell_id, &alice_app_tx).await,
         Some(CountersigningSessionState::Unknown { .. })
@@ -360,14 +356,18 @@ async fn countersigning_session_interaction_calls() {
     });
 
     // Alice's session should be in state Unknown.
-    println!(
-        "state is {:?}",
-        get_session_state(&alice.cell_id, &alice_app_tx).await
-    );
     assert_matches!(
         get_session_state(&alice.cell_id, &alice_app_tx).await,
         Some(CountersigningSessionState::Unknown { .. })
     );
+
+    // Alice publishes the unresolved session.
+    let response: AppResponse = request(
+        AppRequest::PublishCountersigningSession(Box::new(alice.cell_id.clone())),
+        &alice_app_tx,
+    )
+    .await;
+    println!("response {response:?}");
 }
 
 struct Agent {
@@ -386,7 +386,6 @@ async fn setup_agent(bootstrap_url: String, signal_url: String, network_seed: St
     let admin_port = 0;
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.into_path();
-    println!("dir is {path:?}");
     // let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
     let mut config = create_config(admin_port, environment_path.into());
