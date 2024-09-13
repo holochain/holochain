@@ -242,10 +242,10 @@ impl SourceChain {
         network: &(dyn HolochainP2pDnaT + Send + Sync),
     ) -> SourceChainResult<Vec<SignedActionHashed>> {
         // Nothing to write
-
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(Vec::new());
         }
+
         let (scheduled_fns, actions, ops, entries, records) =
             self.scratch.apply_and_then(|scratch| {
                 let records: Vec<Record> = scratch.records().collect();
@@ -273,6 +273,55 @@ impl SourceChain {
 
         // If the lock isn't empty this is a countersigning session.
         let is_countersigning_session = !lock_subject.is_empty();
+
+        let ops_to_integrate = ops
+            .iter()
+            .map(|op| (op.1.clone(), op.0.dht_basis()))
+            .collect::<Vec<_>>();
+
+        // Write the entries, actions and ops to the database in one transaction.
+        let author = self.author.clone();
+        let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
+
+        let now = Timestamp::now();
+
+        // Take out a write lock as late as possible, after doing everything we can in memory and
+        // before starting any database read/write operations.
+        let write_permit = self.vault.acquire_write_permit().await?;
+
+        self.vault
+            .read_async({
+                let now = now.clone();
+                let author = author.clone();
+                move |txn| {
+                    let chain_lock = get_chain_lock(&txn, author.as_ref())?;
+                    match chain_lock {
+                        Some(chain_lock) => {
+                            // If the chain is locked, the lock must be for this entry.
+                            if chain_lock.subject() != lock_subject {
+                                return Err(SourceChainError::ChainLocked);
+                            }
+                            // If the lock is expired then we can't write this countersigning session.
+                            else if chain_lock.is_expired_at(now) {
+                                return Err(SourceChainError::LockExpired);
+                            }
+
+                            // Otherwise, the lock matches this entry and has not expired. We can proceed!
+                        }
+                        None => {
+                            // If this is a countersigning entry but there is no chain lock then maybe
+                            // the session expired before the entry could be written or maybe the app
+                            // has just made a mistake. Either way, it's not valid to write this entry!
+                            if is_countersigning_session {
+                                return Err(SourceChainError::CountersigningWriteWithoutSession);
+                            }
+                        }
+                    }
+
+                    Ok(())
+                }
+            })
+            .await?;
 
         // Sync with CHC, if CHC is present
         if let Some(chc) = network.chc() {
@@ -303,19 +352,9 @@ impl SourceChain {
             }
         }
 
-        let ops_to_integrate = ops
-            .iter()
-            .map(|op| (op.1.clone(), op.0.dht_basis()))
-            .collect::<Vec<_>>();
-
-        // Write the entries, actions and ops to the database in one transaction.
-        let author = self.author.clone();
-        let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
-
         let chain_flush_result = self
             .vault
-            .write_async(move |txn: &mut Transaction| {
-                let now = Timestamp::now();
+            .write_async_with_permit(write_permit, move |txn: &mut Transaction| {
                 // TODO: if the chain is locked, functions can still be scheduled.
                 //       Do we want that?
                 for scheduled_fn in scheduled_fns {
@@ -338,31 +377,6 @@ impl SourceChain {
                         persisted_head,
                         head_info,
                     ));
-                }
-
-                // TODO: should this be moved to the top of the function?
-                let chain_lock = get_chain_lock(txn, author.as_ref())?;
-                match chain_lock {
-                    Some(chain_lock) => {
-                        // If the chain is locked, the lock must be for this entry.
-                        if chain_lock.subject() != lock_subject {
-                            return Err(SourceChainError::ChainLocked);
-                        }
-                        // If the lock is expired then we can't write this countersigning session.
-                        else if chain_lock.is_expired_at(now) {
-                            return Err(SourceChainError::LockExpired);
-                        }
-
-                        // Otherwise, the lock matches this entry and has not expired. We can proceed!
-                    }
-                    None => {
-                        // If this is a countersigning entry but there is no chain lock then maybe
-                        // the session expired before the entry could be written or maybe the app
-                        // has just made a mistake. Either way, it's not valid to write this entry!
-                        if is_countersigning_session {
-                            return Err(SourceChainError::CountersigningWriteWithoutSession);
-                        }
-                    }
                 }
 
                 for entry in entries {
@@ -426,7 +440,9 @@ impl SourceChain {
                     ))
                 }
             }
-            Ok(actions) => {
+            Ok((actions, permit)) => {
+                drop(permit);
+
                 authored_ops_to_dht_db(
                     network,
                     ops_to_integrate,
@@ -437,7 +453,7 @@ impl SourceChain {
                 .await?;
                 SourceChainResult::Ok(actions)
             }
-            result => result,
+            Err(e) => Err(e),
         }
     }
 
