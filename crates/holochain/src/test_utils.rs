@@ -16,6 +16,7 @@ use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_conductor_api::conductor::paths::DataRootPath;
+use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_conductor_api::ZomeCall;
@@ -66,8 +67,6 @@ pub use wait_for::*;
 
 mod big_stack_test;
 
-mod generate_records;
-pub use generate_records::*;
 use holochain_types::websocket::AllowedOrigins;
 
 use self::consistency::request_published_ops;
@@ -325,7 +324,7 @@ pub async fn install_app(
     }
     conductor_handle
         .clone()
-        .install_app_minimal(name.to_string(), agent, data)
+        .install_app_minimal(name.to_string(), Some(agent), data, None)
         .await
         .unwrap();
 
@@ -349,18 +348,18 @@ pub type DnasWithProofs = Vec<(DnaFile, Option<MembraneProof>)>;
 /// One of various ways to setup an app, used somewhere...
 pub async fn setup_app_in_new_conductor(
     installed_app_id: InstalledAppId,
-    agent: AgentPubKey,
+    agent: Option<AgentPubKey>,
     dnas: DnasWithProofs,
-) -> (Arc<TempDir>, AppInterfaceApi, ConductorHandle) {
+) -> (Arc<TempDir>, AppInterfaceApi, ConductorHandle, AgentPubKey) {
     let db_dir = test_db_dir();
-
     let conductor_handle = ConductorBuilder::new()
         .with_data_root_path(db_dir.path().to_path_buf().into())
         .test(&[])
         .await
         .unwrap();
 
-    install_app_in_conductor(conductor_handle.clone(), installed_app_id, agent, &dnas).await;
+    let agent =
+        install_app_in_conductor(conductor_handle.clone(), installed_app_id, agent, &dnas).await;
 
     let handle = conductor_handle.clone();
 
@@ -368,6 +367,7 @@ pub async fn setup_app_in_new_conductor(
         Arc::new(db_dir),
         AppInterfaceApi::new(conductor_handle),
         handle,
+        agent,
     )
 }
 
@@ -375,16 +375,16 @@ pub async fn setup_app_in_new_conductor(
 pub async fn install_app_in_conductor(
     conductor_handle: ConductorHandle,
     installed_app_id: InstalledAppId,
-    agent: AgentPubKey,
+    agent: Option<AgentPubKey>,
     dnas_with_proofs: &[(DnaFile, Option<MembraneProof>)],
-) {
+) -> AgentPubKey {
     for (dna, _) in dnas_with_proofs {
         conductor_handle.register_dna(dna.clone()).await.unwrap();
     }
 
-    conductor_handle
+    let agent = conductor_handle
         .clone()
-        .install_app_minimal(installed_app_id.clone(), agent, dnas_with_proofs)
+        .install_app_minimal(installed_app_id.clone(), agent, dnas_with_proofs, None)
         .await
         .unwrap();
 
@@ -401,6 +401,8 @@ pub async fn install_app_in_conductor(
         .unwrap();
 
     assert!(errors.is_empty());
+
+    agent
 }
 
 /// Setup an app for testing
@@ -448,6 +450,7 @@ pub async fn setup_app_inner(
                 allowed_origins: AllowedOrigins::Any,
             },
         }]),
+        dpki: DpkiConfig::disabled(),
         network: network.unwrap_or_default(),
         ..Default::default()
     };
@@ -802,7 +805,7 @@ fn display_op(op: &DhtOp) -> String {
 }
 
 /// Wait for num_attempts * delay, or until all published ops have been integrated.
-#[tracing::instrument(skip(db))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(db)))]
 pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     db: &Db,
     num_published: usize,
@@ -820,7 +823,7 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
             return Ok(());
         } else {
             let total_time_waited = delay * i as u32;
-            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await);
+            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await, "consistency-status");
         }
         tokio::time::sleep(delay).await;
     }
@@ -830,7 +833,7 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     ))
 }
 
-#[tracing::instrument(skip(envs))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(envs)))]
 /// Show authored data for each cell environment
 pub async fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
     for (i, &db) in envs.iter().enumerate() {

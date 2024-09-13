@@ -4,20 +4,22 @@
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::conductor::api::error::ConductorApiError;
-use holochain::sweettest::{DynSweetRendezvous, SweetConductor, SweetDnaFile, SweetInlineZomes};
+use holochain::sweettest::{
+    DynSweetRendezvous, SweetConductor, SweetConductorConfig, SweetDnaFile, SweetInlineZomes,
+};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
-use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::prelude::{StateMutationError, Store, Txn};
 use holochain_types::record::SignedActionHashedExt;
+use rusqlite::Transaction;
 
 /// Test that records can be manually grafted onto a source chain.
 #[tokio::test(flavor = "multi_thread")]
 async fn grafting() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-    let mut config = ConductorConfig::default();
+    let mut config = SweetConductorConfig::standard().no_dpki();
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
@@ -26,7 +28,6 @@ async fn grafting() {
 
     let apps = conductor.setup_app("app", [&dna_file]).await.unwrap();
     let (alice,) = apps.into_tuple();
-
     let zome = alice.zome(SweetInlineZomes::COORDINATOR);
 
     // Trigger init.
@@ -61,7 +62,7 @@ async fn grafting() {
         .read_async({
             let query_chain = chain.clone();
 
-            move |txn| -> DatabaseResult<Vec<_>> {
+            move |txn: Transaction| -> DatabaseResult<Vec<_>> {
                 let txn: Txn = (&txn).into();
                 Ok(query_chain
                     .iter()
@@ -185,7 +186,7 @@ async fn grafting() {
         .await;
 
     // Fork is detected
-    assert!(dbg!(result).is_err());
+    assert!(result.is_err());
 
     // Restore and validate the original records
     // (there has been no change at this point, but it helps for clarity to reset the chain anyway)
@@ -197,6 +198,8 @@ async fn grafting() {
         .await
         .expect("Should restore original chain");
 
+    drop(conductor);
+
     // Start a second conductor.
     let conductor =
         SweetConductor::create_with_defaults(config, Some(keystore), None::<DynSweetRendezvous>)
@@ -207,10 +210,19 @@ async fn grafting() {
 
     let mut payload = holochain::sweettest::get_install_app_payload_from_dnas(
         "app",
-        alice.agent_pubkey().clone(),
+        Some(alice.agent_pubkey().clone()),
         &[(dna_file, None)],
+        None,
     )
     .await;
+
+    let _records = conductor
+        .get_chc(alice.cell_id())
+        .unwrap()
+        .clone()
+        .get_record_data(None)
+        .await
+        .unwrap();
 
     // This results in an error since the CHC already contains genesis, but this
     // is just to create the necessary cell for grafting onto.

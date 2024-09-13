@@ -86,6 +86,9 @@ wasm_io_types! {
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
+    // DPKI
+    fn get_agent_key_lineage (AgentPubKey) -> Vec<AgentPubKey>;
+
     fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
 
     fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
@@ -100,6 +103,9 @@ wasm_io_types! {
 
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
+
+    // Check if agent key 2 is of the same lineage as agent key 2.
+    fn is_same_agent ((AgentPubKey, AgentPubKey)) -> bool;
 
     // Retreive a record from the DHT or short circuit.
     fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> zt::record::Record;
@@ -257,6 +263,12 @@ pub enum ZomeCallResponse {
     NetworkError(String),
     /// A countersigning session has failed to start.
     CountersigningSession(String),
+}
+
+impl std::fmt::Display for ZomeCallResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[cfg(feature = "test_utils")]

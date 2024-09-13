@@ -8,9 +8,10 @@ use crate::action::CreateLink;
 use crate::action::DeleteLink;
 use crate::entry_def::EntryVisibility;
 use crate::signature::Signature;
-use crate::Action;
 use crate::Entry;
+use crate::{Action, ActionHashedContainer, ActionSequenceAndHash};
 use holo_hash::ActionHash;
+use holo_hash::HasHash;
 use holo_hash::HashableContent;
 use holo_hash::HoloHashOf;
 use holo_hash::HoloHashed;
@@ -35,6 +36,26 @@ pub struct Record<A = SignedActionHashed> {
 impl<A> AsRef<A> for Record<A> {
     fn as_ref(&self) -> &A {
         &self.signed_action
+    }
+}
+
+impl ActionHashedContainer for Record {
+    fn action(&self) -> &Action {
+        self.action()
+    }
+
+    fn action_hash(&self) -> &ActionHash {
+        self.action_address()
+    }
+}
+
+impl ActionSequenceAndHash for Record {
+    fn action_seq(&self) -> u32 {
+        self.action().action_seq()
+    }
+
+    fn address(&self) -> &ActionHash {
+        self.action_address()
     }
 }
 
@@ -373,8 +394,19 @@ impl<C: HashableContent<HashType = T>, T: PrimitiveHashType> HashableContent for
     }
 
     fn hashable_content(&self) -> holo_hash::HashableContentBytes {
-        use holo_hash::HasHash;
         holo_hash::HashableContentBytes::Prehashed39(self.hashed.as_hash().get_raw_39().to_vec())
+    }
+}
+
+impl<C: HashableContent> HasHash for SignedHashed<C> {
+    type HashType = C::HashType;
+
+    fn as_hash(&self) -> &HoloHashOf<C> {
+        self.hashed.as_hash()
+    }
+
+    fn into_hash(self) -> HoloHashOf<C> {
+        self.hashed.into_hash()
     }
 }
 

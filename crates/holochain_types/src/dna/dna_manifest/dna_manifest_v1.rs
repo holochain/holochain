@@ -134,7 +134,6 @@ impl DnaManifestV1 {
 /// Manifest for all items that will change the [`DnaHash`].
 pub struct IntegrityManifest {
     /// A network seed for uniquifying this DNA. See [`DnaDef`].
-    // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
     pub network_seed: Option<String>,
 
     /// Any arbitrary application properties can be included in this object.

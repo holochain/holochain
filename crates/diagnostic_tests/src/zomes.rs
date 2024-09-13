@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use holochain_diagnostics::{dht::test_utils::seeded_rng, holochain::prelude::*, random_bytes};
+use holochain_diagnostics::{holochain::prelude::*, random_bytes, seeded_rng};
 
 pub fn basic_zome() -> InlineIntegrityZome {
     InlineIntegrityZome::new_unique([EntryDef::default_from_id("a")], 1)

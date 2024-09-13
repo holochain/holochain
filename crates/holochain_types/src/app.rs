@@ -84,7 +84,7 @@ pub struct UpdateCoordinatorsPayload {
     pub source: CoordinatorSource,
 }
 
-/// The arguments to create a clone of an existing cell.
+/// The parameters to create a clone of an existing cell.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateCloneCellPayload {
     /// The DNA's role name to clone
@@ -99,17 +99,17 @@ pub struct CreateCloneCellPayload {
     pub name: Option<String>,
 }
 
-/// Arguments to specify the clone cell to be disabled.
+/// Parameters to specify the clone cell to be disabled.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct DisableCloneCellPayload {
     /// The clone id or cell id of the clone cell
     pub clone_cell_id: CloneCellId,
 }
 
-/// Arguments to specify the clone cell to be enabled.
+/// Parameters to specify the clone cell to be enabled.
 pub type EnableCloneCellPayload = DisableCloneCellPayload;
 
-/// Arguments to delete a disabled clone cell of an app.
+/// Parameters to delete a disabled clone cell of an app.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct DeleteCloneCellPayload {
     /// The app id that the DNA to clone belongs to
@@ -119,15 +119,41 @@ pub struct DeleteCloneCellPayload {
     pub clone_cell_id: CloneCellId,
 }
 
-/// An [AppBundle] along with an [AgentPubKey] and optional [InstalledAppId]
+/// All the information necessary to install an app
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppPayload {
-    /// The unique identifier for an installed app in this conductor.
+    /// Where to obtain the AppBundle, which contains the app manifest and DNA bundles
+    /// to be installed. This is the main payload of app installation.
+    ///
+    /// Since this field uses `#[serde(flatten)]`, when using other serialized data formats
+    /// like JSON or YAML, this field will actually show up as one of the variants of
+    /// `AppBundleSource` (e.g. `bundle` or `path`), rather than as a `source` field.
     #[serde(flatten)]
     pub source: AppBundleSource,
 
     /// The agent to use when creating Cells for this App.
-    pub agent_key: AgentPubKey,
+    /// If None, a new agent key will be generated in the right circumstances (read on).
+    ///
+    /// It's always OK to provide a pregenerated agent key here, but there is at least one
+    /// major benefit to letting Holochain generate keys for you (other than
+    /// the sheer convenience of not having to generate your own):
+    ///
+    /// If you are using a device seed in your conductor config, the agent key will be derived
+    /// from that seed using a sensible scheme based on the total number of app installations
+    /// in this conductor, which means you can fairly easily regenerate all of your auto-generated
+    /// agent keys if you lose access to the device with your conductor data
+    /// (as long as you retain exclusive access to the device seed of course).
+    ///
+    /// Holochain will only generate an agent key for you if [`ConductorConfig::device_seed_lair_tag`]
+    /// is set and pointing to a seed present in lair. If this config is not set, installation
+    /// will fail if no agent key is provided. This safety mechanism can however be overridden
+    /// by setting the `allow_throwaway_random_agent_key` flag on this payload, which will cause
+    /// Holochain to generate a totally random (non-recoverable) agent key.
+    ///
+    /// If you are not using a device seed, or if your app has special requirements for agent keys,
+    /// you can always provide your own here, no matter what setting you're using.
+    #[serde(default)]
+    pub agent_key: Option<AgentPubKey>,
 
     /// The unique identifier for an installed app in this conductor.
     /// If not specified, it will be derived from the app name in the bundle manifest.
@@ -161,6 +187,15 @@ pub struct InstallAppPayload {
     /// This can be useful for using `graft_records_onto_source_chain`, or for diagnostics.
     #[serde(default)]
     pub ignore_genesis_failure: bool,
+
+    /// By default, if an agent key is not specified, the conductor will generate a new one by
+    /// deriving a key from the device seed specified in the config. If the device seed is not set,
+    /// app installation will fail. If this flag is set, a random key will be created if no device
+    /// seed is present. This is a risky decision, because it will mean that if you lose control of
+    /// this device, you will not be able to regenerate your agent key from the device seed.
+    /// Use only in situations where you know that this is a throwaway key!
+    #[serde(default)]
+    pub allow_throwaway_random_agent_key: bool,
 }
 
 /// Alias
@@ -457,34 +492,17 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
-    pub fn provisioned_cells(&self) -> impl Iterator<Item = (&RoleName, &CellId)> {
+    pub fn provisioned_cells(&self) -> impl Iterator<Item = (&RoleName, CellId)> {
         self.role_assignments
             .iter()
-            .filter_map(|(role_name, role)| role.provisioned_cell().map(|c| (role_name, c)))
-    }
-
-    /// Accessor
-    pub fn into_provisioned_cells(self) -> impl Iterator<Item = (RoleName, CellId)> {
-        self.role_assignments
-            .into_iter()
-            .filter_map(|(role_name, role)| role.into_provisioned_cell().map(|c| (role_name, c)))
-    }
-
-    /// Accessor
-    pub fn clone_cells(&self) -> impl Iterator<Item = (&CloneId, &CellId)> {
-        self.role_assignments
-            .iter()
-            .flat_map(|app_role_assignment| {
-                app_role_assignment
-                    .1
-                    .as_primary()
-                    .into_iter()
-                    .flat_map(|p| p.clones.iter())
+            .filter_map(|(role_name, role)| {
+                role.provisioned_dna_hash()
+                    .map(|d| (role_name, CellId::new(d.clone(), self.agent_key.clone())))
             })
     }
 
     /// Accessor
-    pub fn disabled_clone_cells(&self) -> impl Iterator<Item = (&CloneId, &CellId)> {
+    pub fn clone_cells(&self) -> impl Iterator<Item = (&CloneId, CellId)> {
         self.role_assignments
             .iter()
             .flat_map(|app_role_assignment| {
@@ -492,7 +510,28 @@ impl InstalledAppCommon {
                     .1
                     .as_primary()
                     .into_iter()
-                    .flat_map(|p| p.disabled_clones.iter())
+                    .flat_map(|p| {
+                        p.clones
+                            .iter()
+                            .map(|(id, d)| (id, CellId::new(d.clone(), self.agent_key.clone())))
+                    })
+            })
+    }
+
+    /// Accessor
+    pub fn disabled_clone_cells(&self) -> impl Iterator<Item = (&CloneId, CellId)> {
+        self.role_assignments
+            .iter()
+            .flat_map(|app_role_assignment| {
+                app_role_assignment
+                    .1
+                    .as_primary()
+                    .into_iter()
+                    .flat_map(|p| {
+                        p.disabled_clones
+                            .iter()
+                            .map(|(id, d)| (id, CellId::new(d.clone(), self.agent_key.clone())))
+                    })
             })
     }
 
@@ -500,31 +539,39 @@ impl InstalledAppCommon {
     pub fn clone_cells_for_role_name(
         &self,
         role_name: &RoleName,
-    ) -> Option<&HashMap<CloneId, CellId>> {
-        Some(&self.role_assignments.get(role_name)?.as_primary()?.clones)
+    ) -> Option<impl Iterator<Item = (&CloneId, CellId)>> {
+        Some(
+            self.role_assignments
+                .get(role_name)?
+                .as_primary()?
+                .clones
+                .iter()
+                .map(|(id, dna_hash)| (id, CellId::new(dna_hash.clone(), self.agent_key.clone()))),
+        )
     }
 
     /// Accessor
     pub fn disabled_clone_cells_for_role_name(
         &self,
         role_name: &RoleName,
-    ) -> Option<&HashMap<CloneId, CellId>> {
+    ) -> Option<impl Iterator<Item = (&CloneId, CellId)>> {
         Some(
-            &self
-                .role_assignments
+            self.role_assignments
                 .get(role_name)?
                 .as_primary()?
-                .disabled_clones,
+                .disabled_clones
+                .iter()
+                .map(|(id, dna_hash)| (id, CellId::new(dna_hash.clone(), self.agent_key.clone()))),
         )
     }
 
     /// Accessor
-    pub fn clone_cell_ids(&self) -> impl Iterator<Item = &CellId> {
+    pub fn clone_cell_ids(&self) -> impl Iterator<Item = CellId> + '_ {
         self.clone_cells().map(|(_, cell_id)| cell_id)
     }
 
     /// Accessor
-    pub fn disabled_clone_cell_ids(&self) -> impl Iterator<Item = &CellId> {
+    pub fn disabled_clone_cell_ids(&self) -> impl Iterator<Item = CellId> + '_ {
         self.disabled_clone_cells().map(|(_, cell_id)| cell_id)
     }
 
@@ -533,7 +580,7 @@ impl InstalledAppCommon {
     // the definition of this function, since this represents all cells in use by the conductor.
     // Any cell which exists and is not returned by this function is fair game for purging
     // during app installation. See [`Conductor::remove_dangling_cells`].
-    pub fn all_cells(&self) -> impl Iterator<Item = &CellId> {
+    pub fn all_cells(&self) -> impl Iterator<Item = CellId> + '_ {
         self.provisioned_cells()
             .map(|(_, c)| c)
             .chain(self.clone_cell_ids())
@@ -543,7 +590,7 @@ impl InstalledAppCommon {
     /// Iterator of all running cells, both provisioned and cloned.
     /// Provisioned cells will always be running if the app is running,
     /// but some cloned cells may be disabled and will not be returned.
-    pub fn all_enabled_cells(&self) -> impl Iterator<Item = &CellId> {
+    pub fn all_enabled_cells(&self) -> impl Iterator<Item = CellId> + '_ {
         self.provisioned_cells()
             .map(|(_, c)| c)
             .chain(self.clone_cell_ids())
@@ -554,7 +601,7 @@ impl InstalledAppCommon {
     ///
     /// Currently this is simply all provisioned cells, but this concept may
     /// become more nuanced in the future.
-    pub fn required_cells(&self) -> impl Iterator<Item = &CellId> {
+    pub fn required_cells(&self) -> impl Iterator<Item = CellId> + '_ {
         self.provisioned_cells().map(|(_, c)| c)
     }
 
@@ -600,14 +647,8 @@ impl InstalledAppCommon {
     }
 
     /// Add a clone cell.
-    pub fn add_clone(&mut self, role_name: &RoleName, cell_id: &CellId) -> AppResult<CloneId> {
+    pub fn add_clone(&mut self, role_name: &RoleName, dna_hash: &DnaHash) -> AppResult<CloneId> {
         let app_role_assignment = self.primary_role_mut(role_name)?;
-
-        assert_eq!(
-            cell_id.agent_pubkey(),
-            app_role_assignment.agent_key(),
-            "A clone cell must use the same agent key as the role it is added to"
-        );
 
         if app_role_assignment.is_clone_limit_reached() {
             return Err(AppError::CloneLimitExceeded(
@@ -623,25 +664,23 @@ impl InstalledAppCommon {
         // add clone
         app_role_assignment
             .clones
-            .insert(clone_id.clone(), cell_id.clone());
+            .insert(clone_id.clone(), dna_hash.clone());
         // increment next clone index
         app_role_assignment.next_clone_index += 1;
         Ok(clone_id)
     }
 
     /// Get a clone cell id from its clone id.
-    pub fn get_clone_cell_id(&self, clone_cell_id: &CloneCellId) -> AppResult<CellId> {
+    pub fn get_clone_dna_hash(&self, clone_cell_id: &CloneCellId) -> AppResult<DnaHash> {
         let cell_id = match clone_cell_id {
-            CloneCellId::CellId(cell_id) => cell_id,
-            CloneCellId::CloneId(clone_id) => {
-                let role_name = clone_id.as_base_role_name();
-                self.primary_role(&role_name)?
-                    .clones
-                    .get(clone_id)
-                    .ok_or_else(|| {
-                        AppError::CloneCellNotFound(CloneCellId::CloneId(clone_id.clone()))
-                    })?
-            }
+            CloneCellId::DnaHash(dna_hash) => dna_hash,
+            CloneCellId::CloneId(clone_id) => self
+                .primary_role(&clone_id.as_base_role_name())?
+                .clones
+                .get(clone_id)
+                .ok_or_else(|| {
+                    AppError::CloneCellNotFound(CloneCellId::CloneId(clone_id.clone()))
+                })?,
         };
         Ok(cell_id.clone())
     }
@@ -650,10 +689,10 @@ impl InstalledAppCommon {
     pub fn get_clone_id(&self, clone_cell_id: &CloneCellId) -> AppResult<CloneId> {
         let clone_id = match clone_cell_id {
             CloneCellId::CloneId(id) => id,
-            CloneCellId::CellId(id) => {
+            CloneCellId::DnaHash(id) => {
                 self.clone_cells()
-                    .find(|(_, cell_id)| *cell_id == id)
-                    .ok_or_else(|| AppError::CloneCellNotFound(CloneCellId::CellId(id.clone())))?
+                    .find(|(_, cell_id)| cell_id.dna_hash() == id)
+                    .ok_or_else(|| AppError::CloneCellNotFound(CloneCellId::DnaHash(id.clone())))?
                     .0
             }
         };
@@ -664,7 +703,7 @@ impl InstalledAppCommon {
     pub fn get_disabled_clone_id(&self, clone_cell_id: &CloneCellId) -> AppResult<CloneId> {
         let clone_id = match clone_cell_id {
             CloneCellId::CloneId(id) => id.clone(),
-            CloneCellId::CellId(id) => self
+            CloneCellId::DnaHash(id) => self
                 .role_assignments
                 .iter()
                 .flat_map(|(_, role_assignment)| {
@@ -674,7 +713,7 @@ impl InstalledAppCommon {
                         .flat_map(|r| r.disabled_clones.iter())
                 })
                 .find(|(_, cell_id)| *cell_id == id)
-                .ok_or_else(|| AppError::CloneCellNotFound(CloneCellId::CellId(id.clone())))?
+                .ok_or_else(|| AppError::CloneCellNotFound(CloneCellId::DnaHash(id.clone())))?
                 .0
                 .clone(),
         };
@@ -727,10 +766,10 @@ impl InstalledAppCommon {
                 .clones
                 .get(clone_id)
                 .cloned()
-                .map(|cell_id| {
+                .map(|dna_hash| {
                     Ok(InstalledCell {
                         role_name: clone_id.as_app_role_name().to_owned(),
-                        cell_id,
+                        cell_id: CellId::new(dna_hash, self.agent_key.clone()),
                     })
                 })
                 .unwrap_or_else(|| {
@@ -738,18 +777,18 @@ impl InstalledAppCommon {
                         clone_id.to_owned(),
                     )))
                 }),
-            Some(cell_id) => {
+            Some(dna_hash) => {
                 // insert clone back into role's clones map
                 let insert_result = app_role_assignment
                     .clones
-                    .insert(clone_id.to_owned(), cell_id.clone());
+                    .insert(clone_id.to_owned(), dna_hash.clone());
                 assert!(
                     insert_result.is_none(),
                     "enable: clone cell already enabled"
                 );
                 Ok(InstalledCell {
                     role_name: clone_id.as_app_role_name().to_owned(),
-                    cell_id,
+                    cell_id: CellId::new(dna_hash, self.agent_key.clone()),
                 })
             }
         }
@@ -789,7 +828,7 @@ impl InstalledAppCommon {
 
         // Get the agent key of the first cell
         // NB: currently this has no significance.
-        let _agent_key = installed_cells
+        let agent_key = installed_cells
             .first()
             .expect("Can't create app with 0 cells")
             .cell_id
@@ -799,10 +838,10 @@ impl InstalledAppCommon {
         // ensure all cells use the same agent key
         if installed_cells
             .iter()
-            .any(|c| *c.cell_id.agent_pubkey() != _agent_key)
+            .any(|c| *c.cell_id.agent_pubkey() != agent_key)
         {
-            tracing::warn!(
-                "It's kind of an informal convention that all cells in a legacy installation should use the same agent key. But, no big deal... Cell data: {:#?}",
+            panic!(
+                "All cells in an app must use the same agent key. Cell data: {:#?}",
                 installed_cells
             );
         }
@@ -825,7 +864,7 @@ impl InstalledAppCommon {
             .into_iter()
             .map(|InstalledCell { role_name, cell_id }| {
                 let role = AppRolePrimary {
-                    base_cell_id: cell_id,
+                    base_dna_hash: cell_id.dna_hash().clone(),
                     is_provisioned: true,
                     clones: HashMap::new(),
                     clone_limit: 256,
@@ -838,7 +877,7 @@ impl InstalledAppCommon {
 
         Ok(Self {
             installed_app_id,
-            agent_key: _agent_key,
+            agent_key,
             role_assignments,
             manifest,
         })
@@ -1085,6 +1124,8 @@ pub enum DisabledAppReason {
     NotStartedAfterProvidingMemproofs,
     /// The disabling was done manually by the user (via admin interface)
     User,
+    /// Disabling app in order to revoke its agent key and render all chains read-only.
+    DeletingAgentKey,
     /// The disabling was due to an UNRECOVERABLE error
     Error(String),
 }
@@ -1119,28 +1160,20 @@ impl AppRoleAssignment {
     }
 
     /// Accessor
-    pub fn provisioned_cell(&self) -> Option<&CellId> {
+    pub fn provisioned_dna_hash(&self) -> Option<&DnaHash> {
         match self {
-            Self::Primary(p) => p.provisioned_cell(),
+            Self::Primary(p) => p.provisioned_dna_hash(),
             Self::Dependency(_) => None,
         }
     }
 
-    /// Accessor
-    pub fn into_provisioned_cell(self) -> Option<CellId> {
-        match self {
-            Self::Primary(p) => p.into_provisioned_cell(),
-            Self::Dependency(_) => None,
-        }
-    }
-
-    /// Accessor
-    pub fn cell_id(&self) -> &CellId {
-        match self {
-            Self::Primary(p) => p.cell_id(),
-            Self::Dependency(d) => &d.cell_id,
-        }
-    }
+    // /// Accessor
+    // pub fn cell_id(&self) -> &CellId {
+    //     match self {
+    //         Self::Primary(p) => p.dna_hash(),
+    //         Self::Dependency(d) => &d.cell_id,
+    //     }
+    // }
 }
 
 /// An app role whose cell(s) were created by the installation of this app.
@@ -1149,14 +1182,13 @@ pub struct AppRolePrimary {
     /// The Id of the Cell which will be provisioned for this role.
     /// This also identifies the basis for cloned DNAs, and this is how the
     /// Agent is determined for clones (always the same as the provisioned cell).
-    pub base_cell_id: CellId,
-
+    pub base_dna_hash: DnaHash,
     /// Records whether the base cell has actually been provisioned or not.
-    /// If true, then `base_cell_id` refers to an actual existing Cell.
-    /// If false, then `base_cell_id` is just recording what that cell will be
-    /// called in the future.
+    /// If true, then `base_dna_hash` refers to an actual existing Cell with
+    /// that DNA hash.
+    /// If false, then `base_dna_hash` is referring to a future cell which will
+    /// be created with that DNA hash.
     pub is_provisioned: bool,
-
     /// The number of allowed clone cells.
     pub clone_limit: u32,
 
@@ -1165,19 +1197,18 @@ pub struct AppRolePrimary {
 
     /// Cells which were cloned at runtime. The length cannot grow beyond
     /// `clone_limit`.
-    pub clones: HashMap<CloneId, CellId>,
-
+    pub clones: HashMap<CloneId, DnaHash>,
     /// Clone cells that have been disabled. These cells cannot be called
     /// any longer and are not returned as part of the app info either.
     /// Disabled clone cells can be deleted through the Admin API.
-    pub disabled_clones: HashMap<CloneId, CellId>,
+    pub disabled_clones: HashMap<CloneId, DnaHash>,
 }
 
 impl AppRolePrimary {
     /// Constructor. List of clones always starts empty.
-    pub fn new(base_cell_id: CellId, is_provisioned: bool, clone_limit: u32) -> Self {
+    pub fn new(base_dna_hash: DnaHash, is_provisioned: bool, clone_limit: u32) -> Self {
         Self {
-            base_cell_id,
+            base_dna_hash,
             is_provisioned,
             clone_limit,
             clones: HashMap::new(),
@@ -1187,24 +1218,14 @@ impl AppRolePrimary {
     }
 
     /// Accessor
-    pub fn cell_id(&self) -> &CellId {
-        &self.base_cell_id
-    }
-
-    /// Accessor
     pub fn dna_hash(&self) -> &DnaHash {
-        self.base_cell_id.dna_hash()
+        &self.base_dna_hash
     }
 
     /// Accessor
-    pub fn agent_key(&self) -> &AgentPubKey {
-        self.base_cell_id.agent_pubkey()
-    }
-
-    /// Accessor
-    pub fn provisioned_cell(&self) -> Option<&CellId> {
+    pub fn provisioned_dna_hash(&self) -> Option<&DnaHash> {
         if self.is_provisioned {
-            Some(&self.base_cell_id)
+            Some(&self.base_dna_hash)
         } else {
             None
         }
@@ -1223,15 +1244,6 @@ impl AppRolePrimary {
     /// Accessor
     pub fn is_clone_limit_reached(&self) -> bool {
         self.clones.len() as u32 == self.clone_limit
-    }
-
-    /// Transformer
-    pub fn into_provisioned_cell(self) -> Option<CellId> {
-        if self.is_provisioned {
-            Some(self.base_cell_id)
-        } else {
-            None
-        }
     }
 }
 
@@ -1262,7 +1274,7 @@ mod tests {
             fixt!(AgentPubKey),
             vec![(
                 CLONE_ID_DELIMITER.into(),
-                AppRolePrimary::new(fixt!(CellId), false, 0).into(),
+                AppRolePrimary::new(fixt!(DnaHash), false, 0).into(),
             )],
             AppManifest::arbitrary(&mut u).unwrap(),
         );
@@ -1271,11 +1283,10 @@ mod tests {
 
     #[test]
     fn clone_management() {
-        let base_cell_id = fixt!(CellId);
-        let agent = base_cell_id.agent_pubkey().clone();
-        let new_clone = || CellId::new(fixt!(DnaHash), agent.clone());
+        let base_dna_hash = fixt!(DnaHash);
+        let new_clone = || fixt!(DnaHash);
         let clone_limit = 3;
-        let role1 = AppRolePrimary::new(base_cell_id, false, clone_limit).into();
+        let role1 = AppRolePrimary::new(base_dna_hash, false, clone_limit).into();
         let agent = fixt!(AgentPubKey);
         let role_name: RoleName = "role_name".into();
         let manifest = AppManifest::arbitrary(&mut unstructured_noise()).unwrap();
@@ -1299,8 +1310,10 @@ mod tests {
         assert_eq!(clone_id_2, CloneId::new(&role_name, 2));
 
         assert_eq!(
-            app.clone_cell_ids().collect::<HashSet<_>>(),
-            maplit::hashset! { &clones[0], &clones[1], &clones[2] }
+            app.clone_cell_ids()
+                .map(|id| id.dna_hash().clone())
+                .collect::<HashSet<_>>(),
+            clones.clone().into_iter().collect::<HashSet<_>>()
         );
         assert_eq!(app.clone_cells().count(), 3);
 
@@ -1341,8 +1354,10 @@ mod tests {
             .clone_cells()
             .any(|(clone_id, _)| *clone_id == clone_id_0));
         assert_eq!(
-            app.clone_cell_ids().collect::<HashSet<_>>(),
-            maplit::hashset! { &clones[0], &clones[1], &clones[2] }
+            app.clone_cell_ids()
+                .map(|id| id.dna_hash().clone())
+                .collect::<HashSet<_>>(),
+            clones.clone().into_iter().collect::<HashSet<_>>()
         );
         assert_eq!(app.clone_cells().count(), 3);
 

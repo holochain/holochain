@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
+use super::DpkiApi;
 use crate::conductor::conductor::ConductorServices;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::ConductorHandle;
@@ -75,8 +76,8 @@ impl CellConductorApiT for CellConductorApi {
 
     fn conductor_services(&self) -> ConductorServices {
         self.conductor_handle
-            .services
-            .share_ref(|s| s.clone().expect("Conductor services not yet initialized"))
+            .running_services
+            .share_ref(|s| s.clone())
     }
 
     fn keystore(&self) -> &MetaLairClient {
@@ -99,12 +100,12 @@ impl CellConductorApiT for CellConductorApi {
             .get_ribosome(self.cell_id.dna_hash())?)
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
-        Ok(self
+        let dna = self
             .get_dna(dna_hash)
-            .ok_or_else(|| ConductorApiError::DnaMissing(dna_hash.clone()))?
-            .dna_def()
-            .get_zome(zome_name)?)
+            .ok_or_else(|| ConductorApiError::DnaMissing(dna_hash.clone()))?;
+        Ok(dna.dna_def().get_zome(zome_name)?)
     }
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
@@ -183,6 +184,9 @@ pub trait CellConductorReadHandleT: Send + Sync {
 
     /// Get a [`EntryDef`] from the [`EntryDefBufferKey`]
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
+
+    /// Call into DPKI
+    fn get_dpki(&self) -> DpkiApi;
 
     /// Try to put the nonce from a calling agent in the db. Fails with a stale result if a newer nonce exists.
     async fn witness_nonce_from_calling_agent(
@@ -266,6 +270,10 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         CellConductorApiT::get_entry_def(self, key)
+    }
+
+    fn get_dpki(&self) -> DpkiApi {
+        CellConductorApiT::conductor_services(self).dpki
     }
 
     async fn witness_nonce_from_calling_agent(

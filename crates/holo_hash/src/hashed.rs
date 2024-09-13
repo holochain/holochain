@@ -20,7 +20,9 @@ pub struct HoloHashed<C: HashableContent> {
     pub hash: HoloHashOf<C>,
 }
 
-impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
+impl<C: HashableContent> HasHash for HoloHashed<C> {
+    type HashType = C::HashType;
+
     fn as_hash(&self) -> &HoloHashOf<C> {
         &self.hash
     }

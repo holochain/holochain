@@ -109,9 +109,9 @@ pub struct LinkQuery {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// An agents chain records returned from a agent_activity_query
 pub struct AgentActivity {
-    /// Valid actions on this chain.
+    /// Valid actions on this chain. `(sequence, action_hash)`.
     pub valid_activity: Vec<(u32, ActionHash)>,
-    /// Rejected actions on this chain.
+    /// Rejected actions on this chain. `(sequence, action_hash)`.
     pub rejected_activity: Vec<(u32, ActionHash)>,
     /// The status of this chain.
     pub status: ChainStatus,
@@ -263,26 +263,28 @@ impl ChainQueryFilter {
     /// actions that are not in the correct branch.
     /// Numerical range bounds do NOT support fork disambiguation, and neither
     /// does unbounded, but everything hash bounded does.
-    pub fn disambiguate_forks(&self, actions: Vec<ActionHashed>) -> Vec<ActionHashed> {
+    pub fn disambiguate_forks<T: ActionHashedContainer + Clone>(&self, actions: Vec<T>) -> Vec<T> {
         match &self.sequence_range {
             ChainQueryFilterRange::Unbounded => actions,
             ChainQueryFilterRange::ActionSeqRange(start, end) => actions
                 .into_iter()
-                .filter(|action| *start <= action.action_seq() && action.action_seq() <= *end)
+                .filter(|action| {
+                    *start <= action.action().action_seq() && action.action().action_seq() <= *end
+                })
                 .collect(),
             ChainQueryFilterRange::ActionHashRange(start, end) => {
                 let mut action_hashmap = actions
                     .into_iter()
-                    .map(|action| (action.as_hash().clone(), action))
-                    .collect::<HashMap<ActionHash, ActionHashed>>();
+                    .map(|action| (action.action_hash().clone(), action))
+                    .collect::<HashMap<ActionHash, T>>();
                 let mut filtered_actions = Vec::new();
                 let mut maybe_next_action = action_hashmap.remove(end);
                 while let Some(next_action) = maybe_next_action {
                     maybe_next_action = next_action
-                        .as_content()
+                        .action()
                         .prev_action()
                         .and_then(|prev_action| action_hashmap.remove(prev_action));
-                    let is_start = next_action.as_hash() == start;
+                    let is_start = next_action.action_hash() == start;
                     filtered_actions.push(next_action);
                     // This comes after the push to make the range inclusive.
                     if is_start {
@@ -294,14 +296,14 @@ impl ChainQueryFilter {
             ChainQueryFilterRange::ActionHashTerminated(end, n) => {
                 let mut action_hashmap = actions
                     .iter()
-                    .map(|action| (action.as_hash().clone(), action))
-                    .collect::<HashMap<ActionHash, &ActionHashed>>();
+                    .map(|action| (action.action_hash().clone(), action.clone()))
+                    .collect::<HashMap<ActionHash, T>>();
                 let mut filtered_actions = Vec::new();
                 let mut maybe_next_action = action_hashmap.remove(end);
                 let mut i = 0;
                 while let Some(next_action) = maybe_next_action {
                     maybe_next_action = next_action
-                        .as_content()
+                        .action()
                         .prev_action()
                         .and_then(|prev_action| action_hashmap.remove(prev_action));
                     filtered_actions.push(next_action.clone());
@@ -317,19 +319,20 @@ impl ChainQueryFilter {
     }
 
     /// Filter a vector of hashed actions according to the query.
-    pub fn filter_actions(&self, actions: Vec<ActionHashed>) -> Vec<ActionHashed> {
+    pub fn filter_actions<T: ActionHashedContainer + Clone>(&self, actions: Vec<T>) -> Vec<T> {
         self.disambiguate_forks(actions)
             .into_iter()
             .filter(|action| {
                 self.action_type
                     .as_ref()
-                    .map(|action_types| action_types.contains(&action.as_ref().action_type()))
+                    .map(|action_types| action_types.contains(&action.action().action_type()))
                     .unwrap_or(true)
                     && self
                         .entry_type
                         .as_ref()
                         .map(|entry_types| {
                             action
+                                .action()
                                 .entry_type()
                                 .map(|entry_type| entry_types.contains(entry_type))
                                 .unwrap_or(false)
@@ -338,7 +341,7 @@ impl ChainQueryFilter {
                     && self
                         .entry_hashes
                         .as_ref()
-                        .map(|entry_hashes| match action.entry_hash() {
+                        .map(|entry_hashes| match action.action().entry_hash() {
                             Some(entry_hash) => entry_hashes.contains(entry_hash),
                             None => false,
                         })

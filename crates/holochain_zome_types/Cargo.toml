@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.4.0-dev.11"
+version = "0.4.0-dev.16"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -11,16 +11,16 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-kitsune_p2p_dht = { version = "^0.4.0-dev.7", path = "../kitsune_p2p/dht", optional = true }
-kitsune_p2p_timestamp = { version = "^0.4.0-dev.2", path = "../kitsune_p2p/timestamp" }
-kitsune_p2p_block = { version = "^0.4.0-dev.9", path = "../kitsune_p2p/block" }
-holo_hash = { version = "^0.4.0-dev.9", path = "../holo_hash", features = [
+kitsune_p2p_dht = { version = "^0.4.0-dev.9", path = "../kitsune_p2p/dht", optional = true }
+kitsune_p2p_timestamp = { version = "^0.4.0-dev.4", path = "../kitsune_p2p/timestamp" }
+kitsune_p2p_block = { version = "^0.4.0-dev.11", path = "../kitsune_p2p/block" }
+holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash", features = [
   "encoding",
 ] }
-holochain_integrity_types = { version = "^0.4.0-dev.10", path = "../holochain_integrity_types", features = [
+holochain_integrity_types = { version = "^0.4.0-dev.13", path = "../holochain_integrity_types", features = [
   "tracing",
 ] }
-holochain_nonce = { version = "^0.4.0-dev.4", path = "../holochain_nonce" }
+holochain_nonce = { version = "^0.4.0-dev.7", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.55"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
@@ -37,7 +37,7 @@ strum = { version = "0.18.0", optional = true }
 rand = { version = "0.8.5", optional = true }
 
 # sqlite dependencies
-rusqlite = { version = "0.31", optional = true }
+rusqlite = { version = "0.32.1", optional = true }
 num_enum = { version = "0.7", optional = true }
 
 # full-dna-def dependencies

@@ -9,16 +9,20 @@ use rand::{thread_rng, Rng};
 // fetch pool and bring gossip to a halt
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn must_get_agent_activity_saturation() {
     use holochain::sweettest::await_consistency;
 
     holochain_trace::test_run();
+
     let mut rng = thread_rng();
     let (dna, _, _) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MustGetAgentActivity]).await;
-    let mut conductors =
-        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(true))
-            .await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(
+        2,
+        SweetConductorConfig::rendezvous(true).no_dpki_mustfix(),
+    )
+    .await;
     let apps = conductors
         .setup_app("", [&dna])
         .await

@@ -9,7 +9,7 @@ use holochain_conductor_api::{
     config::conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver,
 };
 use holochain_types::websocket::AllowedOrigins;
-use holochain_websocket::{self as ws, WebsocketConfig, WebsocketSender};
+use holochain_websocket::{self as ws, WebsocketConfig, WebsocketResult, WebsocketSender};
 
 use crate::config::read_config;
 use crate::config::write_config;
@@ -50,14 +50,14 @@ pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
 /// all messages on the receiving side
 pub(crate) async fn get_admin_api(
     port: u16,
-) -> std::io::Result<(WebsocketSender, tokio::task::JoinHandle<()>)> {
+) -> WebsocketResult<(WebsocketSender, tokio::task::JoinHandle<()>)> {
     tracing::debug!(port);
     websocket_client_by_port(port).await
 }
 
 async fn websocket_client_by_port(
     port: u16,
-) -> std::io::Result<(WebsocketSender, tokio::task::JoinHandle<()>)> {
+) -> WebsocketResult<(WebsocketSender, tokio::task::JoinHandle<()>)> {
     let req = holochain_websocket::ConnectRequest::new(
         format!("localhost:{port}")
             .to_socket_addrs()?

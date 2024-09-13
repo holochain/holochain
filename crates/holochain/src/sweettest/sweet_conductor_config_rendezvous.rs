@@ -12,7 +12,7 @@ pub trait SweetRendezvous: 'static + Send + Sync {
 }
 
 /// Trait object rendezvous.
-pub type DynSweetRendezvous = Arc<dyn SweetRendezvous + 'static + Send + Sync>;
+pub type DynSweetRendezvous = Arc<dyn SweetRendezvous>;
 
 /// Local rendezvous infrastructure for unit testing.
 pub struct SweetLocalRendezvous {

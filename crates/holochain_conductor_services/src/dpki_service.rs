@@ -1,129 +1,127 @@
 use std::sync::Arc;
 
-use holochain_keystore::MetaLairClient;
+pub use hc_deepkey_sdk::*;
 use holochain_types::prelude::*;
+use holochain_util::timed;
+
+pub mod derivation_paths;
+
+mod deepkey;
+pub use deepkey::*;
 
 use crate::CellRunner;
 
+/// This magic string, when used as the installed app id, denotes that the app
+/// is not actually an app, but the DPKI service! This is now a reserved app id,
+/// and is used to distinguish the DPKI service from other apps.
+pub const DPKI_APP_ID: &str = "DPKI";
+
+pub type DpkiImpl = Arc<DpkiService>;
+
+pub struct DpkiService {
+    /// Mirrored from the State.
+    /// Note, this is a little weird for DPKI implementations which are not backed by a Holochain DNA.
+    /// In that case, the impl still needs an AgentPubKey to sign new key registrations with, and it still
+    /// needs a unique identifier to advertise network compatibility, which is covered by the DnaHash.
+    /// So such an implementation should just use 32 unique bytes and create a DnaHash from that, to be
+    /// used in this CellId.
+    pub cell_id: CellId,
+
+    /// State must be accessed through a Mutex
+    state: tokio::sync::Mutex<Box<dyn DpkiState>>,
+}
+
 /// Interface for the DPKI service
+impl DpkiService {
+    pub fn new(cell_id: CellId, state: impl DpkiState + 'static) -> Self {
+        let state: Box<dyn DpkiState> = Box::new(state);
+        let state = tokio::sync::Mutex::new(state);
+        Self { cell_id, state }
+    }
+
+    /// Whether the passed in DNA hash is Deepkey DNA hash
+    pub fn is_deepkey_dna(&self, dna_hash: &DnaHash) -> bool {
+        self.cell_id.dna_hash() == dna_hash
+    }
+
+    /// Get the UUID of the DPKI service.
+    pub fn uuid(&self) -> [u8; 32] {
+        self.cell_id.dna_hash().get_raw_32().try_into().unwrap()
+    }
+
+    pub fn new_deepkey(installation: DeepkeyInstallation, runner: Arc<impl CellRunner>) -> Self {
+        let state: Box<dyn DpkiState> = Box::new(DeepkeyState {
+            runner,
+            cell_id: installation.cell_id.clone(),
+        });
+        let cell_id = installation.cell_id;
+        let state = tokio::sync::Mutex::new(state);
+        Self { cell_id, state }
+    }
+
+    pub async fn state(&self) -> tokio::sync::MutexGuard<Box<dyn DpkiState>> {
+        timed!([1, 10, 1000], { self.state.lock().await })
+    }
+}
+
 #[async_trait::async_trait]
 #[mockall::automock]
-#[allow(clippy::needless_lifetimes)]
-pub trait DpkiService: Send + Sync {
-    /// Check if the key is valid (properly created and not revoked) as-at the given Timestamp
-    async fn is_key_valid(&self, key: AgentPubKey, timestamp: Timestamp)
-        -> DpkiServiceResult<bool>;
-
-    /// Defines the different ways that keys can be created and destroyed:
-    /// If an old key is specified, it will be destroyed
-    /// If a new key is specified, it will be registered
-    /// If both a new and an old key are specified, the new key will atomically replace the old key
-    /// (If no keys are specified, nothing will happen)
-    async fn key_mutation(
+pub trait DpkiState: Send + Sync {
+    /// Get derivation details for the next key in a lineage.
+    async fn next_derivation_details(
         &self,
-        old_key: Option<AgentPubKey>,
-        new_key: Option<AgentPubKey>,
-    ) -> DpkiServiceResult<()>;
+        agent_key: AgentPubKey,
+    ) -> DpkiServiceResult<DerivationDetails>;
 
-    /// The CellIds in use by this service, which need to be protected
-    fn cell_ids<'a>(&'a self) -> std::collections::HashSet<&'a CellId>;
+    /// Create a new key for a given app.
+    async fn register_key(
+        &self,
+        input: CreateKeyInput,
+    ) -> DpkiServiceResult<(ActionHash, KeyRegistration, KeyMeta)>;
+
+    /// Query meta data for a given key.
+    async fn query_key_meta(&self, key: AgentPubKey) -> DpkiServiceResult<KeyMeta>;
+
+    /// Revoke a registered key.
+    async fn revoke_key(
+        &self,
+        input: RevokeKeyInput,
+    ) -> DpkiServiceResult<(ActionHash, KeyRegistration)>;
+
+    /// Check if the key is valid (properly created and not revoked) as-at the given Timestamp.
+    async fn key_state(
+        &self,
+        key: AgentPubKey,
+        timestamp: Timestamp,
+    ) -> DpkiServiceResult<KeyState>;
+
+    /// Get lineage of all keys of an agent, ordered by timestamp.
+    async fn get_agent_key_lineage(&self, key: AgentPubKey) -> DpkiServiceResult<Vec<AgentPubKey>>;
+
+    /// Check if the two provided agent keys belong to the same agent.
+    async fn is_same_agent(
+        &self,
+        key_1: AgentPubKey,
+        key_2: AgentPubKey,
+    ) -> DpkiServiceResult<bool>;
 }
 
 /// The errors which can be produced by DPKI
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
 pub enum DpkiServiceError {
-    #[error("DPKI DNA could not be called: {0}")]
+    #[error("DPKI DNA call failed: {0}")]
     ZomeCallFailed(anyhow::Error),
+    #[error(transparent)]
+    Serialization(#[from] SerializedBytesError),
+    #[error("Error talking to lair keystore: {0}")]
+    Lair(anyhow::Error),
+    #[error("DPKI service not installed")]
+    DpkiNotInstalled,
+    #[error("The agent {0} could not be found in DPKI")]
+    DpkiAgentMissing(AgentPubKey),
+    #[error("The agent {0} was found to be invalid at {1} according to the DPKI service")]
+    DpkiAgentInvalid(AgentPubKey, Timestamp),
 }
 /// Alias
 pub type DpkiServiceResult<T> = Result<T, DpkiServiceError>;
-
-/// Some more helpful methods built around the methods provided by the service
-#[async_trait::async_trait]
-pub trait DpkiServiceExt: DpkiService {
-    /// Register a newly created key with DPKI
-    async fn register_key(&self, key: AgentPubKey) -> DpkiServiceResult<()> {
-        self.key_mutation(None, Some(key)).await
-    }
-
-    /// Replace an old key with a new one
-    async fn update_key(
-        &self,
-        old_key: AgentPubKey,
-        new_key: AgentPubKey,
-    ) -> DpkiServiceResult<()> {
-        self.key_mutation(Some(old_key), Some(new_key)).await
-    }
-
-    /// Delete an existing key without replacing it with a new one.
-    /// This effectively terminates the "lineage" that this key was a part of.
-    async fn remove_key(&self, key: AgentPubKey) -> DpkiServiceResult<()> {
-        self.key_mutation(Some(key), None).await
-    }
-}
-
-/// The built-in implementation of the DPKI service contract, which runs a DNA
-#[derive(derive_more::Constructor)]
-pub struct DeepkeyBuiltin {
-    runner: Arc<dyn CellRunner>,
-    keystore: MetaLairClient,
-    cell_id: CellId,
-}
-
-#[allow(unreachable_code)]
-#[allow(unused_variables)]
-#[allow(clippy::needless_lifetimes)]
-#[async_trait::async_trait]
-impl DpkiService for DeepkeyBuiltin {
-    async fn is_key_valid(
-        &self,
-        key: AgentPubKey,
-        timestamp: Timestamp,
-    ) -> DpkiServiceResult<bool> {
-        let keystore = self.keystore.clone();
-        let cell_id = self.cell_id.clone();
-        let zome_name: ZomeName = "TODO: depends on dna implementation".into();
-        let fn_name: FunctionName = "TODO: depends on dna implementation".into();
-        let payload = todo!("TODO: depends on dna implementation");
-        let cap_secret = None;
-        let provenance = cell_id.agent_pubkey().clone();
-        let response = self
-            .runner
-            .call_zome(
-                &provenance,
-                cap_secret,
-                cell_id,
-                zome_name,
-                fn_name,
-                payload,
-            )
-            .await
-            .map_err(DpkiServiceError::ZomeCallFailed)?;
-        let is_valid = todo!("deserialize response");
-        Ok(is_valid)
-    }
-
-    async fn key_mutation(
-        &self,
-        old_key: Option<AgentPubKey>,
-        new_key: Option<AgentPubKey>,
-    ) -> DpkiServiceResult<()> {
-        todo!()
-    }
-
-    fn cell_ids<'a>(&'a self) -> std::collections::HashSet<&'a CellId> {
-        [&self.cell_id].into_iter().collect()
-    }
-}
-
-/// Create a minimal usable mock of DPKI
-pub fn mock_dpki() -> MockDpkiService {
-    use futures::FutureExt;
-    let mut dpki = MockDpkiService::new();
-    dpki.expect_is_key_valid()
-        .returning(|_, _| async move { Ok(true) }.boxed());
-    dpki.expect_cell_ids()
-        .return_const(std::collections::HashSet::new());
-    dpki
-}

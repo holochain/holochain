@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 
 use ::fixt::prelude::strum_macros;
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 use tempfile::{tempdir, TempDir};
 
 use crate::sweettest::*;
@@ -12,7 +12,6 @@ use holochain_wasm_test_utils::TestWasm;
 #[tokio::test(flavor = "multi_thread")]
 async fn network_seed_regression() {
     let conductor = SweetConductor::from_standard_config().await;
-    let agent = SweetAgents::one(conductor.keystore()).await;
     let tmp = tempdir().unwrap();
     let (dna, _, _) = SweetDnaFile::from_test_wasms(
         "".into(),
@@ -62,13 +61,14 @@ async fn network_seed_regression() {
     let _app1 = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            agent_key: agent.clone(),
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle1),
             installed_app_id: Some("no-seed".into()),
             network_seed: None,
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -76,13 +76,14 @@ async fn network_seed_regression() {
     let _app2 = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            agent_key: agent.clone(),
+            agent_key: None,
             source: AppBundleSource::Bundle(bundle2),
             installed_app_id: Some("yes-seed".into()),
             network_seed: Some("seed".into()),
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -90,8 +91,6 @@ async fn network_seed_regression() {
 
 /// Test all possible combinations of Locations and network seeds:
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "glacial_tests")]
-#[ignore = "this is a really useful comprehensive test, but it's so dang slow"]
 async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     let conductor = SweetConductor::from_standard_config().await;
     let tmp = tempdir().unwrap();
@@ -104,7 +103,7 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
 
     let write_dna = |seed: Seed| {
         let mut dna = dna.clone();
-        let path = tmp.as_ref().join(format!("{}.dna", seed.to_string()));
+        let path = tmp.as_ref().join(format!("{seed}.dna"));
         async move {
             if seed != Seed::None {
                 dna = dna.with_network_seed(seed.to_string()).await;
@@ -145,26 +144,33 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
 
     // Populate the groups with all (most) possible combinations of seed values and location specifiers
     for (app_loc, dna_loc) in all_locs {
-        group_0.extend([TestCase(None, None, None, app_loc, dna_loc).install(&c)]);
+        group_0.extend([TestCase(None, None, None, app_loc, dna_loc)
+            .install(&c)
+            .await]);
         group_a.extend([
-            TestCase(A, None, None, app_loc, dna_loc).install(&c),
-            TestCase(None, A, None, app_loc, dna_loc).install(&c),
-            TestCase(None, None, A, app_loc, dna_loc).install(&c),
+            TestCase(A, None, None, app_loc, dna_loc).install(&c).await,
+            TestCase(None, A, None, app_loc, dna_loc).install(&c).await,
+            TestCase(None, None, A, app_loc, dna_loc).install(&c).await,
             //
-            TestCase(A, A, None, app_loc, dna_loc).install(&c),
-            TestCase(A, None, A, app_loc, dna_loc).install(&c),
-            TestCase(None, A, A, app_loc, dna_loc).install(&c),
+            TestCase(A, A, None, app_loc, dna_loc).install(&c).await,
+            TestCase(A, None, A, app_loc, dna_loc).install(&c).await,
+            TestCase(None, A, A, app_loc, dna_loc).install(&c).await,
             //
-            TestCase(A, B, None, app_loc, dna_loc).install(&c),
-            TestCase(A, None, B, app_loc, dna_loc).install(&c),
-            TestCase(None, A, B, app_loc, dna_loc).install(&c),
+            TestCase(A, B, None, app_loc, dna_loc).install(&c).await,
+            TestCase(A, None, B, app_loc, dna_loc).install(&c).await,
+            TestCase(None, A, B, app_loc, dna_loc).install(&c).await,
             //
-            TestCase(A, B, B, app_loc, dna_loc).install(&c),
+            TestCase(A, B, B, app_loc, dna_loc).install(&c).await,
         ]);
     }
 
-    let group_0 = futures::future::join_all(group_0).await;
-    let group_a = futures::future::join_all(group_a).await;
+    // It would be preferable to use join_all here to let all installations happen
+    // in parallel, but it causes timeouts in macos tests. If it's ever determined
+    // that we can parallelize this again, just remove all `.await` in the
+    // above group construction and use join_all here to await them all.
+    //
+    // let group_0 = futures::future::join_all(group_0).await;
+    // let group_a = futures::future::join_all(group_a).await;
 
     let (hash_0, case_0) = &group_0[0];
     let (hash_a, case_a) = &group_a[0];
@@ -178,22 +184,10 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     assert_ne!(hash_0, hash_a);
 
     for (h, c) in group_0.iter() {
-        assert_eq!(
-            hash_0,
-            h,
-            "case mismatch: {}, {}",
-            case_0.to_string(),
-            c.to_string()
-        );
+        assert_eq!(hash_0, h, "case mismatch: {case_0}, {c}");
     }
     for (h, c) in group_a.iter() {
-        assert_eq!(
-            hash_a,
-            h,
-            "case mismatch: {}, {}",
-            case_a.to_string(),
-            c.to_string()
-        );
+        assert_eq!(hash_a, h, "case mismatch: {case_a}, {c}");
     }
 }
 
@@ -204,13 +198,13 @@ struct TestcaseCommon {
     _start: std::time::Instant,
 }
 
-#[derive(Clone, Copy, Debug, strum_macros::ToString)]
+#[derive(Clone, Copy, Debug, strum_macros::Display)]
 enum Location {
     Path,
     Bundle,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::ToString)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::Display)]
 enum Seed {
     None,
     A,
@@ -220,16 +214,9 @@ enum Seed {
 #[derive(Debug)]
 struct TestCase(Seed, Seed, Seed, Location, Location);
 
-impl ToString for TestCase {
-    fn to_string(&self) -> String {
-        format!(
-            "{}-{}-{}-{}-{}",
-            self.0.to_string(),
-            self.1.to_string(),
-            self.2.to_string(),
-            self.3.to_string(),
-            self.4.to_string(),
-        )
+impl Display for TestCase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}-{}-{}-{}", self.0, self.1, self.2, self.3, self.4,)
     }
 }
 
@@ -244,7 +231,7 @@ impl TestCase {
             Seed::B => common.dnas[2].clone(),
         };
         let dna_hash = dna.dna_hash();
-        let agent_key = SweetAgents::one(common.conductor.keystore()).await;
+        let agent_key = Some(SweetAgents::one(common.conductor.keystore()).await);
 
         let dna_modifiers = match role_seed {
             Seed::None => DnaModifiersOpt::none(),
@@ -252,10 +239,7 @@ impl TestCase {
             Seed::B => DnaModifiersOpt::none().with_network_seed(Seed::B.to_string()),
         };
 
-        let dna_path = common
-            .tmp
-            .as_ref()
-            .join(format!("{}.dna", dna_seed.to_string()));
+        let dna_path = common.tmp.as_ref().join(format!("{dna_seed}.dna"));
 
         let bundle = match dna_loc {
             Location::Bundle => {
@@ -334,6 +318,7 @@ impl TestCase {
                 membrane_proofs: Default::default(),
                 existing_cells: Default::default(),
                 ignore_genesis_failure: false,
+                allow_throwaway_random_agent_key: true,
             })
             .await
             .unwrap();

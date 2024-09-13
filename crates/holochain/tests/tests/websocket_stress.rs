@@ -33,7 +33,6 @@ static GOOD_CLOSE: AtomicU64 = AtomicU64::new(0);
 static BAD_CLOSE: AtomicU64 = AtomicU64::new(0);
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "this is a long-running test that slows down ci - execute this manually"]
 pub async fn websocket_stress() {
     let tmp_dir = TempDir::new().unwrap();
     let data_root_path = tmp_dir.path().to_path_buf();

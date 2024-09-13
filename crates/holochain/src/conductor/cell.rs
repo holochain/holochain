@@ -19,10 +19,10 @@ use tracing_futures::Instrument;
 use error::CellError;
 use holo_hash::*;
 use holochain_cascade::authority;
+use holochain_chc::ChcImpl;
 use holochain_conductor_api::ZomeCall;
 use holochain_nonce::fresh_nonce;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
-use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDna;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
@@ -374,7 +374,7 @@ impl Cell {
         }
     }
 
-    #[instrument(skip(self, evt))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, evt)))]
     /// Entry point for incoming messages from the network that need to be handled
     //
     // TODO: when we had CellStatus to track whether a cell had joined the network or not,
@@ -587,7 +587,7 @@ impl Cell {
         Ok(())
     }
 
-    #[instrument(skip(self, message))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, message)))]
     /// we are receiving a response from a countersigning authority
     async fn handle_countersigning_session_negotiation(
         &self,
@@ -625,7 +625,7 @@ impl Cell {
         }
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     /// a remote node is asking us for entry data
     async fn handle_get(
         &self,
@@ -653,7 +653,7 @@ impl Cell {
         r
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     async fn handle_get_entry(
         &self,
         hash: EntryHash,
@@ -665,7 +665,7 @@ impl Cell {
             .map_err(Into::into)
     }
 
-    #[tracing::instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     async fn handle_get_record(
         &self,
         hash: ActionHash,
@@ -677,7 +677,10 @@ impl Cell {
             .map_err(Into::into)
     }
 
-    #[instrument(skip(self, _dht_hash, _options))]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self, _dht_hash, _options))
+    )]
     /// a remote node is asking us for metadata
     async fn handle_get_meta(
         &self,
@@ -687,7 +690,7 @@ impl Cell {
         unimplemented!()
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     /// a remote node is asking us for links
     // TODO: Right now we are returning all the full actions
     // We could probably send some smaller types instead of the full actions
@@ -705,7 +708,7 @@ impl Cell {
     }
 
     /// a remote node is asking us to count links
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     async fn handle_count_links(&self, query: WireLinkQuery) -> CellResult<CountLinksResponse> {
         let db = self.space.dht_db.clone();
         Ok(CountLinksResponse::new(
@@ -717,20 +720,20 @@ impl Cell {
         ))
     }
 
-    #[instrument(skip(self, options))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     async fn handle_get_agent_activity(
         &self,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
-    ) -> CellResult<AgentActivityResponse<ActionHash>> {
+    ) -> CellResult<AgentActivityResponse> {
         let db = self.space.dht_db.clone();
         authority::handle_get_agent_activity(db.into(), agent, query, options)
             .await
             .map_err(Into::into)
     }
 
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     async fn handle_must_get_agent_activity(
         &self,
         author: AgentPubKey,
@@ -743,7 +746,7 @@ impl Cell {
     }
 
     /// A remote agent is sending us a validation receipt bundle.
-    #[tracing::instrument(skip(self, receipts))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, receipts)))]
     async fn handle_validation_receipts(
         &self,
         receipts: ValidationReceiptBundle,
@@ -854,12 +857,15 @@ impl Cell {
     }
 
     /// the network module would like this cell/agent to sign some data
-    #[tracing::instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     async fn handle_sign_network_data(&self) -> CellResult<Signature> {
         Ok([0; 64].into())
     }
 
-    #[instrument(skip(self, from_agent, fn_name, cap_secret, payload))]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self, from_agent, fn_name, cap_secret, payload))
+    )]
     #[allow(clippy::too_many_arguments)]
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(
@@ -919,7 +925,6 @@ impl Cell {
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
 
         let dna_def = ribosome.dna_def().as_content().clone();
-
         // If there is no existing zome call then this is the root zome call
         let is_root_zome_call = workspace_lock.is_none();
         let workspace_lock = match workspace_lock {
@@ -937,7 +942,6 @@ impl Cell {
                 .await?
             }
         };
-
         let args = CallZomeWorkflowArgs {
             cell_id: self.id.clone(),
             ribosome,
@@ -959,7 +963,7 @@ impl Cell {
     }
 
     /// Check if each Zome's init callback has been run, and if not, run it.
-    #[tracing::instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub(crate) async fn check_or_run_zome_init(&self) -> CellResult<()> {
         // Ensure that only one init check is run at a time
         let _guard = tokio::time::timeout(
@@ -1018,17 +1022,20 @@ impl Cell {
     }
 
     /// Clean up long-running managed tasks.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(cell_id = ?self.id())))]
     pub async fn cleanup(&self) -> CellResult<()> {
         use holochain_p2p::HolochainP2pDnaT;
         let shutdown = self
             .conductor_handle
             .task_manager()
             .stop_cell_tasks(self.id().clone())
-            .map(|r| CellResult::Ok(r?));
+            .map(|r| CellResult::Ok(r?))
+            .in_current_span();
         let leave = self
             .holochain_p2p_dna()
             .leave(self.id.agent_pubkey().clone())
-            .map(|r| CellResult::Ok(r?));
+            .map(|r| CellResult::Ok(r?))
+            .in_current_span();
         let (shutdown, leave) = futures::future::join(shutdown, leave).await;
         shutdown?;
         leave?;
@@ -1069,6 +1076,12 @@ impl Cell {
         self.queue_triggers
             .integrate_dht_ops
             .trigger(&"notify_authored_ops_moved_to_limbo");
+    }
+
+    pub(crate) fn publish_authored_ops(&self) {
+        self.queue_triggers
+            .publish_dht_ops
+            .trigger(&"publish_authored_ops");
     }
 
     #[cfg(any(test, feature = "test_utils"))]

@@ -76,14 +76,11 @@
 //!
 //! ### Workflow re-triggering
 //!
-//! Awaiting missing ops re-triggers the validation workflow for a fixed period
-//! of time. After this period has elapsed without new missing ops having
-//! arrived, workflow re-triggering ends.
-//!
-//! Ops that are known to have missing dependencies are omitted from a workflow
-//! run, because they cannot be validated without them. Once their missing
-//! dependencies have all been fetched, these ops will be validated the next
-//! time the workflow runs.
+//! Missing dependencies of ops re-trigger the validation workflow. After a delay of
+//! a maximum of 3 seconds, which gives the background task that gets the missing
+//! dependencies from the network some time to complete, the app validation workflow
+//! runs again. All ops whose missing dependencies could be fetched during this interval
+//! will successfully validate now.
 //!
 //! ### Integration workflow
 //!
@@ -97,6 +94,7 @@
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
 
+use crate::conductor::api::DpkiApi;
 use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::Conductor;
 use crate::conductor::ConductorHandle;
@@ -114,7 +112,6 @@ use crate::core::ValidationOutcome;
 
 pub use error::*;
 pub use types::Outcome;
-pub use validation_dependencies::ValidationDependencies;
 
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
@@ -137,8 +134,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
 
-mod validation_dependencies;
-
 #[cfg(todo_redo_old_tests)]
 mod network_call_tests;
 #[cfg(test)]
@@ -156,15 +151,17 @@ mod run_validation_callback_tests;
 mod error;
 mod types;
 
-#[instrument(skip(
-    workspace,
-    trigger_integration,
-    trigger_publish,
-    conductor_handle,
-    network,
-    dht_query_cache,
-    validation_dependencies,
-))]
+#[cfg_attr(
+    feature = "instrument",
+    instrument(skip(
+        workspace,
+        trigger_integration,
+        trigger_publish,
+        conductor_handle,
+        network,
+        dht_query_cache,
+    ))
+)]
 #[allow(clippy::too_many_arguments)]
 pub async fn app_validation_workflow(
     dna_hash: Arc<DnaHash>,
@@ -174,7 +171,6 @@ pub async fn app_validation_workflow(
     conductor_handle: ConductorHandle,
     network: HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
-    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> WorkflowResult<WorkComplete> {
     let outcome_summary = app_validation_workflow_inner(
         dna_hash,
@@ -182,7 +178,6 @@ pub async fn app_validation_workflow(
         conductor_handle,
         &network,
         dht_query_cache,
-        validation_dependencies.clone(),
     )
     .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
@@ -197,18 +192,11 @@ pub async fn app_validation_workflow(
         trigger_publish.trigger(&"app_validation_workflow");
     }
 
-    let validations_dependencies = validation_dependencies.lock();
     Ok(
-        // If not all ops have been validated
-        // and fetching missing hashes has not timed out,
-        // trigger app validation workflow again.
-        if outcome_summary.validated < outcome_summary.ops_to_validate
-            && !validations_dependencies.fetch_missing_hashes_timed_out()
-        {
-            // Trigger app validation workflow again in 100-1000 milliseconds.
-            let interval = 900u64
-                .saturating_sub(validations_dependencies.missing_hashes.len() as u64 * 100)
-                + 100;
+        // If not all ops have been validated, trigger app validation workflow again.
+        if outcome_summary.validated < outcome_summary.ops_to_validate {
+            // Trigger app validation workflow again in 100-3000 milliseconds.
+            let interval = 2900u64.saturating_sub(outcome_summary.missing as u64 * 100) + 100;
             WorkComplete::Incomplete(Some(Duration::from_millis(interval)))
         } else {
             WorkComplete::Complete
@@ -222,28 +210,14 @@ async fn app_validation_workflow_inner(
     conductor: ConductorHandle,
     network: &HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
-    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone().into();
     let sorted_dht_ops = validation_query::get_ops_to_app_validate(&db).await?;
-
-    // filter out ops that have missing dependencies
-    tracing::debug!("number of ops to validate {:?}", sorted_dht_ops.len());
-    let sorted_dht_ops = validation_dependencies
-        .lock()
-        .filter_ops_missing_dependencies(sorted_dht_ops);
     let num_ops_to_validate = sorted_dht_ops.len();
-    tracing::debug!(
-        "number of ops to validate after filtering out ops missing hashes {num_ops_to_validate}"
-    );
-    tracing::trace!(
-        "missing hashes: {:?}",
-        validation_dependencies.lock().missing_hashes
-    );
+
     let sleuth_id = conductor.config.sleuth_id();
 
     let cascade = Arc::new(workspace.full_cascade(network.clone()));
-    let validation_dependencies = validation_dependencies.clone();
     let accepted_ops = Arc::new(AtomicUsize::new(0));
     let awaiting_ops = Arc::new(AtomicUsize::new(0));
     let rejected_ops = Arc::new(AtomicUsize::new(0));
@@ -278,16 +252,7 @@ async fn app_validation_workflow_inner(
         // Validate this op
         let validation_outcome = match chain_op_to_op(*chain_op.clone(), cascade.clone()).await {
             Ok(op) => {
-                validate_op_outer(
-                    dna_hash.clone(),
-                    &op,
-                    &dht_op_hash,
-                    &conductor,
-                    &workspace,
-                    network,
-                    validation_dependencies.clone(),
-                )
-                .await
+                validate_op_outer(dna_hash.clone(), &op, &conductor, &workspace, network).await
             }
             Err(e) => Err(e),
         };
@@ -360,12 +325,12 @@ async fn app_validation_workflow_inner(
                                 put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Valid)
                             }
                         }
-                        Outcome::AwaitingDeps(deps) => {
+                        Outcome::AwaitingDeps(_) => {
                             awaiting_ops.fetch_add(1, Ordering::SeqCst);
                             put_validation_limbo(
                                 txn,
                                 &dht_op_hash,
-                                ValidationStage::AwaitingAppDeps(deps),
+                                ValidationStage::AwaitingAppDeps,
                             )
                         }
                         Outcome::Rejected(_) => {
@@ -450,8 +415,6 @@ pub async fn record_to_op(
     op_type: ChainOpType,
     cascade: Arc<impl Cascade>,
 ) -> AppValidationOutcome<(Op, DhtOpHash, Option<Entry>)> {
-    use ChainOpType::*;
-
     // Hide private data where appropriate
     let (record, mut hidden_entry) = if matches!(op_type, ChainOpType::StoreEntry) {
         // We don't want to hide private data for a StoreEntry, because when doing
@@ -470,7 +433,7 @@ pub async fn record_to_op(
     let action = sah.into();
     // Register agent activity doesn't store the entry so we need to
     // save it so we can reconstruct the record later.
-    if matches!(op_type, RegisterAgentActivity) {
+    if matches!(op_type, ChainOpType::RegisterAgentActivity) {
         hidden_entry = entry.take().or(hidden_entry);
     }
     let chain_op = ChainOp::from_type(op_type, action, entry)?;
@@ -555,11 +518,9 @@ async fn chain_op_to_op(chain_op: ChainOp, cascade: Arc<impl Cascade>) -> AppVal
 async fn validate_op_outer(
     dna_hash: Arc<DnaHash>,
     op: &Op,
-    dht_op_hash: &DhtOpHash,
     conductor_handle: &ConductorHandle,
     workspace: &AppValidationWorkspace,
     network: &HolochainP2pDna,
-    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
     let host_fn_workspace = workspace.validation_workspace().await?;
@@ -569,14 +530,15 @@ async fn validate_op_outer(
         .get_ribosome(dna_hash.as_ref())
         .map_err(|_| AppValidationError::DnaMissing((*dna_hash).clone()))?;
 
+    let dpki = conductor_handle.running_services().dpki;
+
     validate_op(
         op,
-        dht_op_hash,
         host_fn_workspace,
         network,
         &ribosome,
         conductor_handle,
-        validation_dependencies,
+        dpki,
         false, // is_inline
     )
     .await
@@ -585,12 +547,11 @@ async fn validate_op_outer(
 #[allow(clippy::too_many_arguments)]
 pub async fn validate_op(
     op: &Op,
-    dht_op_hash: &DhtOpHash,
     workspace: HostFnWorkspaceRead,
     network: &HolochainP2pDna,
     ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
-    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    dpki: DpkiApi,
     is_inline: bool,
 ) -> AppValidationOutcome<Outcome> {
     check_entry_def(op, &network.dna_hash(), conductor_handle)
@@ -607,16 +568,8 @@ pub async fn validate_op(
     let invocation = ValidateInvocation::new(zomes_to_invoke, op)
         .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
 
-    let outcome = run_validation_callback(
-        invocation,
-        dht_op_hash,
-        ribosome,
-        workspace,
-        network,
-        validation_dependencies,
-        is_inline,
-    )
-    .await?;
+    let outcome =
+        run_validation_callback(invocation, ribosome, workspace, network, dpki, is_inline).await?;
 
     Ok(outcome)
 }
@@ -797,42 +750,37 @@ fn get_integrity_zome_from_ribosome(
     Ok(ZomesToInvoke::OneIntegrity(zome))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_validation_callback(
     invocation: ValidateInvocation,
-    dht_op_hash: &DhtOpHash,
     ribosome: &impl RibosomeT,
     workspace: HostFnWorkspaceRead,
     network: GenericNetwork,
-    validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    dpki: DpkiApi,
     is_inline: bool,
 ) -> AppValidationResult<Outcome> {
-    let validate_result = ribosome.run_validate(
-        ValidateHostAccess::new(workspace.clone(), network.clone(), is_inline),
-        invocation.clone(),
-    )?;
+    let validate_result = ribosome
+        .run_validate(
+            ValidateHostAccess::new(workspace.clone(), network.clone(), dpki, is_inline),
+            invocation.clone(),
+        )
+        .await?;
     match validate_result {
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(hashes)) => {
             tracing::debug!(
                 ?hashes,
-                "Op validation returned unresolved dependencies -  AgentActivity"
+                "Op validation returned unresolved dependencies -  Hashes"
             );
             // fetch all missing hashes in the background without awaiting them
             let cascade_workspace = workspace.clone();
             let cascade =
                 CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
 
-            // keep track of which dependencies are being fetched for which dht op and to
-            // prevent multiple fetches of the same hash
-            let new_hashes_to_fetch = validation_dependencies
-                .lock()
-                .insert_missing_hashes_for_op(hashes.clone(), dht_op_hash.clone());
-
             // build a collection of futures to fetch the missing hashes
-            let fetches = new_hashes_to_fetch.into_iter().map(move |hash| {
+            let fetches = hashes.clone().into_iter().map(move |hash| {
                 let cascade = cascade.clone();
-                let validation_dependencies = validation_dependencies.clone();
                 async move {
                     let result = cascade
                         .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
@@ -840,12 +788,6 @@ async fn run_validation_callback(
                     if let Err(err) = result {
                         tracing::warn!("error fetching dependent hash {hash:?}: {err}");
                     }
-                    // Dependency has been fetched and added to the cache
-                    // or an error occurred along the way.
-                    // In case of an error the hash is still removed from
-                    // the collection so that it will be tried again to be
-                    // fetched in the subsequent workflow run.
-                    validation_dependencies.lock().remove_missing_hash(&hash);
                 }
             });
             // await all fetches in a separate task in the background
@@ -867,36 +809,18 @@ async fn run_validation_callback(
             let cascade =
                 CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
 
-            // keep track of which dependencies are being fetched to
-            // prevent multiple fetches of the same hash
-            let validation_dependencies = validation_dependencies.clone();
-            let is_new_dependency = validation_dependencies
-                .lock()
-                .insert_missing_hash_for_op(author.clone().into(), dht_op_hash.clone());
-            // fetch dependency if it is not being fetched yet
-            if is_new_dependency {
-                tokio::spawn({
-                    let author = author.clone();
-                    async move {
-                        let result = cascade
-                            .must_get_agent_activity(author.clone(), filter)
-                            .await;
-                        if let Err(err) = result {
-                            tracing::warn!(
-                                "error fetching dependent chain of agent {author:?}: {err}"
-                            );
-                        }
-                        // dependency has been fetched and added to the cache
-                        // or an error occurred along the way; in case of an
-                        // error the hash is still removed from the
-                        // collection so that it will be tried again to be
-                        // fetched in the subsequent workflow run
-                        validation_dependencies
-                            .lock()
-                            .remove_missing_hash(&author.into());
+            // fetch dependency
+            tokio::spawn({
+                let author = author.clone();
+                async move {
+                    let result = cascade
+                        .must_get_agent_activity(author.clone(), filter)
+                        .await;
+                    if let Err(err) = result {
+                        tracing::warn!("error fetching dependent chain of agent {author:?}: {err}");
                     }
-                });
-            }
+                }
+            });
             Ok(Outcome::AwaitingDeps(vec![author.into()]))
         }
     }

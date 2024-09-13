@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.4.0-dev.16
+
+## 0.4.0-dev.15
+
+## 0.4.0-dev.14
+
+## 0.4.0-dev.13
+
+- **BREAKING**: `CloneCellId::CellId` has become `CloneCellId::DnaHash`. Now that it’s required that all cells in an app be installed under the same agent key, and because we don’t yet support sharing cells across apps, the DnaHash is sufficient to identify a clone cell within an app. If we allow cell sharing, this may change.
+
+## 0.4.0-dev.12
+
 ## 0.4.0-dev.11
 
 ## 0.4.0-dev.10

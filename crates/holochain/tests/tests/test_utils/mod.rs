@@ -5,9 +5,10 @@ use arbitrary::Arbitrary;
 use ed25519_dalek::{Signer, SigningKey};
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::DataRootPath;
+use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::FullStateDump;
-use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
+use holochain_websocket::{WebsocketReceiver, WebsocketResult};
 
 pub async fn admin_port(conductor: &ConductorHandle) -> u16 {
     conductor
@@ -38,7 +39,6 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::Child;
 use tokio::process::Command;
-use tracing::instrument;
 
 use hdk::prelude::*;
 use holochain::{
@@ -90,7 +90,7 @@ pub async fn grant_zome_call_capability(
     zome_name: ZomeName,
     fn_name: FunctionName,
     signing_key: AgentPubKey,
-) -> std::io::Result<CapSecret> {
+) -> WebsocketResult<CapSecret> {
     let mut fns = BTreeSet::new();
     fns.insert((zome_name, fn_name));
     let functions = GrantedFunctions::Listed(fns);
@@ -160,7 +160,7 @@ pub async fn call_zome_fn<S>(
     assert_matches!(call_response, AppResponse::ZomeCalled(_));
 }
 
-pub async fn attach_app_interface(client: &mut WebsocketSender, port: Option<u16>) -> u16 {
+pub async fn attach_app_interface(client: &WebsocketSender, port: Option<u16>) -> u16 {
     let request = AdminRequest::AttachAppInterface {
         port,
         allowed_origins: AllowedOrigins::Any,
@@ -200,7 +200,7 @@ pub async fn retry_admin_interface(
 pub async fn generate_agent_pub_key(
     client: &mut WebsocketSender,
     timeout: u64,
-) -> std::io::Result<AgentPubKey> {
+) -> WebsocketResult<AgentPubKey> {
     let request = AdminRequest::GenerateAgentPubKey;
     let response = client
         .request_timeout(request, Duration::from_millis(timeout))
@@ -209,19 +209,16 @@ pub async fn generate_agent_pub_key(
     Ok(unwrap_to::unwrap_to!(response => AdminResponse::AgentPubKeyGenerated).clone())
 }
 
+/// Returns the hash of the DNA installed, after modifiers have been applied
 pub async fn register_and_install_dna(
     client: &mut WebsocketSender,
-    orig_dna_hash: DnaHash,
-    agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
     role_name: RoleName,
     timeout: u64,
-) -> std::io::Result<DnaHash> {
+) -> WebsocketResult<CellId> {
     register_and_install_dna_named(
         client,
-        orig_dna_hash,
-        agent_key,
         dna_path,
         properties,
         role_name,
@@ -231,17 +228,16 @@ pub async fn register_and_install_dna(
     .await
 }
 
+/// Returns the hash of the DNA installed, after modifiers have been applied
 #[allow(clippy::too_many_arguments)]
 pub async fn register_and_install_dna_named(
     client: &mut WebsocketSender,
-    _orig_dna_hash: DnaHash,
-    agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
     role_name: RoleName,
     name: String,
     timeout: u64,
-) -> std::io::Result<DnaHash> {
+) -> WebsocketResult<CellId> {
     let mods = DnaModifiersOpt {
         properties,
         ..Default::default()
@@ -249,17 +245,18 @@ pub async fn register_and_install_dna_named(
 
     let dna_bundle1 = DnaBundle::read_from_file(&dna_path).await.unwrap();
     let dna_bundle = DnaBundle::read_from_file(&dna_path).await.unwrap();
-    let (_dna, dna_hash) = dna_bundle1
+    let (dna, _) = dna_bundle1
         .into_dna_file(mods.clone().serialized().unwrap())
         .await
         .unwrap();
+    let dna_hash = dna.dna_hash().clone();
 
     let roles = vec![AppRoleManifest {
         name: role_name,
         dna: AppRoleDnaManifest {
             location: Some(DnaLocation::Bundled(dna_path.clone())),
             modifiers: mods,
-            installed_hash: Some(dna_hash.clone().into()),
+            installed_hash: None,
             clone_limit: 0,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
@@ -279,19 +276,23 @@ pub async fn register_and_install_dna_named(
         .unwrap();
 
     let payload = InstallAppPayload {
-        agent_key,
+        agent_key: None,
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(name),
         network_seed: None,
         membrane_proofs: Default::default(),
         existing_cells: Default::default(),
         ignore_genesis_failure: false,
+        allow_throwaway_random_agent_key: true,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
     let response = check_timeout_named("InstallApp", response, timeout).await?;
-    assert_matches!(response, AdminResponse::AppInstalled(_));
-    Ok(dna_hash)
+    if let AdminResponse::AppInstalled(app) = response {
+        Ok(CellId::new(dna_hash, app.agent_pub_key))
+    } else {
+        panic!("InstallApp failed: {:?}", response);
+    }
 }
 
 pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16> {
@@ -342,6 +343,7 @@ pub async fn check_started(holochain: &mut Child) {
     }
 }
 
+/// Create test config with test keystore and DPKI disabled
 pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig {
     ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -352,6 +354,7 @@ pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig
         }]),
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,
+        dpki: DpkiConfig::disabled(),
         ..Default::default()
     }
 }
@@ -362,26 +365,27 @@ pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
     path
 }
 
-#[instrument(skip(response))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(response)))]
 pub async fn check_timeout<T>(
-    response: impl Future<Output = std::io::Result<T>>,
+    response: impl Future<Output = WebsocketResult<T>>,
     timeout_ms: u64,
-) -> std::io::Result<T> {
+) -> WebsocketResult<T> {
     check_timeout_named("<unnamed>", response, timeout_ms).await
 }
 
-#[instrument(skip(response))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(response)))]
 async fn check_timeout_named<T>(
     name: &'static str,
-    response: impl Future<Output = std::io::Result<T>>,
+    response: impl Future<Output = WebsocketResult<T>>,
     timeout_millis: u64,
-) -> std::io::Result<T> {
+) -> WebsocketResult<T> {
     match tokio::time::timeout(Duration::from_millis(timeout_millis), response).await {
         Ok(response) => response,
         Err(_) => Err(std::io::Error::other(format!(
             "{}: Timed out on request after {}",
             name, timeout_millis
-        ))),
+        ))
+        .into()),
     }
 }
 
@@ -389,7 +393,7 @@ pub async fn dump_full_state(
     client: &mut WebsocketSender,
     cell_id: CellId,
     dht_ops_cursor: Option<u64>,
-) -> std::io::Result<FullStateDump> {
+) -> WebsocketResult<FullStateDump> {
     let request = AdminRequest::DumpFullState {
         cell_id: Box::new(cell_id),
         dht_ops_cursor,
@@ -399,9 +403,6 @@ pub async fn dump_full_state(
 
     match response {
         AdminResponse::FullStateDumped(state) => Ok(state),
-        _ => Err(std::io::Error::other(format!(
-            "DumpFullState failed: {:?}",
-            response
-        ))),
+        _ => Err(std::io::Error::other(format!("DumpFullState failed: {:?}", response)).into()),
     }
 }

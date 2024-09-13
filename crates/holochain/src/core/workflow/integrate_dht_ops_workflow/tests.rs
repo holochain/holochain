@@ -35,7 +35,7 @@ impl TestData {
         Self::new_inner(original_entry, new_entry)
     }
 
-    #[instrument()]
+    #[cfg_attr(feature = "instrument", tracing::instrument())]
     fn new_inner(original_entry: Entry, new_entry: Entry) -> Self {
         // original entry
         let original_entry_hash =
@@ -46,7 +46,7 @@ impl TestData {
 
         // Original entry and action for updates
         let mut original_action = fixt!(NewEntryAction, PublicCurve);
-        debug!(?original_action);
+        tracing::debug!(?original_action);
 
         match &mut original_action {
             NewEntryAction::Create(c) => c.entry_hash = original_entry_hash.clone(),
@@ -136,7 +136,7 @@ enum Db {
 
 impl Db {
     /// Checks that the database is in a state
-    #[instrument(skip(expects, env))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(expects, env)))]
     async fn check(expects: Vec<Self>, env: DbWrite<DbKindDht>, here: String) {
         env.read_async(move |txn| -> DatabaseResult<()> {
             for expect in expects {
@@ -315,7 +315,7 @@ impl Db {
     }
 
     // Sets the database to a certain state
-    #[instrument(skip(pre_state, env))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(pre_state, env)))]
     async fn set<'env>(pre_state: Vec<Self>, env: DbWrite<DbKindDht>) {
         env.write_async(move |txn| -> DatabaseResult<()> {
             for state in pre_state {

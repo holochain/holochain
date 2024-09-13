@@ -706,7 +706,7 @@ mod tests {
             if self.every_other_call_fails && calls % 2 == 1 {
                 return async move {
                     Err(KitsuneP2pError::Bootstrap(BootstrapClientError::Bootstrap(
-                        "test error".to_string().into_boxed_str(),
+                        "TestBootstrapService error".to_string().into_boxed_str(),
                     )))
                 }
                 .boxed();

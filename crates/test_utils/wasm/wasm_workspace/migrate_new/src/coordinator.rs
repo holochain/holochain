@@ -18,7 +18,10 @@ fn init() -> ExternResult<InitCallbackResult> {
                 "Could not deserialize properties".to_string()
             ))
         })?;
-    open_chain(properties.prev_dna_hash.clone())?;
+
+    // TODO: must get close_hash from init context, which is currently not possible.
+    let close_hash = ActionHash::from_raw_36(vec![0; 36]);
+    open_chain(properties.prev_dna_hash.clone().into(), close_hash)?;
 
     let my_agent_info = agent_info()?;
     let response = call(

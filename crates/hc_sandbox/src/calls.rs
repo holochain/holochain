@@ -37,6 +37,7 @@ use crate::CmdRunner;
 use clap::{Args, Parser, Subcommand};
 use holochain_trace::Output;
 use holochain_types::websocket::AllowedOrigins;
+use holochain_websocket::WebsocketError;
 
 #[doc(hidden)]
 #[derive(Debug, Parser)]
@@ -289,7 +290,7 @@ pub async fn call(
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
             match CmdRunner::try_new(port).await {
                 Ok(cmd) => cmds.push((cmd, None, None)),
-                Err(e) => {
+                Err(WebsocketError::Io(e)) => {
                     if let std::io::ErrorKind::ConnectionRefused
                     | std::io::ErrorKind::AddrNotAvailable = e.kind()
                     {
@@ -303,6 +304,12 @@ pub async fn call(
                         cmds.push((CmdRunner::new(port).await, Some(holochain), Some(lair)));
                         continue;
                     }
+                    bail!(
+                        "Failed to connect to running conductor or start one {:?}",
+                        e
+                    )
+                }
+                Err(e) => {
                     bail!(
                         "Failed to connect to running conductor or start one {:?}",
                         e
@@ -535,11 +542,6 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         network_seed,
     } = args;
 
-    let agent_key = match agent_key {
-        Some(agent) => agent,
-        None => generate_agent_pub_key(cmd).await?,
-    };
-
     let payload = InstallAppPayload {
         installed_app_id: app_id,
         agent_key,
@@ -548,6 +550,7 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         existing_cells: Default::default(),
         network_seed,
         ignore_genesis_failure: false,
+        allow_throwaway_random_agent_key: true,
     };
 
     let r = AdminRequest::InstallApp(Box::new(payload));

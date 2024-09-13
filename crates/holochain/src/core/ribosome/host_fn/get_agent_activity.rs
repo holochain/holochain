@@ -28,11 +28,13 @@ pub fn get_agent_activity(
                 ActivityRequest::Status => GetActivityOptions {
                     include_valid_activity: false,
                     include_rejected_activity: false,
+                    get_options: GetOptions::local(),
                     ..Default::default()
                 },
                 ActivityRequest::Full => GetActivityOptions {
                     include_valid_activity: true,
                     include_rejected_activity: true,
+                    get_options: GetOptions::local(),
                     ..Default::default()
                 },
             };

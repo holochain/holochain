@@ -1,13 +1,11 @@
-use std::sync::Arc;
-
+use super::WireLinkKey;
 use holo_hash::AnyLinkableHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_state::prelude::*;
 use holochain_state::query::StateQueryError;
 use holochain_types::sql::ToSqlStatement;
-
-use super::WireLinkKey;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct GetLinksOpsQuery {
@@ -97,12 +95,13 @@ impl Query for GetLinksOpsQuery {
     }
 
     fn params(&self) -> Vec<Params> {
-        named_params! {
+        let params = named_params! {
             ":create": ChainOpType::RegisterAddLink,
             ":delete": ChainOpType::RegisterRemoveLink,
             ":base_hash": self.base,
-        }
-        .to_vec()
+        };
+
+        params.to_vec()
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
