@@ -30,7 +30,7 @@ pub async fn accept_countersigning_request(
 
     if workspace.is_none() {
         tracing::warn!(
-            "Received countersigning signature bundle for agent: {:?} but no workspace found",
+            "Cannot accept countersigning session because the workspace is missing: {:?}",
             author
         );
         return Err(WorkflowError::other("Missing workspace"));
@@ -97,7 +97,7 @@ pub async fn accept_countersigning_request(
     };
 
     // Kick off the countersigning workflow and let it figure out what actions to take.
-    tracing::debug!("Accepted countersigning session, triggering countersigning workflow");
+    tracing::info!("Accepted countersigning session, triggering countersigning workflow");
     countersigning_trigger.trigger(&"accept_countersigning_request");
 
     Ok(PreflightRequestAcceptance::Accepted(
