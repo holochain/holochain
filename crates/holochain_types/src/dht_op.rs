@@ -558,6 +558,23 @@ impl ChainOp {
         }
     }
 
+    /// Get the signed action from this op
+    pub fn signed_action(&self) -> SignedAction {
+        match self {
+            Self::StoreRecord(s, a, _) => SignedAction::new(a.clone(), s.clone()),
+            Self::StoreEntry(s, a, _) => SignedAction::new(a.clone().into(), s.clone()),
+            Self::RegisterAgentActivity(s, a) => SignedAction::new(a.clone(), s.clone()),
+            Self::RegisterUpdatedContent(s, a, _) => SignedAction::new(a.clone().into(), s.clone()),
+            Self::RegisterUpdatedRecord(s, a, _) => SignedAction::new(a.clone().into(), s.clone()),
+            Self::RegisterDeletedBy(s, a) => SignedAction::new(a.clone().into(), s.clone()),
+            Self::RegisterDeletedEntryAction(s, a) => {
+                SignedAction::new(a.clone().into(), s.clone())
+            }
+            Self::RegisterAddLink(s, a) => SignedAction::new(a.clone().into(), s.clone()),
+            Self::RegisterRemoveLink(s, a) => SignedAction::new(a.clone().into(), s.clone()),
+        }
+    }
+
     /// Check if this represents a genesis op.
     pub fn is_genesis(&self) -> bool {
         // XXX: Not great encapsulation here, but hey, at least it's using
@@ -647,6 +664,24 @@ impl ChainOp {
         Ok(r)
     }
 
+    /// "Normalize" the op by running it through `from_type` to give a sensisble
+    /// interpretation of the potential absence of an entry.
+    ///
+    /// If the action contains no entry but an entry is provided anyway, ignore
+    /// the provided entry.
+    ///
+    /// This is useful when generating arbitrary ops.
+    #[cfg(feature = "test_utils")]
+    pub fn normalized(self) -> DhtOpResult<Self> {
+        let action = self.signed_action();
+        let entry = if action.entry_hash().is_none() {
+            None
+        } else {
+            self.entry().into_option().cloned()
+        };
+        Self::from_type(self.get_type(), action, entry)
+    }
+
     /// Enzymatic countersigning session ops need special handling so that they
     /// arrive at the enzyme and not elsewhere. If this isn't an enzymatic
     /// countersigning session then the return will be None so can be used as
@@ -700,6 +735,22 @@ impl ChainOp {
     /// Calculate the op's sys validation dependency action hash
     pub fn sys_validation_dependencies(&self) -> SysValDeps {
         self.get_type().sys_validation_dependencies(&self.action())
+    }
+
+    /// Map the RecordEntry in the op using a function
+    pub fn map_entry(self, f: impl FnOnce(RecordEntry) -> RecordEntry) -> Self {
+        match self {
+            Self::StoreRecord(signature, action, entry) => {
+                Self::StoreRecord(signature, action, f(entry))
+            }
+            Self::RegisterUpdatedContent(signature, action, entry) => {
+                Self::RegisterUpdatedContent(signature, action, f(entry))
+            }
+            Self::RegisterUpdatedRecord(signature, action, entry) => {
+                Self::RegisterUpdatedRecord(signature, action, f(entry))
+            }
+            _ => self,
+        }
     }
 }
 
