@@ -134,7 +134,7 @@ struct Signature([u8; 64]);
 
 Implementation detail: Theoretically all actions could point via a hash to an entry that would contain the "content" of that action. But because many of the different actions entries are system-defined, and they thus have a known structure, we can reduce unnecessary data elements and gossip by embedding the entry data for system-defined entry types right in the action itself. However, for application-defined entry types, because the structure of the entry is not known at compile time for Holochain, the entry data must be in a separate data structure. Additionally there are a few system entry types (see below) that must be independently retrievable from the DHT, and thus have their own separate system-defined variant of the `Entry` enum type.
 
-The action types and their additional data fields necessary are:
+Many, though not all, actions comprise intentions to create, read, update, or delete (CRUD), data on the DHT. The action types and their additional data fields necessary are:
 
 * `Dna`: indicates the DNA hash of the validation rules by which the data in this source chain agrees to abide.
 
@@ -231,7 +231,7 @@ The action types and their additional data fields necessary are:
     }
     ```
 
-All of the CRUD actions SHOULD include data to implement rate-limiting so as to prevent malicious network actions. In our implementation, all CRUD actions have a `weight` field of the following type:
+All of the CRUD actions MUST include data to implement rate-limiting so as to prevent malicious network actions. In our implementation, all CRUD actions have a `weight` field of the following type:
 
 ```rust
 struct RateWeight {
@@ -1539,9 +1539,25 @@ impl HashableContent for Warrant {
 
 ### Changing States of DHT Content
 
-A Holochain DHT exhibits a logical monotonicity[^calm-theorem]; it is an accumulation of operations over time. The natural consequence of this property is that any two peers who receive the same set of DHT operations will arrive at the same database state without need of a coordination protocol.
+As a simple accumulation of data (DHT operations) attached to their respective basis addresses, a Holochain DHT exhibits a logical monotonicity[^calm-theorem]. The natural consequence of this property is that any two peers who receive the same set of DHT operations will arrive at the same database state without need of a coordination protocol.
 
 [^calm-theorem]: [Keeping CALM: When Distributed Consistency is Easy](https://arxiv.org/abs/1901.01930), Joseph M Hellerstein and Peter Alvaro.
+
+While the monotonic accumulation of operations is the most fundamental truth about the nature of DHT data, it is nevertheless important for the goal of ensuring Holochain's fitness for application development that we give the operations further meaning. This happens at two levels:
+
+* **Data and metadata**: The immediate result of applying an operation to a basis address is that data or metadata is now available for querying at that basis address. This takes the form of:
+    * A record as primary data,
+    * An entry and its set of creation actions as primary data, presented as the Cartesian product $\{e\} \times \{h_1, \dots, h_n\}$,
+    * Record updates and deletes as metadata,
+    * Link creations and deletions as metadata,
+    * Agent activity as a tree of metadata,
+    * Validation status as metadata, and
+    * Warrants as metadata.
+* **CRUD**: The total set of metadata on a basis address can always be accessed and interpreted as the application developer sees fit (see `get_details` in the DHT Data Retrieval section of this appendix), but certain opinionated interpretations of that set are useful to provide as defaults[^crdt-like]:
+    * The set difference between all record creates/updates and deletes that refer to them can be accessed as a "tombstone" set that yields the list of non-deleted records, the liveness of an entry or record, or the earliest live non-deleted record for an entry (see `get` in the DHT Data Retrieval section).
+    * The set difference between all link creates and link deletes that refer to them can be accessed as a tombstone set that yields the list of non-deleted links (see `get_links` in the DHT Data Retrieval section).
+
+[^crdt-like]: While this interpretation indicates that the set of metadata can be validly seen as operations in a simple operation-based [conflict-free replicated data type (CRDT)](https://crdt.tech), we have chosen not to use this term in order to avoid overlaying of preconceptions formed by more capable CRDTs.
 
 #### Validation and Liveness on the DHT
 
@@ -1605,6 +1621,19 @@ An Agent's status, which can be retrieved from the Agent ID basis (that is, the 
 * Validity of every Source Chain action (that is, whether all `RegisterAgentActivity` operations are valid)
 * Linearity of Source Chain (that is, whether there are any branches in the Source chain, also determined during integration of `RegisterAgentActivity` operations)
 * Presence of valid Warrants received from other authorities via `WarrantOp` DHT operations
+
+```dot
+digraph {
+    edge [color=Blue]
+
+    Empty -> Valid [label="Integration of\nRegisterAgentActivity(Dna)\nsucceeds"]
+    Empty -> Invalid [label="Integration of\nRegisterAgentActivity(Dna)\nfails"]
+    Valid -> Valid [label="Integration of\nRegisterAgentActivity(n)\nsucceeds"]
+    Valid -> Invalid [label="Integration of\nRegisterAgentActivity(n)\nfails"]
+    Valid -> Forked [label="Integration of\nRegisterAgentActivity(n)\ndetects fork"]
+    Valid -> Invalid [label="Integration of\nwarrant against\nagent"]
+}
+```
 
 ## P2P Networking
 

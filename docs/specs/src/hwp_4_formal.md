@@ -83,7 +83,7 @@ The code that comprises a Holochain application is categorized into two differen
     * identifies the types of entries and links that may be committed in the app,
     * defines the structure of data entries, and
     * defines the validation code each node runs for each type of operation that intends to add to state at a given DHT address.
-2. **Coordinator Zomes**, the set of which can be removed from or added to while an app is live, and which contain various CRUD operations for entries and links, functions related to following graph links and querying collections of data on the DHT, and any auxillary functionality someone wants to bundle in their application.
+2. **Coordinator Zomes**, the set of which can be removed from or added to while an app is live, and which contain various create, read, update, and delete (CRUD) operations for entries and links, functions related to following graph links and querying collections of data on the DHT, and any auxillary functionality someone wants to bundle in their application.
 
 Each application running on Holochain is uniquely identified by a DNA hash of the integrity zome code, after being compiled to Web Assembly (WASM) and bundled with additional settings and properties required for that app.
 
