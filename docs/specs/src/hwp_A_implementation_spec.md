@@ -83,11 +83,11 @@ For any guest functions which are permitted to change source chain state (`init`
 1. Prepare a context which includes the aforementioned host function access, as well as the current source chain state and a temporary "scratch space" into which to write new source chain state changes.
 2. Check the state of the source chain; if it does not contain an `InitZomesComplete` action, run the `init` callback and remember any state changes in the scratch space.
 3. If no `init` callbacks fail, proceed to call the guest function, remembering any state changes in the scratch space.
-4. Produce DHT transforms from the state changes in the scratch space.
-5. Attempt to validate the DHT transforms.
-6. If all the DHT transforms are valid, persist the Actions in the scratch space to the source chain.
+4. Transform the state changes in the scratch space into DHT operations.
+5. Attempt to validate the DHT operations.
+6. If all the DHT operations are valid, persist the Actions in the scratch space to the source chain.
 7. If the called function was a zome function, return the zome function call's return value to the caller.
-8. Spawn the `post_commit` callback in the same Coordinator Zome as the called guest function and attempt to publish the DHT transforms to the DHT.
+8. Spawn the `post_commit` callback in the same Coordinator Zome as the called guest function and attempt to publish the DHT operations to the DHT.
 
 State changes in a scratch space MUST be committed atomically to the source chain; that is, all of them MUST be written or fail as a batch.
 
@@ -376,7 +376,7 @@ Comparing this structure to a Resource Description Framework (RDF) triple:
 
 ##### The `Op` Data Type
 
-The `Op` types that hold the chain entry transform data that is published to different portions of the DHT (formally described in [section four](hwp_4_formal.md#graph-transformation)) are listed below. The integrity zome defines a validation callback for the entry and link types it defines, and is called with an `Op` enum variant as its single parameter, which indicates the DHT perspective from which to validate the data. Each variant holds a struct containing the DHT operation payload:
+The `Op` types that hold the chain entry data that is published to different portions of the DHT (formally described in [section four](hwp_4_formal.md#graph-transformation)) are listed below. The integrity zome defines a validation callback for the entry and link types it defines, and is called with an `Op` enum variant as its single parameter, which indicates the DHT perspective from which to validate the data. Each variant holds a struct containing the DHT operation payload:
 
 * `StoreRecord`: executed by the record (action) authorities to store data. It contains the record to be validated, including the entry if it is public.
 
@@ -401,7 +401,7 @@ The `Op` types that hold the chain entry transform data that is published to dif
     }
     ```
 
-* `RegisterUpdate`: executed by both the entry and record authorities for the _old_ data to store metadata pointing to the _new_ data. This op collapses both the `RegisterUpdatedRecord` and `RegisterUpdatedContent` transforms into one for simplicity. It contains the update action as well as the entry, if it is public.
+* `RegisterUpdate`: executed by both the entry and record authorities for the _old_ data to store metadata pointing to the _new_ data. This op collapses both the `RegisterUpdatedRecord` and `RegisterUpdatedContent` operations into one for simplicity. It contains the update action as well as the entry, if it is public.
 
     ```rust
     struct RegisterUpdate {
@@ -410,7 +410,7 @@ The `Op` types that hold the chain entry transform data that is published to dif
     }
     ```
 
-* `RegisterDelete`: executed by the entry authorities for the _old_ entry creation and its entry to store metadata that tombstones the data. This opp collapses both the `RegisterDeletedEntryAction` and `RegisterDeletedBy` transforms into one. It contains only the delete action.
+* `RegisterDelete`: executed by the entry authorities for the _old_ entry creation and its entry to store metadata that tombstones the data. This opp collapses both the `RegisterDeletedEntryAction` and `RegisterDeletedBy` operations into one. It contains only the delete action.
 
     ```rust
     struct RegisterDelete {
@@ -899,7 +899,7 @@ It is the application's responsibility to retrieve a stored capability claim usi
 
     Depending on the value of the `ActivityRequest` argument, `status` may be the only populated field.
 
-* `get_validation_receipts(GetValidationReceiptsInput) -> ExternResult<Vec<ValidationReceiptSet>>`: Retrieve information about how 'persisted' the DHT transforms for an Action are. This is meant to provide end-user feedback on whether an agent's authored data can easily be retrieved by other peers. The input argument is defined as:
+* `get_validation_receipts(GetValidationReceiptsInput) -> ExternResult<Vec<ValidationReceiptSet>>`: Retrieve information about how 'persisted' the DHT operations for an Action are. This is meant to provide end-user feedback on whether an agent's authored data can easily be retrieved by other peers. The input argument is defined as:
 
     ```rust
     struct GetValidationReceiptsInput {
@@ -911,7 +911,7 @@ It is the application's responsibility to retrieve a stored capability claim usi
 
     ```rust
     struct ValidationReceiptSet {
-        // The DHT transform hash that this receipt is for.
+        // The DHT operation hash that this receipt is for.
         op_hash: DhtOpHash,
         // The type of the op that was validated. This represents the underlying
         // operation type and does not map one-for-one to the `Op` type used in
@@ -1281,13 +1281,13 @@ The previous section describes the functions exposed to, and callable from, DNA 
 
 ### Ontology of Workflows
 
-While a properly defined and implemented Holochain system must necessarily be robust enough to handle data from an incorrectly operating peer, it is nevertheless a more productive experience for everyone if all nodes in a network transform their states according to the same process. There are also cases in which an incorrect implementation may result in unrecoverable corruption to state.
+While a properly defined and implemented Holochain system must necessarily be robust enough to handle data from an incorrectly operating peer, it is nevertheless a more productive experience for everyone if all nodes in a network change their states according to the same process. There are also cases in which an incorrect implementation may result in unrecoverable corruption to state.
 
 Hence, we must define an **ontology of workflows**. A Workflow is defined ontologically as a process which:
 
-1. Accesses and potentially transforms Holochain state,
+1. Accesses and potentially changes Holochain state,
 2. Receives an ephemeral input context necessary to do its job,
-3. Optionally triggers other workflows to follow up on the newly transformed state, potentially including another iteration of itself, and
+3. Optionally triggers other workflows to follow up on the newly changed state, potentially including another iteration of itself, and
 3. Optionally returns a value which can be passed to a waiting receiver.
 
 It is important to note that Workflows are reifications of the inherent physics of Holochain; that is, the concept of a Workflow is demanded by the kinds of state changes a Holochain implementation is expected to make.
@@ -1296,8 +1296,8 @@ The properties which hold for all Workflows are:
 
 * A Workflow MUST operate only on an aspect of local Holochain state, and MUST NOT make assumptions about the value of any aspects of Holochain state it does not operate on, whether local or remote.
 * A Workflow MUST NOT leave the state it operates on in a corrupt condition it fails for any reason, whether the failure is expected (such as validation failure) or unexpected (such as hardware malfunction). This means that it MUST either make an atomic and valid state change or make no state change at all.
-    * Corollary: a Workflow MUST treat the Holochain state upon which it operates as the ultimate source of truth about itself, which means that any other state it builds up during execution MUST be treated as incidental and disposable; that is, it MUST able to successfully recover from a failure and correctly transform cryptographic state even if incidental state is lost.
-* A Workflow MUST have direct access to the state it is manipulating so that it may observe it immediately before transforming it, to avoid race conditions between Workflows that operate on the same state.
+    * Corollary: a Workflow MUST treat the Holochain state upon which it operates as the ultimate source of truth about itself, which means that any other state it builds up during execution MUST be treated as incidental and disposable; that is, it MUST able to successfully recover from a failure and correctly change cryptographic state even if incidental state is lost.
+* A Workflow MUST have direct access to the state it is manipulating so that it may observe it immediately before changing it, to avoid race conditions between Workflows that operate on the same state.
 * A Workflow MUST operate on only one aspect of Holochain state, an aspect being defined as a portion of state which can be changed independently of other aspects.
 * A change to Holochain state MUST be expressed monotonically. (This is merely a restatement of the fact that all changes of Holochain state are by nature monotonic.)
 * If a Workflow operates on a contentious aspect of state, it MUST either:
@@ -1315,23 +1315,23 @@ We intend to publish an addendum which enumerates the necessary workflows, the a
 
 In this section we detail some important implementation details of Holochain's graph DHT.
 
-### DHT Operation Transforms
+### DHT Operations
 
 #### Structure of DhtOps
 
-You can think of a topological transform operation as having this sort of grammar:
+You can think of a DHT operation as having this sort of grammar:
 
-$BasisHash, TransformType, Payload$
+$BasisHash, OperationType, Payload$
 
 Where:
 
-* $BasisHash$ is the address to which a transform is being applied.
-* $TransformType$ is the type of transform a node is responsible for performing.
-* $Payload$ is the self-proving structure which contains the data needed to perform the transform. In all cases this includes the `Action`; it may also include the `Entry` if such a thing exists for the action type and if it is required to validate and perform the transform.
+* $BasisHash$ is the address to which an operation is being applied.
+* $OperationType$ is the type of operation a node is responsible for performing.
+* $Payload$ is the self-proving structure which contains the data needed to perform the operation. In all cases this includes the `Action`; it may also include the `Entry` if such a thing exists for the action type and if it is required to validate and perform the operation.
 
-The technical implementation below of the human-friendly grammar above compresses and drops unnecessary items where possible. There are a couple of $TransformType$ where we can drop the entry (but never the action); in these cases we can reduce all the data down to `Action` + an $TransformType$ enum struct which usually contains the entry.
+The technical implementation below of the human-friendly grammar above compresses and drops unnecessary items where possible. There are a couple of $OperationType$ where we can drop the entry (but never the action); in these cases we can reduce all the data down to `Action` + an $OperationType$ enum struct which usually contains the entry.
 
-The basis hash (or hash neighborhood we're sending the transform to) can be derived from the payload using the `dht_basis` function outlined below.
+The basis hash (or hash neighborhood we're sending the operation to) can be derived from the payload using the `dht_basis` function outlined below.
 
 ```rust
 enum DhtOp {
@@ -1419,7 +1419,7 @@ enum ChainIntegrityWarrant {
 }
 ```
 
-#### Uniquely Hashing Transform Ops
+#### Uniquely Hashing Dht Operations
 
 When items are gossiped/published to us, we SHOULD be able to quickly check:
 
@@ -1428,10 +1428,10 @@ When items are gossiped/published to us, we SHOULD be able to quickly check:
 
 and quickly take appropriate action.
 
-To facilitate this, implementations MUST define a reproducible way of hashing DHT transforms. The following code outlines the minimal necessary contents to create the correct transform hash. The basic procedure for all transforms is:
+To facilitate this, implementations MUST define a reproducible way of hashing DHT operations. The following code outlines the minimal necessary contents to create the correct operation hash. The basic procedure for all operations is:
 
-1. Drop all data from the transform except the action.
-2. Wrap the action in a variant of a simplified enum representing the minimal data needed to uniquely identify the transform, thus allowing it to be distinguished from other transforms derived from the same action.
+1. Drop all data from the operation except the action.
+2. Wrap the action in a variant of a simplified enum representing the minimal data needed to uniquely identify the operation, thus allowing it to be distinguished from other operations derived from the same action.
 3. Serialize and hash the simplified value.
 
 ```rust
@@ -1537,19 +1537,17 @@ impl HashableContent for Warrant {
 }
 ```
 
-### Transforming States of DHT Content
+### Changing States of DHT Content
 
-A Holochain DHT exhibits a simple monotonicity; it is an accumulation of transform operations over time. However, in order to become a practical graph database with affordances such as mutability, it also exhibits a _logical monotonicity_[^calm-theorem] -- specifically, it is an operation-based conflict-free replicated data type (CRDT) [^op-crdt] which yields a final state consisting of a hash table of basis hashes containing individual meaningful states which together form such a database. The natural consequence of this property is that any two peers who receive the same set of DHT transform operations will arrive at the same database state without need of a coordination protocol.
+A Holochain DHT exhibits a logical monotonicity[^calm-theorem]; it is an accumulation of operations over time. The natural consequence of this property is that any two peers who receive the same set of DHT operations will arrive at the same database state without need of a coordination protocol.
 
 [^calm-theorem]: [Keeping CALM: When Distributed Consistency is Easy](https://arxiv.org/abs/1901.01930), Joseph M Hellerstein and Peter Alvaro.
 
-[^op-crdt]: [Conflict-free Replicated Data Types](https://inria.hal.science/hal-00932836/file/CRDTs_SSS-2011.pdf), Marc Shapiro, Nuno Preguiça, Carlos Baquero, Marek Zawirski. An operation-based CRDT is not necessarily idempotent, which requires that its communications infrastructure make guarantees about uniqueness of delivery and causal ordering for operations. In Holochain, however, these requirements are satisfied by the data structures themselves: hashing of DHT transform operations guarantees uniqueness, while CRUD operations that are order-dependent list their causal dependencies explicitly by hash, which allows the Conductor's integration workflow to integrate operations in the correct order.
-
 #### Validation and Liveness on the DHT
 
-The first task before transforming the DHT to include a new piece of data is to validate the transform according to both system-level and application-specific rules. Additionally, a transform MUST be accompanied by a valid provenance signature that matches the public key of its author.
+The first task before changing the DHT to include a new piece of data is to validate the operation according to both system-level and application-specific rules. Additionally, an operation MUST be accompanied by a valid provenance signature that matches the public key of its author.
 
-DHT transforms whose validation process has been abandoned are not gossiped. There are two reasons to abandon validation. Both have to do with consuming too much resources.
+DHT operations whose validation process has been abandoned are not gossiped. There are two reasons to abandon validation. Both have to do with consuming too much resources.
 
 1. It has stayed in our validation queue too long without being able to resolve dependencies.
 2. The app validation code used more resources (CPU, memory, bandwidth) than we allocate for validation. This lets us address the halting problem of validation with infinite loops.
@@ -1566,7 +1564,7 @@ digraph {
 
 #### Entry Liveness Status
 
-The 'liveness' status of an Entry at its DHT basis is transformed in the following ways:
+The 'liveness' status of an Entry at its DHT basis is changed in the following ways:
 
 ```dot
 digraph {
@@ -1604,9 +1602,9 @@ A link is considered `Dead` only after at least one `RegisterDeleteLink` operati
 An Agent's status, which can be retrieved from the Agent ID basis (that is, the Agent's public key), is a composite of:
 
 * Liveness of `AgentID` Entry, according to the above rules defined in Entry Liveness Status
-* Validity of every Source Chain action (that is, whether all `RegisterAgentActivity` transforms are valid)
-* Linearity of Source Chain (that is, whether there are any branches in the Source chain, also determined during integration of `RegisterAgentActivity` transforms)
-* Presence of valid Warrants received from other authorities via `WarrantOp` DHT transforms
+* Validity of every Source Chain action (that is, whether all `RegisterAgentActivity` operations are valid)
+* Linearity of Source Chain (that is, whether there are any branches in the Source chain, also determined during integration of `RegisterAgentActivity` operations)
+* Presence of valid Warrants received from other authorities via `WarrantOp` DHT operations
 
 ## P2P Networking
 
@@ -2107,10 +2105,10 @@ These are the message types that MUST be implemented. They are all defined as va
             User(Vec<u8>),
             // Broadcast one's own agent info.
             AgentInfo(AgentInfoSigned),
-            // Announce that one or more DHT transforms have been published for
+            // Announce that one or more DHT operations have been published for
             // which the receiver is believed to be an authority; it is expected
             // that they will follow up by sending `FetchOp` messages to request
-            // the transforms. Because the remote node may claim authority for a
+            // the operations. Because the remote node may claim authority for a
             // range of basis hashes, multiple operations MUST be permitted to
             // be announced in one message.
             Publish {
@@ -2160,7 +2158,7 @@ These are the message types that MUST be implemented. They are all defined as va
         // of roughly -x * 4096.
         struct RoughInt(i16);
 
-        // Represents a DHT transform hash.
+        // Represents a DHT operation hash.
         struct KitsuneOpHash(Vec<u8>);
 
         // Arbitrary context identifier.
@@ -2189,7 +2187,7 @@ These are the message types that MUST be implemented. They are all defined as va
 
         The `data` argument is the data to be passed on to the neighborhood, and is defined above under `Broadcast`.
 
-* `Gossip`: Negotiate gossiping of DHT transforms, with an opaque data block to be interpreted by a gossip implementation.
+* `Gossip`: Negotiate gossiping of DHT operations, with an opaque data block to be interpreted by a gossip implementation.
 
     * **Notes**: Kitsune handles gossip per Space (which maps to a DNA at the higher Holochain layer) rather than a cell. This message uses the Notify strategy.
 
@@ -2266,7 +2264,7 @@ These are the message types that MUST be implemented. They are all defined as va
         }
         ```
 
-* `FetchOp`: Request DHT transform data which a node claims to hold.
+* `FetchOp`: Request DHT operation data which a node claims to hold.
 
     * **Notes**: This and its response `PushOpData` transfer the actual data which is validated and integrated at basis hashes for which a node is an authority. As an optimization, a node can request data for multiple Spaces which they believe the remote node has in common with them. The `FetchKey` type is defined as:
 
@@ -2338,7 +2336,7 @@ Any gossip algorithm to be used in the Holochain context MUST be able to handle 
 3. Gossip SHOULD prioritize the synchronization of data that is more likely to be in demand; for many common application scenarios, this means that more recently published data should be synchronized sooner and more frequently.
 4. Gossip SHOULD dynamically adapt to changing realities of authority coverage for all basis hashes by communicating individual peer coverage regularly, allowing nodes with sufficient excess capacity to assume greater coverage to compensate for regions with poor coverage, either because peers go offline or their excess capacity is limited.
 
-We have developed a hybrid gossip implementation that separates DHT transforms into "recent" and "historical", with recent gossip using a Bloom filter and historical gossip using a novel "quantized gossip" algorithm that efficiently shards and redistributes data as nodes come and go on the network. While the full description of that implementation is beyond the scope of this document, we will document the messages that nodes pass:
+We have developed a hybrid gossip implementation that separates DHT operations into "recent" and "historical", with recent gossip using a Bloom filter and historical gossip using a novel "quantized gossip" algorithm that efficiently shards and redistributes data as nodes come and go on the network. While the full description of that implementation is beyond the scope of this document, we will document the messages that nodes pass:
 
 * `Initiate`: Propose a gossip round, specifying one or more arcs of the location space for which the initiator is an authority.
 
@@ -3004,7 +3002,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
     * **Arguments**: If supplied, the `dna_hash` argument MUST constrain the results to the peers of the specified DNA.
 
 * `GraftRecords { cell_id: CellId, validate: bool, records: Vec<Record> } -> RecordsGrafted`: "Graft" `Record`s onto the source chain of the specified `CellId`.
-    * **Notes**: Implementations MAY implement this function. This admin call is provided for the purposes of restoring chains from backup. All records must be authored and signed by the same agent; if they are not, the call MUST fail. Caution must be exercised to avoid creating source chain forks, which will occur if the chains in the Conductor store and the new records supplied in this call diverge and have had their `RegisterAgentActivity` transforms already published.
+    * **Notes**: Implementations MAY implement this function. This admin call is provided for the purposes of restoring chains from backup. All records must be authored and signed by the same agent; if they are not, the call MUST fail. Caution must be exercised to avoid creating source chain forks, which will occur if the chains in the Conductor store and the new records supplied in this call diverge and have had their `RegisterAgentActivity` operations already published.
     * **Arguments**:
         * If `validate` is `true`, then the records MUST be validated before insertion. If `validate` is `false`, then records MUST be inserted as-is.
         * Records provided are expected to form a valid chain segment (ascending sequence numbers and valid `prev_action` references). If the first record contains a `prev_action` which matches an existing record, then the new records MUST be "grafted" onto the existing chain at that point, and any other records following that point which do not match the new records MUST be discarded. See the note above about the risk of source chain forks when using this call.

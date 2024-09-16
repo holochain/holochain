@@ -82,7 +82,7 @@ The code that comprises a Holochain application is categorized into two differen
 1. **Integrity Zomes** which provide the immutable portion of the app's code that:
     * identifies the types of entries and links that may be committed in the app,
     * defines the structure of data entries, and
-    * defines the validation code each node runs for each type of operation that intends to transform the state at a given DHT address.
+    * defines the validation code each node runs for each type of operation that intends to add to state at a given DHT address.
 2. **Coordinator Zomes**, the set of which can be removed from or added to while an app is live, and which contain various CRUD operations for entries and links, functions related to following graph links and querying collections of data on the DHT, and any auxillary functionality someone wants to bundle in their application.
 
 Each application running on Holochain is uniquely identified by a DNA hash of the integrity zome code, after being compiled to Web Assembly (WASM) and bundled with additional settings and properties required for that app.
@@ -245,9 +245,9 @@ Here is a high-level summary of how a countersigning session flows:
 
 ## Graph DHT: Formal State Model
 
-The Holochain DHT performs a topological transform on the set of the various agents' source chains into a content-addressable graph database (graph DHT or GDHT) sharded across many nodes who each function as authoritative sources for retrieving certain data.
+Holochain performs a topological transform on the set of the various agents' source chains into a content-addressable graph database (graph DHT or GDHT) sharded across many nodes who each function as authoritative sources for retrieving certain data.
 
-**Fundamental Write Constraint:** The DHT can never be "written" to directly. All data enters the DHT **only** by having been committed to an agent's source chain and then being **transformed** from validated local chain state into the elements required for GDHT representation and lookup.
+**Fundamental Write Constraint:** The DHT can never be "written" to directly. All data enters the DHT **only** by having been committed to an agent's source chain and then being **transformed** from validated local chain state into the elements (DHT operations) required for GDHT representation and lookup.
 
 **Structure of GDHT data:** The DHT is a content-addressable space where each piece of content is found at the address which is the hash of its content. In addition, any address in the DHT can have metadata attached to it. This metadata is not part of the content being hashed.
 
@@ -288,25 +288,25 @@ For links, we refer to an address with link metadata as a **Base** and the addre
 
 ### Graph Transformation
 
-While source chain entries and actions contain all the information needed to construct a graphing DHT, the data must be restructured from a linear local chain under single authority and location, to a graph across many nodes (where a node is an address or hash, optionally with content) with many authorities taking responsibility for redundantly storing content and metadata for the entire range of nodes. In this section we focus only on the graph transformations. The next section will focus on the transformation of authoritative sources for data.
+While source chain entries and actions contain all the information needed to construct a graphing DHT, the data must be restructured from a linear local chain under single authority and location, to a graph across many nodes (where a node is an address or hash, optionally with content) with many authorities taking responsibility for redundantly storing content and metadata for the entire range of nodes. In this section we focus only on the transformation from source chain to DHT. The next section will focus on the election of authoritative sources for data.
 
 The linking/graphing aspects must be constructed from the state changes committed to source chains.
 
 The process from an agent's action to changed DHT state is as follows:
 
 1. An action produces a **source chain record** detailing the nature of the action, including the context in which it was taken (author and current source chain state).
-2. The source chain record is transformed to **DHT transformations (operations)**, each of which has a **basis hash** that it applies to.
-3. The author sends these transformations to the respective neighborhoods of their basis hashes, where peers who have assumed authority for the basis hashes **integrate** them into an updated state for the data at those basis hashes.
+2. The source chain record is transformed to **DHT operations**, each of which has a **basis hash** that it applies to.
+3. The author sends these DHT operations to the respective neighborhoods of their basis hashes, where peers who have assumed authority for the basis hashes **integrate** them into an updated state for the data at those basis hashes.
 
-The following table shows how each action (which gets stored on the author's source chain as a record) yields multiple DHT transforms. Remember a transform corresponds with a way that the DHT state needs to be transformed.
+The following table shows how each action (which gets stored on the author's source chain as a record) is transformed into multiple DHT operations. Remember an operation corresponds with a way that the DHT state needs to be manipulated.
 
-For viable eventual consistency in a gossipped DHT, all actions must be idempotent (where a second application of a transform will not result in a changed state) and additive/monotonic:
+For viable eventual consistency in a gossipped DHT, all actions must be idempotent (where a second application of an operation will not result in a changed state) and additive/monotonic:
 
 * The deletion of an entry creation header and its corresponding entry doesn't actually delete the entry; it _marks_ the header as deleted. At the entry basis hash, the delete header becomes part of a CRDT-style "tombstone set", and a set difference is taken between the entry creation headers $H_c$ and entry deletion headers $H_d$ that reference at the entry's basis hash to determine which creation headers are still 'live' ($H_{c_l} = H_c - H_d$). Eventually the entry itself is considered deleted when $H_c - H_d = \varnothing$.
 * The removal of a link adds the removal header to a tombstone set at the link's base address in a similar fashion, subtracting the link removal headers from the link creation headers they reference to determine the set of live links.
 * Updating an entry creation header and its corresponding entry doesn't change the content in place; it adds a link to the original header and entry pointing to their replacements. One entry creation action may validly have many updates, which may or may not be seen by the application's logic as a conflict in need of resolution.
 
-Each action results in sending the transforms to specific DHT basis hashes, instructing the agents claiming authority for a range of address space covering those basis hashes, to validate and store their respective portion of the state changes. Because the DHT is a **graph** database, what is added is either a node or an edge. A node is a basis hash in the DHT, while an edge is part of the addressable content or metadata stored at a node.
+The transformation of an action is followed by sending the operation to specific DHT basis hashes, instructing the agents claiming authority for a range of address space covering those basis hashes, to validate and store (integrate) the operations into their respective portions of the DHT store. Because the DHT is a **graph** database, what is added is either a node or an edge. A node is a basis hash in the DHT, while an edge is part of the addressable content or metadata stored at a node.
 
 Here is a legend of labels and symbols used in the diagrams:
 
@@ -322,27 +322,27 @@ Here is a legend of labels and symbols used in the diagrams:
 * $C_B$ and $C_T$ are a link base and target, the basis hashes of previously existing content. Any addressable content can be the base and target of a link. These are represented by blobs.
 * Blue arrows are graph edges.
 * $h_{p}$ and $E_{p}$ are the previously existing content which a graph edge $\rightarrow$ references, when the reference may _only_ pertain to a header or an entry, respectively.
-* A label styled as $\mathsf{RegisterX}$ is a DHT transform that adds metadata to a basis hash. A label styled as $\mathsf{StoreX}$ is a DHT transform that adds addressable content to a DHT basis hash. The payload of a transform is contained in a gray triangle.
+* A label styled as $\mathsf{RegisterX}$ is a DHT operation that adds metadata to a basis hash. A label styled as $\mathsf{StoreX}$ is a DHT transform that adds addressable content to a DHT basis hash. The payload of an operation is contained in a gray triangle.
 * Basis hashes are represented as $b_x$ in black circles, in which the subscript $x$ represents the kind of addressable content stored at that basis hash. For instance, $b_k$ is the basis hash of the author $k$'s agent ID entry; that is, their public key.
-* A stack of rounded rectangles represents the neighborhood of the basis hash being transformed, in which multiple peers may be assuming authority for the same hash.
+* A stack of rounded rectangles represents the neighborhood of the basis hash being manipulated, in which multiple peers may be assuming authority for the same hash.
 * Gray arrows represent the transformation or movement of data.
 * Data attached to a basis hash by a line is metadata, while data overlapping a basis hash is primary content.
 * A green slash indicates existing data that has been replaced by an update. A green arrow leads from the update header to the data it replaces.
 * A red X indicates existing data that has been _tombstoned_; that is. it is marked as dead. A red arrow leads from the delete header to the data it tombstones.
 
-![Transformations and state changes produced by `create` action](create_ops.svg){#fig:create_ops width=60%}
+![Operations and state changes produced by `create` action](create_ops.svg){#fig:create_ops width=60%}
 
-![Transformations and state changes produced by `update` action](update_ops.svg){#fig:update_ops width=60%}
+![Operations and state changes produced by `update` action](update_ops.svg){#fig:update_ops width=60%}
 
-![Transformations and state changes produced by `delete` action](delete_ops.svg){#fig:delete_ops width=60%}
+![Operations and state changes produced by `delete` action](delete_ops.svg){#fig:delete_ops width=60%}
 
-![Transformations and state changes produced by `create_link` action](create_link_ops.svg){#fig:create_link_ops width=60%}
+![Operations and state changes produced by `create_link` action](create_link_ops.svg){#fig:create_link_ops width=60%}
 
-![Transformations and state changes produced by `delete_link` action](delete_link_ops.svg){#fig:delete_link_ops width=60%}
+![Operations and state changes produced by `delete_link` action](delete_link_ops.svg){#fig:delete_link_ops width=60%}
 
 \newpage
 
-#### Authority Transformation
+#### Authority Election
 
 In the case of source chain entries (and actions), it is fairly obvious that the author who created them is the **author**itative source. But part of translating from a series of local chain states to a resilient global data store involves identifying which nodes in the network become the responsible authorities for holding which DHT content.
 
@@ -401,13 +401,13 @@ k_best = L_K
 
 #### Network Location Quantization
 
-Additionally, arcs can be subjected to **quantization** which splits the network location space $L$ into disjoint subsets of a given quantum size $s_q$, and to which the starting arc boundary $k$ and arc size $s_{arc}$ are also snapped. The quantized arc size is then represented as an 8-bit integers containing the current size of quantum chunks of the address space and the number of chunks in the arc. Peers can also quantize their held transforms in the time dimension using a quantum size that exponentially increases as the dimension extends into the past.
+Additionally, arcs can be subjected to **quantization** which splits the network location space $L$ into disjoint subsets of a given quantum size $s_q$, and to which the starting arc boundary $k$ and arc size $s_{arc}$ are also snapped. The quantized arc size is then represented as an 8-bit integers containing the current size of quantum chunks of the address space and the number of chunks in the arc. Peers can also quantize their held operations in the time dimension using a quantum size that exponentially increases as the dimension extends into the past.
 
-The spaces of network locations and time form two dimensions of a coordinate space, and each transform can be mapped to a point in this space using the network location of its basis hash as the $x$ coordinate and its authoring time as the $y$ coordinate.
+The spaces of network locations and time form two dimensions of a coordinate space, and each operation can be mapped to a point in this space using the network location of its basis hash as the $x$ coordinate and its authoring time as the $y$ coordinate.
 
-When the coordinate space is quantized, it forms a grid. Each agent holds a finite region of this grid, bounded by their quantized arc, and the total set of held transforms within each cell is fingerprinted using a lossy algorithm (such as the XOR of the hashes of all the transforms whose coordinates fall within the cell).
+When the coordinate space is quantized, it forms a grid. Each agent holds a finite region of this grid, bounded by their quantized arc, and the total set of held operations within each cell is fingerprinted using a lossy algorithm (such as the XOR of the hashes of all the operations whose coordinates fall within the cell).
 
-When two peers attempt to synchronize the held sets of transforms for the intersection of their two address spaces $ARC_{l_{k_a}} \cap ARC_{l_{k_b}}$, they can then simply compare their respective fingerprints of each cell within that intersection. If the fingerprints do not match, they exchange and compare the entire list of transform hashes they each hold. This allows peers to more quickly compare and synchronize regions of shared authority, and the exponential nature of quantum sizes in the time dimension allows them to prioritize syncing of newer, more rapidly changing data.
+When two peers attempt to synchronize the held sets of operations for the intersection of their two address spaces $ARC_{l_{k_a}} \cap ARC_{l_{k_b}}$, they can then simply compare their respective fingerprints of each cell within that intersection. If the fingerprints do not match, they exchange and compare the entire list of operation hashes they each hold. This allows peers to more quickly compare and synchronize regions of shared authority, and the exponential nature of quantum sizes in the time dimension allows them to prioritize syncing of newer, more rapidly changing data.
 
 #### DHT Communication Protocols
 

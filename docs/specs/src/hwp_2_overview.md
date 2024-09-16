@@ -136,7 +136,7 @@ All subsequent Records in the Source Chain are simply the Actions taken by that 
 
 After Agents record the Actions they take to their Source Chains, they Publish these Actions to other Agents on the Network. Agents receiving published data validate it and make it available to other agents to query, thus creating a distributed database. Because all retrieval requests are keyed on the hashes of Actions or Entries, we describe this database as a Distributed Hash Table (DHT). Because such content-addressable stores create sparse spaces in which discovery is prohibitively expensive, we have extended the usual Put/Get operators of a DHT to include linking hashes to other hashes, thus creating a Graphing DHT.
 
-As a distributed database, the DHT may be understood as a transform of many Agents' Source Chain states into a form that makes that data retrievable by all the other Agents for different purposes. These purposes include:
+As a distributed database, the DHT may be understood as a topological transform of many Agents' Source Chain states into a form that makes that data retrievable by all the other Agents for different purposes. These purposes include:
 
 1. Retrieval of Agent's Actions and created Entries
 
