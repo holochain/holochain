@@ -160,11 +160,15 @@ impl Scratch {
         Ok(r)
     }
 
-    pub fn clear(&mut self) {
+    /// Clear the scratch and return true if there was anything to clear.
+    pub fn clear(&mut self) -> bool {
+        let no_change =
+            self.actions.is_empty() && self.entries.is_empty() && self.scheduled_fns.is_empty();
         self.actions.clear();
         self.entries.clear();
         self.scheduled_fns.clear();
         self.chain_head = None;
+        !no_change
     }
 
     pub fn drain_scheduled_fns(&mut self) -> impl Iterator<Item = ScheduledFn> + '_ {

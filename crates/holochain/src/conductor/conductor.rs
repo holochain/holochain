@@ -2137,7 +2137,10 @@ mod cell_impls {
                 .collect())
         }
 
-        /// Instantiate a source chain object for the given agent and DNA hash.
+        /// Instantiate a SourceChain for the given agent and DNA hash.
+        ///
+        /// If `allow_empty` is false, this will produce an error if the source chain is empty
+        /// (via [`SourceChain::new`]).
         pub async fn get_agent_source_chain(
             &self,
             CellId(dna_hash, agent_key): &CellId,
@@ -3055,8 +3058,11 @@ mod misc_impls {
         /// If the records form a chain segment that can be "grafted" onto the existing chain, it will be.
         /// Otherwise, a new chain will be formed using the specified records.
         //
-        // TODO: could integrate this better with [`SourceChain::flush`] when re-visit our workflows
-        //       and use them more consistently for moving data around
+        // TODO: could integrate this better with [`SourceChain::flush`] when we re-visit our workflows:
+        //      this function is called automatically during a [`SourceChain::flush`] when the CHC head is beyond
+        //      the local head. In [`ChainHeadOrdering::Relaxed`] mode, we have the opportunity to rebase the current
+        //      scratch records onto the incoming grafted records from the CHC. We can also make use of the validation
+        //      and integration that already runs for flushed records, rather than re-implementing those here.
         pub async fn graft_records_onto_source_chain(
             self: Arc<Self>,
             cell_id: CellId,
@@ -3073,13 +3079,7 @@ mod misc_impls {
             let ribosome = self.get_ribosome(dna_hash)?;
 
             let space = self.get_or_create_space(dna_hash)?;
-            let op_hashes = chain
-                // XXX: probably unnecessary clone
-                .graft_records_onto_source_chain(records.clone())
-                .await?
-                .into_iter()
-                .map(|(hash, _basis)| hash)
-                .collect();
+
             let workspace = space
                 .source_chain_workspace(self.keystore().clone(), agent_pubkey.clone())
                 .await?;
@@ -3096,10 +3096,18 @@ mod misc_impls {
                     network.clone(),
                     self.clone(),
                     ribosome,
-                    records,
+                    records.clone(),
                 )
                 .await?;
             }
+
+            let op_hashes = chain
+                // XXX: probably unnecessary clone
+                .graft_records_onto_source_chain(records)
+                .await?
+                .into_iter()
+                .map(|(hash, _basis)| hash)
+                .collect();
 
             // Integrate the ops.
             // XXX: this is not checking for authorityship and just integrating everything we author,
@@ -3747,7 +3755,6 @@ impl Conductor {
 }
 
 #[allow(missing_docs)]
-#[allow(dead_code)]
 mod direct_db_access_impls {
     use super::*;
 

@@ -31,7 +31,9 @@ impl SourceChain {
     ) -> SourceChainResult<Vec<(DhtOpHash, AnyLinkableHash)>> {
         // Clear the scratch space. There shouldn't be anything in the scratch if this function were
         // called properly, but if there were, it would be invalid after grafting.
-        self.scratch().apply(|s| s.clear())?;
+        self.scratch().apply(|s| if s.clear() {
+            tracing::warn!("Cleared scratch space when grafting records. This is unexpected and indicates a minor bug.");
+        })?;
 
         let existing = self
             .query(ChainQueryFilter::new().descending())
