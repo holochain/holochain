@@ -19,7 +19,7 @@ pub fn get_used_metering_points(_instance_with_store: Arc<InstanceWithStore>) ->
 // If a preserialized_path is specified for the zome, it is ignored.
 pub fn get_prebuilt_module(wasm_zome: &WasmZome) -> RibosomeResult<Option<Arc<Module>>> {
     if wasm_zome.preserialized_path.is_some() {
-        warn!("A precompiled wasm path was specified but the feature flag 'wasmer_sys' must be enabled to support use of precompiled wasm modules. Ignoring the precompiled path.");
+        warn!("A precompiled wasm path was specified, but the feature flag 'wasmer_sys' must be enabled to support use of precompiled wasm modules. Ignoring the precompiled path.");
     }
 
     Ok(None)
