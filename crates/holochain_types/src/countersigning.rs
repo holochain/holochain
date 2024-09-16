@@ -2,11 +2,13 @@
 
 use holo_hash::{AgentPubKey, EntryHash};
 use holochain_zome_types::{
+    cell::CellId,
     prelude::PreflightRequest,
     record::{SignedAction, SignedActionHashed},
 };
 use kitsune_p2p_dht::op::Timestamp;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 /// State and data of an ongoing countersigning session.
 
@@ -157,4 +159,18 @@ pub enum SessionCompletionDecision {
     Abandoned,
     /// No decision made.
     Indeterminate,
+}
+
+/// Errors related to countersigning sessions.
+#[derive(Debug, Error)]
+pub enum CountersigningError {
+    /// Countersigning workspace does not exist for cell.
+    #[error("Countersigning workspace does not exist for cell id {0:?}")]
+    WorkspaceDoesNotExist(CellId),
+    /// No countersigning session found for the cell.
+    #[error("No countersigning session found for cell id {0:?}")]
+    SessionNotFound(CellId),
+    /// Countersigning session in a resolvable state cannot be abandoned or published.
+    #[error("Countersigning session for cell id {0:?} is resolvable. Only unresolvable sessions can be abandoned or published.")]
+    SessionNotUnresolvable(CellId),
 }

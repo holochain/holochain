@@ -3257,7 +3257,7 @@ mod countersigning_impls {
     use super::*;
     use crate::core::workflow::{
         self,
-        countersigning_workflow::{countersigning_publish, force_abandon_session},
+        countersigning_workflow::{force_abandon_session, force_publish_countersigning_session},
     };
 
     impl Conductor {
@@ -3289,17 +3289,70 @@ mod countersigning_impls {
             let countersigning_workspaces = space.countersigning_workspaces.lock();
             match countersigning_workspaces.get(&cell_id) {
                 None => Ok(None),
-                Some(workspace) => match workspace
+                Some(workspace) => workspace
                     .get_countersigning_session_state()
-                    .map_err(|err| ConductorError::KitsuneP2pError(err.into()))?
-                {
-                    None => Ok(None),
-                    Some(session_state) => Ok(Some(session_state)),
-                },
+                    .map_err(|err| ConductorError::KitsuneP2pError(err.into())),
             }
         }
 
         pub(crate) async fn abandon_countersigning_session(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<()> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            let maybe_countersigning_workspace =
+                space.countersigning_workspaces.lock().get(cell_id).cloned();
+            match maybe_countersigning_workspace {
+                None => {
+                    return Err(ConductorError::CountersigningError(
+                        CountersigningError::WorkspaceDoesNotExist(cell_id.clone()),
+                    ))
+                }
+                Some(countersigning_workspace) => {
+                    let session_state = match countersigning_workspace
+                        .get_countersigning_session_state()
+                        .map_err(|err| ConductorError::KitsuneP2pError(err.into()))?
+                    {
+                        None => {
+                            return Err(ConductorError::CountersigningError(
+                                CountersigningError::SessionNotFound(cell_id.clone()),
+                            ))
+                        }
+                        Some(session_state) => session_state,
+                    };
+                    if let CountersigningSessionState::Unknown {
+                        preflight_request, ..
+                    } = session_state
+                    {
+                        force_abandon_session(
+                            space.clone(),
+                            cell_id.agent_pubkey(),
+                            &preflight_request,
+                        )
+                        .await?;
+                        // Remove countersigning session from the workspace.
+                        if let None = countersigning_workspace
+                            .remove_countersigning_session()
+                            .map_err(|err| ConductorError::KitsuneP2pError(err.into()))?
+                        {
+                            // The session exists in the space as previously checked, so this case must never happen.
+                            tracing::warn!(
+                            ?cell_id,
+                            "Could not remove countersigning session from workspace after abandoning it."
+                        );
+                        }
+                    } else {
+                        // Session can only be abanoned when unresolvable.
+                        return Err(ConductorError::CountersigningError(
+                            CountersigningError::SessionNotUnresolvable(cell_id.clone()),
+                        ));
+                    }
+                }
+            }
+            Ok(())
+        }
+
+        pub(crate) async fn publish_countersigning_session(
             &self,
             cell_id: &CellId,
         ) -> ConductorResult<()> {
@@ -3316,10 +3369,16 @@ mod countersigning_impls {
                         None => return Err(ConductorError::Other("no".into())),
                         Some(session_state) => session_state.preflight_request().clone(),
                     };
-                    force_abandon_session(
-                        space.clone(),
-                        cell_id.agent_pubkey(),
-                        &preflight_request,
+                    let cell = self.cell_by_id(cell_id).await?;
+                    let network = Arc::new(cell.holochain_p2p_dna().clone());
+                    force_publish_countersigning_session(
+                        space,
+                        network,
+                        self.keystore().clone(),
+                        cell.triggers().integrate_dht_ops.clone(),
+                        cell.triggers().publish_dht_ops.clone(),
+                        cell_id.clone(),
+                        preflight_request,
                     )
                     .await?;
                     if let None = countersigning_workspace
@@ -3328,32 +3387,10 @@ mod countersigning_impls {
                     {
                         // The session exists in the space as previously checked, so this case must never happen.
                         tracing::warn!(
-                        ?cell_id,
-                        "Could not remove countersigning session from workspace after abandoning it."
-                    );
+                            ?cell_id,
+                            "Could not remove countersigning session from workspace after publishing it."
+                        );
                     }
-                }
-            }
-            Ok(())
-        }
-
-        pub(crate) async fn publish_countersigning_session(
-            &self,
-            cell_id: &CellId,
-        ) -> ConductorResult<()> {
-            let space = self.get_or_create_space(cell_id.dna_hash())?;
-            let mut countersigning_workspaces = space.countersigning_workspaces.lock();
-            match countersigning_workspaces.get(cell_id) {
-                None => return Err(ConductorError::Other("no".into())),
-                Some(workspace) => {
-                    // let a = countersigning_publish(
-                    //     &self
-                    //         .holochain_p2p
-                    //         .to_dna(cell_id.dna_hash().clone(), self.get_chc(cell_id)),
-                    //     op,
-                    //     author,
-                    // )
-                    // .await?;
                 }
             }
             Ok(())

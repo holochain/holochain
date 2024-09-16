@@ -23,6 +23,10 @@ pub(crate) async fn countersigning_success(
         let guard = space.countersigning_workspaces.lock();
         guard.get(&cell_id).cloned()
     };
+    println!(
+        "received countersigning signature bundle for agent {:?}, {:?}",
+        author, signature_bundle
+    );
 
     if workspace.is_none() {
         tracing::warn!(

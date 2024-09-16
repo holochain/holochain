@@ -40,13 +40,23 @@ use crate::tests::test_utils::{
 
 // Test countersigning interaction calls.
 // - two agents on two conductors
-// - one commits a countersigned entry and then shuts down the conductor (puts session in unresolvable state)
-// - call is made to abandon the session
-// - again one commits a countersigned entry and shuts down conductor (session unresolvable)
-// - call is made to publish entry
+// - alice commits a countersigned entry, bob does not commit, and alice shuts down the conductor (puts her session in unresolvable state)
+// - alice makes call to abandon the session
+// - again alice and bob accept a new preflight request
+// - bob commits the countersigned entry and shuts down (session unresolvable)
+// - alice commits the countersigned entry too while bob is offline and restarts her conductor (session unresolvable)
+// - alice makes call to publish entry
+// - bob starts up conductor again
+// - await dht sync
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn countersigning_session_interaction_calls() {
+    use holochain::{
+        conductor::{api::error::ConductorApiError, error::ConductorError},
+        prelude::CountersigningError,
+    };
+    use holochain_conductor_api::ExternalApiWireError;
+
     holochain_trace::test_run();
 
     // Start local bootstrap and signal servers.
@@ -69,22 +79,7 @@ async fn countersigning_session_interaction_calls() {
     let (alice_app_tx, mut alice_app_rx) = websocket_client_by_port(alice_app_port).await.unwrap();
     authenticate_app_ws_client(alice_app_tx.clone(), alice.admin_port, "test".to_string()).await;
 
-    tokio::spawn(async move {
-        // while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {}
-        while let Ok(ReceiveMessage::Signal(signal)) = alice_app_rx.recv::<AppResponse>().await {
-            match ExternIO::from(signal).decode::<Signal>().unwrap() {
-                Signal::System(system_signal) => match system_signal {
-                    SystemSignal::AbandonedCountersigning(entry) => {
-                        println!("alice received system signal to abandon countersigning with entry {entry:?}");
-                    }
-                    SystemSignal::SuccessfulCountersigning(entry) => {
-                        println!("alice received system signal successful countersigning with entry {entry:?}");
-                    }
-                },
-                _ => (),
-            }
-        }
-    });
+    tokio::spawn(async move { while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {} });
 
     let mut bob = setup_agent(bootstrap_url, signal_url, network_seed.clone()).await;
 
@@ -134,6 +129,38 @@ async fn countersigning_session_interaction_calls() {
     // Countersigning session state should not be in Bob's conductor memory yet.
     assert_matches!(get_session_state(&bob.cell_id, &bob_app_tx).await, None);
 
+    // Abandoning a session of a non-existing cell should return an error.
+    let response: AppResponse = request(
+        AppRequest::AbandonCountersigningSession(Box::new(bob.cell_id.clone())),
+        &alice_app_tx,
+    )
+    .await;
+    // println!("response {response:?}");
+    let expected_error = AppResponse::Error(
+        ConductorApiError::ConductorError(ConductorError::CountersigningError(
+            CountersigningError::WorkspaceDoesNotExist(bob.cell_id.clone()),
+        ))
+        .into(),
+    );
+    // println!("expected error {expected_error:?}");
+    assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+
+    // Abandoning a non-existing session of an existing cell should return an error.
+    let response: AppResponse = request(
+        AppRequest::AbandonCountersigningSession(Box::new(alice.cell_id.clone())),
+        &alice_app_tx,
+    )
+    .await;
+    // println!("response {response:?}");
+    let expected_error = AppResponse::Error(
+        ConductorApiError::ConductorError(ConductorError::CountersigningError(
+            CountersigningError::SessionNotFound(alice.cell_id.clone()),
+        ))
+        .into(),
+    );
+    // println!("expected error {expected_error:?}");
+    assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+
     // Set up the session and accept it for both agents.
     let preflight_request: PreflightRequest = call_zome(
         &alice,
@@ -181,6 +208,22 @@ async fn countersigning_session_interaction_calls() {
         Some(CountersigningSessionState::Accepted(_))
     );
 
+    // Abandoning a session in a state other than Unknown should return an error.
+    let response: AppResponse = request(
+        AppRequest::AbandonCountersigningSession(Box::new(alice.cell_id.clone())),
+        &alice_app_tx,
+    )
+    .await;
+    println!("response {response:?}");
+    let expected_error = AppResponse::Error(
+        ConductorApiError::ConductorError(ConductorError::CountersigningError(
+            CountersigningError::SessionNotUnresolvable(alice.cell_id.clone()),
+        ))
+        .into(),
+    );
+    // println!("expected error {expected_error:?}");
+    assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+
     // Alice commits the countersigning entry. Up to 5 retries in case Bob's chain head can not be fetched
     // immediately.
     for _ in 0..5 {
@@ -210,34 +253,35 @@ async fn countersigning_session_interaction_calls() {
     authenticate_app_ws_client(alice_app_tx.clone(), alice.admin_port, "test".to_string()).await;
 
     // Spawn task with app socket signal waiting for system signals.
-    // let (bob_session_abanded_tx, mut bob_session_abandonded_rx) = tokio::sync::mpsc::channel(1);
-    tokio::spawn(async move {
-        while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {}
-        // while let Ok(ReceiveMessage::Signal(signal)) = alice_app_rx.recv::<AppResponse>().await {
-        //     match ExternIO::from(signal).decode::<Signal>().unwrap() {
-        //         Signal::System(system_signal) => match system_signal {
-        //             SystemSignal::AbandonedCountersigning(entry) => {
-        //                 println!("alice abandoned cs session signal {entry:?}");
-        //                 // let _ = bob_session_abanded_tx.clone().send(entry).await;
-        //             }
-        //             _ => unreachable!(),
-        //         },
-        //         _ => unreachable!(),
-        //     }
-        // }
-    });
+    tokio::spawn(async move { while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {} });
 
-    // Alice's session should be in state Unknown.
-    assert_matches!(
-        get_session_state(&alice.cell_id, &alice_app_tx).await,
-        Some(CountersigningSessionState::Unknown { .. })
-    );
+    // Alice's session should be in state Unknown with 1 attempted resolution.
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let state = get_session_state(&alice.cell_id, &alice_app_tx).await;
+            println!("state is {state:?}");
+            if let Some(CountersigningSessionState::Unknown {
+                resolution: Some(summary),
+                ..
+            }) = state
+            {
+                if summary.attempts == 1 {
+                    break;
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .unwrap();
+
     // Bob's session should still be in Accepted state.
     assert_matches!(
         get_session_state(&bob.cell_id, &bob_app_tx).await,
         Some(CountersigningSessionState::Accepted(_))
     );
 
+    println!("alice will abandon session now");
     // Alice abandons the session.
     let response: AppResponse = request(
         AppRequest::AbandonCountersigningSession(Box::new(alice.cell_id.clone())),
@@ -245,6 +289,9 @@ async fn countersigning_session_interaction_calls() {
     )
     .await;
     assert_matches!(response, AppResponse::CountersigningSessionAbandoned);
+    println!("session abandoned");
+
+    // TODO call abandon again and assert error
 
     // Alice's session should be gone.
     assert_matches!(get_session_state(&alice.cell_id, &alice_app_tx).await, None);
@@ -310,8 +357,34 @@ async fn countersigning_session_interaction_calls() {
         get_session_state(&bob.cell_id, &bob_app_tx).await,
         Some(CountersigningSessionState::Accepted(_))
     );
+
+    // TODO Bob needs to commit entry and shut down.
     for i in 0..5 {
-        println!("trying to commit again {i}");
+        println!("trying to commit bob's entry {i}");
+        let response = call_zome_fn_fallible(
+            &bob_app_tx,
+            bob.cell_id.clone(),
+            &bob.signing_keypair,
+            bob.cap_secret.clone(),
+            TestWasm::CounterSigning.coordinator_zome_name(),
+            "create_a_countersigned_thing_with_entry_hash".into(),
+            &[alice_response.clone(), bob_response.clone()],
+        )
+        .await;
+
+        if let AppResponse::ZomeCalled(_) = response {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    drop(bob._holochain);
+    drop(bob._admin_rx);
+    drop(bob.admin_tx);
+
+    // Alice commits countersigned entry.
+    for i in 0..5 {
+        println!("alice trying to commit again {i}");
         let response = call_zome_fn_fallible(
             &alice_app_tx,
             alice.cell_id.clone(),
@@ -338,22 +411,7 @@ async fn countersigning_session_interaction_calls() {
     authenticate_app_ws_client(alice_app_tx.clone(), alice.admin_port, "test".to_string()).await;
 
     // Spawn task with app socket signal waiting for system signals.
-    // let (bob_session_abanded_tx, mut bob_session_abandonded_rx) = tokio::sync::mpsc::channel(1);
-    tokio::spawn(async move {
-        while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {}
-        // while let Ok(ReceiveMessage::Signal(signal)) = alice_app_rx.recv::<AppResponse>().await {
-        //     match ExternIO::from(signal).decode::<Signal>().unwrap() {
-        //         Signal::System(system_signal) => match system_signal {
-        //             SystemSignal::AbandonedCountersigning(entry) => {
-        //                 println!("alice abandoned cs session signal {entry:?}");
-        //                 // let _ = bob_session_abanded_tx.clone().send(entry).await;
-        //             }
-        //             _ => unreachable!(),
-        //         },
-        //         _ => unreachable!(),
-        //     }
-        // }
-    });
+    tokio::spawn(async move { while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {} });
 
     // Alice's session should be in state Unknown.
     assert_matches!(
@@ -368,6 +426,83 @@ async fn countersigning_session_interaction_calls() {
     )
     .await;
     println!("response {response:?}");
+    assert_matches!(response, AppResponse::CountersigningSessionPublished);
+
+    println!(
+        "alice's session state after publishing {:?}",
+        get_session_state(&alice.cell_id, &alice_app_tx).await
+    );
+    assert_matches!(get_session_state(&alice.cell_id, &alice_app_tx).await, None);
+
+    // TODO bring Bob back
+    let (_holochain, admin_port) = start_holochain_with_lair(bob.config_path.clone(), true).await;
+    let admin_port = admin_port.await.unwrap();
+    let (admin_tx, _admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _admin_rx = WsPollRecv::new::<AdminResponse>(_admin_rx);
+
+    let mut bob = Agent {
+        admin_tx,
+        admin_port,
+        cell_id: bob.cell_id,
+        signing_keypair: bob.signing_keypair,
+        cap_secret: bob.cap_secret,
+        // tmp_dir,
+        config_path: bob.config_path,
+        _admin_rx,
+        _holochain,
+    };
+    let bob_app_port = attach_app_interface(&mut bob.admin_tx, None).await;
+    let (bob_app_tx, mut bob_app_rx) = websocket_client_by_port(bob_app_port).await.unwrap();
+    authenticate_app_ws_client(bob_app_tx.clone(), bob.admin_port, "test".to_string()).await;
+
+    // Spawn task with app socket signal waiting for system signals.
+    let (bob_session_abanded_tx, mut bob_session_abandonded_rx) = tokio::sync::mpsc::channel(1);
+    tokio::spawn(async move {
+        while let Ok(ReceiveMessage::Signal(signal)) = bob_app_rx.recv::<AppResponse>().await {
+            match ExternIO::from(signal).decode::<Signal>().unwrap() {
+                Signal::System(system_signal) => match system_signal {
+                    SystemSignal::AbandonedCountersigning(entry) => {
+                        println!("bob received system signal to abandon countersigning with entry {entry:?}");
+                        let _ = bob_session_abanded_tx.clone().send(entry).await;
+                    }
+                    _ => unreachable!(),
+                },
+                _ => unreachable!(),
+            }
+        }
+    });
+    println!(
+        "bob state {:?}",
+        get_session_state(&bob.cell_id, &bob_app_tx).await
+    );
+    // assert_matches!(get_session_state(&bob.cell_id, &bob_app_tx).await, None);
+    tokio::time::timeout(Duration::from_secs(10), await_dht_sync(&[&alice, &bob]))
+        .await
+        .unwrap();
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let state = get_session_state(&bob.cell_id, &bob_app_tx).await;
+            println!("state is {state:?}");
+            if let Some(CountersigningSessionState::Unknown {
+                resolution: Some(summary),
+                ..
+            }) = state
+            {
+                if summary.attempts == 1 {
+                    break;
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .unwrap();
+    // tokio::time::sleep(Duration::from_secs(10)).await;
+    println!(
+        "bob state {:?}",
+        get_session_state(&bob.cell_id, &bob_app_tx).await
+    );
 }
 
 struct Agent {
@@ -395,6 +530,8 @@ async fn setup_agent(bootstrap_url: String, signal_url: String, network_seed: St
         signal_url,
         webrtc_config: None,
     }];
+    // TODO lower before restarting Bob
+    // config.conductor_tuning_params().countersigning_resolution_retry_delay = 3000;
     let config_path = write_config(path, &config);
 
     let (_holochain, admin_port) = start_holochain_with_lair(config_path.clone(), true).await;

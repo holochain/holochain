@@ -33,6 +33,7 @@ mod success;
 mod tests;
 
 pub(crate) use accept::accept_countersigning_request;
+pub(crate) use complete::force_publish_countersigning_session;
 use holochain_keystore::MetaLairClient;
 use holochain_state::chain_lock::get_chain_lock;
 pub(crate) use success::countersigning_success;
