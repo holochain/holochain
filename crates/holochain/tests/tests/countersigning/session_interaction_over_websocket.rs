@@ -161,6 +161,34 @@ async fn countersigning_session_interaction_calls() {
     // println!("expected error {expected_error:?}");
     assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
 
+    // Publishing a session of a non-existing cell should return an error.
+    let response: AppResponse = request(
+        AppRequest::PublishCountersigningSession(Box::new(bob.cell_id.clone())),
+        &alice_app_tx,
+    )
+    .await;
+    let expected_error = AppResponse::Error(
+        ConductorApiError::ConductorError(ConductorError::CountersigningError(
+            CountersigningError::WorkspaceDoesNotExist(bob.cell_id.clone()),
+        ))
+        .into(),
+    );
+    assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+
+    // Publishing a non-existing session of an existing cell should return an error.
+    let response: AppResponse = request(
+        AppRequest::PublishCountersigningSession(Box::new(alice.cell_id.clone())),
+        &alice_app_tx,
+    )
+    .await;
+    let expected_error = AppResponse::Error(
+        ConductorApiError::ConductorError(ConductorError::CountersigningError(
+            CountersigningError::SessionNotFound(alice.cell_id.clone()),
+        ))
+        .into(),
+    );
+    assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+
     // Set up the session and accept it for both agents.
     let preflight_request: PreflightRequest = call_zome(
         &alice,
@@ -208,20 +236,32 @@ async fn countersigning_session_interaction_calls() {
         Some(CountersigningSessionState::Accepted(_))
     );
 
-    // Abandoning a session in a state other than Unknown should return an error.
+    // Abandoning a session in a resolvable state should not be possible and return an error.
     let response: AppResponse = request(
         AppRequest::AbandonCountersigningSession(Box::new(alice.cell_id.clone())),
         &alice_app_tx,
     )
     .await;
-    println!("response {response:?}");
     let expected_error = AppResponse::Error(
         ConductorApiError::ConductorError(ConductorError::CountersigningError(
             CountersigningError::SessionNotUnresolvable(alice.cell_id.clone()),
         ))
         .into(),
     );
-    // println!("expected error {expected_error:?}");
+    assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+
+    // Publishing a session in a resolvable state should not be possible and return an error.
+    let response: AppResponse = request(
+        AppRequest::PublishCountersigningSession(Box::new(alice.cell_id.clone())),
+        &alice_app_tx,
+    )
+    .await;
+    let expected_error = AppResponse::Error(
+        ConductorApiError::ConductorError(ConductorError::CountersigningError(
+            CountersigningError::SessionNotUnresolvable(alice.cell_id.clone()),
+        ))
+        .into(),
+    );
     assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
 
     // Alice commits the countersigning entry. Up to 5 retries in case Bob's chain head can not be fetched

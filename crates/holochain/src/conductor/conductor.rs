@@ -3360,36 +3360,54 @@ mod countersigning_impls {
             let maybe_countersigning_workspace =
                 space.countersigning_workspaces.lock().get(cell_id).cloned();
             match maybe_countersigning_workspace {
-                None => return Err(ConductorError::Other("no".into())),
+                None => {
+                    return Err(ConductorError::CountersigningError(
+                        CountersigningError::WorkspaceDoesNotExist(cell_id.clone()),
+                    ))
+                }
                 Some(countersigning_workspace) => {
-                    let preflight_request = match countersigning_workspace
+                    let session_state = match countersigning_workspace
                         .get_countersigning_session_state()
                         .map_err(|err| ConductorError::KitsuneP2pError(err.into()))?
                     {
-                        None => return Err(ConductorError::Other("no".into())),
-                        Some(session_state) => session_state.preflight_request().clone(),
+                        None => {
+                            return Err(ConductorError::CountersigningError(
+                                CountersigningError::SessionNotFound(cell_id.clone()),
+                            ))
+                        }
+                        Some(session_state) => session_state,
                     };
-                    let cell = self.cell_by_id(cell_id).await?;
-                    let network = Arc::new(cell.holochain_p2p_dna().clone());
-                    force_publish_countersigning_session(
-                        space,
-                        network,
-                        self.keystore().clone(),
-                        cell.triggers().integrate_dht_ops.clone(),
-                        cell.triggers().publish_dht_ops.clone(),
-                        cell_id.clone(),
-                        preflight_request,
-                    )
-                    .await?;
-                    if let None = countersigning_workspace
-                        .remove_countersigning_session()
-                        .map_err(|err| ConductorError::KitsuneP2pError(err.into()))?
+                    if let CountersigningSessionState::Unknown {
+                        preflight_request, ..
+                    } = session_state
                     {
-                        // The session exists in the space as previously checked, so this case must never happen.
-                        tracing::warn!(
+                        let cell = self.cell_by_id(cell_id).await?;
+                        let network = Arc::new(cell.holochain_p2p_dna().clone());
+                        force_publish_countersigning_session(
+                            space,
+                            network,
+                            self.keystore().clone(),
+                            cell.triggers().integrate_dht_ops.clone(),
+                            cell.triggers().publish_dht_ops.clone(),
+                            cell_id.clone(),
+                            preflight_request,
+                        )
+                        .await?;
+                        if let None = countersigning_workspace
+                            .remove_countersigning_session()
+                            .map_err(|err| ConductorError::KitsuneP2pError(err.into()))?
+                        {
+                            // The session exists in the space as previously checked, so this case must never happen.
+                            tracing::warn!(
                             ?cell_id,
                             "Could not remove countersigning session from workspace after publishing it."
                         );
+                        }
+                    } else {
+                        // Session can only be published when unresolvable.
+                        return Err(ConductorError::CountersigningError(
+                            CountersigningError::SessionNotUnresolvable(cell_id.clone()),
+                        ));
                     }
                 }
             }
