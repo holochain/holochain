@@ -76,7 +76,7 @@ rand = "0.8.5"
 
 [build-dependencies]
 pretty_assertions = "1.4"
-sqlformat = "0.2"
+sqlformat = "=0.2.6"
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.7", features = ["futures", "checkpoint"] }
