@@ -397,8 +397,6 @@ k_best = L_K
     .last()
 ```
 
-[WP-TODO: is it okay to suddenly switch to pseudocode? Can we represent this mathematically somehow?]
-
 #### Network Location Quantization
 
 Additionally, arcs can be subjected to **quantization** which splits the network location space $L$ into disjoint subsets of a given quantum size $s_q$, and to which the starting arc boundary $k$ and arc size $s_{arc}$ are also snapped. The quantized arc size is then represented as an 8-bit integers containing the current size of quantum chunks of the address space and the number of chunks in the arc. Peers can also quantize their held operations in the time dimension using a quantum size that exponentially increases as the dimension extends into the past.
