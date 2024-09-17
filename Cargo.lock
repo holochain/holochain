@@ -2695,7 +2695,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2886,7 +2886,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "aitia",
  "anyhow",
@@ -3004,7 +3004,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "async-trait",
  "fixt",
@@ -3035,7 +3035,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_chc"
-version = "0.1.0-dev.3"
+version = "0.1.0-dev.4"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -3063,7 +3063,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "anyhow",
  "clap 4.5.9",
@@ -3117,7 +3117,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3146,7 +3146,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "derive_more",
  "holo_hash",
@@ -3174,7 +3174,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_services"
-version = "0.3.0-dev.23"
+version = "0.3.0-dev.24"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3298,7 +3298,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "aitia",
  "async-trait",
@@ -3414,7 +3414,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.24"
 dependencies = [
  "aitia",
  "anyhow",
@@ -4645,9 +4645,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db43da034583683b3a25d473e6024c7f529c31115418a7b95e609d5b0f090e5b"
+checksum = "ff167fc218b19e270557f6e688969bf137521b4dcfe00ebbfb00df8a14caa5a4"
 dependencies = [
  "lair_keystore_api",
  "pretty_assertions",
@@ -4661,9 +4661,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2da1e0069976825273a8ba0e36b09785dc83812a9b0cf2c5eef3d85351534592"
+checksum = "241847cf5de13da9c60930b6ccd0d6411e68d9f6b2f942dd029bb668e3aa9e1d"
 dependencies = [
  "base64 0.22.1",
  "dunce",
@@ -7496,9 +7496,9 @@ dependencies = [
 
 [[package]]
 name = "sqlformat"
-version = "0.2.4"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f895e3734318cc55f1fe66258926c9b910c124d47520339efecbb6c59cec7c1f"
+checksum = "7bba3a93db0cc4f7bdece8bb09e77e2e785c20bfebf79eb8340ed80708048790"
 dependencies = [
  "nom",
  "unicode_categories",
