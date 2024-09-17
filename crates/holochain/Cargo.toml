@@ -43,7 +43,9 @@ holochain_serialized_bytes = "=0.0.55"
 holochain_state = { version = "^0.4.0-dev.24", path = "../holochain_state" }
 holochain_types = { version = "^0.4.0-dev.23", path = "../holochain_types" }
 holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util" }
-holochain_wasmer_host = "=0.0.95"
+holochain_wasmer_host = { version = "=0.0.96", default-features = false, features = [
+  "error_as_host",
+] }
 holochain_websocket = { version = "^0.4.0-dev.23", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.4.0-dev.16", path = "../holochain_zome_types", features = [
   "full",
@@ -94,9 +96,12 @@ url2 = "0.0.6"
 uuid = { version = "1.8", features = ["serde", "v4"] }
 holochain_wasm_test_utils = { version = "^0.4.0-dev.23", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
-wasmer = "=4.3.1"
-wasmer-middlewares = "=4.3.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
+
+# Temporarily include a fork of wasmer from the git branch 'wamr', until it is officially released in wasmer v5
+hc-wasmer = { version = "=4.3.6-hc.1", optional = true, default-features = false }
+wasmer = { version = "=4.3.6", optional = true, default-feature = false }
+wasmer-middlewares = { version = "=4.3.6", optional = true, default-feature = false }
 
 # Dependencies for test_utils / other optional deps
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
@@ -189,7 +194,14 @@ path = "src/bin/holochain/main.rs"
 workspace = true
 
 [features]
-default = ["chc", "sqlite-encrypted", "tx2", "tx5", "metrics_influxive"]
+default = [
+  "chc",
+  "sqlite-encrypted",
+  "tx2",
+  "tx5",
+  "metrics_influxive",
+  "wasmer_sys",
+]
 
 tx2 = ["kitsune_p2p/tx2"]
 tx5 = ["kitsune_p2p/tx5", "tx5-go-pion-turn"]
@@ -278,6 +290,23 @@ sqlite = [
 
 # Extremely verbose wasm memory read/write logging
 wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
+
+# Enable wasm compiler
+# Incompatible with "wasmer_wamr"
+wasmer_sys = [
+  "dep:wasmer",
+  "dep:wasmer-middlewares",
+  "wasmer/default",
+  "holochain_wasmer_host/wasmer_sys",
+]
+
+# Enable wasm interpreter (experimental)
+# Incompatible with "wasmer_sys"
+wasmer_wamr = [
+  "dep:hc-wasmer",
+  "hc-wasmer/wamr",
+  "holochain_wasmer_host/wasmer_wamr",
+]
 
 # Enable chain head coordination
 chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_chc/http"]
