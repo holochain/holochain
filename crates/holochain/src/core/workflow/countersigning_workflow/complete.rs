@@ -3,7 +3,7 @@ use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::{WorkflowError, WorkflowResult};
 use hdk::prelude::{CellId, PreflightRequest, Record};
-use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash, HashableContentExtSync};
+use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
 use holochain_chc::AddRecordPayload;
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_p2p::HolochainP2pDnaT;
@@ -16,7 +16,6 @@ use holochain_state::prelude::{
 };
 use holochain_types::dht_op::ChainOp;
 use holochain_zome_types::prelude::SignedAction;
-use holochain_zome_types::Action;
 use kitsune_p2p_types::dht::prelude::Timestamp;
 use rusqlite::{named_params, Transaction};
 use std::sync::Arc;
@@ -143,7 +142,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         return Ok(None);
     }
 
-    publish_countersigning_session(
+    reveal_countersigning_session(
         space,
         network.clone(),
         keystore,
@@ -174,7 +173,7 @@ pub(crate) async fn inner_countersigning_session_complete(
     }
 
     tracing::info!(
-        "Countersigning session complete for agent {:?} in approximately {}ms",
+        "Countersigning session complete for agent {:?} in approximately {} ms",
         author,
         (Timestamp::now() - session_data.preflight_request.session_times.start)
             .unwrap_or_default()
@@ -185,7 +184,7 @@ pub(crate) async fn inner_countersigning_session_complete(
 }
 
 #[clippy::allow(too_many_arguments)]
-async fn publish_countersigning_session(
+async fn reveal_countersigning_session(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,
     keystore: MetaLairClient,
@@ -244,13 +243,15 @@ async fn apply_success_state_changes(
                 // All checks have passed so unlock the chain.
                 mutations::unlock_chain(txn, &author)?;
                 // Update ops to publish.
-                txn.execute(
-                    "UPDATE DhtOp SET withhold_publish = NULL WHERE action_hash = :action_hash",
-                    named_params! {
-                        ":action_hash": this_cells_action_hash,
-                    },
-                )
-                .map_err(holochain_state::prelude::StateMutationError::from)?;
+                let ops_set_to_be_published = txn
+                    .execute(
+                        "UPDATE DhtOp SET withhold_publish = NULL WHERE action_hash = :action_hash",
+                        named_params! {
+                            ":action_hash": this_cells_action_hash,
+                        },
+                    )
+                    .map_err(holochain_state::prelude::StateMutationError::from)?;
+                assert_eq!(ops_set_to_be_published, 3);
 
                 // Load the op hashes for this session so that we can publish them.
                 Ok(get_countersigning_op_hashes(txn, this_cells_action_hash)?)
@@ -308,7 +309,7 @@ pub async fn force_publish_countersigning_session(
         let preflight_request = preflight_request.clone();
         move |txn: Transaction| {
             // This chain lock isn't necessarily for the current session, we can't check that until later.
-            if let Some((session_record, cs_entry_hash, session_data)) =
+            if let Some((session_record, _, session_data)) =
                 current_countersigning_session(&txn, Arc::new(author.clone()))?
             {
                 let lock_subject = session_data.preflight_request.fingerprint()?;
@@ -325,14 +326,14 @@ pub async fn force_publish_countersigning_session(
                         return SourceChainResult::Ok(None);
                     }
 
-                    return Ok(Some((session_record, session_data)));
+                    return Ok(Some(session_record));
                 }
             }
             SourceChainResult::Ok(None)
         }
     };
     let authored_db = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
-    let (session_record, session_data) = match authored_db.read_async(reader_closure).await? {
+    let session_record = match authored_db.read_async(reader_closure).await? {
         Some(cs) => cs,
         None => {
             // If there is no active session then we can short circuit.
@@ -340,15 +341,9 @@ pub async fn force_publish_countersigning_session(
             return Ok(false);
         }
     };
-    let this_cells_action = Action::from_countersigning_data(
-        preflight_request.app_entry_hash.clone(),
-        &session_data,
-        cell_id.agent_pubkey().clone(),
-        weigh_placeholder(),
-    )?;
-    let this_cells_action_hash = this_cells_action.to_hash();
+    let this_cells_action_hash = session_record.action_hashed().hash.clone();
 
-    publish_countersigning_session(
+    reveal_countersigning_session(
         space,
         network,
         keystore,
