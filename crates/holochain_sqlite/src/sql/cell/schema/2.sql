@@ -96,8 +96,7 @@ CREATE TABLE IF NOT EXISTS DhtOp (
 
     storage_center_loc          INTEGER   NOT NULL,
 
-    -- NOTE: this is a misnomer. This is just the timestamp when this row was created.
-    --       It applies even for the DHT and Cache DBs.
+    -- The timestamp on the DhtOp itself. NOT the timestamp of the row being created.
     authored_timestamp       INTEGER   NOT NULL,
 
     -- This is the order that process ops should result

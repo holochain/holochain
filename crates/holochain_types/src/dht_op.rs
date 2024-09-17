@@ -447,7 +447,11 @@ impl PartialOrd for DhtOp {
 
 impl Ord for DhtOp {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.to_order().cmp(&other.to_order())
+        match self.to_order().cmp(&other.to_order()) {
+            // Use signature as a tiebreaker
+            std::cmp::Ordering::Equal => self.signature().cmp(&other.signature()),
+            ordering => ordering,
+        }
     }
 }
 
