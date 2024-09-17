@@ -547,6 +547,11 @@ async fn test_ops_state() {
         let (pre_state, expect, name) = t(td);
         Db::set(pre_state, env.clone()).await;
         call_workflow(env.clone()).await;
-        Db::check(expect, env.clone(), format!("{}: {}", name, crate::here!(""))).await;
+        Db::check(
+            expect,
+            env.clone(),
+            format!("{}: {}", name, crate::here!("")),
+        )
+        .await;
     }
 }
