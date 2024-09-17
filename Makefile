@@ -30,7 +30,7 @@ static-toml:
 
 # ensure our chosen style lints are followed
 static-clippy:
-	$(F) cargo clippy --all-targets
+	$(F) CHK_SQL_FMT=1 cargo clippy --all-targets
 
 # ensure we can build the docs
 static-doc:
