@@ -316,6 +316,22 @@ mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[should_panic(expected = "invalid type: unit value, expected variant identifier")]
+    async fn test_init_implemented_invalid_return() {
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitInvalidReturn]))
+            .next()
+            .unwrap();
+        let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
+        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
+
+        let host_access = fixt!(InitHostAccess);
+        let _result = ribosome
+            .run_init(host_access, init_invocation)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn conductor_will_not_accept_zome_calls_before_the_network_is_initialised() {
         let (dna_file, _, _) = SweetDnaFile::from_test_wasms(
             random_network_seed(),

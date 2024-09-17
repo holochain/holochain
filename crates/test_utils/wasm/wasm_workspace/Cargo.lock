@@ -1925,6 +1925,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_init_invalid_return"
+version = "0.0.1"
+dependencies = [
+ "hdk",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_init_pass"
 version = "0.0.1"
 dependencies = [

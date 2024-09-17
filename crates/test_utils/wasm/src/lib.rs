@@ -47,6 +47,7 @@ pub enum TestWasm {
     HashPath,
     HdkExtern,
     InitFail,
+    InitInvalidReturn,
     InitPass,
     Link,
     MigrateInitial,
@@ -157,6 +158,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::HashPath => "hash_path",
             TestWasm::HdkExtern => "hdk_extern",
             TestWasm::InitFail => "init_fail",
+            TestWasm::InitInvalidReturn => "init_invalid_return",
             TestWasm::InitPass => "init_pass",
             TestWasm::Link => "link",
             TestWasm::MigrateInitial => "migrate_initial",
@@ -242,6 +244,7 @@ impl From<TestWasm> for PathBuf {
             TestWasm::HashPath => "wasm32-unknown-unknown/release/test_wasm_hash_path.wasm",
             TestWasm::HdkExtern => "wasm32-unknown-unknown/release/test_wasm_hdk_extern.wasm",
             TestWasm::InitFail => "wasm32-unknown-unknown/release/test_wasm_init_fail.wasm",
+            TestWasm::InitInvalidReturn => "wasm32-unknown-unknown/release/test_wasm_init_invalid_return.wasm",
             TestWasm::InitPass => "wasm32-unknown-unknown/release/test_wasm_init_pass.wasm",
             TestWasm::Link => "wasm32-unknown-unknown/release/test_wasm_link.wasm",
             TestWasm::MigrateInitial => {

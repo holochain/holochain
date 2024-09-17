@@ -30,6 +30,7 @@ members = [
   "hash_path",
   "hdk_extern",
   "init_fail",
+  "init_invalid_return",
   "init_pass",
   "integrity_zome",
   "link",
