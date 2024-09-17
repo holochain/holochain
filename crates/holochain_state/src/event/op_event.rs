@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use derive_more::Constructor;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 
 use crate::{prelude::*, query::map_sql_dht_op};
@@ -40,13 +39,20 @@ impl OpEventStore {
         )
     }
 
+    pub async fn apply_event(&self, event: OpEvent) -> StateMutationResult<()> {
+        self.apply_events(vec![event]).await
+    }
+
     pub async fn apply_events(&self, events: Vec<OpEvent>) -> StateMutationResult<()> {
+        // TODO: no clone
+        let events1 = events.clone();
+        let events2 = events.clone();
         self.authored
             .write_async(|txn| {
-                for event in events {
+                for event in events1 {
                     match event {
                         OpEvent::Authored { op } => {
-                            insert_op(txn, &op.into_hashed())?;
+                            insert_op(txn, &op.clone().into_hashed())?;
                         }
                         OpEvent::Integrated { .. } => {
                             unimplemented!("Integrated event not implemented")
@@ -57,97 +63,220 @@ impl OpEventStore {
                         OpEvent::SysValidated { .. } => {
                             unimplemented!("SysValidated event not implemented")
                         }
-                        OpEvent::Fetched { .. } => unimplemented!("Fetched event not implemented"),
+                        OpEvent::Fetched { .. } => (),
                     }
                 }
-                Ok(())
+                StateMutationResult::Ok(())
             })
-            .await
+            .await?;
+
+        self.dht
+            .write_async(|txn| {
+                for event in events2 {
+                    match event {
+                        OpEvent::Fetched { op } => {
+                            insert_op(txn, &op.clone().into_hashed())?;
+                        }
+                        OpEvent::Integrated { .. } => {
+                            unimplemented!("Integrated event not implemented")
+                        }
+                        OpEvent::AppValidated { .. } => {
+                            unimplemented!("AppValidated event not implemented")
+                        }
+                        OpEvent::SysValidated { .. } => {
+                            unimplemented!("SysValidated event not implemented")
+                        }
+                        OpEvent::Authored { .. } => (),
+                    }
+                }
+                StateMutationResult::Ok(())
+            })
+            .await?;
+
+        Ok(())
     }
 
     pub async fn get_events(&self) -> StateQueryResult<Vec<(Timestamp, OpEvent)>> {
-        let ops = self
+        let sql_common = "
+            SELECT
+            Action.blob as action_blob,
+            Entry.blob as entry_blob,
+            DhtOp.type as dht_type,
+            DhtOp.authored_timestamp,
+            
+            DhtOp.when_sys_validated,
+            DhtOp.when_app_validated,
+            DhtOp.when_integrated
+            FROM Action
+            JOIN
+            DhtOp ON DhtOp.action_hash = Action.hash
+            LEFT JOIN
+            Entry ON Action.entry_hash = Entry.hash
+            ORDER BY DhtOp.authored_timestamp ASC
+        ";
+        let events_authored = self
             .authored
             .read_async(|txn| {
-                txn.prepare_cached(
-                    "
-                    SELECT
-                    Action.blob as action_blob,
-                    Entry.blob as entry_blob,
-                    DhtOp.type as dht_type,
-                    DhtOp.authored_timestamp
-                    FROM Action
-                    JOIN
-                    DhtOp ON DhtOp.action_hash = Action.hash
-                    LEFT JOIN
-                    Entry ON Action.entry_hash = Entry.hash
-                    ORDER BY DhtOp.authored_timestamp ASC
-            ",
-                )?
-                .query_and_then([], |row| {
-                    let timestamp: Timestamp = row.get("authored_timestamp")?;
-                    let op = map_sql_dht_op(true, "dht_type", row)?;
-                    let authored = OpEvent::Authored { op };
-                    StateQueryResult::Ok((timestamp, authored))
-                })?
-                .collect::<Result<BTreeMap<_, _>, _>>()
+                txn.prepare_cached(sql_common)?
+                    .query_and_then([], |row| {
+                        let timestamp: Timestamp = row.get("authored_timestamp")?;
+                        let op = map_sql_dht_op(true, "dht_type", row)?;
+                        let op_hash = op.to_hash();
+
+                        // The existence of an op implies the Authored event
+                        let mut events = vec![(timestamp, OpEvent::Authored { op })];
+
+                        // The existence of a when_sys_validated timestamp
+                        // implies the SysValidated event
+                        if let Some(when_sys_validated) = row.get("when_sys_validated")? {
+                            let ev = OpEvent::SysValidated {
+                                op: op_hash.clone(),
+                            };
+                            events.push((when_sys_validated, ev));
+                        }
+
+                        // The existence of a when_app_validated timestamp
+                        // implies the AppValidated event
+                        if let Some(when_app_validated) = row.get("when_app_validated")? {
+                            let ev = OpEvent::AppValidated {
+                                op: op_hash.clone(),
+                            };
+                            events.push((when_app_validated, ev));
+                        }
+
+                        // The existence of a when_integrated timestamp
+                        // implies the Integrated event
+                        if let Some(when_integrated) = row.get("when_integrated")? {
+                            let ev = OpEvent::Integrated {
+                                op: op_hash.clone(),
+                            };
+                            events.push((when_integrated, ev));
+                        }
+
+                        StateQueryResult::Ok(events)
+                    })?
+                    .collect::<Result<Vec<Vec<_>>, _>>()
             })
             .await?;
-        Ok(ops.into_iter().collect::<Vec<_>>())
+
+        let events_dht = self
+            .dht
+            .read_async(|txn| {
+                txn.prepare_cached(sql_common)?
+                    .query_and_then([], |row| {
+                        let timestamp: Timestamp = row.get("authored_timestamp")?;
+                        let op = map_sql_dht_op(true, "dht_type", row)?;
+                        let op_hash = op.to_hash();
+
+                        // The existence of an op implies the Fetched event
+                        let mut events = vec![(timestamp, OpEvent::Fetched { op })];
+
+                        // The existence of a when_sys_validated timestamp
+                        // implies the SysValidated event
+                        if let Some(when_sys_validated) = row.get("when_sys_validated")? {
+                            let ev = OpEvent::SysValidated {
+                                op: op_hash.clone(),
+                            };
+                            events.push((when_sys_validated, ev));
+                        }
+
+                        // The existence of a when_app_validated timestamp
+                        // implies the AppValidated event
+                        if let Some(when_app_validated) = row.get("when_app_validated")? {
+                            let ev = OpEvent::AppValidated {
+                                op: op_hash.clone(),
+                            };
+                            events.push((when_app_validated, ev));
+                        }
+
+                        // The existence of a when_integrated timestamp
+                        // implies the Integrated event
+                        if let Some(when_integrated) = row.get("when_integrated")? {
+                            let ev = OpEvent::Integrated {
+                                op: op_hash.clone(),
+                            };
+                            events.push((when_integrated, ev));
+                        }
+
+                        StateQueryResult::Ok(events)
+                    })?
+                    .collect::<Result<Vec<Vec<_>>, _>>()
+            })
+            .await?;
+
+        Ok(events_authored
+            .into_iter()
+            .chain(events_dht.into_iter())
+            .flatten()
+            .collect::<BTreeMap<_, _>>()
+            .into_iter()
+            .collect::<Vec<_>>())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeSet, HashSet};
+    use std::collections::BTreeSet;
 
     use super::*;
     use ::fixt::prelude::*;
     use arbitrary::Arbitrary;
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_event_creation() {
-        let mut u = unstructured_noise();
-        let cell_id = fixt!(CellId);
-        let op1: DhtOp = ChainOp::arbitrary(&mut u)
-            .unwrap()
-            .normalized()
-            .unwrap()
-            .into();
-        let op2: DhtOp = ChainOp::arbitrary(&mut u)
-            .unwrap()
-            .normalized()
-            .unwrap()
-            .into();
-        let op3: DhtOp = ChainOp::arbitrary(&mut u)
-            .unwrap()
-            .normalized()
-            .unwrap()
-            .into();
-
-        // let h1 = op1.to_hash();
-
-        let events = maplit::btreeset![
-            OpEvent::Authored { op: op1.clone() },
-            OpEvent::Authored { op: op2.clone() },
-            OpEvent::Authored { op: op3.clone() },
-        ];
-
-        let store = OpEventStore::new_test(cell_id);
-
+    async fn db_roundtrip(
+        store: &mut OpEventStore,
+        events: &BTreeSet<OpEvent>,
+    ) -> BTreeSet<OpEvent> {
         store
             .apply_events(events.clone().into_iter().collect())
             .await
             .unwrap();
 
-        let events2: BTreeSet<_> = store
+        store
             .get_events()
             .await
             .unwrap()
             .into_iter()
             .map(second)
+            .collect()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_event_creation() {
+        const NUM_OPS: usize = 3;
+        let mut u = unstructured_noise();
+        let ops: Vec<DhtOp> = (0..NUM_OPS)
+            .map(|_| {
+                ChainOp::arbitrary(&mut u)
+                    .unwrap()
+                    .normalized()
+                    .unwrap()
+                    .into()
+            })
             .collect();
 
-        pretty_assertions::assert_eq!(events, events2);
+        let cell_id_1 = fixt!(CellId);
+        let cell_id_2 = CellId::new(cell_id_1.dna_hash().clone(), fixt!(AgentPubKey));
+
+        // Setup store 1
+
+        let events_1 = maplit::btreeset![
+            OpEvent::Authored { op: ops[0].clone() },
+            OpEvent::Authored { op: ops[1].clone() },
+            OpEvent::Authored { op: ops[2].clone() },
+        ];
+        let mut store_1 = OpEventStore::new_test(cell_id_1);
+        let extracted_events_1 = db_roundtrip(&mut store_1, &events_1).await;
+        pretty_assertions::assert_eq!(events_1, extracted_events_1);
+
+        // Setup store 2
+
+        let events_2 = maplit::btreeset![
+            OpEvent::Fetched { op: ops[0].clone() },
+            OpEvent::Fetched { op: ops[1].clone() },
+            OpEvent::Fetched { op: ops[2].clone() },
+        ];
+        let mut store_2 = OpEventStore::new_test(cell_id_2);
+        let extracted_events_2 = db_roundtrip(&mut store_2, &events_2).await;
+        pretty_assertions::assert_eq!(events_2, extracted_events_2);
     }
 }
