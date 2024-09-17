@@ -55,97 +55,35 @@ impl OpEventStore {
         )
     }
 
-    async fn lookup_op(&self, op_hash: &DhtOpHash) -> EventResult<Db> {
-        let sql = "
-            SELECT when_stored
-            FROM DhtOp
-            WHERE hash = :op_hash
-        ";
-
-        let op_hash_clone = op_hash.clone();
-        let authored_timestamp: Option<Timestamp> = self
-            .authored
-            .read_async(move |txn| {
-                txn.query_row_and_then(
-                    sql,
-                    named_params! {
-                        ":op_hash": op_hash_clone,
-                    },
-                    |row| Ok(row.get("when_stored")?),
-                )
-                .optional()
-                .map_err(StateMutationError::from)
-            })
-            .await?;
-
-        let op_hash_clone = op_hash.clone();
-        let dht_timestamp: Option<Timestamp> = self
-            .dht
-            .read_async(move |txn| {
-                txn.query_row_and_then(
-                    sql,
-                    named_params! {
-                        ":op_hash": op_hash_clone,
-                    },
-                    |row| Ok(row.get("when_stored")?),
-                )
-                .optional()
-                .map_err(StateMutationError::from)
-            })
-            .await?;
-
-        match (authored_timestamp, dht_timestamp) {
-            (Some(authored_timestamp), None) => Ok(Db::Authored),
-            (None, Some(dht_timestamp)) => Ok(Db::Dht),
-            (Some(authored_timestamp), Some(dht_timestamp)) => {
-                if authored_timestamp < dht_timestamp {
-                    Ok(Db::Authored)
-                } else {
-                    Ok(Db::Dht)
-                }
-            }
-            (None, None) => Err(EventError::RequisiteEventNotFound(op_hash.clone())),
-        }
-    }
-
     pub async fn apply_event(&self, event: Event) -> EventResult<()> {
         let timestamp = event.timestamp;
         match event.data {
             EventData::Op(event) => match event {
                 OpEvent::Authored { op } => {
-                    dbg!(&op.to_hash());
                     let op = op.into_hashed();
                     self.authored
                         .write_async(move |txn| insert_op_when(txn, &op, timestamp))
                         .await?;
                 }
                 OpEvent::Fetched { op } => {
-                    dbg!(&op.to_hash());
                     let op = op.into_hashed();
                     self.dht
                         .write_async(move |txn| insert_op_when(txn, &op, timestamp))
                         .await?;
                 }
                 OpEvent::SysValidated { op: op_hash } => {
-                    let db = self.lookup_op(&op_hash).await?;
-                    dbg!(&op_hash, db);
-                    self.with_db(db, move |txn| {
-                        set_when_sys_validated(txn, &op_hash, timestamp)
-                    })
-                    .await?;
+                    self.dht
+                        .write_async(move |txn| set_when_sys_validated(txn, &op_hash, timestamp))
+                        .await?;
                 }
                 OpEvent::AppValidated { op: op_hash } => {
-                    let db = self.lookup_op(&op_hash).await?;
-                    dbg!(&op_hash, db);
-                    self.with_db(db, move |txn| {
-                        set_when_app_validated(txn, &op_hash, timestamp)
-                    })
-                    .await?;
+                    self.dht
+                        .write_async(move |txn| set_when_app_validated(txn, &op_hash, timestamp))
+                        .await?;
                 }
                 OpEvent::Integrated { op: op_hash } => {
-                    let db = self.lookup_op(&op_hash).await?;
-                    dbg!(&op_hash, db);
-                    self.with_db(db, move |txn| set_when_integrated(txn, &op_hash, timestamp))
+                    self.dht
+                        .write_async(move |txn| set_when_integrated(txn, &op_hash, timestamp))
                         .await?;
                 }
             },
@@ -190,32 +128,8 @@ impl OpEventStore {
                         // The existence of an op implies the Authored event
                         let mut events = vec![Event::new(timestamp, OpEvent::Authored { op })];
 
-                        // The existence of a when_sys_validated timestamp
-                        // implies the SysValidated event
-                        if let Some(when_sys_validated) = row.get("when_sys_validated")? {
-                            let ev = OpEvent::SysValidated {
-                                op: op_hash.clone(),
-                            };
-                            events.push(Event::new(when_sys_validated, ev));
-                        }
-
-                        // The existence of a when_app_validated timestamp
-                        // implies the AppValidated event
-                        if let Some(when_app_validated) = row.get("when_app_validated")? {
-                            let ev = OpEvent::AppValidated {
-                                op: op_hash.clone(),
-                            };
-                            events.push(Event::new(when_app_validated, ev));
-                        }
-
-                        // The existence of a when_integrated timestamp
-                        // implies the Integrated event
-                        if let Some(when_integrated) = row.get("when_integrated")? {
-                            let ev = OpEvent::Integrated {
-                                op: op_hash.clone(),
-                            };
-                            events.push(Event::new(when_integrated, ev));
-                        }
+                        // More events to come:
+                        // - [ ] Published
 
                         StateQueryResult::Ok(events)
                     })?
@@ -289,6 +203,59 @@ impl OpEventStore {
             Db::Dht => self.dht.write_async(f).await,
         }
     }
+
+    // async fn lookup_op(&self, op_hash: &DhtOpHash) -> EventResult<Db> {
+    //     let sql = "
+    //         SELECT when_stored
+    //         FROM DhtOp
+    //         WHERE hash = :op_hash
+    //     ";
+
+    //     let op_hash_clone = op_hash.clone();
+    //     let authored_timestamp: Option<Timestamp> = self
+    //         .authored
+    //         .read_async(move |txn| {
+    //             txn.query_row_and_then(
+    //                 sql,
+    //                 named_params! {
+    //                     ":op_hash": op_hash_clone,
+    //                 },
+    //                 |row| Ok(row.get("when_stored")?),
+    //             )
+    //             .optional()
+    //             .map_err(StateMutationError::from)
+    //         })
+    //         .await?;
+
+    //     let op_hash_clone = op_hash.clone();
+    //     let dht_timestamp: Option<Timestamp> = self
+    //         .dht
+    //         .read_async(move |txn| {
+    //             txn.query_row_and_then(
+    //                 sql,
+    //                 named_params! {
+    //                     ":op_hash": op_hash_clone,
+    //                 },
+    //                 |row| Ok(row.get("when_stored")?),
+    //             )
+    //             .optional()
+    //             .map_err(StateMutationError::from)
+    //         })
+    //         .await?;
+
+    //     match (authored_timestamp, dht_timestamp) {
+    //         (Some(authored_timestamp), None) => Ok(Db::Authored),
+    //         (None, Some(dht_timestamp)) => Ok(Db::Dht),
+    //         (Some(authored_timestamp), Some(dht_timestamp)) => {
+    //             if authored_timestamp < dht_timestamp {
+    //                 Ok(Db::Authored)
+    //             } else {
+    //                 Ok(Db::Dht)
+    //             }
+    //         }
+    //         (None, None) => Err(EventError::RequisiteEventNotFound(op_hash.clone())),
+    //     }
+    // }
 }
 
 #[cfg(test)]
@@ -335,15 +302,6 @@ mod tests {
             Event::now(Authored { op: ops[0].clone() }),
             Event::now(Authored { op: ops[1].clone() }),
             Event::now(Authored { op: ops[2].clone() }),
-            Event::now(SysValidated {
-                op: ops[0].to_hash(),
-            }),
-            Event::now(AppValidated {
-                op: ops[0].to_hash(),
-            }),
-            Event::now(Integrated {
-                op: ops[0].to_hash(),
-            }),
         ];
         let mut store_1 = OpEventStore::new_test(cell_id_1);
         let extracted_events_1 = db_roundtrip(&mut store_1, events_1.iter()).await;
@@ -355,6 +313,27 @@ mod tests {
             Event::now(Fetched { op: ops[0].clone() }),
             Event::now(Fetched { op: ops[1].clone() }),
             Event::now(Fetched { op: ops[2].clone() }),
+            // op 0 is integrated
+            Event::now(SysValidated {
+                op: ops[0].to_hash(),
+            }),
+            Event::now(AppValidated {
+                op: ops[0].to_hash(),
+            }),
+            Event::now(Integrated {
+                op: ops[0].to_hash(),
+            }),
+            // op 1 is merely app validated
+            Event::now(SysValidated {
+                op: ops[1].to_hash(),
+            }),
+            Event::now(AppValidated {
+                op: ops[1].to_hash(),
+            }),
+            // op 2 is merely sys validated
+            Event::now(SysValidated {
+                op: ops[2].to_hash(),
+            }),
         ];
         let mut store_2 = OpEventStore::new_test(cell_id_2);
         let extracted_events_2 = db_roundtrip(&mut store_2, events_2.iter()).await;
