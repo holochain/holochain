@@ -90,6 +90,7 @@ use holochain_util::timed;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
+use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use tokio_stream::StreamExt;
 use wasmer::AsStoreMut;
 use wasmer::Exports;
@@ -107,7 +108,6 @@ use crate::core::ribosome::host_fn::close_chain::close_chain;
 use crate::core::ribosome::host_fn::count_links::count_links;
 use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
 use crate::core::ribosome::host_fn::open_chain::open_chain;
-use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
@@ -118,9 +118,16 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use wasmer_middlewares::metering::get_remaining_points;
-use wasmer_middlewares::metering::set_remaining_points;
-use wasmer_middlewares::metering::MeteringPoints;
+
+#[cfg(feature = "wasmer_sys")]
+mod wasmer_sys;
+#[cfg(feature = "wasmer_sys")]
+use wasmer_sys::*;
+
+#[cfg(feature = "wasmer_wamr")]
+mod wasmer_wamr;
+#[cfg(feature = "wasmer_wamr")]
+use wasmer_wamr::*;
 
 pub(crate) type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
 
@@ -212,12 +219,12 @@ impl HostFnBuilder {
                                         WasmError {
                                             error: WasmErrorInner::HostShortCircuit(_),
                                             ..
-                                        } => return Err(wasm_error.into()),
-                                        _ => Err(wasm_error),
+                                        } => return Err(WasmHostError(wasm_error).into()),
+                                        _ => Err(WasmHostError(wasm_error)),
                                     },
                                     Err(runtime_error) => return Err(runtime_error),
                                 },
-                                Ok(o) => Result::<_, WasmError>::Ok(o),
+                                Ok(o) => Result::<_, WasmHostError>::Ok(o),
                             })?
                             .to_le_bytes(),
                         ))
@@ -369,10 +376,7 @@ impl RealRibosome {
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    pub async fn runtime_compiled_module(
-        &self,
-        zome_name: &ZomeName,
-    ) -> RibosomeResult<Arc<Module>> {
+    pub async fn build_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
         // When running tests, use cache folder accessible to all tests.
         #[cfg(test)]
@@ -404,11 +408,10 @@ impl RealRibosome {
     pub async fn get_module_for_zome(&self, zome: &Zome<ZomeDef>) -> RibosomeResult<Arc<Module>> {
         match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
-                if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                    let module = holochain_wasmer_host::module::get_ios_module_from_file(path)?;
-                    Ok(Arc::new(module))
+                if let Some(module) = get_prebuilt_module(wasm_zome)? {
+                    Ok(module)
                 } else {
-                    self.runtime_compiled_module(zome.zome_name()).await
+                    self.build_module(zome.zome_name()).await
                 }
             }
             _ => RibosomeResult::Err(RibosomeError::DnaError(DnaError::ZomeError(
@@ -741,7 +744,7 @@ macro_rules! do_callback {
                     Some(Err((zome, RibosomeError::WasmRuntimeError(runtime_error)))) => (
                         zome.into(),
                         <$callback_result>::try_from_wasm_error(runtime_error.downcast()?)
-                            .map_err(|e| -> RuntimeError { e.into() })?,
+                            .map_err(|e| -> RuntimeError { WasmHostError(e).into() })?,
                     ),
                     Some(Err((_zome, other_error))) => return Err(other_error),
                     None => {
@@ -823,16 +826,8 @@ impl RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
-                    let instance = instance_with_store.instance.clone();
-                    {
-                        let mut store_lock = instance_with_store.store.lock();
-                        let mut store_mut = store_lock.as_store_mut();
-                        set_remaining_points(
-                            &mut store_mut,
-                            instance.as_ref(),
-                            WASM_METERING_LIMIT,
-                        );
-                    }
+                    // Reset available metering points to the maximum allowed per zome call
+                    reset_metering_points(instance_with_store.clone());
 
                     // be aware of this clone!
                     // the whole invocation is cloned!
@@ -845,16 +840,9 @@ impl RealRibosome {
                     })
                     .await?;
 
-                    {
-                        let mut store_lock = instance_with_store.store.lock();
-                        let mut store_mut = store_lock.as_store_mut();
-                        let points_used =
-                            match get_remaining_points(&mut store_mut, instance.as_ref()) {
-                                MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
-                                MeteringPoints::Exhausted => WASM_METERING_LIMIT,
-                            };
-                        self.usage_meter.add(points_used, &otel_info);
-                    }
+                    // Get metering points consumed in zome call and save to usage_meter
+                    let points_used = get_used_metering_points(instance_with_store.clone());
+                    self.usage_meter.add(points_used, &otel_info);
 
                     // remove context from map after call
                     {
@@ -928,14 +916,10 @@ impl RibosomeT for RealRibosome {
             extern_fns: {
                 match zome.zome_def() {
                     ZomeDef::Wasm(wasm_zome) => {
-                        let module = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                            Arc::new(holochain_wasmer_host::module::get_ios_module_from_file(
-                                path,
-                            )?)
+                        let module = if let Some(module) = get_prebuilt_module(wasm_zome)? {
+                            module
                         } else {
-                            tokio_helper::block_forever_on(
-                                self.runtime_compiled_module(zome.zome_name()),
-                            )?
+                            tokio_helper::block_forever_on(self.build_module(zome.zome_name()))?
                         };
                         self.get_extern_fns_for_wasm(module.clone())
                     }
