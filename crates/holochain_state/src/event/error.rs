@@ -1,3 +1,4 @@
+use holo_hash::DhtOpHash;
 use thiserror::Error;
 
 use crate::mutations::StateMutationError;
@@ -7,6 +8,6 @@ pub enum EventError {
     #[error(transparent)]
     StateMutationError(#[from] StateMutationError),
 
-    #[error("requisite event not found")]
-    RequisiteEventNotFound,
+    #[error("database row not recorded for op hash: {0:?}")]
+    RequisiteEventNotFound(DhtOpHash),
 }
