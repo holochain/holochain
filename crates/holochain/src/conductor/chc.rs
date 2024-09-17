@@ -259,7 +259,7 @@ mod tests {
         );
     }
 
-    // TODO: run this remotely too
+    // TODO: run this against a remote CHC too
     #[tokio::test(flavor = "multi_thread")]
     async fn multi_conductor_chc_sync() {
         holochain_trace::test_run();
@@ -312,9 +312,26 @@ mod tests {
             .install_app_bundle(mk_payload(false).await)
             .await;
 
-        // It's not ideal to match on a string, but it seems like the only option:
-        // - The pattern involves Boxes which are impossible to match on
+        // It's not ideal to match on a string, but it seems like the only sane option:
+        // - The pattern involves Boxes which require multiple steps for matching
+        // - The error actually contains a Vec of errors
+        // - The innermost error is actually a SourceChainError::Other, which is a boxed trait object, not matchable
         // - The error types are not PartialEq, so cannot be constructed and tested for equality
+        // Here's the closest attempt, which does not work (Needs to use SourceChainError::Other), and perhaps a downcast:
+        /*
+                if let Err(ConductorError::GenesisFailed { errors }) = &install_result_1 {
+                    assert_eq!(errors.len(), 1);
+                    if let CellError::ConductorApiError(b) = &errors[0].1 {
+                        assert_matches!(
+                            &**b,
+                            ConductorApiError::WorkflowError(WorkflowError::SourceChainError(SourceChainError::ChcError(
+                                ChcError::InvalidChain(seq, _)
+                            )))
+                            if *seq == 2
+                        );
+                    }
+                }
+        */
 
         println!("install_result_1 = {:?}", install_result_1);
         println!("install_result_2 = {:?}", install_result_2);
