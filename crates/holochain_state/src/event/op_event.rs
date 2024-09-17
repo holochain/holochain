@@ -4,15 +4,9 @@
 //! - [ ] Define what happens when an op is stored in both Authored and DHT databases,
 //!     potentially at different times and stages of integratation.
 
-use std::collections::HashMap;
-
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 
-use crate::{
-    event::EventError,
-    prelude::*,
-    query::{get_public_op_from_db, map_sql_dht_op},
-};
+use crate::{event::EventError, prelude::*, query::map_sql_dht_op};
 
 use super::{Event, EventData, EventResult};
 
@@ -32,18 +26,16 @@ pub enum OpEvent {
 
     /// The node has integrated an op authored by someone else
     Integrated { op: DhtOpHash },
+
+    /// The node has received a validation receipt from another
+    /// agent for op it authored
+    ReceivedValidationReceipt { receipt: SignedValidationReceipt },
 }
 
 #[derive(derive_more::Constructor)]
 pub struct OpEventStore {
     authored: DbWrite<DbKindAuthored>,
     dht: DbWrite<DbKindDht>,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Db {
-    Authored,
-    Dht,
 }
 
 #[allow(unused)]
@@ -86,6 +78,13 @@ impl OpEventStore {
                         .write_async(move |txn| set_when_integrated(txn, &op_hash, timestamp))
                         .await?;
                 }
+                OpEvent::ReceivedValidationReceipt { receipt } => {
+                    self.authored
+                        .write_async(move |txn| {
+                            insert_validation_receipt_when(txn, receipt, timestamp)
+                        })
+                        .await?;
+                }
             },
         }
         Ok(())
@@ -100,7 +99,7 @@ impl OpEventStore {
     }
 
     pub async fn get_events(&self) -> StateQueryResult<Vec<Event>> {
-        let sql_common = "
+        let sql_ops = "
             SELECT
             Action.blob as action_blob,
             Entry.blob as entry_blob,
@@ -116,38 +115,68 @@ impl OpEventStore {
             Entry ON Action.entry_hash = Entry.hash
             ORDER BY DhtOp.when_stored ASC
         ";
+
+        let sql_receipts = "
+            SELECT
+            ValidationReceipt.blob as receipt_blob,
+            ValidationReceipt.when_received
+            FROM ValidationReceipt
+            ORDER BY ValidationReceipt.when_received ASC
+        ";
+
         let events_authored = self
             .authored
             .read_async(|txn| {
-                txn.prepare_cached(sql_common)?
+                let mut events = Vec::new();
+
+                txn.prepare_cached(sql_ops)?
                     .query_and_then([], |row| {
                         let timestamp: Timestamp = row.get("when_stored")?;
                         let op = map_sql_dht_op(true, "dht_type", row)?;
-                        let op_hash = op.to_hash();
 
                         // The existence of an op implies the Authored event
-                        let mut events = vec![Event::new(timestamp, OpEvent::Authored { op })];
+                        events.push(Event::new(timestamp, OpEvent::Authored { op }));
 
                         // More events to come:
                         // - [ ] Published
 
-                        StateQueryResult::Ok(events)
+                        StateQueryResult::Ok(())
                     })?
-                    .collect::<Result<Vec<Vec<_>>, _>>()
+                    .collect::<Result<Vec<()>, _>>()?;
+
+                txn.prepare_cached(sql_receipts)?
+                    .query_and_then([], |row| {
+                        let timestamp: Timestamp = row.get("when_received")?;
+                        let receipt =
+                            from_blob::<SignedValidationReceipt>(row.get("receipt_blob")?)?;
+
+                        // The existence of a receipt implies the ReceivedValidationReceipt event
+                        events.push(Event::new(
+                            timestamp,
+                            OpEvent::ReceivedValidationReceipt { receipt },
+                        ));
+
+                        StateQueryResult::Ok(())
+                    })?
+                    .collect::<Result<Vec<()>, _>>()?;
+
+                StateQueryResult::Ok(events)
             })
             .await?;
 
         let events_dht = self
             .dht
             .read_async(|txn| {
-                txn.prepare_cached(sql_common)?
+                let mut events = Vec::new();
+
+                txn.prepare_cached(sql_ops)?
                     .query_and_then([], |row| {
                         let timestamp: Timestamp = row.get("when_stored")?;
                         let op = map_sql_dht_op(true, "dht_type", row)?;
                         let op_hash = op.to_hash();
 
                         // The existence of an op implies the Fetched event
-                        let mut events = vec![Event::new(timestamp, OpEvent::Fetched { op })];
+                        events.push(Event::new(timestamp, OpEvent::Fetched { op }));
 
                         // The existence of a when_sys_validated timestamp
                         // implies the SysValidated event
@@ -176,16 +205,16 @@ impl OpEventStore {
                             events.push(Event::new(when_integrated, ev));
                         }
 
-                        StateQueryResult::Ok(events)
+                        StateQueryResult::Ok(())
                     })?
-                    .collect::<Result<Vec<Vec<_>>, _>>()
+                    .collect::<Result<Vec<()>, _>>()?;
+                StateQueryResult::Ok(events)
             })
             .await?;
 
         let mut events = events_authored
             .into_iter()
             .chain(events_dht.into_iter())
-            .flatten()
             .collect::<Vec<_>>();
 
         // Ord is by timestamp, so this sorts the events in chronological order
@@ -258,6 +287,12 @@ impl OpEventStore {
     // }
 }
 
+// #[derive(Debug, Clone, Copy)]
+// enum Db {
+//     Authored,
+//     Dht,
+// }
+
 #[cfg(test)]
 mod tests {
 
@@ -266,6 +301,7 @@ mod tests {
     use super::*;
     use ::fixt::prelude::*;
     use arbitrary::Arbitrary;
+    use holochain_keystore::test_keystore;
     use maplit::btreeset;
 
     async fn db_roundtrip(
@@ -293,8 +329,18 @@ mod tests {
             })
             .collect();
 
-        let cell_id_1 = fixt!(CellId);
-        let cell_id_2 = CellId::new(cell_id_1.dna_hash().clone(), fixt!(AgentPubKey));
+        let keystore = test_keystore();
+
+        let agent_1 = keystore.new_sign_keypair_random().await.unwrap();
+        let agent_2 = keystore.new_sign_keypair_random().await.unwrap();
+        let dna_hash = fixt!(DnaHash);
+        let cell_id_1 = CellId::new(dna_hash.clone(), agent_1);
+        let cell_id_2 = CellId::new(dna_hash.clone(), agent_2);
+
+        let mut receipt = ValidationReceipt::arbitrary(&mut u).unwrap();
+        receipt.validators = vec![cell_id_1.agent_pubkey().clone()];
+        receipt.dht_op_hash = ops[0].to_hash();
+        let receipt = receipt.sign(&keystore).await.unwrap().unwrap();
 
         // Setup store 1
 
@@ -302,6 +348,7 @@ mod tests {
             Event::now(Authored { op: ops[0].clone() }),
             Event::now(Authored { op: ops[1].clone() }),
             Event::now(Authored { op: ops[2].clone() }),
+            Event::now(ReceivedValidationReceipt { receipt }),
         ];
         let mut store_1 = OpEventStore::new_test(cell_id_1);
         let extracted_events_1 = db_roundtrip(&mut store_1, events_1.iter()).await;

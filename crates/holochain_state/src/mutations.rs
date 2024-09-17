@@ -237,6 +237,15 @@ pub fn insert_validation_receipt(
     txn: &mut Transaction,
     receipt: SignedValidationReceipt,
 ) -> StateMutationResult<()> {
+    insert_validation_receipt_when(txn, receipt, Timestamp::now())
+}
+
+/// Insert a [`SignedValidationReceipt`] into the database.
+pub fn insert_validation_receipt_when(
+    txn: &mut Transaction,
+    receipt: SignedValidationReceipt,
+    timestamp: Timestamp,
+) -> StateMutationResult<()> {
     let op_hash = receipt.receipt.dht_op_hash.clone();
     let bytes: UnsafeBytes = SerializedBytes::try_from(receipt)?.into();
     let bytes: Vec<u8> = bytes.into();
@@ -245,6 +254,7 @@ pub fn insert_validation_receipt(
         "hash": hash,
         "op_hash": op_hash,
         "blob": bytes,
+        "when_received": timestamp,
     })?;
     Ok(())
 }

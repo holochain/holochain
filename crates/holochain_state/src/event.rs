@@ -68,6 +68,11 @@ impl EventData {
                 OpEvent::SysValidated { op } => op.as_ref(),
                 OpEvent::AppValidated { op } => op.as_ref(),
                 OpEvent::Integrated { op } => op.as_ref(),
+                OpEvent::ReceivedValidationReceipt { receipt } => receipt
+                    .validators_signatures
+                    .first()
+                    .map(|s| s.as_ref())
+                    .unwrap_or(&[]),
             },
         }
     }
