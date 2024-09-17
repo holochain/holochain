@@ -28,8 +28,6 @@ In distributed systems much has been written about Fault Tolerance especially to
 
 3. **Faults from temporal indeterminacy:** In general these faults do not apply to the system described here because it only relies on temporality where it is known that one can rely on it; i.e., when recording Actions that take place locally as experienced by an Agent. As these temporally recorded Actions are shared into the space in which nodes may receive messages in an unpredictable order, the system still guarantees eventual consistency (though not uniform global state) because of the intrinsic integrity of recorded hash-chains and deterministic validation. Additionally, see the section on "Multi-agent reality binding (Countersigning)" for more details on how some of the use cases addressed by consensus systems are handled in this system.
 
-[^corruption]: CITATION NEEDED
-
 ## Completeness/Fit
 
 ### Multi-agent reality binding (Countersigning)
@@ -37,7 +35,7 @@ In distributed systems much has been written about Fault Tolerance especially to
 The addition of the single feature of Countersigning to Holochain enables our eventually consistent framework to provide most of the consensus assurances people seek from decentralized systems. Countersigning provides the capacity for specific groups of agents to mutually sign a single state-change on all their respective source-chains. It makes the deterministic validity of a single Entry require the cryptographic signatures of multiple agents instead of just one. Furthermore any slow-downs necessary to add coordinated countersigned entries are not just localized to the DNA involved, they are also localized to just the parties involved. The same parties can
 continue to interact in other DNAs.
 
-The following are common use cases for countersigning; for a detailed technical specification, please see the [Countersigning Spec (Appendix B)](hwp_B_countersigning_spec.md).
+The following are common use cases for countersigning:
 
 * **Multi-Agent State Changes:** Some applications require changes that affect multiple agents simultaneously. Consider the transfer of a deed or tracking a chain of custody, where Alice transfers ownership or custody of something to Bob and they want to produce an **atomic change across both of their source chains**. We must be able to prevent indeterminate states like Alice committing a change releasing an item without Bob having taken possession yet, or Bob committing an entry acknowledging possession while Alice's release fails to commit. Holochain provides a countersigning process for multiple agents to momentarily lock their chains while they negotiate one matching entry that each one commits to their chain. An entry which has roles for multiple signers requires signed chain Actions from each counterparty to enter the validation process. This ensures no party's state changes unless every party's state changes.
 
