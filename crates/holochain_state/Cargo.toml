@@ -92,6 +92,8 @@ test_utils = [
   "nanoid",
 ]
 
+instrument = []
+
 sqlite-encrypted = [
   "holo_hash/sqlite-encrypted",
   "holochain_sqlite/sqlite-encrypted",

@@ -147,10 +147,8 @@ pub trait Store {
 
     /// Get an [`Entry`] from this store.
     /// - Will return any public entry.
-    /// - If an author is provided
-    /// and an action for this entry matches
-    /// the author then any entry will be return
-    /// regardless of visibility .
+    /// - If an author is provided and an action for this entry matches the author then any entry
+    ///   will be return regardless of visibility.
     fn get_public_or_authored_entry(
         &self,
         hash: &EntryHash,

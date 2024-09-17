@@ -238,6 +238,8 @@ test_utils = [
   "sbd-server",
 ]
 
+fuzzing = []
+
 # Wasm ribosome tests take > 60 seconds - let's only run them in CI
 slow_tests = []
 

@@ -73,15 +73,18 @@ resolver = "2"
 # it will publish unbuildable releases to crates.io
 
 [workspace.lints.clippy]
-nursery = "allow"
-cargo = "allow"
-pedantic = "allow"
-restriction = "allow"
+nursery = { level = "allow", priority = -1 }
+cargo = { level = "allow", priority = -1 }
+pedantic = { level = "allow", priority = -1 }
+restriction = { level = "allow", priority = -1 }
 style = "deny"
 complexity = "deny"
 perf = "deny"
 correctness = "deny"
 dbg_macro = "deny"
+
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(build_wasm)', 'cfg(loom)'] }
 
 [profile.dev]
 debug = 1

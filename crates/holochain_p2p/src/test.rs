@@ -245,7 +245,7 @@ mod tests {
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
-            holo_hash::$p::from_raw_36([$c as u8; HOLO_HASH_UNTYPED_LEN].to_vec())
+            holo_hash::$p::from_raw_36([b'3'; HOLO_HASH_UNTYPED_LEN].to_vec())
         };
     }
 

@@ -50,3 +50,5 @@ default = ["http"]
 test_utils = ["holochain_types/test_utils"]
 
 http = ["holochain_serialized_bytes", "reqwest"]
+
+instrument = []

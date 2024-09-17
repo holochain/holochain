@@ -105,6 +105,7 @@ where
 ///   either "there are N more/less creates than deletes" or "there is at least one delete", the
 ///   former leads to flakiness as above and the latter means it would be impossible to create a
 ///   link after any previous delete of any link.
+///
 /// All of this is bad so link creates point to entries (See [ `create_link` ]) and deletes point to
 /// creates.
 pub fn delete_link(address: ActionHash) -> ExternResult<ActionHash> {

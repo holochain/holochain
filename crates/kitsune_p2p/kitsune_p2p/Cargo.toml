@@ -110,6 +110,8 @@ mock_network = ["kitsune_p2p_types/test_utils", "mockall"]
 tx2 = ["kitsune_p2p_types/tx2"]
 tx5 = ["dep:tx5", "kitsune_p2p_types/tx5"]
 
+instrument = []
+
 sqlite-encrypted = [
   "kitsune_p2p_fetch/sqlite-encrypted",
   "kitsune_p2p_proxy/sqlite-encrypted",

@@ -2797,6 +2797,7 @@ mod scheduler_impls {
         /// Calling this will:
         /// - Delete/unschedule all ephemeral scheduled functions GLOBALLY
         /// - Add an interval that runs IN ADDITION to previous invocations
+        ///
         /// So ideally this would be called ONCE per conductor lifecycle ONLY.
         #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn start_scheduler(

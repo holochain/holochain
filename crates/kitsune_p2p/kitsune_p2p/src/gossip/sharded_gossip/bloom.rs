@@ -6,8 +6,9 @@ impl ShardedGossipLocal {
     /// Generate a bloom filter of all agents.
     /// - Agents are only included if they are within the common arc set.
     /// - The bloom is `KitsuneAgent` + `signed_at_ms`. So multiple agent infos could
-    /// be in the same filter.
+    ///   be in the same filter.
     /// - Only create the filter if there are any agents matching the above criteria.
+    ///
     /// No empty bloom filters.
     /// - Bloom has a 1% chance of false positive (which will lead to agents not being sent back).
     /// - Expect this function to complete in an average of 10 ms and worst case 100 ms.
@@ -46,6 +47,7 @@ impl ShardedGossipLocal {
     /// - The bloom is `KitsuneOpHah`.
     /// - Ops are only included from local agents that are within the common arc set.
     /// - Only create the filter if there are any ops matching the above criteria.
+    ///
     /// No empty bloom filters.
     /// - Bloom has a 1% chance of false positive (which will lead to agents not being sent back).
     /// - Expect this function to complete in an average of 10 ms and worst case 100 ms.

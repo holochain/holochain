@@ -900,6 +900,7 @@ where
                 }
             })
             .await?;
+
         self.scratch.apply(|scratch| {
             let mut scratch_records: Vec<_> = scratch
                 .actions()
