@@ -233,4 +233,4 @@ jobs:
           ## limits ssh access and adds the ssh public key for the user which triggered the workflow
           limit-access-to-actor: true
           ## limits ssh access and adds the ssh public keys of the listed GitHub users
-          limit-access-to-users: steveeJ,jost-s,neonphog,thedavidmeister,maackle,ThetaSinner
+          limit-access-to-users: steveeJ,jost-s,neonphog,maackle,ThetaSinner,cdunster
