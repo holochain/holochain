@@ -1,4 +1,10 @@
-use std::collections::BTreeMap;
+//! This module defines the two-way mapping between OpEvents and the DhtOp databases.
+//!
+//! TODO:
+//! - [ ] Define what happens when an op is stored in both Authored and DHT databases,
+//!     potentially at different times and stages of integratation.
+
+use std::collections::{BTreeMap, HashMap};
 
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 
@@ -44,54 +50,36 @@ impl OpEventStore {
     }
 
     pub async fn apply_events(&self, events: Vec<OpEvent>) -> StateMutationResult<()> {
-        // TODO: no clone
-        let events1 = events.clone();
-        let events2 = events.clone();
-        self.authored
-            .write_async(|txn| {
-                for event in events1 {
-                    match event {
-                        OpEvent::Authored { op } => {
-                            insert_op(txn, &op.clone().into_hashed())?;
-                        }
-                        OpEvent::Integrated { .. } => {
-                            unimplemented!("Integrated event not implemented")
-                        }
-                        OpEvent::AppValidated { .. } => {
-                            unimplemented!("AppValidated event not implemented")
-                        }
-                        OpEvent::SysValidated { .. } => {
-                            unimplemented!("SysValidated event not implemented")
-                        }
-                        OpEvent::Fetched { .. } => (),
-                    }
+        enum Db {
+            Authored,
+            Dht,
+        }
+        let mut ops = HashMap::new();
+        for event in events {
+            match event {
+                OpEvent::Authored { op } => {
+                    let op = op.into_hashed();
+                    ops.insert(op.as_hash().clone(), (op.clone(), Db::Authored));
+                    self.authored
+                        .write_async(move |txn| insert_op(txn, &op))
+                        .await?;
                 }
-                StateMutationResult::Ok(())
-            })
-            .await?;
-
-        self.dht
-            .write_async(|txn| {
-                for event in events2 {
-                    match event {
-                        OpEvent::Fetched { op } => {
-                            insert_op(txn, &op.clone().into_hashed())?;
-                        }
-                        OpEvent::Integrated { .. } => {
-                            unimplemented!("Integrated event not implemented")
-                        }
-                        OpEvent::AppValidated { .. } => {
-                            unimplemented!("AppValidated event not implemented")
-                        }
-                        OpEvent::SysValidated { .. } => {
-                            unimplemented!("SysValidated event not implemented")
-                        }
-                        OpEvent::Authored { .. } => (),
-                    }
+                OpEvent::Integrated { .. } => {
+                    unimplemented!("Integrated event not implemented")
                 }
-                StateMutationResult::Ok(())
-            })
-            .await?;
+                OpEvent::AppValidated { .. } => {
+                    unimplemented!("AppValidated event not implemented")
+                }
+                OpEvent::SysValidated { .. } => {
+                    unimplemented!("SysValidated event not implemented")
+                }
+                OpEvent::Fetched { op } => {
+                    let op = op.into_hashed();
+                    ops.insert(op.as_hash().clone(), (op.clone(), Db::Dht));
+                    self.dht.write_async(move |txn| insert_op(txn, &op)).await?;
+                }
+            }
+        }
 
         Ok(())
     }
