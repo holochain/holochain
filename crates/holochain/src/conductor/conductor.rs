@@ -3059,34 +3059,27 @@ mod misc_impls {
         /// Otherwise, a new chain will be formed using the specified records.
         //
         // TODO: could integrate this better with [`SourceChain::flush`] when we re-visit our workflows:
-        //      this function is called automatically during a [`SourceChain::flush`] when the CHC head is beyond
-        //      the local head. In [`ChainHeadOrdering::Relaxed`] mode, we have the opportunity to rebase the current
-        //      scratch records onto the incoming grafted records from the CHC. We can also make use of the validation
-        //      and integration that already runs for flushed records, rather than re-implementing those here.
+        //       this function is called automatically during a [`SourceChain::flush`] when the CHC head is beyond
+        //       the local head. In [`ChainHeadOrdering::Relaxed`] mode, we have the opportunity to rebase the current
+        //       scratch records onto the incoming grafted records from the CHC. We can also make use of the validation
+        //       and integration that already runs for flushed records, rather than re-implementing those here.
         pub async fn graft_records_onto_source_chain(
             self: Arc<Self>,
             cell_id: CellId,
             validate: bool,
             records: Vec<Record>,
         ) -> ConductorApiResult<()> {
-            let chain = self.get_agent_source_chain(&cell_id, true).await?;
-
-            let authored = chain.author_db().clone().into();
-            let dht = chain.dht_db().clone();
-            let cache = chain.dht_db_cache().clone();
-
-            let CellId(dna_hash, agent_pubkey) = &cell_id;
-            let ribosome = self.get_ribosome(dna_hash)?;
+            let CellId(dna_hash, agent_key) = &cell_id;
 
             let space = self.get_or_create_space(dna_hash)?;
-
             let workspace = space
-                .source_chain_workspace(self.keystore().clone(), agent_pubkey.clone())
+                .source_chain_workspace(self.keystore().clone(), agent_key.clone())
                 .await?;
             let network = self
                 .holochain_p2p()
                 .clone()
                 .into_dna(dna_hash.clone(), self.get_chc(&cell_id));
+            let ribosome = self.get_ribosome(dna_hash)?;
 
             // Validate
             if validate {
@@ -3096,18 +3089,26 @@ mod misc_impls {
                     network.clone(),
                     self.clone(),
                     ribosome,
+                    // XXX: probably unnecessary clone
                     records.clone(),
                 )
                 .await?;
             }
 
-            let op_hashes = chain
-                // XXX: probably unnecessary clone
-                .graft_records_onto_source_chain(records)
-                .await?
-                .into_iter()
-                .map(|(hash, _basis)| hash)
-                .collect();
+            let authored = self.get_or_create_authored_db(dna_hash, agent_key.clone())?;
+            let dht = self.get_dht_db(dna_hash)?;
+            let cache = self.get_dht_db_cache(dna_hash)?;
+
+            let op_hashes = authored
+                .write_async(|txn| {
+                    SourceChainResult::Ok(
+                        SourceChain::graft_records_onto_source_chain_txn(txn, records, cell_id)?
+                            .into_iter()
+                            .map(|(hash, _basis)| hash)
+                            .collect(),
+                    )
+                })
+                .await?;
 
             // Integrate the ops.
             // XXX: this is not checking for authorityship and just integrating everything we author,
@@ -3115,7 +3116,10 @@ mod misc_impls {
             //      The reason for doing this is that when doing a CHC sync during genesis, we have not
             //      yet joined the network, so we can't actually check authorityship at that time.
             holochain_state::integrate::authored_ops_to_dht_db_without_check(
-                op_hashes, authored, dht, &cache,
+                op_hashes,
+                authored.into(),
+                dht,
+                &cache,
             )
             .await?;
 

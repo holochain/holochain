@@ -29,23 +29,31 @@ impl SourceChain {
         &self,
         records: Vec<Record>,
     ) -> SourceChainResult<Vec<(DhtOpHash, AnyLinkableHash)>> {
-        // Clear the scratch space. There shouldn't be anything in the scratch if this function were
-        // called properly, but if there were, it would be invalid after grafting.
-        self.scratch().apply(|s| if s.clear() {
-            tracing::warn!("Cleared scratch space when grafting records. This is unexpected and indicates a minor bug.");
-        })?;
+        let cell_id = (*self.cell_id()).clone();
+        self.author_db()
+            .write_async(|txn| Self::graft_records_onto_source_chain_txn(txn, records, cell_id))
+            .await
+    }
 
-        let existing = self
-            .query(ChainQueryFilter::new().descending())
-            .await?
-            .into_iter()
-            .map(|r| r.signed_action)
-            .collect::<Vec<SignedActionHashed>>();
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    pub fn graft_records_onto_source_chain_txn(
+        txn: &mut Transaction<'_>,
+        records: Vec<Record>,
+        cell_id: CellId,
+    ) -> SourceChainResult<Vec<(DhtOpHash, AnyLinkableHash)>> {
+        let existing = Self::query_txn(
+            txn,
+            ChainQueryFilter::new().descending(),
+            None,
+            cell_id.agent_pubkey(),
+            false,
+        )?
+        .into_iter()
+        .map(|r| r.signed_action)
+        .collect::<Vec<SignedActionHashed>>();
 
         let graft = ChainGraft::new(existing, records).rebalance();
         let chain_top = graft.existing_chain_top();
-        let cell_id = self.cell_id();
-        let author_db = self.author_db();
 
         // Produce the op lites for each record.
         let data = graft
@@ -63,50 +71,42 @@ impl SourceChain {
             .collect::<StateMutationResult<Vec<_>>>()?;
 
         // Commit the records to the source chain.
-        let ops_to_integrate = author_db
-            .write_async({
-                let cell_id = cell_id.clone();
-                move |txn| {
-                    if let Some((_, seq)) = chain_top {
-                        // Remove records above the grafting position.
-                        //
-                        // NOTES:
-                        // - the chain top may have moved since the grafting call began,
-                        //   but it doesn't really matter, since we explicitly want to
-                        //   clobber anything beyond the grafting point anyway.
-                        // - if there is an existing fork, there may still be a fork after the
-                        //   grafting. A more rigorous approach would thin out the existing
-                        //   actions until a single fork is obtained.
-                        txn.execute(
-                            holochain_sqlite::sql::sql_cell::DELETE_ACTIONS_AFTER_SEQ,
-                            named_params! {
-                                ":author": cell_id.agent_pubkey(),
-                                ":seq": seq
-                            },
-                        )
-                        .map_err(StateMutationError::from)?;
-                    }
+        if let Some((_, seq)) = chain_top {
+            // Remove records above the grafting position.
+            //
+            // NOTES:
+            // - the chain top may have moved since the grafting call began,
+            //   but it doesn't really matter, since we explicitly want to
+            //   clobber anything beyond the grafting point anyway.
+            // - if there is an existing fork, there may still be a fork after the
+            //   grafting. A more rigorous approach would thin out the existing
+            //   actions until a single fork is obtained.
+            txn.execute(
+                holochain_sqlite::sql::sql_cell::DELETE_ACTIONS_AFTER_SEQ,
+                named_params! {
+                    ":author": cell_id.agent_pubkey(),
+                    ":seq": seq
+                },
+            )
+            .map_err(StateMutationError::from)?;
+        }
 
-                    let mut ops_to_integrate = Vec::new();
+        let mut ops_to_integrate = Vec::new();
 
-                    // Commit the records and ops to the authored db.
-                    for (sah, ops, entry) in data {
-                        // Clippy is wrong :(
-                        #[allow(clippy::needless_collect)]
-                        let basis = ops
-                            .iter()
-                            .map(|op| op.dht_basis().clone())
-                            .collect::<Vec<_>>();
-                        ops_to_integrate.extend(
-                            source_chain::put_raw(txn, sah, ops, entry)?
-                                .into_iter()
-                                .zip(basis.into_iter()),
-                        );
-                    }
-                    SourceChainResult::Ok(ops_to_integrate)
-                }
-            })
-            .await?;
+        // Commit the records and ops to the authored db.
+        for (sah, ops, entry) in data {
+            // Clippy is wrong :(
+            #[allow(clippy::needless_collect)]
+            let basis = ops
+                .iter()
+                .map(|op| op.dht_basis().clone())
+                .collect::<Vec<_>>();
+            ops_to_integrate.extend(
+                source_chain::put_raw(txn, sah, ops, entry)?
+                    .into_iter()
+                    .zip(basis.into_iter()),
+            );
+        }
 
         Ok(ops_to_integrate)
     }
