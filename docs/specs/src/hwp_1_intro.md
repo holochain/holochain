@@ -4,6 +4,7 @@ subtitle: 'Distributed Coordination by Scaled Consent not Global Consensus'
 author:
  - Eric Harris-Braun
  - Arthur Brock
+ - Paul d'Aoust
 abstract: |
  In this paper we present a frame and a specification for a generalized system for
  large scale distributed coordination that does not rely on global consensus. We start
