@@ -84,7 +84,10 @@ correctness = "deny"
 dbg_macro = "deny"
 
 [workspace.lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(build_wasm)', 'cfg(loom)'] }
+unexpected_cfgs = { level = "warn", check-cfg = [
+  'cfg(build_wasm)',
+  'cfg(loom)',
+] }
 
 [profile.dev]
 debug = 1

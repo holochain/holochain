@@ -67,6 +67,4 @@ default = ["chc"]
 
 chc = ["holochain_chc", "holochain_conductor_api/chc"]
 
-instrument = [
-  "holochain_chc/instrument",
-]
+instrument = ["holochain_chc/instrument"]

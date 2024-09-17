@@ -116,9 +116,7 @@ fuzzing = [
   "mr_bundle/fuzzing",
 ]
 
-instrument = [
-
-]
+instrument = []
 
 sqlite-encrypted = [
   "rusqlite/bundled-sqlcipher-vendored-openssl",
