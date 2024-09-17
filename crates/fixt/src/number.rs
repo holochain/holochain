@@ -139,17 +139,10 @@ macro_rules! fixturator_float {
                 if rng.gen() {
                     rng.gen()
                 } else {
-                    vec![
-                        $t::NEG_INFINITY,
-                        $t::INFINITY,
-                        $t::NAN,
-                        -1.0,
-                        0.0,
-                        1.0,
-                    ]
-                    .choose(&mut rng)
-                    .unwrap()
-                    .to_owned()
+                    vec![$t::NEG_INFINITY, $t::INFINITY, $t::NAN, -1.0, 0.0, 1.0]
+                        .choose(&mut rng)
+                        .unwrap()
+                        .to_owned()
                 }
             },
             {

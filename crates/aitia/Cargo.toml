@@ -43,3 +43,5 @@ tracing = [
   "tracing-serde",
   "tracing-subscriber",
 ]
+
+instrument = []

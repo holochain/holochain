@@ -1,4 +1,5 @@
 #![crate_type = "proc-macro"]
+#![allow(clippy::manual_unwrap_or_default)] // Fixing requires a `darling` upgrade
 
 use proc_macro::Span;
 use proc_macro::TokenStream;

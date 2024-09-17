@@ -49,6 +49,8 @@ default = ["sqlite"]
 
 test_utils = []
 
+instrument = []
+
 sqlite-encrypted = [
   "holo_hash/sqlite-encrypted",
   "lair_keystore/rusqlite-bundled-sqlcipher-vendored-openssl",

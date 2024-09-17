@@ -1428,7 +1428,8 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             self.bandwidth.clone(),
             metrics,
             fetch_pool,
-            #[cfg(test)] false
+            #[cfg(test)]
+            false,
         ))
     }
 }
@@ -1462,7 +1463,8 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             self.bandwidth.clone(),
             metrics,
             fetch_pool,
-            #[cfg(test)] false,
+            #[cfg(test)]
+            false,
         ))
     }
 }

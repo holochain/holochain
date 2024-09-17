@@ -121,6 +121,8 @@ test_utils = [
   "holochain_integrity_types/test_utils",
 ]
 
+instrument = []
+
 sqlite-encrypted = [
   "rusqlite",
   "rusqlite/bundled-sqlcipher-vendored-openssl",
