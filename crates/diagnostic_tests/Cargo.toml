@@ -13,7 +13,7 @@ anyhow = "1.0"
 chashmap = "2.2"
 colored = "2.1"
 futures = "0.3"
-kitsune_p2p = { version = "^0.4.0-dev.20", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p = { version = "^0.4.0-dev.21", path = "../kitsune_p2p/kitsune_p2p" }
 holochain_diagnostics = { path = "../holochain_diagnostics", default-features = false }
 holochain_trace = { version = "^0.4.0-dev.5", path = "../holochain_trace" }
 tokio = { version = "1.36.0", features = ["full"] }
