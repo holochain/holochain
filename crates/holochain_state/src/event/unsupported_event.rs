@@ -1,3 +1,5 @@
+//! Some events that we wish to eventually support, but don't just yet.
+
 use crate::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 
@@ -8,9 +10,6 @@ pub enum UnsupportedEvent {
         op: DhtOpHash,
         deps: Vec<AnyDhtHash>,
     },
-
-    /// The node has fetched an op after hearing about the hash via publish or gossip
-    Fetched { op: DhtOpHash },
 
     /// The node has published or gossiped this at least once, to somebody
     SentHash {

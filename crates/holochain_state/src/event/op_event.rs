@@ -1,8 +1,10 @@
 //! This module defines the two-way mapping between OpEvents and the DhtOp databases.
 //!
-//! TODO:
-//! - [ ] Define what happens when an op is stored in both Authored and DHT databases,
-//!     potentially at different times and stages of integratation.
+//! OpEvents are concerned with the lifecycle of DhtOps, from their creation, to
+//! their validation and integration.
+//!
+//! The database state pertaining to DhtOps can be streamed out as a list of `OpEvent`s,
+//! and that same state can be recreated by applying a list of `OpEvent`s.
 
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 
