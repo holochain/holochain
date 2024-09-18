@@ -45,7 +45,7 @@ pub struct Create {
     pub no_dpki: bool,
 
     /// Set the network seed for the DPKI service.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "no_dpki")]
     pub dpki_network_seed: Option<String>,
 
     /// Set the conductor config CHC (Chain Head Coordinator) URL
