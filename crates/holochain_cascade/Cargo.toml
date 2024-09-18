@@ -56,6 +56,8 @@ test_utils = [
   "holochain_state/test_utils",
 ]
 
+instrument = []
+
 sqlite-encrypted = [
   "holo_hash/sqlite-encrypted",
   "holochain_sqlite/sqlite-encrypted",

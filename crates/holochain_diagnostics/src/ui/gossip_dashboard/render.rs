@@ -14,8 +14,7 @@ impl GossipDashboard {
             let queue_info: Vec<_> = state
                 .nodes()
                 .iter()
-                .enumerate()
-                .map(|(_i, n)| {
+                .map(|n| {
                     // tracing::info!("{} {:?}\n{}", i, n.cert, n.diagnostics.fetch_pool.summary());
                     (
                         n.diagnostics.fetch_pool.info(

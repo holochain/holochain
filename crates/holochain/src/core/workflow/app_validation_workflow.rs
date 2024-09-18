@@ -134,8 +134,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
 
-#[cfg(todo_redo_old_tests)]
-mod network_call_tests;
 #[cfg(test)]
 mod tests;
 

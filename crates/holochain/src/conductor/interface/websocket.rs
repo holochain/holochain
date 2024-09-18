@@ -1053,9 +1053,8 @@ pub mod test {
         // Check it is running, and get all cells
         let cell_ids: HashSet<CellId> = state
             .get_app(&app_id)
-            .map(|app| {
+            .inspect(|app| {
                 assert_eq!(*app.status(), AppStatus::Running);
-                app
             })
             .unwrap()
             .all_cells()
@@ -1100,9 +1099,8 @@ pub mod test {
         // Check it's deactivated, and get all cells
         let cell_ids: HashSet<CellId> = state
             .get_app(&app_id)
-            .map(|app| {
+            .inspect(|app| {
                 assert_matches!(*app.status(), AppStatus::Disabled(_));
-                app
             })
             .unwrap()
             .all_cells()

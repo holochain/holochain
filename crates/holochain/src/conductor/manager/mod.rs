@@ -232,12 +232,11 @@ fn produce_task_outcome(kind: &TaskKind, result: ManagedTaskResult, name: String
 
 /// Handle the result of shutting down the main thread.
 pub fn handle_shutdown(result: Result<TaskManagerResult, tokio::task::JoinError>) {
-    let result = result.map_err(|e| {
+    let result = result.inspect_err(|e| {
         error!(
-            error = &e as &dyn std::error::Error,
+            error = e as &dyn std::error::Error,
             "Failed to join the main task"
         );
-        e
     });
     match result {
         Ok(result) => result.expect("Conductor shutdown error"),

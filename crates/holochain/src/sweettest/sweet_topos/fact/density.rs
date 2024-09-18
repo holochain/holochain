@@ -5,6 +5,7 @@ use contrafact::Mutation;
 
 /// Fact:
 /// - The network has a specific density according to graph theory.
+///
 /// This is the number of edges divided by the maximum number of edges.
 /// This is a number between 0 and 1. 0 means no edges. 1 means every node
 /// is connected to every other node.

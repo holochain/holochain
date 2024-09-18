@@ -168,16 +168,16 @@ impl ShardedGossip {
         bandwidth: Arc<BandwidthThrottle>,
         metrics: MetricsSync,
         fetch_pool: FetchPool,
-        #[cfg(feature = "test")] enable_history: bool,
+        #[cfg(test)] enable_history: bool,
     ) -> Arc<Self> {
-        #[cfg(feature = "test")]
+        #[cfg(test)]
         let state = if enable_history {
             ShardedGossipState::with_history()
         } else {
             Default::default()
         };
 
-        #[cfg(not(feature = "test"))]
+        #[cfg(not(test))]
         let state = Default::default();
 
         let tuning_params = config.tuning_params.clone();
@@ -1428,6 +1428,8 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             self.bandwidth.clone(),
             metrics,
             fetch_pool,
+            #[cfg(test)]
+            false,
         ))
     }
 }
@@ -1461,6 +1463,8 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             self.bandwidth.clone(),
             metrics,
             fetch_pool,
+            #[cfg(test)]
+            false,
         ))
     }
 }
