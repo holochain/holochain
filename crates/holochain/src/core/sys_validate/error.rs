@@ -22,6 +22,7 @@ use thiserror::Error;
 /// - An Error
 /// - Failed validation
 /// - Successful validation
+///
 /// It is a lot cleaner to express this using
 /// ? try's unfortunately try for custom types is
 /// unstable but when it lands we should use:
