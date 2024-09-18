@@ -4,7 +4,7 @@ use holochain_sqlite::prelude::DbRead;
 use holochain_state::prelude::validation_receipts_for_action;
 use holochain_types::access::{HostFnAccess, Permission};
 use holochain_util::tokio_helper;
-use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
+use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner, WasmHostError};
 use holochain_zome_types::prelude::{GetValidationReceiptsInput, ValidationReceiptSet};
 use std::sync::Arc;
 use wasmer::RuntimeError;

@@ -29,7 +29,7 @@ pub fn call_info(
                         let check_agent = provenance.clone();
                         let call_context = call_context.clone();
                         let cap_grant = tokio_helper::block_forever_on(async move {
-                            Result::<_, WasmError>::Ok(call_context
+                            Result::<_, WasmHostError>::Ok(call_context
                             .host_context
                             .workspace()
                             .source_chain()

@@ -1,15 +1,10 @@
-#![cfg(test)]
-#![cfg(feature = "test_utils")]
-
 use super::*;
 
 use crate::core::queue_consumer::TriggerSender;
-use crate::here;
 use crate::test_utils::test_network;
 use ::fixt::prelude::*;
 use holochain_state::mutations;
 use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
-use holochain_trace;
 
 #[derive(Clone)]
 struct TestData {
@@ -353,6 +348,7 @@ impl Db {
     }
 }
 
+#[allow(unused)]
 async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
     let (qt, _rx) = TriggerSender::new();
     let test_network = test_network(None, None).await;
@@ -363,6 +359,7 @@ async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
 }
 
 // Need to clear the data from the previous test
+#[allow(unused)]
 async fn clear_dbs(env: DbWrite<DbKindDht>) {
     env.write_async(move |txn| -> StateMutationResult<()> {
         txn.execute("DELETE FROM DhtOp", []).unwrap();
@@ -378,7 +375,7 @@ async fn clear_dbs(env: DbWrite<DbKindDht>) {
 // The following show an op or ops that you want to test
 // with a desired pre-state that you want the database in
 // and the expected state of the database after the workflow is run
-
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_agent_activity(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     a.link_add.action_seq = 5;
     let dep: DhtOp =
@@ -399,6 +396,7 @@ fn register_agent_activity(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) 
     (pre_state, expect, "register agent activity")
 }
 
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = ChainOp::StoreRecord(
         a.signature.clone(),
@@ -423,6 +421,7 @@ fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register updated record")
 }
 
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
@@ -447,6 +446,7 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
     (pre_state, expect, "register replaced by for entry")
 }
 
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
@@ -468,6 +468,7 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register deleted by")
 }
 
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = ChainOp::StoreRecord(
         a.signature.clone(),
@@ -487,6 +488,7 @@ fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register deleted action by")
 }
 
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
@@ -509,6 +511,7 @@ fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 // Link remove when not an author
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op: DhtOp = ChainOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone()).into();
     let pre_state = vec![Db::IntQueue(op.clone())];
@@ -544,6 +547,11 @@ async fn test_ops_state() {
         let (pre_state, expect, name) = t(td);
         Db::set(pre_state, env.clone()).await;
         call_workflow(env.clone()).await;
-        Db::check(expect, env.clone(), format!("{}: {}", name, here!(""))).await;
+        Db::check(
+            expect,
+            env.clone(),
+            format!("{}: {}", name, crate::here!("")),
+        )
+        .await;
     }
 }

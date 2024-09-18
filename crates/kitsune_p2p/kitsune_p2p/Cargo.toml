@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p"
-version = "0.4.0-dev.20"
+version = "0.4.0-dev.21"
 description = "p2p / dht communication framework"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -21,16 +21,16 @@ futures = "0.3"
 ghost_actor = "=0.3.0-alpha.6"
 governor = "0.3.2"
 itertools = "0.12"
-kitsune_p2p_fetch = { version = "^0.4.0-dev.12", path = "../fetch" }
+kitsune_p2p_fetch = { version = "^0.4.0-dev.13", path = "../fetch" }
 kitsune_p2p_mdns = { version = "^0.4.0-dev.2", path = "../mdns" }
-kitsune_p2p_proxy = { version = "^0.4.0-dev.12", path = "../proxy" }
+kitsune_p2p_proxy = { version = "^0.4.0-dev.13", path = "../proxy" }
 kitsune_p2p_timestamp = { version = "^0.4.0-dev.4", path = "../timestamp", features = [
   "now",
 ] }
 kitsune_p2p_block = { version = "^0.4.0-dev.11", path = "../block" }
-kitsune_p2p_bootstrap_client = { version = "^0.4.0-dev.13", path = "../bootstrap_client" }
+kitsune_p2p_bootstrap_client = { version = "^0.4.0-dev.14", path = "../bootstrap_client" }
 kitsune_p2p_bin_data = { version = "^0.4.0-dev.11", path = "../bin_data" }
-kitsune_p2p_types = { version = "^0.4.0-dev.12", path = "../types", default-features = false }
+kitsune_p2p_types = { version = "^0.4.0-dev.13", path = "../types", default-features = false }
 must_future = "0.1.1"
 nanoid = "0.4"
 num-traits = "0.2"
@@ -109,6 +109,8 @@ mock_network = ["kitsune_p2p_types/test_utils", "mockall"]
 
 tx2 = ["kitsune_p2p_types/tx2"]
 tx5 = ["dep:tx5", "kitsune_p2p_types/tx5"]
+
+instrument = []
 
 sqlite-encrypted = [
   "kitsune_p2p_fetch/sqlite-encrypted",
