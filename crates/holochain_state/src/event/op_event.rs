@@ -40,7 +40,9 @@ pub struct OpEventStore {
 
 #[allow(unused)]
 impl OpEventStore {
+    #[cfg(feature = "test_utils")]
     pub fn new_test(cell_id: CellId) -> Self {
+        use crate::test_utils::test_in_mem_db;
         Self::new(
             test_in_mem_db(DbKindAuthored(cell_id.clone().into())),
             test_in_mem_db(DbKindDht(cell_id.dna_hash().clone().into())),
