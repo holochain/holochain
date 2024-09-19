@@ -19,7 +19,7 @@ use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KSpace};
 use crate::{
     queue::MapQueue,
     source::{FetchSource, SourceState, Sources},
-    FetchContext, FetchKey, FetchPoolPush, RoughInt,
+    FetchContext, FetchKey, FetchPoolPush, RoughInt, TransferMethod,
 };
 
 mod pool_reader;
@@ -214,7 +214,7 @@ impl State {
             space,
             source,
             size,
-            ..
+            transfer_method,
         } = args;
 
         // Register sources once as they are discovered, with a default initial state
@@ -227,6 +227,7 @@ impl State {
                     sources,
                     space,
                     size,
+                    first_transfer_info: (Timestamp::now(), transfer_method),
                     context,
                     pending_response: None,
                 };
@@ -416,6 +417,10 @@ pub struct FetchPoolItem {
     space: KSpace,
     /// Approximate size of the item. If set, the item will be counted towards overall progress.
     size: Option<RoughInt>,
+    /// The timestamp of and method by which this item was first transferred.
+    /// Does not capture the case where an item is transferred by multiple sources
+    /// and multiple methods.
+    first_transfer_info: (TransferMethod, Timestamp),
     /// Opaque user data specified by the host
     pub context: Option<FetchContext>,
     /// If there is a response pending for this item then track the source and when the request was made.
@@ -456,6 +461,7 @@ mod tests {
             sources: Sources::new(sources),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             context,
+            first_transfer_info: (Timestamp::now(), TransferMethod::Publish),
             size: None,
             pending_response: None,
         }
