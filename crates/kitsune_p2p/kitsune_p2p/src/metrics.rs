@@ -6,9 +6,9 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
+use kitsune_p2p_types::GossipType;
 use tokio::time::Instant;
 
-use crate::gossip::sharded_gossip::GossipType;
 use crate::gossip::sharded_gossip::NodeId;
 use crate::gossip::sharded_gossip::RegionDiffs;
 use crate::gossip::sharded_gossip::RoundState;

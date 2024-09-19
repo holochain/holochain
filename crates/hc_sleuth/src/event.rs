@@ -7,6 +7,7 @@ use aitia::Dep;
 use aitia::DepError;
 use aitia::DepResult;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
+use kitsune_p2p::dependencies::kitsune_p2p_types::GossipType;
 
 /// A DhtOpLite along with its corresponding DhtOpHash
 #[derive(
@@ -226,17 +227,21 @@ impl aitia::Fact for Event {
             // whenever the op is received by any method
             Fetched { by, op } => Some(Dep::any_named(
                 "ReceivedHash",
-                [TransferMethod::Publish, TransferMethod::Gossip]
-                    .into_iter()
-                    .map(|method| {
-                        ReceivedHash {
-                            by: by.clone(),
-                            op: op.clone(),
-                            method,
-                        }
-                        .into()
-                    })
-                    .collect(),
+                [
+                    TransferMethod::Publish,
+                    TransferMethod::Gossip(GossipType::Recent),
+                    TransferMethod::Gossip(GossipType::Historical),
+                ]
+                .into_iter()
+                .map(|method| {
+                    ReceivedHash {
+                        by: by.clone(),
+                        op: op.clone(),
+                        method,
+                    }
+                    .into()
+                })
+                .collect(),
             )),
 
             // We can only receive a hash via a given method if some other node has sent it

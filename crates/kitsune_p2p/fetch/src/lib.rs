@@ -3,7 +3,7 @@
 
 //! Kitsune P2p Fetch Queue Logic
 
-use kitsune_p2p_types::{KOpHash, KSpace};
+use kitsune_p2p_types::{GossipType, KOpHash, KSpace};
 
 mod backoff;
 mod pool;
@@ -68,11 +68,15 @@ pub struct FetchPoolPush {
     serde::Serialize,
     serde::Deserialize,
 )]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum TransferMethod {
     /// Transfer by publishing
     Publish,
     /// Transfer by gossiping
-    Gossip,
+    Gossip(GossipType),
 }
 
 /// Usage agnostic context data.

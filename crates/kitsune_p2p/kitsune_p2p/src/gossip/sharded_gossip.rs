@@ -89,20 +89,6 @@ struct TimedBloomFilter {
     time: TimeWindow,
 }
 
-/// Gossip has two distinct variants which share a lot of similarities but
-/// are fundamentally different and serve different purposes
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum GossipType {
-    /// The Recent gossip type is aimed at rapidly syncing the most recent
-    /// data. It runs frequently and expects frequent diffs at each round.
-    Recent,
-    /// The Historical gossip type is aimed at comprehensively syncing the
-    /// entire common history of two nodes, filling in gaps in the historical
-    /// data. It runs less frequently, and expects diffs to be infrequent
-    /// at each round.
-    Historical,
-}
-
 /// The entry point for the sharded gossip strategy.
 ///
 /// This struct encapsulates the network communication concerns, mainly
@@ -132,15 +118,6 @@ struct Stats {
     avg_processing_time: std::time::Duration,
     max_processing_time: std::time::Duration,
     count: u32,
-}
-
-impl std::fmt::Display for GossipType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GossipType::Recent => write!(f, "recent"),
-            GossipType::Historical => write!(f, "historical"),
-        }
-    }
 }
 
 impl Stats {
@@ -308,7 +285,7 @@ impl ShardedGossip {
                 self.gossip.host_api.handle_op_hash_transmitted(
                     &self.gossip.space,
                     hash,
-                    TransferMethod::Gossip,
+                    TransferMethod::Gossip(self.gossip.gossip_type),
                 );
             }
         }
@@ -1036,8 +1013,12 @@ impl ShardedGossipLocal {
                             // there is at least 1 agent
                             let agent = agent.agent.clone();
                             let source = FetchSource::Agent(agent);
-                            self.incoming_missing_op_hashes(source, ops, TransferMethod::Gossip)
-                                .await?;
+                            self.incoming_missing_op_hashes(
+                                source,
+                                ops,
+                                TransferMethod::Gossip(self.gossip_type),
+                            )
+                            .await?;
                         } else {
                             tracing::warn!(
                                 "Op hashes were received for a round with no remote agent(s). {} ops dropped!",

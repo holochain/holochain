@@ -18,10 +18,18 @@ pub enum OpEvent {
     /// The node has fetched this op from another node via the FetchPool
     Fetched { op: DhtOp },
 
-    /// The node has sys validated an op authored by someone else
+    /// The node has sys validated an op authored by someone else,
+    /// and the outcome could be anything (accepted or rejected or other).
+    //
+    // Note: we can't determine the outcome of validation from the database,
+    // because that's not stored until integration..
     SysValidated { op: DhtOpHash },
 
-    /// The node has app validated an op authored by someone else
+    /// The node has app validated an op authored by someone else,
+    /// and the outcome could be anything (accepted or rejected or other).
+    //
+    // Note: we can't determine the outcome of validation from the database,
+    // because that's not stored until integration..
     AppValidated { op: DhtOpHash },
 
     /// The node has integrated an op authored by someone else
