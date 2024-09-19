@@ -255,8 +255,8 @@ mod tests {
     use super::*;
     use crate::prelude::GetOptions;
     use ::fixt::fixt;
-    use holo_hash::AnyDhtHash;
     use holo_hash::fixt::ActionHashFixturator;
+    use holo_hash::AnyDhtHash;
 
     #[test]
     #[allow(unused_variables, unreachable_code)]
