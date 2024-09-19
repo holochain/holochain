@@ -55,7 +55,7 @@ async fn test_new_lair_conductor_integration() {
         keystore: KeystoreConfig::LairServer {
             connection_url: keystore_config.connection_url.clone().into(),
         },
-        ..ConductorConfig::default()
+        ..ConductorConfig::empty()
     };
 
     // write the conductor config

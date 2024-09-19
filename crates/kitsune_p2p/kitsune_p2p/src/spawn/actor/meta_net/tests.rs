@@ -429,7 +429,6 @@ impl Setup2Nodes {
         user_data_b: PreflightUserData,
     ) -> Self {
         let mut tuning_params = config::tuning_params_struct::KitsuneP2pTuningParams::default();
-        tuning_params.tx2_implicit_timeout_ms = 500;
         tuning_params.tx5_timeout_s = 4;
         let tuning_params = Arc::new(tuning_params);
 

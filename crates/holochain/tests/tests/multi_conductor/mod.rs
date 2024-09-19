@@ -69,7 +69,7 @@ async fn test_publish() -> anyhow::Result<()> {
             sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),
         }),
         dpki: DpkiConfig::disabled(),
-        ..ConductorConfig::default()
+        ..ConductorConfig::empty()
     };
 
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;

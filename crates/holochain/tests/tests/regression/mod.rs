@@ -121,9 +121,9 @@ async fn zero_arc_can_link_to_uncached_base() {
 
     holochain_trace::test_run();
 
-    let mut empty_arc_conductor_config = ConductorConfig::default();
+    let mut empty_arc_conductor_config = ConductorConfig::empty();
 
-    let mut network_config = KitsuneP2pConfig::default();
+    let mut network_config = KitsuneP2pConfig::empty();
 
     let mut tuning_params = KitsuneP2pTuningParams::default();
 
@@ -134,7 +134,7 @@ async fn zero_arc_can_link_to_uncached_base() {
     empty_arc_conductor_config.dpki = DpkiConfig::disabled();
 
     let mut conductors = SweetConductorBatch::from_configs(vec![
-        ConductorConfig::default(),
+        ConductorConfig::empty(),
         empty_arc_conductor_config,
     ])
     .await;

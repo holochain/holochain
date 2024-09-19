@@ -355,7 +355,7 @@ pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,
         dpki: DpkiConfig::disabled(),
-        ..Default::default()
+        ..ConductorConfig::empty()
     }
 }
 

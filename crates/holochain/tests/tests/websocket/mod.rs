@@ -47,7 +47,7 @@ async fn call_admin() {
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
-    let (config, _srv_hnd) = create_config(port, environment_path.into()).await;
+    let config = create_config(port, environment_path.into());
     let config_path = write_config(path, &config);
 
     let uuid = uuid::Uuid::new_v4();
@@ -114,7 +114,7 @@ async fn call_zome() {
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
-    let (config, _srv_hnd) = create_config(admin_port, environment_path.into()).await;
+    let config = create_config(admin_port, environment_path.into());
     let config_path = write_config(path, &config);
 
     let (holochain, admin_port) = start_holochain(config_path.clone()).await;
@@ -318,7 +318,7 @@ async fn emit_signals() {
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
-    let (config, _srv_hnd) = create_config(admin_port, environment_path.into()).await;
+    let config = create_config(admin_port, environment_path.into());
     let config_path = write_config(path, &config);
 
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
@@ -674,7 +674,7 @@ async fn concurrent_install_dna() {
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let data_root_path = path.clone();
-    let (config, _srv_hnd) = create_config(admin_port, data_root_path.into()).await;
+    let config = create_config(admin_port, data_root_path.into());
     let config_path = write_config(path, &config);
 
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;

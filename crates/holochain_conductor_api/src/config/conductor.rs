@@ -309,7 +309,7 @@ mod tests {
                 device_seed_lair_tag: None,
                 danger_generate_throwaway_device_seed: false,
                 network: KitsuneP2pConfig::empty(),
-                dpki: None,
+                dpki: DpkiConfig::testing(),
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),

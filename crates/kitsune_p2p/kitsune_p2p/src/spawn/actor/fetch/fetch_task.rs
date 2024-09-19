@@ -17,7 +17,6 @@ impl FetchTask {
         fetch_pool: FetchPool,
         host: HostApiLegacy,
         internal_sender: GhostSender<Internal>,
-        _tracing_scope: Option<String>,
     ) -> Arc<RwLock<Self>> {
         let this = Arc::new(RwLock::new(FetchTask { is_finished: false }));
 
@@ -79,6 +78,7 @@ mod tests {
     use kitsune_p2p_fetch::test_utils::{test_key_hash, test_req_op, test_source};
     use kitsune_p2p_fetch::FetchSource;
     use kitsune_p2p_fetch::{FetchKey, FetchPool};
+    use kitsune_p2p_types::config::KitsuneP2pConfig;
     use kitsune_p2p_types::KOpHash;
     use parking_lot::{Mutex, RwLock};
     use std::collections::HashSet;
@@ -229,7 +229,12 @@ mod tests {
         })
         .legacy(dummy_sender);
 
-        let task = FetchTask::spawn(config, fetch_pool.clone(), host_stub, internal_sender, None);
+        let task = FetchTask::spawn(
+            KitsuneP2pConfig::empty(),
+            fetch_pool.clone(),
+            host_stub,
+            internal_sender,
+        );
 
         (
             task,

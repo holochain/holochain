@@ -59,6 +59,7 @@ blake2b_simd = { version = "1.0", optional = true }
 maplit = { version = "1", optional = true }
 mockall = { version = "0.11.3", optional = true }
 tx5-signal-srv = { version = "=0.0.9-alpha", optional = true }
+sbd-server = { version = "=0.0.6-alpha", optional = true }
 
 [dev-dependencies]
 # include self with test_utils feature, to allow integration tests to run properly
@@ -73,7 +74,6 @@ kitsune_p2p_timestamp = { path = "../timestamp", features = [
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 maplit = "1"
 pretty_assertions = "1.4.0"
-sbd-server = "=0.0.6-alpha"
 test-case = "3.3"
 tokio = { version = "1.11", features = ["full", "test-util"] }
 tracing-subscriber = "0.3.16"
@@ -102,6 +102,7 @@ test_utils = [
   "kitsune_p2p_bin_data/fixt",
   "maplit",
   "mockall",
+  "sbd-server",
   "tx5-signal-srv",
 ]
 

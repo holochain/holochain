@@ -10,7 +10,6 @@ use futures::future::FutureExt;
 use ghost_actor::dependencies::tracing;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tx5_signal_srv::SrvHnd;
 
 /// Utility trait for test values
 pub trait TestVal: Sized {
@@ -67,17 +66,16 @@ pub fn hash_op_data(data: &[u8]) -> Arc<KitsuneOpHash> {
 }
 
 /// Start a test signal server
-pub async fn start_signal_srv() -> (std::net::SocketAddr, SrvHnd) {
-    let mut config = tx5_signal_srv::Config::default();
-    config.interfaces = "127.0.0.1".to_string();
-    config.port = 0;
-    config.demo = false;
-    let (srv_hnd, addr_list, err_list) = tx5_signal_srv::exec_tx5_signal_srv(config).await.unwrap();
+pub async fn start_signal_srv() -> (std::net::SocketAddr, sbd_server::SbdServer) {
+    let server = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
+        bind: vec!["127.0.0.1:0".to_string(), "[::1]:0".to_string()],
+        limit_clients: 100,
+        ..Default::default()
+    }))
+    .await
+    .unwrap();
 
-    assert!(err_list.is_empty());
-    assert_eq!(1, addr_list.len());
-
-    (*addr_list.first().unwrap(), srv_hnd)
+    (*server.bind_addrs().first().unwrap(), server)
 }
 
 mod harness_event;

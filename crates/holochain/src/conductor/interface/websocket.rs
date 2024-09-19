@@ -517,7 +517,6 @@ pub mod test {
     use kitsune_p2p::agent_store::AgentInfoSigned;
     use kitsune_p2p::dependencies::kitsune_p2p_types::fetch_pool::FetchPoolInfo;
     use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
-    use kitsune_p2p_types::config::KitsuneP2pConfig;
     use kitsune_p2p_types::fixt::*;
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
@@ -909,7 +908,7 @@ pub mod test {
         let handle = ConductorBuilder::new()
             .config(ConductorConfig {
                 dpki: DpkiConfig::disabled(),
-                ..Default::default()
+                ..ConductorConfig::empty()
             })
             .with_data_root_path(db_dir.path().to_path_buf().into())
             .test(&[])

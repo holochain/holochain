@@ -165,7 +165,6 @@ impl KitsuneP2pActor {
             fetch_pool.clone(),
             self_host_api.clone(),
             internal_sender.clone(),
-            config.tracing_scope.clone(),
         );
 
         let i_s = internal_sender.clone();
@@ -1010,15 +1009,12 @@ mod tests {
     use kitsune_p2p_bootstrap_client::BootstrapNet;
     use kitsune_p2p_types::config::KitsuneP2pConfig;
     use kitsune_p2p_types::tls::TlsConfig;
-    use std::net::SocketAddr;
-    use std::sync::Arc;
     use url2::url2;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_mdns_meta_net() {
         let (signal_addr, _sig_hnd) = start_signal_srv().await;
 
-        let mut config = KitsuneP2pConfig::default();
         let config = KitsuneP2pConfig::from_signal_addr(signal_addr);
 
         let (meta_net, _, bootstrap_net) = test_create_meta_net(config).await.unwrap();
@@ -1068,17 +1064,5 @@ mod tests {
         )
         .await
         .map(|(n, r, b, _)| (n, r, b))
-    }
-
-    async fn start_signal_srv() -> (SocketAddr, sbd_server::SbdServer) {
-        let server = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
-            bind: vec!["127.0.0.1:0".to_string(), "[::1]:0".to_string()],
-            limit_clients: 100,
-            ..Default::default()
-        }))
-        .await
-        .unwrap();
-
-        (*server.bind_addrs().first().unwrap(), server)
     }
 }

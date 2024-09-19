@@ -39,14 +39,13 @@ async fn can_update_state() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-
+    let config = ConductorConfig {
+        data_root_path: Some(db_dir.path().to_path_buf().into()),
+        ..ConductorConfig::empty()
+    };
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(
-        ConductorConfig {
-            data_root_path: Some(db_dir.path().to_path_buf().into()),
-            ..ConductorConfig::empty()
-        }
-        .into(),
+        config.clone().into(),
         sodoken::BufRead::new_no_lock(b"passphrase"),
     )
     .await
@@ -97,12 +96,12 @@ async fn app_ids_are_unique() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
+    let config = ConductorConfig {
+        data_root_path: Some(db_dir.path().to_path_buf().into()),
+        ..ConductorConfig::empty()
+    };
     let spaces = Spaces::new(
-        ConductorConfig {
-            data_root_path: Some(db_dir.path().to_path_buf().into()),
-            ..ConductorConfig::empty()
-        }
-        .into(),
+        config.clone().into(),
         sodoken::BufRead::new_no_lock(b"passphrase"),
     )
     .await

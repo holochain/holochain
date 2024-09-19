@@ -1,7 +1,7 @@
 #![allow(clippy::field_reassign_with_default)]
 #![allow(clippy::type_complexity)]
 #![allow(clippy::single_match)]
-use std::sync::Arc;
+
 use std::time::{Duration, Instant};
 
 use hdk::prelude::*;
@@ -9,11 +9,7 @@ use holochain::sweettest::*;
 use holochain::test_utils::inline_zomes::{
     batch_create_zome, simple_create_read_zome, simple_crud_zome,
 };
-use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
 use holochain::test_utils::WaitFor;
-use holochain::{
-    conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
-};
 use holochain_p2p::*;
 use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
@@ -1312,7 +1308,7 @@ async fn mock_network_sharded_gossip() {
     tuning.gossip_strategy = "sharded-gossip".to_string();
     tuning.gossip_dynamic_arcs = true;
 
-    let mut network = KitsuneP2pConfig::default();
+    let mut network = KitsuneP2pConfig::empty();
     network.transport_pool = vec![TransportConfig::Mock {
         mock_network: mock_network.into(),
     }];
@@ -1824,7 +1820,7 @@ async fn mock_network_sharding() {
     tuning.gossip_strategy = "sharded-gossip".to_string();
     tuning.gossip_dynamic_arcs = true;
 
-    let mut network = KitsuneP2pConfig::default();
+    let mut network = KitsuneP2pConfig::empty();
     network.bootstrap_service = Some(bootstrap);
     network.transport_pool = vec![TransportConfig::Mock {
         mock_network: mock_network.into(),
