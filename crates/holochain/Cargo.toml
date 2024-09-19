@@ -100,8 +100,8 @@ opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
 # Temporarily include a fork of wasmer from the git branch 'wamr', until it is officially released in wasmer v5
 hc-wasmer = { version = "=4.3.6-hc.1", optional = true, default-features = false }
-wasmer = { version = "=4.3.6", optional = true, default-feature = false }
-wasmer-middlewares = { version = "=4.3.6", optional = true, default-feature = false }
+wasmer = { version = "=4.3.6", optional = true, default-features = false }
+wasmer-middlewares = { version = "=4.3.6", optional = true, default-features = false }
 
 # Dependencies for test_utils / other optional deps
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
