@@ -25,6 +25,7 @@ pub fn generate(
     directory: Option<PathBuf>,
     in_process_lair: bool,
     no_dpki: bool,
+    dpki_network_seed: Option<String>,
     #[cfg(feature = "chc")] chc_url: Option<url2::Url2>,
 ) -> anyhow::Result<ConfigRootPath> {
     let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
@@ -37,6 +38,8 @@ pub fn generate(
     }
     if no_dpki {
         config.dpki = DpkiConfig::disabled();
+    } else if let Some(network_seed) = dpki_network_seed {
+        config.dpki.network_seed = network_seed;
     }
     random_admin_port(&mut config);
     let path = write_config(dir.clone(), &config);
