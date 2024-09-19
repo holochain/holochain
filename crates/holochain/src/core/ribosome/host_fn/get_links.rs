@@ -10,9 +10,8 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-#[allow(clippy::extra_unused_lifetimes)]
-#[tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name))]
-pub fn get_links<'a>(
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name)))]
+pub fn get_links(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetLinksInput>,
@@ -287,7 +286,7 @@ pub mod slow_tests {
         let hash_path_b: holo_hash::AnyLinkableHash =
             conductor.call(&alice, "get_path_hash", "b").await;
 
-        let forward_link_0 = forward_links.get(0).unwrap();
+        let forward_link_0 = forward_links.first().unwrap();
         assert_eq!(forward_link_0.base, hash_path_a);
         assert_eq!(forward_link_0.target, hash_path_b);
         assert_eq!(
@@ -299,7 +298,7 @@ pub mod slow_tests {
         assert_eq!(forward_link_0.zome_index, ZomeIndex(0));
         assert!(t1 <= forward_link_0.timestamp && t2 >= forward_link_0.timestamp);
 
-        let back_link_0 = back_links.get(0).unwrap();
+        let back_link_0 = back_links.first().unwrap();
         assert_eq!(back_link_0.base, hash_path_b);
         assert_eq!(back_link_0.target, hash_path_a);
         assert_eq!(back_link_0.author, alice.cell_id().agent_pubkey().clone());
@@ -566,11 +565,13 @@ pub mod slow_tests {
     async fn get_links_local_only() {
         holochain_trace::test_run();
         // agents should not pass around data
-        let config = SweetConductorConfig::rendezvous(false).tune(|config| {
-            config.disable_historical_gossip = true;
-            config.disable_recent_gossip = true;
-            config.disable_publish = true;
-        });
+        let config = SweetConductorConfig::rendezvous(false)
+            .no_dpki()
+            .tune(|config| {
+                config.disable_historical_gossip = true;
+                config.disable_recent_gossip = true;
+                config.disable_publish = true;
+            });
         let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link]).await;
         let apps = conductors.setup_app("test", &[dna_file]).await.unwrap();

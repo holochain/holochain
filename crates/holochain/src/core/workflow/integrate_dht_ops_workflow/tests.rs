@@ -1,15 +1,10 @@
-#![cfg(test)]
-#![cfg(feature = "test_utils")]
-
 use super::*;
 
 use crate::core::queue_consumer::TriggerSender;
-use crate::here;
 use crate::test_utils::test_network;
 use ::fixt::prelude::*;
 use holochain_state::mutations;
 use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
-use holochain_trace;
 
 #[derive(Clone)]
 struct TestData {
@@ -35,7 +30,7 @@ impl TestData {
         Self::new_inner(original_entry, new_entry)
     }
 
-    #[instrument()]
+    #[cfg_attr(feature = "instrument", tracing::instrument())]
     fn new_inner(original_entry: Entry, new_entry: Entry) -> Self {
         // original entry
         let original_entry_hash =
@@ -46,7 +41,7 @@ impl TestData {
 
         // Original entry and action for updates
         let mut original_action = fixt!(NewEntryAction, PublicCurve);
-        debug!(?original_action);
+        tracing::debug!(?original_action);
 
         match &mut original_action {
             NewEntryAction::Create(c) => c.entry_hash = original_entry_hash.clone(),
@@ -54,7 +49,7 @@ impl TestData {
         }
 
         let original_action_hash =
-            ActionHashed::from_content_sync(original_action.clone().into()).into_hash();
+            ActionHashed::from_content_sync(original_action.clone()).into_hash();
 
         // Action for the new entry
         let mut new_entry_action = fixt!(NewEntryAction, PublicCurve);
@@ -86,7 +81,7 @@ impl TestData {
         link_add.target_address = new_entry_hash.clone().into();
         link_add.tag = fixt!(LinkTag);
 
-        let link_add_hash = ActionHashed::from_content_sync(link_add.clone().into()).into_hash();
+        let link_add_hash = ActionHashed::from_content_sync(link_add.clone()).into_hash();
 
         // Link remove
         let mut link_remove = fixt!(DeleteLink);
@@ -136,7 +131,7 @@ enum Db {
 
 impl Db {
     /// Checks that the database is in a state
-    #[instrument(skip(expects, env))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(expects, env)))]
     async fn check(expects: Vec<Self>, env: DbWrite<DbKindDht>, here: String) {
         env.read_async(move |txn| -> DatabaseResult<()> {
             for expect in expects {
@@ -148,7 +143,7 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP
+                                    SELECT 1 FROM DhtOp
                                     WHERE when_integrated IS NOT NULL
                                     AND hash = :hash
                                     AND validation_status = :status
@@ -170,7 +165,7 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP
+                                    SELECT 1 FROM DhtOp
                                     WHERE when_integrated IS NULL
                                     AND validation_stage = 3
                                     AND hash = :hash
@@ -193,7 +188,7 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP
+                                    SELECT 1 FROM DhtOp
                                     WHERE when_integrated IS NOT NULL
                                     AND basis_hash = :basis
                                     AND action_hash = :hash
@@ -205,7 +200,7 @@ impl Db {
                                     ":basis": basis,
                                     ":hash": hash,
                                     ":status": ValidationStatus::Valid,
-                                    ":activity": DhtOpType::RegisterAgentActivity,
+                                    ":activity": ChainOpType::RegisterAgentActivity,
                                 },
                                 |row| row.get(0),
                             )
@@ -218,7 +213,7 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP
+                                    SELECT 1 FROM DhtOp
                                     WHERE when_integrated IS NOT NULL
                                     AND basis_hash = :basis
                                     AND action_hash = :hash
@@ -230,8 +225,8 @@ impl Db {
                                     ":basis": base,
                                     ":hash": hash,
                                     ":status": ValidationStatus::Valid,
-                                    ":update_content": DhtOpType::RegisterUpdatedContent,
-                                    ":update_record": DhtOpType::RegisterUpdatedRecord,
+                                    ":update_content": ChainOpType::RegisterUpdatedContent,
+                                    ":update_record": ChainOpType::RegisterUpdatedRecord,
                                 },
                                 |row| row.get(0),
                             )
@@ -244,7 +239,7 @@ impl Db {
                             .query_row(
                                 "
                                 SELECT EXISTS(
-                                    SELECT 1 FROM DhtOP
+                                    SELECT 1 FROM DhtOp
                                     JOIN Action on DhtOp.action_hash = Action.hash
                                     WHERE when_integrated IS NOT NULL
                                     AND validation_status = :status
@@ -259,8 +254,8 @@ impl Db {
                                     ":deleted_action_hash": deleted_action_hash,
                                     ":hash": hash,
                                     ":status": ValidationStatus::Valid,
-                                    ":deleted_by": DhtOpType::RegisterDeletedBy,
-                                    ":deleted_entry_action": DhtOpType::RegisterDeletedEntryAction,
+                                    ":deleted_by": ChainOpType::RegisterDeletedBy,
+                                    ":deleted_entry_action": ChainOpType::RegisterDeletedEntryAction,
                                 },
                                 |row| row.get(0),
                             )
@@ -270,7 +265,7 @@ impl Db {
                     Db::IntegratedEmpty => {
                         let not_empty: bool = txn
                             .query_row(
-                                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NOT NULL)",
+                                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NOT NULL)",
                                 [],
                                 |row| row.get(0),
                             )
@@ -280,7 +275,7 @@ impl Db {
                     Db::IntQueueEmpty => {
                         let not_empty: bool = txn
                             .query_row(
-                                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NULL)",
+                                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
                                 [],
                                 |row| row.get(0),
                             )
@@ -290,7 +285,7 @@ impl Db {
                     Db::MetaEmpty => {
                         let not_empty: bool = txn
                             .query_row(
-                                "SELECT EXISTS(SELECT 1 FROM DhtOP WHERE when_integrated IS NOT NULL)",
+                                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NOT NULL)",
                                 [],
                                 |row| row.get(0),
                             )
@@ -315,7 +310,7 @@ impl Db {
     }
 
     // Sets the database to a certain state
-    #[instrument(skip(pre_state, env))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(pre_state, env)))]
     async fn set<'env>(pre_state: Vec<Self>, env: DbWrite<DbKindDht>) {
         env.write_async(move |txn| -> DatabaseResult<()> {
             for state in pre_state {
@@ -353,6 +348,7 @@ impl Db {
     }
 }
 
+#[allow(unused)]
 async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
     let (qt, _rx) = TriggerSender::new();
     let test_network = test_network(None, None).await;
@@ -363,9 +359,10 @@ async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
 }
 
 // Need to clear the data from the previous test
+#[allow(unused)]
 async fn clear_dbs(env: DbWrite<DbKindDht>) {
     env.write_async(move |txn| -> StateMutationResult<()> {
-        txn.execute("DELETE FROM DhtOP", []).unwrap();
+        txn.execute("DELETE FROM DhtOp", []).unwrap();
         txn.execute("DELETE FROM Action", []).unwrap();
         txn.execute("DELETE FROM Entry", []).unwrap();
         Ok(())
@@ -378,15 +375,17 @@ async fn clear_dbs(env: DbWrite<DbKindDht>) {
 // The following show an op or ops that you want to test
 // with a desired pre-state that you want the database in
 // and the expected state of the database after the workflow is run
-
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_agent_activity(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     a.link_add.action_seq = 5;
-    let dep = DhtOp::RegisterAgentActivity(a.signature.clone(), a.link_add.clone().into());
+    let dep: DhtOp =
+        ChainOp::RegisterAgentActivity(a.signature.clone(), a.link_add.clone().into()).into();
     let hash = ActionHash::with_data_sync(&Action::CreateLink(a.link_add.clone()));
     let mut new_action = a.link_add.clone();
     new_action.prev_action = hash;
     new_action.action_seq += 1;
-    let op = DhtOp::RegisterAgentActivity(a.signature.clone(), new_action.clone().into());
+    let op: DhtOp =
+        ChainOp::RegisterAgentActivity(a.signature.clone(), new_action.clone().into()).into();
     let pre_state = vec![Db::Integrated(dep.clone()), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::Integrated(dep.clone()),
@@ -397,17 +396,20 @@ fn register_agent_activity(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) 
     (pre_state, expect, "register agent activity")
 }
 
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreRecord(
+    let original_op = ChainOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
         a.original_entry.clone().into(),
-    );
-    let op = DhtOp::RegisterUpdatedRecord(
+    )
+    .into();
+    let op: DhtOp = ChainOp::RegisterUpdatedRecord(
         a.signature.clone(),
         a.entry_update_action.clone(),
         a.new_entry.clone().into(),
-    );
+    )
+    .into();
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::Integrated(op.clone()),
@@ -419,17 +421,20 @@ fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register updated record")
 }
 
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreEntry(
+    let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
         a.original_action.clone(),
-        a.original_entry.clone().into(),
-    );
-    let op = DhtOp::RegisterUpdatedContent(
+        a.original_entry.clone(),
+    )
+    .into();
+    let op: DhtOp = ChainOp::RegisterUpdatedContent(
         a.signature.clone(),
         a.entry_update_entry.clone(),
         a.new_entry.clone().into(),
-    );
+    )
+    .into();
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::Integrated(op.clone()),
@@ -441,51 +446,58 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
     (pre_state, expect, "register replaced by for entry")
 }
 
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreEntry(
+    let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
         a.original_action.clone(),
-        a.original_entry.clone().into(),
-    );
-    let op = DhtOp::RegisterDeletedEntryAction(a.signature.clone(), a.entry_delete.clone());
+        a.original_entry.clone(),
+    )
+    .into();
+    let op: DhtOp =
+        ChainOp::RegisterDeletedEntryAction(a.signature.clone(), a.entry_delete.clone()).into();
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::IntQueueEmpty,
         Db::Integrated(op.clone()),
         Db::MetaDelete(
-            a.original_action_hash.clone().into(),
+            a.original_action_hash.clone(),
             a.entry_delete.clone().into(),
         ),
     ];
     (pre_state, expect, "register deleted by")
 }
 
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreRecord(
+    let original_op = ChainOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
         a.original_entry.clone().into(),
-    );
-    let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
+    )
+    .into();
+    let op: DhtOp = ChainOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone()).into();
     let pre_state = vec![Db::IntQueue(op.clone()), Db::Integrated(original_op)];
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaDelete(
-            a.original_action_hash.clone().into(),
+            a.original_action_hash.clone(),
             a.entry_delete.clone().into(),
         ),
     ];
     (pre_state, expect, "register deleted action by")
 }
 
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreEntry(
+    let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
         a.original_action.clone(),
-        a.original_entry.clone().into(),
-    );
-    let original_link_op = DhtOp::RegisterAddLink(a.signature.clone(), a.link_add.clone());
-    let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
+        a.original_entry.clone(),
+    )
+    .into();
+    let original_link_op = ChainOp::RegisterAddLink(a.signature.clone(), a.link_add.clone()).into();
+    let op: DhtOp = ChainOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone()).into();
     let pre_state = vec![
         Db::Integrated(original_op),
         Db::Integrated(original_link_op),
@@ -499,8 +511,9 @@ fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 // Link remove when not an author
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
+    let op: DhtOp = ChainOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone()).into();
     let pre_state = vec![Db::IntQueue(op.clone())];
     let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
     (
@@ -534,6 +547,11 @@ async fn test_ops_state() {
         let (pre_state, expect, name) = t(td);
         Db::set(pre_state, env.clone()).await;
         call_workflow(env.clone()).await;
-        Db::check(expect, env.clone(), format!("{}: {}", name, here!(""))).await;
+        Db::check(
+            expect,
+            env.clone(),
+            format!("{}: {}", name, crate::here!("")),
+        )
+        .await;
     }
 }

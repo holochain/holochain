@@ -152,6 +152,9 @@ host_fn_api_impls! {
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
+    // Query agent key lineage for the provided key.
+    fn get_agent_key_lineage (AgentPubKey) -> Vec<AgentPubKey>;
+
     fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
 
     // Get links by entry hash from the cascade.
@@ -163,6 +166,9 @@ host_fn_api_impls! {
 
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
+
+    // Check if agent key 2 is of the same lineage as agent key 2.
+    fn is_same_agent ((AgentPubKey, AgentPubKey)) -> bool;
 
     // Retreive a record from the DHT or short circuit.
     fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> Record;
@@ -230,4 +236,13 @@ host_fn_api_impls! {
 
     // Delete a clone cell.
     fn delete_clone_cell(zt::clone::DeleteCloneCellInput) -> ();
+
+    // Close your source chain, indicating that you are migrating to a new DNA
+    fn close_chain(zt::chain::CloseChainInput) -> holo_hash::ActionHash;
+
+    // Open your chain, pointing to the previous DNA
+    fn open_chain(zt::chain::OpenChainInput) -> holo_hash::ActionHash;
+
+    // Get validation receipts for an action
+    fn get_validation_receipts(zt::validate::GetValidationReceiptsInput) -> Vec<zt::validate::ValidationReceiptSet>;
 }

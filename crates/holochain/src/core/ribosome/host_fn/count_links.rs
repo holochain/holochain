@@ -10,7 +10,7 @@ use wasmer::RuntimeError;
 
 /// Count links
 #[allow(clippy::extra_unused_lifetimes)]
-#[tracing::instrument(skip(_ribosome, call_context), fields(? call_context.zome, function = ? call_context.function_name))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context), fields(? call_context.zome, function = ? call_context.function_name)))]
 pub fn count_links<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
@@ -224,7 +224,7 @@ mod tests {
                     base.clone(),
                     LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
                 )
-                .after(mid_time.clone()),
+                .after(mid_time),
             )
             .await;
         assert_eq!(1, count);
@@ -235,7 +235,7 @@ mod tests {
                 &bob,
                 "get_count",
                 LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))
-                    .before(mid_time.clone()),
+                    .before(mid_time),
             )
             .await;
         assert_eq!(1, count);

@@ -1,11 +1,61 @@
 ---
-default_semver_increment_mode: !pre_minor beta-dev
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+## 0.4.0-dev.21
+
+## 0.4.0-dev.20
+
+## 0.4.0-dev.19
+
+## 0.4.0-dev.18
+
+## 0.4.0-dev.17
+
+## 0.4.0-dev.16
+
+## 0.4.0-dev.15
+
+## 0.4.0-dev.14
+
+## 0.4.0-dev.13
+
+- **Breaking**: Shorten paths to database files by removing the name prefix where that prefix matches the directory name. The file extensions have also been removed. For example, an authored database would have been stored at `<root-dir>/authored/authored-<dna-hash>-<agent-key>.sqlite` and will now be stored at `<root-dir>/authored/<dna-hash>-<agent-key>`. This also affects the DHT, cache, agent store and metrics databases. You can work around this being a breaking change by renaming your database files to match the new expected names.
+
+## 0.4.0-dev.12
+
+## 0.4.0-dev.11
+
+## 0.4.0-dev.10
+
+## 0.4.0-dev.9
+
+## 0.4.0-dev.8
+
+## 0.4.0-dev.7
+
+## 0.4.0-dev.6
+
+## 0.4.0-dev.5
+
+## 0.4.0-dev.4
+
+## 0.4.0-dev.3
+
+## 0.4.0-dev.2
+
+## 0.4.0-dev.1
+
+## 0.4.0-dev.0
+
+## 0.3.0
+
+## 0.3.0-beta-dev.43
 
 ## 0.3.0-beta-dev.42
 

@@ -33,9 +33,6 @@ use crate::core::workflow::sys_validation_workflow::sys_validate_record;
 use crate::sweettest::SweetAgents;
 use crate::sweettest::SweetConductor;
 use crate::test_utils::fake_genesis_for_agent;
-use crate::test_utils::rebuild_record;
-use crate::test_utils::sign_record;
-use crate::test_utils::valid_arbitrary_chain;
 use ::fixt::prelude::*;
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
@@ -43,6 +40,7 @@ use contrafact::Fact;
 use error::SysValidationError;
 
 use futures::FutureExt;
+use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
@@ -54,6 +52,9 @@ use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
+use holochain_types::test_utils::rebuild_record;
+use holochain_types::test_utils::sign_record;
+use holochain_types::test_utils::valid_arbitrary_chain;
 use holochain_zome_types::facts::ActionRefMut;
 use holochain_zome_types::Action;
 use matches::assert_matches;
@@ -62,7 +63,7 @@ use std::time::Duration;
 fn matching_record(g: &mut Unstructured, f: impl Fn(&Record) -> bool) -> Record {
     // get anything but a Dna
     let mut dep = Record::arbitrary(g).unwrap();
-    while !f(&dep) {
+    while !f(&dep) || matches!(dep.action(), Action::Update(_)) {
         dep = Record::arbitrary(g).unwrap();
     }
     dep
@@ -106,7 +107,7 @@ async fn record_with_deps_fixup(
         *action.author_mut() = fake_agent_pubkey_1();
     }
 
-    let (entry, deps) = match &mut action {
+    let (entry, mut deps) = match &mut action {
         Action::Dna(_) => (None, vec![]),
         action => {
             let mut deps = vec![];
@@ -114,12 +115,14 @@ async fn record_with_deps_fixup(
 
             let entry = action.entry_data_mut().map(|(entry_hash, entry_type)| {
                 let et = entry_type.clone();
-                let entry = contrafact::brute("matching entry", move |e: &Entry| match (&et, e) {
-                    (EntryType::AgentPubKey, Entry::Agent(_)) => true,
-                    (EntryType::App(_), Entry::App(_)) => true,
-                    (EntryType::CapClaim, Entry::CapClaim(_)) => true,
-                    (EntryType::CapGrant, Entry::CapGrant(_)) => true,
-                    _ => false,
+                let entry = contrafact::brute("matching entry", move |e: &Entry| {
+                    matches!(
+                        (&et, e),
+                        (EntryType::AgentPubKey, Entry::Agent(_))
+                            | (EntryType::App(_), Entry::App(_))
+                            | (EntryType::CapClaim, Entry::CapClaim(_))
+                            | (EntryType::CapGrant, Entry::CapGrant(_))
+                    )
                 })
                 .build(&mut g);
 
@@ -191,7 +194,7 @@ async fn record_with_deps_fixup(
                     let create =
                         matching_record(&mut g, |r| matches!(r.action(), Action::CreateLink(_)));
                     delete.base_address = base.action_address().clone().into();
-                    delete.link_add_address = create.action_address().clone().into();
+                    delete.link_add_address = create.action_address().clone();
                     deps.push(base);
                     deps.push(create);
                 }
@@ -207,6 +210,10 @@ async fn record_with_deps_fixup(
             (entry, deps)
         }
     };
+
+    for d in deps.iter_mut() {
+        *d.as_action_mut().author_mut() = fake_agent_pubkey_1();
+    }
 
     assert_eq!(*action.author(), fake_agent_pubkey_1());
 
@@ -241,7 +248,7 @@ async fn test_record_with_cascade() {
     let keystore = holochain_keystore::test_keystore();
     for _ in 0..100 {
         let op =
-            holochain_types::facts::valid_dht_op(keystore.clone(), fake_agent_pubkey_1(), false)
+            holochain_types::facts::valid_chain_op(keystore.clone(), fake_agent_pubkey_1(), false)
                 .build(&mut g);
         let action = op.action().clone();
         assert_valid_action(&keystore, action).await;
@@ -276,7 +283,9 @@ async fn check_previous_action() {
     let mut g = random_generator();
 
     let keystore = holochain_keystore::test_keystore();
+    let previous_action = fixt!(SignedActionHashed);
     let mut action = Action::Delete(Delete::arbitrary(&mut g).unwrap());
+    *action.prev_action_mut().unwrap() = previous_action.as_hash().clone();
     *action.author_mut() = keystore.new_sign_keypair_random().await.unwrap();
 
     *action.action_seq_mut().unwrap() = 7;
@@ -292,8 +301,14 @@ async fn check_previous_action() {
         cascade
             .expect_retrieve_action()
             .times(2)
-            // Doesn't matter what we return, the action should be rejected before deps are checked.
-            .returning(|_, _| async move { Ok(None) }.boxed());
+            // Doesn't matter what we return, the action should be rejected before deps are checked,
+            // except for the previous action that is checked for agent validity.
+            .returning({
+                move |_, _| {
+                    let previous_action = previous_action.clone();
+                    async move { Ok(Some((previous_action.clone(), CascadeSource::Local))) }.boxed()
+                }
+            });
 
         let actual = sys_validate_record(
             &sign_record(&keystore, action, None).await,
@@ -328,7 +343,7 @@ async fn check_valid_if_dna_test() {
     let keystore = test_keystore();
     let db = tmp.to_db();
     // Test data
-    let _activity_return = vec![ActionHash::arbitrary(&mut g).unwrap()];
+    let _activity_return = [ActionHash::arbitrary(&mut g).unwrap()];
 
     let mut dna_def = DnaDef::arbitrary(&mut g).unwrap();
     dna_def.modifiers.origin_time = Timestamp::MIN;
@@ -337,11 +352,12 @@ async fn check_valid_if_dna_test() {
     let action = CreateLink::arbitrary(&mut g).unwrap();
     let cache: DhtDbQueryCache = tmp_dht.to_db().into();
     let mut workspace = SysValidationWorkspace::new(
-        db.clone().into(),
-        tmp_dht.to_db().into(),
+        db.clone(),
+        tmp_dht.to_db(),
         cache.clone(),
         tmp_cache.to_db(),
         Arc::new(dna_def.clone()),
+        None,
         std::time::Duration::from_secs(10),
     );
 
@@ -382,14 +398,9 @@ async fn check_valid_if_dna_test() {
 
     check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()).unwrap();
 
-    fake_genesis_for_agent(
-        db.clone().into(),
-        tmp_dht.to_db(),
-        action.author.clone(),
-        keystore,
-    )
-    .await
-    .unwrap();
+    fake_genesis_for_agent(db.clone(), tmp_dht.to_db(), action.author.clone(), keystore)
+        .await
+        .unwrap();
 
     tmp_dht
         .to_db()
@@ -536,7 +547,7 @@ fn check_entry_hash_test() {
     // Safe to unwrap if new entry
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(
-        check_entry_hash(&eh, &entry),
+        check_entry_hash(eh, &entry),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryHash
         ))
@@ -546,7 +557,7 @@ fn check_entry_hash_test() {
     let action: Action = ec.clone().into();
 
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
-    assert_matches!(check_entry_hash(&eh, &entry), Ok(()));
+    assert_matches!(check_entry_hash(eh, &entry), Ok(()));
     assert_matches!(
         check_new_entry_action(&CreateLink::arbitrary(&mut g).unwrap().into()),
         Err(SysValidationError::ValidationOutcome(
@@ -570,7 +581,7 @@ async fn check_entry_size_test() {
     let (mut record, cascade) = record_with_cascade(&keystore, action.into()).await;
 
     let tiny_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
-        (0..5).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
+        (0..5).map(|_| 0u8).collect::<Vec<_>>(),
     ))));
     *record.as_action_mut().entry_data_mut().unwrap().1 =
         EntryType::App(AppEntryDef::arbitrary(&mut g).unwrap());
@@ -579,7 +590,7 @@ async fn check_entry_size_test() {
     sys_validate_record(&record, cascade.clone()).await.unwrap();
 
     let huge_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
-        (0..5_000_000).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
+        (0..5_000_000).map(|_| 0u8).collect::<Vec<_>>(),
     ))));
     *record.as_entry_mut() = RecordEntry::Present(huge_entry);
     let record = rebuild_record(record, &keystore).await;
@@ -613,7 +624,7 @@ async fn check_update_reference_test() {
                 .unwrap_or(false)
     })
     .build(&mut g);
-    let (mut record, cascade) = record_with_cascade(&keystore, action.into()).await;
+    let (mut record, cascade) = record_with_cascade(&keystore, action).await;
 
     let entry_type = record.action().entry_type().unwrap().clone();
     let et2 = entry_type.clone();
@@ -653,7 +664,6 @@ async fn check_link_tag_size_test() {
 
     let bytes = (0..super::MAX_TAG_SIZE + 1)
         .map(|_| 0u8)
-        .into_iter()
         .collect::<Vec<_>>();
     let huge = LinkTag(bytes);
 
@@ -676,7 +686,7 @@ async fn incoming_ops_filters_private_entry() {
     let mut g = random_generator();
 
     let dna = DnaHash::arbitrary(&mut g).unwrap();
-    let spaces = TestSpaces::new([dna.clone()]);
+    let spaces = TestSpaces::new([dna.clone()]).await;
     let space = Arc::new(spaces.test_spaces[&dna].space.clone());
     let vault = space.dht_db.clone();
     let keystore = test_keystore();
@@ -748,10 +758,10 @@ fn valid_chain_test() {
         let err = validate_chain(fork.iter(), &None).expect_err("Forked chain");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::HashMismatch(_),
                 ..
-            }))
+            }
         );
 
         // Test a chain with the wrong seq.
@@ -760,12 +770,10 @@ fn valid_chain_test() {
         let err = validate_chain(wrong_seq.iter(), &None).expect_err("Wrong seq");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::InvalidSeq(_, _),
                 ..
             }
-
-            ))
         );
 
         // Test a wrong root gets rejected.
@@ -777,26 +785,24 @@ fn valid_chain_test() {
         let err = validate_chain(wrong_root.iter(), &None).expect_err("Wrong root");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::InvalidRoot,
                 ..
             }
-
-            ))
         );
 
         // Test without dna at root gets rejected.
         let mut dna_not_at_root = actions.clone();
+        // This is a wrong detection I think, because it's having some trouble understanding the types.
+        #[allow(clippy::clone_on_copy)]
         dna_not_at_root.push(actions[0].clone());
         let err = validate_chain(dna_not_at_root.iter(), &None).expect_err("Dna not at root");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::MissingPrev,
                 ..
             }
-
-            ))
         );
 
         // Test if there is a existing head that a dna in the new chain is rejected.
@@ -804,12 +810,10 @@ fn valid_chain_test() {
         let err = validate_chain(actions.iter(), &Some((hash, 0))).expect_err("Dna not at root");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::MissingPrev,
                 ..
             }
-
-            ))
         );
 
         // Check a sequence that is broken gets rejected.
@@ -824,12 +828,10 @@ fn valid_chain_test() {
         .expect_err("Wrong seq");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::InvalidSeq(_, _),
                 ..
             }
-
-            ))
         );
 
         // Check the correct sequence gets accepted with a root.
@@ -844,12 +846,12 @@ fn valid_chain_test() {
         let err = validate_chain(correct_seq.iter(), &Some((hash, 0))).expect_err("Hash is wrong");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+            PrevActionError {
                 source: PrevActionErrorKind::HashMismatch(_),
                 ..
             }
 
-            ))
+
         );
     });
 }
@@ -860,16 +862,18 @@ async fn test_dpki_agent_update() {
     use crate::core::workflow::inline_validation;
     use crate::sweettest::SweetAgents;
     use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
     use holochain_p2p::actor::HolochainP2pRefToDna;
 
     let dna = SweetDnaFile::unique_empty().await;
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let agents = SweetAgents::get(conductor.keystore(), 4).await;
-    conductor
-        .setup_app_for_agent("app", agents[0].clone(), vec![&dna])
-        .await
-        .unwrap();
+    // TODO: this test fails with deepkey because the agent is not also updated in DPKI.
+    //       once there is a way to update the agent in deepkey, add that to this test
+    //       and re-enable DPKI for this conductor.
+    let config = SweetConductorConfig::standard().no_dpki_mustfix();
+    let mut conductor = SweetConductor::from_config(config).await;
+    let app = conductor.setup_app("app", vec![&dna]).await.unwrap();
+    let initial_agent = app.agent().clone();
 
     let dna_hash = dna.dna_hash().clone();
     let space = conductor
@@ -880,7 +884,7 @@ async fn test_dpki_agent_update() {
     let workspace = space
         .source_chain_workspace(
             conductor.keystore(),
-            agents[0].clone(),
+            initial_agent.clone(),
             Arc::new(dna.dna_def().clone()),
         )
         .await
@@ -896,8 +900,10 @@ async fn test_dpki_agent_update() {
 
     let head = chain.chain_head().unwrap().unwrap();
 
+    let agents = SweetAgents::get(conductor.keystore(), 3).await;
+
     let a1 = Action::AgentValidationPkg(AgentValidationPkg {
-        author: agents[0].clone(),
+        author: initial_agent.clone(),
         timestamp: (head.timestamp + sec).unwrap(),
         action_seq: head.seq + 1,
         prev_action: head.action.clone(),
@@ -905,19 +911,19 @@ async fn test_dpki_agent_update() {
     });
 
     let a2 = Action::Update(Update {
-        author: agents[0].clone(),
+        author: initial_agent.clone(),
         timestamp: (a1.timestamp() + sec).unwrap(),
         action_seq: a1.action_seq() + 1,
         prev_action: a1.to_hash(),
         entry_type: EntryType::AgentPubKey,
-        entry_hash: agents[1].clone().into(),
+        entry_hash: agents[0].clone().into(),
         original_action_address: head.action,
-        original_entry_address: agents[0].clone().into(),
+        original_entry_address: initial_agent.clone().into(),
         weight: EntryRateWeight::default(),
     });
 
     let a3 = Action::AgentValidationPkg(AgentValidationPkg {
-        author: agents[1].clone(),
+        author: agents[0].clone(),
         timestamp: (a2.timestamp() + sec).unwrap(),
         action_seq: a2.action_seq() + 1,
         prev_action: a2.to_hash(),
@@ -925,26 +931,26 @@ async fn test_dpki_agent_update() {
     });
 
     let a4 = Action::Update(Update {
-        author: agents[1].clone(),
+        author: agents[0].clone(),
         timestamp: (a3.timestamp() + sec).unwrap(),
         action_seq: a3.action_seq() + 1,
         prev_action: a3.to_hash(),
         entry_type: EntryType::AgentPubKey,
-        entry_hash: agents[2].clone().into(),
+        entry_hash: agents[1].clone().into(),
         original_action_address: ActionHash::with_data_sync(&a2),
-        original_entry_address: agents[1].clone().into(),
+        original_entry_address: agents[0].clone().into(),
         weight: EntryRateWeight::default(),
     });
 
     let a5 = Action::Update(Update {
-        author: agents[2].clone(),
+        author: agents[1].clone(),
         timestamp: (a4.timestamp() + sec).unwrap(),
         action_seq: a4.action_seq() + 1,
         prev_action: a4.to_hash(),
         entry_type: EntryType::AgentPubKey,
-        entry_hash: agents[3].clone().into(),
+        entry_hash: agents[2].clone().into(),
         original_action_address: ActionHash::with_data_sync(&a4),
-        original_entry_address: agents[2].clone().into(),
+        original_entry_address: agents[1].clone().into(),
         weight: EntryRateWeight::default(),
     });
 
@@ -955,7 +961,7 @@ async fn test_dpki_agent_update() {
     chain
         .put_with_action(
             a2,
-            Some(Entry::Agent(agents[1].clone())),
+            Some(Entry::Agent(agents[0].clone())),
             ChainTopOrdering::Strict,
         )
         .await
@@ -967,7 +973,7 @@ async fn test_dpki_agent_update() {
     chain
         .put_with_action(
             a4,
-            Some(Entry::Agent(agents[2].clone())),
+            Some(Entry::Agent(agents[1].clone())),
             ChainTopOrdering::Strict,
         )
         .await
@@ -985,7 +991,7 @@ async fn test_dpki_agent_update() {
     chain
         .put_with_action(
             a5,
-            Some(Entry::Agent(agents[3].clone())),
+            Some(Entry::Agent(agents[2].clone())),
             ChainTopOrdering::Strict,
         )
         .await

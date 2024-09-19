@@ -21,7 +21,7 @@ async fn test_cell_handle_publish() {
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
 
-    let spaces = TestSpaces::new([dna.clone()]);
+    let spaces = TestSpaces::new([dna.clone()]).await;
     let db = spaces.test_spaces[&dna]
         .space
         .get_or_create_authored_db(cell_id.agent_pubkey().clone())
@@ -35,13 +35,20 @@ async fn test_cell_handle_publish() {
     let db_dir = test_db_dir().path().to_path_buf();
     let data_root_path: DataRootPath = db_dir.clone().into();
     let handle = Conductor::builder()
+        .config(
+            crate::sweettest::SweetConductorConfig::standard()
+                .no_dpki()
+                .into(),
+        )
         .with_keystore(keystore.clone())
         .with_data_root_path(data_root_path.clone())
         .test(&[])
         .await
         .unwrap();
     handle.register_dna(dna_file.clone()).await.unwrap();
-    let wasmer_module_cache = Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(db_dir))));
+    let wasmer_module_cache = Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(
+        db_dir.join("wasm-cache"),
+    ))));
 
     let ribosome = RealRibosome::new(dna_file, wasmer_module_cache)
         .await
@@ -72,17 +79,17 @@ async fn test_cell_handle_publish() {
 
     let action = action::Action::Dna(action::Dna {
         author: agent.clone(),
-        timestamp: Timestamp::now().into(),
+        timestamp: Timestamp::now(),
         hash: dna.clone(),
     });
     let hh = ActionHashed::from_content_sync(action.clone());
     let shh = SignedActionHashed::sign(&keystore, hh).await.unwrap();
-    let op = DhtOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
+    let op = ChainOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
     spaces
         .spaces
-        .handle_publish(&dna, true, false, vec![op.clone()])
+        .handle_publish(&dna, true, false, vec![op.clone().into()])
         .await
         .unwrap();
 

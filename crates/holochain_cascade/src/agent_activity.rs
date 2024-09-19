@@ -1,27 +1,46 @@
-use std::collections::HashSet;
-
 use super::*;
 use holochain_p2p::actor::GetActivityOptions;
 
-#[allow(clippy::result_large_err)] // TODO - investigate this lint
+#[allow(clippy::result_large_err)]
 pub(crate) fn merge_activities(
     agent: AgentPubKey,
     options: &GetActivityOptions,
-    results: Vec<AgentActivityResponse<ActionHash>>,
-) -> CascadeResult<AgentActivityResponse<ActionHash>> {
-    if !options.include_rejected_activity && !options.include_valid_activity {
+    results: Vec<AgentActivityResponse>,
+) -> CascadeResult<AgentActivityResponse> {
+    if !options.include_rejected_activity
+        && !options.include_valid_activity
+        && !options.include_warrants
+    {
         return Ok(merge_status_only(agent, results));
     }
-    Ok(merge_hashes(agent, options, results))
+    Ok(merge_activity_responses(agent, options, results))
 }
 
-fn merge_hashes(
+fn merge_activity_responses(
     agent: AgentPubKey,
     options: &GetActivityOptions,
-    results: Vec<AgentActivityResponse<ActionHash>>,
-) -> AgentActivityResponse<ActionHash> {
-    let mut valid = HashSet::new();
-    let mut rejected = HashSet::new();
+    results: Vec<AgentActivityResponse>,
+) -> AgentActivityResponse {
+    let mut status = ChainStatus::Empty;
+    let mut valid = if options.include_valid_activity {
+        if options.include_full_records {
+            ChainItems::Full(Vec::new())
+        } else {
+            ChainItems::Hashes(Vec::new())
+        }
+    } else {
+        ChainItems::NotRequested
+    };
+    let mut rejected = if options.include_rejected_activity {
+        if options.include_full_records {
+            ChainItems::Full(Vec::new())
+        } else {
+            ChainItems::Hashes(Vec::new())
+        }
+    } else {
+        ChainItems::NotRequested
+    };
+    let mut warrants = Vec::new();
     let mut merged_highest_observed = None;
     for result in results {
         let AgentActivityResponse {
@@ -29,11 +48,15 @@ fn merge_hashes(
             highest_observed,
             valid_activity,
             rejected_activity,
-            ..
+            warrants: these_warrants,
+            status: _,
         } = result;
+
         if the_agent != agent {
             continue;
         }
+
+        warrants.extend(these_warrants);
 
         match (merged_highest_observed.take(), highest_observed) {
             (None, None) => {}
@@ -46,106 +69,213 @@ fn merge_hashes(
             }
         }
 
-        match valid_activity {
-            ChainItems::Full(_) => {
-                // TODO: BACKLOG: Currently not handling full actions from
-                // the activity authority.
+        let (s, v, r) = if options.include_valid_activity && options.include_rejected_activity {
+            match (valid, rejected, valid_activity, rejected_activity) {
+                (
+                    ChainItems::Full(mut v),
+                    ChainItems::Full(mut r),
+                    ChainItems::Full(valid),
+                    ChainItems::Full(rejected),
+                ) if options.include_full_records => {
+                    v.extend(valid);
+                    r.extend(rejected);
+                    let (status, valid, rejected) =
+                        compute_chain_status(v.into_iter(), r.into_iter());
+
+                    (status, valid.to_chain_items(), rejected.to_chain_items())
+                }
+                (
+                    ChainItems::Hashes(mut v),
+                    ChainItems::Hashes(mut r),
+                    ChainItems::Hashes(valid),
+                    ChainItems::Hashes(rejected),
+                ) => {
+                    v.extend(valid);
+                    r.extend(rejected);
+                    let (status, valid, rejected) =
+                        compute_chain_status(v.into_iter(), r.into_iter());
+
+                    (status, valid.to_chain_items(), rejected.to_chain_items())
+                }
+                e => {
+                    warn!("Invalid combination of chain items in merge_hashes: {e:?}");
+                    (
+                        ChainStatus::Empty,
+                        ChainItems::NotRequested,
+                        ChainItems::NotRequested,
+                    )
+                }
             }
-            ChainItems::Hashes(hashes) => {
-                valid.extend(hashes);
+        } else if options.include_valid_activity {
+            match (valid, rejected, valid_activity, rejected_activity) {
+                (ChainItems::Full(mut v), _, ChainItems::Full(valid), _)
+                    if options.include_full_records =>
+                {
+                    v.extend(valid);
+                    let (status, valid, rejected) =
+                        compute_chain_status(v.into_iter(), Vec::with_capacity(0).into_iter());
+
+                    (
+                        status,
+                        valid.to_chain_items(),
+                        if rejected.is_empty() {
+                            ChainItems::NotRequested
+                        } else {
+                            rejected.to_chain_items()
+                        },
+                    )
+                }
+                (ChainItems::Hashes(mut v), _, ChainItems::Hashes(valid), _) => {
+                    v.extend(valid);
+                    let (status, valid, rejected) =
+                        compute_chain_status(v.into_iter(), Vec::with_capacity(0).into_iter());
+
+                    (
+                        status,
+                        valid.to_chain_items(),
+                        if rejected.is_empty() {
+                            ChainItems::NotRequested
+                        } else {
+                            rejected.to_chain_items()
+                        },
+                    )
+                }
+                e => {
+                    warn!("Invalid combination of chain items in merge_hashes: {e:?}");
+                    (
+                        ChainStatus::Empty,
+                        ChainItems::NotRequested,
+                        ChainItems::NotRequested,
+                    )
+                }
             }
-            ChainItems::NotRequested => {}
-        }
-        match rejected_activity {
-            ChainItems::Full(_) => {
-                // TODO: BACKLOG: Currently not handling full actions from
-                // the activity authority.
+        } else if options.include_rejected_activity {
+            match (valid, rejected, valid_activity, rejected_activity) {
+                (_, ChainItems::Full(mut r), _, ChainItems::Full(rejected))
+                    if options.include_full_records =>
+                {
+                    r.extend(rejected);
+                    let (status, valid, rejected) =
+                        compute_chain_status(Vec::with_capacity(0).into_iter(), r.into_iter());
+
+                    (
+                        status,
+                        if valid.is_empty() {
+                            ChainItems::NotRequested
+                        } else {
+                            valid.to_chain_items()
+                        },
+                        rejected.to_chain_items(),
+                    )
+                }
+                (_, ChainItems::Hashes(mut r), _, ChainItems::Hashes(rejected)) => {
+                    r.extend(rejected);
+                    let (status, valid, rejected) =
+                        compute_chain_status(Vec::with_capacity(0).into_iter(), r.into_iter());
+
+                    (
+                        status,
+                        if valid.is_empty() {
+                            ChainItems::NotRequested
+                        } else {
+                            valid.to_chain_items()
+                        },
+                        rejected.to_chain_items(),
+                    )
+                }
+                e => {
+                    warn!("Invalid combination of chain items in merge_hashes: {e:?}");
+                    (
+                        ChainStatus::Empty,
+                        ChainItems::NotRequested,
+                        ChainItems::NotRequested,
+                    )
+                }
             }
-            ChainItems::Hashes(hashes) => {
-                rejected.extend(hashes);
-            }
-            ChainItems::NotRequested => {}
-        }
+        } else {
+            (
+                ChainStatus::Empty,
+                ChainItems::NotRequested,
+                ChainItems::NotRequested,
+            )
+        };
+
+        valid = v;
+        rejected = r;
+        status = s;
     }
 
-    let (status, valid, rejected) = compute_chain_status(valid, rejected);
-    let valid_activity = if options.include_valid_activity {
-        ChainItems::Hashes(valid)
-    } else {
-        ChainItems::NotRequested
-    };
-    let rejected_activity = if options.include_rejected_activity {
-        ChainItems::Hashes(rejected)
-    } else {
-        ChainItems::NotRequested
-    };
     AgentActivityResponse {
         status,
         agent,
-        valid_activity,
-        rejected_activity,
+        valid_activity: valid,
+        rejected_activity: rejected,
+        warrants,
         highest_observed: merged_highest_observed,
     }
 }
 
-type ValidHashes = Vec<(u32, ActionHash)>;
-type RejectedHashes = Vec<(u32, ActionHash)>;
+pub(crate) fn compute_chain_status<T: ActionSequenceAndHash>(
+    valid: impl Iterator<Item = T>,
+    rejected: impl Iterator<Item = T>,
+) -> (ChainStatus, Vec<T>, Vec<T>) {
+    let mut valid: Vec<_> = valid.collect();
+    let mut rejected: Vec<_> = rejected.collect();
 
-fn compute_chain_status(
-    valid: HashSet<(u32, ActionHash)>,
-    rejected: HashSet<(u32, ActionHash)>,
-) -> (ChainStatus, ValidHashes, RejectedHashes) {
-    let mut valid: Vec<_> = valid.into_iter().collect();
-    let mut rejected: Vec<_> = rejected.into_iter().collect();
     // Sort ascending.
-    valid.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-    rejected.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+    valid.sort_unstable_by_key(|a| a.action_seq());
+    rejected.sort_unstable_by_key(|a| a.action_seq());
+
     let mut valid_out = Vec::with_capacity(valid.len());
     let mut status = None;
-    for (seq, hash) in valid {
+
+    for current in valid {
         if status.is_none() {
-            let fork = valid_out
-                .last()
-                .and_then(|v: &(u32, ActionHash)| if seq == v.0 { Some(v) } else { None });
+            let fork = valid_out.last().and_then(|v: &T| {
+                if current.action_seq() == v.action_seq() {
+                    Some(v)
+                } else {
+                    None
+                }
+            });
+
             if let Some(fork) = fork {
                 status = Some(ChainStatus::Forked(ChainFork {
-                    fork_seq: seq,
-                    first_action: hash.clone(),
-                    second_action: fork.1.clone(),
+                    fork_seq: current.action_seq(),
+                    first_action: current.address().clone(),
+                    second_action: fork.address().clone(),
                 }));
             }
         }
 
-        valid_out.push((seq, hash));
+        valid_out.push(current);
     }
 
-    if status.is_none() {
-        if let Some((s, h)) = rejected.first() {
-            status = Some(ChainStatus::Invalid(ChainHead {
-                action_seq: *s,
-                hash: h.clone(),
-            }));
-        }
-    }
-
-    let status = status.unwrap_or_else(|| {
-        if valid_out.is_empty() && rejected.is_empty() {
-            ChainStatus::Empty
-        } else {
-            let last = valid_out.last().expect("Safe due to is_empty check");
-            ChainStatus::Valid(ChainHead {
-                action_seq: last.0,
-                hash: last.1.clone(),
-            })
-        }
+    // The chain status will have been set if we found a fork, otherwise decide the status from
+    // the last valid and first rejected actions.
+    let status = status.unwrap_or_else(|| match (valid_out.last(), rejected.first()) {
+        (None, None) => ChainStatus::Empty,
+        (Some(v), None) => ChainStatus::Valid(ChainHead {
+            action_seq: v.action_seq(),
+            hash: v.address().clone(),
+        }),
+        (None, Some(r)) => ChainStatus::Invalid(ChainHead {
+            action_seq: r.action_seq(),
+            hash: r.address().clone(),
+        }),
+        (Some(_), Some(r)) => ChainStatus::Invalid(ChainHead {
+            action_seq: r.action_seq(),
+            hash: r.address().clone(),
+        }),
     });
+
     (status, valid_out, rejected)
 }
 
 fn merge_status_only(
     agent: AgentPubKey,
-    results: Vec<AgentActivityResponse<ActionHash>>,
-) -> AgentActivityResponse<ActionHash> {
+    results: Vec<AgentActivityResponse>,
+) -> AgentActivityResponse {
     let mut merged_status = None;
     let mut merged_highest_observed = None;
     for result in results {
@@ -234,6 +364,7 @@ fn merge_status_only(
         agent,
         valid_activity: ChainItems::NotRequested,
         rejected_activity: ChainItems::NotRequested,
+        warrants: vec![],
         highest_observed: merged_highest_observed,
     }
 }

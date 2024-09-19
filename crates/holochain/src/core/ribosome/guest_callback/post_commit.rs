@@ -202,10 +202,10 @@ mod slow_tests {
             .unwrap();
         post_commit_invocation.zome = CoordinatorZome::from(TestWasm::Foo);
 
-        let result = ribosome
+        ribosome
             .run_post_commit(host_access, post_commit_invocation)
+            .await
             .unwrap();
-        assert_eq!(result, ());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -221,10 +221,10 @@ mod slow_tests {
             .unwrap();
         post_commit_invocation.zome = CoordinatorZome::from(TestWasm::PostCommitSuccess);
 
-        let result = ribosome
+        ribosome
             .run_post_commit(host_access, post_commit_invocation)
+            .await
             .unwrap();
-        assert_eq!(result, ());
     }
 
     #[tokio::test(flavor = "multi_thread")]

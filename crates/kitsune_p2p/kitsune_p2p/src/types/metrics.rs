@@ -15,7 +15,8 @@ holochain_trace::metrics!(
 );
 
 /// Print all metrics as tracing events
-#[tracing::instrument]
+#[cfg_attr(feature = "instrument", tracing::instrument)]
+#[allow(dead_code)]
 pub fn print_all_metrics() {
     if holochain_trace::metrics::is_enabled() {
         use std::fmt::Write;

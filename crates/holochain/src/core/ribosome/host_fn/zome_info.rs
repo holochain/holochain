@@ -16,12 +16,17 @@ pub fn zome_info(
         HostFnAccess {
             bindings_deterministic: Permission::Allow,
             ..
-        } => ribosome
-            .zome_info(call_context.zome.clone())
-            .map_err(|e| match e {
-                RibosomeError::WasmRuntimeError(wasm_error) => wasm_error,
-                other_error => wasm_error!(WasmErrorInner::Host(other_error.to_string())).into(),
-            }),
+        } => {
+            let f = ribosome.zome_info(call_context.zome.clone());
+            tokio_helper::block_on(f, std::time::Duration::from_secs(60))
+                .map_err(|_| wasm_error!("60s timeout elapsed during zome_info()"))?
+                .map_err(|e| match e {
+                    RibosomeError::WasmRuntimeError(wasm_error) => wasm_error,
+                    other_error => {
+                        wasm_error!(WasmErrorInner::Host(other_error.to_string())).into()
+                    }
+                })
+        }
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
@@ -69,6 +74,28 @@ pub mod test {
             ]
             .into(),
         );
+
+        let entries = vec![(ZomeIndex(0), vec![EntryDefIndex(0), EntryDefIndex(1)])];
+        let links = vec![(ZomeIndex(0), vec![])];
+        assert_eq!(
+            zome_info.zome_types,
+            ScopedZomeTypesSet {
+                entries: ScopedZomeTypes(entries),
+                links: ScopedZomeTypes(links),
+            }
+        );
+    }
+
+    #[cfg(feature = "wasmer_sys")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn zome_info_extern_fns_test() {
+        holochain_trace::test_run();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::EntryDefs).await;
+
+        let zome_info: ZomeInfo = conductor.call(&alice, "zome_info", ()).await;
+
         assert_eq!(
             zome_info.extern_fns,
             vec![
@@ -85,14 +112,33 @@ pub mod test {
                 FunctionName::new("zome_info"),
             ],
         );
-        let entries = vec![(ZomeIndex(0), vec![EntryDefIndex(0), EntryDefIndex(1)])];
-        let links = vec![(ZomeIndex(0), vec![])];
+    }
+
+
+    // Same test, but excluding wasmer metering extern fns
+    #[cfg(feature = "wasmer_wamr")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn zome_info_extern_fns_test() {
+        holochain_trace::test_run();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::EntryDefs).await;
+
+        let zome_info: ZomeInfo = conductor.call(&alice, "zome_info", ()).await;
+
         assert_eq!(
-            zome_info.zome_types,
-            ScopedZomeTypesSet {
-                entries: ScopedZomeTypes(entries),
-                links: ScopedZomeTypes(links),
-            }
+            zome_info.extern_fns,
+            vec![
+                FunctionName::new("__data_end"),
+                FunctionName::new("__getrandom_custom"),
+                FunctionName::new("__hc__allocate_1"),
+                FunctionName::new("__hc__deallocate_1"),
+                FunctionName::new("__heap_base"),
+                FunctionName::new("assert_indexes"),
+                FunctionName::new("entry_defs"),
+                FunctionName::new("memory"),
+                FunctionName::new("zome_info"),
+            ],
         );
     }
 }

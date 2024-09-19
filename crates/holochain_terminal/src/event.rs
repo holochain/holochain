@@ -15,6 +15,8 @@ pub fn handle_events(app: &mut App) -> anyhow::Result<()> {
             if key.kind == event::KeyEventKind::Press {
                 if key.code == KeyCode::Tab {
                     app.incr_tab_index();
+                } else if key.code == KeyCode::BackTab {
+                    app.decr_tab_index();
                 } else if key.code == KeyCode::Char('q') || key.code == KeyCode::Esc {
                     app.stop();
                 } else if key.code == KeyCode::Char('r') {

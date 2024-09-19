@@ -17,10 +17,10 @@ mod error;
 
 pub type BoxApi = Box<dyn HostFnApiT>;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A type marker for an integrity [`InlineZome`].
 pub struct IntegrityZomeMarker;
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A type marker for a coordinator [`InlineZome`].
 pub struct CoordinatorZomeMarker;
 
@@ -28,6 +28,7 @@ pub type InlineIntegrityZome = InlineZome<IntegrityZomeMarker>;
 pub type InlineCoordinatorZome = InlineZome<CoordinatorZomeMarker>;
 
 /// An "inline" zome definition in pure Rust, as opposed to a zome defined in Wasm.
+#[derive(Clone)]
 pub struct InlineZome<T = IntegrityZomeMarker> {
     /// Inline zome type marker.
     _t: PhantomData<T>,
@@ -74,21 +75,10 @@ impl<T> InlineZome<T> {
         let z = move |api: BoxApi, input: ExternIO| -> InlineZomeResult<ExternIO> {
             Ok(ExternIO::encode(f(api, input.decode()?)?)?)
         };
-        if self.functions.insert(name.into(), Box::new(z)).is_some() {
+        if self.functions.insert(name.into(), Arc::new(z)).is_some() {
             tracing::warn!("Replacing existing InlineZome callback '{}'", name);
         };
         self
-    }
-
-    /// Alias for `function`
-    #[deprecated = "Alias for `function`"]
-    pub fn callback<F, I, O>(self, name: &str, f: F) -> Self
-    where
-        F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
-        I: DeserializeOwned + std::fmt::Debug,
-        O: Serialize + std::fmt::Debug,
-    {
-        self.function(name, f)
     }
 
     /// Make a call to an inline zome callback.
@@ -177,7 +167,7 @@ pub trait InlineZomeT: std::fmt::Debug {
 
 /// An inline zome function takes a Host API and an input, and produces an output.
 pub type InlineZomeFn =
-    Box<dyn Fn(BoxApi, ExternIO) -> InlineZomeResult<ExternIO> + 'static + Send + Sync>;
+    Arc<dyn Fn(BoxApi, ExternIO) -> InlineZomeResult<ExternIO> + 'static + Send + Sync>;
 
 impl<T: std::fmt::Debug> InlineZomeT for InlineZome<T> {
     fn functions(&self) -> Vec<FunctionName> {
@@ -264,13 +254,14 @@ impl std::hash::Hash for DynInlineZome {
 mod tests {
     use super::*;
     use crate::prelude::GetOptions;
+    use ::fixt::fixt;
     use holo_hash::AnyDhtHash;
 
     #[test]
     #[allow(unused_variables, unreachable_code)]
     fn can_create_inline_dna() {
         let zome = InlineIntegrityZome::new("", vec![], 0).function("zome_fn_1", |api, a: ()| {
-            let hash: AnyDhtHash = todo!();
+            let hash: AnyDhtHash = fixt!(ActionHash).into();
             Ok(api
                 .get(vec![GetInput::new(hash, GetOptions::default())])
                 .expect("TODO after crate re-org"))

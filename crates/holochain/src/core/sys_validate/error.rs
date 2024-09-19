@@ -1,4 +1,4 @@
-use derive_more::Display;
+use holochain_conductor_services::DpkiServiceError;
 use std::convert::TryFrom;
 
 use super::SourceChainError;
@@ -22,6 +22,7 @@ use thiserror::Error;
 /// - An Error
 /// - Failed validation
 /// - Successful validation
+///
 /// It is a lot cleaner to express this using
 /// ? try's unfortunately try for custom types is
 /// unstable but when it lands we should use:
@@ -49,6 +50,8 @@ pub enum SysValidationError {
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
+    #[error(transparent)]
+    DpkiServiceError(#[from] DpkiServiceError),
     #[error(transparent)]
     ConductorApiError(#[from] Box<ConductorApiError>),
     #[error("Expected Entry-based Action, but got: {0:?}")]
@@ -102,13 +105,23 @@ impl<E> TryFrom<OutcomeOrError<ValidationOutcome, E>> for ValidationOutcome {
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ValidationOutcome {
     #[error("The record with signature {0:?} and action {1:?} was found to be counterfeit")]
-    Counterfeit(Signature, Action),
+    CounterfeitAction(Signature, Action),
+    #[error("A warrant op was found to be counterfeit. Warrant: {0:?}")]
+    CounterfeitWarrant(Warrant),
+    #[error("A warrant op was found to be invalid. Reason: {1}, Warrant: {0:?}")]
+    InvalidWarrant(Warrant, String),
     #[error("The action {1:?} is not found in the countersigning session data {0:?}")]
     ActionNotInCounterSigningSession(CounterSigningSessionData, NewEntryAction),
     #[error(transparent)]
     CounterSigningError(#[from] CounterSigningError),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
+    #[error("The agent {0:?} could not be found in DPKI")]
+    DpkiAgentMissing(AgentPubKey),
+    #[error("The agent {0:?} was found to be invalid at {1:?} according to the DPKI service")]
+    DpkiAgentInvalid(AgentPubKey, Timestamp),
+    #[error("Agent key {0} invalid")]
+    InvalidAgentKey(AgentPubKey),
     #[error("The entry def index for {0:?} was out of range")]
     EntryDefId(AppEntryDef),
     #[error("The entry has a different hash to the action's entry hash")]
@@ -128,7 +141,7 @@ pub enum ValidationOutcome {
     )]
     TagTooLarge(usize),
     #[error("An op with non-private entry type is missing its entry data. Action: {0:?}, Op type: {1:?} Reason: {2}")]
-    MalformedDhtOp(Box<Action>, DhtOpType, String),
+    MalformedDhtOp(Box<Action>, ChainOpType, String),
     #[error("The action with {0:?} was expected to be a link add action")]
     NotCreateLink(ActionHash),
     #[error("The action was expected to be a new entry action but was {0:?}")]
@@ -161,63 +174,16 @@ impl ValidationOutcome {
     pub fn into_outcome<T>(self) -> SysValidationOutcome<T> {
         Err(OutcomeOrError::Outcome(self))
     }
-}
 
-/// Context information for an invalid action to make it easier to trace in errors.
-#[derive(Error, Debug, Display, PartialEq, Eq)]
-#[display(
-    fmt = "{} - with context seq={}, action_hash={:?}, action=[{}]",
-    source,
-    seq,
-    action_hash,
-    action_display
-)]
-pub struct PrevActionError {
-    #[source]
-    pub source: PrevActionErrorKind,
-    pub seq: u32,
-    pub action_hash: ActionHash,
-    pub action_display: String,
-}
-
-impl<A: ChainItem> From<(PrevActionErrorKind, &A)> for PrevActionError {
-    fn from((inner, action): (PrevActionErrorKind, &A)) -> Self {
-        PrevActionError {
-            source: inner,
-            seq: action.seq(),
-            action_hash: action.get_hash().clone().into(),
-            action_display: action.to_display(),
+    /// The outcome is pending further information, so no determination can be made at this time.
+    /// If this is false, then the outcome is determinate, meaning we can reject validation now.
+    pub fn is_indeterminate(&self) -> bool {
+        if let ValidationOutcome::CounterfeitAction(_, _)
+        | ValidationOutcome::CounterfeitWarrant(_) = self
+        {
+            // Just a helpful assertion for us
+            unreachable!("Counterfeit ops are dropped before sys validation")
         }
+        matches!(self, Self::DepMissingFromDht(_) | Self::DpkiAgentMissing(_))
     }
-}
-
-impl From<(PrevActionErrorKind, Action)> for PrevActionError {
-    fn from((inner, action): (PrevActionErrorKind, Action)) -> Self {
-        PrevActionError {
-            source: inner,
-            seq: action.action_seq(),
-            action_hash: action.to_hash(),
-            action_display: format!("{}", action),
-        }
-    }
-}
-
-#[derive(Error, Debug, PartialEq, Eq)]
-pub enum PrevActionErrorKind {
-    #[error("The previous action hash specified in an action doesn't match the actual previous action. Seq: {0}")]
-    HashMismatch(u32),
-    #[error("Root of source chain must be Dna")]
-    InvalidRoot,
-    #[error("Root of source chain must have a timestamp greater than the Dna's origin_time")]
-    InvalidRootOriginTime,
-    #[error("Previous action sequence number {1} != ({0} - 1)")]
-    InvalidSeq(u32, u32),
-    #[error("Action is not the first, so needs previous action")]
-    MissingPrev,
-    #[error("The previous action's timestamp is not before the current action's timestamp: {0:?} >= {1:?}")]
-    Timestamp(Timestamp, Timestamp),
-    #[error("The previous action's author does not match the current action's author: {0} != {1}")]
-    Author(AgentPubKey, AgentPubKey),
-    #[error("It is invalid for these two actions to be paired with each other. context: {0}, actions: {1:?}")]
-    InvalidSuccessor(String, Box<(Action, Action)>),
 }

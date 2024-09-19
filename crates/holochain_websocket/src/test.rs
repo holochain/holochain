@@ -1,6 +1,7 @@
 //! holochain_websocket tests
 
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+use tokio::task::JoinHandle;
 
 use crate::*;
 
@@ -91,8 +92,11 @@ async fn blocks_connect_with_mismatched_origin() {
 
         match l.accept().await {
             Ok(_) => panic!("should not have accepted"),
-            Err(e) => {
+            Err(WebsocketError::Io(e)) => {
                 assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
+            }
+            Err(e) => {
+                panic!("unexpected error: {:?}", e);
             }
         }
     });
@@ -109,8 +113,11 @@ async fn blocks_connect_with_mismatched_origin() {
         .await
         {
             Ok(_) => panic!("should not have connected"),
-            Err(e) => {
+            Err(WebsocketError::Websocket(e)) => {
                 assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
+            }
+            Err(e) => {
+                panic!("unexpected error: {:?}", e);
             }
         }
     });
@@ -140,8 +147,11 @@ async fn blocks_connect_without_origin() {
 
         match l.accept().await {
             Ok(_) => panic!("should not have accepted"),
-            Err(e) => {
+            Err(WebsocketError::Io(e)) => {
                 assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
+            }
+            Err(e) => {
+                panic!("unexpected error: {:?}", e);
             }
         }
     });
@@ -156,8 +166,11 @@ async fn blocks_connect_without_origin() {
         .await
         {
             Ok(_) => panic!("should not have connected"),
-            Err(e) => {
+            Err(WebsocketError::Websocket(e)) => {
                 assert_eq!(e.to_string(), "HTTP error: 400 Bad Request");
+            }
+            Err(e) => {
+                panic!("unexpected error: {:?}", e);
             }
         }
     });
@@ -321,4 +334,76 @@ async fn ipv6_or_ipv4_connect_on_specific_port() {
     }
 
     l_task.await.unwrap();
+}
+
+// This test is meant to cover the case of a client dropping their connection without closing it.
+// We should respond to this by shutting down tasks on our side and the senders that were hooked
+// into those tasks should be able to detect that the receiver has dropped so that the caller knows
+// to drop that send handle.
+#[tokio::test(flavor = "multi_thread")]
+async fn handle_client_close() {
+    holochain_trace::test_run();
+
+    #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq)]
+    enum TestMsg {
+        Hello,
+    }
+
+    let (addr_s, addr_r) = tokio::sync::oneshot::channel();
+
+    let l_task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
+        let l = WebsocketListener::bind(Arc::new(WebsocketConfig::LISTENER_DEFAULT), "localhost:0")
+            .await
+            .unwrap();
+
+        let addr = l.local_addrs().unwrap();
+        addr_s.send(addr).unwrap();
+
+        let (send, mut recv) = l.accept().await.unwrap();
+        let s_task =
+            tokio::task::spawn(async move { while let Ok(_r) = recv.recv::<TestMsg>().await {} });
+
+        let sender = tokio::task::spawn(async move {
+            loop {
+                match send.signal(TestMsg::Hello).await {
+                    Ok(_) => {
+                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    }
+                    Err(WebsocketError::Close(_)) => {
+                        break;
+                    }
+                    Err(e) => {
+                        panic!("unexpected error: {:?}", e);
+                    }
+                };
+            }
+        });
+
+        sender.await?;
+
+        s_task.abort();
+
+        Ok(())
+    });
+
+    let addr = addr_r.await.unwrap()[0];
+    println!("addr: {}", addr);
+
+    let r_task = tokio::task::spawn(async move {
+        let (_send, mut recv) = connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), addr)
+            .await
+            .unwrap();
+
+        let signal = recv.recv::<TestMsg>().await.unwrap();
+        assert!(matches!(signal, ReceiveMessage::Signal(_)));
+    });
+
+    // Listens for one signal then stops listening without closing the connection
+    r_task.await.unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(5), l_task)
+        .await
+        .expect("Timeout waiting for shutdown")
+        .expect("Error joining the signal sender task")
+        .expect("Other error than WebsocketClosed while sending signals");
 }

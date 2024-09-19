@@ -9,9 +9,8 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-#[allow(clippy::extra_unused_lifetimes)]
-#[tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name))]
-pub fn get<'a>(
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name)))]
+pub fn get(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetInput>,
@@ -88,11 +87,13 @@ pub mod slow_tests {
     async fn get_action_entry_local_only() {
         holochain_trace::test_run();
         // agents should not pass around data
-        let config = SweetConductorConfig::rendezvous(false).tune(|config| {
-            config.disable_historical_gossip = true;
-            config.disable_recent_gossip = true;
-            config.disable_publish = true;
-        });
+        let config = SweetConductorConfig::rendezvous(false)
+            .tune(|config| {
+                config.disable_historical_gossip = true;
+                config.disable_recent_gossip = true;
+                config.disable_publish = true;
+            })
+            .no_dpki();
         let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
         let apps = conductors.setup_app("test", &[dna_file]).await.unwrap();

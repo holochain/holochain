@@ -28,13 +28,22 @@ pub async fn default_with_network(
         network,
         root,
         in_process_lair,
+        no_dpki,
+        dpki_network_seed,
+        #[cfg(feature = "chc")]
+        chc_url,
         ..
     } = create;
+    let network = Network::to_kitsune(&NetworkCmd::as_inner(&network)).await;
     let path = crate::generate::generate(
-        network.map(|n| n.into_inner().into()),
+        network,
         root,
         directory,
         in_process_lair,
+        no_dpki,
+        dpki_network_seed,
+        #[cfg(feature = "chc")]
+        chc_url,
     )?;
     let conductor = run_async(holochain_path, path.clone(), None, structured).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;

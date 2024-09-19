@@ -11,6 +11,9 @@ pub use holochain_zome_types::test_utils::*;
 #[warn(missing_docs)]
 pub mod chain;
 
+mod generate_records;
+pub use generate_records::*;
+
 #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 struct FakeProperties {
     test: String,
@@ -49,6 +52,7 @@ pub fn fake_dna_zomes_named(
         },
         integrity_zomes: Vec::new(),
         coordinator_zomes: Vec::new(),
+        lineage: Default::default(),
     };
     tokio_helper::block_forever_on(async move {
         let mut wasm_code = Vec::new();

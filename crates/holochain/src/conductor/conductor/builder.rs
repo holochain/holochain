@@ -6,22 +6,45 @@ use crate::conductor::paths::DataRootPath;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::KeystorePath;
+use holochain_p2p::NetworkCompatParams;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
 pub struct ConductorBuilder {
     /// The configuration
     pub config: ConductorConfig,
+
     /// The RibosomeStore (mockable)
     pub ribosome_store: RibosomeStore,
+
     /// For new lair, passphrase is required
     pub passphrase: Option<sodoken::BufRead>,
+
     /// Optional keystore override
     pub keystore: Option<MetaLairClient>,
-    #[cfg(any(test, feature = "test_utils"))]
+
     /// Optional state override (for testing)
+    #[cfg(any(test, feature = "test_utils"))]
     pub state: Option<ConductorState>,
+
+    /// Optional DPKI service implementation, used to override the service specified in the config,
+    /// especially for testing with a mock
+    #[cfg(any(test, feature = "test_utils"))]
+    pub dpki: Option<DpkiImpl>,
+
+    /// If specified here and a device seed is not already specified in the config,
+    /// a new seed will be generated in lair with a random unique tag, and the conductor config
+    /// will be updated to use this seed.
+    #[cfg(any(test, feature = "test_utils"))]
+    pub generate_test_device_seed: bool,
+
     /// Skip printing setup info to stdout
     pub no_print_setup: bool,
+
+    /// WARNING!! DANGER!! This exposes your database decryption secrets!
+    /// Print the database decryption secrets to stderr.
+    /// With these PRAGMA commands, you'll be able to run sqlcipher
+    /// directly to manipulate holochain databases.
+    pub danger_print_db_secrets: bool,
 }
 
 impl ConductorBuilder {
@@ -64,19 +87,56 @@ impl ConductorBuilder {
         self
     }
 
+    /// WARNING!! DANGER!! This exposes your database decryption secrets!
+    /// Print the database decryption secrets to stderr.
+    /// With these PRAGMA commands, you'll be able to run sqlcipher
+    /// directly to manipulate holochain databases.
+    pub fn danger_print_db_secrets(mut self, v: bool) -> Self {
+        self.danger_print_db_secrets = v;
+        self
+    }
+
     /// Set the data root path for the conductor that will be built.
     pub fn with_data_root_path(mut self, data_root_path: DataRootPath) -> Self {
         self.config.data_root_path = Some(data_root_path);
         self
     }
 
-    /// Initialize a "production" Conductor
-    #[tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope))]
-    pub async fn build(self) -> ConductorResult<ConductorHandle> {
-        tracing::debug!(?self.config);
+    /// If a device seed is not already specified in the config, one will
+    /// be generated and used for the test keystore.
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn with_test_device_seed(mut self) -> Self {
+        self.generate_test_device_seed = true;
+        self
+    }
 
-        let keystore = if let Some(keystore) = self.keystore {
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn setup_test_device_seed(mut self, keystore: MetaLairClient) -> ConductorResult<Self> {
+        // Set up device seed if specified
+        if self.generate_test_device_seed && self.config.device_seed_lair_tag.is_none() {
+            let tag = format!("_hc_test_device_seed_{}", nanoid::nanoid!());
             keystore
+                .lair_client()
+                .new_seed(tag.clone().into(), None, false)
+                .await?;
+            self.config.device_seed_lair_tag = Some(tag);
+        }
+        Ok(self)
+    }
+
+    /// Initialize a "production" Conductor
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope)))]
+    pub async fn build(self) -> ConductorResult<ConductorHandle> {
+        let builder = self;
+        tracing::debug!(?builder.config);
+
+        let passphrase = match &builder.passphrase {
+            Some(p) => p.clone(),
+            None => sodoken::BufRead::new_no_lock(&[]),
+        };
+
+        let keystore = if let Some(keystore) = builder.keystore.clone() {
+            keystore.clone()
         } else {
             pub(crate) fn warn_no_encryption() {
                 #[cfg(not(feature = "sqlite-encrypted"))]
@@ -88,14 +148,14 @@ impl ConductorBuilder {
                 }
             }
             let get_passphrase = || -> ConductorResult<sodoken::BufRead> {
-                match self.passphrase {
+                match builder.passphrase.as_ref() {
                     None => Err(
                         one_err::OneErr::new("passphrase required for lair keystore api").into(),
                     ),
-                    Some(p) => Ok(p),
+                    Some(p) => Ok(p.to_owned()),
                 }
             };
-            match &self.config.keystore {
+            match &builder.config.keystore {
                 KeystoreConfig::DangerTestKeystore => {
                     holochain_keystore::spawn_test_keystore().await?
                 }
@@ -115,7 +175,7 @@ impl ConductorBuilder {
 
                     let keystore_root_path: KeystorePath = match lair_root {
                         Some(lair_root) => lair_root.clone(),
-                        None => self
+                        None => builder
                             .config
                             .data_root_path
                             .as_ref()
@@ -141,17 +201,21 @@ impl ConductorBuilder {
 
         info!("Conductor startup: passphrase obtained.");
 
+        #[cfg(any(test, feature = "test_utils"))]
+        let builder = builder.setup_test_device_seed(keystore.clone()).await?;
+
         let Self {
             ribosome_store,
             config,
             ..
-        } = self;
+        } = builder;
 
         let config = Arc::new(config);
 
         let ribosome_store = RwShare::new(ribosome_store);
 
-        let spaces = Spaces::new(config.clone())?;
+        crate::conductor::space::set_danger_print_db_secrets(builder.danger_print_db_secrets);
+        let spaces = Spaces::new(config.clone(), passphrase).await?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();
@@ -184,10 +248,32 @@ impl ConductorBuilder {
             Some(keystore.lair_client()),
         );
 
-        let network_compat = crate::conductor::space::query_conductor_state(&spaces.conductor_db)
-            .await?
-            .map(|s| s.get_network_compat())
-            .unwrap_or_default();
+        // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
+        let dpki_config = Some(config.dpki.clone());
+
+        let dpki_dna_to_install = match &dpki_config {
+            Some(config) => {
+                if config.no_dpki {
+                    None
+                } else {
+                    let dna = get_dpki_dna(config)
+                        .await?
+                        .into_dna_file(Default::default())
+                        .await?
+                        .0;
+
+                    Some(dna)
+                }
+            }
+            _ => unreachable!(
+                "We currently require DPKI to be used, but this may change in the future"
+            ),
+        };
+
+        let dpki_uuid = dpki_dna_to_install
+            .as_ref()
+            .map(|dna| dna.dna_hash().get_raw_32().try_into().expect("32 bytes"));
+        let network_compat = NetworkCompatParams { dpki_uuid };
 
         let (holochain_p2p, p2p_evt) = match holochain_p2p::spawn_holochain_p2p(
             network_config,
@@ -224,7 +310,7 @@ impl ConductorBuilder {
         let shutting_down = conductor.shutting_down.clone();
 
         #[cfg(any(test, feature = "test_utils"))]
-        let conductor = Self::update_fake_state(self.state, conductor).await?;
+        let conductor = Self::update_fake_state(builder.state, conductor).await?;
 
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
@@ -244,10 +330,11 @@ impl ConductorBuilder {
         Self::finish(
             handle,
             config,
+            dpki_dna_to_install,
             p2p_evt,
             post_commit_receiver,
             outcome_rx,
-            self.no_print_setup,
+            builder.no_print_setup,
         )
         .await
     }
@@ -272,12 +359,7 @@ impl ConductorBuilder {
                     } = post_commit_args;
                     match conductor_handle.clone().get_ribosome(cell_id.dna_hash()) {
                         Ok(ribosome) => {
-                            if let Err(e) = tokio::task::spawn_blocking(move || {
-                                if let Err(e) = ribosome.run_post_commit(host_access, invocation) {
-                                    tracing::error!(?e);
-                                }
-                            })
-                            .await
+                            if let Err(e) = ribosome.run_post_commit(host_access, invocation).await
                             {
                                 tracing::error!(?e);
                             }
@@ -305,9 +387,11 @@ impl ConductorBuilder {
             .await;
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub(crate) async fn finish(
         conductor: ConductorHandle,
         config: Arc<ConductorConfig>,
+        dpki_dna_to_install: Option<DnaFile>,
         p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         outcome_receiver: OutcomeReceiver,
@@ -351,6 +435,18 @@ impl ConductorBuilder {
             );
         }
 
+        // Install DPKI from DNA
+        if let Some(dna) = dpki_dna_to_install {
+            let dna_hash = dna.dna_hash().clone();
+            match conductor.clone().install_dpki(dna, true).await {
+                Ok(_) => tracing::info!("Installed DPKI from DNA {}", dna_hash),
+                Err(ConductorError::AppAlreadyInstalled(_)) => {
+                    tracing::debug!("DPKI already installed, skipping installation")
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
         if !no_print_setup {
             conductor.print_setup();
         }
@@ -373,7 +469,7 @@ impl ConductorBuilder {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub(crate) async fn update_fake_state(
         state: Option<ConductorState>,
         conductor: Conductor,
@@ -386,16 +482,23 @@ impl ConductorBuilder {
 
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
-    #[tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope)))]
     pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
-        use holochain_p2p::NetworkCompatParams;
+        let builder = self;
 
-        let keystore = self
+        let keystore = builder
             .keystore
+            .clone()
             .unwrap_or_else(holochain_keystore::test_keystore);
 
-        let config = Arc::new(self.config);
-        let spaces = Spaces::new(config.clone())?;
+        let builder = builder
+            .with_test_device_seed()
+            .setup_test_device_seed(keystore.clone())
+            .await?;
+
+        let config = Arc::new(builder.config);
+        let spaces =
+            Spaces::new(config.clone(), sodoken::BufRead::new_no_lock(b"passphrase")).await?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();
@@ -407,7 +510,7 @@ impl ConductorBuilder {
         let network_config = config.network.clone();
         let strat = network_config.tuning_params.to_arq_strat();
 
-        let ribosome_store = RwShare::new(self.ribosome_store);
+        let ribosome_store = RwShare::new(builder.ribosome_store);
         let host = KitsuneHostImpl::new(
             spaces.clone(),
             config.clone(),
@@ -416,7 +519,37 @@ impl ConductorBuilder {
             Some(tag_ed),
             Some(keystore.lair_client()),
         );
-        let network_compat = NetworkCompatParams::default();
+
+        // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
+        let dpki_config = Some(config.dpki.clone());
+
+        let (dpki_uuid, dpki_dna_to_install) = match (&builder.dpki, &dpki_config) {
+            // If a DPKI impl was provided to the builder, use that
+            (Some(dpki_impl), _) => (Some(dpki_impl.uuid()), None),
+
+            // Otherwise load the DNA from config if specified
+            (None, Some(dpki_config)) => {
+                if dpki_config.no_dpki {
+                    (None, None)
+                } else {
+                    let dna = get_dpki_dna(dpki_config)
+                        .await?
+                        .into_dna_file(Default::default())
+                        .await?
+                        .0;
+                    (
+                        Some(dna.dna_hash().get_raw_32().try_into().expect("32 bytes")),
+                        Some(dna),
+                    )
+                }
+            }
+
+            (None, None) => unreachable!(
+                "We currently require DPKI to be used, but this may change in the future"
+            ),
+        };
+
+        let network_compat = NetworkCompatParams { dpki_uuid };
 
         let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host, network_compat)
@@ -437,10 +570,18 @@ impl ConductorBuilder {
             outcome_tx,
         );
 
-        let conductor = Self::update_fake_state(self.state, conductor).await?;
+        let conductor = Self::update_fake_state(builder.state, conductor).await?;
 
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
+
+        // Install DPKI from DNA or mock
+        if let Some(dpki_impl) = builder.dpki {
+            // This is a mock DPKI impl, so inject it into the conductor directly
+            handle.running_services_mutex().share_mut(|s| {
+                s.dpki = Some(dpki_impl);
+            });
+        }
 
         // Install extra DNAs, in particular:
         // the ones with InlineZomes will not be registered in the Wasm DB
@@ -456,10 +597,11 @@ impl ConductorBuilder {
         Self::finish(
             handle,
             config,
+            dpki_dna_to_install,
             p2p_evt,
             post_commit_receiver,
             outcome_rx,
-            self.no_print_setup,
+            builder.no_print_setup,
         )
         .await
     }

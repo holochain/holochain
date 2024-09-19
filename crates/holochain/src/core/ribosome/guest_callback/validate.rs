@@ -1,3 +1,4 @@
+use crate::conductor::api::DpkiApi;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
@@ -34,6 +35,8 @@ impl ValidateInvocation {
 pub struct ValidateHostAccess {
     pub workspace: HostFnWorkspaceRead,
     pub network: GenericNetwork,
+    pub dpki: DpkiApi,
+    pub is_inline: bool,
 }
 
 impl std::fmt::Debug for ValidateHostAccess {
@@ -169,9 +172,8 @@ mod test {
             let number_of_extras = rng.gen_range(0..5);
             for _ in 0..number_of_extras {
                 let maybe_extra = results.choose(&mut rng).cloned();
-                match maybe_extra {
-                    Some(extra) => results.push(extra),
-                    _ => {}
+                if let Some(extra) = maybe_extra {
+                    results.push(extra);
                 };
             }
 
@@ -252,6 +254,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .await
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -268,6 +271,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .await
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -289,7 +293,7 @@ mod slow_tests {
         let op = Op::StoreRecord(StoreRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(
-                    ActionHashed::from_content_sync(action.into()),
+                    ActionHashed::from_content_sync(action),
                     Signature::arbitrary(&mut u).unwrap(),
                 ),
                 Some(entry),
@@ -302,6 +306,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .await
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()));
     }

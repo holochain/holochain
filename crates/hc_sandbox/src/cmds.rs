@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{ArgAction, Parser};
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::TransportConfig;
 use url2::Url2;
@@ -39,6 +39,19 @@ pub struct Create {
     /// Use this option to run the sandboxed conductors when you don't have access to the lair binary.
     #[arg(long)]
     pub in_process_lair: bool,
+
+    /// Launch Holochain with the DPKI service disabled.
+    #[arg(long, action = ArgAction::SetFalse)]
+    pub no_dpki: bool,
+
+    /// Set the network seed for the DPKI service.
+    #[arg(long, conflicts_with = "no_dpki")]
+    pub dpki_network_seed: Option<String>,
+
+    /// Set the conductor config CHC (Chain Head Coordinator) URL
+    #[cfg(feature = "chc")]
+    #[arg(long, value_parser=try_parse_url2)]
+    pub chc_url: Option<Url2>,
 }
 
 #[derive(Debug, Parser, Clone)]
@@ -47,9 +60,10 @@ pub enum NetworkCmd {
 }
 
 impl NetworkCmd {
-    pub fn into_inner(self) -> Network {
-        match self {
-            NetworkCmd::Network(n) => n,
+    pub fn as_inner(this: &Option<Self>) -> Option<&Network> {
+        match this {
+            None => None,
+            Some(NetworkCmd::Network(n)) => Some(n),
         }
     }
 }
@@ -80,6 +94,9 @@ pub enum NetworkType {
     WebRTC {
         /// URL to a holochain tx5 WebRTC signal server.
         signal_url: String,
+
+        /// Optional path to override webrtc peer connection config file.
+        webrtc_config: Option<std::path::PathBuf>,
     },
 }
 
@@ -189,13 +206,17 @@ Run `hc sandbox generate --help` for more options."
     }
 }
 
-impl From<Network> for KitsuneP2pConfig {
-    fn from(n: Network) -> Self {
+impl Network {
+    pub async fn to_kitsune(this: &Option<&Self>) -> Option<KitsuneP2pConfig> {
         let Network {
             transport,
             bootstrap,
-        } = n;
-        let mut kit = KitsuneP2pConfig::empty();
+        } = match this {
+            None => return None,
+            Some(n) => (*n).clone(),
+        };
+
+        let mut kit = KitsuneP2pConfig::default();
         kit.bootstrap_service = bootstrap;
 
         match transport {
@@ -240,12 +261,29 @@ impl From<Network> for KitsuneP2pConfig {
                 }];
             }
             */
-            NetworkType::WebRTC { signal_url } => {
-                let transport = TransportConfig::WebRTC { signal_url };
+            NetworkType::WebRTC {
+                signal_url,
+                webrtc_config,
+            } => {
+                let webrtc_config = match webrtc_config {
+                    Some(path) => {
+                        let content = tokio::fs::read_to_string(path)
+                            .await
+                            .expect("failed to read webrtc_config file");
+                        let parsed = serde_json::from_str(&content)
+                            .expect("failed to parse webrtc_config file content");
+                        Some(parsed)
+                    }
+                    None => None,
+                };
+                let transport = TransportConfig::WebRTC {
+                    signal_url,
+                    webrtc_config,
+                };
                 kit.transport_pool = vec![transport];
             }
         }
-        kit
+        Some(kit)
     }
 }
 
@@ -257,6 +295,10 @@ impl Default for Create {
             root: None,
             directories: Vec::with_capacity(0),
             in_process_lair: false,
+            no_dpki: false,
+            dpki_network_seed: None,
+            #[cfg(feature = "chc")]
+            chc_url: None,
         }
     }
 }

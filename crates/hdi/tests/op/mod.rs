@@ -107,8 +107,8 @@ fn op_errors(op: Op) -> WasmErrorInner {
 #[test_case(FlatOp::RegisterAgentActivity(OpActivity::DeleteLink{ action: dl(ah(0)), original_action_hash: ah(0), base_address: eh(0).into()}))]
 // Action's without entries
 #[test_case(FlatOp::RegisterAgentActivity(OpActivity::Dna { action: dna(dh(0)), dna_hash: dh(0)}))]
-#[test_case(FlatOp::RegisterAgentActivity(OpActivity::OpenChain { previous_dna_hash: dh(0), action: oc(dh(0))}))]
-#[test_case(FlatOp::RegisterAgentActivity(OpActivity::CloseChain { new_dna_hash: dh(0), action: cc(dh(0))}))]
+#[test_case(FlatOp::RegisterAgentActivity(OpActivity::open_chain(oc(dh(0).into(), ah(0)))))]
+#[test_case(FlatOp::RegisterAgentActivity(OpActivity::close_chain(cc(Some(dh(0).into())))))]
 #[test_case(FlatOp::RegisterAgentActivity(OpActivity::InitZomesComplete { action: izc()}))]
 #[test_case(FlatOp::RegisterAgentActivity(OpActivity::AgentValidationPkg{ membrane_proof: None, action: avp(None) }))]
 #[test_case(FlatOp::RegisterAgentActivity(OpActivity::AgentValidationPkg{ membrane_proof: Some(mp()), action: avp(Some(mp())) }))]
@@ -136,8 +136,8 @@ fn op_errors(op: Op) -> WasmErrorInner {
 #[test_case(FlatOp::StoreRecord(OpRecord::DeleteLink { action: dl(ah(0)), original_action_hash: ah(0), base_address: eh(0).into() }))]
 // Action's without entries
 #[test_case(FlatOp::StoreRecord(OpRecord::Dna{ action: dna(dh(0)), dna_hash: dh(0)}))]
-#[test_case(FlatOp::StoreRecord(OpRecord::OpenChain{ action: oc(dh(0)), previous_dna_hash: dh(0)}))]
-#[test_case(FlatOp::StoreRecord(OpRecord::CloseChain{ action: cc(dh(1)), new_dna_hash: dh(1)}))]
+#[test_case(FlatOp::StoreRecord(OpRecord::open_chain(oc(dh(0).into(), ah(0)))))]
+#[test_case(FlatOp::StoreRecord(OpRecord::close_chain(cc(Some(dh(1).into())))))]
 #[test_case(FlatOp::StoreRecord(OpRecord::InitZomesComplete { action: izc() }))]
 #[test_case(FlatOp::StoreRecord(OpRecord::AgentValidationPkg { action: avp(None), membrane_proof: None}))]
 #[test_case(FlatOp::StoreRecord(OpRecord::AgentValidationPkg { action: avp(Some(mp())), membrane_proof: Some(mp())}))]
@@ -598,21 +598,15 @@ fn op_match_sanity() {
         FlatOp::RegisterUpdate(_) => (),
         FlatOp::RegisterDelete(_) => (),
     }
-    match op.flattened::<_, ()>().unwrap() {
-        FlatOp::StoreRecord(OpRecord::CreateEntry {
-            action: _,
-            app_entry: EntryTypes::A(_),
-        }) => (),
-        _ => (),
-    }
-    match op.flattened::<(), _>().unwrap() {
-        FlatOp::StoreRecord(OpRecord::CreateLink {
-            link_type: LinkTypes::A,
-            ..
-        }) => (),
-        _ => (),
-    }
-    match op.flattened::<(), ()>().unwrap() {
-        _ => (),
-    }
+    if let FlatOp::StoreRecord(OpRecord::CreateEntry {
+        action: _,
+        app_entry: EntryTypes::A(_),
+    }) = op.flattened::<_, ()>().unwrap()
+    {}
+    if let FlatOp::StoreRecord(OpRecord::CreateLink {
+        link_type: LinkTypes::A,
+        ..
+    }) = op.flattened::<(), _>().unwrap()
+    {}
+    op.flattened::<(), ()>().unwrap();
 }

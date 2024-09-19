@@ -36,6 +36,8 @@ pub trait HdiT: Send + Sync {
         &self,
         must_get_agent_activity_input: MustGetAgentActivityInput,
     ) -> ExternResult<Vec<RegisterAgentActivity>>;
+    // DPKI
+    fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool>;
     // Info
     fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
     fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
@@ -91,6 +93,9 @@ impl HdiT for ErrHdi {
     ) -> ExternResult<Vec<RegisterAgentActivity>> {
         Self::err("must_get_agent_activity")
     }
+    fn is_same_agent(&self, _: AgentPubKey, _: AgentPubKey) -> ExternResult<bool> {
+        Self::err("is_same_agent")
+    }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
         Self::err("dna_info")
     }
@@ -127,6 +132,12 @@ pub struct HostHdi;
 impl HostHdi {
     pub const fn new() -> Self {
         Self {}
+    }
+}
+
+impl Default for HostHdi {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -178,6 +189,9 @@ impl HdiT for HostHdi {
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
         host_call::<(), ZomeInfo>(__hc__zome_info_1, ())
     }
+    fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool> {
+        host_call::<(AgentPubKey, AgentPubKey), bool>(__hc__is_same_agent_1, (key_1, key_2))
+    }
     fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()> {
         if cfg!(feature = "trace") {
             host_call::<TraceMsg, ()>(__hc__trace_1, trace_msg)
@@ -219,9 +233,9 @@ impl HdiT for HostHdi {
 /// At any time the global HDI can be set to a different HDI.
 /// Generally this is only useful during rust unit testing.
 /// When executing wasm without the `mock` feature, the host will be assumed.
-pub fn set_hdi<H: 'static>(hdi: H) -> Rc<dyn HdiT>
+pub fn set_hdi<H>(hdi: H) -> Rc<dyn HdiT>
 where
-    H: HdiT,
+    H: HdiT + 'static,
 {
     HDI.with(|h| std::mem::replace(&mut *h.borrow_mut(), Rc::new(hdi)))
 }

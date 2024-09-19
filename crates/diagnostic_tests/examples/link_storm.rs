@@ -1,7 +1,6 @@
 #![recursion_limit = "256"]
 
 use holochain_diagnostics::{
-    gossip::sharded_gossip::NodeId,
     holochain::{
         conductor::{conductor::RwShare, config::ConductorConfig},
         prelude::*,
@@ -11,6 +10,7 @@ use holochain_diagnostics::{
     ui::gossip_dashboard::*,
     *,
 };
+use kitsune_p2p::{gossip::sharded_gossip::NodeId, metrics::Metrics};
 use std::{
     collections::HashMap,
     error::Error,
@@ -21,7 +21,7 @@ use std::{
 };
 use tui::{backend::Backend, Terminal};
 
-const BASES: usize = 1;
+const BASES: usize = 2;
 
 const ENTRY_SIZE: usize = 3_000_000;
 const MAX_COMMITS: usize = 1_000;
@@ -242,7 +242,7 @@ impl ClientState for State {
         self.link_counts.as_ref()
     }
 
-    fn node_rounds_sorted<'a>(&self, metrics: &'a metrics::Metrics) -> NodeRounds<'a, usize> {
+    fn node_rounds_sorted<'a>(&self, metrics: &'a Metrics) -> NodeRounds<'a, usize> {
         let mut histories: Vec<_> = metrics
             .peer_node_histories()
             .iter()

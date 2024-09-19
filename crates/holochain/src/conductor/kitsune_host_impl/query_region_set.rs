@@ -95,15 +95,13 @@ mod tests {
 
         let mk_op = |i: u8| {
             let entry = Entry::App(AppEntryBytes(
-                UnsafeBytes::from(vec![i % 10; 10_000_000])
-                    .try_into()
-                    .unwrap(),
+                UnsafeBytes::from(vec![i % 10; 10_000_000]).into(),
             ));
             let sig = ::fixt::fixt!(Signature);
             let mut create = ::fixt::fixt!(Create);
             create.timestamp = Timestamp::now();
             let action = NewEntryAction::Create(create);
-            DhtOpHashed::from_content_sync(DhtOp::StoreEntry(sig, action, entry))
+            DhtOpHashed::from_content_sync(ChainOp::StoreEntry(sig, action, entry))
         };
         let num = 100;
 

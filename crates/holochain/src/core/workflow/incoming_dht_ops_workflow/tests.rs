@@ -24,7 +24,7 @@ async fn incoming_ops_to_limbo() {
         let action = Action::CreateLink(action);
         let signature = author.sign(&keystore, &action).await.unwrap();
 
-        let op = DhtOp::RegisterAgentActivity(signature, action);
+        let op = ChainOp::RegisterAgentActivity(signature, action);
         let hash = DhtOpHash::with_data_sync(&op);
         hash_list.push(hash);
         op_list.push(op);
@@ -36,7 +36,7 @@ async fn incoming_ops_to_limbo() {
         let space = space.space.clone();
         all.push(tokio::task::spawn(async move {
             let start = std::time::Instant::now();
-            incoming_dht_ops_workflow(space, sys_validation_trigger, vec![op], false)
+            incoming_dht_ops_workflow(space, sys_validation_trigger, vec![op.into()], false)
                 .await
                 .unwrap();
             println!("IN OP in {} s", start.elapsed().as_secs_f64());
@@ -67,7 +67,7 @@ async fn can_retry_failed_op() {
     // Create a dummy signature that will fail validation
     let signature = Signature([0; SIGNATURE_BYTES]);
 
-    let op = DhtOp::RegisterAgentActivity(signature, action.clone());
+    let op = ChainOp::RegisterAgentActivity(signature, action.clone()).into();
     let hash = DhtOpHash::with_data_sync(&op);
 
     // Try running the workflow and...
@@ -85,7 +85,7 @@ async fn can_retry_failed_op() {
 
     // Now fix the signature
     let signature = author.sign(&keystore, &action).await.unwrap();
-    let op = DhtOp::RegisterAgentActivity(signature, action);
+    let op = ChainOp::RegisterAgentActivity(signature, action).into();
     let hash = DhtOpHash::with_data_sync(&op);
 
     // Run the workflow again to simulate a re-send of the op...
@@ -117,7 +117,7 @@ async fn republish_to_request_validation_receipt() {
     action.author = author.clone();
     let action = Action::CreateLink(action);
     let signature = author.sign(&keystore, &action).await.unwrap();
-    let op = DhtOp::RegisterAgentActivity(signature, action);
+    let op: DhtOp = ChainOp::RegisterAgentActivity(signature, action).into();
     let hash = DhtOpHash::with_data_sync(&op);
 
     incoming_dht_ops_workflow(
@@ -154,8 +154,7 @@ async fn verify_is_pending_validation_receipt(env: DbWrite<DbKindDht>, hash: Dht
 
     assert!(pending_hashes
         .into_iter()
-        .find(|pending_hash| *pending_hash == hash)
-        .is_some());
+        .any(|pending_hash| pending_hash == hash));
 }
 
 async fn verify_ops_present(env: DbWrite<DbKindDht>, hash_list: Vec<DhtOpHash>, present: bool) {
@@ -165,7 +164,7 @@ async fn verify_ops_present(env: DbWrite<DbKindDht>, hash_list: Vec<DhtOpHash>, 
                 .query_row(
                     "
                 SELECT EXISTS(
-                    SELECT 1 FROM DhtOP
+                    SELECT 1 FROM DhtOp
                     WHERE when_integrated IS NULL
                     AND hash = :hash
                 )
@@ -189,7 +188,7 @@ async fn get_pending_op_hashes(env: DbWrite<DbKindDht>) -> Vec<DhtOpHash> {
     env.read_async(|txn| -> StateQueryResult<_> {
         let mut stmt = txn.prepare(
             "
-        SELECT hash FROM DhtOP
+        SELECT hash FROM DhtOp
         WHERE when_integrated IS NULL
         AND require_receipt = 1
     ",

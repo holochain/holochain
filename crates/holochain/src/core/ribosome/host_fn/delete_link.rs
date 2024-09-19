@@ -124,7 +124,7 @@ pub mod slow_tests {
         // links should start empty
         let links: Vec<Vec<Link>> = conductor.call(&alice, "get_links", ()).await;
 
-        assert!(links.len() == 0);
+        assert!(links.is_empty());
 
         // add a couple of links
         let mut link_actions: Vec<ActionHash> = Vec::new();
@@ -152,7 +152,7 @@ pub mod slow_tests {
 
         let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
 
-        assert!(links.len() == 0);
+        assert!(links.is_empty());
 
         // Add some links then delete them all
         let _h: ActionHash = conductor.call(&alice, "create_link", ()).await;
@@ -167,6 +167,6 @@ pub mod slow_tests {
         // Should be no links left
         let links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
 
-        assert!(links.len() == 0);
+        assert!(links.is_empty());
     }
 }

@@ -5,6 +5,8 @@ use super::queue_consumer::TriggerSender;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::space::Space;
+use holochain_conductor_services::DpkiService;
+use holochain_conductor_services::KeyState;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -13,7 +15,6 @@ pub use error::*;
 pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-pub use holochain_zome_types::prelude::*;
 
 #[allow(missing_docs)]
 mod error;
@@ -34,11 +35,26 @@ pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Verify the signature for this action
 pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysValidationResult<()> {
-    if action.author().verify_signature(sig, action).await? {
+    if action.signer().verify_signature(sig, action).await? {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::Counterfeit((*sig).clone(), (*action).clone()),
+            ValidationOutcome::CounterfeitAction((*sig).clone(), (*action).clone()),
+        ))
+    }
+}
+
+/// Verify the signature for this warrant
+pub async fn verify_warrant_signature(warrant_op: &WarrantOp) -> SysValidationResult<()> {
+    if warrant_op
+        .author
+        .verify_signature(warrant_op.signature(), warrant_op.warrant().clone())
+        .await?
+    {
+        Ok(())
+    } else {
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::CounterfeitWarrant(warrant_op.warrant().clone()),
         ))
     }
 }
@@ -277,27 +293,7 @@ pub fn check_agent_validation_pkg_predecessor(
 
 /// Check that the author didn't change between actions
 pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
-    // Agent updates will be valid when DPKI support lands
-    let a1: AgentPubKey = if let Action::Update(
-        u @ Update {
-            entry_type: EntryType::AgentPubKey,
-            ..
-        },
-    ) = prev_action
-    {
-        #[cfg(feature = "dpki")]
-        {
-            u.entry_hash.clone().into()
-        }
-
-        #[cfg(not(feature = "dpki"))]
-        {
-            u.author.clone()
-        }
-    } else {
-        prev_action.author().clone()
-    };
-
+    let a1 = prev_action.author().clone();
     let a2 = action.author();
     if a1 == *a2 {
         Ok(())
@@ -339,7 +335,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 }
 
 /// Check that the EntryVisibility is congruous with the presence or absence of entry data
-pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
+pub fn check_entry_visibility(op: &ChainOp) -> SysValidationResult<()> {
     use EntryVisibility::*;
     use RecordEntry::*;
 
@@ -361,7 +357,7 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
         (Some(_), NA) => err("There is action entry data but the entry itself is N/A"),
         (Some(Private), Present(_)) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
         (Some(Public), NotStored) => {
-            if op.get_type() == DhtOpType::RegisterAgentActivity
+            if op.get_type() == ChainOpType::RegisterAgentActivity
                 || op.action().entry_type() == Some(&EntryType::AgentPubKey)
             {
                 // RegisterAgentActivity is a special case, where the entry data can be omitted.
@@ -374,6 +370,79 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
         }
         (None, NA) => Ok(()),
         (None, _) => err("Entry must be N/A for action with no entry type"),
+    }
+}
+
+/// Check that the record is valid from the perspective of DPKI.
+pub async fn check_dpki_agent_validity_for_record(
+    dpki: &DpkiService,
+    record: &Record,
+) -> SysValidationResult<()> {
+    let author = record.action().author().clone();
+    let timestamp = if record.action().is_genesis() {
+        None
+    } else {
+        Some(record.action().timestamp())
+    };
+    check_dpki_agent_validity(dpki, author, timestamp).await
+}
+
+/// Check that the op is valid from the perspective of DPKI.
+pub async fn check_dpki_agent_validity_for_op(
+    dpki: &DpkiService,
+    op: &ChainOp,
+) -> SysValidationResult<()> {
+    let author = op.author().clone();
+    let timestamp = if op.is_genesis() {
+        None
+    } else {
+        Some(op.timestamp())
+    };
+    let agent_validity_result = check_dpki_agent_validity(dpki, author, timestamp).await;
+    // If agent key is invalid in Dpki and the op being validated is a `Delete` of that agent key, it must pass
+    // for the delete to succeed. Otherwise Dpki would prevent deletion of an agent key on the source chain.
+    if let Err(SysValidationError::ValidationOutcome(ValidationOutcome::DpkiAgentInvalid(_, _))) =
+        &agent_validity_result
+    {
+        if let Action::Delete(d) = &op.action() {
+            if d.deletes_entry_address == op.author().clone().into() {
+                return Ok(());
+            }
+        }
+    }
+    agent_validity_result
+}
+
+/// Check that the agent is valid from the perspective of DPKI.
+///
+/// There are different rules for genesis actions and all other actions:
+/// - For genesis actions, we use None for the timestamp, and we only check that the key is the
+///   first key in the app's keyset, i.e. that key_index == 0.
+/// - For all other actions, we include the timestamp, and use `key_state` to check that the key
+///   is valid as-at that timestamp.
+async fn check_dpki_agent_validity(
+    dpki: &DpkiService,
+    author: AgentPubKey,
+    timestamp: Option<Timestamp>,
+) -> SysValidationResult<()> {
+    if let Some(timestamp) = timestamp {
+        let key_state = dpki
+            .state()
+            .await
+            .key_state(author.clone(), timestamp)
+            .await?;
+
+        match key_state {
+            KeyState::Valid(_) => Ok(()),
+            KeyState::Invalid(_) => {
+                Err(ValidationOutcome::DpkiAgentInvalid(author, timestamp).into())
+            }
+            KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(author).into()),
+        }
+    } else {
+        // TODO: add check for key_index == 0 once updates are possible
+        tracing::info!("Skipping DPKI check for genesis action until updates are possible");
+        Ok(())
     }
 }
 
@@ -448,71 +517,6 @@ pub fn check_update_reference(
     Ok(())
 }
 
-/// Validate a chain of actions with an optional starting point.
-pub fn validate_chain<'iter, A: 'iter + ChainItem>(
-    mut actions: impl Iterator<Item = &'iter A>,
-    persisted_chain_head: &Option<(A::Hash, u32)>,
-) -> SysValidationResult<()> {
-    // Check the chain starts in a valid way.
-    let mut last_item = match actions.next() {
-        Some(item) => {
-            match persisted_chain_head {
-                Some((prev_hash, prev_seq)) => {
-                    check_prev_action_chain(prev_hash, *prev_seq, item)
-                        .map_err(ValidationOutcome::from)?;
-                }
-                None => {
-                    // If there's no persisted chain head, then the first action
-                    // must have no parent.
-                    if item.prev_hash().is_some() {
-                        return Err(ValidationOutcome::PrevActionError(
-                            (PrevActionErrorKind::InvalidRoot, item).into(),
-                        )
-                        .into());
-                    }
-                }
-            }
-            (item.get_hash(), item.seq())
-        }
-        None => return Ok(()),
-    };
-
-    for item in actions {
-        // Check each item of the chain is valid.
-        check_prev_action_chain(last_item.0, last_item.1, item).map_err(ValidationOutcome::from)?;
-        last_item = (item.get_hash(), item.seq());
-    }
-    Ok(())
-}
-
-// Check the action is valid for the previous action.
-fn check_prev_action_chain<A: ChainItem>(
-    prev_action_hash: &A::Hash,
-    prev_action_seq: u32,
-    action: &A,
-) -> Result<(), PrevActionError> {
-    // The root cannot appear later in the chain
-    if action.prev_hash().is_none() {
-        Err((PrevActionErrorKind::MissingPrev, action).into())
-    } else if action.prev_hash().map_or(true, |p| p != prev_action_hash) {
-        // Check the prev hash matches.
-        Err((PrevActionErrorKind::HashMismatch(action.seq()), action).into())
-    } else if action
-        .seq()
-        .checked_sub(1)
-        .map_or(true, |s| prev_action_seq != s)
-    {
-        // Check the prev seq is one less.
-        Err((
-            PrevActionErrorKind::InvalidSeq(action.seq(), prev_action_seq),
-            action,
-        )
-            .into())
-    } else {
-        Ok(())
-    }
-}
-
 /// Allows DhtOps to be sent to some receiver
 #[async_trait::async_trait]
 #[cfg_attr(test, mockall::automock)]
@@ -558,7 +562,7 @@ impl DhtOpSender for IncomingDhtOpSender {
     }
 
     async fn send_store_record(&self, record: Record) -> SysValidationResult<()> {
-        self.send_op(make_store_record(record)).await
+        self.send_op(make_store_record(record).into()).await
     }
 
     async fn send_store_entry(&self, record: Record) -> SysValidationResult<()> {
@@ -568,7 +572,7 @@ impl DhtOpSender for IncomingDhtOpSender {
         });
         if is_public_entry {
             if let Some(op) = make_store_entry(record) {
-                self.send_op(op).await?;
+                self.send_op(op.into()).await?;
             }
         }
         Ok(())
@@ -576,42 +580,43 @@ impl DhtOpSender for IncomingDhtOpSender {
 
     async fn send_register_add_link(&self, record: Record) -> SysValidationResult<()> {
         if let Some(op) = make_register_add_link(record) {
-            self.send_op(op).await?;
+            self.send_op(op.into()).await?;
         }
 
         Ok(())
     }
 
     async fn send_register_agent_activity(&self, record: Record) -> SysValidationResult<()> {
-        self.send_op(make_register_agent_activity(record)).await
+        self.send_op(make_register_agent_activity(record).into())
+            .await
     }
 }
 
-/// Make a StoreRecord DhtOp from a Record.
+/// Make a StoreRecord ChainOp from a Record.
 /// Note that this can fail if the op is missing an
 /// Entry when it was supposed to have one.
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_record(record: Record) -> DhtOp {
+fn make_store_record(record: Record) -> ChainOp {
     // Extract the data
     let (shh, record_entry) = record.privatized().0.into_inner();
     let (action, signature) = shh.into_inner();
     let action = action.into_content();
 
     // Create the op
-    DhtOp::StoreRecord(signature, action, record_entry)
+    ChainOp::StoreRecord(signature, action, record_entry)
 }
 
-/// Make a StoreEntry DhtOp from a Record.
+/// Make a StoreEntry ChainOp from a Record.
 /// Note that this can fail if the op is missing an Entry or
 /// the action is the wrong type.
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_entry(record: Record) -> Option<DhtOp> {
+fn make_store_entry(record: Record) -> Option<ChainOp> {
     // Extract the data
     let (shh, record_entry) = record.into_inner();
     let (action, signature) = shh.into_inner();
@@ -622,17 +627,17 @@ fn make_store_entry(record: Record) -> Option<DhtOp> {
     let action = action.into_content().try_into().ok()?;
 
     // Create the op
-    let op = DhtOp::StoreEntry(signature, action, entry_box);
+    let op = ChainOp::StoreEntry(signature, action, entry_box);
     Some(op)
 }
 
-/// Make a RegisterAddLink DhtOp from a Record.
+/// Make a RegisterAddLink ChainOp from a Record.
 /// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_add_link(record: Record) -> Option<DhtOp> {
+fn make_register_add_link(record: Record) -> Option<ChainOp> {
     // Extract the data
     let (shh, _) = record.into_inner();
     let (action, signature) = shh.into_inner();
@@ -641,17 +646,17 @@ fn make_register_add_link(record: Record) -> Option<DhtOp> {
     let action = action.into_content().try_into().ok()?;
 
     // Create the op
-    let op = DhtOp::RegisterAddLink(signature, action);
+    let op = ChainOp::RegisterAddLink(signature, action);
     Some(op)
 }
 
-/// Make a RegisterAgentActivity DhtOp from a Record.
+/// Make a RegisterAgentActivity ChainOp from a Record.
 /// Note that this can fail if the action is the wrong type
 ///
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_agent_activity(record: Record) -> DhtOp {
+fn make_register_agent_activity(record: Record) -> ChainOp {
     // Extract the data
     let (shh, _) = record.into_inner();
     let (action, signature) = shh.into_inner();
@@ -661,7 +666,7 @@ fn make_register_agent_activity(record: Record) -> DhtOp {
     let action = action.into_content();
 
     // Create the op
-    DhtOp::RegisterAgentActivity(signature, action)
+    ChainOp::RegisterAgentActivity(signature, action)
 }
 
 #[cfg(test)]
@@ -709,11 +714,8 @@ pub mod test {
             .await
             .unwrap();
 
-        assert_eq!(
-            check_countersigning_preflight_response_signature(&preflight_response)
-                .await
-                .unwrap(),
-            (),
-        );
+        check_countersigning_preflight_response_signature(&preflight_response)
+            .await
+            .unwrap();
     }
 }

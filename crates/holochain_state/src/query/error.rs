@@ -15,7 +15,7 @@ pub enum StateQueryError {
     #[error(transparent)]
     DhtOpError(#[from] holochain_types::dht_op::DhtOpError),
     #[error("Unexpected op {0:?} for query")]
-    UnexpectedOp(DhtOpType),
+    UnexpectedOp(ChainOpType),
     #[error("Unexpected action {0:?} for query")]
     UnexpectedAction(ActionType),
     #[error(transparent)]

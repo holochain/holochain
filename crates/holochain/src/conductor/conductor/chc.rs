@@ -1,13 +1,14 @@
-use holochain_p2p::ChcImpl;
+use holochain_chc::ChcImpl;
 
 use super::*;
 
 impl Conductor {
+    /// Get access to the CHC used by the conductor
     #[allow(unused_variables)]
-    pub(crate) fn chc(&self, keystore: MetaLairClient, cell_id: &CellId) -> Option<ChcImpl> {
+    pub fn get_chc(&self, cell_id: &CellId) -> Option<ChcImpl> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "chc")] {
-                crate::conductor::chc::build_chc(self.config.chc_url.as_ref().map(|u| u.as_ref()), keystore, cell_id)
+                crate::conductor::chc::build_chc(self.config.chc_url.as_ref().map(|u| u.as_ref()), self.keystore().clone(), cell_id)
             } else {
                 None
             }
@@ -21,7 +22,7 @@ impl Conductor {
         cell_id: CellId,
         enable_app: Option<InstalledAppId>,
     ) -> ConductorApiResult<()> {
-        if let Some(chc) = self.chc(self.keystore().clone(), &cell_id) {
+        if let Some(chc) = self.get_chc(&cell_id) {
             let db =
                 self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
             let author = cell_id.agent_pubkey().clone();

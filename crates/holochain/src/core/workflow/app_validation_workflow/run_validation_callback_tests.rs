@@ -5,20 +5,20 @@ use crate::{
             guest_callback::validate::ValidateInvocation, real_ribosome::RealRibosome,
             ZomesToInvoke,
         },
-        workflow::app_validation_workflow::{
-            run_validation_callback, Outcome, ValidationDependencies,
-        },
+        workflow::app_validation_workflow::{run_validation_callback, Outcome},
     },
     fixt::MetaLairClientFixturator,
     sweettest::{SweetDnaFile, SweetInlineZomes},
 };
 use fixt::fixt;
-use holo_hash::{AgentPubKey, AnyDhtHash, HashableContentExtSync};
+use holo_hash::{ActionHash, AgentPubKey, HashableContentExtSync};
 use holochain_p2p::{HolochainP2pDnaFixturator, MockHolochainP2pDnaT};
+use holochain_sqlite::exports::FallibleIterator;
 use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, mutations::insert_op};
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
-    dht_op::{DhtOp, DhtOpHashed, WireOps},
+    db::{DbKindCache, DbWrite},
+    dht_op::{ChainOp, DhtOpHashed, WireOps},
     record::WireRecordOps,
 };
 use holochain_wasmer_host::module::ModuleCache;
@@ -34,7 +34,7 @@ use holochain_zome_types::{
     Action,
 };
 use matches::assert_matches;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use std::{
     collections::HashSet,
     sync::{
@@ -81,7 +81,7 @@ async fn validation_callback_must_get_action() {
     } = TestCase::new(zomes).await;
 
     let network = Arc::new(fixt!(HolochainP2pDna));
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let dpki = None;
 
     // a create by alice
     let mut create = fixt!(Create);
@@ -92,11 +92,6 @@ async fn validation_callback_must_get_action() {
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
-    let delete_dht_op = DhtOp::RegisterDeletedBy(
-        delete_action_signed_hashed.signature.clone(),
-        delete.clone(),
-    );
-    let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
     });
@@ -106,34 +101,27 @@ async fn validation_callback_must_get_action() {
     // validation should indicate it is awaiting create action hash
     let outcome = run_validation_callback(
         invocation.clone(),
-        &delete_dht_op_hash,
         &ribosome,
         workspace.clone(),
         network.clone(),
-        validation_dependencies.clone(),
+        dpki.clone(),
+        false,
     )
     .await
     .unwrap();
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![create_action.to_hash().into()]);
 
     // write action to be must got during validation to dht cache db
-    let dht_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
+    let dht_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
     test_space.space.cache_db.test_write(move |txn| {
         insert_op(txn, &dht_op_hashed).unwrap();
     });
 
     // the same validation should now successfully validate the op
-    let outcome = run_validation_callback(
-        invocation,
-        &delete_dht_op_hash,
-        &ribosome,
-        workspace,
-        network,
-        validation_dependencies.clone(),
-    )
-    .await
-    .unwrap();
+    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, dpki, false)
+        .await
+        .unwrap();
     assert_matches!(outcome, Outcome::Accepted);
 }
 
@@ -172,7 +160,7 @@ async fn validation_callback_awaiting_deps_hashes() {
         alice,
         bob,
         workspace,
-        ..
+        test_space,
     } = TestCase::new(zomes).await;
 
     // a create by alice
@@ -186,11 +174,6 @@ async fn validation_callback_awaiting_deps_hashes() {
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
-    let delete_dht_op = DhtOp::RegisterDeletedBy(
-        delete_action_signed_hashed.signature.clone(),
-        delete.clone(),
-    );
-    let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
     });
@@ -198,11 +181,12 @@ async fn validation_callback_awaiting_deps_hashes() {
 
     // mock network that returns the requested create action
     let mut network = MockHolochainP2pDnaT::new();
+    let action_to_return = create_action_signed_hashed.clone();
     network.expect_get().returning(move |hash, _| {
-        assert_eq!(hash, create_action_signed_hashed.as_hash().clone().into());
+        assert_eq!(hash, action_to_return.as_hash().clone().into());
         Ok(vec![WireOps::Record(WireRecordOps {
             action: Some(Judged::new(
-                create_action_signed_hashed.clone().into(),
+                action_to_return.clone().into(),
                 ValidationStatus::Valid,
             )),
             deletes: vec![],
@@ -212,36 +196,33 @@ async fn validation_callback_awaiting_deps_hashes() {
     });
 
     let network = Arc::new(network);
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let dpki = None;
 
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback(
         invocation.clone(),
-        &delete_dht_op_hash,
         &ribosome,
         workspace.clone(),
         network.clone(),
-        validation_dependencies.clone(),
+        dpki.clone(),
+        false,
     )
     .await
     .unwrap();
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![create_action.clone().to_hash().into()]);
 
     // await while missing record is being fetched in background task
-    tokio::time::sleep(Duration::from_millis(10)).await;
+    await_actions_in_cache(
+        &test_space.space.cache_db,
+        vec![create_action_signed_hashed.as_hash().clone()],
+    )
+    .await;
 
     // app validation outcome should be accepted, now that the missing record
     // has been fetched
-    let outcome = run_validation_callback(
-        invocation,
-        &delete_dht_op_hash,
-        &ribosome,
-        workspace,
-        network,
-        validation_dependencies.clone(),
-    )
-    .await
-    .unwrap();
+    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, dpki, false)
+        .await
+        .unwrap();
     assert_matches!(outcome, Outcome::Accepted)
 }
 
@@ -286,6 +267,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         ribosome,
         alice,
         workspace,
+        test_space,
         ..
     } = TestCase::new(zomes).await;
 
@@ -307,11 +289,6 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     let delete_action = Action::Delete(delete.clone());
     let delete_action_signed_hashed =
         SignedActionHashed::new_unchecked(delete_action.clone(), fixt!(Signature));
-    let delete_dht_op = DhtOp::RegisterDeletedBy(
-        delete_action_signed_hashed.signature.clone(),
-        delete.clone(),
-    );
-    let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: SignedHashed::new_unchecked(delete.clone(), fixt!(Signature)),
     });
@@ -327,6 +304,8 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     network.expect_must_get_agent_activity().returning({
         let times_same_hash_is_fetched = times_same_hash_is_fetched.clone();
         let expected_chain_top = expected_chain_top.clone();
+        let create_action_signed_hashed = create_action_signed_hashed.clone();
+        let delete_action_signed_hashed = delete_action_signed_hashed.clone();
         move |author, filter| {
             assert_eq!(author, alice);
             assert_eq!(&filter.chain_top, expected_chain_top.as_hash());
@@ -334,7 +313,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
             times_same_hash_is_fetched
                 .clone()
                 .fetch_add(1, Ordering::Relaxed);
-            Ok(vec![MustGetAgentActivityResponse::Activity(vec![
+            Ok(vec![MustGetAgentActivityResponse::activity(vec![
                 RegisterAgentActivity {
                     action: create_action_signed_hashed.clone(),
                     cached_entry: None,
@@ -348,45 +327,42 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     });
     let network = Arc::new(network);
 
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let dpki = None;
 
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback(
         invocation.clone(),
-        &delete_dht_op_hash,
         &ribosome,
         workspace.clone(),
         network.clone(),
-        validation_dependencies.clone(),
+        dpki.clone(),
+        false,
     )
     .await
     .unwrap();
     assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![expected_chain_top.hashed.author().clone().into()]);
 
     // await while bob's chain is being fetched in background task
-    tokio::time::sleep(Duration::from_millis(10)).await;
+    await_actions_in_cache(
+        &test_space.space.cache_db,
+        vec![
+            create_action_signed_hashed.as_hash().clone(),
+            delete_action_signed_hashed.as_hash().clone(),
+        ],
+    )
+    .await;
 
     // app validation outcome should be accepted, now that bob's missing agent
     // activity is available in alice's cache
-    let outcome = run_validation_callback(
-        invocation,
-        &delete_dht_op_hash,
-        &ribosome,
-        workspace,
-        network,
-        validation_dependencies.clone(),
-    )
-    .await
-    .unwrap();
+    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, dpki, false)
+        .await
+        .unwrap();
     assert_matches!(outcome, Outcome::Accepted);
 }
 
-// test that unresolved dependent hashes are not fetched multiple times
-// it cannot be tested for must_get_agent_activity calls, because in this small
-// test scenario every agent is an authority and are expected to hold data
-// they are an authority of
+// test that unresolved dependent hashes can be fetched multiple times
 #[tokio::test(flavor = "multi_thread")]
-async fn validation_callback_prevent_multiple_identical_hash_fetches() {
+async fn validation_callback_allow_multiple_identical_hash_fetches() {
     holochain_trace::test_run();
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
@@ -417,7 +393,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
         alice,
         bob,
         workspace,
-        ..
+        test_space,
     } = TestCase::new(zomes).await;
 
     // a create by alice
@@ -431,17 +407,12 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
     delete.author = bob.clone();
     delete.deletes_address = create_action.clone().to_hash();
     let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
-    let delete_dht_op = DhtOp::RegisterDeletedBy(
-        delete_action_signed_hashed.signature.clone(),
-        delete.clone(),
-    );
-    let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: delete_action_signed_hashed.clone(),
     });
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
-    let action_to_be_fetched = create_action_signed_hashed;
+    let action_to_be_fetched = create_action_signed_hashed.clone();
     let times_same_hash_is_fetched = Arc::new(AtomicI8::new(0));
 
     // mock network that returns the requested create action and increments
@@ -451,7 +422,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
         let times_same_hash_is_fetched = times_same_hash_is_fetched.clone();
         move |hash, _| {
             if hash == action_to_be_fetched.as_hash().clone().into() {
-                times_same_hash_is_fetched.fetch_add(1, Ordering::Relaxed);
+                times_same_hash_is_fetched.fetch_add(1, Ordering::SeqCst);
             };
             Ok(vec![WireOps::Record(WireRecordOps {
                 action: Some(Judged::new(
@@ -466,37 +437,32 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
     });
     let network = Arc::new(network);
 
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let dpki = None;
 
     // run two op validations that depend on the same record in parallel
-    let validate_1 = run_validation_callback(
+    let _validate_1 = run_validation_callback(
         invocation.clone(),
-        &delete_dht_op_hash,
         &ribosome,
         workspace.clone(),
         network.clone(),
-        validation_dependencies.clone(),
+        dpki.clone(),
+        false,
     );
-    let validate_2 = run_validation_callback(
-        invocation,
-        &delete_dht_op_hash,
-        &ribosome,
-        workspace,
-        network,
-        validation_dependencies.clone(),
-    );
-    futures::future::join_all([validate_1, validate_2]).await;
+    let _validate_2 =
+        run_validation_callback(invocation, &ribosome, workspace, network, dpki, false);
+    futures::future::join_all([_validate_1, _validate_2]).await;
 
-    // await while missing records are being fetched in background task
-    tokio::time::sleep(Duration::from_millis(10)).await;
+    await_actions_in_cache(
+        &test_space.space.cache_db,
+        vec![create_action_signed_hashed.as_hash().clone()],
+    )
+    .await;
 
-    assert_eq!(times_same_hash_is_fetched.load(Ordering::Relaxed), 1);
-    // after successfully fetching dependencies, the set should be empty
-    assert_eq!(validation_dependencies.lock().missing_hashes.len(), 0);
+    assert_eq!(times_same_hash_is_fetched.load(Ordering::SeqCst), 2);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn validation_callback_prevent_multiple_identical_agent_activity_fetches() {
+async fn validation_callback_allow_multiple_identical_agent_activity_fetches() {
     holochain_trace::test_run();
 
     let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
@@ -535,6 +501,7 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
         ribosome,
         alice,
         workspace,
+        test_space,
         ..
     } = TestCase::new(zomes).await;
 
@@ -556,11 +523,6 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     let delete_action = Action::Delete(delete.clone());
     let delete_action_signed_hashed =
         SignedActionHashed::new_unchecked(delete_action.clone(), fixt!(Signature));
-    let delete_dht_op = DhtOp::RegisterDeletedBy(
-        delete_action_signed_hashed.signature.clone(),
-        delete.clone(),
-    );
-    let delete_dht_op_hash = delete_dht_op.to_hash();
     let delete_action_op = Op::RegisterDelete(RegisterDelete {
         delete: SignedHashed::new_unchecked(delete.clone(), fixt!(Signature)),
     });
@@ -576,14 +538,16 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     network.expect_must_get_agent_activity().returning({
         let times_same_hash_is_fetched = times_same_hash_is_fetched.clone();
         let expected_chain_top = expected_chain_top.clone();
+        let create_action_signed_hashed = create_action_signed_hashed.clone();
+        let delete_action_signed_hashed = delete_action_signed_hashed.clone();
         move |author, filter| {
             assert_eq!(author, alice);
             assert_eq!(&filter.chain_top, expected_chain_top.as_hash());
 
             times_same_hash_is_fetched
                 .clone()
-                .fetch_add(1, Ordering::Relaxed);
-            Ok(vec![MustGetAgentActivityResponse::Activity(vec![
+                .fetch_add(1, Ordering::SeqCst);
+            Ok(vec![MustGetAgentActivityResponse::activity(vec![
                 RegisterAgentActivity {
                     action: create_action_signed_hashed.clone(),
                     cached_entry: None,
@@ -597,189 +561,32 @@ async fn validation_callback_prevent_multiple_identical_agent_activity_fetches()
     });
     let network = Arc::new(network);
 
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+    let dpki = None;
 
-    // run two op validations that depend on the same record in parallel
-    let validate_1 = run_validation_callback(
+    // run two op validations that depend on the same record
+    let _validate_1 = run_validation_callback(
         invocation.clone(),
-        &delete_dht_op_hash,
         &ribosome,
         workspace.clone(),
         network.clone(),
-        validation_dependencies.clone(),
+        dpki.clone(),
+        false,
     );
-    let validate_2 = run_validation_callback(
-        invocation,
-        &delete_dht_op_hash,
-        &ribosome,
-        workspace,
-        network,
-        validation_dependencies.clone(),
-    );
-    futures::future::join_all([validate_1, validate_2]).await;
+    let _validate_2 =
+        run_validation_callback(invocation, &ribosome, workspace, network, dpki, false);
+    futures::future::join_all([_validate_1, _validate_2]).await;
 
     // await while missing records are being fetched in background task
-    tokio::time::sleep(Duration::from_millis(20)).await;
-
-    assert_eq!(times_same_hash_is_fetched.load(Ordering::Relaxed), 1);
-    // after successfully fetching dependencies, the set should be empty
-    assert_eq!(validation_dependencies.lock().missing_hashes.len(), 0);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn hashes_missing_for_op_are_updated_before_and_after_fetching_deps() {
-    holochain_trace::test_run();
-
-    let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
-        move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
-                let result =
-                    api.must_get_action(MustGetActionInput(delete.hashed.deletes_address.clone()));
-                if result.is_ok() {
-                    Ok(ValidateCallbackResult::Valid)
-                } else {
-                    Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![delete
-                            .hashed
-                            .deletes_address
-                            .clone()
-                            .into()]),
-                    ))
-                }
-            } else {
-                unreachable!()
-            }
-        }
-    });
-
-    let TestCase {
-        zomes_to_invoke,
-        ribosome,
-        alice,
-        workspace,
-        bob,
-        ..
-    } = TestCase::new(zomes).await;
-
-    // a create by alice
-    let mut create = fixt!(Create);
-    create.author = alice.clone();
-    let create_action = Action::Create(create.clone());
-    let create_action_signed_hashed =
-        SignedHashed::new_unchecked(create_action.clone(), fixt!(Signature));
-    // a delete by bob that references alice's create
-    let mut delete = fixt!(Delete);
-    delete.author = bob.clone();
-    delete.deletes_address = create_action.clone().to_hash();
-    let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
-    let delete_dht_op = DhtOp::RegisterDeletedBy(
-        delete_action_signed_hashed.signature.clone(),
-        delete.clone(),
-    );
-    let delete_dht_op_hash = delete_dht_op.to_hash();
-    let delete_action_op = Op::RegisterDelete(RegisterDelete {
-        delete: delete_action_signed_hashed.clone(),
-    });
-
-    // mock network that returns the requested create action
-    let mut network = MockHolochainP2pDnaT::new();
-    network.expect_get().returning({
-        let create_action_signed_hashed = create_action_signed_hashed.clone();
-        move |hash, _| {
-            assert_eq!(hash, create_action_signed_hashed.as_hash().clone().into());
-            Ok(vec![WireOps::Record(WireRecordOps {
-                action: Some(Judged::new(
-                    create_action_signed_hashed.clone().into(),
-                    ValidationStatus::Valid,
-                )),
-                deletes: vec![],
-                updates: vec![],
-                entry: None,
-            })])
-        }
-    });
-    let network = Arc::new(network);
-
-    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
-    let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
-
-    // hashes missing for delete dht op should be empty
-    assert_eq!(
-        validation_dependencies
-            .lock()
-            .hashes_missing_for_op
-            .get(&delete_dht_op_hash),
-        None
-    );
-
-    // filtering out ops with missing dependencies should not filter anything
-    let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
-    let filtered_ops_to_validate = validation_dependencies
-        .lock()
-        .filter_ops_missing_dependencies(ops_to_validate.clone());
-    assert_eq!(filtered_ops_to_validate, ops_to_validate);
-
-    let _ = run_validation_callback(
-        invocation.clone(),
-        &delete_dht_op_hash,
-        &ribosome,
-        workspace.clone(),
-        network.clone(),
-        validation_dependencies.clone(),
+    await_actions_in_cache(
+        &test_space.space.cache_db,
+        vec![
+            create_action_signed_hashed.as_hash().clone(),
+            delete_action_signed_hashed.as_hash().clone(),
+        ],
     )
-    .await
-    .unwrap();
+    .await;
 
-    // hashes missing for delete dht op should contain the missing create hash
-    assert_eq!(
-        validation_dependencies
-            .lock()
-            .hashes_missing_for_op
-            .get(&delete_dht_op_hash)
-            .unwrap()
-            .clone()
-            .into_iter()
-            .collect::<Vec<AnyDhtHash>>(),
-        vec![create_action_signed_hashed.as_hash().clone().into()]
-    );
-
-    // filtering out ops with missing dependencies should filter out delete
-    let ops_to_validate = vec![delete_dht_op.clone().into_hashed()];
-    let filtered_ops_to_validate = validation_dependencies
-        .lock()
-        .filter_ops_missing_dependencies(ops_to_validate.clone());
-    assert_eq!(filtered_ops_to_validate, vec![]);
-
-    // await while missing record is being fetched in background task
-    tokio::time::sleep(Duration::from_millis(10)).await;
-
-    let _ = run_validation_callback(
-        invocation,
-        &delete_dht_op_hash,
-        &ribosome,
-        workspace,
-        network,
-        validation_dependencies.clone(),
-    )
-    .await
-    .unwrap();
-
-    // hashes missing for delete dht op should be empty again after create
-    // has been fetched
-    assert_eq!(
-        validation_dependencies
-            .lock()
-            .hashes_missing_for_op
-            .get(&delete_dht_op_hash),
-        None
-    );
-
-    // filtering out ops with missing dependencies should not filter anything
-    let ops_to_validate = vec![delete_dht_op.into_hashed()];
-    let filtered_ops_to_validate = validation_dependencies
-        .lock()
-        .filter_ops_missing_dependencies(ops_to_validate.clone());
-    assert_eq!(filtered_ops_to_validate, ops_to_validate);
+    assert_eq!(times_same_hash_is_fetched.load(Ordering::SeqCst), 2);
 }
 
 // test case with alice and bob agent keys
@@ -815,7 +622,7 @@ impl TestCase {
                 .into(),
             test_space.space.dht_db.clone().into(),
             test_space.space.dht_query_cache.clone(),
-            test_space.space.cache_db.clone().into(),
+            test_space.space.cache_db.clone(),
             fixt!(MetaLairClient),
             None,
             Arc::new(dna_file.dna_def().clone()),
@@ -830,5 +637,26 @@ impl TestCase {
             bob,
             workspace,
         }
+    }
+}
+
+// wait for provided actions to arrive in cache db
+async fn await_actions_in_cache(cache_db: &DbWrite<DbKindCache>, hashes: Vec<ActionHash>) {
+    let hashes = Arc::new(hashes.clone());
+    loop {
+        let hashes = hashes.clone();
+        let all_actions_in_cache = cache_db.test_read(move |txn| {
+            let mut stmt = txn.prepare("SELECT hash FROM Action").unwrap();
+            let rows = stmt.query([]).unwrap();
+            let action_hashes_in_cache: Vec<ActionHash> =
+                rows.map(|row| row.get(0)).collect().unwrap();
+            hashes
+                .iter()
+                .all(|hash| action_hashes_in_cache.contains(hash))
+        });
+        if all_actions_in_cache {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
     }
 }

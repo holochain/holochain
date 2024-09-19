@@ -1,5 +1,5 @@
 ---
-default_semver_increment_mode: !pre_minor beta-dev
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
@@ -8,6 +8,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 
 - Removed `network_type` from `KitsuneP2pConfig`
+
+## 0.4.0-dev.21
+
+## 0.4.0-dev.20
+
+## 0.4.0-dev.19
+
+## 0.4.0-dev.18
+
+## 0.4.0-dev.17
+
+- minor sbd rate limiting fix - tx5 webrtc buffer size fix - tx5 webrtc connection close fix - better tx5 connection tracing [\#4184](https://github.com/holochain/holochain/pull/4184)
+
+## 0.4.0-dev.16
+
+## 0.4.0-dev.15
+
+## 0.4.0-dev.14
+
+## 0.4.0-dev.13
+
+## 0.4.0-dev.12
+
+## 0.4.0-dev.11
+
+## 0.4.0-dev.10
+
+## 0.4.0-dev.9
+
+- Change the default `DbSyncStrategy` from `Fast` to `Resilient` which should reduce database corruptions. You can override this setting in your conductor config if you wish to go faster and are willing to rebuild your database if it gets corrupted. \#4010
+
+## 0.4.0-dev.8
+
+- **BREAKING** Bumped KITSUNE\_PROTOCOL\_VERSION. This *should* have been bumped with https://github.com/holochain/holochain/pull/3842, but better late than never. [\#3984](https://github.com/holochain/holochain/pull/3984)
+
+## 0.4.0-dev.7
+
+## 0.4.0-dev.6
+
+## 0.4.0-dev.5
+
+## 0.4.0-dev.4
+
+- Fix an issue with delegated publish where delegates were publishing to nodes near the target basis, rather than nodes covering the basis.
+
+## 0.4.0-dev.3
+
+## 0.4.0-dev.2
+
+## 0.4.0-dev.1
+
+## 0.4.0-dev.0
+
+## 0.3.0
+
+## 0.3.0-beta-dev.40
+
 - **BREAKING** - AgentInfo uses a quantized arc instead of an arc half-length to represent DHT coverage. This is a breaking protocol change, nodes on different versions will not be able to gossip with each other.
 
 ## 0.3.0-beta-dev.39

@@ -76,6 +76,38 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::ListWasmHostFunctions`]
     ListWasmHostFunctions,
+
+    /// Provide the membrane proofs for this app, if this app was installed
+    /// using `allow_deferred_memproofs` and memproofs were not provided at
+    /// installation time.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::Ok`]
+    ProvideMemproofs(MemproofMap),
+
+    /// Enable the app, only in special circumstances.
+    /// Can only be called while the app is in the `Disabled(NotStartedAfterProvidingMemproofs)` state.
+    /// Cannot be used to enable the app if it's in any other state, or Disabled for any other reason.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::Ok`]
+    EnableApp,
+    //
+    // TODO: implement after DPKI lands
+    // /// Replace the agent key associated with this app with a new one.
+    // /// The new key will be created using the same method which is used
+    // /// when installing an app with no agent key provided.
+    // ///
+    // /// This method is only available if this app was installed using `allow_deferred_memproofs`,
+    // /// and can only be called before [`AppRequest::ProvideMemproofs`] has been called.
+    // /// Until then, it can be called as many times as needed.
+    // ///
+    // /// # Returns
+    // ///
+    // /// [`AppResponse::AppAgentKeyRotated`]
+    // RotateAppAgentKey,
 }
 
 /// Represents the possible responses to an [`AppRequest`].
@@ -121,6 +153,12 @@ pub enum AppResponse {
 
     /// All the wasm host functions supported by this conductor.
     ListWasmHostFunctions(Vec<String>),
+
+    /// The app agent key as been rotated, and the new key is returned.
+    AppAgentKeyRotated(AgentPubKey),
+
+    /// Operation successful, no payload.
+    Ok,
 }
 
 /// The data provided over an app interface in order to make a zome call
@@ -209,7 +247,6 @@ impl ZomeCall {
     }
 }
 
-///
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CellInfo {
@@ -309,11 +346,13 @@ impl AppInfo {
             let mut cell_info_for_role: Vec<CellInfo> = Vec::new();
 
             // push the base cell to the vector of cell infos
-            if let Some(provisioned_cell) = role_assignment.provisioned_cell() {
-                if let Some(dna_def) = dna_definitions.get(provisioned_cell) {
+            if let Some(provisioned_dna_hash) = role_assignment.provisioned_dna_hash() {
+                let provisioned_cell_id =
+                    CellId::new(provisioned_dna_hash.clone(), agent_pub_key.clone());
+                if let Some(dna_def) = dna_definitions.get(&provisioned_cell_id) {
                     // TODO: populate `enabled` with cell state once it is implemented for a base cell
                     let cell_info = CellInfo::new_provisioned(
-                        provisioned_cell.clone(),
+                        provisioned_cell_id.clone(),
                         dna_def.modifiers.to_owned(),
                         dna_def.name.to_owned(),
                     );
@@ -330,7 +369,10 @@ impl AppInfo {
                         }
                     }
                 } else {
-                    tracing::error!("no DNA definition found for cell id {}", provisioned_cell);
+                    tracing::error!(
+                        "no DNA definition found for cell id {}",
+                        provisioned_cell_id
+                    );
                 }
             } else {
                 // no provisioned cell, thus there must be a deferred cell
@@ -340,10 +382,10 @@ impl AppInfo {
 
             // push enabled clone cells to the vector of cell infos
             if let Some(clone_cells) = app.clone_cells_for_role_name(role_name) {
-                clone_cells.iter().for_each(|(clone_id, cell_id)| {
-                    if let Some(dna_def) = dna_definitions.get(cell_id) {
+                clone_cells.for_each(|(clone_id, cell_id)| {
+                    if let Some(dna_def) = dna_definitions.get(&cell_id) {
                         let cell_info = CellInfo::new_cloned(
-                            cell_id.to_owned(),
+                            cell_id,
                             clone_id.to_owned(),
                             dna_def.hash.to_owned(),
                             dna_def.modifiers.to_owned(),
@@ -359,10 +401,10 @@ impl AppInfo {
 
             // push disabled clone cells to the vector of cell infos
             if let Some(clone_cells) = app.disabled_clone_cells_for_role_name(role_name) {
-                clone_cells.iter().for_each(|(clone_id, cell_id)| {
-                    if let Some(dna_def) = dna_definitions.get(cell_id) {
+                clone_cells.for_each(|(clone_id, cell_id)| {
+                    if let Some(dna_def) = dna_definitions.get(&cell_id) {
                         let cell_info = CellInfo::new_cloned(
-                            cell_id.to_owned(),
+                            cell_id,
                             clone_id.to_owned(),
                             dna_def.hash.to_owned(),
                             dna_def.modifiers.to_owned(),
@@ -389,6 +431,13 @@ impl AppInfo {
     }
 }
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+/// The parameters to revoke an agent for an app.
+pub struct RevokeAgentKeyPayload {
+    pub agent_key: AgentPubKey,
+    pub app_id: InstalledAppId,
+}
+
 /// A flat, slightly more API-friendly representation of [`AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]
@@ -396,6 +445,7 @@ pub enum AppInfoStatus {
     Paused { reason: PausedAppReason },
     Disabled { reason: DisabledAppReason },
     Running,
+    AwaitingMemproofs,
 }
 
 impl From<AppStatus> for AppInfoStatus {
@@ -404,6 +454,7 @@ impl From<AppStatus> for AppInfoStatus {
             AppStatus::Running => AppInfoStatus::Running,
             AppStatus::Disabled(reason) => AppInfoStatus::Disabled { reason },
             AppStatus::Paused(reason) => AppInfoStatus::Paused { reason },
+            AppStatus::AwaitingMemproofs => AppInfoStatus::AwaitingMemproofs,
         }
     }
 }
@@ -414,6 +465,7 @@ impl From<AppInfoStatus> for AppStatus {
             AppInfoStatus::Running => AppStatus::Running,
             AppInfoStatus::Disabled { reason } => AppStatus::Disabled(reason),
             AppInfoStatus::Paused { reason } => AppStatus::Paused(reason),
+            AppInfoStatus::AwaitingMemproofs => AppStatus::AwaitingMemproofs,
         }
     }
 }
@@ -433,10 +485,10 @@ pub enum ScottyPanel {
     GossipInfo { last_round: Option<Timestamp> },
 }
 
-/// The request payload that should be sent in a [WireMessage::Authenticate](holochain_websocket::WireMessage::Authenticate) message.
+/// The request payload that should be sent in a [`holochain_websocket::WireMessage::Authenticate`]
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppAuthenticationRequest {
-    /// The authentication token that was provided by the conductor when [AdminRequest::IssueAppInterfaceToken] was called.
+    /// The authentication token that was provided by the conductor when [`AdminRequest::IssueAppInterfaceToken`] was called.
     pub token: AppAuthenticationToken,
 }
 
@@ -455,10 +507,10 @@ mod tests {
         let serialized_request = holochain_serialized_bytes::encode(&request).unwrap();
         assert_eq!(
             serialized_request,
-            vec![129, 164, 116, 121, 112, 101, 129, 168, 97, 112, 112, 95, 105, 110, 102, 111, 192]
+            vec![129, 164, 116, 121, 112, 101, 168, 97, 112, 112, 95, 105, 110, 102, 111]
         );
 
-        let json_expected = r#"{"type":{"app_info":null}}"#;
+        let json_expected = r#"{"type":"app_info"}"#;
         let mut deserializer = Deserializer::new(&*serialized_request);
         let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
         let json_actual = serde_json::to_string(&json_value).unwrap();
@@ -474,15 +526,15 @@ mod tests {
         assert_eq!(
             serialized_response,
             vec![
-                130, 164, 116, 121, 112, 101, 129, 184, 108, 105, 115, 116, 95, 119, 97, 115, 109,
-                95, 104, 111, 115, 116, 95, 102, 117, 110, 99, 116, 105, 111, 110, 115, 192, 164,
-                100, 97, 116, 97, 146, 169, 104, 111, 115, 116, 95, 102, 110, 95, 49, 169, 104,
-                111, 115, 116, 95, 102, 110, 95, 50
+                130, 164, 116, 121, 112, 101, 184, 108, 105, 115, 116, 95, 119, 97, 115, 109, 95,
+                104, 111, 115, 116, 95, 102, 117, 110, 99, 116, 105, 111, 110, 115, 164, 100, 97,
+                116, 97, 146, 169, 104, 111, 115, 116, 95, 102, 110, 95, 49, 169, 104, 111, 115,
+                116, 95, 102, 110, 95, 50
             ]
         );
 
         let json_expected =
-            r#"{"type":{"list_wasm_host_functions":null},"data":["host_fn_1","host_fn_2"]}"#;
+            r#"{"type":"list_wasm_host_functions","data":["host_fn_1","host_fn_2"]}"#;
         let mut deserializer = Deserializer::new(&*serialized_response);
         let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
         let json_actual = serde_json::to_string(&json_value).unwrap();

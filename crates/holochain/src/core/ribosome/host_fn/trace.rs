@@ -3,7 +3,6 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use once_cell::unsync::Lazy;
 use std::sync::Arc;
-use tracing::*;
 use wasmer::RuntimeError;
 
 #[cfg(test)]
@@ -17,7 +16,7 @@ static CAPTURE: AtomicBool = AtomicBool::new(false);
 static CAPTURED: SyncLazy<Arc<std::sync::Mutex<Vec<TraceMsg>>>> =
     SyncLazy::new(|| Arc::new(std::sync::Mutex::new(Vec::new())));
 
-#[instrument(skip(input))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(input)))]
 pub fn wasm_trace(input: TraceMsg) {
     match input.level {
         holochain_types::prelude::Level::TRACE => tracing::trace!("{}", input.msg),
@@ -76,9 +75,7 @@ pub mod wasm_test {
             msg: "ribosome trace works".to_string(),
         };
 
-        let output: () = trace(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
-
-        assert_eq!((), output);
+        let _: () = trace(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]

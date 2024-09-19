@@ -3,7 +3,7 @@
 // use holochain_types::prelude::write_fake_dna_file;
 // use holochain_wasm_test_utils::TestWasm;
 
-#[path = "../tests/test_utils/mod.rs"]
+#[path = "../tests/tests/test_utils/mod.rs"]
 mod test_utils;
 
 // use test_utils::*;

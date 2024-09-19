@@ -45,7 +45,7 @@ pub async fn spawn_kitsune_p2p(
 
     // Create the network. Any events it sends will have to wait to be processed until Kitsune has finished initialising
     // but everything that is needed to construct the network is available now.
-    let (ep_hnd, ep_evt, bootstrap_net) = create_meta_net(
+    let (ep_hnd, ep_evt, bootstrap_net, maybe_peer_url) = create_meta_net(
         &config,
         tls_config,
         internal_sender.clone(),
@@ -65,6 +65,7 @@ pub async fn spawn_kitsune_p2p(
                 ep_hnd,
                 ep_evt,
                 bootstrap_net,
+                maybe_peer_url,
             )
             .await?,
         ),

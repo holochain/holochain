@@ -28,10 +28,11 @@ static SIGNALS_SENT: AtomicUsize = AtomicUsize::new(0);
 async fn main() {
     let (app, signal_rxs) = App::setup().await;
 
-    let mut handles = vec![];
-    handles.push(task_signal_handler(app.clone(), signal_rxs));
-    handles.push(task_signal_sender(app.clone()));
-    handles.push(task_commit(app.clone()));
+    let handles = vec![
+        task_signal_handler(app.clone(), signal_rxs),
+        task_signal_sender(app.clone()),
+        task_commit(app.clone()),
+    ];
 
     futures::future::join_all(handles).await;
 }
@@ -60,7 +61,7 @@ impl App {
         let signal_rxs = conductors
             .iter_mut()
             .map(|c| c.subscribe_to_app_signals("basic".to_string()))
-            .map(|rx| tokio_stream::wrappers::BroadcastStream::new(rx))
+            .map(tokio_stream::wrappers::BroadcastStream::new)
             .collect::<Vec<_>>();
         let nodes = std::iter::zip(conductors.into_iter().map(Arc::new), zomes.into_iter())
             .map(|(conductor, zome)| Node { conductor, zome })

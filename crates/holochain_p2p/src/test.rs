@@ -129,7 +129,7 @@ impl HolochainP2pHandler for StubNetwork {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse<ActionHash>>> {
+    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse>> {
         Err("stub".into())
     }
 
@@ -312,7 +312,7 @@ mod tests {
 
         let zome_name: ZomeName = "".into();
         let fn_name: FunctionName = "".into();
-        let nonce = Nonce256Bits::try_from([0; 32]).unwrap();
+        let nonce = Nonce256Bits::from([0; 32]);
         let cap_secret = None;
         let payload = ExternIO::encode(b"yippo").unwrap();
         let expires_at = (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap();
@@ -535,13 +535,19 @@ mod tests {
         .unwrap();
 
         let test_1 = WireOps::Record(WireRecordOps {
-            action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
+            action: Some(Judged::valid(SignedAction::new(
+                fixt!(Action),
+                fixt!(Signature),
+            ))),
             deletes: vec![],
             updates: vec![],
             entry: None,
         });
         let test_2 = WireOps::Record(WireRecordOps {
-            action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
+            action: Some(Judged::valid(SignedAction::new(
+                fixt!(Action),
+                fixt!(Signature),
+            ))),
             deletes: vec![],
             updates: vec![],
             entry: None,

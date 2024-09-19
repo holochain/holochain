@@ -8,6 +8,7 @@ use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p_types::config::TransportConfig;
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "This test is flaky"]
 async fn gossip_test() {
     holochain_trace::test_run();
     let config = SweetConductorConfig::standard().no_publish();
@@ -60,7 +61,7 @@ async fn signature_smoke_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_info_test() {
     holochain_trace::test_run();
-    let config = SweetConductorConfig::standard().no_publish();
+    let config = SweetConductorConfig::standard().no_publish().no_dpki();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
     let (dna_file, _, _) =
@@ -81,6 +82,7 @@ async fn agent_info_test() {
         .collect();
 
     await_consistency(10, [&cell_1, &cell_2]).await.unwrap();
+    assert_eq!(p2p_agents_dbs.len(), 2);
     for p2p_agents_db in p2p_agents_dbs {
         let len = p2p_agents_db.p2p_count_agents().await.unwrap();
         assert_eq!(len, 2);

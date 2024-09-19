@@ -9,9 +9,10 @@ on:
         default: "false"
         type: choice
         options:
-          - "0_1"
           - "0_2"
           - "0_2_rc"
+          - "0_3"
+          - "0_3_rc"
           - "weekly"
 
 concurrency:
@@ -34,9 +35,9 @@ jobs:
       - name: Run the update script
         run: |
           ./scripts/update-holonix-version.sh ${{ github.event.inputs.version }}
-          
+
           echo "Completed source update. Now updating the flake locks"
-          
+
           nix run .#scripts-repo-flake-update ${{ github.event.inputs.version }}
       - name: Create Pull Request
         id: cpr

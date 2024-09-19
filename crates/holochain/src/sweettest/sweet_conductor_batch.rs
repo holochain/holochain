@@ -1,9 +1,10 @@
-use super::{DnaWithRole, SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
+use super::{SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::api::error::ConductorApiResult;
-use crate::sweettest::SweetLocalRendezvous;
+use crate::sweettest::*;
 use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
+use holochain_types::prelude::*;
 use std::path::PathBuf;
 
 /// A collection of SweetConductors, with methods for operating on the entire collection
@@ -36,26 +37,54 @@ impl SweetConductorBatch {
         C: Into<SweetConductorConfig>,
         I: IntoIterator<Item = C>,
     {
-        Self::new(
+        let conductors = Self::new(
             future::join_all(configs.into_iter().map(|c| SweetConductor::from_config(c))).await,
-        )
+        );
+
+        let dpki_cells = conductors.dpki_cells();
+        if !dpki_cells.is_empty() {
+            conductors.exchange_peer_info().await;
+            await_consistency(10, dpki_cells.as_slice()).await.unwrap();
+        }
+
+        conductors
     }
 
-    /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
+    /// Create SweetConductors from the given ConductorConfigs, each with its own new TestEnvironments,
+    /// using a "rendezvous" bootstrap server for peer discovery.
+    ///
+    /// Also await consistency for DPKI cells, if DPKI is enabled.
     pub async fn from_configs_rendezvous<C, I>(configs: I) -> SweetConductorBatch
     where
         C: Into<SweetConductorConfig>,
         I: IntoIterator<Item = C>,
     {
         let rendezvous = SweetLocalRendezvous::new().await;
-        Self::new(
+        let conductors = Self::new(
             future::join_all(
                 configs
                     .into_iter()
                     .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
             )
             .await,
-        )
+        );
+
+        let not_full_bootstrap = conductors
+            .iter()
+            .any(|c| !c.get_config().has_rendezvous_bootstrap());
+
+        let dpki_cells = conductors.dpki_cells();
+        if !dpki_cells.is_empty() {
+            // Typically we expect either all nodes are using a rendezvous bootstrap, or none are.
+            // To cover all cases, we say if any are not using bootstrap, we'll exchange peer info
+            // for everyone, even though this may be incorrect.
+            if not_full_bootstrap {
+                conductors.exchange_peer_info().await;
+            }
+            await_consistency(15, dpki_cells.as_slice()).await.unwrap();
+        }
+
+        conductors
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
@@ -67,21 +96,15 @@ impl SweetConductorBatch {
         Self::from_configs(std::iter::repeat(config).take(num)).await
     }
 
-    /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
+    /// Create a number of SweetConductors from the given ConductorConfig, each with its own new TestEnvironments.
+    /// using a "rendezvous" bootstrap server for peer discovery.
+    ///
+    /// Also await consistency for DPKI cells, if DPKI is enabled.
     pub async fn from_config_rendezvous<C>(num: usize, config: C) -> SweetConductorBatch
     where
         C: Into<SweetConductorConfig> + Clone,
     {
-        let rendezvous = crate::sweettest::SweetLocalRendezvous::new().await;
-        let config = config.into();
-        Self::new(
-            future::join_all(
-                std::iter::repeat(config)
-                    .take(num)
-                    .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
-            )
-            .await,
-        )
+        Self::from_configs_rendezvous(std::iter::repeat(config).take(num)).await
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
@@ -90,6 +113,11 @@ impl SweetConductorBatch {
             std::iter::repeat_with(|| SweetConductorConfig::rendezvous(false)).take(num),
         )
         .await
+    }
+
+    /// Create the given number of new SweetConductors, each with its own new TestEnvironments
+    pub async fn from_standard_config_rendezvous(num: usize) -> SweetConductorBatch {
+        Self::from_config_rendezvous(num, SweetConductorConfig::rendezvous(true)).await
     }
 
     /// Iterate over the SweetConductors
@@ -135,22 +163,18 @@ impl SweetConductorBatch {
     /// Opinionated app setup.
     /// Creates one app on each Conductor in this batch, creating a new AgentPubKey for each.
     /// The created AgentPubKeys can be retrieved via each SweetApp.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn setup_app<'a>(
         &mut self,
         installed_app_id: &str,
-        dna_files: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
+        dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetAppBatch> {
         let apps = self
             .0
             .iter_mut()
             .map(|conductor| {
-                let dna_files = dna_files.clone();
-                async move {
-                    let agent = SweetAgents::one(conductor.keystore()).await;
-                    conductor
-                        .setup_app_for_agent(installed_app_id, agent, dna_files)
-                        .await
-                }
+                let dnas_with_roles = dnas_with_roles.clone();
+                async move { conductor.setup_app(installed_app_id, dnas_with_roles).await }
             })
             .collect::<Vec<_>>();
 
@@ -234,6 +258,11 @@ impl SweetConductorBatch {
         }
 
         crate::conductor::p2p_agent_store::reveal_peer_info(observer_envs, seen_envs).await;
+    }
+
+    /// Get the DPKI cell for each conductor, if applicable
+    pub fn dpki_cells(&self) -> Vec<SweetCell> {
+        self.0.iter().filter_map(|c| c.dpki_cell()).collect()
     }
 
     /// Force trigger all dht ops that haven't received

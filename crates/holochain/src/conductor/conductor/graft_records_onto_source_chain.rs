@@ -3,7 +3,7 @@ use holochain_types::prelude::ChainItem;
 
 use super::*;
 
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub(crate) async fn graft_records_onto_source_chain(
     conductor: ConductorHandle,
     cell_id: CellId,
@@ -155,7 +155,7 @@ async fn validate_records(
     let sc = workspace.source_chain();
 
     // Validate the chain.
-    crate::core::validate_chain(records.iter().map(|e| e.signed_action()), chain_top)
+    validate_chain(records.iter().map(|e| e.signed_action()), chain_top)
         .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
 
     // Add the records to the source chain so we can validate them.

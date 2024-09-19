@@ -5,6 +5,7 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
+use holochain_conductor_services::DpkiImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
@@ -27,6 +28,7 @@ impl InitInvocation {
 pub struct InitHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
+    pub dpki: Option<DpkiImpl>,
     pub network: HolochainP2pDna,
     pub signal_tx: broadcast::Sender<Signal>,
     pub call_zome_handle: CellConductorReadHandle,
@@ -170,10 +172,9 @@ mod test {
             let number_of_extras = rng.gen_range(0..5);
             for _ in 0..number_of_extras {
                 let maybe_extra = results.choose(&mut rng).cloned();
-                match maybe_extra {
-                    Some(extra) => results.push(extra),
-                    _ => {}
-                };
+                if let Some(extra) = maybe_extra {
+                    results.push(extra);
+                }
             }
 
             assert_eq!(expected, results.into(),);
@@ -252,7 +253,10 @@ mod slow_tests {
         init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
-        let result = ribosome.run_init(host_access, init_invocation).unwrap();
+        let result = ribosome
+            .run_init(host_access, init_invocation)
+            .await
+            .unwrap();
         assert_eq!(result, InitResult::Pass,);
     }
 
@@ -265,7 +269,10 @@ mod slow_tests {
         init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
-        let result = ribosome.run_init(host_access, init_invocation).unwrap();
+        let result = ribosome
+            .run_init(host_access, init_invocation)
+            .await
+            .unwrap();
         assert_eq!(result, InitResult::Pass,);
     }
 
@@ -278,7 +285,10 @@ mod slow_tests {
         init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
-        let result = ribosome.run_init(host_access, init_invocation).unwrap();
+        let result = ribosome
+            .run_init(host_access, init_invocation)
+            .await
+            .unwrap();
         assert_eq!(
             result,
             InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),
@@ -295,7 +305,10 @@ mod slow_tests {
         init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
-        let result = ribosome.run_init(host_access, init_invocation).unwrap();
+        let result = ribosome
+            .run_init(host_access, init_invocation)
+            .await
+            .unwrap();
         assert_eq!(
             result,
             InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),
@@ -355,11 +368,7 @@ mod slow_tests {
         let mut had_successful_zome_call = false;
         for _ in 0..30 {
             let create_post_result: ConductorApiResult<ActionHash> = conductor
-                .call_fallible(
-                    &zome,
-                    "create_post",
-                    Post(format!("clone message").to_string()),
-                )
+                .call_fallible(&zome, "create_post", Post("clone message".to_string()))
                 .await;
 
             match create_post_result {

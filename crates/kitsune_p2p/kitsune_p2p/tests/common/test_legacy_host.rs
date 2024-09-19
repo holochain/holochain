@@ -4,7 +4,9 @@ use kitsune_p2p::event::{
     full_time_window, FetchOpDataEvt, FetchOpDataEvtQuery, KitsuneP2pEvent, PutAgentInfoSignedEvt,
     QueryAgentsEvt, QueryOpHashesEvt, SignNetworkDataEvt,
 };
-use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneOpData, KitsuneSignature, KitsuneSpace};
+use kitsune_p2p_bin_data::{
+    KitsuneAgent, KitsuneBinType, KitsuneOpData, KitsuneSignature, KitsuneSpace,
+};
 use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::bootstrap::AgentInfoPut;
@@ -23,7 +25,7 @@ use std::{
     },
 };
 
-use super::TestHostOp;
+use super::{dht_location, TestHostOp};
 
 pub struct TestLegacyHost {
     handle: Option<tokio::task::JoinHandle<()>>,
@@ -131,6 +133,7 @@ impl TestLegacyHost {
 
                                     out
                                         .into_iter()
+                                        .filter(|(dist, _)| *dist != u32::MAX) // Filter out Zero arcs
                                         .take(limit as usize)
                                         .map(|(_, v)| v.clone())
                                         .collect()
@@ -242,7 +245,7 @@ impl TestLegacyHost {
                             respond.respond(Ok(async move { Ok(()) }.boxed().into()))
                         }
                         KitsuneP2pEvent::QueryOpHashes { respond, input, .. } => {
-                            tracing::info!("QueryOpHashes: {:?}", input);
+                            tracing::debug!("QueryOpHashes: {:?}", input);
                             let op_store = op_store.read();
                             let selected_ops: Vec<TestHostOp> = op_store
                                 .iter()
@@ -265,8 +268,15 @@ impl TestLegacyHost {
                                         for interval in intervals {
                                             match interval {
                                                 DhtArcRange::Bounded(lower, upper) => {
-                                                    if lower < op.location()
-                                                        && op.location() < upper
+                                                    if lower <= upper {
+                                                        if lower <= op.location()
+                                                            && op.location() <= upper
+                                                        {
+                                                            in_any = true;
+                                                            break;
+                                                        }
+                                                    } else if lower < op.location()
+                                                        || op.location() < upper
                                                     {
                                                         in_any = true;
                                                         break;
@@ -333,7 +343,7 @@ impl TestLegacyHost {
                         }
                         KitsuneP2pEvent::SignNetworkData { respond, input, .. } => {
                             let mut key = [0; 32];
-                            key.copy_from_slice(input.agent.0.as_slice());
+                            key.copy_from_slice(&input.agent.0[0..32]);
                             let sig = keystore
                                 .sign_by_pub_key(
                                     key.into(),
@@ -378,7 +388,10 @@ impl TestLegacyHost {
             .new_seed(tag.into(), None, false)
             .await
             .unwrap();
-        Arc::new(KitsuneAgent(info.ed25519_pub_key.0.to_vec()))
+        let mut pub_key_bytes = info.ed25519_pub_key.0.to_vec();
+        let loc = dht_location(&pub_key_bytes[0..32].try_into().unwrap());
+        pub_key_bytes.extend(&loc);
+        Arc::new(KitsuneAgent::new(pub_key_bytes))
     }
 }
 

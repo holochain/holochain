@@ -46,7 +46,7 @@ impl WireRecordOps {
         let mut ops = Vec::with_capacity(1 + deletes.len() + updates.len());
         if let Some(action) = action {
             let status = action.validation_status();
-            let SignedAction(action, signature) = action.data;
+            let (action, signature) = action.data.into();
             // TODO: If they only need the metadata because they already have
             // the content we could just send the entry hash instead of the
             // SignedAction.
@@ -55,7 +55,7 @@ impl WireRecordOps {
                 action,
                 signature,
                 status,
-                DhtOpType::StoreRecord,
+                ChainOpType::StoreRecord,
             )?);
             if let Some(entry_hash) = entry_hash {
                 for op in deletes {
@@ -68,19 +68,18 @@ impl WireRecordOps {
                         action,
                         signature,
                         status,
-                        DhtOpType::RegisterDeletedBy,
+                        ChainOpType::RegisterDeletedBy,
                     )?);
                 }
                 for op in updates {
                     let status = op.validation_status();
-                    let SignedAction(action, signature) =
-                        op.data.into_signed_action(entry_hash.clone());
+                    let (action, signature) = op.data.into_signed_action(entry_hash.clone()).into();
 
                     ops.push(RenderedOp::new(
                         action,
                         signature,
                         status,
-                        DhtOpType::RegisterUpdatedRecord,
+                        ChainOpType::RegisterUpdatedRecord,
                     )?);
                 }
             }
@@ -88,6 +87,7 @@ impl WireRecordOps {
         Ok(RenderedOps {
             entry: entry.map(EntryHashed::from_content_sync),
             ops,
+            warrant: None,
         })
     }
 }
@@ -322,25 +322,6 @@ impl RawGetEntryResponse {
 
 /// Extension trait to keep zome types minimal
 #[async_trait::async_trait]
-pub trait RecordExt {
-    /// Validate the signature matches the data
-    async fn validate(&self) -> Result<(), KeystoreError>;
-}
-
-#[async_trait::async_trait]
-impl RecordExt for Record {
-    /// Validates a chain record
-    async fn validate(&self) -> Result<(), KeystoreError> {
-        self.signed_action().validate().await?;
-
-        //TODO: make sure that any cases around entry existence are valid:
-        //      SourceChainError::InvalidStructure(ActionAndEntryMismatch(address)),
-        Ok(())
-    }
-}
-
-/// Extension trait to keep zome types minimal
-#[async_trait::async_trait]
 pub trait SignedActionHashedExt {
     /// Create a hash from data
     fn from_content_sync(signed_action: SignedAction) -> SignedActionHashed;
@@ -351,7 +332,7 @@ pub trait SignedActionHashedExt {
         action: ActionHashed,
     ) -> LairResult<SignedActionHashed>;
     /// Validate the data
-    async fn validate(&self) -> Result<(), KeystoreError>;
+    async fn verify_signature(&self) -> Result<(), KeystoreError>;
 }
 
 #[allow(missing_docs)]
@@ -367,17 +348,17 @@ impl SignedActionHashedExt for SignedActionHashed {
     /// Construct by signing the Action (NOT including the hash)
     async fn sign(keystore: &MetaLairClient, action_hashed: ActionHashed) -> LairResult<Self> {
         let signature = action_hashed
-            .author()
+            .signer()
             .sign(keystore, action_hashed.as_content())
             .await?;
         Ok(Self::with_presigned(action_hashed, signature))
     }
 
-    /// Validates a signed action
-    async fn validate(&self) -> Result<(), KeystoreError> {
+    /// Verify that the signature matches the signed action
+    async fn verify_signature(&self) -> Result<(), KeystoreError> {
         if !self
             .action()
-            .author()
+            .signer()
             .verify_signature(self.signature(), self.action())
             .await?
         {
@@ -460,12 +441,10 @@ mod tests {
     async fn test_signed_action_roundtrip() {
         let signature = SignatureFixturator::new(Unpredictable).next().unwrap();
         let action = ActionFixturator::new(Unpredictable).next().unwrap();
-        let signed_action = SignedAction(action, signature);
+        let signed_action = SignedAction::new(action, signature);
         let hashed: HoloHashed<SignedAction> = HoloHashed::from_content_sync(signed_action);
-        let HoloHashed {
-            content: SignedAction(action, signature),
-            hash,
-        } = hashed.clone();
+        let HoloHashed { content, hash } = hashed.clone();
+        let (action, signature) = content.into();
         let shh = SignedActionHashed {
             hashed: ActionHashed::with_pre_hashed(action, hash),
             signature,
@@ -474,7 +453,7 @@ mod tests {
         assert_eq!(shh.action_address(), hashed.as_hash());
 
         let round = HoloHashed {
-            content: SignedAction(shh.action().clone(), shh.signature().clone()),
+            content: SignedAction::new(shh.action().clone(), shh.signature().clone()),
             hash: shh.action_address().clone(),
         };
 

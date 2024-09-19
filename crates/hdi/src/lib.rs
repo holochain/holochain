@@ -25,7 +25,7 @@
 //! - entry type definitions
 //! - link type definitions
 //! - a validation callback that constrains the kinds of data that can validly be called entries
-//! and links of those types (see also [`Op`](crate::prelude::holochain_integrity_types::Op)).
+//!   and links of those types (see also [`Op`](crate::prelude::holochain_integrity_types::Op)).
 //!
 //! **The coordination zomes comprise the application's controller layer** — the code that actually
 //! writes and retrieves data, handles countersigning sessions and sends and receives messages
@@ -34,14 +34,14 @@
 //!
 //! Advantages of this approach are:
 //! * The DNA hash is constant as long as the integrity zomes remain the same. The peer network of
-//! a DNA is tied to its hash. Changes to the DNA hash result in a new peer network. Changes to the
-//! domain logic enclosed in coordinator zomes, however, do not affect the DNA hash. Hence the DNAs
-//! and therefore hApps can be modified without creating a new peer network on every
-//! deployment.
+//!   a DNA is tied to its hash. Changes to the DNA hash result in a new peer network. Changes to the
+//!   domain logic enclosed in coordinator zomes, however, do not affect the DNA hash. Hence the DNAs
+//!   and therefore hApps can be modified without creating a new peer network on every
+//!   deployment.
 //! * Integrity zomes can be shared among DNAs. Any coordinator zome can import an integrity
-//! zome's data types and implement functions for data manipulation. This composability of
-//! integrity and coordinator zomes allows for a multitude of permutations with shared integrity
-//! zomes, i. e. a shared data model.
+//!   zome's data types and implement functions for data manipulation. This composability of
+//!   integrity and coordinator zomes allows for a multitude of permutations with shared integrity
+//!   zomes, i. e. a shared data model.
 //!
 //! # Data validation
 //!
@@ -326,6 +326,8 @@ pub mod trace;
 /// The `mockall` crate (in prelude with `mock` feature) can be used to generate compatible mocks for unit testing.
 /// See mocking examples in the test WASMs crate, such as `agent_info`.
 pub mod hdi;
+
+pub mod agent;
 
 pub mod link;
 

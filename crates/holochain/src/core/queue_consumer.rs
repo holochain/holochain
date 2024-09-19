@@ -136,7 +136,7 @@ pub async fn spawn_queue_consumer_tasks(
         spawn_app_validation_consumer(
             dna_hash.clone(),
             AppValidationWorkspace::new(
-                authored_db.clone().into(),
+                authored_db.clone(),
                 dht_db.clone(),
                 space.dht_query_cache.clone(),
                 cache.clone(),
@@ -145,6 +145,7 @@ pub async fn spawn_queue_consumer_tasks(
             ),
             conductor.clone(),
             tx_integration.clone(),
+            tx_publish.clone(),
             network.clone(),
             dht_query_cache.clone(),
         )
@@ -159,11 +160,12 @@ pub async fn spawn_queue_consumer_tasks(
     let tx_sys = queue_consumer_map.spawn_once_sys_validation(dna_hash.clone(), || {
         spawn_sys_validation_consumer(
             SysValidationWorkspace::new(
-                authored_db.clone().into(),
+                authored_db.clone(),
                 dht_db.clone(),
                 dht_query_cache.clone(),
                 cache.clone(),
                 Arc::new(dna_def),
+                conductor.running_services().dpki.clone(),
                 conductor
                     .get_config()
                     .conductor_tuning_params()
@@ -172,7 +174,9 @@ pub async fn spawn_queue_consumer_tasks(
             space.clone(),
             conductor.clone(),
             tx_app.clone(),
+            tx_publish.clone(),
             network.clone(),
+            conductor.keystore().clone(),
         )
     });
 

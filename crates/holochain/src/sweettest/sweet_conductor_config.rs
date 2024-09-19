@@ -8,6 +8,8 @@ use holochain_conductor_api::{
 use holochain_types::websocket::AllowedOrigins;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
+use super::SweetConductor;
+
 pub(crate) static NUM_CREATED: AtomicUsize = AtomicUsize::new(0);
 
 /// Wrapper around ConductorConfig with some helpful builder methods
@@ -55,7 +57,7 @@ impl SweetConductorConfig {
 
         {
             for t in network.transport_pool.iter_mut() {
-                if let kitsune_p2p_types::config::TransportConfig::WebRTC { signal_url } = t {
+                if let kitsune_p2p_types::config::TransportConfig::WebRTC { signal_url, .. } = t {
                     if signal_url == "rendezvous:" {
                         *signal_url = rendezvous.sig_addr().to_string();
                     }
@@ -68,28 +70,64 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        Self::rendezvous(false)
+        let mut c = SweetConductorConfig::from(KitsuneP2pConfig::default())
+            .tune(|tune| {
+                tune.gossip_loop_iteration_delay_ms = 500;
+                tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
+                tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;
+                tune.gossip_round_timeout_ms = 10_000;
+            })
+            .tune_conductor(|tune| {
+                tune.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
+            });
+
+        // Allow device seed generation to exercise key derivation in sweettests.
+        c.device_seed_lair_tag = Some("sweet-conductor-device-seed".to_string());
+        c.danger_generate_throwaway_device_seed = true;
+        c
+    }
+
+    /// Disable DPKI, which is on by default.
+    /// You would want to disable DPKI in situations where you're testing unusual situations
+    /// such as tests which disable networking, tests which use pregenerated agent keys,
+    /// or any situation where it's known that DPKI is irrelevant.
+    pub fn no_dpki(mut self) -> Self {
+        self.dpki = holochain_conductor_api::conductor::DpkiConfig::disabled();
+        self
+    }
+
+    /// Disable DPKI in a situation where we would like to run DPKI in a test, but the test
+    /// only passes if it's disabled and we can't figure out why.
+    #[cfg(feature = "test_utils")]
+    pub fn no_dpki_mustfix(mut self) -> Self {
+        tracing::warn!("Disabling DPKI for a test which should pass with DPKI enabled. TODO: fix");
+        self.dpki = holochain_conductor_api::conductor::DpkiConfig::disabled();
+        self
     }
 
     /// Rendezvous config for SweetConductors
     pub fn rendezvous(bootstrap: bool) -> Self {
-        let mut tuning =
-            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-        tuning.gossip_strategy = "sharded-gossip".to_string();
+        let mut config = Self::standard();
 
-        let mut network = KitsuneP2pConfig::empty();
         if bootstrap {
-            network.bootstrap_service = Some(url2::url2!("rendezvous:"));
+            config.network.bootstrap_service = Some(url2::url2!("rendezvous:"));
         }
+
 
         {
-            network.transport_pool = vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
-                signal_url: "rendezvous:".into(),
-            }];
+            config.network.transport_pool =
+                vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
+                    signal_url: "rendezvous:".into(),
+                    webrtc_config: None,
+                }];
         }
 
-        network.tuning_params = Arc::new(tuning);
-        network.into()
+        config
+    }
+
+    /// Build a SweetConductor from this config
+    pub async fn build_conductor(self) -> SweetConductor {
+        SweetConductor::from_config(self).await
     }
 
     /// Set network tuning params.

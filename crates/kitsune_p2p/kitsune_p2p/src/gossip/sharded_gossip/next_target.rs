@@ -216,7 +216,7 @@ mod tests {
         (0..n)
             .map(|_| {
                 let info = random_agent_info(&mut rng);
-                let url = info.url_list.get(0).unwrap().clone();
+                let url = info.url_list.first().unwrap().clone();
                 let purl = kitsune_p2p_types::tx_utils::ProxyUrl::from_full(url.as_str()).unwrap();
                 Node {
                     agent_info_list: vec![info],

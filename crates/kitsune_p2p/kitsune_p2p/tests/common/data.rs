@@ -40,6 +40,13 @@ impl TestHostOp {
         self
     }
 
+    pub fn with_forced_location(mut self, loc: DhtLocation) -> Self {
+        assert_eq!(36, self.hash.len(), "Should already have a hash");
+        let x = loc.as_u32().to_le_bytes();
+        self.hash.0[32..].copy_from_slice(&x);
+        self
+    }
+
     pub fn space(&self) -> KSpace {
         self.space.clone()
     }
@@ -113,7 +120,6 @@ fn generated_hash() -> KitsuneOpHash {
 }
 
 // Ideally this would match the implementation in `holo_dht_location_bytes`
-#[cfg(feature = "test_utils")]
 pub fn dht_location(data: &[u8; 32]) -> [u8; 4] {
     let hash = blake2b_simd::Params::new()
         .hash_length(16)

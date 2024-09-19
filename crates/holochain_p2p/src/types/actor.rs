@@ -3,6 +3,7 @@
 
 use crate::event::GetRequest;
 use crate::*;
+use holochain_chc::ChcImpl;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::prelude::ValidationReceiptBundle;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext;
@@ -229,9 +230,12 @@ pub struct GetActivityOptions {
     pub include_valid_activity: bool,
     /// Include any rejected actions in the response.
     pub include_rejected_activity: bool,
-    /// Include the full signed actions and hashes in the response
-    /// instead of just the hashes.
-    pub include_full_actions: bool,
+    /// Include warrants for this agent
+    pub include_warrants: bool,
+    /// Include the full signed records in the response, instead of just the hashes.
+    pub include_full_records: bool,
+    /// Configure how the data should be fetched.
+    pub get_options: holochain_zome_types::entry::GetOptions,
 }
 
 impl Default for GetActivityOptions {
@@ -241,7 +245,9 @@ impl Default for GetActivityOptions {
             retry_gets: 0,
             include_valid_activity: true,
             include_rejected_activity: false,
-            include_full_actions: false,
+            include_warrants: true,
+            include_full_records: false,
+            get_options: Default::default(),
         }
     }
 }
@@ -341,7 +347,7 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> Vec<AgentActivityResponse<ActionHash>>;
+        ) -> Vec<AgentActivityResponse>;
 
         /// A remote node is requesting agent activity from us.
         fn must_get_agent_activity(

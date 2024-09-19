@@ -22,7 +22,9 @@ use kitsune_p2p_dht_arc::{DhtArc, DhtArcRange};
 
 use crate::{op::Loc, spacetime::*};
 
-/// Convenience method for taking the power of 2 in u32
+/// Convenience method for taking the power of 2 in u32.
+///
+/// If `p` is greater than 31, this function will return 2^31.
 pub fn pow2(p: u8) -> u32 {
     debug_assert!(p < 32);
     2u32.pow((p as u32).min(31))
@@ -328,6 +330,7 @@ impl Arq<Loc> {
     pub fn to_bounds_std(&self) -> ArqBounds {
         self.to_bounds(SpaceDimension::standard())
     }
+
     /// Convert to the [`ArqBounds`] representation, which forgets about the
     /// [`Loc`] associated with this arq.
     pub fn to_bounds(&self, dim: impl SpaceDim) -> ArqBounds {
@@ -360,6 +363,7 @@ impl Arq<Loc> {
     }
 
     /// Computes the Arq which most closely matches the given [`DhtArc`]
+    #[cfg(feature = "test_utils")]
     pub fn from_dht_arc_approximate(
         dim: impl SpaceDim,
         strat: &ArqStrat,
@@ -376,6 +380,7 @@ impl Arq<Loc> {
     }
 
     /// Computes the Arq which most closely matches the given params
+    #[cfg(feature = "test_utils")]
     pub fn from_start_and_half_len_approximate(
         dim: impl SpaceDim,
         strat: &ArqStrat,
@@ -574,11 +579,12 @@ pub fn is_full(dim: impl SpaceDim, power: u8, count: u32) -> bool {
 /// Calculate the unique pairing of power and count implied by a given length
 /// and max number of chunks. Gives the nearest value that satisfies the constraints,
 /// but may not be exact.
+#[cfg(feature = "test_utils")]
 pub fn power_and_count_from_length(dim: impl SpaceDim, len: u64, max_chunks: u32) -> ArqSize {
     let dim = dim.get();
     assert!(len <= U32_LEN);
     let mut power = 0;
-    let mut count = (len / dim.quantum as u64) as f64;
+    let mut count = (len as f64 / dim.quantum as f64).ceil();
     let max = max_chunks as f64;
 
     while count.round() > max {
@@ -595,6 +601,7 @@ pub fn power_and_count_from_length(dim: impl SpaceDim, len: u64, max_chunks: u32
 /// Calculate the highest power and lowest count such that the given length is
 /// represented exactly. If the length is not representable even at the quantum
 /// level (power==0), return None.
+#[cfg(feature = "test_utils")]
 pub fn power_and_count_from_length_exact(
     dim: impl SpaceDim,
     len: u64,
@@ -622,6 +629,7 @@ pub fn power_and_count_from_length_exact(
 }
 
 /// Given a center and a length, give Arq which matches most closely given the provided strategy
+#[cfg(feature = "test_utils")]
 pub fn approximate_arq(dim: impl SpaceDim, strat: &ArqStrat, start: Loc, len: u64) -> Arq {
     let dim = dim.get();
     if len == 0 {

@@ -1,7 +1,7 @@
 use crate::conductor::api::CellConductorReadHandle;
 use holochain_types::app::{InstalledApp, InstalledAppId};
 use holochain_util::tokio_helper;
-use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
+use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner, WasmHostError};
 use holochain_zome_types::{call::RoleName, cell::CellId};
 use wasmer::RuntimeError;
 
@@ -31,11 +31,15 @@ pub fn check_clone_access(
         .into(),
     )?;
 
+    let agent_key = installed_app.agent_key();
+
     // Check whether the current cell belongs to the app we're trying to perform a clone operation on.
     let matched_app_role = installed_app
-        .roles()
-        .iter()
-        .find(|(_, app)| app.cell_id() == target_cell_id)
+        .primary_roles()
+        .find(|(_, role)| {
+            target_cell_id.agent_pubkey() == agent_key
+                && target_cell_id.dna_hash() == role.dna_hash()
+        })
         .map(|(role_name, _)| role_name);
 
     if let Some(role_name) = matched_app_role {

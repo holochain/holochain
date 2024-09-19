@@ -1,5 +1,5 @@
 ---
-default_semver_increment_mode: !pre_minor beta-dev
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
@@ -7,9 +7,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.0-dev.14
+
+## 0.4.0-dev.13
+
+## 0.4.0-dev.12
+
+## 0.4.0-dev.11
+
+## 0.4.0-dev.10
+
+## 0.4.0-dev.9
+
+## 0.4.0-dev.8
+
+## 0.4.0-dev.7
+
+## 0.4.0-dev.6
+
+## 0.4.0-dev.5
+
+## 0.4.0-dev.4
+
+## 0.4.0-dev.3
+
+## 0.4.0-dev.2
+
+## 0.4.0-dev.1
+
+## 0.4.0-dev.0
+
+## 0.3.0
+
 ## 0.3.0-beta-dev.33
 
 - **BREAKING**: Original action and entry have been removed from relevant variants of `Op`. To use original action and entry during validation, they can be explicitly fetched with HDK calls `must_get_action` and `must_get_entry`. Op is passed into the app validation callback `validate` where validation rules of an app can be implemented. For update and delete operations original action and original entry used to be prefetched, regardless of whether they were used in `validate` or not. Particularly for an update or delete of an entry it is not common to employ the original entry in validation. It is therefore removed from those variants of `Op` which means a potential performance increase for not having to fetch original actions and entries for all ops to be validated.
+
+- Removed `DnaCompatParams` which was never fully hooked up and didn’t do anything.
 
 ## 0.3.0-beta-dev.32
 

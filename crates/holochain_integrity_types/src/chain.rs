@@ -7,6 +7,8 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 
+use crate::MigrationTarget;
+
 #[cfg(test)]
 mod test;
 
@@ -173,4 +175,21 @@ impl<H: Eq + Ord + std::hash::Hash> Default for ChainFilters<H> {
     fn default() -> Self {
         Self::ToGenesis
     }
+}
+
+/// Input to close a chain.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct CloseChainInput {
+    /// The target identifier for the chain that will be migrated to.
+    pub new_target: Option<MigrationTarget>,
+}
+
+/// Input to open a chain.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct OpenChainInput {
+    /// The identifier for the chain that was migrated from.
+    pub prev_target: MigrationTarget,
+
+    /// Hash of the corresponding CloseChain action
+    pub close_hash: ActionHash,
 }

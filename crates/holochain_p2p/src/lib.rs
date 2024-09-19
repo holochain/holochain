@@ -2,6 +2,7 @@
 //! holochain specific wrapper around more generic p2p module
 
 use holo_hash::*;
+use holochain_chc::ChcImpl;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
@@ -132,7 +133,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>>;
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>>;
 
     /// Get agent activity deterministically from the DHT.
     async fn must_get_agent_activity(
@@ -182,9 +183,6 @@ impl From<HolochainP2pDna> for GenericNetwork {
         Arc::new(value)
     }
 }
-
-/// A CHC implementation
-pub type ChcImpl = Arc<dyn 'static + Send + Sync + ChainHeadCoordinatorExt>;
 
 #[async_trait::async_trait]
 impl HolochainP2pDnaT for HolochainP2pDna {
@@ -311,7 +309,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .await
     }
 
-    /// Get [`DhtOp::StoreRecord`] or [`DhtOp::StoreEntry`] from the DHT.
+    /// Get [`ChainOp::StoreRecord`] or [`ChainOp::StoreEntry`] from the DHT.
     async fn get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,
@@ -361,7 +359,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse>> {
         self.sender
             .get_agent_activity((*self.dna_hash).clone(), agent, query, options)
             .await

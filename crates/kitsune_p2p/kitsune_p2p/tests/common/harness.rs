@@ -6,6 +6,7 @@ use kitsune_p2p::{
     actor::KitsuneP2p, event::KitsuneP2pEventReceiver, spawn_kitsune_p2p, HostApi,
     KitsuneP2pResult, PreflightUserData,
 };
+use kitsune_p2p_bootstrap::BootstrapShutdown;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     config::{tuning_params_struct, KitsuneP2pConfig},
@@ -54,6 +55,7 @@ impl KitsuneTestHarness {
             .transport_pool
             .push(kitsune_p2p_types::config::TransportConfig::WebRTC {
                 signal_url: format!("ws://{signal_url}"),
+                webrtc_config: None,
             });
         self
     }
@@ -147,28 +149,55 @@ impl KitsuneTestHarness {
     }
 }
 
-pub async fn start_bootstrap() -> (SocketAddr, AbortHandle) {
+pub struct TestBootstrapHandle {
+    shutdown_cb: Option<BootstrapShutdown>,
+    abort_handle: AbortHandle,
+}
+
+impl TestBootstrapHandle {
+    fn new(shutdown_cb: BootstrapShutdown, abort_handle: AbortHandle) -> Self {
+        Self {
+            shutdown_cb: Some(shutdown_cb),
+            abort_handle,
+        }
+    }
+
+    pub fn abort(&mut self) {
+        if let Some(shutdown_cb) = self.shutdown_cb.take() {
+            shutdown_cb();
+        }
+        self.abort_handle.abort();
+    }
+}
+
+impl Drop for TestBootstrapHandle {
+    fn drop(&mut self) {
+        self.abort();
+    }
+}
+
+pub async fn start_bootstrap() -> (SocketAddr, TestBootstrapHandle) {
     let (bs_driver, bs_addr, shutdown) =
         kitsune_p2p_bootstrap::run("127.0.0.1:0".parse::<SocketAddr>().unwrap(), vec![])
             .await
             .expect("Could not start bootstrap server");
 
     let abort_handle = tokio::spawn(async move {
-        let _shutdown_cb = shutdown;
         bs_driver.await;
     })
     .abort_handle();
 
-    (bs_addr, abort_handle)
+    (bs_addr, TestBootstrapHandle::new(shutdown, abort_handle))
 }
 
-pub async fn start_signal_srv() -> (SocketAddr, tx5_signal_srv::SrvHnd) {
-    let mut config = tx5_signal_srv::Config::default();
-    config.interfaces = "127.0.0.1".to_string();
-    config.port = 0;
-    config.demo = false;
-    let (sig_hnd, addr_list, _err_list) =
-        tx5_signal_srv::exec_tx5_signal_srv(config).await.unwrap();
+pub async fn start_signal_srv() -> (SocketAddr, sbd_server::SbdServer) {
+    let server = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
+        bind: vec!["127.0.0.1:0".to_string(), "[::1]:0".to_string()],
+        limit_clients: 100,
+        ..Default::default()
+    }))
+    .await
+    .unwrap();
 
-    (*addr_list.first().unwrap(), sig_hnd)
+    (*server.bind_addrs().first().unwrap(), server)
 }

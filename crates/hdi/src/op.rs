@@ -27,19 +27,6 @@ pub trait OpHelper {
         LT: LinkTypesHelper,
         WasmError: From<<ET as EntryTypesHelper>::Error>,
         WasmError: From<<LT as LinkTypesHelper>::Error>;
-
-    /// Alias for `flattened`, for backward compatibility
-    #[deprecated = "`to_type` has been renamed to `flattened`, please use that name instead"]
-    fn to_type<ET, LT>(&self) -> Result<FlatOp<ET, LT>, WasmError>
-    where
-        ET: EntryTypesHelper + UnitEnum,
-        <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
-        LT: LinkTypesHelper,
-        WasmError: From<<ET as EntryTypesHelper>::Error>,
-        WasmError: From<<LT as LinkTypesHelper>::Error>,
-    {
-        self.flattened()
-    }
 }
 
 /// All possible variants that an [`RegisterAgentActivity`]
@@ -110,16 +97,21 @@ impl OpHelper for Op {
                         }
                     }
                     Action::OpenChain(action) => {
-                        let OpenChain { prev_dna_hash, .. } = action;
+                        let OpenChain {
+                            prev_target,
+                            close_hash,
+                            ..
+                        } = action;
                         OpRecord::OpenChain {
-                            previous_dna_hash: prev_dna_hash.clone(),
+                            previous_target: prev_target.clone(),
+                            close_hash: close_hash.clone(),
                             action: action.clone(),
                         }
                     }
                     Action::CloseChain(action) => {
-                        let CloseChain { new_dna_hash, .. } = action;
+                        let CloseChain { new_target, .. } = action;
                         OpRecord::CloseChain {
-                            new_dna_hash: new_dna_hash.clone(),
+                            new_target: new_target.clone(),
                             action: action.clone(),
                         }
                     }
@@ -365,16 +357,21 @@ impl OpHelper for Op {
                         action: action.clone(),
                     },
                     Action::OpenChain(action) => {
-                        let OpenChain { prev_dna_hash, .. } = action;
+                        let OpenChain {
+                            prev_target,
+                            close_hash,
+                            ..
+                        } = action;
                         OpActivity::OpenChain {
-                            previous_dna_hash: prev_dna_hash.clone(),
+                            previous_target: prev_target.clone(),
+                            close_hash: close_hash.clone(),
                             action: action.clone(),
                         }
                     }
                     Action::CloseChain(action) => {
-                        let CloseChain { new_dna_hash, .. } = action;
+                        let CloseChain { new_target, .. } = action;
                         OpActivity::CloseChain {
-                            new_dna_hash: new_dna_hash.clone(),
+                            new_target: new_target.clone(),
                             action: action.clone(),
                         }
                     }

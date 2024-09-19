@@ -452,7 +452,7 @@ mod tests {
         context: Option<FetchContext>,
     ) -> FetchPoolItem {
         FetchPoolItem {
-            sources: Sources::new(sources.into_iter()),
+            sources: Sources::new(sources),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             context,
             size: None,

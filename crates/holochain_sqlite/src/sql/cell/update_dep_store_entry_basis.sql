@@ -11,11 +11,11 @@ WHERE
     SELECT
       1
     FROM
-      DhtOp AS OP_DEP
+      DhtOp AS DhtOpDep
     WHERE
-      OP_DEP.basis_hash = DhtOp.dependency
-      AND OP_DEP.when_integrated IS NOT NULL
-      AND OP_DEP.type = :store_entry
+      DhtOpDep.basis_hash = DhtOp.dependency
+      AND DhtOpDep.when_integrated IS NOT NULL
+      AND DhtOpDep.type = :store_entry
     LIMIT
       1
   )

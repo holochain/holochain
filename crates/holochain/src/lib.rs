@@ -6,6 +6,9 @@
 #![allow(clippy::ptr_arg)]
 #![recursion_limit = "256"]
 
+#[cfg(doc)]
+pub mod docs;
+
 #[cfg(feature = "hdk")]
 pub use hdk::HDI_VERSION;
 
@@ -45,16 +48,23 @@ pub mod prelude {
     #[cfg(feature = "hdk")]
     pub use hdk::link::GetLinksInputBuilder;
 
-    #[cfg(not(feature = "fuzzing"))]
     pub use holochain_types::prelude::{fixt, *};
-    #[cfg(not(feature = "fuzzing"))]
-    pub use kitsune_p2p::{KITSUNE_PROTOCOL_VERSION, *};
 
-    #[cfg(feature = "fuzzing")]
-    pub use holochain_types::prelude::{fixt, *};
     #[cfg(feature = "fuzzing")]
     pub use kitsune_p2p::{NOISE, *};
 
     #[cfg(feature = "test_utils")]
     pub use holochain_types::inline_zome::*;
 }
+
+#[cfg(all(feature = "wasmer_sys", feature = "wasmer_wamr"))]
+compile_error!(
+    "feature \"wasmer_sys\" and feature \"wasmer_wamr\" cannot be enabled at the same time"
+);
+
+#[cfg(all(not(feature = "wasmer_sys"), not(feature = "wasmer_wamr"),))]
+compile_error!("One of: `wasmer_sys`, `wasmer_wamr` features must be enabled. Please, pick one.");
+
+// Temporarily include a fork of wasmer from the git branch 'wamr', until it is officially released in wasmer v5
+#[cfg(feature = "wasmer_wamr")]
+extern crate hc_wasmer as wasmer;

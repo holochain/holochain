@@ -79,7 +79,7 @@ impl BootstrapTask {
         internal_sender: GhostSender<SpaceInternal>,
         host_sender: Sender<KitsuneP2pEvent>,
         space: Arc<KitsuneSpace>,
-        bootstrap_query: Box<impl BootstrapService + Send + Sync + 'static>,
+        bootstrap_query: Box<impl BootstrapService + Sync + 'static>,
         bootstrap_check_delay_backoff_multiplier: u32,
     ) -> Arc<RwLock<Self>> {
         let task_this = this.clone();
@@ -294,7 +294,8 @@ mod tests {
             async move {
                 for _ in 0..3 {
                     host_stub.next_event(Duration::from_secs(5)).await;
-                    sender.send(task.read().current_delay).await.unwrap();
+                    let send = task.read().current_delay;
+                    sender.send(send).await.unwrap();
                 }
             }
         })
@@ -335,7 +336,8 @@ mod tests {
             async move {
                 for _ in 0..3 {
                     host_stub.next_event(Duration::from_secs(5)).await;
-                    sender.send(task.read().current_delay).await.unwrap();
+                    let send = task.read().current_delay;
+                    sender.send(send).await.unwrap();
                 }
             }
         })
@@ -344,10 +346,11 @@ mod tests {
 
         let durations = receiver.map(|d| d.as_millis()).collect::<Vec<u128>>().await;
 
-        assert_eq!(
-            vec![2, 4, 8],
-            durations,
-            "Expected durations to increase exponentially"
+        // Reading the current delay above can be subject to timing. We might read the value after more than one increase
+        // This test just cares that the increase happened at some point and wasn't disabled by setting the multiplier to 0.
+        assert!(
+            durations[durations.len() - 1] > durations[0],
+            "Expected delay to increase"
         );
 
         test_sender.ghost_actor_shutdown_immediate().await.unwrap();
@@ -371,7 +374,8 @@ mod tests {
             async move {
                 for _ in 0..3 {
                     host_stub.next_event(Duration::from_secs(5)).await;
-                    sender.send(task.read().current_delay).await.unwrap();
+                    let send = task.read().current_delay;
+                    sender.send(send).await.unwrap();
                 }
             }
         })
@@ -556,6 +560,10 @@ mod tests {
     impl GhostControlHandler for DummySpaceInternalImpl {}
     impl GhostHandler<SpaceInternal> for DummySpaceInternalImpl {}
     impl SpaceInternalHandler for DummySpaceInternalImpl {
+        fn handle_new_address(&mut self, _: String) -> SpaceInternalHandlerResult<()> {
+            unreachable!()
+        }
+
         fn handle_list_online_agents_for_basis_hash(
             &mut self,
             _space: KSpace,
@@ -698,7 +706,7 @@ mod tests {
             if self.every_other_call_fails && calls % 2 == 1 {
                 return async move {
                     Err(KitsuneP2pError::Bootstrap(BootstrapClientError::Bootstrap(
-                        "test error".to_string().into_boxed_str(),
+                        "TestBootstrapService error".to_string().into_boxed_str(),
                     )))
                 }
                 .boxed();

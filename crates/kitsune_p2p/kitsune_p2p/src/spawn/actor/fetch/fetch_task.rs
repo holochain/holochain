@@ -12,14 +12,13 @@ pub struct FetchTask {
 
 impl FetchTask {
     pub fn spawn(
+        _config: KitsuneP2pConfig,
         fetch_pool: FetchPool,
         host: HostApiLegacy,
         internal_sender: GhostSender<Internal>,
         tracing_scope: Option<String>,
     ) -> Arc<RwLock<Self>> {
         let this = Arc::new(RwLock::new(FetchTask { is_finished: false }));
-
-        let span = tracing::info_span!("FetchTask::spawn", scope = config.tracing_scope);
 
         tokio::spawn({
             let this = this.clone();
@@ -60,7 +59,7 @@ impl FetchTask {
 
                 tracing::info!("Fetch task is finishing");
                 this.write().is_finished = true;
-            }.instrument(span)
+            }.in_current_span()
         });
 
         this
@@ -229,7 +228,7 @@ mod tests {
         })
         .legacy(dummy_sender);
 
-        let task = FetchTask::spawn(fetch_pool.clone(), host_stub, internal_sender, None);
+        let task = FetchTask::spawn(config, fetch_pool.clone(), host_stub, internal_sender, None);
 
         (
             task,
@@ -251,14 +250,13 @@ mod tests {
             }
         })
         .await
-        .expect(
-            format!(
+        .unwrap_or_else(|_| {
+            panic!(
                 "Timeout while waiting for fetch pool to contain {} items, has {}",
                 n,
                 fetch_pool.len()
             )
-            .as_str(),
-        )
+        })
     }
 
     async fn wait_for_fetch_n(

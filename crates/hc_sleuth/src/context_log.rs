@@ -36,7 +36,7 @@ pub struct Context {
     pub map_agent_to_node: HashMap<AgentPubKey, SleuthId>,
 
     /// Track the sys validation deps for an op hash
-    pub map_op_to_sysval_dep_hash: HashMap<OpRef, Option<ActionHash>>,
+    pub map_op_to_sysval_dep_hashes: HashMap<OpRef, Vec<ActionHash>>,
 
     /// Track the app validation deps for an op hash
     pub map_op_to_appval_dep_hash: HashMap<OpRef, HashSet<AnyDhtHash>>,
@@ -45,7 +45,7 @@ pub struct Context {
     pub map_dep_hash_to_op: HashMap<AnyDhtHash, OpRef>,
 
     /// Map the (action hash + op type) representation to the actual op hash
-    pub map_action_to_op: HashMap<OpAction, OpRef>,
+    pub map_action_to_op: HashMap<ChainOpAction, OpRef>,
 
     /// The full info associated with each op hash
     pub op_info: HashMap<OpRef, OpInfo>,
@@ -81,19 +81,18 @@ impl Context {
     }
 
     /// Get the sys validation dependency of this op hash if applicable
-    pub fn sysval_op_dep(&self, op: &OpRef) -> ContextResult<Option<&OpInfo>> {
-        self.map_op_to_sysval_dep_hash
+    pub fn sysval_op_deps(&self, op: &OpRef) -> ContextResult<Vec<&OpInfo>> {
+        self.map_op_to_sysval_dep_hashes
             .get(op)
             .ok_or(format!("map_op_to_sysval_dep_hash({op})"))?
-            .as_ref()
+            .iter()
             .map(|h| {
                 self.map_dep_hash_to_op
                     .get(&h.clone().into())
                     .ok_or(format!("map_dep_hash_to_op({h})"))
+                    .and_then(|d| self.op_info(d))
             })
-            .transpose()?
-            .map(|d| self.op_info(d))
-            .transpose()
+            .collect::<Result<Vec<_>, _>>()
     }
 
     /// Get the app validation dependencies of this op hash
@@ -117,12 +116,8 @@ impl Context {
         self.op_info.get(op).ok_or(format!("op_info({op})"))
     }
 
-    pub fn op_to_action(&self, op: &OpRef) -> ContextResult<OpAction> {
-        Ok(OpAction::from((**self.op_info(op)?).clone()))
-    }
-
-    pub fn op_from_action(&self, action: ActionHash, op_type: DhtOpType) -> ContextResult<OpRef> {
-        let oa = OpAction(action, op_type);
+    pub fn op_from_action(&self, action: ActionHash, op_type: ChainOpType) -> ContextResult<OpRef> {
+        let oa = ChainOpAction(action, op_type);
         self.map_action_to_op
             .get(&oa)
             .cloned()
@@ -156,11 +151,15 @@ impl aitia::logging::Log for Context {
             Event::Authored { by: _, op } => {
                 // TODO: add check that the same op is not authored twice?
                 let op_hash = op.as_hash();
-                let a = OpAction::from((*op).clone());
-                self.map_dep_hash_to_op
-                    .insert(op.fetch_dependency_hash(), op_hash.clone());
+                let a = match &op.op {
+                    DhtOpLite::Chain(op) => ChainOpAction::from((**op).clone()),
+                    _ => unimplemented!("hc_sleuth can only handle chain ops"),
+                };
+                for h in op.fetch_dependency_hashes() {
+                    self.map_dep_hash_to_op.insert(h, op_hash.clone());
+                }
                 self.map_action_to_op.insert(a, op_hash.clone());
-                self.map_op_to_sysval_dep_hash
+                self.map_op_to_sysval_dep_hashes
                     .insert(op_hash.clone(), op.dep.clone());
                 self.op_info.insert(op_hash.clone(), op);
             }

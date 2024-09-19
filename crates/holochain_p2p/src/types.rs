@@ -35,7 +35,7 @@ pub enum HolochainP2pError {
 
     /// Chain Head Coordination error
     #[error(transparent)]
-    ChcError(#[from] holochain_types::chc::ChcError),
+    ChcError(#[from] holochain_chc::ChcError),
 }
 
 impl HolochainP2pError {

@@ -1,4 +1,5 @@
 #![crate_type = "proc-macro"]
+#![allow(clippy::unwrap_or_default)] // Fixing requires a `darling` upgrade
 
 use proc_macro::Span;
 use proc_macro::TokenStream;
@@ -26,7 +27,6 @@ struct EntryDef(holochain_integrity_types::entry_def::EntryDef);
 struct EntryDefId(holochain_integrity_types::entry_def::EntryDefId);
 struct EntryVisibility(holochain_integrity_types::entry_def::EntryVisibility);
 struct RequiredValidations(holochain_integrity_types::entry_def::RequiredValidations);
-struct RequiredValidationType(holochain_integrity_types::validate::RequiredValidationType);
 
 impl Parse for EntryDef {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -118,22 +118,6 @@ impl quote::ToTokens for EntryVisibility {
         );
         tokens.append_all(quote::quote! {
             hdi::prelude::EntryVisibility::#variant
-        });
-    }
-}
-
-impl quote::ToTokens for RequiredValidationType {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let variant = syn::Ident::new(
-            match self.0 {
-                holochain_integrity_types::validate::RequiredValidationType::Record => "Record",
-                holochain_integrity_types::validate::RequiredValidationType::SubChain => "SubChain",
-                holochain_integrity_types::validate::RequiredValidationType::Full => "Full",
-            },
-            proc_macro2::Span::call_site(),
-        );
-        tokens.append_all(quote::quote! {
-            hdi::prelude::RequiredValidationType::#variant
         });
     }
 }

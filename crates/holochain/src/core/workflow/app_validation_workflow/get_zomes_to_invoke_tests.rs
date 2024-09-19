@@ -12,7 +12,7 @@ use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::mutations::insert_op;
 use holochain_state::validation_db::ValidationStage;
-use holochain_types::dht_op::{DhtOp, DhtOpHashed};
+use holochain_types::dht_op::{ChainOp, DhtOpHashed};
 use holochain_types::rate_limit::{EntryRateWeight, RateWeight};
 use holochain_zome_types::action::{AppEntryDef, Create, Delete, EntryType, Update, ZomeIndex};
 use holochain_zome_types::fixt::{
@@ -52,7 +52,7 @@ async fn register_agent_activity() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -88,7 +88,7 @@ async fn store_entry_create_app_entry() {
         author: fixt!(AgentPubKey),
         entry_hash: entry.clone().to_hash(),
         entry_type: EntryType::App(AppEntryDef {
-            zome_index: zome_index.clone(),
+            zome_index,
             entry_index: 0.into(),
             visibility: Default::default(),
         }),
@@ -112,7 +112,7 @@ async fn store_entry_create_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -168,7 +168,7 @@ async fn store_entry_create_non_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -204,7 +204,7 @@ async fn store_entry_update_app_entry() {
         author: fixt!(AgentPubKey),
         entry_hash: entry.to_hash(),
         entry_type: EntryType::App(AppEntryDef {
-            zome_index: zome_index.clone(),
+            zome_index,
             entry_index: 0.into(),
             visibility: Default::default(),
         }),
@@ -230,7 +230,7 @@ async fn store_entry_update_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -288,7 +288,7 @@ async fn store_entry_update_non_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -324,7 +324,7 @@ async fn store_record_create_app_entry() {
         author: fixt!(AgentPubKey),
         entry_hash: entry.clone().to_hash(),
         entry_type: EntryType::App(AppEntryDef {
-            zome_index: zome_index.clone(),
+            zome_index,
             entry_index: 0.into(),
             visibility: Default::default(),
         }),
@@ -345,7 +345,7 @@ async fn store_record_create_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -388,7 +388,7 @@ async fn store_record_create_non_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -444,7 +444,7 @@ async fn store_record_create_wrong_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -476,7 +476,7 @@ async fn store_record_create_link() {
     });
 
     let mut create_link = fixt!(CreateLink);
-    create_link.zome_index = zome_index.clone();
+    create_link.zome_index = zome_index;
     let action = Action::CreateLink(create_link);
     let action = SignedActionHashed::new_unchecked(action, fixt!(Signature));
     let record = Record::new(action.clone(), None);
@@ -491,7 +491,7 @@ async fn store_record_create_link() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -523,7 +523,7 @@ async fn store_record_update_app_entry() {
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::App(AppEntryDef {
-        zome_index: zome_index.clone(),
+        zome_index,
         entry_index: 0.into(),
         visibility: Default::default(),
     });
@@ -532,7 +532,7 @@ async fn store_record_update_app_entry() {
         author: fixt!(AgentPubKey),
         entry_hash: fixt!(EntryHash),
         entry_type: EntryType::App(AppEntryDef {
-            zome_index: zome_index.clone(),
+            zome_index,
             entry_index: 0.into(),
             visibility: Default::default(),
         }),
@@ -555,7 +555,7 @@ async fn store_record_update_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -602,7 +602,7 @@ async fn store_record_update_non_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -634,7 +634,7 @@ async fn store_record_update_of_update_app_entry() {
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::App(AppEntryDef {
-        zome_index: zome_index.clone(),
+        zome_index,
         entry_index: 0.into(),
         visibility: Default::default(),
     });
@@ -643,7 +643,7 @@ async fn store_record_update_of_update_app_entry() {
         author: fixt!(AgentPubKey),
         entry_hash: fixt!(EntryHash),
         entry_type: EntryType::App(AppEntryDef {
-            zome_index: zome_index.clone(),
+            zome_index,
             entry_index: 0.into(),
             visibility: Default::default(),
         }),
@@ -681,7 +681,7 @@ async fn store_record_update_of_update_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -713,7 +713,7 @@ async fn store_record_delete_without_entry() {
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::App(AppEntryDef {
-        zome_index: zome_index.clone(),
+        zome_index,
         entry_index: 0.into(),
         visibility: Default::default(),
     });
@@ -740,7 +740,7 @@ async fn store_record_delete_without_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -750,7 +750,7 @@ async fn store_record_delete_without_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -797,7 +797,7 @@ async fn store_record_delete_non_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -807,7 +807,7 @@ async fn store_record_delete_non_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -839,7 +839,7 @@ async fn store_record_delete_link() {
     });
 
     let mut create_link = fixt!(CreateLink);
-    create_link.zome_index = zome_index.clone();
+    create_link.zome_index = zome_index;
     let original_action = Action::CreateLink(create_link.clone());
     let mut delete_link = fixt!(DeleteLink);
     delete_link.link_add_address = original_action.to_hash();
@@ -857,7 +857,7 @@ async fn store_record_delete_link() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -867,7 +867,7 @@ async fn store_record_delete_link() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -901,7 +901,7 @@ async fn store_record_delete_of_delete_entry() {
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::App(AppEntryDef {
-        zome_index: zome_index.clone(),
+        zome_index,
         entry_index: 0.into(),
         visibility: Default::default(),
     });
@@ -938,7 +938,7 @@ async fn store_record_delete_of_delete_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -948,8 +948,10 @@ async fn store_record_delete_of_delete_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op =
-        DhtOpHashed::from_content_sync(DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete));
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::RegisterDeletedEntryAction(
+        fixt!(Signature),
+        delete,
+    ));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
@@ -979,7 +981,7 @@ async fn store_record_delete_of_delete_without_entry() {
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::App(AppEntryDef {
-        zome_index: zome_index.clone(),
+        zome_index,
         entry_index: 0.into(),
         visibility: Default::default(),
     });
@@ -1016,7 +1018,7 @@ async fn store_record_delete_of_delete_without_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -1026,8 +1028,10 @@ async fn store_record_delete_of_delete_without_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op =
-        DhtOpHashed::from_content_sync(DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete));
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::RegisterDeletedEntryAction(
+        fixt!(Signature),
+        delete,
+    ));
     test_space.space.dht_db.test_write(move |txn| {
         insert_op(txn, &dht_op).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
@@ -1060,7 +1064,7 @@ async fn register_update_app_entry() {
         author: fixt!(AgentPubKey),
         entry_hash: entry.to_hash(),
         entry_type: EntryType::App(AppEntryDef {
-            zome_index: zome_index.clone(),
+            zome_index,
             entry_index: 0.into(),
             visibility: Default::default(),
         }),
@@ -1085,7 +1089,7 @@ async fn register_update_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -1133,7 +1137,7 @@ async fn register_update_non_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -1165,7 +1169,7 @@ async fn register_delete_create_app_entry() {
 
     let mut create = fixt!(Create);
     create.entry_type = EntryType::App(AppEntryDef {
-        zome_index: zome_index.clone(),
+        zome_index,
         entry_index: 0.into(),
         visibility: Default::default(),
     });
@@ -1193,7 +1197,7 @@ async fn register_delete_create_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -1203,7 +1207,7 @@ async fn register_delete_create_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -1260,7 +1264,7 @@ async fn register_delete_create_non_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -1270,7 +1274,7 @@ async fn register_delete_create_non_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -1303,7 +1307,7 @@ async fn register_delete_update_app_entry() {
 
     let mut update = fixt!(Update);
     update.entry_type = EntryType::App(AppEntryDef {
-        zome_index: zome_index.clone(),
+        zome_index,
         entry_index: 0.into(),
         visibility: Default::default(),
     });
@@ -1331,7 +1335,7 @@ async fn register_delete_update_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -1341,7 +1345,7 @@ async fn register_delete_update_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -1398,7 +1402,7 @@ async fn register_delete_update_non_app_entry() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -1408,7 +1412,7 @@ async fn register_delete_update_non_app_entry() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -1455,7 +1459,7 @@ async fn register_delete_of_delete() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -1465,7 +1469,7 @@ async fn register_delete_of_delete() {
     let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // write original action to dht db
-    let dht_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+    let dht_op = DhtOpHashed::from_content_sync(ChainOp::StoreRecord(
         fixt!(Signature),
         original_action,
         RecordEntry::NA,
@@ -1499,7 +1503,7 @@ async fn register_create_link() {
     });
 
     let mut create_link = fixt!(CreateLink);
-    create_link.zome_index = zome_index.clone();
+    create_link.zome_index = zome_index;
     let create_link = SignedHashed::new_unchecked(create_link, fixt!(Signature));
     let op = Op::RegisterCreateLink(RegisterCreateLink {
         create_link: create_link.clone(),
@@ -1514,7 +1518,7 @@ async fn register_create_link() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),
@@ -1545,7 +1549,7 @@ async fn register_delete_link() {
     });
 
     let mut create_link = fixt!(CreateLink);
-    create_link.zome_index = zome_index.clone();
+    create_link.zome_index = zome_index;
     let delete_link = SignedHashed::new_unchecked(fixt!(DeleteLink), fixt!(Signature));
     let op = Op::RegisterDeleteLink(RegisterDeleteLink {
         create_link: create_link.clone(),
@@ -1561,7 +1565,7 @@ async fn register_delete_link() {
             .into(),
         test_space.space.dht_db.clone().into(),
         test_space.space.dht_query_cache.clone(),
-        test_space.space.cache_db.clone().into(),
+        test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
         Arc::new(dna_file.dna_def().clone()),

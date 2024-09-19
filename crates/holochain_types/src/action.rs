@@ -151,13 +151,29 @@ impl NewEntryAction {
             | NewEntryAction::Update(Update { timestamp, .. }) => *timestamp,
         }
     }
+
+    /// Get the author of this action
+    pub fn author(&self) -> &AgentPubKey {
+        match self {
+            NewEntryAction::Create(Create { author, .. })
+            | NewEntryAction::Update(Update { author, .. }) => author,
+        }
+    }
+
+    /// Get the action_seq of this action
+    pub fn action_seq(&self) -> u32 {
+        match self {
+            NewEntryAction::Create(Create { action_seq, .. })
+            | NewEntryAction::Update(Update { action_seq, .. }) => *action_seq,
+        }
+    }
 }
 
 impl From<NewEntryAction> for Action {
-    fn from(h: NewEntryAction) -> Self {
-        match h {
-            NewEntryAction::Create(h) => Action::Create(h),
-            NewEntryAction::Update(h) => Action::Update(h),
+    fn from(a: NewEntryAction) -> Self {
+        match a {
+            NewEntryAction::Create(a) => Action::Create(a),
+            NewEntryAction::Update(a) => Action::Update(a),
         }
     }
 }
@@ -202,7 +218,10 @@ impl From<(Update, Signature)> for WireUpdate {
 impl WireDelete {
     pub fn into_record(self) -> Record {
         Record::new(
-            SignedActionHashed::from_content_sync(SignedAction(self.delete.into(), self.signature)),
+            SignedActionHashed::from_content_sync(SignedAction::new(
+                self.delete.into(),
+                self.signature,
+            )),
             None,
         )
     }
@@ -231,7 +250,7 @@ impl WireUpdateRelationship {
             entry_hash: self.new_entry_address,
             weight: self.weight,
         };
-        SignedAction(Action::Update(eu), self.signature)
+        SignedAction::new(Action::Update(eu), self.signature)
     }
 }
 
@@ -258,10 +277,10 @@ impl NewEntryActionRef<'_> {
 
 impl TryFrom<SignedActionHashed> for WireDelete {
     type Error = WrongActionError;
-    fn try_from(shh: SignedActionHashed) -> Result<Self, Self::Error> {
-        let (h, signature) = shh.into_inner();
+    fn try_from(sah: SignedActionHashed) -> Result<Self, Self::Error> {
+        let (a, signature) = sah.into_inner();
         Ok(Self {
-            delete: h.into_content().try_into()?,
+            delete: a.into_content().try_into()?,
             signature,
         })
     }
@@ -269,10 +288,10 @@ impl TryFrom<SignedActionHashed> for WireDelete {
 
 impl TryFrom<SignedAction> for WireDelete {
     type Error = WrongActionError;
-    fn try_from(sh: SignedAction) -> Result<Self, Self::Error> {
-        let SignedAction(h, signature) = sh;
+    fn try_from(sa: SignedAction) -> Result<Self, Self::Error> {
+        let (a, signature) = sa.into();
         Ok(Self {
-            delete: h.try_into()?,
+            delete: a.try_into()?,
             signature,
         })
     }
@@ -280,9 +299,9 @@ impl TryFrom<SignedAction> for WireDelete {
 
 impl TryFrom<SignedActionHashed> for WireUpdate {
     type Error = WrongActionError;
-    fn try_from(shh: SignedActionHashed) -> Result<Self, Self::Error> {
-        let (h, signature) = shh.into_inner();
-        let d: Update = h.into_content().try_into()?;
+    fn try_from(sah: SignedActionHashed) -> Result<Self, Self::Error> {
+        let (a, signature) = sah.into_inner();
+        let d: Update = a.into_content().try_into()?;
         Ok(Self {
             signature,
             timestamp: d.timestamp,
@@ -298,17 +317,17 @@ impl TryFrom<SignedActionHashed> for WireUpdate {
 
 impl TryFrom<SignedActionHashed> for WireUpdateRelationship {
     type Error = WrongActionError;
-    fn try_from(shh: SignedActionHashed) -> Result<Self, Self::Error> {
-        let (h, s) = shh.into_inner();
-        SignedAction(h.into_content(), s).try_into()
+    fn try_from(sah: SignedActionHashed) -> Result<Self, Self::Error> {
+        let (a, s) = sah.into_inner();
+        SignedAction::new(a.into_content(), s).try_into()
     }
 }
 
 impl TryFrom<SignedAction> for WireUpdateRelationship {
     type Error = WrongActionError;
-    fn try_from(sh: SignedAction) -> Result<Self, Self::Error> {
-        let SignedAction(h, signature) = sh;
-        let d: Update = h.try_into()?;
+    fn try_from(sa: SignedAction) -> Result<Self, Self::Error> {
+        let (a, signature) = sa.into();
+        let d: Update = a.try_into()?;
         Ok(Self {
             signature,
             timestamp: d.timestamp,
@@ -346,7 +365,7 @@ impl WireNewEntryAction {
                     entry_type,
                     entry_hash,
                 };
-                SignedAction(ec.into(), signature)
+                SignedAction::new(ec.into(), signature)
             }
             WireNewEntryAction::Update(eu) => {
                 let signature = eu.signature;
@@ -361,7 +380,7 @@ impl WireNewEntryAction {
                     entry_type,
                     entry_hash,
                 };
-                SignedAction(eu.into(), signature)
+                SignedAction::new(eu.into(), signature)
             }
         }
     }
@@ -402,9 +421,9 @@ where
 
 impl TryFrom<SignedActionHashed> for WireNewEntryAction {
     type Error = ActionError;
-    fn try_from(shh: SignedActionHashed) -> Result<Self, Self::Error> {
-        let action = shh.hashed.content;
-        let signature = shh.signature;
+    fn try_from(sah: SignedActionHashed) -> Result<Self, Self::Error> {
+        let action = sah.hashed.content;
+        let signature = sah.signature;
         match action {
             Action::Create(ec) => Ok(Self::Create((ec, signature).into())),
             Action::Update(eu) => Ok(Self::Update((eu, signature).into())),
@@ -415,8 +434,8 @@ impl TryFrom<SignedActionHashed> for WireNewEntryAction {
 
 impl TryFrom<SignedAction> for WireNewEntryAction {
     type Error = ActionError;
-    fn try_from(sh: SignedAction) -> Result<Self, Self::Error> {
-        let (action, s) = sh.into();
+    fn try_from(sa: SignedAction) -> Result<Self, Self::Error> {
+        let (action, s) = sa.into();
         match action {
             Action::Create(ec) => Ok(Self::Create((ec, s).into())),
             Action::Update(eu) => Ok(Self::Update((eu, s).into())),
@@ -429,8 +448,8 @@ impl TryFrom<Action> for NewEntryAction {
     type Error = WrongActionError;
     fn try_from(value: Action) -> Result<Self, Self::Error> {
         match value {
-            Action::Create(h) => Ok(NewEntryAction::Create(h)),
-            Action::Update(h) => Ok(NewEntryAction::Update(h)),
+            Action::Create(a) => Ok(NewEntryAction::Create(a)),
+            Action::Update(a) => Ok(NewEntryAction::Update(a)),
             _ => Err(WrongActionError(format!("{:?}", value))),
         }
     }
@@ -440,8 +459,8 @@ impl<'a> TryFrom<&'a Action> for NewEntryActionRef<'a> {
     type Error = WrongActionError;
     fn try_from(value: &'a Action) -> Result<Self, Self::Error> {
         match value {
-            Action::Create(h) => Ok(NewEntryActionRef::Create(h)),
-            Action::Update(h) => Ok(NewEntryActionRef::Update(h)),
+            Action::Create(a) => Ok(NewEntryActionRef::Create(a)),
+            Action::Update(a) => Ok(NewEntryActionRef::Update(a)),
             _ => Err(WrongActionError(format!("{:?}", value))),
         }
     }
@@ -504,7 +523,7 @@ mod tests {
                 0.into(),
                 EntryVisibility::Public,
             )),
-            fake_entry_hash(1).into(),
+            fake_entry_hash(1),
         )
         .into();
         let bytes = holochain_serialized_bytes::encode(&orig).unwrap();
@@ -524,7 +543,7 @@ mod tests {
                 0.into(),
                 EntryVisibility::Public,
             )),
-            fake_entry_hash(1).into(),
+            fake_entry_hash(1),
         )
         .into();
         let bytes: SerializedBytes = orig.clone().try_into().unwrap();

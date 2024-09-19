@@ -1,12 +1,12 @@
 [package]
 name = "holochain_types"
-version = "0.3.0-beta-dev.42"
+version = "0.4.0-dev.24"
 description = "Holochain common types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_types"
 readme = "README.md"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
 # reminder - do not use workspace deps
@@ -15,31 +15,48 @@ anyhow = "1.0"
 async-trait = "0.1"
 automap = { version = "0.1", features = ["serde"] }
 backtrace = "0.3.27"
+base64 = "0.13"
+cfg-if = "0.1"
+chrono = { version = "0.4", default-features = false, features = [
+  "clock",
+  "std",
+  "oldtime",
+  "serde",
+] }
 derive_builder = "0.20"
 derive_more = "0.99"
-fixt = { path = "../fixt", version = "^0.3.0-beta-dev.4"}
+fixt = { path = "../fixt", version = "^0.4.0-dev.3" }
 flate2 = "1.0.14"
 futures = "0.3"
 getrandom = { version = "0.2.7" }
 one_err = "0.0.8"
-holo_hash = { version = "^0.3.0-beta-dev.28", path = "../holo_hash", features = ["encoding"] }
-holochain_keystore = { version = "^0.3.0-beta-dev.36", path = "../holochain_keystore" }
-holochain_nonce = {version = "^0.3.0-beta-dev.27", path = "../holochain_nonce"}
-holochain_serialized_bytes = "=0.0.53"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.42"}
-holochain_util = { version = "^0.3.0-beta-dev.8", path = "../holochain_util", features = ["backtrace"] }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.35", features = ["full"] }
+hc_deepkey_sdk = { version = "^0.7.0-dev.6", path = "../hc_deepkey_sdk" }
+holo_hash = { version = "^0.4.0-dev.12", path = "../holo_hash", features = [
+  "encoding",
+] }
+holochain_keystore = { version = "^0.4.0-dev.22", path = "../holochain_keystore" }
+holochain_nonce = { version = "^0.4.0-dev.7", path = "../holochain_nonce" }
+holochain_serialized_bytes = "=0.0.55"
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.4.0-dev.21" }
+holochain_trace = { version = "^0.4.0-dev.5", path = "../holochain_trace" }
+holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util", features = [
+  "backtrace",
+] }
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.4.0-dev.17", features = [
+  "full",
+] }
 itertools = { version = "0.12" }
-kitsune_p2p_dht = { version = "^0.3.0-beta-dev.23", path = "../kitsune_p2p/dht" }
-mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.3.0-beta-dev.10"}
+kitsune_p2p_dht = { version = "^0.4.0-dev.9", path = "../kitsune_p2p/dht" }
+mr_bundle = { path = "../mr_bundle", features = [
+  "packing",
+], version = "^0.4.0-dev.7" }
 must_future = "0.1.1"
 nanoid = "0.4"
-holochain_trace = { version = "^0.3.0-beta-dev.11", path = "../holochain_trace" }
 parking_lot = "0.12"
 rand = "0.8.5"
 regex = "1.4"
-rusqlite = { version = "0.29" }
-serde = { version = "1.0", features = [ "derive", "rc" ] }
+rusqlite = { version = "0.32.1" }
+serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 serde_derive = "1.0"
 serde_json = "1.0"
@@ -50,10 +67,10 @@ strum = "0.18.0"
 strum_macros = "0.18.0"
 tempfile = "3"
 thiserror = "1.0.22"
-tokio = { version = "1.27", features = [ "rt" ] }
+tokio = { version = "1.27", features = ["rt"] }
 tracing = "0.1.26"
 
-arbitrary = { version = "1.0", features = ["derive"], optional = true}
+arbitrary = { version = "1.0", features = ["derive"], optional = true }
 isotest = { version = "0", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
@@ -62,7 +79,7 @@ proptest-derive = { version = "0", optional = true }
 contrafact = { version = "0.2.0-rc.1", optional = true }
 
 [dev-dependencies]
-holochain_types = { version = "^0.3.0-beta-dev.27", path = ".", features = ["test_utils", "fuzzing"]}
+holochain_types = { path = ".", features = ["test_utils", "fuzzing"] }
 
 arbitrary = "1.0"
 isotest = { version = "0" }
@@ -71,7 +88,7 @@ matches = "0.1"
 pretty_assertions = "1.4"
 serde_json = "1.0"
 test-case = "3.3"
-tokio = { version = "1.11", features = [ "full" ] }
+tokio = { version = "1.11", features = ["full"] }
 
 [lints]
 workspace = true
@@ -99,6 +116,8 @@ fuzzing = [
   "mr_bundle/fuzzing",
 ]
 
+instrument = []
+
 sqlite-encrypted = [
   "rusqlite/bundled-sqlcipher-vendored-openssl",
   "holo_hash/sqlite-encrypted",
@@ -115,5 +134,3 @@ sqlite = [
   "holochain_zome_types/sqlite",
   "kitsune_p2p_dht/sqlite",
 ]
-
-chc = []

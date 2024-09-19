@@ -1,3 +1,6 @@
+#![allow(clippy::type_complexity)]
+
+use crate::actor::BroadcastData;
 use crate::actor::*;
 use crate::spawn::actor::{
     EvtRcv, InternalHandler, InternalHandlerResult, KSpace, MaybeDelegate, OpHashList, VecMXM,
@@ -81,7 +84,7 @@ impl InternalStub {
             Ordering::SeqCst,
         ) {
             self.respond_with_error_count.fetch_add(1, Ordering::SeqCst);
-            return Err("test error".into());
+            return Err("InternalStub error".into());
         }
 
         Ok(())
@@ -91,6 +94,10 @@ impl InternalStub {
 impl GhostControlHandler for InternalStub {}
 impl GhostHandler<Internal> for InternalStub {}
 impl InternalHandler for InternalStub {
+    fn handle_new_address(&mut self, _: String) -> InternalHandlerResult<()> {
+        todo!()
+    }
+
     fn handle_register_space_event_handler(&mut self, _recv: EvtRcv) -> InternalHandlerResult<()> {
         todo!()
     }

@@ -1,0 +1,20 @@
+[package]
+name = "test_wasm_app_validation"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "test_wasm_app_validation"
+crate-type = ["cdylib", "rlib"]
+
+[[example]]
+name = "integrity_test_wasm_app_validation"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
+# reminder - do not use workspace deps
+[dependencies]
+serde = "1.0"
+holochain_test_wasm_common = { path = "../../../wasm_common", optional = true }
+hdk = { path = "../../../../hdk" }
+hdi = { path = "../../../../hdi" }

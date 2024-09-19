@@ -7,14 +7,15 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
 
-use tracing::*;
-
 #[cfg(test)]
 mod query_tests;
-#[cfg(feature = "test_utils")]
+#[cfg(test)]
 mod tests;
 
-#[instrument(skip(vault, trigger_receipt, network, dht_query_cache))]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(vault, trigger_receipt, network, dht_query_cache))
+)]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
     dht_query_cache: DhtDbQueryCache,
@@ -38,7 +39,7 @@ pub async fn integrate_dht_ops_workflow(
 
                     total += stmt.execute(named_params! {
                         ":when_integrated": time,
-                        ":register_activity": DhtOpType::RegisterAgentActivity,
+                        ":register_activity": ChainOpType::RegisterAgentActivity,
                         ":seq_start": start,
                         ":seq_end": end,
                         ":author": author,
@@ -49,9 +50,9 @@ pub async fn integrate_dht_ops_workflow(
                 .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_ENTRY)?
                 .execute(named_params! {
                     ":when_integrated": time,
-                    ":updated_content": DhtOpType::RegisterUpdatedContent,
-                    ":deleted_entry_action": DhtOpType::RegisterDeletedEntryAction,
-                    ":store_entry": DhtOpType::StoreEntry,
+                    ":updated_content": ChainOpType::RegisterUpdatedContent,
+                    ":deleted_entry_action": ChainOpType::RegisterDeletedEntryAction,
+                    ":store_entry": ChainOpType::StoreEntry,
                 })?;
             total += changed;
             let changed = txn
@@ -60,25 +61,25 @@ pub async fn integrate_dht_ops_workflow(
                 )?
                 .execute(named_params! {
                     ":when_integrated": time,
-                    ":create_link": DhtOpType::RegisterAddLink,
-                    ":store_entry": DhtOpType::StoreEntry,
+                    ":create_link": ChainOpType::RegisterAddLink,
+                    ":store_entry": ChainOpType::StoreEntry,
                 })?;
             total += changed;
             let changed = txn
                 .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_RECORD)?
                 .execute(named_params! {
                     ":when_integrated": time,
-                    ":store_record": DhtOpType::StoreRecord,
-                    ":updated_record": DhtOpType::RegisterUpdatedRecord,
-                    ":deleted_by": DhtOpType::RegisterDeletedBy,
+                    ":store_record": ChainOpType::StoreRecord,
+                    ":updated_record": ChainOpType::RegisterUpdatedRecord,
+                    ":deleted_by": ChainOpType::RegisterDeletedBy,
                 })?;
             total += changed;
             let changed = txn
                 .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_CREATE_LINK)?
                 .execute(named_params! {
                     ":when_integrated": time,
-                    ":create_link": DhtOpType::RegisterAddLink,
-                    ":delete_link": DhtOpType::RegisterRemoveLink,
+                    ":create_link": ChainOpType::RegisterAddLink,
+                    ":delete_link": ChainOpType::RegisterRemoveLink,
 
                 })?;
             total += changed;

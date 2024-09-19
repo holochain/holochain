@@ -1,3 +1,4 @@
+use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::api::error::SerializationError;
 use crate::conductor::interface::error::InterfaceError;
@@ -133,6 +134,44 @@ impl AppInterfaceApi {
             AppRequest::ListWasmHostFunctions => Ok(AppResponse::ListWasmHostFunctions(
                 self.conductor_handle.list_wasm_host_functions().await?,
             )),
+            AppRequest::ProvideMemproofs(memproofs) => {
+                self.conductor_handle
+                    .clone()
+                    .provide_memproofs(&installed_app_id, memproofs)
+                    .await?;
+                Ok(AppResponse::Ok)
+            }
+            AppRequest::EnableApp => {
+                let status = self
+                    .conductor_handle
+                    .get_app_info(&installed_app_id)
+                    .await?
+                    .ok_or(ConductorApiError::other("app not found".to_string()))?
+                    .status;
+                match status {
+                    AppInfoStatus::Running
+                    | AppInfoStatus::Disabled {
+                        reason: DisabledAppReason::NotStartedAfterProvidingMemproofs,
+                    } => {
+                        self.conductor_handle
+                            .clone()
+                            .enable_app(installed_app_id.clone())
+                            .await?;
+                        Ok(AppResponse::Ok)
+                    }
+                    _ => Err(ConductorApiError::other(
+                        "app not in correct state to enable".to_string(),
+                    )),
+                }
+            } //
+              // TODO: implement after DPKI lands
+              // AppRequest::RotateAppAgentKey => {
+              //     let new_key = self
+              //         .conductor_handle
+              //         .rotate_app_agent_key(&installed_app_id)
+              //         .await?;
+              //     Ok(AppResponse::AppAgentKeyRotated(new_key))
+              // }
         }
     }
 }

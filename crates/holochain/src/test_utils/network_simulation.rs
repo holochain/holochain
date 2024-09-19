@@ -14,7 +14,7 @@ use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::store::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
-use holochain_types::dht_op::{DhtOp, DhtOpHashed, DhtOpType};
+use holochain_types::dht_op::{ChainOp, ChainOpHashed, ChainOpType};
 use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
@@ -53,7 +53,7 @@ pub struct MockNetworkData {
     /// Hash to basis location.
     pub op_to_loc: HashMap<Arc<DhtOpHash>, DhtLocation>,
     /// The DhtOps
-    pub ops: HashMap<Arc<DhtOpHash>, DhtOpHashed>,
+    pub ops: HashMap<Arc<DhtOpHash>, ChainOpHashed>,
     /// The uuid for the integrity zome (also for the dna).
     pub integrity_uuid: String,
     /// The uuid for the coordinator zome.
@@ -65,7 +65,7 @@ struct GeneratedData {
     coordinator_uuid: String,
     peer_data: Vec<AgentInfoSigned>,
     authored: HashMap<Arc<AgentPubKey>, Vec<Arc<DhtOpHash>>>,
-    ops: HashMap<Arc<DhtOpHash>, DhtOpHashed>,
+    ops: HashMap<Arc<DhtOpHash>, ChainOpHashed>,
 }
 
 impl MockNetworkData {
@@ -277,8 +277,11 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
     )
     .unwrap();
     for op in data.ops.values() {
-        holochain_state::test_utils::mutations_helpers::insert_valid_integrated_op(&mut txn, op)
-            .unwrap();
+        holochain_state::test_utils::mutations_helpers::insert_valid_integrated_op(
+            &mut txn,
+            &op.downcast(),
+        )
+        .unwrap();
     }
     for (author, ops) in &data.authored {
         for op in ops {
@@ -319,7 +322,7 @@ fn get_cached() -> Option<GeneratedData> {
             .optional()
             .ok()
             .flatten()?;
-        let ops = get_ops(&mut txn);
+        let ops = get_chain_ops(&mut txn);
         let peer_data = txn
             .p2p_list_agents(Arc::new(KitsuneSpace::new(vec![0; 36])))
             .unwrap();
@@ -398,21 +401,9 @@ async fn create_test_data(
         ..ConductorConfig::empty()
     };
     let mut conductor = SweetConductor::from_config(config).await;
-    let mut agents = Vec::new();
-
-    for i in 0..num_agents {
-        eprintln!("generating agent {}", i);
-        let agent = conductor
-            .keystore()
-            .clone()
-            .new_sign_keypair_random()
-            .await
-            .unwrap();
-        agents.push(agent);
-    }
 
     let apps = conductor
-        .setup_app_for_agents("app", &agents, [&dna_file])
+        .setup_apps("app", num_agents, [&dna_file])
         .await
         .unwrap();
 
@@ -434,8 +425,8 @@ async fn create_test_data(
         let data = db
             .read_async({
                 let agent_pk = cell.agent_pubkey().clone();
-                move |txn| -> DatabaseResult<HashMap<Arc<DhtOpHash>, DhtOpHashed>> {
-                    Ok(get_authored_ops(&txn, &agent_pk))
+                move |txn| -> DatabaseResult<HashMap<Arc<DhtOpHash>, ChainOpHashed>> {
+                    Ok(get_authored_chain_ops(&txn, &agent_pk))
                 }
             })
             .await
@@ -487,26 +478,26 @@ async fn reset_peer_data(peers: Vec<AgentInfoSigned>, dna_hash: &DnaHash) -> Vec
     peer_data
 }
 
-fn get_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
+fn get_chain_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, ChainOpHashed> {
     txn.prepare(
         "
                 SELECT DhtOp.hash, DhtOp.type AS dht_type,
                 Action.blob AS action_blob, Entry.blob AS entry_blob
-                FROM DHtOp
+                FROM DhtOp
                 JOIN Action ON DhtOp.action_hash = Action.hash
                 LEFT JOIN Entry ON Action.entry_hash = Entry.hash
             ",
     )
     .unwrap()
     .query_map([], |row| {
+        let op_type: ChainOpType = row.get("dht_type")?;
         let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
-        let op_type: DhtOpType = row.get("dht_type")?;
         let hash: DhtOpHash = row.get("hash")?;
         // Check the entry isn't private before gossiping it.
         let e: Option<Vec<u8>> = row.get("entry_blob")?;
         let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
-        let op = DhtOp::from_type(op_type, action, entry).unwrap();
-        let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
+        let op = ChainOp::from_type(op_type, action, entry).unwrap();
+        let op = ChainOpHashed::with_pre_hashed(op, hash.clone());
         Ok((Arc::new(hash), op))
     })
     .unwrap()
@@ -514,10 +505,10 @@ fn get_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
     .unwrap()
 }
 
-fn get_authored_ops(
+fn get_authored_chain_ops(
     txn: &Transaction<'_>,
     author: &AgentPubKey,
-) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
+) -> HashMap<Arc<DhtOpHash>, ChainOpHashed> {
     txn.prepare(
         "
                 SELECT DhtOp.hash, DhtOp.type AS dht_type,
@@ -531,14 +522,14 @@ fn get_authored_ops(
     )
     .unwrap()
     .query_map([author], |row| {
+        let op_type: ChainOpType = row.get("dht_type")?;
         let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
-        let op_type: DhtOpType = row.get("dht_type")?;
         let hash: DhtOpHash = row.get("hash")?;
         // Check the entry isn't private before gossiping it.
         let e: Option<Vec<u8>> = row.get("entry_blob")?;
         let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
-        let op = DhtOp::from_type(op_type, action, entry).unwrap();
-        let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
+        let op = ChainOp::from_type(op_type, action, entry).unwrap();
+        let op = ChainOpHashed::with_pre_hashed(op, hash.clone());
         Ok((Arc::new(hash), op))
     })
     .unwrap()

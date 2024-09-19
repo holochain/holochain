@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 use crate::event::{
     FetchOpDataEvtQuery, KitsuneP2pEvent, KitsuneP2pEventHandlerResult, PutAgentInfoSignedEvt,
 };

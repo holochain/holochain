@@ -15,11 +15,12 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
+use holochain_chc::*;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::params;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_sqlite::sql::sql_cell::SELECT_VALID_AGENT_PUB_KEY;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
 use holochain_state_types::SourceChainDumpRecord;
@@ -67,7 +68,7 @@ pub type SourceChainRead = SourceChain<DbRead<DbKindAuthored>, DbRead<DbKindDht>
 //       not the entire source chain!
 /// Writable functions for a source chain with write access.
 impl SourceChain {
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn unlock_chain(&self) -> SourceChainResult<()> {
         self.vault
             .write_async({
@@ -79,7 +80,7 @@ impl SourceChain {
         Ok(())
     }
 
-    #[tracing::instrument(skip_all)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn accept_countersigning_preflight_request(
         &self,
         preflight_request: PreflightRequest,
@@ -234,7 +235,7 @@ impl SourceChain {
     }
 
     #[async_recursion]
-    #[tracing::instrument(skip(self, network))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, network)))]
     pub async fn flush(
         &self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
@@ -266,13 +267,14 @@ impl SourceChain {
             )
             .await
             .map_err(SourceChainError::other)?;
-            if let Err(err @ ChcError::InvalidChain(_, _)) = chc.add_records_request(payload).await
-            {
-                return Err(SourceChainError::ChcHeadMoved(
+
+            match chc.add_records_request(payload).await {
+                Err(e @ ChcError::InvalidChain(_, _)) => Err(SourceChainError::ChcHeadMoved(
                     "SourceChain::flush".into(),
-                    err,
-                ));
-            }
+                    e,
+                )),
+                e => e.map_err(SourceChainError::other),
+            }?;
         }
 
         let maybe_countersigned_entry = entries
@@ -291,7 +293,7 @@ impl SourceChain {
 
         let ops_to_integrate = ops
             .iter()
-            .map(|op| (op.1.clone(), op.0.dht_basis().clone()))
+            .map(|op| (op.1.clone(), op.0.dht_basis()))
             .collect::<Vec<_>>();
 
         // Write the entries, actions and ops to the database in one transaction.
@@ -414,6 +416,66 @@ impl SourceChain {
             }
             result => result,
         }
+    }
+
+    /// Checks if the current [`AgentPubKey`] of the source chain is valid and returns its [`Create`] action.
+    ///
+    /// Valid means that there's no [`Update`] or [`Delete`] action for the key on the chain.
+    /// Returns the create action if it is valid, and an [`SourceChainError::InvalidAgentKey`] otherwise.
+    pub async fn valid_create_agent_key_action(&self) -> SourceChainResult<Action> {
+        let agent_key_entry_hash: EntryHash = self.agent_pubkey().clone().into();
+        self.author_db()
+            .read_async({
+                let agent_key = self.agent_pubkey().clone();
+                let cell_id = self.cell_id().as_ref().clone();
+                move |txn| {
+                    txn.query_row(
+                        SELECT_VALID_AGENT_PUB_KEY,
+                        named_params! {
+                            ":author": agent_key.clone(),
+                            ":type": ActionType::Create.to_string(),
+                            ":entry_type": EntryType::AgentPubKey.to_string(),
+                            ":entry_hash": agent_key_entry_hash
+                        },
+                        |row| {
+                            let create_agent_signed_action = from_blob::<SignedAction>(row.get(0)?)
+                                .map_err(|_| rusqlite::Error::BlobSizeError)?;
+                            let create_agent_action = create_agent_signed_action.action().clone();
+                            Ok(create_agent_action)
+                        },
+                    )
+                    .map_err(|err| match err {
+                        rusqlite::Error::BlobSizeError | rusqlite::Error::QueryReturnedNoRows => {
+                            SourceChainError::InvalidAgentKey(agent_key, cell_id)
+                        }
+                        _ => {
+                            tracing::error!(?err, "Error looking up valid agent pub key");
+                            SourceChainError::other(err)
+                        }
+                    })
+                }
+            })
+            .await
+    }
+
+    /// Deletes the current [`AgentPubKey`] of the source chain if it is valid and returns a [`SourceChainError::InvalidAgentKey`]
+    /// otherwise.
+    ///
+    /// The agent key is valid if there are no [`Update`] or [`Delete`] actions for that key on the chain.
+    pub async fn delete_valid_agent_pub_key(&self) -> SourceChainResult<()> {
+        let valid_create_agent_key_action = self.valid_create_agent_key_action().await?;
+
+        self.put_weightless(
+            builder::Delete::new(
+                valid_create_agent_key_action.to_hash(),
+                self.agent_pubkey().clone().into(),
+            ),
+            None,
+            ChainTopOrdering::Strict,
+        )
+        .await?;
+
+        Ok(())
     }
 }
 
@@ -813,7 +875,7 @@ where
                             args.iter().map(|a| (a.0.as_str(), a.1.as_ref())).collect::<Vec<(&str, &dyn rusqlite::ToSql)>>().as_slice(),
                             |row| {
                                 let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                                let SignedAction(action, signature) = action;
+                                let (action, signature) = action.into();
                                 let private_entry = action
                                     .entry_type()
                                     .map_or(false, |e| *e.visibility() == EntryVisibility::Private);
@@ -838,6 +900,7 @@ where
                 }
             })
             .await?;
+
         self.scratch.apply(|scratch| {
             let mut scratch_records: Vec<_> = scratch
                 .actions()
@@ -866,7 +929,7 @@ where
 
     /// If there is a countersigning session get the
     /// StoreEntry op to send to the entry authorities.
-    pub fn countersigning_op(&self) -> SourceChainResult<Option<DhtOp>> {
+    pub fn countersigning_op(&self) -> SourceChainResult<Option<ChainOp>> {
         let r = self.scratch.apply(|scratch| {
             scratch
                 .entries()
@@ -881,7 +944,7 @@ where
                                 .unwrap_or(false)
                         })
                         .and_then(|shh| {
-                            Some(DhtOp::StoreEntry(
+                            Some(ChainOp::StoreEntry(
                                 shh.signature().clone(),
                                 shh.action().clone().try_into().ok()?,
                                 (**entry).clone(),
@@ -924,7 +987,7 @@ fn build_ops_from_actions(
     actions: Vec<SignedActionHashed>,
 ) -> SourceChainResult<(
     Vec<SignedActionHashed>,
-    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, SysValDep)>,
+    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, SysValDeps)>,
 )> {
     // Actions end up back in here.
     let mut actions_output = Vec::with_capacity(actions.len());
@@ -946,15 +1009,17 @@ fn build_ops_from_actions(
         let mut h = Some(action);
         for op in ops_inner {
             let op_type = op.get_type();
+            let op = DhtOpLite::from(op);
             // Action is required by value to produce the DhtOpHash.
-            let (action, op_hash) = UniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
+            let (action, op_hash) =
+                ChainOpUniqueForm::op_hash(op_type, h.expect("This can't be empty"))?;
             let op_order = OpOrder::new(op_type, action.timestamp());
             let timestamp = action.timestamp();
             // Put the action back by value.
-            let dependency = op.get_type().sys_validation_dependency(&action);
+            let deps = op_type.sys_validation_dependencies(&action);
             h = Some(action);
             // Collect the DhtOpLite, DhtOpHash and OpOrder.
-            ops.push((op, op_hash, op_order, timestamp, dependency));
+            ops.push((op, op_hash, op_order, timestamp, deps));
         }
 
         // Put the SignedActionHashed back together.
@@ -988,7 +1053,7 @@ async fn rebase_actions_on(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn genesis(
     authored: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
@@ -1055,6 +1120,7 @@ pub async fn genesis(
         )
         .await
         .map_err(SourceChainError::other)?;
+
         match chc.add_records_request(payload).await {
             Err(e @ ChcError::InvalidChain(_, _)) => {
                 Err(SourceChainError::ChcHeadMoved("genesis".into(), e))
@@ -1081,6 +1147,10 @@ pub async fn genesis(
             SourceChainResult::Ok(ops_to_integrate)
         })
         .await?;
+
+    // We don't check for authorityship here because during genesis we have no opportunity
+    // to discover that the network is sharded and that we should not be an authority for
+    // these items, so we assume we are an authority.
     authored_ops_to_dht_db_without_check(
         ops_to_integrate,
         authored.clone().into(),
@@ -1094,7 +1164,7 @@ pub async fn genesis(
 pub fn put_raw(
     txn: &mut Transaction,
     shh: SignedActionHashed,
-    ops: Vec<DhtOpLite>,
+    ops: Vec<ChainOpLite>,
     entry: Option<Entry>,
 ) -> StateMutationResult<Vec<DhtOpHash>> {
     let (action, signature) = shh.into_inner();
@@ -1105,7 +1175,7 @@ pub fn put_raw(
     for op in &ops {
         let op_type = op.get_type();
         let (h, op_hash) =
-            UniqueForm::op_hash(op_type, action.take().expect("This can't be empty"))?;
+            ChainOpUniqueForm::op_hash(op_type, action.take().expect("This can't be empty"))?;
         let op_order = OpOrder::new(op_type, h.timestamp());
         let timestamp = h.timestamp();
         action = Some(h);
@@ -1121,7 +1191,7 @@ pub fn put_raw(
     }
     insert_action(txn, &shh)?;
     for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, &op, &op_hash, &op_order, &timestamp)?;
+        insert_op_lite(txn, &op.into(), &op_hash, &op_order, &timestamp)?;
     }
     Ok(ops_to_integrate)
 }
@@ -1204,7 +1274,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
         action_seq,
         prev_action: prev_action.clone(),
     };
-    let action = action_builder.build(common).weightless().into();
+    let action = action_builder.build(common).weightless();
     let action = ActionHashed::from_content_sync(action);
     let action = SignedActionHashed::sign(keystore, action).await?;
     let record = Record::new(action, maybe_entry);
@@ -1241,7 +1311,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
 }
 
 /// dump the entire source chain as a pretty-printed json string
-#[tracing::instrument(skip_all)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn dump_state(
     vault: DbRead<DbKindAuthored>,
     author: AgentPubKey,
@@ -1267,7 +1337,8 @@ pub async fn dump_state(
                         ":author": author,
                     },
                     |row| {
-                        let SignedAction(action, signature) = from_blob(row.get("action_blob")?)?;
+                        let action: SignedAction = from_blob(row.get("action_blob")?)?;
+                        let (action, signature) = action.into();
                         let action_address = row.get("action_hash")?;
                         let entry: Option<Vec<u8>> = row.get("entry_blob")?;
                         let entry: Option<Entry> = match entry {
@@ -1385,9 +1456,7 @@ mod tests {
         )
         .await?;
 
-        let action_builder = builder::CloseChain {
-            new_dna_hash: fixt!(DnaHash),
-        };
+        let action_builder = builder::CloseChain { new_target: None };
         chain_1
             .put(action_builder.clone(), None, ChainTopOrdering::Strict)
             .await?;
@@ -1566,6 +1635,47 @@ mod tests {
         Ok(())
     }
 
+    // Test that a valid agent pub key can be deleted and that repeated deletes fail.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn delete_valid_agent_pub_key() {
+        let authored_db = test_authored_db().to_db();
+        let dht_db = test_dht_db().to_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.clone().into());
+        let keystore = test_keystore();
+        let agent_key = keystore.new_sign_keypair_random().await.unwrap();
+        let mut mock_network = MockHolochainP2pDnaT::new();
+        mock_network
+            .expect_authority_for_hash()
+            .returning(|_| Ok(false));
+        mock_network.expect_chc().return_const(None);
+
+        source_chain::genesis(
+            authored_db.clone(),
+            dht_db.clone(),
+            &dht_db_cache,
+            keystore.clone(),
+            fake_dna_hash(1),
+            agent_key.clone(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        // Delete valid agent pub key should succeed.
+        let chain = SourceChain::new(authored_db, dht_db, dht_db_cache, keystore, agent_key)
+            .await
+            .unwrap();
+        let result = chain.delete_valid_agent_pub_key().await;
+        assert!(result.is_ok());
+        chain.flush(&mock_network).await.unwrap();
+
+        // Valid agent pub key has been deleted. Repeating the operation should fail now as no valid
+        // pub key can be found.
+        let result = chain.delete_valid_agent_pub_key().await.unwrap_err();
+        assert_matches!(result, SourceChainError::InvalidAgentKey(invalid_key, cell_id) if invalid_key == *chain.author && cell_id == *chain.cell_id());
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_db = test_authored_db();
@@ -1575,6 +1685,7 @@ mod tests {
         let db = test_db.to_db();
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         // create transferable cap grant
+        #[allow(clippy::unnecessary_literal_unwrap)] // must be this type
         let secret_access = CapAccess::from(secret.unwrap());
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
@@ -1680,6 +1791,7 @@ mod tests {
         let mut assignees = BTreeSet::new();
         assignees.insert(bob.clone());
         let updated_secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
+        #[allow(clippy::unnecessary_literal_unwrap)] // must be this type
         let updated_access = CapAccess::from((updated_secret.unwrap(), assignees));
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 

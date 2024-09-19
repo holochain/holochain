@@ -53,7 +53,7 @@
 //! - Capabilities and function level access control: [`capability`] module
 //! - [Holochain Deterministic Integrity (HDI)]
 //! - Application data and entry definitions for the source chain and DHT: [`entry`]
-//! module and [entry_types] callback
+//!   module and [entry_types] callback
 //! - Referencing/linking entries on the DHT together into a graph structure: [`link`] module
 //! - Defining tree-like structures out of links and entries for discoverability and scalability: [`hash_path`] module
 //! - Create, read, update, delete (CRUD) operations on the above
@@ -73,7 +73,7 @@
 //! The only way to execute logic inside WASM is by having the conductor (host) call a function that is marked as an `extern` by the zome (guest).
 //!
 //! > Note: From the perspective of hApp development in WASM, the "guest" is the WASM and the "host" is the running Holochain conductor.
-//! The host is _not_ the "host operating system" in this context.
+//!   The host is _not_ the "host operating system" in this context.
 //!
 //! Similarly, the only way for the guest to do anything other than process data and calculations is to call functions the host provides to it at runtime.
 //!
@@ -102,8 +102,8 @@
 //! - The function must have a unique name across all externs as they share a global namespace in WASM
 //! - Everything inside the function is Rust-as-usual including `?` to interact with `ExternResult` that fails as `WasmError`
 //! - Use the [`wasm_error!`](crate::prelude::wasm_error) macro along with the
-//! [`WasmErrorInner::Guest`](crate::prelude::WasmErrorInner::Guest) variant for failure conditions that the host or
-//! external processes need to be aware of
+//!   [`WasmErrorInner::Guest`](crate::prelude::WasmErrorInner::Guest) variant for failure conditions that the host or
+//!   external processes need to be aware of
 //! - Externed functions can be called as normal by other functions inside the same WASM
 //!
 //! For example:
@@ -297,6 +297,8 @@ fn wasm_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
 
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 getrandom::register_custom_getrandom!(wasm_getrandom);
+
+pub mod agent;
 
 /// Capability claims and grants.
 ///
@@ -578,3 +580,9 @@ pub mod hdk;
 /// Clone cells are a way to create a new cell that is a copy of an existing cell. They are based on the DNA of an existing cell, and run
 /// with the same agent key, but have a unique name or properties that distinguish them from the original cell.
 pub mod clone;
+
+/// Tools for working with migrations from one DNA to another.
+mod migrate;
+
+/// Look up validation receipts for actions that a local agent has authored.
+pub mod validation_receipt;

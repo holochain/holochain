@@ -67,7 +67,7 @@ pub fn delete<'a>(
 pub(crate) fn get_original_entry_data(
     call_context: Arc<CallContext>,
     address: ActionHash,
-) -> Result<(EntryHash, EntryType), WasmError> {
+) -> Result<(EntryHash, EntryType), WasmHostError> {
     let network = call_context.host_context.network().clone();
     let workspace = call_context.host_context.workspace();
 
@@ -113,7 +113,7 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_delete_entry_test<'a>() {
+    async fn ribosome_delete_entry_test() {
         holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..

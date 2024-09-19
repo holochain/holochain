@@ -26,6 +26,10 @@
       ],
       "description": "A description for the app"
     },
+    "allow_deferred_memproofs": {
+      "type": "boolean",
+      "description": "If true, any membrane proofs provided at installation time are ignored and need to be provided later via the app interface for the app to become functional."
+    },
     "roles": {
       "type": "array",
       "items": {

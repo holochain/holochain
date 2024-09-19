@@ -23,6 +23,14 @@ use holochain_zome_types::op::Op;
 use maplit::hashset;
 use matches::assert_matches;
 
+// Module with tests for agent key revocation. With or without DPKI, an agent can revoke their key,
+// which prevents further modifications of the source chain.
+mod agent_key_revocation;
+// Module with tests related to an agent's key lineage. Agents can update their key. Both old and new
+// key belong to the same key lineage, they belong to the same agent.
+pub mod agent_lineage;
+mod test_dpki;
+
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
     let db_dir = test_db_dir();
@@ -33,11 +41,16 @@ async fn can_update_state() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
-    let config = ConductorConfig {
-        data_root_path: Some(db_dir.path().to_path_buf().into()),
-        ..ConductorConfig::empty()
-    };
-    let spaces = Spaces::new(config.clone().into()).unwrap();
+    let spaces = Spaces::new(
+        ConductorConfig {
+            data_root_path: Some(db_dir.path().to_path_buf().into()),
+            ..ConductorConfig::empty()
+        }
+        .into(),
+        sodoken::BufRead::new_no_lock(b"passphrase"),
+    )
+    .await
+    .unwrap();
     let conductor = Conductor::new(
         config.into(),
         ribosome_store,
@@ -69,7 +82,7 @@ async fn can_update_state() {
             .all_cells()
             .collect::<Vec<_>>()
             .as_slice(),
-        &[&cell_id]
+        &[cell_id]
     );
 }
 
@@ -84,11 +97,16 @@ async fn app_ids_are_unique() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
-    let config = ConductorConfig {
-        data_root_path: Some(db_dir.path().to_path_buf().into()),
-        ..ConductorConfig::empty()
-    };
-    let spaces = Spaces::new(config.clone().into()).unwrap();
+    let spaces = Spaces::new(
+        ConductorConfig {
+            data_root_path: Some(db_dir.path().to_path_buf().into()),
+            ..ConductorConfig::empty()
+        }
+        .into(),
+        sodoken::BufRead::new_no_lock(b"passphrase"),
+    )
+    .await
+    .unwrap();
     let conductor = Conductor::new(
         config.into(),
         ribosome_store,
@@ -104,15 +122,12 @@ async fn app_ids_are_unique() {
     let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
     let app = InstalledAppCommon::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
 
-    conductor
-        .add_disabled_app_to_db(app.clone().into())
-        .await
-        .unwrap();
+    conductor.add_disabled_app_to_db(app.clone()).await.unwrap();
 
     assert_matches!(
-        conductor.add_disabled_app_to_db(app.clone().into()).await,
+        conductor.add_disabled_app_to_db(app.clone()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
-        if id == "id".to_string()
+        if id == *"id"
     );
 
     //- it doesn't matter whether the app is active or inactive
@@ -122,19 +137,20 @@ async fn app_ids_are_unique() {
         .unwrap();
     assert_eq!(delta, AppStatusFx::SpinUp);
     assert_matches!(
-        conductor.add_disabled_app_to_db(app.clone().into()).await,
+        conductor.add_disabled_app_to_db(app.clone()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
-        if id == "id".to_string()
+        if &id == "id"
     );
 }
 
 /// App can't be installed if it contains duplicate RoleNames
 #[tokio::test(flavor = "multi_thread")]
 async fn role_names_are_unique() {
+    let agent = fixt!(AgentPubKey);
     let cells = vec![
-        InstalledCell::new(fixt!(CellId), "1".into()),
-        InstalledCell::new(fixt!(CellId), "1".into()),
-        InstalledCell::new(fixt!(CellId), "2".into()),
+        InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "1".into()),
+        InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "1".into()),
+        InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "2".into()),
     ];
     let result = InstalledAppCommon::new_legacy("id", cells.into_iter());
     matches::assert_matches!(
@@ -146,14 +162,16 @@ async fn role_names_are_unique() {
 #[tokio::test(flavor = "multi_thread")]
 async fn can_set_fake_state() {
     let db_dir = test_db_dir();
-    let state = ConductorState::default();
+    let expected = ConductorState::default();
     let conductor = ConductorBuilder::new()
-        .fake_state(state.clone())
+        .config(SweetConductorConfig::standard().no_dpki().into())
+        .fake_state(expected.clone())
         .with_data_root_path(db_dir.path().to_path_buf().into())
         .test(&[])
         .await
         .unwrap();
-    assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
+    let actual = conductor.get_state_from_handle().await.unwrap();
+    assert_eq!(actual, expected);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -176,13 +194,10 @@ async fn test_list_running_apps_for_dependent_cell_id() {
     // Install two apps on the Conductor:
     // Both share a CellId in common, and also include a distinct CellId each.
     let mut conductor = SweetConductor::from_standard_config().await;
-    let alice = SweetAgents::one(conductor.keystore()).await;
-    let app1 = conductor
-        .setup_app_for_agent("app1", alice.clone(), [&dna1, &dna2])
-        .await
-        .unwrap();
+    let app1 = conductor.setup_app("app1", [&dna1, &dna2]).await.unwrap();
+    let alice = app1.agent().clone();
     let app2 = conductor
-        .setup_app_for_agent("app2", alice.clone(), [&dna1, &dna3])
+        .setup_app_for_agent("app2", alice, [&dna1, &dna3])
         .await
         .unwrap();
 
@@ -225,25 +240,13 @@ async fn common_genesis_test_app(
 ) -> ConductorApiResult<SweetApp> {
     let hardcoded_zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
 
-    // Just a strong reminder that we need to be careful once we start using existing Cells:
-    // When a Cell panics or fails validation in general, we want to disable all Apps touching that Cell.
-    // However, if the panic/failure happens during Genesis, we want to completely
-    // destroy the app which is attempting to Create that Cell, but *NOT* any other apps
-    // which might be touching that Cell.
-    //
-    // It probably works out to be the same either way, since if we are creating a Cell,
-    // no other app could be possibly referencing it, but just in case we have some kind of complex
-    // behavior like installing two apps which reference each others' Cells at the same time,
-    // we need to be aware of this distinction.
-    holochain_types::app::we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution();
-
     // Create one DNA which always works, and another from a zome that gets passed in
     let (dna_hardcoded, _, _) = mk_dna(("hardcoded", hardcoded_zome)).await;
     let (dna_custom, _, _) = mk_dna(custom_zomes).await;
 
     // Install both DNAs under the same app:
     conductor
-        .setup_app(&"app", &[dna_hardcoded, dna_custom])
+        .setup_app("app", &[dna_hardcoded, dna_custom])
         .await
 }
 
@@ -251,9 +254,9 @@ async fn common_genesis_test_app(
 async fn test_uninstall_app() {
     holochain_trace::test_run();
     let (dna, _, _) = mk_dna(simple_crud_zome()).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductorConfig::standard().build_conductor().await;
 
-    let app1 = conductor.setup_app(&"app1", [&dna]).await.unwrap();
+    let app1 = conductor.setup_app("app1", [&dna]).await.unwrap();
 
     let hash1: ActionHash = conductor
         .call(
@@ -263,7 +266,7 @@ async fn test_uninstall_app() {
         )
         .await;
 
-    let app2 = conductor.setup_app(&"app2", [&dna]).await.unwrap();
+    let app2 = conductor.setup_app("app2", [&dna]).await.unwrap();
 
     let hash2: ActionHash = conductor
         .call(
@@ -291,12 +294,30 @@ async fn test_uninstall_app() {
         (2, 0)
     );
 
+    let db1 = conductor
+        .spaces
+        .get_or_create_authored_db(dna.dna_hash(), app1.cells()[0].agent_pubkey().clone())
+        .unwrap();
+    let db2 = conductor
+        .spaces
+        .get_or_create_authored_db(dna.dna_hash(), app2.cells()[0].agent_pubkey().clone())
+        .unwrap();
+
+    // - Check that both authored database files exist
+    std::fs::File::open(db1.path()).unwrap();
+    std::fs::File::open(db2.path()).unwrap();
+
     // - Uninstall the first app
     conductor
         .raw_handle()
-        .uninstall_app(&"app1".to_string())
+        .uninstall_app(&"app1".to_string(), false)
         .await
         .unwrap();
+
+    // - Check that the first authored DB file is deleted since the cell was removed.
+    #[cfg(not(windows))]
+    std::fs::File::open(db1.path()).unwrap_err();
+    std::fs::File::open(db2.path()).unwrap();
 
     // - Ensure that the remaining app can still access both hashes
     assert!(conductor
@@ -311,9 +332,13 @@ async fn test_uninstall_app() {
     // - Uninstall the remaining app
     conductor
         .raw_handle()
-        .uninstall_app(&"app2".to_string())
+        .uninstall_app(&"app2".to_string(), false)
         .await
         .unwrap();
+
+    // - Check that second authored DB file is deleted since the cell was removed.
+    #[cfg(not(windows))]
+    std::fs::File::open(db2.path()).unwrap_err();
 
     // - Ensure that the apps are removed
     assert_eq_retry_10s!(
@@ -326,7 +351,7 @@ async fn test_uninstall_app() {
 
     // - A new app can't read any of the data from the previous two, because once the last instance
     //   of the cells was destroyed, all data was destroyed as well.
-    let app3 = conductor.setup_app(&"app2", [&dna]).await.unwrap();
+    let app3 = conductor.setup_app("app2", [&dna]).await.unwrap();
     assert!(conductor
         .call::<_, Option<Record>>(&app3.cells()[0].zome("coordinator"), "read", hash1.clone())
         .await
@@ -364,12 +389,14 @@ async fn test_reconciliation_idempotency() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_signing_error_during_genesis() {
     holochain_trace::test_run();
-    let bad_keystore = spawn_crude_mock_keystore(|| "test error".into()).await;
+    let bad_keystore = spawn_crude_mock_keystore(|| "spawn_crude_mock_keystore error".into()).await;
 
     let db_dir = test_db_dir();
     let config = ConductorConfig {
         data_root_path: Some(db_dir.path().to_path_buf().into()),
-        ..ConductorConfig::empty()
+dpki: DpkiConfig::disabled(),
+device_seed_lair_tag: Some("nonexistent-tag".to_string()),
+..ConductorConfig::empty()
     };
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(bad_keystore, &config, &[]).await,
@@ -382,7 +409,7 @@ async fn test_signing_error_during_genesis() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign]).await;
 
     let result = conductor
-        .setup_app_for_agents(&"app", &[fixt!(AgentPubKey)], [&dna])
+        .setup_app_for_agents("app", &[fixt!(AgentPubKey)], [&dna])
         .await;
 
     // - Assert that we got an error during Genesis. However, this test is
@@ -726,12 +753,8 @@ async fn test_enable_disable_enable_clone_cell() {
 async fn name_has_no_effect_on_dna_hash() {
     holochain_trace::test_run();
     let mut conductor = SweetConductor::from_standard_config().await;
-    let (agent1, agent2, agent3) = SweetAgents::three(conductor.keystore()).await;
     let dna = SweetDnaFile::unique_empty().await;
-    let apps = conductor
-        .setup_app_for_agents("app", [&agent1, &agent2, &agent3], [&dna])
-        .await
-        .unwrap();
+    let apps = conductor.setup_apps("app", 3, [&dna]).await.unwrap();
     let app_id1 = apps[0].installed_app_id().clone();
     let app_id2 = apps[1].installed_app_id().clone();
     let app_id3 = apps[2].installed_app_id().clone();
@@ -844,7 +867,10 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
                 Ok(hash)
             });
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductorConfig::standard()
+        .no_dpki()
+        .build_conductor()
+        .await;
     let app = common_genesis_test_app(&mut conductor, bad_zome)
         .await
         .unwrap();
@@ -1012,7 +1038,8 @@ async fn test_cell_and_app_status_reconciliation() {
         mk_dna(mk_zome()).await.0,
     ];
     let app_id = "app".to_string();
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
     conductor.setup_app(&app_id, &dnas).await.unwrap();
 
     let cell_ids: Vec<_> = conductor.running_cell_ids().into_iter().collect();
@@ -1151,7 +1178,7 @@ async fn test_init_concurrency() {
 
     // Perform 100 concurrent zome calls
     let num_iters = Arc::new(AtomicU32::new(0));
-    let call_tasks = (0..100 as u32).map(|_i| {
+    let call_tasks = (0..100_u32).map(|_i| {
         let conductor = conductor.clone();
         let zome = cell.zome("zome");
         let num_iters = num_iters.clone();
@@ -1165,4 +1192,173 @@ async fn test_init_concurrency() {
     assert_eq!(num_iters.fetch_add(0, Ordering::SeqCst), 100);
     assert_eq!(num_calls_clone.fetch_add(0, Ordering::SeqCst), 100);
     assert_eq!(num_inits_clone.fetch_add(0, Ordering::SeqCst), 1);
+}
+
+/// Check that an app can be installed with deferred memproof provisioning and:
+/// - all status checks return correctly while still provisioned,
+/// - no zome calls can be made while awaiting memproofs,
+/// - cells can be cloned while awaiting memproofs (even though this is unusual),
+/// - conductor can be restarted and app still in AwaitingMemproofs state,
+/// - app functions normally after memproofs provided
+#[tokio::test(flavor = "multi_thread")]
+async fn test_deferred_memproof_provisioning() {
+    holochain_trace::test_run();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app_id = "app-id".to_string();
+    let role_name = "role".to_string();
+    let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true, None).await;
+
+    //- Install with deferred memproofs
+    let app = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            source: AppBundleSource::Bundle(bundle),
+            agent_key: None,
+            installed_app_id: Some(app_id.clone()),
+            membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
+            network_seed: None,
+            ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
+        })
+        .await
+        .unwrap();
+    assert_eq!(app.role_assignments().len(), 1);
+
+    let cell_id = app.all_cells().next().unwrap().clone();
+
+    //- Status is AwaitingMemproofs and there is 1 cell assignment
+    let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
+    assert_eq!(app_info.cell_info.len(), 1);
+
+    let cell = conductor.get_sweet_cell(cell_id.clone()).unwrap();
+
+    //- Can't make zome calls, error returned is CellDisabled
+    //  (which isn't ideal, but gets the message across well enough)
+    let result: Result<String, _> = conductor.call_fallible(&cell.zome("foo"), "foo", ()).await;
+    assert_matches!(
+        result,
+        Err(ConductorApiError::ConductorError(
+            ConductorError::CellDisabled(_)
+        ))
+    );
+
+    conductor.shutdown().await;
+    conductor.startup().await;
+
+    //- Status is still AwaitingMemproofs after a restart
+    let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
+
+    //- Status is still AwaitingMemproofs after enabling but before memproofs
+    let r = conductor.enable_app(app_id.clone()).await;
+    assert_matches!(r, Err(ConductorError::AppStatusError(_)));
+    let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
+
+    //- Can not create a clone cell until memproofs have been provided
+    let error = conductor
+        .create_clone_cell(
+            &app_id,
+            CreateCloneCellPayload {
+                role_name: role_name.clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("seeeeed".into()),
+                membrane_proof: None,
+                name: None,
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_matches!(
+        error,
+        ConductorError::SourceChainError(SourceChainError::ChainEmpty)
+    );
+
+    //- Rotate app agent key a few times just for the heck of it
+    // TODO: not yet implemented
+
+    // let agent1 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
+    // let agent2 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
+    // let agent3 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
+    // assert_ne!(agent_key, agent1);
+    // assert_ne!(agent1, agent2);
+    // assert_ne!(agent2, agent3);
+
+    //- Now provide the memproofs
+    conductor
+        .clone()
+        .provide_memproofs(&app_id, MemproofMap::new())
+        .await
+        .unwrap();
+
+    //- Status is now Disabled with the special `NotStartedAfterProvidingMemproofs` reason.
+    //    It's not tested in this test, but this status allows the app to be enabled
+    //    over the app interface.
+    let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    assert_eq!(
+        app_info.status,
+        AppInfoStatus::Disabled {
+            reason: DisabledAppReason::NotStartedAfterProvidingMemproofs
+        }
+    );
+
+    conductor.enable_app(app_id.clone()).await.unwrap();
+
+    //- Status is now Running and there is 1 cell assignment
+    let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    assert_eq!(app_info.status, AppInfoStatus::Running);
+
+    //- And now we can make a zome call successfully
+    let _: String = conductor.call(&cell.zome("foo"), "foo", ()).await;
+
+    //- And create a clone cell
+    conductor
+        .create_clone_cell(
+            &app_id,
+            CreateCloneCellPayload {
+                role_name,
+                modifiers: DnaModifiersOpt::none().with_network_seed("seeeeed".into()),
+                membrane_proof: None,
+                name: None,
+            },
+        )
+        .await
+        .unwrap();
+}
+
+/// Can uninstall an app with deferred memproofs before providing memproofs
+#[tokio::test(flavor = "multi_thread")]
+async fn test_deferred_memproof_provisioning_uninstall() {
+    holochain_trace::test_run();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
+    let conductor = SweetConductor::from_standard_config().await;
+    let app_id = "app-id".to_string();
+    let role_name = "role".to_string();
+    let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true, None).await;
+
+    //- Install with deferred memproofs
+    conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            source: AppBundleSource::Bundle(bundle),
+            agent_key: None,
+            installed_app_id: Some(app_id.clone()),
+            membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
+            network_seed: None,
+            ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(conductor.list_apps(None).await.unwrap().len(), 1);
+    conductor
+        .clone()
+        .uninstall_app(&app_id, false)
+        .await
+        .unwrap();
+    assert_eq!(conductor.list_apps(None).await.unwrap().len(), 0);
 }

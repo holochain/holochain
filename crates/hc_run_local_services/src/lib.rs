@@ -1,6 +1,7 @@
 use clap::Parser;
+use std::io::{Error, Result};
+use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
-use tx5_signal_srv::{Error, Result};
 
 /// Helper for running local Holochain bootstrap and WebRTC signal servers.
 #[derive(Debug, Parser)]
@@ -30,7 +31,7 @@ pub struct HcRunLocalServices {
     signal_address_path: Option<std::path::PathBuf>,
 
     /// A comma-separated list of interfaces on which to run the signal server.
-    #[arg(long, default_value = "127.0.0.1")]
+    #[arg(long, default_value = "127.0.0.1, [::1]")]
     signal_interfaces: String,
 
     /// The port to use for the signal server. You probably want
@@ -111,11 +112,11 @@ impl HcRunLocalServices {
         let mut task_list = Vec::new();
 
         if !self.disable_bootstrap {
-            let bs_ip: std::net::IpAddr = self.bootstrap_interface.parse().map_err(Error::err)?;
+            let bs_ip: std::net::IpAddr = self.bootstrap_interface.parse().map_err(Error::other)?;
             let bs_addr = std::net::SocketAddr::from((bs_ip, self.bootstrap_port));
             let (bs_driver, bs_addr, shutdown) = kitsune_p2p_bootstrap::run(bs_addr, vec![])
                 .await
-                .map_err(Error::str)?;
+                .map_err(Error::other)?;
             std::mem::forget(shutdown);
             task_list.push(bs_driver);
 
@@ -132,23 +133,27 @@ impl HcRunLocalServices {
         }
 
         if !self.disable_signal {
-            let mut config = tx5_signal_srv::Config::default();
-            config.interfaces = self.signal_interfaces;
-            config.port = self.signal_port;
-            config.demo = false;
+            let bind = self
+                .signal_interfaces
+                .split(',')
+                .map(|i| format!("{}:{}", i.trim(), self.signal_port))
+                .collect();
+            println!("BIND: {bind:?}");
+            let config = sbd_server::Config {
+                bind,
+                ..Default::default()
+            };
             tracing::info!(?config);
 
-            let (sig_hnd, addr_list, err_list) =
-                tx5_signal_srv::exec_tx5_signal_srv(config).await?;
+            let sig_hnd = sbd_server::SbdServer::new(Arc::new(config)).await?;
+
+            let addr_list = sig_hnd.bind_addrs().to_vec();
+
             // there is no real task here... just fake it
             task_list.push(Box::pin(async move {
                 let _sig_hnd = sig_hnd;
                 std::future::pending().await
             }));
-
-            for err in err_list {
-                println!("# HC SIGNAL - ERROR: {err:?}");
-            }
 
             let mut a_out = AOut::new(&self.signal_address_path).await?;
 

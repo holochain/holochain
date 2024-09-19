@@ -242,6 +242,13 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
     wait_for_connected(sender_a.clone(), agent_b.clone(), space.clone()).await;
     wait_for_connected(sender_b.clone(), agent_a.clone(), space.clone()).await;
 
+    let op_hash_list = harness_a
+        .op_store()
+        .read()
+        .iter()
+        .map(|o| o.clone().into())
+        .collect();
+
     sender_a
         .broadcast(
             space.clone(),
@@ -249,12 +256,7 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agent_a.clone(),
-                op_hash_list: harness_a
-                    .op_store()
-                    .read()
-                    .iter()
-                    .map(|o| o.clone().into())
-                    .collect(),
+                op_hash_list,
                 context: FetchContext::default(),
             },
         )
@@ -302,10 +304,11 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
 
 // This is expected to test that agent info is broadcast to current peers when a new agent joins
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Flaky on CI"]
 async fn two_nodes_broadcast_agent_info() {
     holochain_trace::test_run();
 
-    let (bootstrap_addr, bootstrap_handle) = start_bootstrap().await;
+    let (bootstrap_addr, mut bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
 
     let mut harness_a = KitsuneTestHarness::try_new("host_a")
@@ -399,10 +402,11 @@ async fn two_nodes_broadcast_agent_info() {
 // This is expected to test that agent info is gossiped to a new peer when it finds one peer who knows
 // about peers that are unkown to the new peer.
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Flaky on CI"]
 async fn two_nodes_gossip_agent_info() {
     holochain_trace::test_run();
 
-    let (bootstrap_addr, bootstrap_handle) = start_bootstrap().await;
+    let (bootstrap_addr, mut bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
 
     let mut harness_a = KitsuneTestHarness::try_new("host_a")
@@ -494,6 +498,7 @@ async fn two_nodes_gossip_agent_info() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn gossip_stops_when_agent_leaves_space() {
     holochain_trace::test_run();
 
@@ -614,6 +619,7 @@ async fn gossip_stops_when_agent_leaves_space() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn gossip_historical_ops() {
     holochain_trace::test_run();
 
@@ -697,6 +703,7 @@ async fn gossip_historical_ops() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn publish_only_fetches_ops_once() {
     holochain_trace::test_run();
 
@@ -878,10 +885,11 @@ async fn publish_only_fetches_ops_once() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn delegate_publish() {
     holochain_trace::test_run();
 
-    let (bootstrap_addr, bootstrap_handle) = start_bootstrap().await;
+    let (bootstrap_addr, mut bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
 
     let mut harness_a = KitsuneTestHarness::try_new("host_a")

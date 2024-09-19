@@ -145,18 +145,20 @@ impl AdminInterfaceApi {
                     .conductor_handle
                     .clone()
                     .install_app_bundle(*payload)
-                    .await?
-                    .into();
+                    .await?;
                 let dna_definitions = self.conductor_handle.get_dna_definitions(&app)?;
                 Ok(AdminResponse::AppInstalled(AppInfo::from_installed_app(
                     &app,
                     &dna_definitions,
                 )))
             }
-            UninstallApp { installed_app_id } => {
+            UninstallApp {
+                installed_app_id,
+                force,
+            } => {
                 self.conductor_handle
                     .clone()
-                    .uninstall_app(&installed_app_id)
+                    .uninstall_app(&installed_app_id, force)
                     .await?;
                 Ok(AdminResponse::AppUninstalled)
             }
@@ -172,6 +174,26 @@ impl AdminInterfaceApi {
                     .new_sign_keypair_random()
                     .await?;
                 Ok(AdminResponse::AgentPubKeyGenerated(agent_pub_key))
+            }
+            RevokeAgentKey(payload) => {
+                let RevokeAgentKeyPayload { agent_key, app_id } = *payload;
+                let results = self
+                    .conductor_handle
+                    .clone()
+                    .revoke_agent_key_for_app(agent_key, app_id)
+                    .await?;
+                // Convert errors to strings
+                let results: Vec<(CellId, String)> = results
+                    .into_iter()
+                    .filter_map(|(cell_id, result)| {
+                        if let Err(err) = result {
+                            Some((cell_id, err.to_string()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                Ok(AdminResponse::AgentKeyRevoked(results))
             }
             ListCellIds => {
                 let cell_ids = self
@@ -309,6 +331,16 @@ impl AdminInterfaceApi {
                         .issue_app_authentication_token(payload)?,
                 ))
             }
+            RevokeAppAuthenticationToken(token) => {
+                self.conductor_handle
+                    .revoke_app_authentication_token(token)?;
+                Ok(AdminResponse::AppAuthenticationTokenRevoked)
+            }
+            GetCompatibleCells(dna_hash) => Ok(AdminResponse::CompatibleCells(
+                self.conductor_handle
+                    .cells_by_dna_lineage(&dna_hash)
+                    .await?,
+            )),
         }
     }
 }
@@ -384,7 +416,7 @@ mod test {
             .await;
         assert_matches!(
             hash_install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna")
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == *"DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
         );
 
         // with a property should install and produce a different hash

@@ -1,0 +1,82 @@
+{
+  "nodes": {
+    "holochain": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1722347117,
+        "narHash": "sha256-Jv4DxaVtdbO+fOD4woFoepCCOtRN/HF94xJSwViz3ck=",
+        "owner": "holochain",
+        "repo": "holochain",
+        "rev": "97d86050b177829b623461970db5c3b64fbd74c1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "holochain",
+        "ref": "holochain-0.3.2",
+        "repo": "holochain",
+        "type": "github"
+      }
+    },
+    "lair": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1717684904,
+        "narHash": "sha256-vcXt67Tl1qwVUkx8CBevdQocqZXUEeoXjaYw86ljsYo=",
+        "owner": "holochain",
+        "repo": "lair",
+        "rev": "6a84ed490fc7074d107e38bbb4a8d707e9b8e066",
+        "type": "github"
+      },
+      "original": {
+        "owner": "holochain",
+        "ref": "lair_keystore-v0.4.5",
+        "repo": "lair",
+        "type": "github"
+      }
+    },
+    "launcher": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1717431387,
+        "narHash": "sha256-+VvWwBmxcgePV1L6kU2mSkg3emMiMgpdQnCqvQJkRPk=",
+        "owner": "holochain",
+        "repo": "hc-launch",
+        "rev": "9d9cab5e6b57e1c278113921ff203e515c8bbd2e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "holochain",
+        "ref": "holochain-0.3",
+        "repo": "hc-launch",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "holochain": "holochain",
+        "lair": "lair",
+        "launcher": "launcher",
+        "scaffolding": "scaffolding"
+      }
+    },
+    "scaffolding": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1724073530,
+        "narHash": "sha256-PUM8otA5F5s8ZHxhjupn7R+RZAjh2rueYIFwu3UkK44=",
+        "owner": "holochain",
+        "repo": "scaffolding",
+        "rev": "8a6d1dab0f1668c2781a46d93a5ad638fcf25598",
+        "type": "github"
+      },
+      "original": {
+        "owner": "holochain",
+        "ref": "holochain-0.3",
+        "repo": "scaffolding",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

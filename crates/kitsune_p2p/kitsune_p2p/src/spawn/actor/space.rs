@@ -38,6 +38,9 @@ type MaybeDelegate = Option<(KBasis, u32, u32)>;
 ghost_actor::ghost_chan! {
     #[allow(clippy::too_many_arguments)]
     pub(crate) chan SpaceInternal<crate::KitsuneP2pError> {
+        /// Notification that we have a new address to be identified at
+        fn new_address(local_url: String) -> ();
+
         /// List online agents that claim to be covering a basis hash
         fn list_online_agents_for_basis_hash(space: KSpace, from_agent: KAgent, basis: KBasis) -> HashSet<KAgent>;
 
@@ -122,6 +125,7 @@ pub(crate) async fn spawn_space(
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     fetch_pool: FetchPool,
+    local_url: Arc<std::sync::Mutex<Option<String>>>,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     ghost_actor::GhostSender<SpaceInternal>,
@@ -153,6 +157,7 @@ pub(crate) async fn spawn_space(
         bandwidth_throttles,
         parallel_notify_permit,
         fetch_pool,
+        local_url,
     )));
 
     Ok((sender, i_s, evt_recv))
@@ -161,6 +166,19 @@ pub(crate) async fn spawn_space(
 impl ghost_actor::GhostHandler<SpaceInternal> for Space {}
 
 impl SpaceInternalHandler for Space {
+    fn handle_new_address(&mut self, local_url: String) -> SpaceInternalHandlerResult<()> {
+        // shut down open gossip rounds, since we will
+        // now be identified differently
+        for agent in self.local_joined_agents.keys() {
+            for module in self.gossip_mod.values() {
+                module.local_agent_leave(agent.clone());
+                module.local_agent_join(agent.clone());
+            }
+        }
+        *self.ro_inner.local_url.lock().unwrap() = Some(local_url);
+        self.handle_update_agent_info()
+    }
+
     fn handle_list_online_agents_for_basis_hash(
         &mut self,
         _space: Arc<KitsuneSpace>,
@@ -186,6 +204,10 @@ impl SpaceInternalHandler for Space {
     }
 
     fn handle_update_agent_info(&mut self) -> SpaceInternalHandlerResult<()> {
+        let local_url = match self.ro_inner.get_local_url() {
+            None => return Ok(async move { Ok(()) }.boxed().into()),
+            Some(local_url) => local_url,
+        };
         let space = self.space.clone();
         let mut mdns_handles = self.mdns_handles.clone();
         let mut agent_list = Vec::with_capacity(self.local_joined_agents.len());
@@ -194,14 +216,13 @@ impl SpaceInternalHandler for Space {
             agent_list.push((agent, arq));
         }
         let bootstrap_net = self.ro_inner.bootstrap_net;
-        let ep_hnd = self.ro_inner.ep_hnd.clone();
         let evt_sender = self.host_api.legacy.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
         let internal_sender = self.i_s.clone();
         Ok(async move {
-            let urls = vec![TxUrl::try_from(ep_hnd.local_addr()?)?];
+            let urls = vec![TxUrl::try_from(local_url)?];
             let mut peer_data = Vec::with_capacity(agent_list.len());
             for (agent, arq) in agent_list {
                 let input = UpdateAgentInfoInput {
@@ -232,10 +253,14 @@ impl SpaceInternalHandler for Space {
         &mut self,
         agent: Arc<KitsuneAgent>,
     ) -> SpaceInternalHandlerResult<()> {
+        let local_url = match self.ro_inner.get_local_url() {
+            None => return Ok(async move { Ok(()) }.boxed().into()),
+            Some(local_url) => local_url,
+        };
         let space = self.space.clone();
         let bootstrap_net = self.ro_inner.bootstrap_net;
         let mut mdns_handles = self.mdns_handles.clone();
-        let ep_hnd = self.ro_inner.ep_hnd.clone();
+        let network_type = self.config.network_type.clone();
         let evt_sender = self.host_api.legacy.clone();
         let internal_sender = self.i_s.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
@@ -244,7 +269,7 @@ impl SpaceInternalHandler for Space {
         let arc = self.get_agent_arq(&agent);
 
         Ok(async move {
-            let urls = vec![TxUrl::try_from(ep_hnd.local_addr()?)?];
+            let urls = vec![TxUrl::try_from(local_url)?];
             let input = UpdateAgentInfoInput {
                 expires_after,
                 space: space.clone(),
@@ -335,6 +360,7 @@ impl SpaceInternalHandler for Space {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_incoming_delegate_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -403,7 +429,7 @@ impl SpaceInternalHandler for Space {
         let ro_inner = self.ro_inner.clone();
         let timeout = ro_inner.config.tuning_params.implicit_timeout();
         let fut =
-            discover::get_cached_remotes_near_basis(ro_inner.clone(), basis.get_loc(), timeout);
+            discover::search_remotes_covering_basis(ro_inner.clone(), basis.get_loc(), timeout);
 
         Ok(async move {
             futures::future::join_all(local_notify_events).await;
@@ -545,6 +571,7 @@ impl SpaceInternalHandler for Space {
         .into())
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_notify(&mut self, to_agent: KAgent, data: wire::Wire) -> InternalHandlerResult<()> {
         let ro_inner = self.ro_inner.clone();
         let timeout = ro_inner.config.tuning_params.implicit_timeout();
@@ -769,12 +796,6 @@ impl ghost_actor::GhostControlHandler for Space {
 impl ghost_actor::GhostHandler<KitsuneP2p> for Space {}
 
 impl KitsuneP2pHandler for Space {
-    fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
-        unreachable!(
-            "These requests are handled at the to actor level and are never propagated down to the space."
-        )
-    }
-
     fn handle_join(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -783,9 +804,21 @@ impl KitsuneP2pHandler for Space {
         initial_arq: Option<Arq>,
     ) -> KitsuneP2pHandlerResult<()> {
         tracing::debug!(?space, ?agent, ?initial_arq, "handle_join");
-        if let Some(initial_arq) = initial_arq {
-            self.agent_arqs.insert(agent.clone(), initial_arq);
+
+        match initial_arq {
+            // This agent has been on the network before and has an arc stored on the Kitsune host.
+            // Respect the current storage settings and apply this arc.
+            Some(initial_arq) => {
+                self.agent_arqs.insert(agent.clone(), initial_arq);
+            }
+            // This agent is new to the network and has no arc stored on the Kitsune host.
+            // Get a default arc for the agent
+            None => {
+                self.agent_arqs
+                    .insert(agent.clone(), self.default_arc_for_agent(agent.clone()));
+            }
         }
+
         self.local_joined_agents
             .insert(agent.clone(), maybe_agent_info);
         for module in self.gossip_mod.values() {
@@ -891,6 +924,7 @@ impl KitsuneP2pHandler for Space {
         Ok(fut.boxed().into())
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -1047,6 +1081,7 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_targeted_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -1204,6 +1239,7 @@ pub(crate) struct PendingDelegate {
 }
 
 pub(crate) struct SpaceReadOnlyInner {
+    pub(crate) local_url: Arc<std::sync::Mutex<Option<String>>>,
     pub(crate) space: Arc<KitsuneSpace>,
     #[allow(dead_code)]
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
@@ -1221,6 +1257,10 @@ pub(crate) struct SpaceReadOnlyInner {
 }
 
 impl SpaceReadOnlyInner {
+    pub(crate) fn get_local_url(&self) -> Option<String> {
+        self.local_url.lock().unwrap().clone()
+    }
+
     pub(crate) fn publish_pending_delegate(
         self: Arc<Self>,
         op_hash: KOpHash,
@@ -1295,6 +1335,7 @@ impl Space {
         bandwidth_throttles: BandwidthThrottles,
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
         fetch_pool: FetchPool,
+        local_url: Arc<std::sync::Mutex<Option<String>>>,
     ) -> Self {
         let metrics = MetricsSync::default();
 
@@ -1400,6 +1441,7 @@ impl Space {
         }
 
         let ro_inner = Arc::new(SpaceReadOnlyInner {
+            local_url,
             space: space.clone(),
             i_s: i_s.clone(),
             host_api: host_api.clone(),
@@ -1521,16 +1563,28 @@ impl Space {
         // TODO: We are simply setting the initial arc to full.
         // In the future we may want to do something more intelligent.
         //
-        // In the case an initial_arc is passend into the join request,
+        // In the case an initial_arc is passed into the join request,
         // handle_join will initialize this agent_arcs map to that value.
-        let strat = self.config.tuning_params.to_arq_strat();
         self.agent_arqs.get(agent).cloned().unwrap_or_else(|| {
-            let dim = SpaceDimension::standard();
-            match self.config.tuning_params.arc_clamping() {
-                Some(ArqClamping::Empty) => Arq::new_empty(dim, agent.get_loc()),
-                Some(ArqClamping::Full) | None => Arq::new_full_max(dim, &strat, agent.get_loc()),
-            }
+            tracing::warn!("Using default arc for agent, this should be configured by the host or initialised on network join");
+            self.default_arc_for_agent((*agent).clone())
         })
+    }
+
+    /// Get the default arc for an agent.
+    ///
+    /// The default arc depends on the Kitsune tuning parameters.
+    /// - Either arc clamping is set to empty and the arc is empty, or
+    /// - The arc clamping is set to full or not set, in which cases the arc is full.
+    fn default_arc_for_agent(&self, agent: Arc<KitsuneAgent>) -> Arq {
+        let dim = SpaceDimension::standard();
+        match self.config.tuning_params.arc_clamping() {
+            Some(ArqClamping::Empty) => Arq::new_empty(dim, agent.get_loc()),
+            Some(ArqClamping::Full) | None => {
+                let strat = self.config.tuning_params.to_arq_strat();
+                Arq::new_full_max(dim, &strat, agent.get_loc())
+            }
+        }
     }
 }
 

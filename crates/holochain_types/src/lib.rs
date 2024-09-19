@@ -18,7 +18,6 @@ pub mod activity;
 pub mod app;
 pub mod autonomic;
 pub mod chain;
-pub mod chc;
 pub mod combinators;
 pub mod db;
 pub mod db_cache;
@@ -36,6 +35,7 @@ pub mod signal;
 #[warn(missing_docs)]
 pub mod sql;
 pub mod validation_receipt;
+pub mod warrant;
 pub mod web_app;
 pub mod zome_types;
 
@@ -52,3 +52,29 @@ pub mod test_utils;
 pub mod websocket;
 
 pub use holochain_zome_types::entry::EntryHashed;
+
+/// Convert to the older deepkey version of an HDK prelude type
+#[macro_export]
+macro_rules! deepkey_roundtrip_backward(
+    ($t:ident, $v:expr) => {{
+        let v: &$t = $v;
+        let v: hc_deepkey_sdk::hdk::prelude::$t = holochain_serialized_bytes::decode(
+            &holochain_serialized_bytes::encode(v).expect("Couldn't roundtrip encode"),
+        )
+        .expect("Couldn't roundtrip decode");
+        v
+    }}
+);
+
+/// Convert from the older deepkey version of an HDK prelude type
+#[macro_export]
+macro_rules! deepkey_roundtrip_forward(
+    ($t:ident, $v:expr) => {{
+        let v: &hc_deepkey_sdk::hdk::prelude::$t = $v;
+        let v: $t = holochain_serialized_bytes::decode(
+            &holochain_serialized_bytes::encode($v).expect("Couldn't roundtrip encode"),
+        )
+        .expect("Couldn't roundtrip decode");
+        v
+    }}
+);

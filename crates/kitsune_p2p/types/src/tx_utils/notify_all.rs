@@ -25,7 +25,7 @@ impl std::future::Future for WaitFut {
         let mut index = self.1.take();
         let waker_update_result = self.0.share_mut(|i, _| {
             if let Some(idx) = index {
-                i.wakers[idx] = cx.waker().clone();
+                i.wakers[idx].clone_from(cx.waker());
                 index = Some(idx);
             } else {
                 index = Some(i.wakers.len());

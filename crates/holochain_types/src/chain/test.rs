@@ -1,3 +1,5 @@
+// clippy... this is just the test_case syntax...
+#![allow(clippy::single_range_in_vec_init)]
 use holo_hash::*;
 use std::collections::HashMap;
 use std::ops::Range;
@@ -18,7 +20,7 @@ fn hash(i: u32) -> TestHash {
 /// Build a chain of RegisterAgentActivity and then run them through the
 /// chain filter.
 fn build_chain(c: Vec<TestChainItem>, filter: TestFilter) -> Vec<TestChainItem> {
-    ChainFilterIter::new(filter, c).into_iter().collect()
+    ChainFilterIter::new(filter, c).collect()
 }
 
 /// Useful for displaying diff of test_case failure.
@@ -86,13 +88,13 @@ fn matches_chain(a: &Vec<RegisterAgentActivity>, seq: &[u32]) -> bool {
 
 #[test_case(
     chain(0..3), ChainFilter::new(action_hash(&[1])), hash_to_seq(&[1])
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[1, 0]) ; "chain_top 1 chain 0 to 3")]
+    => matches MustGetAgentActivityResponse::Activity {activity, ..} if matches_chain(&activity, &[1, 0]) ; "chain_top 1 chain 0 to 3")]
 #[test_case(
     chain(10..20), ChainFilter::new(action_hash(&[15])).until(action_hash(&[10])), hash_to_seq(&[10, 15])
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[15, 14, 13, 12, 11, 10]) ; "chain_top 15 until 10 chain 10 to 20")]
+    => matches MustGetAgentActivityResponse::Activity {activity, ..} if matches_chain(&activity, &[15, 14, 13, 12, 11, 10]) ; "chain_top 15 until 10 chain 10 to 20")]
 #[test_case(
     chain(10..16), ChainFilter::new(action_hash(&[15])).until(action_hash(&[10])).take(2), hash_to_seq(&[10, 15])
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[15, 14]) ; "chain_top 15 until 10 take 2 chain 10 to 15")]
+    => matches MustGetAgentActivityResponse::Activity {activity, ..} if matches_chain(&activity, &[15, 14]) ; "chain_top 15 until 10 take 2 chain 10 to 15")]
 #[test_case(
     chain(1..6), ChainFilter::new(action_hash(&[5])).until(action_hash(&[0])).take(6), hash_to_seq(&[0, 5])
     => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top 5 until 0 take 6 chain 1 to 5")]
@@ -104,16 +106,16 @@ fn matches_chain(a: &Vec<RegisterAgentActivity>, seq: &[u32]) -> bool {
     => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top 7 until 0 take 8 chain 0 to 3 then 5 to 10")]
 #[test_case(
     gap_chain(&[0..4, 5..10]), ChainFilter::new(action_hash(&[7])).until(action_hash(&[5])).take(8), hash_to_seq(&[5, 7])
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[7, 6, 5]) ; "chain_top 7 until 5 take 8 chain 0 to 3 then 5 to 10")]
+    => matches MustGetAgentActivityResponse::Activity {activity, ..} if matches_chain(&activity, &[7, 6, 5]) ; "chain_top 7 until 5 take 8 chain 0 to 3 then 5 to 10")]
 #[test_case(
     gap_chain(&[0..4, 5..10]), ChainFilter::new(action_hash(&[7])).until(action_hash(&[0])).take(3), hash_to_seq(&[0, 7])
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[7, 6, 5]) ; "chain_top 7 until 0 take 3 chain 0 to 3 then 5 to 10")]
+    => matches MustGetAgentActivityResponse::Activity {activity, ..} if matches_chain(&activity, &[7, 6, 5]) ; "chain_top 7 until 0 take 3 chain 0 to 3 then 5 to 10")]
 #[test_case(
     forked_chain(&[0..6, 3..8]), ChainFilter::new(action_hash(&[5])).until(action_hash(&[0])).take(8), hash_to_seq(&[0, 5])
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[5, 4, 3, 2, 1, 0]) ; "chain_top 5 until 0 take 8 chain 0 to 5 and 3 to 7")]
+    => matches MustGetAgentActivityResponse::Activity {activity, ..} if matches_chain(&activity, &[5, 4, 3, 2, 1, 0]) ; "chain_top 5 until 0 take 8 chain 0 to 5 and 3 to 7")]
 #[test_case(
     forked_chain(&[0..6, 3..8]), ChainFilter::new(action_hash(&[7, 1])).take(8), |_| Some(7)
-    => matches MustGetAgentActivityResponse::Activity(a) if matches_chain(&a, &[7, 6, 5, 4, 3, 2, 1, 0]) ; "chain_top (7,1) take 8 chain 0 to 5 and 3 to 7")]
+    => matches MustGetAgentActivityResponse::Activity {activity, ..} if matches_chain(&activity, &[7, 6, 5, 4, 3, 2, 1, 0]) ; "chain_top (7,1) take 8 chain 0 to 5 and 3 to 7")]
 #[test_case(
     forked_chain(&[4..6, 3..8]), ChainFilter::new(action_hash(&[5, 0])).until(action_hash(&[4, 1])), |h| if *h == action_hash(&[5, 0]) { Some(5) } else { Some(4) }
     => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top (5,0) until (4,1) chain (0,0) to (5,0) and (3,1) to (7,1)")]
@@ -124,7 +126,7 @@ fn test_filter_then_check(
 ) -> MustGetAgentActivityResponse {
     let chain = chain_to_ops(chain);
     match Sequences::find_sequences::<_, ()>(filter, |a| Ok(f(a))) {
-        Ok(Sequences::Found(s)) => s.filter_then_check(chain),
+        Ok(Sequences::Found(s)) => s.filter_then_check(chain, vec![]),
         _ => unreachable!(),
     }
 }

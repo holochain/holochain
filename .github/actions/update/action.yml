@@ -34,13 +34,13 @@ runs:
       with:
         ref: ${{ inputs.branch }}
     - name: Install nix
-      uses: cachix/install-nix-action@v22
+      uses: cachix/install-nix-action@v27
       with:
-        install_url: https://releases.nixos.org/nix/nix-2.12.0/install
+        install_url: https://releases.nixos.org/nix/nix-2.23.3/install
         extra_nix_config: |
           access-tokens = github.com=${{ inputs.GITHUB_TOKEN }}
     - name: Setup cachix
-      uses: cachix/cachix-action@v12
+      uses: cachix/cachix-action@v15
       with:
         name: holochain-ci
         signingKey: "${{ inputs.CACHIX_SIGNING_KEY }}"
@@ -56,7 +56,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.HRA_GITHUB_TOKEN }}
     - name: create pull request
-      uses: peter-evans/create-pull-request@v5
+      uses: peter-evans/create-pull-request@v6
       id: cpr1
       with:
         token: ${{ inputs.HRA_GITHUB_TOKEN }}
