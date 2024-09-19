@@ -2,6 +2,8 @@ use crate::actor::*;
 use crate::event::*;
 use crate::HostApi;
 use crate::HostApiLegacy;
+use actor::create_meta_net;
+use actor::KitsuneP2pActor;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 mod actor;

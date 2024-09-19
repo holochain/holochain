@@ -58,11 +58,7 @@ use std::time::Instant;
 use tracing::*;
 
 #[cfg(feature = "test_utils")]
-use kitsune_p2p::dependencies::kitsune_p2p_types::box_fut_plain;
-#[cfg(feature = "test_utils")]
-use kitsune_p2p::dependencies::kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
-#[cfg(feature = "test_utils")]
-use std::collections::HashMap;
+use kitsune_p2p::dependencies::kitsune_p2p_types::{box_fut_plain, tx_utils::ShareOpen};
 
 pub mod authority;
 pub mod error;

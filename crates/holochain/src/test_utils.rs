@@ -16,7 +16,6 @@ use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_conductor_api::conductor::paths::DataRootPath;
-use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_conductor_api::ZomeCall;
@@ -451,7 +450,7 @@ pub async fn setup_app_inner(
                 allowed_origins: AllowedOrigins::Any,
             },
         }]),
-        network: network.unwrap_or_default(),
+        network: network.unwrap_or_else(KitsuneP2pConfig::empty),
         ..ConductorConfig::empty()
     };
     let conductor_handle = ConductorBuilder::new()

@@ -1,11 +1,10 @@
 // TODO: not sure how to fix these unused warnings, something to do with
 // the weird module structure and features
 
-#[allow(unused)]
+#![allow(unused)]
+
 mod internal_stub;
-#[allow(unused)]
 mod legacy_host_stub;
-#[allow(unused)]
 mod space_internal_stub;
 
 pub use internal_stub::{InternalStub, InternalStubTest, InternalStubTestSender};

@@ -70,7 +70,7 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        let mut c = SweetConductorConfig::from(KitsuneP2pConfig::default())
+        let mut c = SweetConductorConfig::from(KitsuneP2pConfig::empty())
             .tune(|tune| {
                 tune.gossip_loop_iteration_delay_ms = 500;
                 tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;

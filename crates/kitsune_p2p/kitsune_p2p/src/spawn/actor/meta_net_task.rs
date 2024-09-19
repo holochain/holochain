@@ -16,7 +16,7 @@ use futures::StreamExt;
 use ghost_actor::{GhostError, GhostSender};
 use kitsune_p2p_fetch::{FetchKey, FetchPool, FetchResponseQueue};
 use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use std::error::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -33,13 +33,12 @@ struct DelegateBroadcastItem {
 
 pub struct MetaNetTask {
     host: HostApiLegacy,
-    tuning_params: KitsuneP2pTuningParams,
+    config: KitsuneP2pConfig,
     fetch_pool: FetchPool,
     fetch_response_queue: FetchResponseQueue<FetchResponseConfig>,
     ep_evt: Option<MetaNetEvtRecv>,
     i_s: GhostSender<Internal>,
     is_finished: Arc<AtomicBool>,
-    tracing_scope: Option<String>,
     delegate_broadcast_send: tokio::sync::mpsc::Sender<DelegateBroadcastItem>,
     delegate_broadcast_task: tokio::task::JoinHandle<()>,
 }
@@ -75,12 +74,11 @@ type MetaNetTaskResult<T> = Result<T, MetaNetTaskError>;
 impl MetaNetTask {
     pub fn new(
         host: HostApiLegacy,
-        tuning_params: KitsuneP2pTuningParams,
+        config: KitsuneP2pConfig,
         fetch_pool: FetchPool,
         fetch_response_queue: FetchResponseQueue<FetchResponseConfig>,
         ep_evt: MetaNetEvtRecv,
         i_s: GhostSender<Internal>,
-        tracing_scope: Option<String>,
     ) -> Self {
         const MAX_DELEGATE_BROADCAST: usize = 512;
 
@@ -109,13 +107,12 @@ impl MetaNetTask {
 
         Self {
             host,
-            tuning_params,
+            config,
             fetch_pool,
             fetch_response_queue,
             ep_evt: Some(ep_evt),
             i_s,
             is_finished: Arc::new(AtomicBool::new(false)),
-            tracing_scope,
             delegate_broadcast_send,
             delegate_broadcast_task,
         }

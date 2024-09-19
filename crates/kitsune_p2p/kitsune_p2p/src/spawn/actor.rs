@@ -5,7 +5,6 @@ use crate::event::*;
 use crate::gossip::sharded_gossip::BandwidthThrottles;
 use crate::gossip::sharded_gossip::KitsuneDiagnostics;
 use crate::types::gossip::GossipModuleType;
-use crate::types::metrics::KitsuneMetrics;
 use crate::wire::MetricExchangeMsg;
 use crate::*;
 use futures::future::FutureExt;
@@ -15,7 +14,6 @@ use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
 use kitsune_p2p_types::dht::Arq;
-use kitsune_p2p_types::metrics::Tx2ApiMetrics;
 use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -167,7 +165,7 @@ impl KitsuneP2pActor {
             fetch_pool.clone(),
             self_host_api.clone(),
             internal_sender.clone(),
-            config.tracing_scope(),
+            config.tracing_scope.clone(),
         );
 
         let i_s = internal_sender.clone();
@@ -184,7 +182,6 @@ impl KitsuneP2pActor {
             fetch_response_queue,
             ep_evt,
             i_s,
-            config.tracing_scope(),
         )
         .spawn();
 
@@ -206,7 +203,7 @@ impl KitsuneP2pActor {
 
 pub(super) async fn create_meta_net(
     config: &KitsuneP2pConfig,
-    tls_config: tls::TlsConfig,
+    _tls_config: tls::TlsConfig,
     internal_sender: ghost_actor::GhostSender<Internal>,
     host: HostApiLegacy,
     preflight_user_data: PreflightUserData,
@@ -1012,7 +1009,6 @@ mod tests {
     use ghost_actor::actor_builder::GhostActorBuilder;
     use kitsune_p2p_bootstrap_client::BootstrapNet;
     use kitsune_p2p_types::config::KitsuneP2pConfig;
-    use kitsune_p2p_types::metrics::Tx2ApiMetrics;
     use kitsune_p2p_types::tls::TlsConfig;
     use std::net::SocketAddr;
     use std::sync::Arc;

@@ -1,4 +1,4 @@
-#![allow(clippy::blocks_in_if_conditions)]
+#![allow(clippy::blocks_in_conditions)]
 
 use crate::tx_utils::*;
 use crate::*;

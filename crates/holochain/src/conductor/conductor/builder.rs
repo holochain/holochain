@@ -58,6 +58,9 @@ impl ConductorBuilder {
             #[cfg(any(test, feature = "test_utils"))]
             state: None,
             no_print_setup: false,
+            dpki: None,
+            generate_test_device_seed: false,
+            danger_print_db_secrets: false,
         }
     }
 }

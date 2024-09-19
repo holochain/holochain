@@ -1,6 +1,6 @@
 //! Types for the bootstrap server
 use crate::bin_types::{KitsuneBinType, KitsuneSpace};
-use crate::tx2::tx2_utils::TxUrl;
+use crate::tx_utils::TxUrl;
 use std::collections::HashSet;
 use std::sync::Arc;
 

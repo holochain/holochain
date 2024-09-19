@@ -166,7 +166,7 @@ impl ConductorConfig {
             tracing_override: None,
             data_root_path: None,
             keystore: KeystoreConfig::default(),
-            dpki: None,
+            dpki: DpkiConfig::testing(),
             admin_interfaces: None,
             network: KitsuneP2pConfig::empty(),
             db_sync_strategy: DbSyncStrategy::default(),

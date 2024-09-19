@@ -2,16 +2,13 @@
 
 use holochain::{conductor::api::NetworkInfo, prelude::*};
 use human_repr::{HumanCount, HumanThroughput};
-use kitsune_p2p::dependencies::kitsune_p2p_types::{
-    dependencies::tokio::time::Instant as TokioInstant, tx_utils::ProxyUrl, Tx2Cert,
-};
+use kitsune_p2p::dependencies::kitsune_p2p_types::tx_utils::ProxyUrl;
 use kitsune_p2p::gossip::sharded_gossip::{NodeId, RegionDiffs};
 use kitsune_p2p::metrics::{CompletedRound, CurrentRound, PeerNodeHistory};
 use kitsune_p2p::KitsuneDiagnostics;
 use kitsune_p2p::{
-    dependencies::{
-        kitsune_p2p_proxy,
-        kitsune_p2p_types::{dependencies::tokio::time::Instant as TokioInstant, Tx2Cert},
+    dependencies::kitsune_p2p_types::{
+        dependencies::tokio::time::Instant as TokioInstant, Tx2Cert,
     },
     dht::region::Region,
     metrics::Metrics,

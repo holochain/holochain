@@ -2,6 +2,7 @@ use crate::spawn::actor::{Internal, InternalSender};
 use crate::{HostApiLegacy, KitsuneP2pError};
 use ghost_actor::{GhostError, GhostSender};
 use kitsune_p2p_fetch::{FetchKey, FetchPool};
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use parking_lot::RwLock;
 use std::sync::Arc;
 use tracing::Instrument;
@@ -16,7 +17,7 @@ impl FetchTask {
         fetch_pool: FetchPool,
         host: HostApiLegacy,
         internal_sender: GhostSender<Internal>,
-        tracing_scope: Option<String>,
+        _tracing_scope: Option<String>,
     ) -> Arc<RwLock<Self>> {
         let this = Arc::new(RwLock::new(FetchTask { is_finished: false }));
 
