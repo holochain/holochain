@@ -13,7 +13,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 derive_more = "0.99"
-holochain_trace = { version = "^0.4.0-dev.5", path = "../holochain_trace" }
 parking_lot = "0.12"
 petgraph = "0.6"
 regex = "1"
@@ -29,6 +28,7 @@ tracing-subscriber = { version = "0.3", optional = true }
 maplit = "1"
 pretty_assertions = "1.4"
 test-case = "3.3"
+holochain_trace = { version = "^0.4.0-dev.5", path = "../holochain_trace" }
 
 [lints]
 workspace = true

@@ -2471,7 +2471,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a34addaffa7d2c80637807444f171c646cad7549fcdac8019544034678f76d5"
 dependencies = [
  "futures",
- "mockall",
+ "mockall 0.11.4",
  "must_future",
  "paste",
  "thiserror",
@@ -2838,7 +2838,6 @@ dependencies = [
  "arbitrary",
  "derive_more",
  "hc_sleuth",
- "holochain_state_types",
  "holochain_trace",
  "holochain_types",
  "kitsune_p2p",
@@ -2886,7 +2885,7 @@ dependencies = [
  "holo_hash",
  "holochain_integrity_types",
  "holochain_wasmer_guest",
- "mockall",
+ "mockall 0.11.4",
  "paste",
  "serde",
  "serde_bytes",
@@ -2907,7 +2906,7 @@ dependencies = [
  "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
- "mockall",
+ "mockall 0.11.4",
  "paste",
  "serde",
  "serde_bytes",
@@ -3112,7 +3111,7 @@ dependencies = [
  "lair_keystore",
  "maplit",
  "matches",
- "mockall",
+ "mockall 0.13.0",
  "mr_bundle",
  "must_future",
  "nanoid",
@@ -3185,7 +3184,7 @@ dependencies = [
  "isotest",
  "kitsune_p2p",
  "matches",
- "mockall",
+ "mockall 0.11.4",
  "opentelemetry_api",
  "pretty_assertions",
  "test-case",
@@ -3345,11 +3344,10 @@ dependencies = [
  "futures",
  "hc_deepkey_sdk",
  "hdk",
- "holochain_deepkey_dna",
  "holochain_keystore",
  "holochain_types",
  "holochain_util",
- "mockall",
+ "mockall 0.11.4",
  "must_future",
  "nanoid",
  "serde",
@@ -3446,7 +3444,7 @@ name = "holochain_mock_hdi"
 version = "0.0.1"
 dependencies = [
  "hdi",
- "mockall",
+ "mockall 0.11.4",
 ]
 
 [[package]]
@@ -3480,7 +3478,7 @@ dependencies = [
  "holochain_zome_types",
  "kitsune_p2p",
  "kitsune_p2p_types",
- "mockall",
+ "mockall 0.11.4",
  "rand 0.8.5",
  "serde",
  "serde_bytes",
@@ -3676,7 +3674,6 @@ dependencies = [
  "flate2",
  "futures",
  "getrandom 0.2.15",
- "hc_deepkey_sdk",
  "holo_hash",
  "holochain_keystore",
  "holochain_nonce",
@@ -3845,7 +3842,6 @@ dependencies = [
  "shrinkwraprs",
  "strum 0.18.0",
  "subtle",
- "subtle-encoding",
  "thiserror",
  "tracing",
 ]
@@ -4540,7 +4536,7 @@ dependencies = [
  "kitsune_p2p_timestamp",
  "kitsune_p2p_types",
  "maplit",
- "mockall",
+ "mockall 0.11.4",
  "must_future",
  "nanoid",
  "num-traits",
@@ -4732,7 +4728,6 @@ dependencies = [
  "kitsune_p2p_types",
  "serde",
  "serde_bytes",
- "structopt",
  "tokio",
 ]
 
@@ -4770,7 +4765,7 @@ dependencies = [
  "kitsune_p2p_timestamp",
  "kitsune_p2p_types",
  "lair_keystore_api",
- "mockall",
+ "mockall 0.11.4",
  "once_cell",
  "parking_lot 0.12.3",
  "paste",
@@ -5232,8 +5227,22 @@ dependencies = [
  "downcast",
  "fragile",
  "lazy_static",
- "mockall_derive",
+ "mockall_derive 0.11.4",
  "predicates 2.1.5",
+ "predicates-tree",
+]
+
+[[package]]
+name = "mockall"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4c28b3fb6d753d28c20e826cd46ee611fda1cf3cde03a443a974043247c065a"
+dependencies = [
+ "cfg-if 1.0.0",
+ "downcast",
+ "fragile",
+ "mockall_derive 0.13.0",
+ "predicates 3.1.0",
  "predicates-tree",
 ]
 
@@ -5247,6 +5256,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "mockall_derive"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "341014e7f530314e9a1fdbc7400b244efea7122662c96bfa248c31da5bfb2020"
+dependencies = [
+ "cfg-if 1.0.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.71",
 ]
 
 [[package]]
