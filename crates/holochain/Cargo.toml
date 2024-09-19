@@ -57,7 +57,7 @@ kitsune_p2p = { version = "^0.4.0-dev.21", path = "../kitsune_p2p/kitsune_p2p", 
 kitsune_p2p_bin_data = { version = "^0.4.0-dev.11", path = "../kitsune_p2p/bin_data" }
 kitsune_p2p_types = { version = "^0.4.0-dev.13", path = "../kitsune_p2p/types" }
 kitsune_p2p_block = { version = "^0.4.0-dev.11", path = "../kitsune_p2p/block" }
-mockall = "0.13"
+mockall = "0.11.3"
 mr_bundle = { version = "^0.4.0-dev.7", path = "../mr_bundle" }
 must_future = "0.1.1"
 nanoid = "0.4"
