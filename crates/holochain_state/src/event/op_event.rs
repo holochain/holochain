@@ -6,9 +6,7 @@
 //! The database state pertaining to DhtOps can be streamed out as a list of `OpEvent`s,
 //! and that same state can be recreated by applying a list of `OpEvent`s.
 
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
-
-use crate::{event::EventError, prelude::*, query::map_sql_dht_op};
+use crate::{prelude::*, query::map_sql_dht_op};
 
 use super::{Event, EventData, EventResult};
 

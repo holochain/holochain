@@ -1,5 +1,3 @@
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
-
 use crate::prelude::*;
 
 mod error;
@@ -37,7 +35,7 @@ impl Event {
 
 impl PartialOrd for Event {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 
