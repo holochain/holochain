@@ -224,76 +224,7 @@ impl OpEventStore {
 
         Ok(events)
     }
-
-    async fn with_db<F>(&self, db: Db, f: F) -> StateMutationResult<()>
-    where
-        F: Send + 'static + FnOnce(&mut Transaction) -> Result<(), StateMutationError>,
-    {
-        match db {
-            Db::Authored => self.authored.write_async(f).await,
-            Db::Dht => self.dht.write_async(f).await,
-        }
-    }
-
-    // async fn lookup_op(&self, op_hash: &DhtOpHash) -> EventResult<Db> {
-    //     let sql = "
-    //         SELECT when_stored
-    //         FROM DhtOp
-    //         WHERE hash = :op_hash
-    //     ";
-
-    //     let op_hash_clone = op_hash.clone();
-    //     let authored_timestamp: Option<Timestamp> = self
-    //         .authored
-    //         .read_async(move |txn| {
-    //             txn.query_row_and_then(
-    //                 sql,
-    //                 named_params! {
-    //                     ":op_hash": op_hash_clone,
-    //                 },
-    //                 |row| Ok(row.get("when_stored")?),
-    //             )
-    //             .optional()
-    //             .map_err(StateMutationError::from)
-    //         })
-    //         .await?;
-
-    //     let op_hash_clone = op_hash.clone();
-    //     let dht_timestamp: Option<Timestamp> = self
-    //         .dht
-    //         .read_async(move |txn| {
-    //             txn.query_row_and_then(
-    //                 sql,
-    //                 named_params! {
-    //                     ":op_hash": op_hash_clone,
-    //                 },
-    //                 |row| Ok(row.get("when_stored")?),
-    //             )
-    //             .optional()
-    //             .map_err(StateMutationError::from)
-    //         })
-    //         .await?;
-
-    //     match (authored_timestamp, dht_timestamp) {
-    //         (Some(authored_timestamp), None) => Ok(Db::Authored),
-    //         (None, Some(dht_timestamp)) => Ok(Db::Dht),
-    //         (Some(authored_timestamp), Some(dht_timestamp)) => {
-    //             if authored_timestamp < dht_timestamp {
-    //                 Ok(Db::Authored)
-    //             } else {
-    //                 Ok(Db::Dht)
-    //             }
-    //         }
-    //         (None, None) => Err(EventError::RequisiteEventNotFound(op_hash.clone())),
-    //     }
-    // }
 }
-
-// #[derive(Debug, Clone, Copy)]
-// enum Db {
-//     Authored,
-//     Dht,
-// }
 
 #[cfg(test)]
 mod tests {

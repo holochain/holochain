@@ -15,6 +15,7 @@ pub struct Event {
     pub timestamp: Timestamp,
     pub data: EventData,
 }
+
 impl Event {
     pub fn new(timestamp: Timestamp, data: impl Into<EventData>) -> Self {
         Self {
