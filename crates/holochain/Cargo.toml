@@ -81,7 +81,7 @@ strum = "0.18.0"
 subtle-encoding = "0.5"
 tempfile = "3.3"
 thiserror = "1.0.22"
-tokio = { version = "1.36.0", features = ["full"] }
+tokio = { version = "1.36.0" }
 tokio-stream = { version = "0.1", features = ["sync", "net"] }
 task-motel = "0.1.0"
 tracing = "0.1"
