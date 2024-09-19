@@ -111,6 +111,8 @@ kitsune_p2p_bootstrap = { version = "^0.3.0-dev.14", path = "../kitsune_p2p/boot
 unwrap_to = { version = "0.1.0", optional = true }
 sbd-server = { version = "=0.0.6-alpha", optional = true }
 tx5-go-pion-turn = { version = "=0.1.3-beta", optional = true }
+async-once-cell = { version = "0.5", optional = true }
+get_if_addrs = { version = "0.5.3", optional = true }
 
 # chc deps
 bytes = { version = "1", optional = true }
@@ -160,8 +162,6 @@ test-case = "3.3"
 tokio-tungstenite = "0.21"
 tx5 = "0.1.3-beta"
 predicates = "3.1"
-async-once-cell = "0.5"
-get_if_addrs = "0.5.3"
 
 [build-dependencies]
 hdk = { version = "^0.4.0-dev.17", path = "../hdk" }
@@ -237,6 +237,8 @@ test_utils = [
   "holochain_wasm_test_utils",
   "unwrap_to",
   "sbd-server",
+  "async-once-cell",
+  "get_if_addrs",
 ]
 
 fuzzing = []
