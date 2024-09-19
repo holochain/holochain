@@ -724,52 +724,13 @@ impl RealRibosome {
     }
 }
 
-/// General purpose macro which relies heavily on various impls of the form:
-/// From<Vec<(ZomeName, $callback_result)>> for ValidationResult
-macro_rules! do_callback {
-    ( $self:ident, $access:ident, $invocation:ident, $callback_result:ty ) => {{
-        use tokio_stream::StreamExt;
-        let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
-        // fallible iterator syntax instead of for loop
-        let mut call_stream = $self.call_stream($access.into(), $invocation);
-        loop {
-            let (zome_name, callback_result): (ZomeName, $callback_result) =
-                match call_stream.next().await {
-                    Some(Ok((zome, extern_io))) => (
-                        zome.into(),
-                        extern_io
-                            .decode()
-                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
-                    ),
-                    Some(Err((zome, RibosomeError::WasmRuntimeError(runtime_error)))) => (
-                        zome.into(),
-                        <$callback_result>::try_from_wasm_error(runtime_error.downcast()?)
-                            .map_err(|e| -> RuntimeError { WasmHostError(e).into() })?,
-                    ),
-                    Some(Err((_zome, other_error))) => return Err(other_error),
-                    None => {
-                        break;
-                    }
-                };
-            // return early if we have a definitive answer, no need to keep invoking callbacks
-            // if we know we are done
-            if callback_result.is_definitive() {
-                return Ok(vec![(zome_name, callback_result)].into());
-            }
-            results.push((zome_name, callback_result));
-        }
-        // fold all the non-definitive callbacks down into a single overall result
-        Ok(results.into())
-    }};
-}
-
 impl RealRibosome {
     async fn run_genesis_self_check_v1(
         &self,
         host_access: GenesisSelfCheckHostAccessV1,
         invocation: GenesisSelfCheckInvocationV1,
     ) -> RibosomeResult<GenesisSelfCheckResultV1> {
-        do_callback!(self, host_access, invocation, ValidateCallbackResult)
+        self.do_callback(host_access, invocation).await
     }
 
     async fn run_genesis_self_check_v2(
@@ -777,7 +738,7 @@ impl RealRibosome {
         host_access: GenesisSelfCheckHostAccessV2,
         invocation: GenesisSelfCheckInvocationV2,
     ) -> RibosomeResult<GenesisSelfCheckResultV1> {
-        do_callback!(self, host_access, invocation, ValidateCallbackResult)
+        self.do_callback(host_access, invocation).await
     }
 
     /// call a function in a zome for an invocation if it exists
@@ -863,6 +824,45 @@ impl RealRibosome {
                 Ok(result)
             }
         }
+    }
+
+    async fn do_callback<A, I, CR, R>(&self, access: A, invocation: I) -> RibosomeResult<R>
+    where
+        A: Into<HostContext>,
+        I: Invocation + 'static,
+        CR: CallbackResult + std::fmt::Debug + serde::de::DeserializeOwned,
+        R: From<Vec<(ZomeName, CR)>>,
+    {
+        let mut results: Vec<(ZomeName, CR)> = Vec::new();
+        // fallible iterator syntax instead of for loop
+        let mut call_stream = self.call_stream(access.into(), invocation);
+        loop {
+            let (zome_name, callback_result): (ZomeName, CR) = match call_stream.next().await {
+                Some(Ok((zome, extern_io))) => (
+                    zome.into(),
+                    extern_io
+                        .decode()
+                        .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
+                ),
+                Some(Err((zome, RibosomeError::WasmRuntimeError(runtime_error)))) => (
+                    zome.into(),
+                    <CR>::try_from_wasm_error(runtime_error.downcast()?)
+                        .map_err(|e| -> RuntimeError { WasmHostError(e).into() })?,
+                ),
+                Some(Err((_zome, other_error))) => return Err(other_error),
+                None => {
+                    break;
+                }
+            };
+            // return early if we have a definitive answer, no need to keep invoking callbacks
+            // if we know we are done
+            if callback_result.is_definitive() {
+                return Ok(vec![(zome_name, callback_result)].into());
+            }
+            results.push((zome_name, callback_result));
+        }
+        // fold all the non-definitive callbacks down into a single overall result
+        Ok(results.into())
     }
 }
 
@@ -1088,7 +1088,7 @@ impl RibosomeT for RealRibosome {
         host_access: ValidateHostAccess,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult> {
-        do_callback!(self, host_access, invocation, ValidateCallbackResult)
+        self.do_callback(host_access, invocation).await
     }
 
     async fn run_init(
@@ -1096,7 +1096,7 @@ impl RibosomeT for RealRibosome {
         host_access: InitHostAccess,
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult> {
-        do_callback!(self, host_access, invocation, InitCallbackResult)
+        self.do_callback(host_access, invocation).await
     }
 
     async fn run_entry_defs(
@@ -1104,7 +1104,7 @@ impl RibosomeT for RealRibosome {
         host_access: EntryDefsHostAccess,
         invocation: EntryDefsInvocation,
     ) -> RibosomeResult<EntryDefsResult> {
-        do_callback!(self, host_access, invocation, EntryDefsCallbackResult)
+        self.do_callback(host_access, invocation).await
     }
 
     fn zome_types(&self) -> &Arc<GlobalZomeTypes> {
