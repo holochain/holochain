@@ -55,12 +55,14 @@ impl ConductorBuilder {
             ribosome_store: Default::default(),
             passphrase: None,
             keystore: None,
+            no_print_setup: false,
+            danger_print_db_secrets: false,
             #[cfg(any(test, feature = "test_utils"))]
             state: None,
-            no_print_setup: false,
+            #[cfg(any(test, feature = "test_utils"))]
             dpki: None,
+            #[cfg(any(test, feature = "test_utils"))]
             generate_test_device_seed: false,
-            danger_print_db_secrets: false,
         }
     }
 }
