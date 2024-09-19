@@ -888,7 +888,6 @@ impl MetaNet {
         ))
     }
 
-
     pub async fn broadcast(
         &self,
         payload: &wire::Wire,
@@ -918,7 +917,7 @@ impl MetaNet {
     pub fn close_peer_con(&self, peer_url: TxUrl) -> KitsuneResult<()> {
         // Not supported for tx2
 
-                {
+        {
             // Even if tx5 is enabled, check that the peer_url is a ws or wss url to the signal server
             if peer_url.scheme() == "ws" || peer_url.scheme() == "wss" {
                 if let MetaNet::Tx5 { ep, .. } = self {

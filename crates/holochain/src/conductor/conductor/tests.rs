@@ -394,9 +394,9 @@ async fn test_signing_error_during_genesis() {
     let db_dir = test_db_dir();
     let config = ConductorConfig {
         data_root_path: Some(db_dir.path().to_path_buf().into()),
-dpki: DpkiConfig::disabled(),
-device_seed_lair_tag: Some("nonexistent-tag".to_string()),
-..ConductorConfig::empty()
+        dpki: DpkiConfig::disabled(),
+        device_seed_lair_tag: Some("nonexistent-tag".to_string()),
+        ..ConductorConfig::empty()
     };
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(bad_keystore, &config, &[]).await,

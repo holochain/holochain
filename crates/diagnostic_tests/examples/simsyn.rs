@@ -49,7 +49,7 @@ struct App {
 }
 
 impl App {
-        async fn setup() -> (Self, Vec<BroadcastStream<Signal>>) {
+    async fn setup() -> (Self, Vec<BroadcastStream<Signal>>) {
         let config = SweetConductorConfig::rendezvous(false).into();
 
         let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", syn_zome())).await;

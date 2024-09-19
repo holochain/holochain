@@ -6,11 +6,11 @@ use kitsune_p2p_bootstrap_client::BootstrapNet;
 use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
-use kitsune_p2p_types::dht::prelude::*;
 use kitsune_p2p_types::config::NetworkType;
+use kitsune_p2p_types::dht::arq::ArqSize;
+use kitsune_p2p_types::dht::prelude::*;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx_utils::TxUrl;
-use kitsune_p2p_types::dht::arq::ArqSize;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use url2::Url2;
@@ -1496,7 +1496,7 @@ impl Space {
                 space.clone(),
                 agent.clone(),
                 ArqSize::empty(), // no storage arc
-                Vec::new(), // no urls
+                Vec::new(),       // no urls
                 signed_at_ms,
                 expires_at_ms,
                 |d| {

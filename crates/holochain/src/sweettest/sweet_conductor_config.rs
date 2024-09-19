@@ -113,7 +113,6 @@ impl SweetConductorConfig {
             config.network.bootstrap_service = Some(url2::url2!("rendezvous:"));
         }
 
-
         {
             config.network.transport_pool =
                 vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
