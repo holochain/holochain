@@ -20,8 +20,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   That effectively meant that on a larger network, countersigning sessions would get cancelled when nothing had actually
   gone wrong. The rework of locking made fixing the bug simpler, but the key to the fix was in the `countersigning_success`
   function. That now checks that incoming signatures are actually for the current session. #4148
-- Add `danger_generate_throwaway_device_seed` to allow creation and use of a random device seed for test situations, where a proper device seed is not needed. #4238
-- Add `allow_throwaway_random_dpki_agent_key` to allow creation of a random (unrecoverable) DPKI agent when a device seed is not specified. #4238
+
+## 0.4.0-dev.25
+
+## 0.4.0-dev.24
+
+- Add `danger_generate_throwaway_device_seed` to allow creation and use of a random device seed for test situations, where a proper device seed is not needed. \#4238
+- Add `allow_throwaway_random_dpki_agent_key` to allow creation of a random (unrecoverable) DPKI agent when a device seed is not specified. \#4238
+- Fixes issue \#3679 where websocket connections would be closed if a message was received that failed to deserialize. The new behaviour isn’t perfect because you will get a timeout instead, but the websocket will remain open and you can continue to send further valid message. There is another issue to track partial deserialization \#4251 so we can respond with an error message instead of a timeout. \#4252
 
 ## 0.4.0-dev.23
 
@@ -37,6 +43,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - CloseChain can be used on its own, with no forward reference, to make a chain read-only.
   - CloseChain can include a forward reference to either a new AgentPubKey or a new DNA hash, which represent a migration to a new chain. The new chain is expected to begin with a corresponding OpenChain which has a backward reference to the CloseChain action. (This will become a validation rule in future work.)
 - Internal rework of `get_agent_activity`. This is not a breaking change for the HDK function of the same name, but it is a breaking change to the previous version of Holochain because the network response for agent activity has been changed. A future change will be made to the HDK function to expose the new functionality. \#4221
+- Add feature flags `wasmer_sys` and `wasmer_wamr` to toggle between using the current wasm compiler and the new, experimental wasm interpreter. `wasmer_sys` is enabled as a default feature to preserve existing behavior.
 
 ## 0.4.0-dev.21
 

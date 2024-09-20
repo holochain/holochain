@@ -1437,6 +1437,7 @@ pub struct InstallAppCommonFlags {
 /// Methods related to app installation and management
 mod app_impls {
     use holochain_types::deepkey_roundtrip_backward;
+    use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::LairEntryInfo;
 
     use crate::conductor::state::is_app;
 
@@ -2006,48 +2007,68 @@ mod app_impls {
 
             let dst_tag = format!("{lair_tag}.{dst_tag_suffix}");
 
-            let result = self
+            let entry_info = self
                 .keystore()
                 .lair_client()
-                .derive_seed(
-                    lair_tag.clone().into(),
-                    None,
-                    dst_tag.clone().into(),
-                    None,
-                    derivation_path.clone().into_boxed_slice(),
-                )
+                .get_entry(dst_tag.clone().into())
                 .await;
+            let seed_info = match entry_info {
+                Ok(LairEntryInfo::Seed { seed_info, .. }) => {
+                    // If the seed already exists, we don't need to create it again.
+                    seed_info
+                }
+                Ok(_) => {
+                    return Err(ConductorError::other(
+                        "DPKI could not be installed because the device seed points to an entry in lair that is not a seed.",
+                    ));
+                }
+                // Errors on not found, so try to create the seed and if that fails because there's
+                // some issue connecting to Lair then we'll get the error from trying to derive the seed.
+                Err(_) => {
+                    let result = self
+                        .keystore()
+                        .lair_client()
+                        .derive_seed(
+                            lair_tag.clone().into(),
+                            None,
+                            dst_tag.clone().into(),
+                            None,
+                            derivation_path.clone().into_boxed_slice(),
+                        )
+                        .await;
 
-            let info = match result {
-                Err(err) => {
-                    // If the seed could not be derived, assume that this is because there was no device seed
-                    // to derive from and attempt to create a throwaway seed if that was set in the config
-                    if config.danger_generate_throwaway_device_seed {
-                        tracing::info!("Failed to derive seed from lair, falling back to random seed. This is to be expected. Error: {:?}", err);
+                    match result {
+                        Ok(info) => info,
+                        Err(err) => {
+                            // If the seed could not be derived, assume that this is because there was no device seed
+                            // to derive from and attempt to create a throwaway seed if that was set in the config
+                            if config.danger_generate_throwaway_device_seed {
+                                tracing::info!("Failed to derive seed from lair, falling back to random seed. This is to be expected. Error: {:?}", err);
 
-                        self.keystore()
-                            .lair_client()
-                            .new_seed(lair_tag.clone().into(), None, false)
-                            .await?;
+                                self.keystore()
+                                    .lair_client()
+                                    .new_seed(lair_tag.clone().into(), None, false)
+                                    .await?;
 
-                        self.keystore()
-                            .lair_client()
-                            .derive_seed(
-                                lair_tag.into(),
-                                None,
-                                dst_tag.into(),
-                                None,
-                                derivation_path.into_boxed_slice(),
-                            )
-                            .await?
-                    } else {
-                        return Err(err.into());
+                                self.keystore()
+                                    .lair_client()
+                                    .derive_seed(
+                                        lair_tag.into(),
+                                        None,
+                                        dst_tag.into(),
+                                        None,
+                                        derivation_path.into_boxed_slice(),
+                                    )
+                                    .await?
+                            } else {
+                                return Err(err.into());
+                            }
+                        }
                     }
                 }
-                Ok(info) => info,
             };
 
-            let seed = info.ed25519_pub_key.0.to_vec();
+            let seed = seed_info.ed25519_pub_key.0.to_vec();
             Ok(seed)
         }
     }
@@ -2593,7 +2614,6 @@ mod app_status_impls {
 
 /// Methods related to management of Conductor state
 mod service_impls {
-
     use super::*;
 
     impl Conductor {
@@ -2777,6 +2797,7 @@ mod scheduler_impls {
         /// Calling this will:
         /// - Delete/unschedule all ephemeral scheduled functions GLOBALLY
         /// - Add an interval that runs IN ADDITION to previous invocations
+        ///
         /// So ideally this would be called ONCE per conductor lifecycle ONLY.
         #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn start_scheduler(

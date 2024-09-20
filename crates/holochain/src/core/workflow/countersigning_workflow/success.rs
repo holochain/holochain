@@ -71,7 +71,7 @@ pub(crate) async fn countersigning_success(
                             // We must guarantee that this value is always `Some` before switching
                             // to signatures collected so that signatures collected knows we
                             // transitioned from this state.
-                            resolution: Some(resolution.clone().unwrap_or_default()),
+                            resolution: Some(resolution.clone()),
                         };
                     }
                 }

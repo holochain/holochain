@@ -156,11 +156,11 @@ impl interval::ops::Width for DhtLocation {
     type Output = u32;
 
     fn max_value() -> Self {
-        u32::max_value().into()
+        u32::MAX.into()
     }
 
     fn min_value() -> Self {
-        u32::min_value().into()
+        u32::MIN.into()
     }
 
     fn width(lower: &Self, upper: &Self) -> Self::Output {

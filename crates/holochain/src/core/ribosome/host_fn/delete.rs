@@ -67,7 +67,7 @@ pub fn delete<'a>(
 pub(crate) fn get_original_entry_data(
     call_context: Arc<CallContext>,
     address: ActionHash,
-) -> Result<(EntryHash, EntryType), WasmError> {
+) -> Result<(EntryHash, EntryType), WasmHostError> {
     let network = call_context.host_context.network().clone();
     let workspace = call_context.host_context.workspace();
 

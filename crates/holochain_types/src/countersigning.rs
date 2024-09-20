@@ -28,7 +28,8 @@ pub enum CountersigningSessionState {
     /// the session to be completed.
     ///
     /// If we entered this state from the [CountersigningSessionState::Accepted] state, we will either
-    /// complete the session successfully or the session will time out and be abandoned.
+    /// complete the session successfully or the session will time out. On a timeout we will move
+    /// to the [CountersigningSessionState::Unknown] for a limited number of attempts to recover the session.
     ///
     /// This state can also be entered from the [CountersigningSessionState::Unknown] state, which happens when we
     /// have been able to recover the session from the source chain and have requested signed actions
@@ -38,9 +39,9 @@ pub enum CountersigningSessionState {
     /// complete the session successfully, or if the signatures are invalid, we will return to the
     /// [CountersigningSessionState::Unknown] state.
     SignaturesCollected {
-        /// The preflight request that has been exchanged.
+        /// The preflight request that has been exchanged among countersigning peers.
         preflight_request: PreflightRequest,
-        /// Multiple responses in the outer vec, sets of responses in the inner vec
+        /// Signed actions of the committed countersigned entries of all participating peers.
         signature_bundles: Vec<Vec<SignedAction>>,
         /// This field is set when the signature bundle came from querying agent activity authorities
         /// in the unknown state. If we started from that state, we should return to it if the
@@ -54,6 +55,17 @@ pub enum CountersigningSessionState {
     /// before we could complete the session. In this case we need to try to discover what the other
     /// agent or agents involved in the session have done.
     ///
+    /// This state is also entered temporarily when we have published a signature and then the
+    /// session has timed out. To avoid deadlocking with two parties both waiting for each other to
+    /// proceed, we cannot stay in this state indefinitely. We will make a limited number of attempts
+    /// to recover and if we cannot, we will abandon the session.
+    ///
+    /// The only exception to the attempt limiting is if we are unable to reach agent activity authorities
+    /// to progress resolving the session. In this case, the attempts are not counted towards the
+    /// configured limit. This does not protect us against a network partition where we can only see
+    /// a subset of the network, but it does protect us against Holochain forcing a decision while
+    /// it is unable to reach any peers.
+    ///
     /// Note that because the [PreflightRequest] is stored here, we only ever enter the unknown state
     /// if we managed to keep the preflight request in memory, or if we have been able to recover it
     /// from the source chain as part of the committed [CounterSigningSessionData]. Otherwise, we
@@ -63,7 +75,7 @@ pub enum CountersigningSessionState {
         /// The preflight request that has been exchanged.
         preflight_request: PreflightRequest,
         /// Summary of the attempts to resolve this session.
-        resolution: Option<SessionResolutionSummary>,
+        resolution: SessionResolutionSummary,
     },
 }
 
@@ -102,6 +114,8 @@ impl CountersigningSessionState {
 /// This tracks the numbers of attempts and the outcome of the most recent attempt.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionResolutionSummary {
+    /// The reason why session resolution is required.
+    pub required_reason: ResolutionRequiredReason,
     /// How many attempts have been made to resolve the session.
     ///
     /// Attempts are made according to the frequency specified by [RETRY_UNKNOWN_SESSION_STATE_DELAY].
@@ -110,23 +124,29 @@ pub struct SessionResolutionSummary {
     /// is restarted then this counter is also reset.
     pub attempts: usize,
     /// The time of the last attempt to resolve the session.
-    pub last_attempt_at: Timestamp,
+    pub last_attempt_at: Option<Timestamp>,
     /// The outcome of the most recent attempt to resolve the session.
     pub outcomes: Vec<SessionResolutionOutcome>,
-    /// If we've tried to complete the session using signatures found with agent activity authorities
-    /// and still not succeeded, then the number of attempts is recorded here.
-    pub completion_attempts: usize,
 }
 
 impl Default for SessionResolutionSummary {
     fn default() -> Self {
         Self {
-            attempts: 1,
-            last_attempt_at: Timestamp::now(),
+            required_reason: ResolutionRequiredReason::Unknown,
+            attempts: 0,
+            last_attempt_at: None,
             outcomes: Vec::with_capacity(0),
-            completion_attempts: 0,
         }
     }
+}
+
+/// The reason why a countersigning session can not be resolved automatically and requires manual resolution.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ResolutionRequiredReason {
+    /// The session has timed out, so we should try to resolve its state before abandoning.
+    Timeout,
+    /// Something happened, like a conductor restart, and we lost track of the session.
+    Unknown,
 }
 
 /// The outcome for a single agent who participated in a countersigning session.
@@ -153,12 +173,19 @@ pub const NUM_AUTHORITIES_TO_QUERY: usize = 3;
 /// Decision about an incomplete countersigning session.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SessionCompletionDecision {
-    /// Complete by an action.
+    /// Evidence found on the network that this session completed successfully.
     Complete(Box<SignedActionHashed>),
-    /// Session is to be abandoned.
+    /// Evidence found on the network that this session was abandoned and other agents have
+    /// added to their chain without completing the session.
     Abandoned,
-    /// No decision made.
+    /// No evidence, or inconclusive evidence, was found on the network. Holochain will not make an
+    /// automatic decision until the evidence is conclusive.
     Indeterminate,
+    /// There were errors encountered while trying to resolve the session. Errors such as network
+    /// errors are treated differently to inconclusive evidence. We don't want to force a decision
+    /// when we're offline, for example. In this case, the resolution must be retried later and this
+    /// attempt should not be counted.
+    Failed,
 }
 
 /// Errors related to countersigning sessions.

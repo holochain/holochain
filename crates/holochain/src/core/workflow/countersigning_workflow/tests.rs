@@ -22,11 +22,11 @@ use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::ActionHash;
 use holo_hash::{AgentPubKey, DnaHash, EntryHash};
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::MockHolochainP2pDnaT;
+use holochain_p2p::{HolochainP2pError, MockHolochainP2pDnaT};
 use holochain_state::chain_lock::get_chain_lock;
 use holochain_state::prelude::{
-    chain_head_db, remove_countersigning_session, set_withhold_publish, AppEntryBytesFixturator,
-    HeadInfo,
+    chain_head_db, current_countersigning_session, remove_countersigning_session,
+    set_withhold_publish, AppEntryBytesFixturator, HeadInfo,
 };
 use holochain_state::prelude::{
     insert_action, insert_entry, insert_op, unlock_chain, CounterSigningSessionData,
@@ -55,7 +55,7 @@ async fn accept_countersigning_request_creates_state() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -74,11 +74,11 @@ async fn duplicate_accepts_do_not_overwrite_state() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
-    let request1 = test_preflight_request(&test_harness, std::time::Duration::from_secs(60), &bob);
+    let request1 = test_preflight_request(&test_harness, Duration::from_secs(60), &bob);
     test_harness
         .accept_countersigning_request(request1.clone())
         .await
@@ -98,15 +98,15 @@ async fn duplicate_accepts_do_not_overwrite_state() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn countersigning_session_expiry() {
+async fn countersigning_session_expiry_from_accepted_with_no_commit() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
-    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
+    let request = test_preflight_request(&test_harness, Duration::from_secs(1), &bob);
     test_harness
         .accept_countersigning_request(request)
         .await
@@ -141,7 +141,7 @@ async fn chain_unlocked_outside_workflow() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -177,7 +177,7 @@ async fn chain_unlocked_outside_workflow_then_restart() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -214,11 +214,11 @@ async fn discard_session_with_lock_but_no_state() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
-    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
+    let request = test_preflight_request(&test_harness, Duration::from_secs(1), &bob);
     test_harness
         .accept_countersigning_request(request)
         .await
@@ -251,7 +251,7 @@ async fn receive_signatures_and_complete() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -315,7 +315,7 @@ async fn receive_valid_and_invalid_signatures_and_complete() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -411,11 +411,11 @@ async fn receive_valid_and_invalid_signatures_and_complete() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn time_out_if_only_invalid_signatures_received() {
+async fn attempts_resolution_if_only_invalid_signatures_received() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -447,7 +447,7 @@ async fn time_out_if_only_invalid_signatures_received() {
             .await,
     ];
 
-    // Receive the invalid signatures.
+    // Receive the invalid signature bundle.
     countersigning_success(
         test_harness.test_space.space.clone(),
         test_harness.author.clone(),
@@ -460,15 +460,33 @@ async fn time_out_if_only_invalid_signatures_received() {
         .respond_to_countersigning_workflow_signal()
         .await;
 
+    // Saw the signatures but didn't accept them. We also haven't reached the end time yet so we
+    // don't go straight to resolution
     test_harness.expect_session_in_signatures_collected();
 
-    // Should run again at timeout and abandon the session.
+    // Have Bob's authorities now show any activity yet.
+    let activity_response = bob.no_activity_response();
+    test_harness.reconfigure_network({
+        let activity_response = activity_response.clone();
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity().returning({
+                let activity_response = activity_response.clone();
+                move |_, _, _| Ok(vec![activity_response.clone()])
+            });
+
+            net
+        }
+    });
+
+    // Should run again at timeout and attempt to resolve the session
     test_harness
         .respond_to_countersigning_workflow_signal()
         .await;
 
-    // One run should be enough when we got valid signatures and the session is now completed.
     test_harness.expect_abandoned_signal().await;
+    test_harness.expect_session_removed(request).await;
 
     test_harness.expect_no_pending_signals();
     test_harness.expect_empty_workspace();
@@ -480,11 +498,11 @@ async fn recover_from_commit_when_other_agent_abandons() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
-    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
+    let request = test_preflight_request(&test_harness, Duration::from_secs(1), &bob);
     let my_acceptance = test_harness
         .accept_countersigning_request(request.clone())
         .await
@@ -507,12 +525,30 @@ async fn recover_from_commit_when_other_agent_abandons() {
 
     // Now, don't send signatures to our agent.
 
-    // Run our workflow, which should trigger itself to spot the timed out session and abandon it.
+    // Provide no information about Bob's chain when resolution runs
+    let activity_response = bob.no_activity_response();
+    test_harness.reconfigure_network({
+        let activity_response = activity_response.clone();
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity().returning({
+                let activity_response = activity_response.clone();
+                move |_, _, _| Ok(vec![activity_response.clone()])
+            });
+
+            net
+        }
+    });
+
+    // Run our workflow, which should trigger itself to spot the timed out session it will make a
+    // single recovery attempt that will be indeterminate, and then abandon the session.
     test_harness
         .respond_to_countersigning_workflow_signal()
         .await;
 
     test_harness.expect_abandoned_signal().await;
+    test_harness.expect_session_removed(request).await;
 
     test_harness.expect_no_pending_signals();
     test_harness.expect_empty_workspace();
@@ -524,7 +560,7 @@ async fn recover_after_restart_from_commit_when_other_agent_abandons() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -576,8 +612,6 @@ async fn recover_after_restart_from_commit_when_other_agent_abandons() {
 
     // This is where we'll stay unless Bob takes some action
     let resolution = test_harness.expect_session_in_unknown_state();
-    assert!(resolution.is_some());
-    let resolution = resolution.unwrap();
     assert_eq!(1, resolution.attempts);
     assert_eq!(1, resolution.outcomes.len());
     let bob_resolution = &resolution.outcomes[0];
@@ -611,6 +645,7 @@ async fn recover_after_restart_from_commit_when_other_agent_abandons() {
         .await;
 
     test_harness.expect_abandoned_signal().await;
+    test_harness.expect_session_removed(request).await;
 
     test_harness.expect_no_pending_signals();
     test_harness.expect_empty_workspace();
@@ -622,7 +657,7 @@ async fn recover_after_restart_from_commit_when_other_agent_completes() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -670,8 +705,7 @@ async fn recover_after_restart_from_commit_when_other_agent_completes() {
         .respond_to_countersigning_workflow_signal()
         .await;
 
-    let resolution = test_harness.expect_session_in_unknown_state();
-    assert!(resolution.is_some());
+    test_harness.expect_session_in_unknown_state();
 
     test_harness.expect_session_in_unknown_state();
 
@@ -722,7 +756,7 @@ async fn stay_in_unknown_state_when_activity_authorities_do_not_agree() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -789,9 +823,6 @@ async fn stay_in_unknown_state_when_activity_authorities_do_not_agree() {
         test_harness.countersigning_tx.trigger(&"test");
 
         let resolution = test_harness.expect_session_in_unknown_state();
-        assert!(resolution.is_some());
-
-        let resolution = resolution.unwrap();
         assert_eq!(i, resolution.attempts);
 
         let some_complete = resolution.outcomes.iter().all(|o| {
@@ -820,7 +851,7 @@ async fn stay_in_unknown_state_when_activity_authorities_are_missing_data() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -887,9 +918,6 @@ async fn stay_in_unknown_state_when_activity_authorities_are_missing_data() {
         test_harness.countersigning_tx.trigger(&"test");
 
         let resolution = test_harness.expect_session_in_unknown_state();
-        assert!(resolution.is_some());
-
-        let resolution = resolution.unwrap();
         assert_eq!(i, resolution.attempts);
 
         let some_complete = resolution.outcomes.iter().all(|o| {
@@ -918,7 +946,7 @@ async fn stay_in_unknown_state_when_bad_signatures_are_fetched() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -962,6 +990,7 @@ async fn stay_in_unknown_state_when_bad_signatures_are_fetched() {
         move |mut net| {
             net.expect_authority_for_hash().returning(|_| Ok(true));
 
+            // TODO only one available!
             let pick_response = Arc::new(AtomicUsize::new(0));
             net.expect_get_agent_activity().returning({
                 let pick_response = pick_response.clone();
@@ -983,12 +1012,8 @@ async fn stay_in_unknown_state_when_bad_signatures_are_fetched() {
             .await;
         test_harness.countersigning_tx.trigger(&"test");
 
-        let resolution = test_harness.expect_session_in_signatures_collected();
-        assert!(resolution.is_some());
-
-        let resolution = resolution.unwrap();
+        let resolution = test_harness.expect_session_in_unknown_state();
         assert_eq!(i, resolution.attempts);
-        assert_eq!(i - 1, resolution.completion_attempts);
     }
 }
 
@@ -997,11 +1022,11 @@ async fn timeout_during_accept_does_not_interfere_with_previous_session() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash).await;
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
 
     let bob = test_harness.new_remote_agent().await;
 
-    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(60), &bob);
+    let request = test_preflight_request(&test_harness, Duration::from_secs(60), &bob);
     let my_acceptance = test_harness
         .accept_countersigning_request(request.clone())
         .await
@@ -1058,7 +1083,7 @@ async fn timeout_during_accept_does_not_interfere_with_previous_session() {
     let chain_head_after_first_session = test_harness.read_chain_head_hash().await;
 
     // Now, start a new session
-    let request = test_preflight_request(&test_harness, std::time::Duration::from_secs(1), &bob);
+    let request = test_preflight_request(&test_harness, Duration::from_secs(1), &bob);
     test_harness
         .accept_countersigning_request(request.clone())
         .await
@@ -1099,6 +1124,505 @@ async fn timeout_during_accept_does_not_interfere_with_previous_session() {
     test_harness.expect_scheduling_complete();
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn respect_retry_limit_on_timeout_with_no_signatures_received() {
+    holochain_trace::test_run();
+
+    let dna_hash = fixt!(DnaHash);
+    let mut test_harness = TestHarness::new(dna_hash, Some(3)).await;
+
+    let bob = test_harness.new_remote_agent().await;
+
+    let request = test_preflight_request(&test_harness, Duration::from_secs(1), &bob);
+    let my_acceptance = test_harness
+        .accept_countersigning_request(request.clone())
+        .await
+        .unwrap();
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    let bob_acceptance = bob
+        .accept_preflight_request(request.clone(), test_harness.keystore.clone())
+        .await;
+
+    let (session_data, entry, entry_hash) =
+        test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
+
+    test_harness
+        .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+        .await;
+
+    // Now we're in the accepted state and have committed but haven't received any signatures yet.
+    test_harness.expect_session_accepted();
+
+    // Have Bob's authorities now show any activity.
+    let activity_response = bob.no_activity_response();
+    test_harness.reconfigure_network({
+        let activity_response = activity_response.clone();
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity().returning({
+                let activity_response = activity_response.clone();
+                move |_, _, _| Ok(vec![activity_response.clone()])
+            });
+
+            net
+        }
+    });
+
+    for _ in 0..2 {
+        test_harness
+            .respond_to_countersigning_workflow_signal()
+            .await;
+
+        test_harness.expect_session_in_unknown_state();
+    }
+
+    // Trying again should now abandon the session
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    test_harness.expect_abandoned_signal().await;
+    test_harness.expect_session_removed(request).await;
+
+    test_harness.expect_no_pending_signals();
+    test_harness.expect_empty_workspace();
+    test_harness.expect_scheduling_complete();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn respect_unlimited_retries_on_timeout_with_no_signatures_received() {
+    holochain_trace::test_run();
+
+    let dna_hash = fixt!(DnaHash);
+    let mut test_harness = TestHarness::new(dna_hash, Some(0)).await;
+
+    let bob = test_harness.new_remote_agent().await;
+
+    let request = test_preflight_request(&test_harness, Duration::from_secs(1), &bob);
+    let my_acceptance = test_harness
+        .accept_countersigning_request(request.clone())
+        .await
+        .unwrap();
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    let bob_acceptance = bob
+        .accept_preflight_request(request.clone(), test_harness.keystore.clone())
+        .await;
+
+    let (session_data, entry, entry_hash) =
+        test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
+
+    test_harness
+        .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+        .await;
+
+    // Now we're in the accepted state and have committed but haven't received any signatures yet.
+    test_harness.expect_session_accepted();
+
+    // Have Bob's authorities now show any activity.
+    let activity_response = bob.no_activity_response();
+    test_harness.reconfigure_network({
+        let activity_response = activity_response.clone();
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity().returning({
+                let activity_response = activity_response.clone();
+                move |_, _, _| Ok(vec![activity_response.clone()])
+            });
+
+            net
+        }
+    });
+
+    for _ in 0..10 {
+        test_harness
+            .respond_to_countersigning_workflow_signal()
+            .await;
+
+        test_harness.expect_session_in_unknown_state();
+    }
+
+    // And on and on and on...
+    test_harness.expect_session_in_unknown_state();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn retry_limit_does_not_apply_after_a_restart() {
+    holochain_trace::test_run();
+
+    let dna_hash = fixt!(DnaHash);
+    // Configure 3 retries for sessions that time out
+    let mut test_harness = TestHarness::new(dna_hash, Some(3)).await;
+
+    let bob = test_harness.new_remote_agent().await;
+
+    let request = test_preflight_request(&test_harness, Duration::from_secs(1), &bob);
+    let my_acceptance = test_harness
+        .accept_countersigning_request(request.clone())
+        .await
+        .unwrap();
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    let bob_acceptance = bob
+        .accept_preflight_request(request.clone(), test_harness.keystore.clone())
+        .await;
+
+    let (session_data, entry, entry_hash) =
+        test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
+
+    test_harness
+        .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+        .await;
+
+    // Simulate a restart
+    test_harness.clear_workspace_session();
+
+    // Have Bob's authorities now show any activity.
+    let activity_response = bob.no_activity_response();
+    test_harness.reconfigure_network({
+        let activity_response = activity_response.clone();
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity().returning({
+                let activity_response = activity_response.clone();
+                move |_, _, _| Ok(vec![activity_response.clone()])
+            });
+
+            net
+        }
+    });
+
+    // Run the workflow on init
+    test_harness.countersigning_tx.trigger(&"init");
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    for _ in 0..10 {
+        test_harness
+            .respond_to_countersigning_workflow_signal()
+            .await;
+
+        test_harness.expect_session_in_unknown_state();
+    }
+
+    // And on and on and on...
+    test_harness.expect_session_in_unknown_state();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn network_errors_do_not_count_towards_retry_limit() {
+    holochain_trace::test_run();
+
+    let dna_hash = fixt!(DnaHash);
+    let mut test_harness = TestHarness::new(dna_hash, Some(3)).await;
+
+    let bob = test_harness.new_remote_agent().await;
+
+    let request = test_preflight_request(&test_harness, Duration::from_secs(1), &bob);
+    let my_acceptance = test_harness
+        .accept_countersigning_request(request.clone())
+        .await
+        .unwrap();
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    let bob_acceptance = bob
+        .accept_preflight_request(request.clone(), test_harness.keystore.clone())
+        .await;
+
+    let (session_data, entry, entry_hash) =
+        test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
+
+    test_harness
+        .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+        .await;
+
+    // Now we're in the accepted state and have committed but haven't received any signatures yet.
+    test_harness.expect_session_accepted();
+
+    // Have Bob's authorities return an error
+    test_harness.reconfigure_network({
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity()
+                .returning(move |_, _, _| Err(HolochainP2pError::Other("test".into())));
+
+            net
+        }
+    });
+
+    for _ in 0..10 {
+        test_harness
+            .respond_to_countersigning_workflow_signal()
+            .await;
+
+        let summary = test_harness.expect_session_in_unknown_state();
+        assert_eq!(0, summary.attempts);
+    }
+
+    // Fix responses, so now we'll progress towards the session being abandoned
+    let activity_response = bob.no_activity_response();
+    test_harness.reconfigure_network({
+        let activity_response = activity_response.clone();
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity().returning({
+                let activity_response = activity_response.clone();
+                move |_, _, _| Ok(vec![activity_response.clone()])
+            });
+
+            net
+        }
+    });
+
+    for i in 0..2 {
+        test_harness
+            .respond_to_countersigning_workflow_signal()
+            .await;
+
+        let summary = test_harness.expect_session_in_unknown_state();
+        assert_eq!(i + 1, summary.attempts);
+    }
+
+    // Trying again should now abandon the session
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    test_harness.expect_abandoned_signal().await;
+    test_harness.expect_session_removed(request).await;
+
+    test_harness.expect_no_pending_signals();
+    test_harness.expect_empty_workspace();
+    test_harness.expect_scheduling_complete();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn recover_and_complete_after_resolution_failures() {
+    holochain_trace::test_run();
+
+    let dna_hash = fixt!(DnaHash);
+    let mut test_harness = TestHarness::new(dna_hash, Some(3)).await;
+
+    let bob = test_harness.new_remote_agent().await;
+
+    let request = test_preflight_request(&test_harness, Duration::from_secs(1), &bob);
+    let my_acceptance = test_harness
+        .accept_countersigning_request(request.clone())
+        .await
+        .unwrap();
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    let bob_acceptance = bob
+        .accept_preflight_request(request.clone(), test_harness.keystore.clone())
+        .await;
+
+    let (session_data, entry, entry_hash) =
+        test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
+
+    test_harness
+        .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+        .await;
+
+    // Now we're in the accepted state and have committed but haven't received any signatures yet.
+    test_harness.expect_session_accepted();
+
+    // Have Bob's authorities return an error
+    test_harness.reconfigure_network({
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity()
+                .returning(move |_, _, _| Err(HolochainP2pError::Other("test".into())));
+
+            net
+        }
+    });
+
+    // Fail to progress
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+    let summary = test_harness.expect_session_in_unknown_state();
+    assert_eq!(0, summary.attempts);
+
+    // Fix responses, so now we'll progress towards the session being abandoned
+    let activity_response = bob.no_activity_response();
+    test_harness.reconfigure_network({
+        let activity_response = activity_response.clone();
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity().returning({
+                let activity_response = activity_response.clone();
+                move |_, _, _| Ok(vec![activity_response.clone()])
+            });
+
+            net
+        }
+    });
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+    let summary = test_harness.expect_session_in_unknown_state();
+    assert_eq!(1, summary.attempts);
+
+    // Now have Bob showing activity with a bad signature
+    let activity_response = bob
+        .complete_session_activity_response(
+            &session_data,
+            entry.clone(),
+            &entry_hash,
+            test_harness.keystore.clone(),
+            false,
+        )
+        .await;
+    test_harness.reconfigure_network({
+        let activity_response = activity_response.clone();
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity().returning({
+                let activity_response = activity_response.clone();
+                move |_, _, _| Ok(vec![activity_response.clone()])
+            });
+
+            net.expect_chc().return_once(|| None);
+
+            net.expect_publish_countersign()
+                .return_once(|_, _, _| Ok(()));
+
+            net
+        }
+    });
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+    let summary = test_harness.expect_session_in_unknown_state();
+    assert_eq!(2, summary.attempts);
+
+    // Now have Bob showing valid activity
+    let activity_response = bob
+        .complete_session_activity_response(
+            &session_data,
+            entry.clone(),
+            &entry_hash,
+            test_harness.keystore.clone(),
+            true,
+        )
+        .await;
+    test_harness.reconfigure_network({
+        let activity_response = activity_response.clone();
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity().returning({
+                let activity_response = activity_response.clone();
+                move |_, _, _| Ok(vec![activity_response.clone()])
+            });
+
+            net.expect_chc().return_once(|| None);
+
+            net.expect_publish_countersign()
+                .return_once(|_, _, _| Ok(()));
+
+            net
+        }
+    });
+
+    // Trying again should complete the session
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    test_harness.expect_success_signal().await;
+    test_harness.expect_publish_and_integrate();
+
+    test_harness.expect_no_pending_signals();
+    test_harness.expect_empty_workspace();
+    test_harness.expect_scheduling_complete();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn retry_on_network_errors_even_with_no_retries_configured() {
+    holochain_trace::test_run();
+
+    let dna_hash = fixt!(DnaHash);
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
+
+    let bob = test_harness.new_remote_agent().await;
+
+    let request = test_preflight_request(&test_harness, Duration::from_secs(1), &bob);
+    let my_acceptance = test_harness
+        .accept_countersigning_request(request.clone())
+        .await
+        .unwrap();
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    let bob_acceptance = bob
+        .accept_preflight_request(request.clone(), test_harness.keystore.clone())
+        .await;
+
+    let (session_data, entry, entry_hash) =
+        test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
+
+    test_harness
+        .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+        .await;
+
+    // Now we're in the accepted state and have committed but haven't received any signatures yet.
+    test_harness.expect_session_accepted();
+
+    // Have Bob's authorities return an error
+    test_harness.reconfigure_network({
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity()
+                .returning(move |_, _, _| Err(HolochainP2pError::Other("test".into())));
+
+            net
+        }
+    });
+
+    for _ in 0..10 {
+        test_harness
+            .respond_to_countersigning_workflow_signal()
+            .await;
+
+        test_harness.expect_session_in_unknown_state();
+    }
+
+    // And on and on and on...
+    test_harness.expect_session_in_unknown_state();
+}
+
 struct TestHarness {
     dna_hash: DnaHash,
     test_space: TestSpace,
@@ -1119,7 +1643,7 @@ struct TestHarness {
 
 /// Test driver implementation
 impl TestHarness {
-    async fn new(dna_hash: DnaHash) -> Self {
+    async fn new(dna_hash: DnaHash, retry_limit: Option<usize>) -> Self {
         let test_space = TestSpace::new(dna_hash.clone());
         let network = MockHolochainP2pDnaT::new();
         let signal = tokio::sync::broadcast::channel::<Signal>(1);
@@ -1146,7 +1670,10 @@ impl TestHarness {
         .unwrap();
 
         let cell_id = CellId::new(dna_hash.clone(), author.clone());
-        let workspace = Arc::new(CountersigningWorkspace::new(Duration::from_secs(3)));
+        let workspace = Arc::new(CountersigningWorkspace::new(
+            Duration::from_secs(1),
+            retry_limit,
+        ));
         test_space
             .space
             .countersigning_workspaces
@@ -1207,13 +1734,10 @@ impl TestHarness {
     }
 
     async fn respond_to_countersigning_workflow_signal(&mut self) {
-        tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            self.countersigning_rx.listen(),
-        )
-        .await
-        .expect("Didn't receive a trigger in time")
-        .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), self.countersigning_rx.listen())
+            .await
+            .expect("Didn't receive a trigger in time")
+            .unwrap();
 
         let outcome = countersigning_workflow(
             self.test_space.space.clone(),
@@ -1399,7 +1923,7 @@ impl TestHarness {
         }
     }
 
-    fn expect_session_in_unknown_state(&self) -> Option<SessionResolutionSummary> {
+    fn expect_session_in_unknown_state(&self) -> SessionResolutionSummary {
         let maybe_found = self
             .workspace
             .inner
@@ -1470,6 +1994,35 @@ impl TestHarness {
             .unwrap();
 
         assert!(lock.is_none());
+    }
+
+    pub async fn expect_session_removed(&self, preflight_request: PreflightRequest) {
+        let authored = self
+            .test_space
+            .space
+            .get_or_create_authored_db(self.author.clone())
+            .unwrap();
+
+        let session = authored
+            .read_async({
+                let author = self.author.clone();
+                move |txn| current_countersigning_session(&txn, Arc::new(author))
+            })
+            .await
+            .unwrap();
+
+        match session {
+            None => {
+                // Good, no session on the chain top
+            }
+            Some((_, _, session)) => {
+                // If there is a session, it must not match!
+                assert_ne!(
+                    session.preflight_request.fingerprint(),
+                    preflight_request.fingerprint()
+                );
+            }
+        }
     }
 
     pub async fn expect_abandoned_signal(&mut self) {

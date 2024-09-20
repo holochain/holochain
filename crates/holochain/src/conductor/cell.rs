@@ -61,8 +61,6 @@ pub mod error;
 
 #[cfg(test)]
 mod gossip_test;
-#[cfg(todo_redo_old_tests)]
-mod op_query_test;
 
 #[cfg(test)]
 mod test;

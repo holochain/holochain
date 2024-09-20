@@ -2,6 +2,7 @@
 //!
 //! ## Open questions
 //! - [x] Publish add and remove links on private entries, what are the constraints on when to publish
+//!
 //! For now, Publish links on private entries
 // TODO: B-01827 Make story about: later consider adding a flag to make a link private and not publish it.
 //       Even for those private links, we may need to publish them to the author of the private entry

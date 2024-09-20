@@ -830,7 +830,7 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     let alice = conductor.setup_app("app", [&dna_file]).await.unwrap();
 
     let (alice,) = alice.into_tuple();
-    let bobbo = conductor.setup_app("app2 ", [&dna_file]).await.unwrap();
+    let bobbo = conductor.setup_app("app2", [&dna_file]).await.unwrap();
 
     let (bobbo,) = bobbo.into_tuple();
 

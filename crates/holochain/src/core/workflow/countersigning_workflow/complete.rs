@@ -294,6 +294,8 @@ fn get_countersigning_op_hashes(
         .collect::<Result<Vec<_>, _>>()?)
 }
 
+/// When a countersigning session has become unresolvable automatically by querying peer state,
+/// it can be completed and published anyway.
 pub async fn force_publish_countersigning_session(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,

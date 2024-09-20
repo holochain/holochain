@@ -193,6 +193,10 @@ pub async fn spawn_queue_consumer_tasks(
                         .config
                         .conductor_tuning_params()
                         .countersigning_resolution_retry_delay(),
+                    conductor
+                        .config
+                        .conductor_tuning_params()
+                        .countersigning_resolution_retry_limit,
                 ))
             })
             .clone()

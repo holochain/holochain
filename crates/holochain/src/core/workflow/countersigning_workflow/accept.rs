@@ -23,15 +23,14 @@ pub async fn accept_countersigning_request(
         DnaHash::from_raw_36(space.dna_hash.get_raw_36().to_vec()),
         author.clone(),
     );
-    let workspace = space
-        .countersigning_workspaces
-        .lock()
-        .get(&cell_id)
-        .cloned();
+    let workspace = {
+        let guard = space.countersigning_workspaces.lock();
+        guard.get(&cell_id).cloned()
+    };
 
     if workspace.is_none() {
         tracing::warn!(
-            "Received countersigning signature bundle for agent: {:?} but no workspace found",
+            "Cannot accept countersigning session because the workspace is missing: {:?}",
             author
         );
         return Err(WorkflowError::other("Missing workspace"));
@@ -98,7 +97,7 @@ pub async fn accept_countersigning_request(
     };
 
     // Kick off the countersigning workflow and let it figure out what actions to take.
-    tracing::debug!("Accepted countersigning session, triggering countersigning workflow");
+    tracing::info!("Accepted countersigning session, triggering countersigning workflow");
     countersigning_trigger.trigger(&"accept_countersigning_request");
 
     Ok(PreflightRequestAcceptance::Accepted(

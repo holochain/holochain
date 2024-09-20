@@ -74,6 +74,28 @@ pub mod test {
             ]
             .into(),
         );
+
+        let entries = vec![(ZomeIndex(0), vec![EntryDefIndex(0), EntryDefIndex(1)])];
+        let links = vec![(ZomeIndex(0), vec![])];
+        assert_eq!(
+            zome_info.zome_types,
+            ScopedZomeTypesSet {
+                entries: ScopedZomeTypes(entries),
+                links: ScopedZomeTypes(links),
+            }
+        );
+    }
+
+    #[cfg(feature = "wasmer_sys")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn zome_info_extern_fns_test() {
+        holochain_trace::test_run();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::EntryDefs).await;
+
+        let zome_info: ZomeInfo = conductor.call(&alice, "zome_info", ()).await;
+
         assert_eq!(
             zome_info.extern_fns,
             vec![
@@ -90,14 +112,33 @@ pub mod test {
                 FunctionName::new("zome_info"),
             ],
         );
-        let entries = vec![(ZomeIndex(0), vec![EntryDefIndex(0), EntryDefIndex(1)])];
-        let links = vec![(ZomeIndex(0), vec![])];
+    }
+
+
+    // Same test, but excluding wasmer metering extern fns
+    #[cfg(feature = "wasmer_wamr")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn zome_info_extern_fns_test() {
+        holochain_trace::test_run();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::EntryDefs).await;
+
+        let zome_info: ZomeInfo = conductor.call(&alice, "zome_info", ()).await;
+
         assert_eq!(
-            zome_info.zome_types,
-            ScopedZomeTypesSet {
-                entries: ScopedZomeTypes(entries),
-                links: ScopedZomeTypes(links),
-            }
+            zome_info.extern_fns,
+            vec![
+                FunctionName::new("__data_end"),
+                FunctionName::new("__getrandom_custom"),
+                FunctionName::new("__hc__allocate_1"),
+                FunctionName::new("__hc__deallocate_1"),
+                FunctionName::new("__heap_base"),
+                FunctionName::new("assert_indexes"),
+                FunctionName::new("entry_defs"),
+                FunctionName::new("memory"),
+                FunctionName::new("zome_info"),
+            ],
         );
     }
 }

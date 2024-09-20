@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cascade"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.25"
 description = "Logic for cascading updates to Holochain state and network interaction"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -12,20 +12,20 @@ edition = "2021"
 [dependencies]
 fixt = { version = "^0.4.0-dev.3", path = "../fixt" }
 futures = "0.3"
-holo_hash = { version = "^0.4.0-dev.11", path = "../holo_hash", features = [
+holo_hash = { version = "^0.4.0-dev.12", path = "../holo_hash", features = [
   "full",
 ] }
-holochain_chc = { version = "^0.1.0-dev.3", path = "../holochain_chc" }
-holochain_sqlite = { version = "^0.4.0-dev.20", path = "../holochain_sqlite" }
-holochain_p2p = { version = "^0.4.0-dev.23", path = "../holochain_p2p" }
+holochain_chc = { version = "^0.1.0-dev.5", path = "../holochain_chc" }
+holochain_sqlite = { version = "^0.4.0-dev.21", path = "../holochain_sqlite" }
+holochain_p2p = { version = "^0.4.0-dev.25", path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_state = { version = "^0.4.0-dev.23", path = "../holochain_state" }
-holochain_types = { version = "^0.4.0-dev.23", path = "../holochain_types" }
+holochain_state = { version = "^0.4.0-dev.25", path = "../holochain_state" }
+holochain_types = { version = "^0.4.0-dev.24", path = "../holochain_types" }
 holochain_trace = { version = "^0.4.0-dev.5", path = "../holochain_trace" }
 holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util" }
-holochain_zome_types = { version = "^0.4.0-dev.16", path = "../holochain_zome_types" }
+holochain_zome_types = { version = "^0.4.0-dev.17", path = "../holochain_zome_types" }
 holochain_nonce = { version = "^0.4.0-dev.7", path = "../holochain_nonce" }
-kitsune_p2p = { version = "^0.4.0-dev.20", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p = { version = "^0.4.0-dev.21", path = "../kitsune_p2p/kitsune_p2p" }
 tokio = { version = "1.36.0", features = ["full"] }
 thiserror = "1.0"
 tracing = "0.1"
@@ -55,6 +55,8 @@ test_utils = [
   "holochain_types/test_utils",
   "holochain_state/test_utils",
 ]
+
+instrument = []
 
 sqlite-encrypted = [
   "holo_hash/sqlite-encrypted",

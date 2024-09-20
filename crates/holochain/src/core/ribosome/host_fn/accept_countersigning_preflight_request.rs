@@ -29,8 +29,7 @@ pub fn accept_countersigning_preflight_request<'a>(
                 return Ok(PreflightRequestAcceptance::Invalid(e.to_string()));
             }
             tokio_helper::block_forever_on(async move {
-                if (Timestamp::now() + SESSION_TIME_FUTURE_MAX)
-                    .unwrap_or(Timestamp::MAX)
+                if (Timestamp::now() + SESSION_TIME_FUTURE_MAX).unwrap_or(Timestamp::MAX)
                     < *input.session_times.start()
                 {
                     return Ok(PreflightRequestAcceptance::UnacceptableFutureStart);
@@ -38,7 +37,11 @@ pub fn accept_countersigning_preflight_request<'a>(
 
                 let cell_id = call_context.host_context.call_zome_handle().cell_id();
 
-                call_context.host_context.call_zome_handle().accept_countersigning_session(cell_id.clone(), input.clone()).await
+                call_context
+                    .host_context
+                    .call_zome_handle()
+                    .accept_countersigning_session(cell_id.clone(), input.clone())
+                    .await
                     .map_err(|e| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(e.to_string())).into()
                     })
@@ -59,7 +62,6 @@ pub fn accept_countersigning_preflight_request<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use matches::assert_matches;
     use crate::conductor::api::error::ConductorApiError;
     use crate::conductor::api::ZomeCall;
     use crate::conductor::CellError;
@@ -71,6 +73,7 @@ pub mod wasm_test {
     use holochain_state::source_chain::SourceChainError;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
+    use matches::assert_matches;
     use wasmer::RuntimeError;
 
     /// Allow ChainLocked error, panic on anything else
@@ -96,7 +99,9 @@ pub mod wasm_test {
         match result {
             Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
                 match *workflow_error {
-                    WorkflowError::SourceChainError(SourceChainError::CountersigningWriteWithoutSession) => {}
+                    WorkflowError::SourceChainError(
+                        SourceChainError::CountersigningWriteWithoutSession,
+                    ) => {}
                     _ => panic!("{:?}", workflow_error),
                 }
             }
@@ -324,7 +329,8 @@ pub mod wasm_test {
                 "must_get_action",
                 countersigned_action_hash_alice.clone(),
             )
-            .await.unwrap_err();
+            .await
+            .unwrap();
 
         conductor
             .call_fallible::<_, Record>(
@@ -332,14 +338,16 @@ pub mod wasm_test {
                 "must_get_valid_record",
                 countersigned_action_hash_alice.clone(),
             )
-            .await.unwrap_err();
+            .await
+            .unwrap();
         conductor
             .call_fallible::<_, EntryHashed>(
                 &alice,
                 "must_get_entry",
                 countersigned_entry_hash_alice.clone(),
             )
-            .await.unwrap_err();
+            .await
+            .unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]

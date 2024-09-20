@@ -289,7 +289,7 @@ async fn countersigning_session_interaction_calls() {
         loop {
             let state = get_session_state(&alice.cell_id, &alice_app_tx).await;
             if let Some(CountersigningSessionState::Unknown {
-                resolution: Some(summary),
+                resolution: summary,
                 ..
             }) = state
             {
