@@ -275,7 +275,7 @@ pub(crate) async fn countersigning_workflow(
     .await;
 
     // Abandon any sessions that have timed out.
-    apply_timeout(&space, workspace.clone(), &cell_id, signal_tx.clone()).await;
+    apply_timeout(&space, workspace.clone(), &cell_id, signal_tx.clone()).await?;
 
     // If the session is in an unknown state, try to recover it.
     try_recover_failed_session(
@@ -285,7 +285,7 @@ pub(crate) async fn countersigning_workflow(
         &cell_id,
         &signal_tx,
     )
-    .await;
+    .await?;
 
     let maybe_completed_session = workspace
         .inner
@@ -416,7 +416,7 @@ async fn try_recover_failed_session(
     network: Arc<impl HolochainP2pDnaT + Sized>,
     cell_id: &CellId,
     signal_tx: &Sender<Signal>,
-) {
+) -> WorkflowResult<()> {
     let maybe_session_in_unknown_state = workspace
         .inner
         .share_ref(|inner| {
@@ -483,28 +483,34 @@ async fn try_recover_failed_session(
 
                 let resolution = get_resolution(workspace.clone());
                 if let Some(SessionResolutionSummary {
-                                required_reason: ResolutionRequiredReason::Timeout,
-                                attempts,
-                                ..
-                            }) = resolution
+                    required_reason: ResolutionRequiredReason::Timeout,
+                    attempts,
+                    ..
+                }) = resolution
                 {
                     let limit = workspace.countersigning_resolution_retry_limit.unwrap_or(0);
 
                     // If we have reached the limit of attempts, then abandon the session.
-                    if workspace.countersigning_resolution_retry_limit.is_none() || (limit > 0 && attempts >= limit) {
-                        tracing::info!(
-                                    "Reached the limit of attempts to resolve countersigning session for agent: {:?}",
-                                    cell_id.agent_pubkey()
-                                );
+                    if workspace.countersigning_resolution_retry_limit.is_none()
+                        || (limit > 0 && attempts >= limit)
+                    {
+                        tracing::info!("Reached the limit ({}) of attempts ({}) to resolve countersigning session for agent: {:?}", limit, attempts, cell_id.agent_pubkey());
+
+                        force_abandon_session(
+                            space.clone(),
+                            cell_id.agent_pubkey(),
+                            &preflight_request,
+                        )
+                        .await?;
 
                         // The session state has been resolved, so we can remove it from the workspace.
                         workspace
                             .inner
                             .share_mut(|inner, _| {
                                 tracing::trace!(
-                                            "Abandoning countersigning session for agent: {:?}",
-                                            cell_id.agent_pubkey()
-                                        );
+                                    "Abandoning countersigning session for agent: {:?}",
+                                    cell_id.agent_pubkey()
+                                );
 
                                 inner.session = None;
                                 Ok(())
@@ -537,6 +543,8 @@ async fn try_recover_failed_session(
             }
         }
     }
+
+    Ok(())
 }
 
 fn reschedule_self(
@@ -619,14 +627,60 @@ async fn apply_timeout(
     workspace: Arc<CountersigningWorkspace>,
     cell_id: &CellId,
     signal_tx: Sender<Signal>,
-) {
+) -> WorkflowResult<()> {
+    let preflight_request = workspace
+        .inner
+        .share_ref(|inner| {
+            Ok(inner
+                .session
+                .as_ref()
+                .map(|session| session.preflight_request().clone()))
+        })
+        .unwrap();
+    if preflight_request.is_none() {
+        tracing::info!("Cannot check session timeout because there is no active session");
+        return Ok(());
+    }
+
+    let authored = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
+
+    let current_session = authored
+        .read_async({
+            let author = cell_id.agent_pubkey().clone();
+            move |txn| current_countersigning_session(&txn, Arc::new(author))
+        })
+        .await?;
+
+    let mut has_committed_session = false;
+    if let Some((_, _, session_data)) = current_session {
+        if session_data.preflight_request.fingerprint() == preflight_request.unwrap().fingerprint()
+        {
+            has_committed_session = true;
+        }
+    }
+
     let timed_out = workspace
         .inner
         .share_mut(|inner, _| {
             Ok(inner.session.as_mut().and_then(|session| {
                 let expired = match session {
                     CountersigningSessionState::Accepted(preflight_request) => {
-                        preflight_request.session_times.end < Timestamp::now()
+                        if preflight_request.session_times.end < Timestamp::now() {
+                            if has_committed_session {
+                                *session = CountersigningSessionState::Unknown {
+                                    preflight_request: preflight_request.clone(),
+                                    resolution: SessionResolutionSummary {
+                                        required_reason: ResolutionRequiredReason::Timeout,
+                                        ..Default::default()
+                                    },
+                                };
+                                false
+                            } else {
+                                true
+                            }
+                        } else {
+                            false
+                        }
                     }
                     CountersigningSessionState::SignaturesCollected {
                         preflight_request,
@@ -696,6 +750,8 @@ async fn apply_timeout(
             }
         }
     }
+
+    Ok(())
 }
 
 async fn force_abandon_session(
