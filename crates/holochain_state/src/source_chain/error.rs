@@ -55,6 +55,9 @@ pub enum SourceChainError {
     #[error("Attempted to write anything other than the countersigning session entry at the same time as the session entry.")]
     DirtyCounterSigningWrite,
 
+    #[error("Attempted to write a countersigning session when there is no active session.")]
+    CountersigningWriteWithoutSession,
+
     #[error(
         "The source chain's structure is invalid. This error is not recoverable. Detail:\n{0}"
     )]
