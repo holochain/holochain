@@ -14,7 +14,10 @@ DEFAULT_FEATURES=chc,slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_d
 	test-workspace-wasmer_sys test-workspace-wasmer_wamr
 
 # default to running everything (first rule)
-default: build-workspace test-workspace
+default: build-workspace-wasmer_sys \
+	test-workspace-wasmer_sys \
+	build-workspace-wasmer_wamr \
+	test-workspace-wasmer_wamr
 
 # execute all static code validation
 static-all: static-fmt static-toml static-clippy static-doc
