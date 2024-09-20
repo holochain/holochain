@@ -227,6 +227,8 @@ $endif$
 \usepackage{soul}
 \NewCommandCopy\styledhyperlink\hyperlink
 \renewcommand{\hyperlink}[2]{\styledhyperlink{#1}{\color{blue}\setulcolor{blue}\ul{#2}}}
+\renewcommand{\url}[1]{\href{#1}{\color{blue}\setulcolor{blue}\ul{#1}}}
+
 \urlstyle{same} % disable monospaced font for URLs
 $if(verbatim-in-note)$
 \VerbatimFootnotes % allow verbatim text in footnotes
