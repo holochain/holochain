@@ -20,6 +20,7 @@ use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time;
+use std::time::Duration;
 use tracing::*;
 
 mod publish_query;
@@ -38,16 +39,19 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(db, network, trigger_self))
+    tracing::instrument(skip(db, network, trigger_self, publish_retry_delay))
 )]
 pub async fn publish_dht_ops_workflow(
     db: DbWrite<DbKindAuthored>,
     network: Arc<impl HolochainP2pDnaT>,
     trigger_self: TriggerSender,
     agent: AgentPubKey,
+    publish_retry_delay: Duration,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
-    let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent.clone()).await?;
+    let to_publish =
+        publish_dht_ops_workflow_inner(db.clone().into(), agent.clone(), publish_retry_delay)
+            .await?;
     let to_publish_count: usize = to_publish.values().map(Vec::len).sum();
 
     if to_publish_count > 0 {
@@ -118,11 +122,12 @@ pub async fn publish_dht_ops_workflow(
 pub async fn publish_dht_ops_workflow_inner(
     db: DbRead<DbKindAuthored>,
     agent: AgentPubKey,
+    publish_retry_delay: Duration,
 ) -> WorkflowResult<HashMap<OpBasis, Vec<(OpHashSized, crate::prelude::DhtOp)>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for (basis, op_hash, op) in get_ops_to_publish(agent, &db).await? {
+    for (basis, op_hash, op) in get_ops_to_publish(agent, &db, publish_retry_delay).await? {
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
@@ -259,9 +264,15 @@ mod tests {
         author: AgentPubKey,
     ) {
         let (trigger_sender, _) = TriggerSender::new();
-        publish_dht_ops_workflow(db.clone(), Arc::new(dna_network), trigger_sender, author)
-            .await
-            .unwrap();
+        publish_dht_ops_workflow(
+            db.clone(),
+            Arc::new(dna_network),
+            trigger_sender,
+            author,
+            MIN_PUBLISH_INTERVAL,
+        )
+        .await
+        .unwrap();
     }
 
     /// There is a test that shows that network messages would be sent to all agents via broadcast.

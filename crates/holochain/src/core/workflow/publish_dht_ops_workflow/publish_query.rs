@@ -1,3 +1,4 @@
+use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
@@ -14,8 +15,6 @@ use rusqlite::Transaction;
 
 use crate::core::workflow::WorkflowResult;
 
-use super::MIN_PUBLISH_INTERVAL;
-
 /// Get all dht ops on an agents chain that need to be published.
 /// - Don't publish private entries.
 /// - Only get ops that haven't been published within the minimum publish interval
@@ -24,6 +23,7 @@ use super::MIN_PUBLISH_INTERVAL;
 pub async fn get_ops_to_publish<AuthorDb>(
     agent: AgentPubKey,
     db: &AuthorDb,
+    min_publish_interval: Duration,
 ) -> WorkflowResult<Vec<(OpBasis, OpHashSized, DhtOp)>>
 where
     AuthorDb: ReadAccess<DbKindAuthored>,
@@ -31,7 +31,7 @@ where
     let recency_threshold = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
-        .and_then(|epoch| epoch.checked_sub(MIN_PUBLISH_INTERVAL))
+        .and_then(|epoch| epoch.checked_sub(min_publish_interval.clone()))
         .map(|t| t.as_secs())
         .unwrap_or(0);
 
@@ -125,6 +125,8 @@ mod tests {
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::*;
 
+    use crate::core::workflow::publish_dht_ops_workflow::MIN_PUBLISH_INTERVAL;
+
     use super::*;
 
     #[derive(Debug, Clone, Copy)]
@@ -153,7 +155,7 @@ mod tests {
         let agent = fixt!(AgentPubKey);
         let db = test_authored_db();
         let expected = test_data(&db.to_db(), agent.clone()).await;
-        let r = get_ops_to_publish(expected.agent.clone(), &db.to_db())
+        let r = get_ops_to_publish(expected.agent.clone(), &db.to_db(), MIN_PUBLISH_INTERVAL)
             .await
             .unwrap();
         assert_eq!(

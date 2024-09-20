@@ -229,6 +229,10 @@ pub struct ConductorTuningParams {
     ///
     /// Default: 5 minutes
     pub countersigning_resolution_retry_delay: Option<std::time::Duration>,
+    /// The delay before a publish of an op is tried again.
+    ///
+    /// Default: 5 minutes
+    pub publish_retry_delay: Option<std::time::Duration>,
 }
 
 impl ConductorTuningParams {
@@ -237,6 +241,7 @@ impl ConductorTuningParams {
         Self {
             sys_validation_retry_delay: None,
             countersigning_resolution_retry_delay: None,
+            publish_retry_delay: None,
         }
     }
 
@@ -251,6 +256,12 @@ impl ConductorTuningParams {
         self.countersigning_resolution_retry_delay
             .unwrap_or_else(|| std::time::Duration::from_secs(60 * 5))
     }
+
+    /// Get the current value of `publish_retry_delay` or its default value.
+    pub fn publish_retry_delay(&self) -> std::time::Duration {
+        self.countersigning_resolution_retry_delay
+            .unwrap_or_else(|| std::time::Duration::from_secs(60 * 5))
+    }
 }
 
 impl Default for ConductorTuningParams {
@@ -261,6 +272,7 @@ impl Default for ConductorTuningParams {
             countersigning_resolution_retry_delay: Some(
                 empty.countersigning_resolution_retry_delay(),
             ),
+            publish_retry_delay: Some(empty.publish_retry_delay()),
         }
     }
 }

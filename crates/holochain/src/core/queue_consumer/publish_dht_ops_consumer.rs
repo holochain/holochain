@@ -2,7 +2,9 @@
 
 use super::*;
 
-use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
+use crate::core::workflow::publish_dht_ops_workflow::{
+    publish_dht_ops_workflow, MIN_PUBLISH_INTERVAL,
+};
 
 /// Spawn the QueueConsumer for Publish workflow
 #[cfg_attr(
@@ -32,11 +34,17 @@ pub fn spawn_publish_dht_ops_consumer(
             let env = env.clone();
             let agent = cell_id.agent_pubkey().clone();
             let network = network.clone();
+            let publish_retry_delay = conductor
+                .get_config()
+                .conductor_tuning_params()
+                .publish_retry_delay
+                .unwrap_or_else(|| MIN_PUBLISH_INTERVAL);
             async move {
                 if conductor.get_config().network.tuning_params.disable_publish {
                     Ok(WorkComplete::Complete)
                 } else {
-                    publish_dht_ops_workflow(env, Arc::new(network), tx, agent).await
+                    publish_dht_ops_workflow(env, Arc::new(network), tx, agent, publish_retry_delay)
+                        .await
                 }
             }
         },

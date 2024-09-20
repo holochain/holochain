@@ -37,6 +37,7 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
             tuning_params: Some(ConductorTuningParams {
                 sys_validation_retry_delay: Some(std::time::Duration::from_secs(1)),
                 countersigning_resolution_retry_delay: Some(std::time::Duration::from_secs(3)),
+                publish_retry_delay: None,
             }),
             ..Default::default()
         }
