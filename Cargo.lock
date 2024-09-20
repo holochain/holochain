@@ -2838,7 +2838,6 @@ dependencies = [
  "arbitrary",
  "derive_more",
  "hc_sleuth",
- "holochain_state_types",
  "holochain_trace",
  "holochain_types",
  "kitsune_p2p",
@@ -3345,7 +3344,6 @@ dependencies = [
  "futures",
  "hc_deepkey_sdk",
  "hdk",
- "holochain_deepkey_dna",
  "holochain_keystore",
  "holochain_types",
  "holochain_util",
@@ -3676,7 +3674,6 @@ dependencies = [
  "flate2",
  "futures",
  "getrandom 0.2.15",
- "hc_deepkey_sdk",
  "holo_hash",
  "holochain_keystore",
  "holochain_nonce",
@@ -3845,7 +3842,6 @@ dependencies = [
  "shrinkwraprs",
  "strum 0.18.0",
  "subtle",
- "subtle-encoding",
  "thiserror",
  "tracing",
 ]
@@ -4732,7 +4728,6 @@ dependencies = [
  "kitsune_p2p_types",
  "serde",
  "serde_bytes",
- "structopt",
  "tokio",
 ]
 

@@ -19,7 +19,6 @@ kitsune_p2p_types = { version = "^0.4.0-dev.13", path = "../types" }
 holochain_trace = { version = "^0.4.0-dev.5", path = "../../holochain_trace" }
 serde = { version = "1", features = ["derive"] }
 serde_bytes = "0.11"
-structopt = "0.3"
 tokio = { version = "1.27", features = ["full"] }
 
 [dev-dependencies]

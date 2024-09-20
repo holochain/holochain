@@ -15,16 +15,17 @@ edition = "2021"
 colored = { version = "2.1", optional = true }
 derivative = "2.2.0"
 derive_more = "0.99"
-futures = "0.3"
 kitsune_p2p_dht_arc = { version = "^0.4.0-dev.9", path = "../dht_arc" }
 kitsune_p2p_timestamp = { version = "^0.4.0-dev.4", path = "../timestamp" }
-must_future = "0.1"
 num-traits = "0.2.14"
 rand = "0.8.4"
 serde = { version = "1.0", features = ["derive"] }
 statrs = "0.16.0"
 thiserror = "1.0"
 tracing = "0.1.29"
+
+futures = { version = "0.3", optional = true }
+must_future = { version = "0.1", optional = true }
 
 arbitrary = { version = "1", features = ["derive"], optional = true }
 proptest = { version = "1", optional = true }
@@ -46,7 +47,7 @@ workspace = true
 
 [features]
 default = ["kitsune_p2p_timestamp/now"]
-test_utils = ["colored", "fuzzing"]
+test_utils = ["dep:colored", "dep:futures", "dep:must_future", "fuzzing"]
 fuzzing = [
   "arbitrary",
   "proptest",
