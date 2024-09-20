@@ -301,7 +301,7 @@ mod tests {
       type: danger_test_keystore
     "#;
         let result: ConductorConfig = config_from_yaml(yaml).unwrap();
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             result,
             ConductorConfig {
                 tracing_override: None,
