@@ -36,7 +36,7 @@ async fn test_validation_receipt() {
     let vault = alice.dht_db();
     let record = vault
         .read_async(move |txn| -> StateQueryResult<Record> {
-            Ok(Txn::from(&txn).get_record(&hash.clone().into())?.unwrap())
+            Ok(CascadeTxn::from(&txn).get_record(&hash.clone().into())?.unwrap())
         })
         .await
         .unwrap();

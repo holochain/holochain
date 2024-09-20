@@ -96,7 +96,7 @@ async fn sys_validation_produces_invalid_chain_warrant() {
                 .get_all_authored_dbs(dna.dna_hash())
                 .unwrap()[0]
                 .test_read(move |txn| {
-                    let store = Txn::from(&txn);
+                    let store = CascadeTxn::from(&txn);
 
                     let warrants = store.get_warrants_for_basis(&basis, false).unwrap();
                     warrants.len()
@@ -190,7 +190,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
                 .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
                 .unwrap()
                 .test_read(move |txn| {
-                    let store = Txn::from(&txn);
+                    let store = CascadeTxn::from(&txn);
                     store.get_warrants_for_basis(&basis, false).unwrap()
                 })
         },

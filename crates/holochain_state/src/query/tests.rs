@@ -245,7 +245,7 @@ fn get_link_query<'a, 'b: 'a>(
             let stores = DbScratch::new(txns, scratch);
             query.run(stores).unwrap()
         }
-        None => query.run(Txns::from(txns)).unwrap(),
+        None => query.run(CascadeTxns::from(txns)).unwrap(),
     }
 }
 
@@ -259,6 +259,6 @@ fn get_entry_query<'a, 'b: 'a>(
             let stores = DbScratch::new(txns, scratch);
             query.run(stores).unwrap()
         }
-        None => query.run(Txns::from(txns)).unwrap(),
+        None => query.run(CascadeTxns::from(txns)).unwrap(),
     }
 }

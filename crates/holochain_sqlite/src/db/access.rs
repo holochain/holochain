@@ -11,6 +11,7 @@ use holochain_util::log_elapsed;
 use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
+use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -24,6 +25,25 @@ use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric
 static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
 static THREAD_ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(30_000);
 
+/// Wrapper around a transaction reference, to which trait impls are attached
+#[derive(derive_more::Deref, derive_more::DerefMut, derive_more::Into)]
+pub struct Txn<'a, D: DbKindT> {
+    #[deref]
+    #[deref_mut]
+    #[into]
+    txn: Transaction<'a>,
+    db_kind: std::marker::PhantomData<D>,
+}
+
+impl<'a, D: DbKindT> From<Transaction<'a>> for Txn<'a, D> {
+    fn from(txn: Transaction<'a>) -> Self {
+        Txn {
+            txn,
+            db_kind: PhantomData,
+        }
+    }
+}
+
 #[async_trait::async_trait]
 /// A trait for being generic over [`DbWrite`] and [`DbRead`] that
 /// both implement read access.
@@ -32,7 +52,7 @@ pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbRead<Kind>> {
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        F: FnOnce(Txn<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static;
 
     /// Access the kind of database.
@@ -45,7 +65,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        F: FnOnce(Txn<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
         let db: &DbRead<Kind> = self.as_ref();
@@ -63,7 +83,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbRead<Kind> {
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        F: FnOnce(Txn<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
         DbRead::read_async(self, f).await
@@ -121,7 +141,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     pub async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        F: FnOnce(Txn<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
         let mut conn = self
@@ -136,7 +156,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
                 let _s = span.enter();
                 log_elapsed!([10, 100, 1000], start, "read_async:before-closure");
-                let r = conn.execute_in_read_txn(f);
+                let r = conn.execute_in_read_txn(|txn| f(txn.into()));
                 log_elapsed!([10, 100, 1000], start, "read_async:after-closure");
                 r
             }).in_current_span()).in_current_span().await.map_err(|e| {
@@ -205,7 +225,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     #[cfg(all(any(test, feature = "test_utils"), not(loom)))]
     pub fn test_read<R, F>(&self, f: F) -> R
     where
-        F: FnOnce(Transaction) -> R + Send + 'static,
+        F: FnOnce(Txn<Kind>) -> R + Send + 'static,
         R: Send + 'static,
     {
         holochain_util::tokio_helper::block_forever_on(async {

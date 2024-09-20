@@ -625,7 +625,7 @@ impl CascadeImpl {
             let results = match scratch {
                 Some(scratch) => scratch
                     .apply_and_then(|scratch| query.run(DbScratch::new(&txns_ref, scratch)))?,
-                None => query.run(Txns::from(&txns_ref[..]))?,
+                None => query.run(CascadeTxns::from(&txns_ref[..]))?,
             };
             CascadeResult::Ok(results)
         })
@@ -647,7 +647,7 @@ impl CascadeImpl {
             let r = cache
                 .read_async({
                     let mut f = f.clone();
-                    move |raw_txn| f(&Txn::from(&raw_txn))
+                    move |raw_txn| f(&CascadeTxn::from(&raw_txn))
                 })
                 .await?;
 
@@ -660,7 +660,7 @@ impl CascadeImpl {
             let r = dht
                 .read_async({
                     let mut f = f.clone();
-                    move |raw_txn| f(&Txn::from(&raw_txn))
+                    move |raw_txn| f(&CascadeTxn::from(&raw_txn))
                 })
                 .await?;
 
@@ -673,7 +673,7 @@ impl CascadeImpl {
             let r = authored
                 .read_async({
                     let mut f = f.clone();
-                    move |raw_txn| f(&Txn::from(&raw_txn))
+                    move |raw_txn| f(&CascadeTxn::from(&raw_txn))
                 })
                 .await?;
 
