@@ -41,7 +41,7 @@
 \newcommand{\chain}{\mathcal{X}}
 \newcommand{\eqbang}{\stackrel{!}{=}}
 \title{Holochain \\
-\small Scalable agent-centric distributed computing\\ALPHA 1 -- 2/15/2018}
+\small Scalable agent-centric distributed computing\\ALPHA -- 2/15/2018}
 \author{Eric Harris-Braun}
 \affiliation{Ceptr, LLC}
 \author{Nicolas Luck}
@@ -183,7 +183,7 @@ Ethereum\footnote{https://github.com/ethereum/wiki/wiki/White-Paper} provides th
 
 This approach does live up to the constraints listed above as described by Wood \cite{yellowpaper} where the bulk of that paper can be understood as a specification of a validation function $V_n()$ and the described state transition function $\sigma_\text{t+1} \equiv \Upsilon(\sigma,T)$ as a specification of how constraints above are met.
 
-Unfortunately the data-centric legacy inherited by Ethereum from the blockchain model, is immediately observable in its high compute cost\footnote{link to our benchmarkng} and difficulty in scaling\footnote{find a scholarly article }.
+Unfortunately the data-centric legacy inherited by Ethereum from the blockchain model, is immediately observable in its high compute cost and difficulty in scaling.
 
 
 \subsection{Holochain}
@@ -235,9 +235,7 @@ DHT are sufficiently mature that there are a number of ways to ensure property \
 
 \item Enforce that all elements of $\dhtstate$ only be changed monotonically, that is, elements $\delta$ can only be added to $\dhtstate$ not removed.
 
-\item Include in $\dhtfns$ the functions defined in \ref{apdx:dhtfn}.
-
-\item Allow the sets $\delta \in \dhtstate$ to also include more elements as defined in  \ref{apdx:dhtfn}.
+\item Include in $\dhtfns$ functions to add and retreive meta-data to elements that point to other elements with tags, thus creating a graph relations between the elments.
 
 \item Let $d(x,y)$ be a \textit{symmetric} and \textit{unidirectional} distance metric within the hash space defined by $H$, as for example the XOR metric defined in \cite{kademlia}. Note that this metric can be applied between entries and nodes alike since the addresses of both are values of the same hash function $H$ (i.e. $\delta_{key}=H(\delta_{value})$ and $A_n=H(pk_n)$).
 
@@ -269,7 +267,7 @@ Call $\hcdht$ a \term{validating}, \term{monotonic}, \term{sharded} DHT.
 \begin{enumerate}
 \item $sys_\text{commit}(e)$ uses the system validation function $V(e,v)$ to add $e$ to $\chain$, and if successful calls $dht_\text{put}(H(e),e)$.
 \item $sys_\text{get}(k) = dht_\text{get}(k)$.
-\item see additional system functions defined in \ref{apdx:sysfn}.
+\item Note: there may be additional system functions for a number of other purpose, such as content encryption, decryption, signature validation, etc that $\appfns$ may pragmatically want to rely on.
 \end{enumerate}
 
 \item Allow the functions in $\appfns$ defined in the \hcdna\ to call the functions in $\sysfns$.
@@ -334,7 +332,7 @@ We wish to provide generalized means by which decentralized multi-agent systems 
 \begin{enumerate}
 \item fit-for-purpose solutions can be applied in order to optimize for application contextualized confidences $\Psi_\alpha$,
 \item violation of any threshold $\varepsilon(\alpha)$ through the actions of other agents can be detected and managed by any agent, such that
-\item the system integrity is maintained at any point in time or, when not, there is a path to regain it (see \ref{sec:evo}).
+\item the system integrity is maintained at any point in time or, when not, there is a path to regain it.
 \end{enumerate}
 \end{quote}
 
@@ -585,8 +583,6 @@ The only overhead that is added by the architecture of this decentralized system
 
 The unknown and also application specific complexity $v(n,m)$ of the validation routines is what could drive up the whole system's complexity still. And indeed it is conceivable to think of Holochain applications with a lot of complexity within their validation routines. It is basically possible to mimic Blockchain's consensus validation requirement by enforcing that a validating node communicates with all other nodes before adding an entry to the DHT. It could as well only be half of all nodes. And there surely is a host of applications with only little complexity - or specific state transitions within an application that involve only little complexity. \textit{In a Holochain app one can put the complexity where it is needed and keep the rest of the system fast and scalable.}
 
-In section \ref{sec:usecases} we proceed by providing real-world use cases and showing how non-trivial Holochain applications can be built that get along with a validation complexity of $O(1)$, resulting in a total time complexity per node in $O(log(m))$ and a high enough confidence in integrity without introducing proof-of-work at all.
-
 \section{Implementation}
 \label{sec:implementation}
 
@@ -662,7 +658,6 @@ We have yet to implement scalability tests for large scale applications, but it 
 We thank Jonathan Paprocki for his care in editing and supporting the mathematical formalizations, and Steve Sawin for his review of this paper, \LaTeXe  support, and moral support.
 
 \end{acknowledgments}
-
 \bibliographystyle{alpha}
 \begin{thebibliography}{9}
 

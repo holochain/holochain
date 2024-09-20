@@ -29,7 +29,7 @@ In this second version, we describe Holochain on its own terms by first providin
 
 We begin by stating our axioms[^byzantine] regarding the nature of coordination:
 
-[^byzantine]: Some readers may come to the problems of distributed coordination from the framework laid out by the literature on Byzantine Fault Tolerance. These axioms and a discussion of why to start with them are explained in our paper [[The Players of Ludos: Beyond Byzantium](https://docs.google.com/document/d/1HBNgIooElD5widCuX9XmiOzbVIpEF5XXH67mZbnUFjo/edit#).
+[^byzantine]: Some readers may come to the problems of distributed coordination from the framework laid out by the literature on Byzantine Fault Tolerance. These axioms and a discussion of why to start with them are explained in our paper [The Players of Ludos: Beyond Byzantium](https://holochain.org/papers/holochain-players-of-ludos.pdf).
 
 1. **Coordination arises from agents**: Starting from the same ground-rules, and then any single agent's ability to act *as soon* as they have confirmed to their satisfaction that other agent's previous actions conform to those ground rules. (Thus, in our frame, coordination looks like alignment heading in the same direction, rather than agreement proceeding in lockstep.)
 
