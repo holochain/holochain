@@ -8,7 +8,6 @@ use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_state::prelude::*;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
-use kitsune_p2p_types::KitsuneResult;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast::Sender;
@@ -54,16 +53,16 @@ impl CountersigningWorkspace {
         }
     }
 
-    pub fn get_countersigning_session_state(
-        &self,
-    ) -> KitsuneResult<Option<CountersigningSessionState>> {
-        self.inner.share_ref(|inner| Ok(inner.session.clone()))
+    pub fn get_countersigning_session_state(&self) -> Option<CountersigningSessionState> {
+        self.inner
+            .share_ref(|inner| Ok(inner.session.clone()))
+            .unwrap()
     }
 
-    pub fn remove_countersigning_session(
-        &self,
-    ) -> KitsuneResult<Option<CountersigningSessionState>> {
-        self.inner.share_mut(|inner, _| Ok(inner.session.take()))
+    pub fn remove_countersigning_session(&self) -> Option<CountersigningSessionState> {
+        self.inner
+            .share_mut(|inner, _| Ok(inner.session.take()))
+            .unwrap()
     }
 }
 
@@ -88,10 +87,11 @@ pub(crate) async fn countersigning_workflow(
     publish_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     tracing::debug!(
-        "Starting countersigning workflow, with a session? {}",
+        "Starting countersigning workflow for agent {:?}, with a session? {:?}",
+        cell_id.agent_pubkey(),
         workspace
             .inner
-            .share_ref(|inner| Ok(inner.session.is_some()))
+            .share_ref(|inner| Ok(inner.session.clone()))
             .unwrap()
     );
 

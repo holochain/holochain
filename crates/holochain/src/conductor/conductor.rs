@@ -3291,9 +3291,7 @@ mod countersigning_impls {
             let countersigning_workspaces = space.countersigning_workspaces.lock();
             match countersigning_workspaces.get(&cell_id) {
                 None => Ok(None),
-                Some(workspace) => workspace
-                    .get_countersigning_session_state()
-                    .map_err(|err| ConductorError::KitsuneP2pError(err.into())),
+                Some(workspace) => Ok(workspace.get_countersigning_session_state()),
             }
         }
 
@@ -3308,10 +3306,7 @@ mod countersigning_impls {
             force_abandon_session(space.clone(), cell_id.agent_pubkey(), &preflight_request)
                 .await?;
             // Remove countersigning session from the workspace.
-            if let None = countersigning_workspace
-                .remove_countersigning_session()
-                .map_err(|err| ConductorError::KitsuneP2pError(err.into()))?
-            {
+            if let None = countersigning_workspace.remove_countersigning_session() {
                 // The session exists in the space as previously checked, so this case must never happen.
                 tracing::warn!(
                     ?cell_id,
@@ -3341,10 +3336,7 @@ mod countersigning_impls {
                 preflight_request,
             )
             .await?;
-            if let None = countersigning_workspace
-                .remove_countersigning_session()
-                .map_err(|err| ConductorError::KitsuneP2pError(err.into()))?
-            {
+            if let None = countersigning_workspace.remove_countersigning_session() {
                 // The session exists in the space as previously checked, so this case must never happen.
                 tracing::warn!(
                     ?cell_id,
@@ -3368,10 +3360,7 @@ mod countersigning_impls {
                     ))
                 }
                 Some(countersigning_workspace) => {
-                    match countersigning_workspace
-                        .get_countersigning_session_state()
-                        .map_err(|err| ConductorError::KitsuneP2pError(err.into()))?
-                    {
+                    match countersigning_workspace.get_countersigning_session_state() {
                         None => {
                             return Err(ConductorError::CountersigningError(
                                 CountersigningError::SessionNotFound(cell_id.clone()),
