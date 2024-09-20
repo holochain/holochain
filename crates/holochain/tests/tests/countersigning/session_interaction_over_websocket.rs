@@ -20,7 +20,7 @@ use holochain_conductor_api::{AdminRequest, AdminResponse, AppResponse};
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use holochain_types::test_utils::{fake_dna_zomes, write_fake_dna_file};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_websocket::{ReceiveMessage, WebsocketSender};
+use holochain_websocket::{ReceiveMessage, WebsocketReceiver, WebsocketSender};
 use kitsune_p2p_types::config::TransportConfig;
 
 use arbitrary::Arbitrary;
@@ -36,6 +36,8 @@ use crate::tests::test_utils::{
     register_and_install_dna, start_holochain_with_lair, start_local_services, write_config,
     SupervisedChild,
 };
+
+const APP_ID: &str = "test";
 
 // Test countersigning interaction calls.
 // - two agents on two conductors
@@ -73,18 +75,14 @@ async fn countersigning_session_interaction_calls() {
     .await;
 
     // Attach app interface to Alice's conductor.
-    let alice_app_port = attach_app_interface(&mut alice.admin_tx, None).await;
-    let (alice_app_tx, mut alice_app_rx) = websocket_client_by_port(alice_app_port).await.unwrap();
-    authenticate_app_ws_client(alice_app_tx.clone(), alice.admin_port, "test".to_string()).await;
+    let (alice_app_tx, mut alice_app_rx) = connect_app_interface(&mut alice).await;
     // Spawn task listening to app socket messages, preventing app socket to be dropped.
     tokio::spawn(async move { while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {} });
 
     let mut bob = setup_agent(bootstrap_url, signal_url, network_seed.clone()).await;
 
     // Attach app interface to Bob's conductor.
-    let bob_app_port = attach_app_interface(&mut bob.admin_tx, None).await;
-    let (bob_app_tx, mut bob_app_rx) = websocket_client_by_port(bob_app_port).await.unwrap();
-    authenticate_app_ws_client(bob_app_tx.clone(), bob.admin_port, "test".to_string()).await;
+    let (bob_app_tx, mut bob_app_rx) = connect_app_interface(&mut bob).await;
     // Spawn task listening to app socket messages, preventing app socket to be dropped.
     // Bob will later listen for an abandoned session signal.
     let (bob_session_abandonded_tx, mut bob_session_abandonded_rx) = tokio::sync::mpsc::channel(1);
@@ -282,9 +280,7 @@ async fn countersigning_session_interaction_calls() {
     let mut alice = restart_conductor(alice).await;
 
     // Attach app interface to Alice's conductor.
-    let alice_app_port = attach_app_interface(&mut alice.admin_tx, None).await;
-    let (alice_app_tx, mut alice_app_rx) = websocket_client_by_port(alice_app_port).await.unwrap();
-    authenticate_app_ws_client(alice_app_tx.clone(), alice.admin_port, "test".to_string()).await;
+    let (alice_app_tx, mut alice_app_rx) = connect_app_interface(&mut alice).await;
     // Spawn task listening to app socket messages, preventing app socket to be dropped.
     tokio::spawn(async move { while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {} });
 
@@ -433,8 +429,7 @@ async fn countersigning_session_interaction_calls() {
     let bob_config = shutdown_agent(bob);
 
     // Alice commits countersigned entry.
-    for i in 0..5 {
-        tracing::info!("alice trying to commit again {i}");
+    for _ in 0..5 {
         let response = call_zome_fn_fallible(
             &alice_app_tx,
             alice.cell_id.clone(),
@@ -458,11 +453,8 @@ async fn countersigning_session_interaction_calls() {
     let mut alice = restart_conductor(alice).await;
 
     // Attach app interface to Alice's conductor.
-    let alice_app_port = attach_app_interface(&mut alice.admin_tx, None).await;
-    let (alice_app_tx, mut alice_app_rx) = websocket_client_by_port(alice_app_port).await.unwrap();
-    authenticate_app_ws_client(alice_app_tx.clone(), alice.admin_port, "test".to_string()).await;
-
-    // Spawn task with app socket signal waiting for system signals.
+    let (alice_app_tx, mut alice_app_rx) = connect_app_interface(&mut alice).await;
+    // Spawn task listening for signals.
     tokio::spawn(async move { while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {} });
 
     // Alice's session should be in state Unresolvable.
@@ -488,10 +480,7 @@ async fn countersigning_session_interaction_calls() {
     // Bring Bob back up.
     let mut bob = startup_agent(bob_config).await;
 
-    let bob_app_port = attach_app_interface(&mut bob.admin_tx, None).await;
-    let (bob_app_tx, mut bob_app_rx) = websocket_client_by_port(bob_app_port).await.unwrap();
-    authenticate_app_ws_client(bob_app_tx.clone(), bob.admin_port, "test".to_string()).await;
-
+    let (bob_app_tx, mut bob_app_rx) = connect_app_interface(&mut bob).await;
     // Spawn task listening for successful countersigning session signal.
     let (bob_successful_session_tx, mut bob_successful_session_rx) = tokio::sync::mpsc::channel(1);
     tokio::spawn(async move {
@@ -514,7 +503,8 @@ async fn countersigning_session_interaction_calls() {
 
     tracing::info!("Sessions resolved successfully. Awaiting DHT sync...");
 
-    tokio::time::timeout(Duration::from_secs(30), await_dht_sync(&[&alice, &bob]))
+    // Syncing takes long because Alice's publish loop pauses for a minute.
+    tokio::time::timeout(Duration::from_secs(90), await_dht_sync(&[&alice, &bob]))
         .await
         .unwrap();
 }
@@ -539,7 +529,7 @@ async fn setup_agent(bootstrap_url: String, signal_url: String, network_seed: St
     config.keystore = KeystoreConfig::LairServerInProc { lair_root: None };
     config.tuning_params = Some(ConductorTuningParams {
         countersigning_resolution_retry_delay: Some(Duration::from_secs(5)),
-        publish_retry_delay: Some(Duration::from_secs(10)),
+        min_publish_interval: Some(Duration::from_secs(5)),
         ..Default::default()
     });
     config.network.bootstrap_service = Some(Url2::parse(bootstrap_url));
@@ -563,26 +553,26 @@ async fn setup_agent(bootstrap_url: String, signal_url: String, network_seed: St
         )],
     );
 
-    // Install Dna
+    // Install Dna.
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
     let cell_id = register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000)
         .await
         .unwrap();
 
-    // Activate cells
+    // Activate cells.
     let request = AdminRequest::EnableApp {
-        installed_app_id: "test".to_string(),
+        installed_app_id: APP_ID.to_string(),
     };
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await.unwrap();
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
-    // Generate signing key pair
+    // Generate signing key pair.
     let mut rng = OsRng;
     let signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
     let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
 
-    // Grant zome call capability for agent
+    // Grant zome call capability for agent.
     let functions = GrantedFunctions::All;
 
     let mut buf = arbitrary::Unstructured::new(&[]);
@@ -658,6 +648,13 @@ async fn startup_agent(config: (PathBuf, CellId, SigningKey, CapSecret)) -> Agen
 async fn restart_conductor(agent: Agent) -> Agent {
     let agent_config = shutdown_agent(agent);
     startup_agent(agent_config).await
+}
+
+async fn connect_app_interface(agent: &mut Agent) -> (WebsocketSender, WebsocketReceiver) {
+    let app_port = attach_app_interface(&mut agent.admin_tx, None).await;
+    let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    authenticate_app_ws_client(app_tx.clone(), agent.admin_port, APP_ID.to_string()).await;
+    (app_tx, app_rx)
 }
 
 async fn expect_bootstrapping_completed(agents: &[&Agent]) {

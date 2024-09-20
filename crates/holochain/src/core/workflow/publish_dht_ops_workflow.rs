@@ -39,18 +39,18 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(db, network, trigger_self, publish_retry_delay))
+    tracing::instrument(skip(db, network, trigger_self, min_publish_interval))
 )]
 pub async fn publish_dht_ops_workflow(
     db: DbWrite<DbKindAuthored>,
     network: Arc<impl HolochainP2pDnaT>,
     trigger_self: TriggerSender,
     agent: AgentPubKey,
-    publish_retry_delay: Duration,
+    min_publish_interval: Duration,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
     let to_publish =
-        publish_dht_ops_workflow_inner(db.clone().into(), agent.clone(), publish_retry_delay)
+        publish_dht_ops_workflow_inner(db.clone().into(), agent.clone(), min_publish_interval)
             .await?;
     let to_publish_count: usize = to_publish.values().map(Vec::len).sum();
 
@@ -122,12 +122,12 @@ pub async fn publish_dht_ops_workflow(
 pub async fn publish_dht_ops_workflow_inner(
     db: DbRead<DbKindAuthored>,
     agent: AgentPubKey,
-    publish_retry_delay: Duration,
+    min_publish_interval: Duration,
 ) -> WorkflowResult<HashMap<OpBasis, Vec<(OpHashSized, crate::prelude::DhtOp)>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for (basis, op_hash, op) in get_ops_to_publish(agent, &db, publish_retry_delay).await? {
+    for (basis, op_hash, op) in get_ops_to_publish(agent, &db, min_publish_interval).await? {
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
