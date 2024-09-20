@@ -324,7 +324,7 @@ pub mod wasm_test {
                 "must_get_action",
                 countersigned_action_hash_alice.clone(),
             )
-            .await.unwrap_err();
+            .await.unwrap();
 
         conductor
             .call_fallible::<_, Record>(
@@ -332,14 +332,14 @@ pub mod wasm_test {
                 "must_get_valid_record",
                 countersigned_action_hash_alice.clone(),
             )
-            .await.unwrap_err();
+            .await.unwrap();
         conductor
             .call_fallible::<_, EntryHashed>(
                 &alice,
                 "must_get_entry",
                 countersigned_entry_hash_alice.clone(),
             )
-            .await.unwrap_err();
+            .await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
