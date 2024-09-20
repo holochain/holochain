@@ -1161,6 +1161,8 @@ pub async fn genesis(
     Ok(())
 }
 
+/// Should only be used to put items into the Authored DB.
+/// Hash transfer fields (source, transfer_method, transfer_time) are not set.
 pub fn put_raw(
     txn: &mut Transaction,
     shh: SignedActionHashed,
@@ -1191,7 +1193,7 @@ pub fn put_raw(
     }
     insert_action(txn, &shh)?;
     for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, &op.into(), &op_hash, &op_order, &timestamp)?;
+        insert_op_lite(txn, &op.into(), &op_hash, &op_order, &timestamp, None)?;
     }
     Ok(ops_to_integrate)
 }

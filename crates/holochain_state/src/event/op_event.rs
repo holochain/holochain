@@ -6,17 +6,36 @@
 //! The database state pertaining to DhtOps can be streamed out as a list of `OpEvent`s,
 //! and that same state can be recreated by applying a list of `OpEvent`s.
 
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
+
 use crate::{prelude::*, query::map_sql_dht_op};
 
-use super::{Event, EventData, EventResult};
+use super::{Event, EventData, EventError, EventResult};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum OpEvent {
     /// The node has authored this op, including validation and integration
     Authored { op: DhtOp },
 
-    /// The node has fetched this op from another node via the FetchPool
-    Fetched { op: DhtOp },
+    /// The node has fetched this op from another node via the FetchPool.
+    Fetched {
+        /// The op fetched
+        op: DhtOp,
+
+        /// The agent that the op was fetched from
+        source: AgentPubKey,
+
+        /// The method by which the op hash was transferred (gossip or publish).
+        /// This relates only to the first time the op hash was transferred to this node.
+        /// i.e. If we fetched from a particular `source`, and that `source` transferred
+        /// the op hash to us by multiple transfer_methods, only the first occurrence is
+        /// recorded.
+        hash_transfer_method: TransferMethod,
+
+        /// The time that the op hash was first received by this node.
+        /// The time of actual op being fetched is recorded in the parent `Event`.
+        hash_transfer_time: Timestamp,
+    },
 
     /// The node has sys validated an op authored by someone else,
     /// and the outcome could be anything (accepted or rejected or other).
@@ -64,13 +83,25 @@ impl OpEventStore {
                 OpEvent::Authored { op } => {
                     let op = op.into_hashed();
                     self.authored
-                        .write_async(move |txn| insert_op_when(txn, &op, timestamp))
+                        .write_async(move |txn| insert_op_when(txn, &op, None, timestamp))
                         .await?;
                 }
-                OpEvent::Fetched { op } => {
+                OpEvent::Fetched {
+                    op,
+                    source,
+                    hash_transfer_method,
+                    hash_transfer_time,
+                } => {
                     let op = op.into_hashed();
                     self.dht
-                        .write_async(move |txn| insert_op_when(txn, &op, timestamp))
+                        .write_async(move |txn| {
+                            insert_op_when(
+                                txn,
+                                &op,
+                                Some((source, hash_transfer_method, hash_transfer_time)),
+                                timestamp,
+                            )
+                        })
                         .await?;
                 }
                 OpEvent::SysValidated { op: op_hash } => {
@@ -108,7 +139,7 @@ impl OpEventStore {
         Ok(())
     }
 
-    pub async fn get_events(&self) -> StateQueryResult<Vec<Event>> {
+    pub async fn get_events(&self) -> EventResult<Vec<Event>> {
         let sql_ops = "
             SELECT
             Action.blob as action_blob,
@@ -150,7 +181,7 @@ impl OpEventStore {
                         // More events to come:
                         // - [ ] Published
 
-                        StateQueryResult::Ok(())
+                        EventResult::Ok(())
                     })?
                     .collect::<Result<Vec<()>, _>>()?;
 
@@ -166,11 +197,11 @@ impl OpEventStore {
                             OpEvent::ReceivedValidationReceipt { receipt },
                         ));
 
-                        StateQueryResult::Ok(())
+                        EventResult::Ok(())
                     })?
                     .collect::<Result<Vec<()>, _>>()?;
 
-                StateQueryResult::Ok(events)
+                EventResult::Ok(events)
             })
             .await?;
 
@@ -185,8 +216,38 @@ impl OpEventStore {
                         let op = map_sql_dht_op(true, "dht_type", row)?;
                         let op_hash = op.to_hash();
 
+                        let source: Option<AgentPubKey> = row.get("transfer_source")?;
+                        let source = source.ok_or_else(|| {
+                            EventError::BadDatabaseState(format!(
+                                "No `transfer_source` specified for op {op_hash}"
+                            ))
+                        })?;
+
+                        let hash_transfer_method: Option<TransferMethod> =
+                            row.get("transfer_method")?;
+                        let hash_transfer_method = hash_transfer_method.ok_or_else(|| {
+                            EventError::BadDatabaseState(format!(
+                                "No `transfer_method` specified for op {op_hash}"
+                            ))
+                        })?;
+
+                        let hash_transfer_time: Option<Timestamp> = row.get("transfer_time")?;
+                        let hash_transfer_time = hash_transfer_time.ok_or_else(|| {
+                            EventError::BadDatabaseState(format!(
+                                "No `transfer_time` specified for op {op_hash}"
+                            ))
+                        })?;
+
                         // The existence of an op implies the Fetched event
-                        events.push(Event::new(timestamp, OpEvent::Fetched { op }));
+                        events.push(Event::new(
+                            timestamp,
+                            OpEvent::Fetched {
+                                op,
+                                source,
+                                hash_transfer_method,
+                                hash_transfer_time,
+                            },
+                        ));
 
                         // The existence of a when_sys_validated timestamp
                         // implies the SysValidated event
@@ -215,10 +276,10 @@ impl OpEventStore {
                             events.push(Event::new(when_integrated, ev));
                         }
 
-                        StateQueryResult::Ok(())
+                        EventResult::Ok(())
                     })?
-                    .collect::<Result<Vec<()>, _>>()?;
-                StateQueryResult::Ok(events)
+                    .collect::<EventResult<Vec<()>>>()?;
+                EventResult::Ok(events)
             })
             .await?;
 
@@ -297,10 +358,25 @@ mod tests {
 
         // Setup store 2
 
-        let events_2 = btreeset![
-            Event::now(Fetched { op: ops[0].clone() }),
-            Event::now(Fetched { op: ops[1].clone() }),
-            Event::now(Fetched { op: ops[2].clone() }),
+        let events_2: BTreeSet<Event> = vec![
+            Event::now(Fetched {
+                op: ops[0].clone(),
+                source: agent_1.clone(),
+                hash_transfer_method: TransferMethod::Publish,
+                hash_transfer_time: Timestamp::now(),
+            }),
+            Event::now(Fetched {
+                op: ops[1].clone(),
+                source: agent_1.clone(),
+                hash_transfer_method: TransferMethod::Gossip(GossipType::Recent),
+                hash_transfer_time: Timestamp::now(),
+            }),
+            Event::now(Fetched {
+                op: ops[2].clone(),
+                source: agent_1.clone(),
+                hash_transfer_method: TransferMethod::Gossip(GossipType::Historical),
+                hash_transfer_time: Timestamp::now(),
+            }),
             // op 0 is integrated
             Event::now(SysValidated {
                 op: ops[0].to_hash(),
@@ -322,7 +398,9 @@ mod tests {
             Event::now(SysValidated {
                 op: ops[2].to_hash(),
             }),
-        ];
+        ]
+        .into_iter()
+        .collect();
         let mut store_2 = OpEventStore::new_test(cell_id_2);
         let extracted_events_2 = db_roundtrip(&mut store_2, events_2.iter()).await;
         pretty_assertions::assert_eq!(events_2, extracted_events_2);

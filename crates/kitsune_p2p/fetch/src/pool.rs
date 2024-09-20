@@ -11,6 +11,7 @@
 //! interval.
 
 use indexmap::map::Entry;
+use kitsune_p2p_timestamp::Timestamp;
 use std::{collections::HashMap, sync::Arc};
 use tokio::time::{Duration, Instant};
 
@@ -227,7 +228,7 @@ impl State {
                     sources,
                     space,
                     size,
-                    first_transfer_info: (Timestamp::now(), transfer_method),
+                    first_transfer_info: (transfer_method, Timestamp::now()),
                     context,
                     pending_response: None,
                 };
@@ -461,7 +462,7 @@ mod tests {
             sources: Sources::new(sources),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             context,
-            first_transfer_info: (Timestamp::now(), TransferMethod::Publish),
+            first_transfer_info: (TransferMethod::Publish, Timestamp::now()),
             size: None,
             pending_response: None,
         }

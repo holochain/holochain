@@ -26,6 +26,7 @@ human-repr = { version = "1", optional = true }
 arbitrary = { version = "1", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
+rusqlite = { version = "0.32.1", optional = true }
 
 [dev-dependencies]
 kitsune_p2p_fetch = { path = ".", features = [
@@ -57,5 +58,5 @@ test_utils = ["human-repr", "kitsune_p2p_types/test_utils"]
 
 default = []
 
-sqlite-encrypted = ["kitsune_p2p_types/sqlite-encrypted"]
-sqlite = ["kitsune_p2p_types/sqlite"]
+sqlite-encrypted = ["rusqlite", "kitsune_p2p_types/sqlite-encrypted"]
+sqlite = ["rusqlite", "kitsune_p2p_types/sqlite"]

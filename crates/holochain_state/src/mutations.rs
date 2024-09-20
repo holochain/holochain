@@ -27,6 +27,7 @@ use holochain_zome_types::block::BlockTargetId;
 use holochain_zome_types::block::BlockTargetReason;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::prelude::*;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 use std::str::FromStr;
 
 pub use error::*;
@@ -103,14 +104,19 @@ pub fn insert_record_scratch(
 }
 
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
-pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
-    insert_op_when(txn, op, Timestamp::now())
+pub fn insert_op(
+    txn: &mut Transaction,
+    op: &DhtOpHashed,
+    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
+) -> StateMutationResult<()> {
+    insert_op_when(txn, op, transfer_data, Timestamp::now())
 }
 
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
 pub fn insert_op_when(
     txn: &mut Transaction,
     op: &DhtOpHashed,
+    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
     when_stored: Timestamp,
 ) -> StateMutationResult<()> {
     let hash = op.as_hash();
@@ -146,7 +152,15 @@ pub fn insert_op_when(
         }
     }
     if create_op {
-        insert_op_lite_when(txn, &op_lite, hash, &op_order, &timestamp, when_stored)?;
+        insert_op_lite_when(
+            txn,
+            &op_lite,
+            hash,
+            &op_order,
+            &timestamp,
+            transfer_data,
+            when_stored,
+        )?;
         set_dependency(txn, hash, deps)?;
     }
     Ok(())
@@ -165,7 +179,7 @@ pub fn insert_op_lite_into_authored(
     order: &OpOrder,
     authored_timestamp: &Timestamp,
 ) -> StateMutationResult<()> {
-    insert_op_lite(txn, op_lite, hash, order, authored_timestamp)?;
+    insert_op_lite(txn, op_lite, hash, order, authored_timestamp, None)?;
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
@@ -178,6 +192,7 @@ pub fn insert_op_lite(
     hash: &DhtOpHash,
     order: &OpOrder,
     authored_timestamp: &Timestamp,
+    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
 ) -> StateMutationResult<()> {
     insert_op_lite_when(
         txn,
@@ -185,6 +200,7 @@ pub fn insert_op_lite(
         hash,
         order,
         authored_timestamp,
+        transfer_data,
         Timestamp::now(),
     )
 }
@@ -196,9 +212,13 @@ pub fn insert_op_lite_when(
     hash: &DhtOpHash,
     order: &OpOrder,
     authored_timestamp: &Timestamp,
+    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
     when_stored: Timestamp,
 ) -> StateMutationResult<()> {
     let basis = op_lite.dht_basis();
+    let (transfer_source, transfer_method, transfer_time) = transfer_data
+        .map(|(s, m, t)| (Some(s), Some(m), Some(t)))
+        .unwrap_or((None, None, None));
     match op_lite {
         DhtOpLite::Chain(op) => {
             let action_hash = op.action_hash().clone();
@@ -210,6 +230,8 @@ pub fn insert_op_lite_when(
                 "when_stored": when_stored,
                 "basis_hash": basis,
                 "action_hash": action_hash,
+                "transfer_source": transfer_source,
+                "transfer_method": transfer_method,
                 "require_receipt": 0,
                 "op_order": order,
             })?;
@@ -224,6 +246,8 @@ pub fn insert_op_lite_when(
                 "when_stored": when_stored,
                 "basis_hash": basis,
                 "action_hash": warrant_hash,
+                "transfer_source": transfer_source,
+                "transfer_method": transfer_method,
                 "require_receipt": 0,
                 "op_order": order,
             })?;
@@ -1025,8 +1049,8 @@ mod tests {
             let op1 = op1.clone();
             let op2 = op2.clone();
             move |txn| {
-                insert_op(txn, &op1).unwrap();
-                insert_op(txn, &op2).unwrap();
+                insert_op(txn, &op1, None).unwrap();
+                insert_op(txn, &op2, None).unwrap();
             }
         });
 

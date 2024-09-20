@@ -54,8 +54,9 @@ nanoid = { version = "0.4", optional = true }
 # contrafact
 contrafact = { version = "0.2.0-rc.1", optional = true }
 
+
 [dev-dependencies]
-holochain_state = { path = ".", features = ["test_utils"] }
+holochain_state = { path = ".", features = ["test_utils", "sqlite"] }
 
 anyhow = "1.0"
 arbitrary = "1.0"

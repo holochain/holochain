@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 mod error;
-pub use error::EventError;
+pub use error::*;
 
 mod op_event;
 pub use op_event::OpEvent;
@@ -63,7 +63,7 @@ impl EventData {
         match self {
             Self::Op(e) => match e {
                 OpEvent::Authored { op } => op.signature().as_ref(),
-                OpEvent::Fetched { op } => op.signature().as_ref(),
+                OpEvent::Fetched { op, .. } => op.signature().as_ref(),
                 OpEvent::SysValidated { op } => op.as_ref(),
                 OpEvent::AppValidated { op } => op.as_ref(),
                 OpEvent::Integrated { op } => op.as_ref(),
@@ -76,5 +76,3 @@ impl EventData {
         }
     }
 }
-
-pub type EventResult<T> = Result<T, EventError>;

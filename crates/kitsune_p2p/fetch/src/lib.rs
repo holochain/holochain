@@ -79,6 +79,30 @@ pub enum TransferMethod {
     Gossip(GossipType),
 }
 
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
+impl rusqlite::ToSql for TransferMethod {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        let stage = match self {
+            TransferMethod::Publish => 1,
+            TransferMethod::Gossip(GossipType::Recent) => 2,
+            TransferMethod::Gossip(GossipType::Historical) => 3,
+        };
+        Ok(rusqlite::types::ToSqlOutput::Owned(stage.into()))
+    }
+}
+
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
+impl rusqlite::types::FromSql for TransferMethod {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        i32::column_result(value).and_then(|int| match int {
+            1 => Ok(TransferMethod::Publish),
+            2 => Ok(TransferMethod::Gossip(GossipType::Recent)),
+            3 => Ok(TransferMethod::Gossip(GossipType::Historical)),
+            _ => Err(rusqlite::types::FromSqlError::InvalidType),
+        })
+    }
+}
+
 /// Usage agnostic context data.
 #[derive(
     Default,

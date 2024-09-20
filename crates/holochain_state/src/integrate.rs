@@ -110,7 +110,7 @@ fn insert_locally_validated_op(
     let op_type = op.get_type();
 
     // Insert the op.
-    insert_op(txn, &op)?;
+    insert_op(txn, &op, None)?;
     // Set the status to valid because we authored it.
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
 
