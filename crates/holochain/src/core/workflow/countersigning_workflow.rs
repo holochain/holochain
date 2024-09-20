@@ -41,14 +41,19 @@ pub(crate) use success::countersigning_success;
 pub struct CountersigningWorkspace {
     inner: Share<CountersigningWorkspaceInner>,
     countersigning_resolution_retry_delay: Duration,
+    countersigning_resolution_retry_limit: Option<usize>,
 }
 
 impl CountersigningWorkspace {
     /// Create a new countersigning workspace.
-    pub fn new(countersigning_resolution_retry_delay: Duration) -> Self {
+    pub fn new(
+        countersigning_resolution_retry_delay: Duration,
+        countersigning_resolution_retry_limit: Option<usize>,
+    ) -> Self {
         Self {
             inner: Default::default(),
             countersigning_resolution_retry_delay,
+            countersigning_resolution_retry_limit,
         }
     }
 }
@@ -76,7 +81,8 @@ enum CountersigningSessionState {
     /// the session to be completed.
     ///
     /// If we entered this state from the [CountersigningSessionState::Accepted] state, we will either
-    /// complete the session successfully or the session will time out and be abandoned.
+    /// complete the session successfully or the session will time out. On a timeout we will move
+    /// to the [CountersigningSessionState::Unknown] for a limited number of attempts to recover the session.
     ///
     /// This state can also be entered from the [CountersigningSessionState::Unknown] state, which happens when we
     /// have been able to recover the session from the source chain and have requested signed actions
@@ -101,6 +107,17 @@ enum CountersigningSessionState {
     /// before we could complete the session. In this case we need to try to discover what the other
     /// agent or agents involved in the session have done.
     ///
+    /// This state is also entered temporarily when we have published a signature and then the
+    /// session has timed out. To avoid deadlocking with two parties both waiting for each other to
+    /// proceed, we cannot stay in this state indefinitely. We will make a limited number of attempts
+    /// to recover and if we cannot, we will abandon the session.
+    ///
+    /// The only exception to the attempt limiting is if we are unable to reach agent activity authorities
+    /// to progress resolving the session. In this case, the attempts are not counted towards the
+    /// configured limit. This does not protect us against a network partition where we can only see
+    /// a subset of the network, but it does protect us against Holochain forcing a decision while
+    /// it is unable to reach any peers.
+    ///
     /// Note that because the [PreflightRequest] is stored here, we only ever enter the unknown state
     /// if we managed to keep the preflight request in memory, or if we have been able to recover it
     /// from the source chain as part of the committed [CounterSigningSessionData]. Otherwise, we
@@ -108,7 +125,7 @@ enum CountersigningSessionState {
     /// without going through this recovery state.
     Unknown {
         preflight_request: PreflightRequest,
-        resolution: Option<SessionResolutionSummary>,
+        resolution: SessionResolutionSummary,
     },
 }
 
@@ -140,11 +157,21 @@ impl CountersigningSessionState {
     }
 }
 
+#[derive(Debug, Clone)]
+enum ResolutionRequiredReason {
+    /// The session has timed out, so we should try to resolve its state before abandoning.
+    Timeout,
+    /// Something happened, like a conductor restart, and we lost track of the session.
+    Unknown,
+}
+
 /// Summary of the workflow's attempts to resolve the outcome a failed countersigning session.
 ///
 /// This tracks the numbers of attempts and the outcome of the most recent attempt.
 #[derive(Debug, Clone)]
 struct SessionResolutionSummary {
+    /// The reason why session resolution is required.
+    required_reason: ResolutionRequiredReason,
     /// How many attempts have been made to resolve the session.
     ///
     /// Attempts are made according to the frequency specified by [RETRY_UNKNOWN_SESSION_STATE_DELAY].
@@ -153,21 +180,18 @@ struct SessionResolutionSummary {
     /// is restarted then this counter is also reset.
     pub attempts: usize,
     /// The time of the last attempt to resolve the session.
-    pub last_attempt_at: Timestamp,
+    pub last_attempt_at: Option<Timestamp>,
     /// The outcome of the most recent attempt to resolve the session.
     pub outcomes: Vec<SessionResolutionOutcome>,
-    /// If we've tried to complete the session using signatures found with agent activity authorities
-    /// and still not succeeded, then the number of attempts is recorded here.
-    pub completion_attempts: usize,
 }
 
 impl Default for SessionResolutionSummary {
     fn default() -> Self {
         Self {
-            attempts: 1,
-            last_attempt_at: Timestamp::now(),
+            required_reason: ResolutionRequiredReason::Unknown,
+            attempts: 0,
+            last_attempt_at: None,
             outcomes: Vec::with_capacity(0),
-            completion_attempts: 0,
         }
     }
 }
@@ -193,9 +217,19 @@ const NUM_AUTHORITIES_TO_QUERY: usize = 3;
 
 #[derive(Clone, Debug, PartialEq)]
 enum SessionCompletionDecision {
+    /// Evidence found on the network that this session completed successfully.
     Complete(Box<SignedActionHashed>),
+    /// Evidence found on the network that this session was abandoned and other agents have
+    /// added to their chain without completing the session.
     Abandoned,
+    /// No evidence, or inconclusive evidence, was found on the network. Holochain will not make an
+    /// automatic decision until the evidence is conclusive.
     Indeterminate,
+    /// There were errors encountered while trying to resolve the session. Errors such as network
+    /// errors are treated differently to inconclusive evidence. We don't want to force a decision
+    /// when we're offline, for example. In this case, the resolution must be retried later and this
+    /// attempt should not be counted.
+    Failed,
 }
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
@@ -243,38 +277,6 @@ pub(crate) async fn countersigning_workflow(
     // Abandon any sessions that have timed out.
     apply_timeout(&space, workspace.clone(), &cell_id, signal_tx.clone()).await;
 
-    workspace
-        .inner
-        .share_mut(|inner, _| {
-            inner.session.iter_mut().for_each(|state| {
-                if let CountersigningSessionState::SignaturesCollected {
-                    preflight_request,
-                    signature_bundles,
-                    resolution,
-                } = state
-                {
-                    if signature_bundles.is_empty() && resolution.is_some() {
-                        tracing::debug!("Countersigning session for agent {:?} has no valid signatures remaining and is a recovery session, returning to unknown state", cell_id.agent_pubkey());
-
-                        // If we have no signatures and no resolution, then we need to try to recover
-                        // the session.
-                        *state = CountersigningSessionState::Unknown {
-                            preflight_request: preflight_request.clone(),
-                            resolution: resolution.clone().map(|r| SessionResolutionSummary {
-                                attempts: r.attempts + 1,
-                                last_attempt_at: Timestamp::now(),
-                                outcomes: r.outcomes.clone(),
-                                completion_attempts: r.completion_attempts + 1,
-                            }),
-                        };
-                    }
-                }
-            });
-
-            Ok(())
-        })
-        .unwrap();
-
     // If the session is in an unknown state, try to recover it.
     try_recover_failed_session(
         &space,
@@ -282,7 +284,6 @@ pub(crate) async fn countersigning_workflow(
         network.clone(),
         &cell_id,
         &signal_tx,
-        &self_trigger,
     )
     .await;
 
@@ -299,6 +300,8 @@ pub(crate) async fn countersigning_workflow(
         .unwrap();
 
     if let Some(signature_bundles) = maybe_completed_session {
+        let mut completed = false;
+
         for signature_bundle in signature_bundles {
             // Try to complete the session using this signature bundle.
 
@@ -333,6 +336,7 @@ pub(crate) async fn countersigning_workflow(
                         )))
                         .ok();
 
+                    completed = true;
                     break;
                 }
                 Ok(None) => {
@@ -346,6 +350,34 @@ pub(crate) async fn countersigning_workflow(
                     );
                 }
             }
+        }
+
+        if !completed {
+            // If we got these signatures from a resolution attempt, then we need to return to the
+            // unknown state now that we've tried the signatures, and they can't be used to resolve
+            // the session.
+            workspace.inner.share_mut(|inner, _| {
+                if let Some(session) = &mut inner.session {
+                    match session {
+                        CountersigningSessionState::SignaturesCollected {
+                            preflight_request,
+                            resolution,
+                            ..
+                        } => {
+                            if resolution.is_some() {
+                                *session = CountersigningSessionState::Unknown {
+                                    preflight_request: preflight_request.clone(),
+                                    resolution: resolution.clone().unwrap_or_default(),
+                                };
+                            }
+                        }
+                        _ => {
+                            tracing::error!("Countersigning session for agent {:?} was not in the expected state while trying to resolve it: {:?}", cell_id.agent_pubkey(), session);
+                        }
+                    }
+                }
+                Ok(())
+            }).unwrap();
         }
     }
 
@@ -361,8 +393,7 @@ pub(crate) async fn countersigning_workflow(
                         preflight_request, ..
                     } => Some(preflight_request.session_times.end),
                     CountersigningSessionState::Unknown { .. } => {
-                        // Don't apply timeouts in the unknown state
-                        None
+                        (Timestamp::now() + workspace.countersigning_resolution_retry_delay).ok()
                     }
                 },
                 None => None,
@@ -385,7 +416,6 @@ async fn try_recover_failed_session(
     network: Arc<impl HolochainP2pDnaT + Sized>,
     cell_id: &CellId,
     signal_tx: &Sender<Signal>,
-    self_trigger: &TriggerSender,
 ) {
     let maybe_session_in_unknown_state = workspace
         .inner
@@ -402,7 +432,6 @@ async fn try_recover_failed_session(
         })
         .unwrap();
 
-    let mut remained_in_unknown_state = false;
     if let Some(preflight_request) = maybe_session_in_unknown_state {
         tracing::info!(
             "Countersigning session for agent {:?} is in an unknown state, attempting to resolve",
@@ -416,10 +445,11 @@ async fn try_recover_failed_session(
         )
         .await
         {
-            Ok((SessionCompletionDecision::Complete(_), _)) => {
+            Ok((SessionCompletionDecision::Complete(_), outcomes)) => {
                 // No need to do anything here. Signatures were found which may be able to complete
                 // the session but the session isn't actually complete yet. We need to let the
                 // workflow re-run and try those signatures.
+                update_last_attempted(workspace.clone(), true, outcomes, cell_id);
             }
             Ok((SessionCompletionDecision::Abandoned, _)) => {
                 // The session state has been resolved, so we can remove it from the workspace.
@@ -443,54 +473,68 @@ async fn try_recover_failed_session(
                     .ok();
             }
             Ok((SessionCompletionDecision::Indeterminate, outcomes)) => {
-                remained_in_unknown_state = true;
                 tracing::info!(
                     "No automated decision could be reached for the current countersigning session: {:?}",
                     cell_id.agent_pubkey()
                 );
 
-                workspace.inner.share_mut(|inner, _| {
-                    if let Some(session_state) = &mut inner.session {
-                        if let CountersigningSessionState::Unknown {
-                            resolution,
-                            ..
-                        } = session_state
-                        {
-                            if let Some(resolution) = resolution {
-                                resolution.attempts += 1;
-                                resolution.last_attempt_at = Timestamp::now();
-                                resolution.outcomes = outcomes;
-                            } else {
-                                *resolution = Some(SessionResolutionSummary {
-                                    outcomes,
-                                    ..Default::default()
-                                });
-                            }
-                        } else {
-                            tracing::error!("Countersigning session for agent {:?} was not in the expected state while trying to resolve it", cell_id.agent_pubkey());
-                        }
-                    } else {
-                        tracing::error!("Countersigning session for agent {:?} was removed from the workspace while trying to resolve it", cell_id.agent_pubkey());
-                    }
+                // Record the attempt
+                update_last_attempted(workspace.clone(), true, outcomes, cell_id);
 
-                    Ok(())
-                }).unwrap();
+                let resolution = get_resolution(workspace.clone());
+                if let Some(SessionResolutionSummary {
+                                required_reason: ResolutionRequiredReason::Timeout,
+                                attempts,
+                                ..
+                            }) = resolution
+                {
+                    let limit = workspace.countersigning_resolution_retry_limit.unwrap_or(0);
+
+                    // If we have reached the limit of attempts, then abandon the session.
+                    if workspace.countersigning_resolution_retry_limit.is_none() || (limit > 0 && attempts >= limit) {
+                        tracing::info!(
+                                    "Reached the limit of attempts to resolve countersigning session for agent: {:?}",
+                                    cell_id.agent_pubkey()
+                                );
+
+                        // The session state has been resolved, so we can remove it from the workspace.
+                        workspace
+                            .inner
+                            .share_mut(|inner, _| {
+                                tracing::trace!(
+                                            "Abandoning countersigning session for agent: {:?}",
+                                            cell_id.agent_pubkey()
+                                        );
+
+                                inner.session = None;
+                                Ok(())
+                            })
+                            .unwrap();
+
+                        signal_tx
+                            .send(Signal::System(SystemSignal::AbandonedCountersigning(
+                                preflight_request.app_entry_hash.clone(),
+                            )))
+                            .ok();
+                    }
+                }
+            }
+            Ok((SessionCompletionDecision::Failed, outcomes)) => {
+                tracing::info!(
+                    "Failed to resolve countersigning session for agent: {:?}",
+                    cell_id.agent_pubkey()
+                );
+
+                // Record the attempt time, but not the attempt count.
+                update_last_attempted(workspace.clone(), false, outcomes, cell_id);
             }
             Err(e) => {
                 tracing::error!(
-                    "Error cleaning up countersigning session for agent: {:?}: {:?}",
+                    "Error resolving countersigning session for agent: {:?}: {:?}",
                     cell_id.agent_pubkey(),
                     e
                 );
             }
-        }
-    }
-
-    if remained_in_unknown_state {
-        if let Ok(t) = Timestamp::now() + workspace.countersigning_resolution_retry_delay {
-            reschedule_self(workspace, self_trigger.clone(), t);
-        } else {
-            tracing::error!("Failed to calculate next trigger time for countersigning workflow");
         }
     }
 }
@@ -514,6 +558,62 @@ fn reschedule_self(
         .unwrap();
 }
 
+fn update_last_attempted(
+    workspace: Arc<CountersigningWorkspace>,
+    add_to_attempts: bool,
+    outcomes: Vec<SessionResolutionOutcome>,
+    cell_id: &CellId,
+) {
+    workspace.inner.share_mut(|inner, _| {
+        if let Some(session) = &mut inner.session {
+            match session {
+                CountersigningSessionState::SignaturesCollected { resolution, .. } => {
+                    if let Some(resolution) = resolution {
+                        if add_to_attempts {
+                            resolution.attempts += 1;
+                        }
+                        resolution.last_attempt_at = Some(Timestamp::now());
+                        resolution.outcomes = outcomes;
+                    } else {
+                        tracing::warn!("Countersigning session for agent {:?} is missing a resolution but we are trying to resolve it", cell_id.agent_pubkey());
+                    }
+                }
+                CountersigningSessionState::Unknown { resolution, .. } => {
+                    if add_to_attempts {
+                        resolution.attempts += 1;
+                    }
+                    resolution.last_attempt_at = Some(Timestamp::now());
+                    resolution.outcomes = outcomes;
+                }
+                state => {
+                    tracing::error!("Countersigning session for agent {:?} was not in the expected state while trying to resolve it: {:?}", cell_id.agent_pubkey(), state);
+                }
+            }
+        } else {
+            tracing::error!("Countersigning session for agent {:?} was removed from the workspace while trying to resolve it", cell_id.agent_pubkey());
+        }
+
+        Ok(())
+    }).unwrap()
+}
+
+fn get_resolution(workspace: Arc<CountersigningWorkspace>) -> Option<SessionResolutionSummary> {
+    workspace
+        .inner
+        .share_ref(|inner| {
+            Ok(match &inner.session {
+                Some(CountersigningSessionState::SignaturesCollected { resolution, .. }) => {
+                    resolution.clone()
+                }
+                Some(CountersigningSessionState::Unknown { resolution, .. }) => {
+                    Some(resolution.clone())
+                }
+                _ => None,
+            })
+        })
+        .unwrap()
+}
+
 async fn apply_timeout(
     space: &Space,
     workspace: Arc<CountersigningWorkspace>,
@@ -522,8 +622,8 @@ async fn apply_timeout(
 ) {
     let timed_out = workspace
         .inner
-        .share_ref(|inner| {
-            Ok(inner.session.as_ref().and_then(|session| {
+        .share_mut(|inner, _| {
+            Ok(inner.session.as_mut().and_then(|session| {
                 let expired = match session {
                     CountersigningSessionState::Accepted(preflight_request) => {
                         preflight_request.session_times.end < Timestamp::now()
@@ -533,11 +633,22 @@ async fn apply_timeout(
                         signature_bundles,
                         resolution,
                     } => {
-                        // Only time out if all signatures have been tried and this is not a recovery state
+                        // Only change state if all signatures have been tried and this is not a recovery state
                         // because recovery should be dealt with separately.
-                        preflight_request.session_times.end < Timestamp::now()
+                        if preflight_request.session_times.end < Timestamp::now()
                             && signature_bundles.is_empty()
                             && resolution.is_none()
+                        {
+                            *session = CountersigningSessionState::Unknown {
+                                preflight_request: preflight_request.clone(),
+                                resolution: SessionResolutionSummary {
+                                    required_reason: ResolutionRequiredReason::Timeout,
+                                    ..Default::default()
+                                },
+                            };
+                        }
+
+                        false
                     }
                     _ => false,
                 };

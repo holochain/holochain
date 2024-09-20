@@ -4,9 +4,8 @@ use crate::core::workflow::countersigning_workflow::{
     success, SessionCompletionDecision, SessionResolutionOutcome, NUM_AUTHORITIES_TO_QUERY,
 };
 use crate::core::workflow::{countersigning_workflow, WorkflowResult};
-use crate::prelude::{Entry, RecordEntry};
+use crate::prelude::{Entry, PreflightRequest, RecordEntry};
 use either::Either;
-use hdk::prelude::PreflightRequest;
 use holo_hash::AgentPubKey;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::GetActivityOptions;
@@ -38,11 +37,11 @@ pub async fn inner_countersigning_session_incomplete(
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
     let maybe_current_session = authored_db
-        .write_async({
+        .read_async({
             let author = author.clone();
             move |txn| -> SourceChainResult<CurrentCountersigningSessionOpt> {
                 let maybe_current_session =
-                    current_countersigning_session(txn, Arc::new(author.clone()))?;
+                    current_countersigning_session(&txn, Arc::new(author.clone()))?;
 
                 Ok(maybe_current_session)
             }
@@ -72,8 +71,6 @@ pub async fn inner_countersigning_session_incomplete(
         ));
     }
 
-    // TODO don't need to gather per agent, try each until we can get a session data that contains a
-    //      set of signatures
     // We need to find out what state the other signing agents are in.
     // TODO Note that we are ignoring the optional signing agents here - that's something we can figure out later because it's not clear what it means for them
     //      to be optional.
@@ -86,7 +83,7 @@ pub async fn inner_countersigning_session_incomplete(
     let cascade = CascadeImpl::empty().with_network(network, space.cache_db.clone());
 
     let get_activity_options = GetActivityOptions {
-        include_warrants: true, // TODO don't want this, but document that apps should be checking for warrants before completing preflight
+        include_warrants: false, // TODO document that apps should consider checking for warrants before completing preflight
         include_valid_activity: true,
         include_full_records: true,
         get_options: GetOptions::network(),
@@ -125,17 +122,6 @@ pub async fn inner_countersigning_session_incomplete(
 
             let decision = match activity_result {
                 Ok(activity) => {
-                    // TODO don't need this
-                    if !activity.warrants.is_empty() {
-                        // If this agent is warranted then we can't make the decision on our agent's behalf
-                        // whether to trust this agent or not.
-                        tracing::info!(
-                            "Ignoring evidence from agent {:?} because they are warranted",
-                            agent
-                        );
-                        break;
-                    }
-
                     match activity.status {
                         ChainStatus::Valid(ref head) => {
                             tracing::trace!("Agent {:?} has a valid chain: {:?}", agent, head);
@@ -154,7 +140,7 @@ pub async fn inner_countersigning_session_incomplete(
                                 agent,
                                 status
                             );
-                            // Don't try to reason about this agent's state if the chain is invalid or empty.
+                            // Don't try to reason about this agent's state if the chain is invalid or forked.
                             continue;
                         }
                     }
@@ -166,8 +152,12 @@ pub async fn inner_countersigning_session_incomplete(
                                 SessionCompletionDecision::Indeterminate
                             } else if items.len() > 1 {
                                 tracing::warn!("Agent authority returned an unexpected response for agent {:?}: {:?}", agent, activity);
-                                // Continue to try a different authority.
-                                continue;
+                                // This is an entirely unexpected response. We should not attempt further processing.
+                                // Even with a protocol mismatch of some kind, we should not have more than one item returned.
+                                return Ok((
+                                    SessionCompletionDecision::Failed,
+                                    Vec::with_capacity(0),
+                                ));
                             } else {
                                 let maybe_countersigning_record = &items[0];
                                 match &maybe_countersigning_record.entry {
@@ -194,8 +184,15 @@ pub async fn inner_countersigning_session_incomplete(
                                         );
                                         SessionCompletionDecision::Abandoned
                                     }
-                                    // TODO separate out Hidden with a comment in case somebody runs into this later
-                                    RecordEntry::Hidden | RecordEntry::NA => {
+                                    RecordEntry::Hidden => {
+                                        // Hidden countersigning entries don't make sense. Two parties are agreeing to something
+                                        // so at least two people should be able to see the content. Hidden entries are visible
+                                        // only to their author. This comment is being left here in case somebody decides to add
+                                        // a concept of hidden countersigning entries in the future. You will need to modify
+                                        // the logic here!
+                                        SessionCompletionDecision::Abandoned
+                                    }
+                                    RecordEntry::NA => {
                                         // This wouldn't be the case for a countersigning entry so this is evidence that
                                         // the agent has put something else on their chain.
                                         SessionCompletionDecision::Abandoned
@@ -212,17 +209,22 @@ pub async fn inner_countersigning_session_incomplete(
                         }
                         _ => {
                             tracing::warn!("Agent authority returned an unexpected response for agent {:?}: {:?}", agent, activity);
-                            continue;
+                            // This should not happen, the authority did not understand our request for some reason.
+                            // This could be caused by a mismatch between conductors. Attempt no further processing
+                            // and require a new attempt that talks to peers who can answer hte query as we exepct.
+                            return Ok((SessionCompletionDecision::Failed, Vec::with_capacity(0)));
                         }
                     }
                 }
                 e => {
-                    tracing::debug!(
+                    tracing::warn!(
                         "Failed to get activity for agent {:?} because of: {:?}",
                         agent,
                         e
                     );
-                    SessionCompletionDecision::Indeterminate
+                    // Some error getting agent activity from this authority, don't treat this as
+                    // indeterminate, but require a new attempt
+                    return Ok((SessionCompletionDecision::Failed, Vec::with_capacity(0)));
                 }
             };
 
@@ -240,7 +242,7 @@ pub async fn inner_countersigning_session_incomplete(
             // That is likely to make the resolution process slower, but it's more likely to be correct.
             // NOTE: at the moment, since we're calling `get_agent_activity` without a target,
             //       all the responses could have come from the same authority.
-            tracing::info!(
+            tracing::warn!(
                 "Not enough responses to make a decision for agent {:?}. Have {}/{}",
                 agent,
                 authority_decisions.len(),
@@ -337,7 +339,7 @@ pub async fn inner_countersigning_session_incomplete(
     // they can force a decision if they wish. However, Holochain cannot make a decision at this point
     // because we aren't absolutely sure that the session is complete or abandoned.
 
-    tracing::debug!(
+    tracing::info!(
         "Countersigning session state for agent {:?} is indeterminate, will retry later",
         author
     );

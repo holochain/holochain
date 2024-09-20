@@ -1,6 +1,7 @@
 use crate::conductor::space::Space;
 use crate::core::workflow::countersigning_workflow::{
-    CountersigningSessionState, CountersigningWorkspace,
+    CountersigningSessionState, CountersigningWorkspace, ResolutionRequiredReason,
+    SessionResolutionSummary,
 };
 use holochain_sqlite::db::ReadAccess;
 use holochain_state::chain_lock::get_chain_lock;
@@ -106,7 +107,10 @@ pub async fn refresh_workspace_state(
                                             preflight_request: session_data
                                                 .preflight_request()
                                                 .clone(),
-                                            resolution: None,
+                                            resolution: SessionResolutionSummary {
+                                                required_reason: ResolutionRequiredReason::Unknown,
+                                                ..Default::default()
+                                            },
                                         });
 
                                         Ok(())

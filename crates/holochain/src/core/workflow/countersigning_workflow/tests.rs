@@ -411,7 +411,7 @@ async fn receive_valid_and_invalid_signatures_and_complete() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn time_out_if_only_invalid_signatures_received() {
+async fn attempts_resolution_if_only_invalid_signatures_received() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
@@ -447,7 +447,7 @@ async fn time_out_if_only_invalid_signatures_received() {
             .await,
     ];
 
-    // Receive the invalid signatures.
+    // Receive the invalid signature bundle.
     countersigning_success(
         test_harness.test_space.space.clone(),
         test_harness.author.clone(),
@@ -460,9 +460,27 @@ async fn time_out_if_only_invalid_signatures_received() {
         .respond_to_countersigning_workflow_signal()
         .await;
 
+    // Saw the signatures but didn't accept them. We also haven't reached the end time yet so we
+    // don't go straight to resolution
     test_harness.expect_session_in_signatures_collected();
 
-    // Should run again at timeout and abandon the session.
+    // Have Bob's authorities now show any activity yet.
+    let activity_response = bob.no_activity_response();
+    test_harness.reconfigure_network({
+        let activity_response = activity_response.clone();
+        move |mut net| {
+            net.expect_authority_for_hash().returning(|_| Ok(true));
+
+            net.expect_get_agent_activity().returning({
+                let activity_response = activity_response.clone();
+                move |_, _, _| Ok(vec![activity_response.clone()])
+            });
+
+            net
+        }
+    });
+
+    // Should run again at timeout and attempt to resolve the session
     test_harness
         .respond_to_countersigning_workflow_signal()
         .await;
@@ -576,8 +594,6 @@ async fn recover_after_restart_from_commit_when_other_agent_abandons() {
 
     // This is where we'll stay unless Bob takes some action
     let resolution = test_harness.expect_session_in_unknown_state();
-    assert!(resolution.is_some());
-    let resolution = resolution.unwrap();
     assert_eq!(1, resolution.attempts);
     assert_eq!(1, resolution.outcomes.len());
     let bob_resolution = &resolution.outcomes[0];
@@ -670,8 +686,7 @@ async fn recover_after_restart_from_commit_when_other_agent_completes() {
         .respond_to_countersigning_workflow_signal()
         .await;
 
-    let resolution = test_harness.expect_session_in_unknown_state();
-    assert!(resolution.is_some());
+    test_harness.expect_session_in_unknown_state();
 
     test_harness.expect_session_in_unknown_state();
 
@@ -789,9 +804,7 @@ async fn stay_in_unknown_state_when_activity_authorities_do_not_agree() {
         test_harness.countersigning_tx.trigger(&"test");
 
         let resolution = test_harness.expect_session_in_unknown_state();
-        assert!(resolution.is_some());
 
-        let resolution = resolution.unwrap();
         assert_eq!(i, resolution.attempts);
 
         let some_complete = resolution.outcomes.iter().all(|o| {
@@ -887,9 +900,7 @@ async fn stay_in_unknown_state_when_activity_authorities_are_missing_data() {
         test_harness.countersigning_tx.trigger(&"test");
 
         let resolution = test_harness.expect_session_in_unknown_state();
-        assert!(resolution.is_some());
 
-        let resolution = resolution.unwrap();
         assert_eq!(i, resolution.attempts);
 
         let some_complete = resolution.outcomes.iter().all(|o| {
@@ -962,6 +973,7 @@ async fn stay_in_unknown_state_when_bad_signatures_are_fetched() {
         move |mut net| {
             net.expect_authority_for_hash().returning(|_| Ok(true));
 
+            // TODO only one available!
             let pick_response = Arc::new(AtomicUsize::new(0));
             net.expect_get_agent_activity().returning({
                 let pick_response = pick_response.clone();
@@ -983,12 +995,8 @@ async fn stay_in_unknown_state_when_bad_signatures_are_fetched() {
             .await;
         test_harness.countersigning_tx.trigger(&"test");
 
-        let resolution = test_harness.expect_session_in_signatures_collected();
-        assert!(resolution.is_some());
-
-        let resolution = resolution.unwrap();
+        let resolution = test_harness.expect_session_in_unknown_state();
         assert_eq!(i, resolution.attempts);
-        assert_eq!(i - 1, resolution.completion_attempts);
     }
 }
 
@@ -1146,7 +1154,7 @@ impl TestHarness {
         .unwrap();
 
         let cell_id = CellId::new(dna_hash.clone(), author.clone());
-        let workspace = Arc::new(CountersigningWorkspace::new(Duration::from_secs(3)));
+        let workspace = Arc::new(CountersigningWorkspace::new(Duration::from_secs(3), None));
         test_space
             .space
             .countersigning_workspaces
@@ -1399,7 +1407,7 @@ impl TestHarness {
         }
     }
 
-    fn expect_session_in_unknown_state(&self) -> Option<SessionResolutionSummary> {
+    fn expect_session_in_unknown_state(&self) -> SessionResolutionSummary {
         let maybe_found = self
             .workspace
             .inner

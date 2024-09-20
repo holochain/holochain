@@ -229,6 +229,21 @@ pub struct ConductorTuningParams {
     ///
     /// Default: 5 minutes
     pub countersigning_resolution_retry_delay: Option<std::time::Duration>,
+    /// The maximum number of times that Holochain should attempt to resolve a failed countersigning session.
+    ///
+    /// Note that this *only* applies to sessions that fail through a timeout. Sessions that fail because
+    /// of a conductor crash or otherwise will not be limited by this value. This is a safety measure to
+    /// make it less likely that a failed session was down to a temporary network issue.
+    ///
+    /// Holochain will always try once, so this value sets the number of retries after the first attempt.
+    /// So the possible values for this setting are:
+    /// - `None`: Not set, then Holochain will just make a single attempt and then consider the session failed
+    ///    if it can't make a decision
+    /// - `Some(0)`: Holochain will treat this the same as a session that failed after a crash. It will retry
+    ///   until it can make a decision or until the user forces a decision.
+    /// - `Some(n)`, n > 0: Holochain will retry `n` times after the first attempt. If it can't make a decision
+    ///   after `n` retries, it will consider the session failed.
+    pub countersigning_resolution_retry_limit: Option<usize>,
 }
 
 impl ConductorTuningParams {
@@ -237,6 +252,7 @@ impl ConductorTuningParams {
         Self {
             sys_validation_retry_delay: None,
             countersigning_resolution_retry_delay: None,
+            countersigning_resolution_retry_limit: None,
         }
     }
 
@@ -261,6 +277,7 @@ impl Default for ConductorTuningParams {
             countersigning_resolution_retry_delay: Some(
                 empty.countersigning_resolution_retry_delay(),
             ),
+            countersigning_resolution_retry_limit: None,
         }
     }
 }
