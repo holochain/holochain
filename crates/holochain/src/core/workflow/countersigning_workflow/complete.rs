@@ -2,7 +2,6 @@ use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::weigh_placeholder;
 use crate::core::workflow::{WorkflowError, WorkflowResult};
-use hdk::prelude::{CellId, PreflightRequest, Record};
 use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
 use holochain_chc::AddRecordPayload;
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
@@ -14,7 +13,10 @@ use holochain_state::mutations;
 use holochain_state::prelude::{
     current_countersigning_session, SourceChainError, SourceChainResult, Store,
 };
-use holochain_types::dht_op::ChainOp;
+use holochain_types::{
+    dht_op::ChainOp,
+    prelude::{CellId, PreflightRequest, Record},
+};
 use holochain_zome_types::prelude::SignedAction;
 use kitsune_p2p_types::dht::prelude::Timestamp;
 use rusqlite::{named_params, Transaction};
