@@ -77,7 +77,7 @@ async fn countersigning_session_interaction_calls() {
     // Attach app interface to Alice's conductor.
     let (alice_app_tx, mut alice_app_rx) = connect_app_interface(&mut alice).await;
     // Spawn task listening to app socket messages, preventing app socket to be dropped.
-    tokio::spawn(async move { while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {} });
+    tokio::spawn(async move { while alice_app_rx.recv::<AppResponse>().await.is_ok() {} });
 
     let mut bob = setup_agent(bootstrap_url, signal_url, network_seed.clone()).await;
 
@@ -261,7 +261,7 @@ async fn countersigning_session_interaction_calls() {
             &alice_app_tx,
             alice.cell_id.clone(),
             &alice.signing_keypair,
-            alice.cap_secret.clone(),
+            alice.cap_secret,
             TestWasm::CounterSigning.coordinator_zome_name(),
             "create_a_countersigned_thing_with_entry_hash".into(),
             &[alice_response.clone(), bob_response.clone()],
@@ -282,7 +282,7 @@ async fn countersigning_session_interaction_calls() {
     // Attach app interface to Alice's conductor.
     let (alice_app_tx, mut alice_app_rx) = connect_app_interface(&mut alice).await;
     // Spawn task listening to app socket messages, preventing app socket to be dropped.
-    tokio::spawn(async move { while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {} });
+    tokio::spawn(async move { while alice_app_rx.recv::<AppResponse>().await.is_ok() {} });
 
     // Alice's session should be in state Unresolvable with 1 attempted resolution.
     tokio::time::timeout(Duration::from_secs(5), async {
@@ -411,7 +411,7 @@ async fn countersigning_session_interaction_calls() {
             &bob_app_tx,
             bob.cell_id.clone(),
             &bob.signing_keypair,
-            bob.cap_secret.clone(),
+            bob.cap_secret,
             TestWasm::CounterSigning.coordinator_zome_name(),
             "create_a_countersigned_thing_with_entry_hash".into(),
             &[alice_response.clone(), bob_response.clone()],
@@ -434,7 +434,7 @@ async fn countersigning_session_interaction_calls() {
             &alice_app_tx,
             alice.cell_id.clone(),
             &alice.signing_keypair,
-            alice.cap_secret.clone(),
+            alice.cap_secret,
             TestWasm::CounterSigning.coordinator_zome_name(),
             "create_a_countersigned_thing_with_entry_hash".into(),
             &[alice_response.clone(), bob_response.clone()],
@@ -455,7 +455,7 @@ async fn countersigning_session_interaction_calls() {
     // Attach app interface to Alice's conductor.
     let (alice_app_tx, mut alice_app_rx) = connect_app_interface(&mut alice).await;
     // Spawn task listening for signals.
-    tokio::spawn(async move { while let Ok(_) = alice_app_rx.recv::<AppResponse>().await {} });
+    tokio::spawn(async move { while alice_app_rx.recv::<AppResponse>().await.is_ok() {} });
 
     // Alice's session should be in state Unresolvable.
     assert_matches!(
@@ -651,7 +651,7 @@ async fn restart_conductor(agent: Agent) -> Agent {
 }
 
 async fn connect_app_interface(agent: &mut Agent) -> (WebsocketSender, WebsocketReceiver) {
-    let app_port = attach_app_interface(&mut agent.admin_tx, None).await;
+    let app_port = attach_app_interface(&agent.admin_tx, None).await;
     let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
     authenticate_app_ws_client(app_tx.clone(), agent.admin_port, APP_ID.to_string()).await;
     (app_tx, app_rx)
@@ -659,7 +659,7 @@ async fn connect_app_interface(agent: &mut Agent) -> (WebsocketSender, Websocket
 
 async fn expect_bootstrapping_completed(agents: &[&Agent]) {
     loop {
-        let agent_requests = agents.into_iter().map(|agent| async {
+        let agent_requests = agents.iter().map(|agent| async {
             match request(AdminRequest::AgentInfo { cell_id: None }, &agent.admin_tx).await {
                 AdminResponse::AgentInfo(agent_infos) => agent_infos.len() == agents.len(),
                 _ => unreachable!(),
@@ -679,7 +679,7 @@ async fn expect_bootstrapping_completed(agents: &[&Agent]) {
 
 async fn await_dht_sync(agents: &[&Agent]) {
     loop {
-        let requests = agents.into_iter().map(|agent| async {
+        let requests = agents.iter().map(|agent| async {
             match request(
                 AdminRequest::DumpFullState {
                     cell_id: Box::new(agent.cell_id.clone()),
@@ -708,7 +708,7 @@ async fn await_dht_sync(agents: &[&Agent]) {
     }
 }
 
-fn sort_dht(dht: &mut Vec<DhtOp>) {
+fn sort_dht(dht: &mut [DhtOp]) {
     dht.sort_by(|a, b| match a {
         DhtOp::ChainOp(chain_op_a) => {
             if let DhtOp::ChainOp(chain_op_b) = b {
@@ -773,7 +773,7 @@ where
         app_tx,
         agent.cell_id.clone(),
         &agent.signing_keypair,
-        agent.cap_secret.clone(),
+        agent.cap_secret,
         zome_name,
         fn_name.into(),
         input,

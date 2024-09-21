@@ -3310,7 +3310,7 @@ mod countersigning_impls {
         ) -> ConductorResult<Option<CountersigningSessionState>> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
             let countersigning_workspaces = space.countersigning_workspaces.lock();
-            match countersigning_workspaces.get(&cell_id) {
+            match countersigning_workspaces.get(cell_id) {
                 None => Ok(None),
                 Some(workspace) => Ok(workspace.get_countersigning_session_state()),
             }
@@ -3327,7 +3327,10 @@ mod countersigning_impls {
             force_abandon_session(space.clone(), cell_id.agent_pubkey(), &preflight_request)
                 .await?;
             // Remove countersigning session from the workspace.
-            if let None = countersigning_workspace.remove_countersigning_session() {
+            if countersigning_workspace
+                .remove_countersigning_session()
+                .is_none()
+            {
                 // The session exists in the space as previously checked, so this case must never happen.
                 tracing::warn!(
                     ?cell_id,
@@ -3357,7 +3360,10 @@ mod countersigning_impls {
                 preflight_request,
             )
             .await?;
-            if let None = countersigning_workspace.remove_countersigning_session() {
+            if countersigning_workspace
+                .remove_countersigning_session()
+                .is_none()
+            {
                 // The session exists in the space as previously checked, so this case must never happen.
                 tracing::warn!(
                     ?cell_id,
@@ -3375,18 +3381,14 @@ mod countersigning_impls {
             let maybe_countersigning_workspace =
                 space.countersigning_workspaces.lock().get(cell_id).cloned();
             match maybe_countersigning_workspace {
-                None => {
-                    return Err(ConductorError::CountersigningError(
-                        CountersigningError::WorkspaceDoesNotExist(cell_id.clone()),
-                    ))
-                }
+                None => Err(ConductorError::CountersigningError(
+                    CountersigningError::WorkspaceDoesNotExist(cell_id.clone()),
+                )),
                 Some(countersigning_workspace) => {
                     match countersigning_workspace.get_countersigning_session_state() {
-                        None => {
-                            return Err(ConductorError::CountersigningError(
-                                CountersigningError::SessionNotFound(cell_id.clone()),
-                            ))
-                        }
+                        None => Err(ConductorError::CountersigningError(
+                            CountersigningError::SessionNotFound(cell_id.clone()),
+                        )),
                         Some(CountersigningSessionState::Unknown {
                             preflight_request, ..
                         }) => Ok((countersigning_workspace, preflight_request)),
@@ -3976,7 +3978,7 @@ pub fn app_manifest_from_dnas(
             let dna = dr.dna();
             let path = PathBuf::from(format!("{}", dna.dna_hash()));
             let mut modifiers = DnaModifiersOpt::none();
-            modifiers.network_seed = network_seed.clone();
+            modifiers.network_seed.clone_from(&network_seed);
             AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {

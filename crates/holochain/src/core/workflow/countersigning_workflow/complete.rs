@@ -185,7 +185,7 @@ pub(crate) async fn inner_countersigning_session_complete(
     Ok(Some(session_data.preflight_request.app_entry_hash))
 }
 
-#[clippy::allow(too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 async fn reveal_countersigning_session(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,
@@ -219,8 +219,7 @@ async fn reveal_countersigning_session(
         }
     }
 
-    apply_success_state_changes(space, &author, this_cells_action_hash, integration_trigger)
-        .await?;
+    apply_success_state_changes(space, author, this_cells_action_hash, integration_trigger).await?;
 
     publish_trigger.trigger(&"publish countersigning_success");
 

@@ -105,7 +105,7 @@ impl AppInterfaceApi {
                 let countersigning_session_state = self
                     .conductor_handle
                     .clone()
-                    .get_countersigning_session_state(&*payload)
+                    .get_countersigning_session_state(&payload)
                     .await?;
                 Ok(AppResponse::CountersigningSessionState(Box::new(
                     countersigning_session_state,
@@ -114,14 +114,14 @@ impl AppInterfaceApi {
             AppRequest::AbandonCountersigningSession(payload) => {
                 self.conductor_handle
                     .clone()
-                    .abandon_countersigning_session(&*payload)
+                    .abandon_countersigning_session(&payload)
                     .await?;
                 Ok(AppResponse::CountersigningSessionAbandoned)
             }
             AppRequest::PublishCountersigningSession(payload) => {
                 self.conductor_handle
                     .clone()
-                    .publish_countersigning_session(&*payload)
+                    .publish_countersigning_session(&payload)
                     .await?;
                 Ok(AppResponse::CountersigningSessionPublished)
             }

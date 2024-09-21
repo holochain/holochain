@@ -521,7 +521,7 @@ async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
         .unwrap();
 
     // Everyone's DHT should sync
-    await_consistency(60, [alice, bob, &carol]).await.unwrap();
+    await_consistency(60, [alice, bob, carol]).await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -653,7 +653,7 @@ async fn alice_can_recover_from_a_session_timeout() {
         .unwrap();
 
     // Everyone's DHT should sync
-    await_consistency(60, [alice, bob, &carol]).await.unwrap();
+    await_consistency(60, [alice, bob, carol]).await.unwrap();
 }
 
 #[cfg(feature = "chc")]
