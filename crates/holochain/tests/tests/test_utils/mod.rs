@@ -115,21 +115,6 @@ pub async fn start_local_services() -> (
 pub async fn start_holochain(
     config_path: PathBuf,
 ) -> (SupervisedChild, tokio::sync::oneshot::Receiver<u16>) {
-    // tracing::info!("\n\n----\nstarting holochain\n----\n\n");
-    // let cmd = std::process::Command::cargo_bin("holochain").unwrap();
-    // let mut cmd = Command::from(cmd);
-    // let rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
-    // cmd.arg("--structured")
-    //     .arg("--config-path")
-    //     .arg(config_path)
-    //     .env("RUST_LOG", rust_log)
-    //     .stdout(Stdio::piped())
-    //     .stderr(Stdio::piped())
-    //     .kill_on_drop(true);
-    // let mut child = cmd.spawn().expect("Failed to spawn holochain");
-    // let admin_port = spawn_output(&mut child);
-    // check_started(&mut child).await;
-    // (SupervisedChild("Holochain".to_string(), child), admin_port)
     start_holochain_with_lair(config_path, false).await
 }
 

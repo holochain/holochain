@@ -31,7 +31,7 @@ where
     let recency_threshold = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
-        .and_then(|epoch| epoch.checked_sub(min_publish_interval.clone()))
+        .and_then(|epoch| epoch.checked_sub(min_publish_interval))
         .map(|t| t.as_secs())
         .unwrap_or(0);
 

@@ -823,6 +823,7 @@ async fn stay_in_unknown_state_when_activity_authorities_do_not_agree() {
         test_harness.countersigning_tx.trigger(&"test");
 
         let resolution = test_harness.expect_session_in_unknown_state();
+
         assert_eq!(i, resolution.attempts);
 
         let some_complete = resolution.outcomes.iter().all(|o| {
@@ -918,6 +919,7 @@ async fn stay_in_unknown_state_when_activity_authorities_are_missing_data() {
         test_harness.countersigning_tx.trigger(&"test");
 
         let resolution = test_harness.expect_session_in_unknown_state();
+
         assert_eq!(i, resolution.attempts);
 
         let some_complete = resolution.outcomes.iter().all(|o| {
