@@ -515,9 +515,9 @@ struct Agent {
     cell_id: CellId,
     signing_keypair: SigningKey,
     cap_secret: CapSecret,
-    _holochain: SupervisedChild,
     config_path: PathBuf,
     _admin_rx: WsPollRecv,
+    _holochain: SupervisedChild,
 }
 
 async fn setup_agent(bootstrap_url: String, signal_url: String, network_seed: String) -> Agent {
@@ -614,9 +614,9 @@ fn shutdown_agent(agent: Agent) -> (PathBuf, CellId, SigningKey, CapSecret) {
         cell_id,
         signing_keypair,
         cap_secret,
-        _holochain,
         admin_tx,
         _admin_rx,
+        _holochain,
         ..
     } = agent;
     drop(_holochain);
