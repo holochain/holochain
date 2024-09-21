@@ -3290,7 +3290,12 @@ mod countersigning_impls {
             cell_id: CellId,
             request: PreflightRequest,
         ) -> ConductorResult<PreflightRequestAcceptance> {
-            let countersigning_trigger = self.cell_by_id(&cell_id).await?.countersigning_trigger();
+            let countersigning_trigger = self
+                .cell_by_id(&cell_id)
+                .await?
+                .triggers()
+                .countersigning
+                .clone();
 
             Ok(
                 workflow::countersigning_workflow::accept_countersigning_request(
