@@ -457,14 +457,21 @@ async fn countersigning_session_interaction_calls() {
     // Spawn task listening for signals.
     tokio::spawn(async move { while alice_app_rx.recv::<AppResponse>().await.is_ok() {} });
 
-    // Leave some time for the countersigning workflow to refresh the session in memory.
-    tokio::time::sleep(Duration::from_secs(1)).await;
-
     // Alice's session should be in state Unresolvable.
-    assert_matches!(
-        get_session_state(&alice.cell_id, &alice_app_tx).await,
-        Some(CountersigningSessionState::Unknown { .. })
-    );
+    // Leave some time for the countersigning workflow to refresh the session in memory.
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if matches!(
+                get_session_state(&alice.cell_id, &alice_app_tx).await,
+                Some(CountersigningSessionState::Unknown { .. })
+            ) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .unwrap();
 
     tracing::info!("Alice about to force-publish countersigned entry.\n");
 
