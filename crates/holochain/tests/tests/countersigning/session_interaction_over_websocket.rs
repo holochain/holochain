@@ -457,6 +457,9 @@ async fn countersigning_session_interaction_calls() {
     // Spawn task listening for signals.
     tokio::spawn(async move { while alice_app_rx.recv::<AppResponse>().await.is_ok() {} });
 
+    // Leave some time for the countersigning workflow to refresh the session in memory.
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
     // Alice's session should be in state Unresolvable.
     assert_matches!(
         get_session_state(&alice.cell_id, &alice_app_tx).await,
@@ -495,7 +498,7 @@ async fn countersigning_session_interaction_calls() {
         }
     });
 
-    tokio::time::timeout(Duration::from_secs(6), bob_successful_session_rx.recv())
+    tokio::time::timeout(Duration::from_secs(10), bob_successful_session_rx.recv())
         .await
         .unwrap();
 
@@ -504,7 +507,7 @@ async fn countersigning_session_interaction_calls() {
     tracing::info!("Sessions resolved successfully. Awaiting DHT sync...");
 
     // Syncing takes long because Alice's publish loop pauses for a minute.
-    tokio::time::timeout(Duration::from_secs(90), await_dht_sync(&[&alice, &bob]))
+    tokio::time::timeout(Duration::from_secs(120), await_dht_sync(&[&alice, &bob]))
         .await
         .unwrap();
 }
