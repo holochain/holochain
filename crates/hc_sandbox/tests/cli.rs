@@ -1,4 +1,6 @@
 use holochain_cli_sandbox::cli::LaunchInfo;
+use holochain_cli_sandbox::config::read_config;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest};
 use holochain_types::app::InstalledAppId;
@@ -12,10 +14,11 @@ use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use tokio::process::Command;
+use tokio::process::{Child, Command};
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -276,6 +279,49 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
     assert!(exit_code.success());
 }
 
+/// Create a new sandbox without DPKI enabled in the conductor config.
+#[tokio::test(flavor = "multi_thread")]
+async fn default_sandbox_has_dpki_enabled() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("create")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+
+    let mut sandbox_process = input_piped_password(&mut cmd).await;
+    let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
+    assert_eq!(conductor_config.dpki.no_dpki, false);
+}
+
+/// Create a new sandbox without DPKI enabled in the conductor config.
+#[tokio::test(flavor = "multi_thread")]
+async fn create_sandbox_without_dpki() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("create")
+        .arg("--no-dpki")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+
+    let mut sandbox_process = input_piped_password(&mut cmd).await;
+    let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
+    assert_eq!(conductor_config.dpki.no_dpki, true);
+}
+
 include!(concat!(env!("OUT_DIR"), "/target.rs"));
 
 fn get_target(file: &str) -> std::path::PathBuf {
@@ -325,6 +371,34 @@ async fn get_launch_info(mut child: tokio::process::Child) -> LaunchInfo {
     eprintln!("{buf}");
 
     panic!("Unable to find launch info in sandbox output. See stderr above.")
+}
+
+async fn input_piped_password(cmd: &mut Command) -> Child {
+    let mut child_process = cmd.spawn().expect("Failed to spawn holochain");
+    let mut child_stdin = child_process.stdin.take().unwrap();
+    child_stdin.write_all(b"test-phrase\n").await.unwrap();
+    child_process
+}
+
+async fn get_created_conductor_config(process: &mut Child) -> ConductorConfig {
+    let stdout = process.stdout.take().unwrap();
+    let mut lines = BufReader::new(stdout).lines();
+    while let Ok(Some(line)) = lines.next_line().await {
+        println!("{line}");
+        if let Some(index) = line.find("ConfigRootPath") {
+            let config_root_path_debug_output = line[index..].trim();
+            let config_root_path = config_root_path_debug_output
+                .strip_prefix("ConfigRootPath(\"")
+                .unwrap()
+                .strip_suffix("\")]")
+                .unwrap();
+            let config = read_config(PathBuf::from_str(config_root_path).unwrap().into())
+                .unwrap()
+                .unwrap();
+            return config;
+        }
+    }
+    panic!("getting created conductor config failed");
 }
 
 struct WsPoll(tokio::task::JoinHandle<()>);
