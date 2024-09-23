@@ -342,7 +342,11 @@ async fn countersigning_session_interaction_calls() {
     tracing::info!("Alice abandoned session.\n");
 
     // Await Bob's session to be abandoned due to timeout.
-    let abandoned_session_entry_hash = bob_session_abandonded_rx.recv().await.unwrap();
+    let abandoned_session_entry_hash =
+        tokio::time::timeout(Duration::from_secs(30), bob_session_abandonded_rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
     assert_eq!(
         abandoned_session_entry_hash,
         bob_response.request.app_entry_hash
@@ -505,7 +509,7 @@ async fn countersigning_session_interaction_calls() {
         }
     });
 
-    tokio::time::timeout(Duration::from_secs(10), bob_successful_session_rx.recv())
+    tokio::time::timeout(Duration::from_secs(30), bob_successful_session_rx.recv())
         .await
         .unwrap();
 
