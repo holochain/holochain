@@ -54,8 +54,8 @@ First, let us clarify what we mean by coordination, our goals for coordination a
 4. It is hard to maintain a unified dynamic shared state across a network (because of the constraints of physics).
 5. Since only local time is knowable -- non-local ordering is constructed by explicit reference.
 6. Agents always act based on their state -- data they can access locally.
-7. (non unified action & accountability for it?) 
-8. protections from bad actions? Two levels... Evolvable agreements... app updates and data migration. anti-fragility
+7. Incorrect actions taken by an agent must harm only themself.
+8. Two levels... Evolvable agreements... app updates and data migration. anti-fragility
 
 ### Detailed Axioms and Architectural Consequences
 
@@ -69,26 +69,15 @@ First, let us clarify what we mean by coordination, our goals for coordination a
 
 **It is hard to maintain a unified dynamic shared state across a network (because of the constraints of physics).** In a distributed and open system, which enables autonomous agents to make valid changes to their state, one cannot expect any one agent to know the state of all other agents across whatever partitions they may be in and making whatever realtime changes they may. Such an assumption requires either centralization or omniscience about unreachable data. However, it is feasible to ensure strong eventual consistency, so that when any agents interact with the same data, all will converge to matching conclusions about the validity of any state change it represents. 
 
-**Since only local time is knowable -- non-local ordering is constructed by explicit reference.** The first simple structure for constructing order by reference is that each agent's action log is structured as an unbroken hash chain, with every new action's header containing the hash of the prior action. Timestamps are also included, but must be understood to not be any kind of authoritative universal time. When agents make state changes that rely on their prior state, the chain automatically provides explicit sequence. When an agent's action has logical dependencies another agent's data, they must reference the hash of those action(s) of to provide explicit ordering.
+**Since only local time is knowable -- non-local ordering is constructed by explicit reference.** The first simple structure for constructing order by reference is that each agent's action log is structured as an unbroken hash chain, with every new action's header containing the hash of the prior action. Timestamps are also included, but must be understood to not be any kind of authoritative universal time. When agents make state changes that rely on their prior state, the chain automatically provides explicit sequence. When an agent's action has logical dependencies another agent's data, they must reference the hash of those action(s) of to provide explicit ordering. In almost every application, there is no need to construct absolute time or sequencing to guarantee correct action. If the problem cannot be restructured to eliminate all rivalrous state data, Holochain provides tools to implement conflict resolution or micro-consensus for that tiny subset of data for which it remains useful.
 
-**Agents always act based on their state -- data they can access locally.**
+**Agents always act based on their state -- data they can access locally.** Since agents must act on what they know, they should be able to act *as soon* as they have have whatever local knowledge they need to take an action, with the asurance that any other nodes validating their action will reach their same conclusion. There is no reason to wait for other agents to reach a state *unless that is the confidence threshold required* to take that particular action. It is possible to architect agent-centric solution to most decentralized problems which are many orders of magnitude more efficient than managing global, data-centric consensus. For example, this even includes building cryptocurrences structured as P2P accounting instead of global tracking of token locations -- enabling the only two agents who are changing their state to validate each others actions, and countersign a transaction independent from the rest of the network who will validate it when they receive it after it is done.
 
+**Incorrect actions taken by an agent must harm only themself.** We mentioned in the goals of collaboration that incorrect actios must not harm other agents or the integrity of the group. This is accomplished via the validation that occurs during publishing and gossip. When a node receives a data element which it is supposed to store and serve as part of the (DHT) architecture of global visibility into local state changes, the receiving agent must validate it before integrating and serving it to others. For the example mentioned in the previous paragraph of two agents completing a currency transaction, if the sender had not previoiusly countersigned receipt of enough credits in their chain state for the amount they are sending, the transaction would fail validation. The validating agents mark this action invalid, add both parties who signed the transaction to their blocked list, and publish a warrant letting others know about the corrupt nodes so other agents can block them. These warrants function as an immune system which protects the group coherence and other agents from malicious or corrupt actors. The agents did not need to be prevented from taking the bad action, because they only changed their own state, and the bad action becomes the proof needed for the warrant to protect others from it. 
 
-7. (non unified action & accountability for it?) 
-8. protections from bad actions?
+**Two levels... Evolvable agreements... app updates and data migration. anti-fragility**  ??? Do we put this here or in next section?
 
-
-3. // Agents consenting to a shared set of rules is the foundation for coordination.  (It is easy for agents to start with the same ground rules / static agreements up front are easy.  // evidence of having the rules is that they're playing by the rules // shared social context establishe up fronState and sequence are both localt
-
-4. It is hard to maintain agreement about dynamic and changing state, especially across partitionable networks with incomplete and massively simultaneous action
-
-5. Agents can share information about state and state changes, which happen across relativistic time, and unreliable communication media. A system needs to be able to function without requiring an omniscient global perspective which is unreliable to construct.
-
-
-
-
-
-
+In all these axioms enable agents to take independent and autonomous action with partial information as soon as they have whatever they need to ensure it is a correct action. An agent being able to act, despite message loss or malicious actor, constitutes a signficant departure from the frame of reference that Byzantine Fault Tolerance requires the construction of complete consensus before action.
 
 
 
@@ -116,7 +105,8 @@ The core axiom (though not explicitly stated as such) of the Byzantine Generals'
 
 ## From Global Consensus to Scaled Consent
 
-*Normally one uses AXIOMS to reaason upon and create some conclusions they intend to demonstrate or prove... should that be what happens in this section?*
+*Normally one uses AXIOMS to reaason upon and create some conclusions they intend to demonstrate or prove... should that be what happens in this section?*  **Two levels enabling evolution ??**
+
 
 In distributed systems, it is absolutely fundamental to understand that every action taken by an agent in any social context happens because that agent has crossed a confidence threshold of some sort. From its own point of view, that the given action is appropriate to take. Stated another way: agentic assessment of the social context and its coherence allows agents to act. This is always true, whether through centralized coordiation or a Byzantine Generals' Problem approach or by Blockchain consensus algorithms.
 
