@@ -16,7 +16,7 @@ pub fn create_config(
     let mut conductor_config = ConductorConfig {
         data_root_path: Some(config_root_path.is_also_data_root_path()),
         dpki: DpkiConfig::testing(),
-        ..ConductorConfig::empty()
+        ..ConductorConfig::testing()
     };
     match con_url {
         Some(url) => {

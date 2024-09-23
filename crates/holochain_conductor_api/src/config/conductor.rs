@@ -178,6 +178,16 @@ impl ConductorConfig {
         }
     }
 
+    /// Create a config using the testing network config,
+    /// testing DPKI, and default values for everything else.
+    pub fn testing() -> Self {
+        Self {
+            network: KitsuneP2pConfig::testing(),
+            dpki: DpkiConfig::testing(),
+            ..ConductorConfig::empty()
+        }
+    }
+
     /// Create a conductor config from a YAML file path.
     pub fn load_yaml(path: &Path) -> ConductorConfigResult<ConductorConfig> {
         let config_yaml = std::fs::read_to_string(path).map_err(|err| match err {

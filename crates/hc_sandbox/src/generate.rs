@@ -31,7 +31,7 @@ pub fn generate(
     let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
     let mut config = create_config(dir.clone(), con_url)?;
-    config.network = network.unwrap_or_else(KitsuneP2pConfig::empty);
+    config.network = network.unwrap_or_else(KitsuneP2pConfig::testing);
     #[cfg(feature = "chc")]
     {
         config.chc_url = chc_url;

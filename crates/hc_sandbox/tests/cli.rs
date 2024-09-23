@@ -165,7 +165,7 @@ async fn generate_sandbox_and_connect() {
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .kill_on_drop(true);
 
     println!("@@ {cmd:?}");
@@ -207,7 +207,7 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .kill_on_drop(true);
 
     let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
@@ -252,7 +252,7 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
         .arg("tests/fixtures/my-app-deferred/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .kill_on_drop(true);
 
     let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");

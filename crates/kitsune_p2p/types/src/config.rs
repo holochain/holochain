@@ -1,8 +1,6 @@
 //! Kitsune Config Tuning Params
 #![allow(missing_docs)]
 
-use std::net::SocketAddr;
-
 use crate::tx_utils::TxUrl;
 use url2::Url2;
 
@@ -379,6 +377,18 @@ impl KitsuneP2pConfig {
         Self {
             transport_pool: vec![],
             bootstrap_service: None,
+            tuning_params: KitsuneP2pTuningParams::default(),
+            tracing_scope: None,
+        }
+    }
+
+    pub fn testing() -> Self {
+        Self {
+            transport_pool: vec![TransportConfig::WebRTC {
+                signal_url: "wss://signal.holo.host".to_string(),
+                webrtc_config: None,
+            }],
+            bootstrap_service: Some(Url2::parse("https://bootstrap.holo.host")),
             tuning_params: KitsuneP2pTuningParams::default(),
             tracing_scope: None,
         }
