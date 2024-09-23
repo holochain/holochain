@@ -318,11 +318,15 @@ async fn get_launch_info(mut child: tokio::process::Child) -> LaunchInfo {
     }
 
     let mut buf = String::new();
-    BufReader::new(child.stderr.take().unwrap())
-        .read_to_string(&mut buf)
-        .await
-        .unwrap();
-    eprintln!("{buf}");
+    if let Some(stderr) = child.stderr.take() {
+        BufReader::new(stderr)
+            .read_to_string(&mut buf)
+            .await
+            .unwrap();
+        eprintln!("{buf}");
+    } else {
+        panic!("No stderr! Was the process handle dropped?");
+    }
 
     panic!("Unable to find launch info in sandbox output. See stderr above.")
 }
