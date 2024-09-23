@@ -17,7 +17,7 @@ use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
@@ -168,16 +168,12 @@ async fn generate_sandbox_and_connect() {
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
     println!("@@ {cmd:?}");
 
-    let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
-
-    let mut child_stdin = hc_admin.stdin.take().unwrap();
-    child_stdin.write_all(b"test-phrase\n").await.unwrap();
-    drop(child_stdin);
+    let hc_admin = input_piped_password(&mut cmd).await;
 
     let launch_info = get_launch_info(hc_admin).await;
 
@@ -210,13 +206,10 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
-    let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
-    let mut child_stdin = hc_admin.stdin.take().unwrap();
-    child_stdin.write_all(b"test-phrase\n").await.unwrap();
-    drop(child_stdin);
+    let hc_admin = input_piped_password(&mut cmd).await;
 
     let launch_info = get_launch_info(hc_admin).await;
 
@@ -255,13 +248,10 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
         .arg("tests/fixtures/my-app-deferred/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
-    let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
-    let mut child_stdin = hc_admin.stdin.take().unwrap();
-    child_stdin.write_all(b"test-phrase\n").await.unwrap();
-    drop(child_stdin);
+    let hc_admin = input_piped_password(&mut cmd).await;
 
     let launch_info = get_launch_info(hc_admin).await;
 
@@ -297,7 +287,7 @@ async fn default_sandbox_has_dpki_enabled() {
 
     let mut sandbox_process = input_piped_password(&mut cmd).await;
     let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
-    assert_eq!(conductor_config.dpki.no_dpki, false);
+    assert!(!conductor_config.dpki.no_dpki);
 }
 
 /// Create a new sandbox with DPKI disabled in the conductor config.
@@ -319,7 +309,7 @@ async fn create_sandbox_without_dpki() {
 
     let mut sandbox_process = input_piped_password(&mut cmd).await;
     let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
-    assert_eq!(conductor_config.dpki.no_dpki, true);
+    assert!(conductor_config.dpki.no_dpki);
 }
 
 /// Create a new default sandbox which should have a test network seed set for DPKI.
@@ -410,14 +400,6 @@ async fn get_launch_info(mut child: tokio::process::Child) -> LaunchInfo {
             return serde_json::from_str::<LaunchInfo>(launch_info_str).unwrap();
         }
     }
-
-    let mut buf = String::new();
-    BufReader::new(child.stderr.take().unwrap())
-        .read_to_string(&mut buf)
-        .await
-        .unwrap();
-    eprintln!("{buf}");
-
     panic!("Unable to find launch info in sandbox output. See stderr above.")
 }
 
