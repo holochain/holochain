@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   That effectively meant that on a larger network, countersigning sessions would get cancelled when nothing had actually
   gone wrong. The rework of locking made fixing the bug simpler, but the key to the fix was in the `countersigning_success`
   function. That now checks that incoming signatures are actually for the current session. #4148
+- HC sandbox: Fix `--no-dpki` option which previously enabled DPKI in the conductor when set, instead of disabling it.
 
 ## 0.4.0-dev.25
 
