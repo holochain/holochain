@@ -22,6 +22,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 
+mod session_interaction_over_websocket;
+
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn listen_for_countersigning_completion() {
@@ -519,7 +521,7 @@ async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
         .unwrap();
 
     // Everyone's DHT should sync
-    await_consistency(60, [alice, bob, &carol]).await.unwrap();
+    await_consistency(60, [alice, bob, carol]).await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -651,7 +653,7 @@ async fn alice_can_recover_from_a_session_timeout() {
         .unwrap();
 
     // Everyone's DHT should sync
-    await_consistency(60, [alice, bob, &carol]).await.unwrap();
+    await_consistency(60, [alice, bob, carol]).await.unwrap();
 }
 
 #[cfg(feature = "chc")]
@@ -1195,14 +1197,14 @@ async fn chc_should_respect_chain_lock() {
     let alice_rx = conductors[0].subscribe_to_app_signals("app".into());
     let bob_rx = conductors[1].subscribe_to_app_signals("app".into());
 
+    wait_for_completion(alice_rx, preflight_request.app_entry_hash.clone()).await;
+    wait_for_completion(bob_rx, preflight_request.app_entry_hash).await;
+
     // Now a commit should success because the session has finished and we shouldn't be behind the CHC.
     conductors[0]
         .call_fallible::<_, ActionHash>(&alice_zome, "create_a_thing", ())
         .await
         .unwrap();
-
-    wait_for_completion(alice_rx, preflight_request.app_entry_hash.clone()).await;
-    wait_for_completion(bob_rx, preflight_request.app_entry_hash).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

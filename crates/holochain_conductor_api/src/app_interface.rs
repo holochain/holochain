@@ -33,6 +33,27 @@ pub enum AppRequest {
     /// [`AppResponse::ZomeCalled`]
     CallZome(Box<ZomeCall>),
 
+    /// Get the state of a countersigning session.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CountersigningSessionState`]
+    GetCountersigningSessionState(Box<CellId>),
+
+    /// Abandon an unresolved countersigning session.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CountersigningSessionAbandoned`]
+    AbandonCountersigningSession(Box<CellId>),
+
+    /// Publish an unresolved countersigning session.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CountersigningSessionPublished`]
+    PublishCountersigningSession(Box<CellId>),
+
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
     ///
     /// Using the provided, already-registered DNA, create a new DNA with a unique
@@ -131,6 +152,15 @@ pub enum AppResponse {
     ///
     /// [msgpack]: https://msgpack.org/
     ZomeCalled(Box<ExternIO>),
+
+    /// The successful response to an [`AppRequest::GetCountersigningSessionState`].
+    CountersigningSessionState(Box<Option<CountersigningSessionState>>),
+
+    /// The successful response to an [`AppRequest::AbandonCountersigningSession`].
+    CountersigningSessionAbandoned,
+
+    /// The successful response to an [`AppRequest::PublishCountersigningSession`].
+    CountersigningSessionPublished,
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///

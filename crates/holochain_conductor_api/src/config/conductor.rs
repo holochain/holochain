@@ -243,6 +243,10 @@ pub struct ConductorTuningParams {
     /// - `Some(n)`, n > 0: Holochain will retry `n` times, including the required first attempt. If
     ///   it can't make a decision after `n` retries, it will consider the session failed.
     pub countersigning_resolution_retry_limit: Option<usize>,
+    /// The interval that has to pass before an op that has been published is considered for publishing again.
+    ///
+    /// Default: 5 minutes
+    pub min_publish_interval: Option<std::time::Duration>,
 }
 
 impl ConductorTuningParams {
@@ -252,6 +256,7 @@ impl ConductorTuningParams {
             sys_validation_retry_delay: None,
             countersigning_resolution_retry_delay: None,
             countersigning_resolution_retry_limit: None,
+            min_publish_interval: None,
         }
     }
 
@@ -277,6 +282,7 @@ impl Default for ConductorTuningParams {
                 empty.countersigning_resolution_retry_delay(),
             ),
             countersigning_resolution_retry_limit: None,
+            min_publish_interval: None,
         }
     }
 }

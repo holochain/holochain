@@ -3276,7 +3276,12 @@ mod authenticate_token_impls {
 /// Methods for bridging from host calls to workflows for countersigning
 mod countersigning_impls {
     use super::*;
-    use crate::core::workflow;
+    use crate::core::workflow::{
+        self,
+        countersigning_workflow::{
+            force_abandon_session, force_publish_countersigning_session, CountersigningWorkspace,
+        },
+    };
 
     impl Conductor {
         /// Accept a countersigning session
@@ -3285,7 +3290,12 @@ mod countersigning_impls {
             cell_id: CellId,
             request: PreflightRequest,
         ) -> ConductorResult<PreflightRequestAcceptance> {
-            let countersigning_trigger = self.cell_by_id(&cell_id).await?.countersigning_trigger();
+            let countersigning_trigger = self
+                .cell_by_id(&cell_id)
+                .await?
+                .triggers()
+                .countersigning
+                .clone();
 
             Ok(
                 workflow::countersigning_workflow::accept_countersigning_request(
@@ -3297,6 +3307,102 @@ mod countersigning_impls {
                 )
                 .await?,
             )
+        }
+
+        pub(crate) async fn get_countersigning_session_state(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<Option<CountersigningSessionState>> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            let countersigning_workspaces = space.countersigning_workspaces.lock();
+            match countersigning_workspaces.get(cell_id) {
+                None => Ok(None),
+                Some(workspace) => Ok(workspace.get_countersigning_session_state()),
+            }
+        }
+
+        pub(crate) async fn abandon_countersigning_session(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<()> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            let (countersigning_workspace, preflight_request) = self
+                .get_preflight_request_from_unknown_session(&space, cell_id)
+                .await?;
+            force_abandon_session(space.clone(), cell_id.agent_pubkey(), &preflight_request)
+                .await?;
+            // Remove countersigning session from the workspace.
+            if countersigning_workspace
+                .remove_countersigning_session()
+                .is_none()
+            {
+                // The session exists in the space as previously checked, so this case must never happen.
+                tracing::warn!(
+                    ?cell_id,
+                    "Could not remove countersigning session from workspace after abandoning it."
+                );
+            }
+            Ok(())
+        }
+
+        pub(crate) async fn publish_countersigning_session(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<()> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            let (countersigning_workspace, preflight_request) = self
+                .get_preflight_request_from_unknown_session(&space, cell_id)
+                .await?;
+            let cell = self.cell_by_id(cell_id).await?;
+            let network = Arc::new(cell.holochain_p2p_dna().clone());
+            force_publish_countersigning_session(
+                space,
+                network,
+                self.keystore().clone(),
+                cell.triggers().integrate_dht_ops.clone(),
+                cell.triggers().publish_dht_ops.clone(),
+                cell_id.clone(),
+                preflight_request,
+            )
+            .await?;
+            if countersigning_workspace
+                .remove_countersigning_session()
+                .is_none()
+            {
+                // The session exists in the space as previously checked, so this case must never happen.
+                tracing::warn!(
+                    ?cell_id,
+                    "Could not remove countersigning session from workspace after publishing it."
+                );
+            }
+            Ok(())
+        }
+
+        async fn get_preflight_request_from_unknown_session(
+            &self,
+            space: &Space,
+            cell_id: &CellId,
+        ) -> ConductorResult<(Arc<CountersigningWorkspace>, PreflightRequest)> {
+            let maybe_countersigning_workspace =
+                space.countersigning_workspaces.lock().get(cell_id).cloned();
+            match maybe_countersigning_workspace {
+                None => Err(ConductorError::CountersigningError(
+                    CountersigningError::WorkspaceDoesNotExist(cell_id.clone()),
+                )),
+                Some(countersigning_workspace) => {
+                    match countersigning_workspace.get_countersigning_session_state() {
+                        None => Err(ConductorError::CountersigningError(
+                            CountersigningError::SessionNotFound(cell_id.clone()),
+                        )),
+                        Some(CountersigningSessionState::Unknown {
+                            preflight_request, ..
+                        }) => Ok((countersigning_workspace, preflight_request)),
+                        _ => Err(ConductorError::CountersigningError(
+                            CountersigningError::SessionNotUnresolvable(cell_id.clone()),
+                        )),
+                    }
+                }
+            }
         }
     }
 }
@@ -3877,7 +3983,7 @@ pub fn app_manifest_from_dnas(
             let dna = dr.dna();
             let path = PathBuf::from(format!("{}", dna.dna_hash()));
             let mut modifiers = DnaModifiersOpt::none();
-            modifiers.network_seed = network_seed.clone();
+            modifiers.network_seed.clone_from(&network_seed);
             AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {

@@ -32,9 +32,9 @@ use holochain_types::db_cache::DhtDbQueryCache;
 
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::cell::error::CellResult;
+use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueTriggers;
-use crate::core::queue_consumer::{spawn_queue_consumer_tasks, TriggerSender};
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -1083,14 +1083,6 @@ impl Cell {
             .trigger(&"publish_authored_ops");
     }
 
-    pub(crate) fn countersigning_trigger(&self) -> TriggerSender {
-        self.queue_triggers.countersigning.clone()
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
-    /// Get the triggers for the cell
-    /// Useful for testing when you want to
-    /// Cause workflows to trigger
     pub(crate) fn triggers(&self) -> &QueueTriggers {
         &self.queue_triggers
     }
