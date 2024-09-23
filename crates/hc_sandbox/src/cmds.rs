@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{ArgAction, Parser};
+use clap::Parser;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::TransportConfig;
 use url2::Url2;
@@ -41,7 +41,7 @@ pub struct Create {
     pub in_process_lair: bool,
 
     /// Launch Holochain with the DPKI service disabled.
-    #[arg(long, action = ArgAction::SetFalse)]
+    #[arg(long)]
     pub no_dpki: bool,
 
     /// Set the network seed for the DPKI service.
