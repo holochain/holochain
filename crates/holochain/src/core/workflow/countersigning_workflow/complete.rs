@@ -244,15 +244,13 @@ async fn apply_success_state_changes(
                 // All checks have passed so unlock the chain.
                 mutations::unlock_chain(txn, &author)?;
                 // Update ops to publish.
-                let ops_set_to_be_published = txn
-                    .execute(
-                        "UPDATE DhtOp SET withhold_publish = NULL WHERE action_hash = :action_hash",
-                        named_params! {
-                            ":action_hash": this_cells_action_hash,
-                        },
-                    )
-                    .map_err(holochain_state::prelude::StateMutationError::from)?;
-                assert_eq!(ops_set_to_be_published, 3);
+                txn.execute(
+                    "UPDATE DhtOp SET withhold_publish = NULL WHERE action_hash = :action_hash",
+                    named_params! {
+                        ":action_hash": this_cells_action_hash,
+                    },
+                )
+                .map_err(holochain_state::prelude::StateMutationError::from)?;
 
                 // Load the op hashes for this session so that we can publish them.
                 Ok(get_countersigning_op_hashes(txn, this_cells_action_hash)?)
