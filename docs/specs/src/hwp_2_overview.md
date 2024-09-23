@@ -26,7 +26,7 @@ Agents have these properties:
 
 4. Agents share Records of the Actions they take with other Agents through distributed storage so that those Records can be retrieved by other Agents reliably.
 
-5. Agents validate received Actions before storing them.
+5. Agents validate received Actions before storing or sharing them.
 
 6. Agents respond to requests for stored information.
 
