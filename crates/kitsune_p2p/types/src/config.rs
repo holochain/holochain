@@ -395,7 +395,7 @@ impl KitsuneP2pConfig {
     }
 
     #[cfg(feature = "test_utils")]
-    pub fn from_signal_addr(socket_addr: SocketAddr) -> Self {
+    pub fn from_signal_addr(socket_addr: std::net::SocketAddr) -> Self {
         let signal_url = format!("ws://{:?}", socket_addr);
         Self {
             transport_pool: vec![TransportConfig::WebRTC {
