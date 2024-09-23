@@ -67,6 +67,8 @@ async fn test_publish() -> anyhow::Result<()> {
         network,
         tuning_params: Some(ConductorTuningParams {
             sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),
+            countersigning_resolution_retry_delay: None,
+            ..Default::default()
         }),
         dpki: DpkiConfig::disabled(),
         ..ConductorConfig::empty()

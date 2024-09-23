@@ -73,6 +73,7 @@ holochain_sqlite = { path = ".", features = ["test_utils", "slow_tests"] }
 holochain_trace = { version = "^0.4.0-dev.5", path = "../holochain_trace" }
 nanoid = "0.4.0"
 rand = "0.8.5"
+walkdir = "2.5.0"
 
 [build-dependencies]
 pretty_assertions = "1.4"
