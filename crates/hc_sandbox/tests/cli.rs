@@ -1,6 +1,6 @@
 use holochain_cli_sandbox::cli::LaunchInfo;
 use holochain_cli_sandbox::config::read_config;
-use holochain_conductor_api::conductor::ConductorConfig;
+use holochain_conductor_api::conductor::{ConductorConfig, DpkiConfig};
 use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest};
 use holochain_types::app::InstalledAppId;
@@ -292,7 +292,7 @@ async fn default_sandbox_has_dpki_enabled() {
         .arg("create")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
     let mut sandbox_process = input_piped_password(&mut cmd).await;
@@ -314,12 +314,60 @@ async fn create_sandbox_without_dpki() {
         .arg("--no-dpki")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
     let mut sandbox_process = input_piped_password(&mut cmd).await;
     let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
     assert_eq!(conductor_config.dpki.no_dpki, true);
+}
+
+/// Create a new default sandbox which should have a test network seed set for DPKI.
+#[tokio::test(flavor = "multi_thread")]
+async fn create_default_sandbox_with_dpki_test_network_seed() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("create")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut sandbox_process = input_piped_password(&mut cmd).await;
+    let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
+    assert_eq!(
+        conductor_config.dpki.network_seed,
+        DpkiConfig::testing().network_seed
+    );
+}
+
+/// Create a new sandbox with a custom DPKI network seed.
+#[tokio::test(flavor = "multi_thread")]
+async fn create_sandbox_with_custom_dpki_network_seed() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let network_seed = "sandbox_test_dpki";
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("create")
+        .arg("--dpki-network-seed")
+        .arg(network_seed)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut sandbox_process = input_piped_password(&mut cmd).await;
+    let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
+    assert_eq!(conductor_config.dpki.network_seed, network_seed);
 }
 
 include!(concat!(env!("OUT_DIR"), "/target.rs"));
@@ -384,7 +432,7 @@ async fn get_created_conductor_config(process: &mut Child) -> ConductorConfig {
     let stdout = process.stdout.take().unwrap();
     let mut lines = BufReader::new(stdout).lines();
     while let Ok(Some(line)) = lines.next_line().await {
-        println!("{line}");
+        println!("@@@-{line}-@@@");
         if let Some(index) = line.find("ConfigRootPath") {
             let config_root_path_debug_output = line[index..].trim();
             let config_root_path = config_root_path_debug_output
