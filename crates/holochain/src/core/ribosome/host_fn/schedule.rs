@@ -53,7 +53,6 @@ mod tests {
     use holochain_state::schedule::fn_is_scheduled;
     use holochain_state::schedule::live_scheduled_fns;
     use holochain_wasm_test_utils::TestWasm;
-    use rusqlite::Transaction;
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]

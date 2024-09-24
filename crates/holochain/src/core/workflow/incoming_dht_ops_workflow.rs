@@ -256,7 +256,7 @@ fn op_exists_inner(txn: &rusqlite::Transaction<'_>, hash: &DhtOpHash) -> Databas
 
 pub async fn op_exists(vault: &DbWrite<DbKindDht>, hash: DhtOpHash) -> DatabaseResult<bool> {
     vault
-        .read_async(move |txn| op_exists_inner(&txn, &hash))
+        .read_async(move |txn| op_exists_inner(txn, &hash))
         .await
 }
 
@@ -266,7 +266,7 @@ pub async fn filter_existing_ops(
 ) -> DatabaseResult<Vec<DhtOpHashed>> {
     vault
         .read_async(move |txn| {
-            ops.retain(|op| !op_exists_inner(&txn, &op.hash).unwrap_or(true));
+            ops.retain(|op| !op_exists_inner(txn, &op.hash).unwrap_or(true));
             Ok(ops)
         })
         .await

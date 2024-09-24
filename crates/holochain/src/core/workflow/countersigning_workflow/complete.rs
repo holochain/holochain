@@ -49,11 +49,11 @@ pub(crate) async fn inner_countersigning_session_complete(
         move |txn: &Ta<DbKindAuthored>| {
             // This chain lock isn't necessarily for the current session, we can't check that until later.
             if let Some((session_record, cs_entry_hash, session_data)) =
-                current_countersigning_session(&txn, Arc::new(author.clone()))?
+                current_countersigning_session(txn, Arc::new(author.clone()))?
             {
                 let lock_subject = session_data.preflight_request.fingerprint()?;
 
-                let chain_lock = holochain_state::chain_lock::get_chain_lock(&txn, &author)?;
+                let chain_lock = holochain_state::chain_lock::get_chain_lock(txn, &author)?;
                 if let Some(chain_lock) = chain_lock {
                     // This is the case where we have already locked the chain for another session and are
                     // receiving another signature bundle from a different session. We don't need this, so

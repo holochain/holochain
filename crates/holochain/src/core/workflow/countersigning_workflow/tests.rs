@@ -1862,7 +1862,7 @@ impl TestHarness {
         let chain_head = authored
             .read_async({
                 let author = self.author.clone();
-                move |txn| chain_head_db(&txn, Arc::new(author))
+                move |txn| chain_head_db(txn, Arc::new(author))
             })
             .await
             .unwrap();
@@ -1973,7 +1973,7 @@ impl TestHarness {
         let lock = authored
             .read_async({
                 let author = self.author.clone();
-                move |txn| get_chain_lock(&txn, &author)
+                move |txn| get_chain_lock(txn, &author)
             })
             .await
             .unwrap();
@@ -1990,7 +1990,7 @@ impl TestHarness {
         let lock = authored
             .read_async({
                 let author = self.author.clone();
-                move |txn| get_chain_lock(&txn, &author)
+                move |txn| get_chain_lock(txn, &author)
             })
             .await
             .unwrap();
@@ -2008,7 +2008,7 @@ impl TestHarness {
         let session = authored
             .read_async({
                 let author = self.author.clone();
-                move |txn| current_countersigning_session(&txn, Arc::new(author))
+                move |txn| current_countersigning_session(txn, Arc::new(author))
             })
             .await
             .unwrap();

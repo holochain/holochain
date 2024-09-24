@@ -13,13 +13,13 @@ use holochain_zome_types::block::BlockTargetId;
 pub async fn block(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
     tracing::warn!(?input, "blocking node!");
 
-    db.write_async(move |txn| mutations::insert_block(&txn, input))
+    db.write_async(move |txn| mutations::insert_block(txn, input))
         .await
 }
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn unblock(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
-    db.write_async(move |txn| mutations::insert_unblock(&txn, input))
+    db.write_async(move |txn| mutations::insert_unblock(txn, input))
         .await
 }
 
@@ -135,7 +135,7 @@ mod test {
                 let control0 = control.clone();
                 assert!(!db
                     .read_async(move |txn| super::query_is_blocked(
-                        &txn,
+                        txn,
                         control0.into(),
                         Timestamp(check)
                     ))
@@ -145,7 +145,7 @@ mod test {
                 assert_eq!(
                     expected,
                     db.read_async(move |txn| super::query_is_blocked(
-                        &txn,
+                        txn,
                         target0.into(),
                         Timestamp(check)
                     ))
@@ -182,7 +182,7 @@ mod test {
 
         let target01 = target0.clone();
         assert!(db
-            .read_async(move |txn| super::query_is_blocked(&txn, target01.into(), Timestamp(0)))
+            .read_async(move |txn| super::query_is_blocked(txn, target01.into(), Timestamp(0)))
             .await
             .unwrap());
 
@@ -198,7 +198,7 @@ mod test {
 
         let target02 = target0.clone();
         assert!(db
-            .read_async(move |txn| super::query_is_blocked(&txn, target02.into(), Timestamp(0)))
+            .read_async(move |txn| super::query_is_blocked(txn, target02.into(), Timestamp(0)))
             .await
             .unwrap());
 
@@ -216,7 +216,7 @@ mod test {
         // Even though the app block was unblocked the bad crypto block remains.
         assert!(db
             .read_async(move |txn| super::query_is_blocked(
-                &txn,
+                txn,
                 target0.clone().into(),
                 Timestamp(0)
             ))
@@ -245,7 +245,7 @@ mod test {
             let control0 = control.clone();
             assert!(!db
                 .read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     control0.into(),
                     Timestamp(check)
                 ))
@@ -254,7 +254,7 @@ mod test {
             let target0 = target.clone();
             assert!(!db
                 .read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     target0.into(),
                     Timestamp(check)
                 ))
@@ -292,7 +292,7 @@ mod test {
             let control0 = control.clone();
             assert!(!db
                 .read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     control0.into(),
                     Timestamp(check)
                 ))
@@ -301,7 +301,7 @@ mod test {
             let target0 = target.clone();
             assert!(
                 db.read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     target0.into(),
                     Timestamp(check)
                 ))
@@ -347,7 +347,7 @@ mod test {
             let control0 = control.clone();
             assert!(!db
                 .read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     control0.into(),
                     Timestamp(check)
                 ))
@@ -356,7 +356,7 @@ mod test {
             let target0 = target.clone();
             assert!(!db
                 .read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     target0.into(),
                     Timestamp(check)
                 ))
@@ -393,7 +393,7 @@ mod test {
 
             assert!(!db
                 .read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     control.clone().into(),
                     Timestamp(check)
                 ))
@@ -401,7 +401,7 @@ mod test {
                 .unwrap());
             assert!(
                 !db.read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     target.clone().into(),
                     Timestamp(check)
                 ))
@@ -424,7 +424,7 @@ mod test {
 
         assert!(!db
             .read_async(move |txn| super::query_is_blocked(
-                &txn,
+                txn,
                 target.into(),
                 ::fixt::fixt!(Timestamp)
             ))
@@ -448,7 +448,7 @@ mod test {
             let control0 = control.clone();
             assert!(!db
                 .read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     control0.into(),
                     Timestamp(check)
                 ))
@@ -457,7 +457,7 @@ mod test {
             let target0 = target.clone();
             assert!(!db
                 .read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     target0.into(),
                     Timestamp(check)
                 ))
@@ -477,7 +477,7 @@ mod test {
             let control0 = control.clone();
             assert!(!db
                 .read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     control0.into(),
                     Timestamp(check)
                 ))
@@ -485,7 +485,7 @@ mod test {
                 .unwrap());
             assert!(!db
                 .read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     target.clone().into(),
                     Timestamp(check)
                 ))
@@ -517,7 +517,7 @@ mod test {
             let target00 = target0.clone();
             assert!(!db
                 .read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     BlockTargetId::from(target00),
                     Timestamp(mid)
                 ))
@@ -526,7 +526,7 @@ mod test {
             let target10 = target1.clone();
             assert!(!db
                 .read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     BlockTargetId::from(target10),
                     Timestamp(mid)
                 ))
@@ -545,7 +545,7 @@ mod test {
 
             assert!(!db
                 .read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     BlockTargetId::from(target0),
                     Timestamp(mid)
                 ))
@@ -553,7 +553,7 @@ mod test {
                 .unwrap());
             assert!(
                 db.read_async(move |txn| super::query_is_blocked(
-                    &txn,
+                    txn,
                     BlockTargetId::from(target1),
                     Timestamp(mid)
                 ))

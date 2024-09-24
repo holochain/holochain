@@ -54,7 +54,7 @@ pub async fn authored_ops_to_dht_db_without_check(
             for hash in hashes {
                 // This function filters out any private entries from ops
                 // or store entry ops with private entries.
-                if let Some(op) = get_public_op_from_db(&txn, &hash)? {
+                if let Some(op) = get_public_op_from_db(txn, &hash)? {
                     ops.push(op);
                 }
             }
@@ -63,9 +63,9 @@ pub async fn authored_ops_to_dht_db_without_check(
         .await?;
     let mut activity = Vec::new();
     let activity = dht_db
-        .write_async(|mut txn| {
+        .write_async(|txn| {
             for op in ops {
-                if let Some(op) = insert_locally_validated_op(&mut txn, op)? {
+                if let Some(op) = insert_locally_validated_op(txn, op)? {
                     activity.push(op);
                 }
             }

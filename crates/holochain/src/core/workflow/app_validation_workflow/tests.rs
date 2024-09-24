@@ -1041,7 +1041,7 @@ async fn app_validation_produces_warrants() {
     //- Ensure that bob authored a warrant
     let alice_pubkey = alice.agent_pubkey().clone();
     conductors[1].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
-        let store = Txn::from(&txn);
+        let store = Txn::from(txn);
 
         let warrants = store
             .get_warrants_for_basis(&alice_pubkey.into(), false)
@@ -1071,7 +1071,7 @@ async fn app_validation_produces_warrants() {
                 .dht_db(dna_hash)
                 .unwrap()
                 .test_read(move |txn| {
-                    let store = Txn::from(&txn);
+                    let store = Txn::from(txn);
                     store.get_warrants_for_basis(&basis, true).unwrap()
                 })
                 .len()
@@ -1261,10 +1261,10 @@ async fn run_test(
     alice_db
         .read_async(move |txn| -> DatabaseResult<()> {
             // Validation should be empty
-            let limbo = show_limbo(&txn);
-            assert!(limbo_is_empty(&txn), "{:?}", limbo);
+            let limbo = show_limbo(txn);
+            assert!(limbo_is_empty(txn), "{:?}", limbo);
 
-            assert_eq!(num_valid(&txn), expected_count);
+            assert_eq!(num_valid(txn), expected_count);
 
             Ok(())
         })
@@ -1291,16 +1291,16 @@ async fn run_test(
 
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
-                let limbo = show_limbo(&txn);
-                assert!(limbo_is_empty(&txn), "{:?}", limbo);
+                let limbo = show_limbo(txn);
+                assert!(limbo_is_empty(txn), "{:?}", limbo);
 
                 assert!(expected_invalid_entry(
-                    &txn,
+                    txn,
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
                 // Expect having one invalid op for the store entry.
-                assert_eq!(num_valid(&txn), expected_count - 1);
+                assert_eq!(num_valid(txn), expected_count - 1);
 
                 Ok(())
             }
@@ -1333,16 +1333,16 @@ async fn run_test(
 
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
-                let limbo = show_limbo(&txn);
-                assert!(limbo_is_empty(&txn), "{:?}", limbo);
+                let limbo = show_limbo(txn);
+                assert!(limbo_is_empty(txn), "{:?}", limbo);
 
                 assert!(expected_invalid_entry(
-                    &txn,
+                    txn,
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
                 // Expect having one invalid op for the store entry.
-                assert_eq!(num_valid(&txn), expected_count - 1);
+                assert_eq!(num_valid(txn), expected_count - 1);
 
                 Ok(())
             }
@@ -1384,17 +1384,17 @@ async fn run_test(
 
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
-                let limbo = show_limbo(&txn);
-                assert!(limbo_is_empty(&txn), "{:?}", limbo);
+                let limbo = show_limbo(txn);
+                assert!(limbo_is_empty(txn), "{:?}", limbo);
 
                 assert!(expected_invalid_entry(
-                    &txn,
+                    txn,
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
-                assert!(expected_invalid_link(&txn, &check_invalid_link_hash));
+                assert!(expected_invalid_link(txn, &check_invalid_link_hash));
                 // Expect having two invalid ops for the two store entries.
-                assert_eq!(num_valid(&txn), expected_count - 2);
+                assert_eq!(num_valid(txn), expected_count - 2);
 
                 Ok(())
             }
@@ -1434,17 +1434,17 @@ async fn run_test(
 
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
-                let limbo = show_limbo(&txn);
-                assert!(limbo_is_empty(&txn), "{:?}", limbo);
+                let limbo = show_limbo(txn);
+                assert!(limbo_is_empty(txn), "{:?}", limbo);
 
                 assert!(expected_invalid_entry(
-                    &txn,
+                    txn,
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
-                assert!(expected_invalid_link(&txn, &check_invalid_link_hash));
+                assert!(expected_invalid_link(txn, &check_invalid_link_hash));
                 // Expect having two invalid ops for the two store entries.
-                assert_eq!(num_valid(&txn), expected_count - 2);
+                assert_eq!(num_valid(txn), expected_count - 2);
 
                 Ok(())
             }
@@ -1486,18 +1486,18 @@ async fn run_test(
 
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
-                let limbo = show_limbo(&txn);
-                assert!(limbo_is_empty(&txn), "{:?}", limbo);
+                let limbo = show_limbo(txn);
+                assert!(limbo_is_empty(txn), "{:?}", limbo);
 
                 assert!(expected_invalid_entry(
-                    &txn,
+                    txn,
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
-                assert!(expected_invalid_link(&txn, &check_invalid_link_hash));
-                assert!(expected_invalid_remove_link(&txn, &invalid_remove_hash));
+                assert!(expected_invalid_link(txn, &check_invalid_link_hash));
+                assert!(expected_invalid_remove_link(txn, &invalid_remove_hash));
                 // 3 invalid ops above plus 1 extra invalid ops that `remove_invalid_link` commits.
-                assert_eq!(num_valid(&txn), expected_count - (3 + 1));
+                assert_eq!(num_valid(txn), expected_count - (3 + 1));
 
                 Ok(())
             }
@@ -1539,16 +1539,16 @@ async fn run_test_entry_def_id(
     alice_db
         .read_async(move |txn| -> DatabaseResult<()> {
             // Validation should be empty
-            let limbo = show_limbo(&txn);
-            assert!(limbo_is_empty(&txn), "{:?}", limbo);
+            let limbo = show_limbo(txn);
+            assert!(limbo_is_empty(txn), "{:?}", limbo);
 
             assert!(expected_invalid_entry(
-                &txn,
+                txn,
                 &invalid_action_hash,
                 &invalid_entry_hash
             ));
             // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
-            assert_eq!(num_valid(&txn), expected_count - 5);
+            assert_eq!(num_valid(txn), expected_count - 5);
 
             Ok(())
         })

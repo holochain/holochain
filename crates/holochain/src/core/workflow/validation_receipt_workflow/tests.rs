@@ -36,7 +36,7 @@ async fn test_validation_receipt() {
     let vault = alice.dht_db();
     let record = vault
         .read_async(move |txn| -> StateQueryResult<Record> {
-            Ok(Txn::from(&txn).get_record(&hash.clone().into())?.unwrap())
+            Ok(Txn::from(txn).get_record(&hash.clone().into())?.unwrap())
         })
         .await
         .unwrap();
@@ -54,8 +54,8 @@ async fn test_validation_receipt() {
                 let count = vault
                     .read_async({
                         let query_hash = hash.clone();
-                        move |r| -> StateQueryResult<usize> {
-                            Ok(list_receipts(&r, &query_hash)?.len())
+                        move |txn| -> StateQueryResult<usize> {
+                            Ok(list_receipts(txn, &query_hash)?.len())
                         }
                     })
                     .await
@@ -72,7 +72,7 @@ async fn test_validation_receipt() {
         let receipts: Vec<_> = vault
             .read_async({
                 let query_hash = hash.clone();
-                move |r| list_receipts(&r, &query_hash)
+                move |txn| list_receipts(txn, &query_hash)
             })
             .await
             .unwrap();
@@ -92,7 +92,7 @@ async fn test_validation_receipt() {
     crate::assert_eq_retry_1m!(
         {
             vault
-                .read_async(move |txn: Transaction| -> DatabaseResult<Vec<u32>> {
+                .read_async(move |txn| -> DatabaseResult<Vec<u32>> {
                     let mut stmt = txn
                         .prepare("SELECT COUNT(hash) FROM ValidationReceipt GROUP BY op_hash")
                         .unwrap();

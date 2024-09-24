@@ -326,7 +326,7 @@ impl AgentStoreByPath {
             }
         }
 
-        let agent_store = db.read_async(|txn| AgentStore::new(&txn)).await?;
+        let agent_store = db.read_async(|txn| AgentStore::new(txn)).await?;
 
         let mut map = self.map.lock();
         match map.entry(store_key) {
@@ -360,8 +360,7 @@ pub async fn p2p_put(
     signed: &AgentInfoSigned,
 ) -> DatabaseResult<()> {
     let record = P2pRecord::from_signed(signed)?;
-    db.write_async(move |mut txn| tx_p2p_put(&mut txn, record))
-        .await
+    db.write_async(move |txn| tx_p2p_put(txn, record)).await
 }
 
 /// Put an iterator of AgentInfoSigned records into the p2p_store
@@ -377,14 +376,14 @@ pub async fn p2p_put_all(
         records.push(P2pRecord::from_signed(s)?);
     }
     let space = db.kind().0.clone();
-    db.write_async(move |mut txn| {
+    db.write_async(move |txn| {
         let mut responses = Vec::new();
         for s in ns {
             responses.push(cache_get(space.clone(), &*txn)?.put(s)?);
         }
 
         for record in records {
-            tx_p2p_put(&mut txn, record)?;
+            tx_p2p_put(txn, record)?;
         }
 
         Ok(responses)
@@ -400,7 +399,7 @@ pub fn p2p_put_single(
 ) -> DatabaseResult<AgentInfoPut> {
     let agent_info_put = cache_get(space, &*txn)?.put(signed.clone())?;
     let record = P2pRecord::from_signed(signed)?;
-    tx_p2p_put(&mut txn.into(), record)?;
+    tx_p2p_put(&txn.into(), record)?;
     Ok(agent_info_put)
 }
 

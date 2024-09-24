@@ -1013,7 +1013,7 @@ mod tests {
         });
 
         db.test_read(move |txn| {
-            let warrants: Vec<DhtOp> = Txn::from(&txn)
+            let warrants: Vec<DhtOp> = Txn::from(txn)
                 .get_warrants_for_basis(&action_author.into(), false)
                 .unwrap()
                 .into_iter()

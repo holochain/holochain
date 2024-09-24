@@ -41,7 +41,7 @@ pub async fn inner_countersigning_session_incomplete(
             let author = author.clone();
             move |txn| -> SourceChainResult<CurrentCountersigningSessionOpt> {
                 let maybe_current_session =
-                    current_countersigning_session(&txn, Arc::new(author.clone()))?;
+                    current_countersigning_session(txn, Arc::new(author.clone()))?;
 
                 Ok(maybe_current_session)
             }

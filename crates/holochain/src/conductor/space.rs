@@ -297,13 +297,13 @@ impl Spaces {
             .read_async(move |txn| {
                 Ok(
                     // If the target_id is directly blocked then we always return true.
-                    holochain_state::block::query_is_blocked(&txn, target_id, timestamp)?
+                    holochain_state::block::query_is_blocked(txn, target_id, timestamp)?
             // If there are zero unblocked cells then return true.
             || {
                 let mut all_blocked_cell_ids = true;
                 for cell_id in cell_ids {
                     if !holochain_state::block::query_is_blocked(
-                        &txn,
+                        txn,
                         BlockTargetId::Cell(cell_id), timestamp)? {
                             all_blocked_cell_ids = false;
                             break;

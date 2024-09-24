@@ -295,7 +295,7 @@ impl SourceChain {
                 .read_async({
                     let author = author.clone();
                     move |txn| {
-                        let chain_lock = get_chain_lock(&txn, author.as_ref())?;
+                        let chain_lock = get_chain_lock(txn, author.as_ref())?;
                         match chain_lock {
                             Some(chain_lock) => {
                                 // If the chain is locked, the lock must be for this entry.
@@ -537,7 +537,7 @@ where
             vault
                 .read_async({
                     let author = author.clone();
-                    move |txn| chain_head_db_nonempty(&txn, author)
+                    move |txn| chain_head_db_nonempty(txn, author)
                 })
                 .await?,
         );
@@ -570,7 +570,7 @@ where
         let head_info = vault
             .read_async({
                 let author = author.clone();
-                move |txn| chain_head_db(&txn, author)
+                move |txn| chain_head_db(txn, author)
             })
             .await?;
         Ok(Self {
@@ -963,7 +963,7 @@ where
         let author = self.author.clone();
         Ok(self
             .vault
-            .read_async(move |txn| get_chain_lock(&txn, author.as_ref()))
+            .read_async(move |txn| get_chain_lock(txn, author.as_ref()))
             .await?)
     }
 
@@ -1302,7 +1302,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
         .read_async({
             let query_author = author.clone();
 
-            move |txn| chain_head_db_nonempty(&txn, query_author.clone())
+            move |txn| chain_head_db_nonempty(txn, query_author.clone())
         })
         .await?;
     let action_seq = last_action_seq + 1;
@@ -1649,7 +1649,7 @@ mod tests {
 
         db.read_async(move |txn| -> DatabaseResult<()> {
             // get the full record
-            let store = Txn::from(&txn);
+            let store = Txn::from(txn);
             let h1_record_entry_fetched = store
                 .get_record(&h1.clone().into())
                 .expect("error retrieving")
@@ -2231,7 +2231,7 @@ mod tests {
                 let query_author = author.clone();
 
                 move |txn| -> DatabaseResult<()> {
-                    assert_matches!(chain_head_db(&txn, query_author.clone()), Ok(None));
+                    assert_matches!(chain_head_db(txn, query_author.clone()), Ok(None));
 
                     Ok(())
                 }
@@ -2288,13 +2288,13 @@ mod tests {
 
                 move |txn| -> DatabaseResult<()> {
                     assert_eq!(
-                        chain_head_db_nonempty(&txn, check_author.clone())
+                        chain_head_db_nonempty(txn, check_author.clone())
                             .unwrap()
                             .action,
                         check_h2
                     );
                     // get the full record
-                    let store = Txn::from(&txn);
+                    let store = Txn::from(txn);
                     let h1_record_fetched = store
                         .get_record(&check_h1.clone().into())
                         .expect("error retrieving")
