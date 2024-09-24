@@ -3218,6 +3218,7 @@ mod accessor_impls {
     }
 }
 
+/// Methods related to app authentication tokens
 mod authenticate_token_impls {
     use super::*;
     use holochain_conductor_api::{
@@ -3269,6 +3270,34 @@ mod authenticate_token_impls {
             self.app_auth_token_store.share_mut(|app_connection_auth| {
                 app_connection_auth.authenticate_token(token, app_id)
             })
+        }
+    }
+}
+
+/// Methods for bridging from host calls to workflows for countersigning
+mod countersigning_impls {
+    use super::*;
+    use crate::core::workflow;
+
+    impl Conductor {
+        /// Accept a countersigning session
+        pub(crate) async fn accept_countersigning_session(
+            &self,
+            cell_id: CellId,
+            request: PreflightRequest,
+        ) -> ConductorResult<PreflightRequestAcceptance> {
+            let countersigning_trigger = self.cell_by_id(&cell_id).await?.countersigning_trigger();
+
+            Ok(
+                workflow::countersigning_workflow::accept_countersigning_request(
+                    self.spaces.get_or_create_space(cell_id.dna_hash())?,
+                    self.keystore.clone(),
+                    cell_id.agent_pubkey().clone(),
+                    request,
+                    countersigning_trigger,
+                )
+                .await?,
+            )
         }
     }
 }
@@ -3680,7 +3709,7 @@ impl Conductor {
         Ok(installed_clone_cell)
     }
 
-    /// Print the current setup in a machine readable way
+    /// Print the current setup in a machine-readable way
     fn print_setup(&self) {
         use std::fmt::Write;
         let mut out = String::new();
