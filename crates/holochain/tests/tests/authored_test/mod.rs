@@ -23,7 +23,7 @@ async fn authored_test() {
     let delay_per_attempt = Duration::from_millis(100);
 
     let zomes = vec![TestWasm::Create];
-    let mut conductor = SweetConductor::local_rendezvous().await;
+    let mut conductor = SweetConductor::shared_rendezvous().await;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(zomes).await;
     let ((alice,), (bob,)) = conductor
         .setup_apps("app", 2, [&dna])

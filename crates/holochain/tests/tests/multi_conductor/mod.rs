@@ -17,7 +17,7 @@ struct AppString(String);
 async fn dpki_publish() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::standard();
+    let config = SweetConductorConfig::rendezvous(false).apply_shared_rendezvous().await;
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     conductors.exchange_peer_info().await;
@@ -32,7 +32,7 @@ async fn dpki_publish() {
 async fn dpki_no_publish() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::standard().no_publish();
+    let config = SweetConductorConfig::rendezvous(false).apply_shared_rendezvous().await.no_publish();
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     conductors.exchange_peer_info().await;
@@ -193,7 +193,7 @@ async fn sharded_consistency() {
     const NUM_CONDUCTORS: usize = 3;
     const NUM_CELLS: usize = 5;
 
-    let config = SweetConductorConfig::standard().tune(|tuning| {
+    let config = SweetConductorConfig::rendezvous(false).apply_shared_rendezvous().await.tune(|tuning| {
         tuning.gossip_strategy = "sharded-gossip".to_string();
         tuning.gossip_dynamic_arcs = true;
     });

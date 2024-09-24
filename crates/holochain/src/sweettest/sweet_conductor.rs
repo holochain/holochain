@@ -69,11 +69,6 @@ impl PartialEq for SweetConductor {
 
 impl Eq for SweetConductor {}
 
-/// Standard config for SweetConductors
-pub fn standard_config() -> SweetConductorConfig {
-    SweetConductorConfig::standard()
-}
-
 impl SweetConductor {
     /// Get the ID of this conductor for manual equality checks.
     pub fn id(&self) -> String {
@@ -117,7 +112,9 @@ impl SweetConductor {
     where
         C: Into<SweetConductorConfig>,
     {
-        Self::create_with_defaults(config, None, None::<DynSweetRendezvous>).await
+        let config: SweetConductorConfig = config.into();
+        let vous = config.get_rendezvous();
+        Self::create_with_defaults(config, None, vous).await
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
@@ -172,7 +169,7 @@ impl SweetConductor {
 
         let config: SweetConductorConfig = config.into();
         let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
-            config.apply_rendezvous(&*r).into()
+            config.apply_rendezvous(&r).into()
         } else {
             if let Some(b) = config.network.bootstrap_service.as_ref() {
                 if b.to_string().starts_with("rendezvous:") {
@@ -250,7 +247,7 @@ impl SweetConductor {
 
     /// Create a SweetConductor with a new set of TestEnvs, using the "empty" config
     /// with a singleton rendezvous. Can only be used in single-conductor tests.
-    pub async fn local_rendezvous() -> SweetConductor {
+    pub async fn shared_rendezvous() -> SweetConductor {
         Self::from_config_rendezvous(
             SweetConductorConfig::rendezvous(false),
             shared_rendezvous().await,

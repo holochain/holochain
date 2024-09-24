@@ -11,7 +11,7 @@ use holochain_wasm_test_utils::TestWasm;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn network_seed_regression() {
-    let conductor = SweetConductor::local_rendezvous().await;
+    let conductor = SweetConductor::shared_rendezvous().await;
     let tmp = tempdir().unwrap();
     let (dna, _, _) = SweetDnaFile::from_test_wasms(
         "".into(),
@@ -92,7 +92,7 @@ async fn network_seed_regression() {
 /// Test all possible combinations of Locations and network seeds:
 #[tokio::test(flavor = "multi_thread")]
 async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
-    let conductor = SweetConductor::local_rendezvous().await;
+    let conductor = SweetConductor::shared_rendezvous().await;
     let tmp = tempdir().unwrap();
     let (dna, _, _) = SweetDnaFile::from_test_wasms(
         "".to_string(),

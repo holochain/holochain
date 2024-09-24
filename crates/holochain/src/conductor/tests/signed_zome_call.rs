@@ -18,7 +18,7 @@ async fn signed_zome_call() {
 
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let mut conductor = SweetConductor::local_rendezvous().await;
+    let mut conductor = SweetConductor::shared_rendezvous().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
     let agent_pub_key = cell_id.agent_pubkey().clone();
@@ -172,7 +172,7 @@ async fn signed_zome_call_wildcard() {
 
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let mut conductor = SweetConductor::local_rendezvous().await;
+    let mut conductor = SweetConductor::shared_rendezvous().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cell_id = app.cells()[0].cell_id();
     let agent_pub_key = app.agent().clone();

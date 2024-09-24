@@ -11,7 +11,7 @@ use kitsune_p2p_types::config::TransportConfig;
 #[ignore = "This test is flaky"]
 async fn gossip_test() {
     holochain_trace::test_run();
-    let config = SweetConductorConfig::standard().no_publish();
+    let config = SweetConductorConfig::rendezvous(false).apply_shared_rendezvous().await.no_publish();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor]).await;
@@ -61,7 +61,7 @@ async fn signature_smoke_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_info_test() {
     holochain_trace::test_run();
-    let config = SweetConductorConfig::standard().no_publish().no_dpki();
+    let config = SweetConductorConfig::rendezvous(false).apply_shared_rendezvous().await.no_publish().no_dpki();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
     let (dna_file, _, _) =

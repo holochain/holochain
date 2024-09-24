@@ -36,7 +36,7 @@ async fn test_cell_handle_publish() {
     let data_root_path: DataRootPath = db_dir.clone().into();
     let handle = Conductor::builder()
         .config(
-            crate::sweettest::SweetConductorConfig::standard()
+            crate::sweettest::SweetConductorConfig::rendezvous(false).apply_shared_rendezvous().await
                 .no_dpki()
                 .into(),
         )

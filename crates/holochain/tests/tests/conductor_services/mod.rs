@@ -8,7 +8,7 @@ use holochain_types::prelude::*;
 async fn initialize_dpki() {
     holochain_trace::test_run();
 
-    let mut config = SweetConductorConfig::standard();
+    let mut config = SweetConductorConfig::rendezvous(false).apply_shared_rendezvous().await;
     config.dpki = DpkiConfig::production(None);
     let mut conductor = SweetConductor::from_config(config).await;
 

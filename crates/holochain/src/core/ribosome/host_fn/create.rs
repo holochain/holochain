@@ -311,7 +311,7 @@ pub mod wasm_test {
         const N: u32 = 50;
 
         holochain_trace::test_run();
-        let mut conductor = SweetConductor::local_rendezvous().await;
+        let mut conductor = SweetConductor::shared_rendezvous().await;
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await;
 
         let app = conductor.setup_app("app", [&dna]).await.unwrap();

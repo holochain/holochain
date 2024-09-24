@@ -10,7 +10,7 @@ async fn app_info_returns_all_cells_with_info() {
     // set up app with two provisioned cells and one clone cell of each of them
     let (dna_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let (dna_2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let mut conductor = SweetConductor::local_rendezvous().await;
+    let mut conductor = SweetConductor::shared_rendezvous().await;
 
     let app_id: InstalledAppId = "app".into();
     let role_name_1: RoleName = "role_1".into();

@@ -12,7 +12,7 @@ use matches::assert_matches;
 async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::local_rendezvous().await;
+    let mut conductor = SweetConductor::shared_rendezvous().await;
 
     async fn make_payload(clone_limit: u32) -> InstallAppPayload {
         // The integrity zome in this WASM will fail if the properties are not set. This helps verify that genesis
@@ -139,7 +139,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn reject_duplicate_app_for_same_agent() {
-    let conductor = SweetConductor::local_rendezvous().await;
+    let conductor = SweetConductor::shared_rendezvous().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let path = PathBuf::from(format!("{}", dna.dna_hash()));
@@ -254,7 +254,7 @@ async fn reject_duplicate_app_for_same_agent() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_info() {
-    let conductor = SweetConductor::local_rendezvous().await;
+    let conductor = SweetConductor::shared_rendezvous().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let path = PathBuf::from(format!("{}", dna.dna_hash()));
@@ -350,7 +350,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cells_by_dna_lineage() {
-    let mut conductor = SweetConductor::local_rendezvous().await;
+    let mut conductor = SweetConductor::shared_rendezvous().await;
 
     async fn mk_dna(lineage: &[&DnaHash]) -> DnaFile {
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
@@ -442,7 +442,7 @@ async fn cells_by_dna_lineage() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn use_existing_integration() {
-    let conductor = SweetConductor::local_rendezvous().await;
+    let conductor = SweetConductor::shared_rendezvous().await;
 
     let (dna1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
     let (dna2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;

@@ -870,7 +870,10 @@ async fn test_dpki_agent_update() {
     // TODO: this test fails with deepkey because the agent is not also updated in DPKI.
     //       once there is a way to update the agent in deepkey, add that to this test
     //       and re-enable DPKI for this conductor.
-    let config = SweetConductorConfig::standard().no_dpki_mustfix();
+    let config = SweetConductorConfig::rendezvous(false)
+        .local_rendezvous()
+        .await
+        .no_dpki_mustfix();
     let mut conductor = SweetConductor::from_config(config).await;
     let app = conductor.setup_app("app", vec![&dna]).await.unwrap();
     let initial_agent = app.agent().clone();
@@ -1012,7 +1015,7 @@ async fn test_dpki_agent_update() {
 #[ignore = "flaky"]
 async fn valid_chain_fact_test() {
     let n = 100;
-    let keystore = SweetConductor::local_rendezvous().await.keystore();
+    let keystore = SweetConductor::shared_rendezvous().await.keystore();
     let author = SweetAgents::one(keystore.clone()).await;
     let mut g = random_generator();
 

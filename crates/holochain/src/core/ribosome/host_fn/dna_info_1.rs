@@ -58,7 +58,7 @@ pub mod test {
         )
         .await;
 
-        let mut conductor = SweetConductor::local_rendezvous().await;
+        let mut conductor = SweetConductor::shared_rendezvous().await;
         let apps = conductor.setup_apps("app-", 2, &[dna_file]).await.unwrap();
 
         let ((alice,), (bobbo,)) = apps.into_tuples();
