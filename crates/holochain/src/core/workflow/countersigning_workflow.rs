@@ -190,7 +190,7 @@ pub(crate) async fn countersigning_success(
         authored_db
             .read_async(move |txn| {
                 if holochain_state::chain_lock::is_chain_locked(&txn, &[], &author)? {
-                    let transaction: holochain_state::prelude::CascadeTxn = (&txn).into();
+                    let transaction: holochain_state::prelude::Txn = (&txn).into();
                     if transaction.contains_entry(&entry_hash)? {
                         // If this is a countersigning session we can grab all the ops
                         // for this cells action so we can check if we need to self publish them.

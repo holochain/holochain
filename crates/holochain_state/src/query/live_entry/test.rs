@@ -25,7 +25,7 @@ async fn can_handle_update_in_scratch() {
     insert_valid_integrated_op(&mut txn, &td.update_store_entry_op.downcast()).unwrap();
     let r = td
         .query
-        .run(CascadeTxn::from(&txn))
+        .run(Txn::from(&txn))
         .unwrap()
         .expect("Record not found");
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);

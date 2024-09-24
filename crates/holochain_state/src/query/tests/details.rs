@@ -31,7 +31,7 @@ async fn entry_scratch_same_as_sql() {
     .unwrap();
     insert_valid_integrated_op(&mut txn, &td.store_entry_op.downcast()).unwrap();
     let r1 = query
-        .run(CascadeTxn::from(&txn))
+        .run(Txn::from(&txn))
         .unwrap()
         .expect("Record not found");
     let r2 = query
@@ -65,7 +65,7 @@ async fn record_scratch_same_as_sql() {
     .unwrap();
     insert_valid_integrated_op(&mut txn, &td.store_record_op.downcast()).unwrap();
     let r1 = query
-        .run(CascadeTxn::from(&txn))
+        .run(Txn::from(&txn))
         .unwrap()
         .expect("Record not found");
     let r2 = query

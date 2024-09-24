@@ -11,7 +11,7 @@ use holochain::test_utils::inline_zomes::simple_crud_zome;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
 use holochain_sqlite::error::DatabaseResult;
-use holochain_state::prelude::{StateMutationError, Store, CascadeTxn};
+use holochain_state::prelude::{StateMutationError, Store, Txn};
 use holochain_types::record::SignedActionHashedExt;
 use rusqlite::Transaction;
 
@@ -63,7 +63,7 @@ async fn grafting() {
             let query_chain = chain.clone();
 
             move |txn: Transaction| -> DatabaseResult<Vec<_>> {
-                let txn: CascadeTxn = (&txn).into();
+                let txn: Txn = (&txn).into();
                 Ok(query_chain
                     .iter()
                     .map(|h| txn.get_record(&h.0.clone().into()).unwrap().unwrap())

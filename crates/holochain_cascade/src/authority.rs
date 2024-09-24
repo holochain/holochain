@@ -13,7 +13,7 @@ use crate::authority::get_agent_activity_query::records::GetAgentActivityRecords
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_state::query::link::GetLinksQuery;
-use holochain_state::query::CascadeTxn;
+use holochain_state::query::Txn;
 use holochain_state::query::{Query, Store};
 use holochain_types::prelude::*;
 use holochain_zome_types::agent_activity::DeterministicGetAgentActivityFilter;
@@ -34,7 +34,7 @@ pub async fn handle_get_entry(
     _options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<WireEntryOps> {
     let query = GetEntryOpsQuery::new(hash);
-    let results = db.read_async(move |txn| query.run(CascadeTxn::from(&txn))).await?;
+    let results = db.read_async(move |txn| query.run(Txn::from(&txn))).await?;
     Ok(results)
 }
 
@@ -47,7 +47,7 @@ pub async fn handle_get_record(
 ) -> CascadeResult<WireRecordOps> {
     let query = GetRecordOpsQuery::new(hash, options);
     let results = env
-        .read_async(move |txn| query.run(CascadeTxn::from(&txn)))
+        .read_async(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)
 }
@@ -62,7 +62,7 @@ pub async fn handle_get_agent_activity(
 ) -> CascadeResult<AgentActivityResponse> {
     let results = env
         .read_async(move |txn| -> CascadeResult<AgentActivityResponse> {
-            let txn = CascadeTxn::from(&txn);
+            let txn = Txn::from(&txn);
 
             let warrants =
                 txn.get_warrants_for_basis(&AnyLinkableHash::from(agent.clone()), true)?;
@@ -108,7 +108,7 @@ pub async fn handle_get_agent_activity_deterministic(
 ) -> CascadeResult<DeterministicGetAgentActivityResponse> {
     let query = DeterministicGetAgentActivityQuery::new(agent, filter, options);
     let results = env
-        .read_async(move |txn| query.run(CascadeTxn::from(&txn)))
+        .read_async(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)
 }
@@ -122,7 +122,7 @@ pub async fn handle_get_links(
 ) -> CascadeResult<WireLinkOps> {
     let query = GetLinksOpsQuery::new(link_key);
     let results = env
-        .read_async(move |txn| query.run(CascadeTxn::from(&txn)))
+        .read_async(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)
 }
@@ -140,6 +140,6 @@ pub async fn handle_get_links_query(
         query.into(),
     );
     Ok(db
-        .read_async(move |txn| get_links_query.run(CascadeTxn::from(&txn)))
+        .read_async(move |txn| get_links_query.run(Txn::from(&txn)))
         .await?)
 }

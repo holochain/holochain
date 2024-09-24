@@ -19,10 +19,10 @@ async fn exists() {
     )
     .unwrap();
     insert_op(&mut txn, &td.store_entry_op.downcast()).unwrap();
-    assert!(CascadeTxn::from(&txn)
+    assert!(Txn::from(&txn)
         .contains_hash(&td.hash.clone().into())
         .unwrap());
-    assert!(CascadeTxn::from(&txn)
+    assert!(Txn::from(&txn)
         .contains_hash(&td.action.as_hash().clone().into())
         .unwrap());
     assert!(scratch.contains_hash(&td.hash.clone().into()).unwrap());
