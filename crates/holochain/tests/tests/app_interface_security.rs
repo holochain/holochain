@@ -18,7 +18,7 @@ use std::sync::Arc;
 async fn app_allowed_origins() {
     holochain_trace::test_run();
 
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::isolated_singleton().await;
 
     let port = conductor
         .clone()
@@ -52,7 +52,7 @@ async fn app_allowed_origins() {
 async fn app_allowed_origins_independence() {
     holochain_trace::test_run();
 
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::isolated_singleton().await;
 
     let token = create_multi_use_token(&conductor, "test-app".into()).await;
 
@@ -118,7 +118,7 @@ async fn app_allowed_origins_independence() {
 async fn app_interface_requires_auth() {
     holochain_trace::test_run();
 
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::isolated_singleton().await;
 
     // App interface with no restrictions, but should still require auth
     let app_port = conductor
@@ -172,7 +172,7 @@ async fn app_interface_requires_auth() {
 async fn app_interface_can_handle_bad_auth_payload() {
     holochain_trace::test_run();
 
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::isolated_singleton().await;
 
     let app_port = conductor
         .clone()
@@ -222,7 +222,7 @@ async fn app_interface_can_handle_bad_auth_payload() {
 async fn app_interfaces_can_be_bound_to_apps() {
     holochain_trace::test_run();
 
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::isolated_singleton().await;
 
     // App interface with an app restriction
     let app_port = conductor
@@ -281,7 +281,7 @@ async fn app_interfaces_can_be_bound_to_apps() {
 async fn signals_are_not_sent_until_after_auth() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal]).await;
 
@@ -368,7 +368,7 @@ async fn signals_are_not_sent_until_after_auth() {
 async fn signals_are_restricted_by_app() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal]).await;
 
@@ -505,7 +505,7 @@ async fn signals_are_restricted_by_app() {
 async fn revoke_app_auth_token() {
     holochain_trace::test_run();
 
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::isolated_singleton().await;
 
     let app_port = conductor
         .clone()

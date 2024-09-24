@@ -192,7 +192,7 @@ async fn test_list_running_apps_for_dependent_cell_id() {
 
     // Install two apps on the Conductor:
     // Both share a CellId in common, and also include a distinct CellId each.
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
     let app1 = conductor.setup_app("app1", [&dna1, &dna2]).await.unwrap();
     let alice = app1.agent().clone();
     let app2 = conductor
@@ -365,7 +365,7 @@ async fn test_uninstall_app() {
 async fn test_reconciliation_idempotency() {
     holochain_trace::test_run();
     let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
     common_genesis_test_app(&mut conductor, ("custom", zome))
         .await
         .unwrap();
@@ -572,7 +572,7 @@ pub(crate) fn simple_create_entry_zome() -> InlineIntegrityZome {
 async fn test_enable_disable_enable_app() {
     holochain_trace::test_run();
     let zome = simple_create_entry_zome();
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
     let app = common_genesis_test_app(&mut conductor, ("zome", zome))
         .await
         .unwrap();
@@ -656,7 +656,7 @@ async fn test_enable_disable_enable_app() {
 async fn test_enable_disable_enable_clone_cell() {
     holochain_trace::test_run();
     let zome = simple_create_entry_zome();
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
     let app = common_genesis_test_app(&mut conductor, ("zome", zome))
         .await
         .unwrap();
@@ -751,7 +751,7 @@ async fn test_enable_disable_enable_clone_cell() {
 #[tokio::test(flavor = "multi_thread")]
 async fn name_has_no_effect_on_dna_hash() {
     holochain_trace::test_run();
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
     let dna = SweetDnaFile::unique_empty().await;
     let apps = conductor.setup_apps("app", 3, [&dna]).await.unwrap();
     let app_id1 = apps[0].installed_app_id().clone();
@@ -825,7 +825,7 @@ async fn test_installation_fails_if_genesis_self_check_is_invalid() {
         },
     );
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
     let err = if let Err(err) = common_genesis_test_app(&mut conductor, bad_zome).await {
         err
     } else {
@@ -932,7 +932,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
                 Ok(hash)
             });
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
     let app = common_genesis_test_app(&mut conductor, bad_zome)
         .await
         .unwrap();
@@ -956,7 +956,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
 async fn test_app_status_states() {
     holochain_trace::test_run();
     let zome = simple_create_entry_zome();
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
     common_genesis_test_app(&mut conductor, ("zome", zome))
         .await
         .unwrap();
@@ -1089,7 +1089,7 @@ async fn test_app_status_filters() {
     let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
     let dnas = [mk_dna(("dna", zome)).await.0];
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
 
     conductor.setup_app("running", &dnas).await.unwrap();
     conductor.setup_app("paused", &dnas).await.unwrap();
@@ -1170,7 +1170,7 @@ async fn test_init_concurrency() {
             Ok(())
         });
     let dnas = [mk_dna(zome).await.0];
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
     let app = conductor.setup_app("app", &dnas).await.unwrap();
     let (cell,) = app.into_tuple();
     let conductor = Arc::new(conductor);
@@ -1203,7 +1203,7 @@ async fn test_init_concurrency() {
 async fn test_deferred_memproof_provisioning() {
     holochain_trace::test_run();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
     let app_id = "app-id".to_string();
     let role_name = "role".to_string();
     let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true, None).await;
@@ -1332,7 +1332,7 @@ async fn test_deferred_memproof_provisioning() {
 async fn test_deferred_memproof_provisioning_uninstall() {
     holochain_trace::test_run();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::isolated_singleton().await;
     let app_id = "app-id".to_string();
     let role_name = "role".to_string();
     let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true, None).await;

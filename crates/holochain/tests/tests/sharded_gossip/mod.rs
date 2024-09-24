@@ -295,7 +295,7 @@ async fn test_zero_arc_get_links() {
     let config = SweetConductorConfig::standard().set_tuning_params(tuning);
 
     let mut conductor0 = SweetConductor::from_config(config).await;
-    let mut conductor1 = SweetConductor::from_standard_config().await;
+    let mut conductor1 = SweetConductor::isolated_singleton().await;
 
     let tw = holochain_wasm_test_utils::TestWasm::Link;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![tw]).await;

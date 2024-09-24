@@ -7,7 +7,7 @@ async fn hc_stress_test_check_zome_functions() {
     // this is a sanity check to make sure the zome functions work
     // so that we can make more complex behavioral tests
 
-    let conductor = SweetConductor::from_standard_config().await;
+    let conductor = SweetConductor::isolated_singleton().await;
     let dna = HcStressTest::test_dna(random_network_seed()).await;
     let mut test = HcStressTest::new(conductor, &[dna]).await;
 

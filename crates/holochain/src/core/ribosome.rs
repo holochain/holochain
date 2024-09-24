@@ -880,7 +880,7 @@ pub mod wasm_test {
         pub async fn new(test_wasm: TestWasm) -> Self {
             let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
-            let mut conductor = SweetConductor::from_standard_config().await;
+            let mut conductor = SweetConductor::isolated_singleton().await;
 
             let apps = conductor.setup_apps("app-", 2, [&dna_file]).await.unwrap();
 

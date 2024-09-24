@@ -67,7 +67,7 @@ async fn is_same_agent_without_dpki() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn is_same_agent() {
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::isolated_singleton().await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
         .await
         .0;
