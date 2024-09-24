@@ -326,7 +326,7 @@ impl AgentStoreByPath {
             }
         }
 
-        let agent_store = db.read_async(|txn| AgentStore::new(&txn)).await?;
+        let agent_store = db.read_async(|txn| AgentStore::new(txn)).await?;
 
         let mut map = self.map.lock();
         match map.entry(store_key) {
@@ -399,11 +399,11 @@ pub fn p2p_put_single(
 ) -> DatabaseResult<AgentInfoPut> {
     let agent_info_put = cache_get(space, &*txn)?.put(signed.clone())?;
     let record = P2pRecord::from_signed(signed)?;
-    tx_p2p_put(txn, record)?;
+    tx_p2p_put(&txn.into(), record)?;
     Ok(agent_info_put)
 }
 
-fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
+fn tx_p2p_put(txn: &Ta<DbKindP2pAgents>, record: P2pRecord) -> DatabaseResult<()> {
     txn.execute(
         sql_p2p_agent_store::INSERT,
         named_params! {

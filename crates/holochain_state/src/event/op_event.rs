@@ -304,6 +304,7 @@ mod tests {
     use ::fixt::prelude::*;
     use arbitrary::Arbitrary;
     use holochain_keystore::test_keystore;
+    use kitsune_p2p::dependencies::kitsune_p2p_types::GossipType;
     use maplit::btreeset;
 
     async fn db_roundtrip(

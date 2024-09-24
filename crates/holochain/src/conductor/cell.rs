@@ -11,7 +11,6 @@ use std::sync::Arc;
 use futures::future::FutureExt;
 use holochain_serialized_bytes::SerializedBytes;
 use rusqlite::OptionalExtension;
-use rusqlite::Transaction;
 use tokio::sync::broadcast;
 use tracing::*;
 use tracing_futures::Instrument;
@@ -32,17 +31,17 @@ use holochain_types::db_cache::DhtDbQueryCache;
 
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::cell::error::CellResult;
-use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueTriggers;
+use crate::core::queue_consumer::{spawn_queue_consumer_tasks, TriggerSender};
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::call_zome_workflow;
 use crate::core::workflow::countersigning_workflow::countersigning_success;
-use crate::core::workflow::countersigning_workflow::incoming_countersigning;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::initialize_zomes_workflow;
+use crate::core::workflow::witnessing_workflow::receive_incoming_countersigning_ops;
 use crate::core::workflow::CallZomeWorkflowArgs;
 use crate::core::workflow::GenesisWorkflowArgs;
 use crate::core::workflow::GenesisWorkspace;
@@ -141,7 +140,8 @@ impl Cell {
                 &space,
                 conductor_handle.clone(),
             )
-            .await?;
+            .await
+            .map_err(Box::new)?;
 
             Ok((
                 Self {
@@ -254,7 +254,7 @@ impl Cell {
 
         let author = self.id.agent_pubkey().clone();
         let live_fns = authored_db
-            .write_async(move |txn: &mut Transaction| {
+            .write_async(move |txn| {
                 // Rescheduling should not fail as the data in the database
                 // should be valid schedules only.
                 reschedule_expired(txn, now, &author)?;
@@ -334,7 +334,7 @@ impl Cell {
                 let author = self.id.agent_pubkey().clone();
                 // We don't do anything with errors in here.
                 let _ = authored_db
-                    .write_async(move |txn: &mut Transaction| {
+                    .write_async(move |txn| {
                         for ((scheduled_fn, _), result) in live_fns.iter().zip(results.iter()) {
                             match result {
                                 Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
@@ -585,7 +585,7 @@ impl Cell {
         Ok(())
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, message)))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     /// we are receiving a response from a countersigning authority
     async fn handle_countersigning_session_negotiation(
         &self,
@@ -600,25 +600,24 @@ impl Cell {
                         (hash, op)
                     })
                     .collect();
-                incoming_countersigning(
+                receive_incoming_countersigning_ops(
                     ops,
-                    &self.space.countersigning_workspace,
-                    self.queue_triggers.countersigning.clone(),
+                    &self.space.witnessing_workspace,
+                    self.queue_triggers.witnessing.clone(),
                 )
                 .map_err(Box::new)?;
                 Ok(())
             }
             CountersigningSessionNegotiationMessage::AuthorityResponse(signed_actions) => {
-                Ok(countersigning_success(
+                countersigning_success(
                     self.space.clone(),
-                    &self.holochain_p2p_cell,
                     self.id.agent_pubkey().clone(),
                     signed_actions,
-                    self.queue_triggers.clone(),
-                    self.signal_tx.clone(),
+                    self.queue_triggers.countersigning.clone(),
                 )
-                .await
-                .map_err(Box::new)?)
+                .await;
+
+                Ok(())
             }
         }
     }
@@ -955,6 +954,7 @@ impl Cell {
             args,
             self.queue_triggers.publish_dht_ops.clone(),
             self.queue_triggers.integrate_dht_ops.clone(),
+            self.queue_triggers.countersigning.clone(),
         )
         .await
         .map_err(Box::new)?)
@@ -1080,6 +1080,10 @@ impl Cell {
         self.queue_triggers
             .publish_dht_ops
             .trigger(&"publish_authored_ops");
+    }
+
+    pub(crate) fn countersigning_trigger(&self) -> TriggerSender {
+        self.queue_triggers.countersigning.clone()
     }
 
     #[cfg(any(test, feature = "test_utils"))]

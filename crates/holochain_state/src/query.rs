@@ -857,12 +857,6 @@ impl<'borrow, 'txn> From<&'borrow Transaction<'txn>> for Txn<'borrow, 'txn> {
     }
 }
 
-impl<'borrow, 'txn, D: DbKindT> From<&'borrow Ta<'txn, D>> for Txn<'borrow, 'txn> {
-    fn from(txn: &'borrow Ta<'txn, D>) -> Self {
-        Self { txn: &txn }
-    }
-}
-
 impl<'borrow, 'txn> From<&'borrow mut Transaction<'txn>> for Txn<'borrow, 'txn> {
     fn from(txn: &'borrow mut Transaction<'txn>) -> Self {
         Self { txn }
@@ -873,6 +867,18 @@ impl<'borrow, 'txn> From<&'borrow Transactions<'borrow, 'txn>> for Txns<'borrow,
     fn from(txns: &'borrow Transactions<'borrow, 'txn>) -> Self {
         let txns = txns.iter().map(|&txn| Txn::from(txn)).collect();
         Self { txns }
+    }
+}
+
+impl<'borrow, 'txn, D: DbKindT> From<&'borrow Ta<'borrow, 'txn, D>> for Txn<'borrow, 'txn> {
+    fn from(txn: &'borrow Ta<'borrow, 'txn, D>) -> Self {
+        Self { txn }
+    }
+}
+
+impl<'borrow, 'txn, D: DbKindT> From<&'borrow mut Ta<'borrow, 'txn, D>> for Txn<'borrow, 'txn> {
+    fn from(txn: &'borrow mut Ta<'borrow, 'txn, D>) -> Self {
+        Self { txn }
     }
 }
 

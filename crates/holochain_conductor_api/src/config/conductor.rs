@@ -219,8 +219,30 @@ impl ConductorConfig {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ConductorTuningParams {
     /// The delay between retries of sys validation when there are missing dependencies waiting to be found on the DHT.
+    ///
     /// Default: 10 seconds
     pub sys_validation_retry_delay: Option<std::time::Duration>,
+    /// The delay between retries attempts at resolving failed countersigning sessions.
+    ///
+    /// This is potentially a very heavy operation because it has to gather information from the network,
+    /// so it is recommended not to set this too low.
+    ///
+    /// Default: 5 minutes
+    pub countersigning_resolution_retry_delay: Option<std::time::Duration>,
+    /// The maximum number of times that Holochain should attempt to resolve a failed countersigning session.
+    ///
+    /// Note that this *only* applies to sessions that fail through a timeout. Sessions that fail because
+    /// of a conductor crash or otherwise will not be limited by this value. This is a safety measure to
+    /// make it less likely that timeout leads to a wrong decision because of a temporary network issue.
+    ///
+    /// Holochain will always try once, whatever value you set. The possible values for this setting are:
+    /// - `None`: Not set, then Holochain will just make a single attempt and then consider the session failed
+    ///    if it can't make a decision.
+    /// - `Some(0)`: Holochain will treat this the same as a session that failed after a crash. It will retry
+    ///   until it can make a decision or until the user forces a decision.
+    /// - `Some(n)`, n > 0: Holochain will retry `n` times, including the required first attempt. If
+    ///   it can't make a decision after `n` retries, it will consider the session failed.
+    pub countersigning_resolution_retry_limit: Option<usize>,
 }
 
 impl ConductorTuningParams {
@@ -228,6 +250,8 @@ impl ConductorTuningParams {
     pub fn new() -> Self {
         Self {
             sys_validation_retry_delay: None,
+            countersigning_resolution_retry_delay: None,
+            countersigning_resolution_retry_limit: None,
         }
     }
 
@@ -236,6 +260,12 @@ impl ConductorTuningParams {
         self.sys_validation_retry_delay
             .unwrap_or_else(|| std::time::Duration::from_secs(10))
     }
+
+    /// Get the current value of `countersigning_resolution_retry_delay` or its default value.
+    pub fn countersigning_resolution_retry_delay(&self) -> std::time::Duration {
+        self.countersigning_resolution_retry_delay
+            .unwrap_or_else(|| std::time::Duration::from_secs(60 * 5))
+    }
 }
 
 impl Default for ConductorTuningParams {
@@ -243,6 +273,10 @@ impl Default for ConductorTuningParams {
         let empty = Self::new();
         Self {
             sys_validation_retry_delay: Some(empty.sys_validation_retry_delay()),
+            countersigning_resolution_retry_delay: Some(
+                empty.countersigning_resolution_retry_delay(),
+            ),
+            countersigning_resolution_retry_limit: None,
         }
     }
 }

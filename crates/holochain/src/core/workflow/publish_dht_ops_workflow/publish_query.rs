@@ -170,7 +170,7 @@ mod tests {
 
         let num_to_publish = db
             .to_db()
-            .read_async(|txn| num_still_needing_publish(&txn, agent))
+            .read_async(|txn| num_still_needing_publish(txn, agent))
             .await
             .unwrap();
 

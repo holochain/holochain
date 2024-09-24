@@ -14,13 +14,14 @@ use super::{
     p2p_agent_store::{self, P2pBatch},
 };
 use crate::conductor::{error::ConductorError, state::ConductorState};
+use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
 use crate::core::{
     queue_consumer::QueueConsumerMap,
     workflow::{
-        countersigning_workflow::{incoming_countersigning, CountersigningWorkspace},
         incoming_dht_ops_workflow::{
             incoming_dht_ops_workflow, IncomingOpHashes, IncomingOpsBatch,
         },
+        witnessing_workflow::{receive_incoming_countersigning_ops, WitnessingWorkspace},
     },
 };
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
@@ -107,8 +108,12 @@ pub struct Space {
     /// A cache for slow database queries.
     pub dht_query_cache: DhtDbQueryCache,
 
-    /// Countersigning workspace that is shared across this cell.
-    pub countersigning_workspace: CountersigningWorkspace,
+    /// Countersigning workspace for session state.
+    pub countersigning_workspaces:
+        Arc<parking_lot::Mutex<HashMap<CellId, Arc<CountersigningWorkspace>>>>,
+
+    /// Witnessing workspace that is shared across this cell.
+    pub witnessing_workspace: WitnessingWorkspace,
 
     /// Incoming op hashes that are queued for processing.
     pub incoming_op_hashes: IncomingOpHashes,
@@ -292,13 +297,13 @@ impl Spaces {
             .read_async(move |txn| {
                 Ok(
                     // If the target_id is directly blocked then we always return true.
-                    holochain_state::block::query_is_blocked(&txn, target_id, timestamp)?
+                    holochain_state::block::query_is_blocked(txn, target_id, timestamp)?
             // If there are zero unblocked cells then return true.
             || {
                 let mut all_blocked_cell_ids = true;
                 for cell_id in cell_ids {
                     if !holochain_state::block::query_is_blocked(
-                        &txn,
+                        txn,
                         BlockTargetId::Cell(cell_id), timestamp)? {
                             all_blocked_cell_ids = false;
                             break;
@@ -699,17 +704,17 @@ impl Spaces {
 
             let (workspace, trigger) = self.get_or_create_space_ref(dna_hash, |space| {
                 (
-                    space.countersigning_workspace.clone(),
+                    space.witnessing_workspace.clone(),
                     self.queue_consumer_map
-                        .countersigning_trigger(space.dna_hash.clone()),
+                        .witnessing_trigger(space.dna_hash.clone()),
                 )
             })?;
             let trigger = match trigger {
                 Some(t) => t,
-                // If the workflow has not been spawned yet we can't handle incoming messages.
+                // If the workflow has not been spawned yet, we can't handle incoming messages.
                 None => return Ok(()),
             };
-            incoming_countersigning(ops, &workspace, trigger)?;
+            receive_incoming_countersigning_ops(ops, &workspace, trigger)?;
         } else {
             let space = self.get_or_create_space(dna_hash)?;
             let trigger = match self
@@ -803,7 +808,7 @@ impl Space {
         ));
         let p2p_batch_sender = tx;
 
-        let countersigning_workspace = CountersigningWorkspace::new();
+        let witnessing_workspace = WitnessingWorkspace::default();
         let incoming_op_hashes = IncomingOpHashes::default();
         let incoming_ops_batch = IncomingOpsBatch::default();
         let dht_query_cache = DhtDbQueryCache::new(dht_db.clone().into());
@@ -815,7 +820,8 @@ impl Space {
             p2p_agents_db,
             p2p_metrics_db,
             p2p_batch_sender,
-            countersigning_workspace,
+            countersigning_workspaces: Default::default(),
+            witnessing_workspace,
             incoming_op_hashes,
             incoming_ops_batch,
             dht_query_cache,

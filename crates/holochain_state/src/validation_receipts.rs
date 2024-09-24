@@ -243,10 +243,10 @@ mod tests {
         })
         .await?;
 
-        env.read_async(move |reader| -> DatabaseResult<()> {
-            assert_eq!(2, count_valid(&reader, &test_op_hash).unwrap());
+        env.read_async(move |txn| -> DatabaseResult<()> {
+            assert_eq!(2, count_valid(txn, &test_op_hash).unwrap());
 
-            let mut list = list_receipts(&reader, &test_op_hash).unwrap();
+            let mut list = list_receipts(txn, &test_op_hash).unwrap();
             list.sort_by(|a, b| {
                 a.receipt.validators[0]
                     .partial_cmp(&b.receipt.validators[0])
@@ -277,7 +277,7 @@ mod tests {
 
         // With no validators
         let pending = env
-            .read_async(|txn| get_pending_validation_receipts(&txn, vec![]))
+            .read_async(|txn| get_pending_validation_receipts(txn, vec![]))
             .await
             .unwrap();
 
@@ -285,7 +285,7 @@ mod tests {
 
         // Same result with validators
         let pending = env
-            .read_async(|txn| get_pending_validation_receipts(&txn, vec![fixt!(AgentPubKey)]))
+            .read_async(|txn| get_pending_validation_receipts(txn, vec![fixt!(AgentPubKey)]))
             .await
             .unwrap();
 
@@ -395,7 +395,7 @@ mod tests {
         let pending = env
             .read_async(
                 move |txn| -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey)>> {
-                    get_pending_validation_receipts(&txn, vec![])
+                    get_pending_validation_receipts(txn, vec![])
                 },
             )
             .await
@@ -446,7 +446,7 @@ mod tests {
         .unwrap();
 
         let receipt_sets = env
-            .read_async(move |txn| validation_receipts_for_action(&txn, action_hash))
+            .read_async(move |txn| validation_receipts_for_action(txn, action_hash))
             .await
             .unwrap();
 

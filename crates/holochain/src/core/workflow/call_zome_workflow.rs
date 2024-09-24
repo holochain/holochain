@@ -40,17 +40,7 @@ pub struct CallZomeWorkflowArgs<RibosomeT> {
     pub cell_id: CellId,
 }
 
-#[cfg_attr(
-    feature = "instrument",
-    tracing::instrument(skip(
-        workspace,
-        network,
-        keystore,
-        args,
-        trigger_publish_dht_ops,
-        trigger_integrate_dht_ops
-    ))
-)]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn call_zome_workflow<Ribosome>(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
@@ -58,6 +48,7 @@ pub async fn call_zome_workflow<Ribosome>(
     args: CallZomeWorkflowArgs<Ribosome>,
     trigger_publish_dht_ops: TriggerSender,
     trigger_integrate_dht_ops: TriggerSender,
+    trigger_countersigning: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult>
 where
     Ribosome: RibosomeT + 'static,
@@ -83,6 +74,7 @@ where
         network.clone(),
         keystore.clone(),
         args,
+        trigger_countersigning,
     )
     .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
@@ -145,6 +137,7 @@ async fn call_zome_workflow_inner<Ribosome>(
     network: HolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome>,
+    trigger_countersigning: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult>
 where
     Ribosome: RibosomeT + 'static,
@@ -189,22 +182,34 @@ where
     ) {
         let scratch_records = workspace.source_chain().scratch_records()?;
         if scratch_records.len() == 1 {
-            let lock = holochain_state::source_chain::lock_for_entry(
+            let lock_subject = holochain_state::source_chain::chain_lock_subject_for_entry(
                 scratch_records[0].entry().as_option(),
             )?;
-            if !lock.is_empty()
-                && workspace
-                    .source_chain()
-                    .is_chain_locked(Vec::with_capacity(0))
-                    .await?
-                && !workspace.source_chain().is_chain_locked(lock).await?
-            {
-                if let Err(error) = workspace.source_chain().unlock_chain().await {
-                    tracing::error!(?error);
+
+            // If this wasn't a countersigning commit then the lock will be empty.
+            if !lock_subject.is_empty() {
+                // Otherwise, we can check whether the chain was locked with a subject matching
+                // the entry that failed validation.
+                if let Some(chain_lock) = workspace.source_chain().get_chain_lock().await? {
+                    // Here we know the chain is locked, and if the lock subject matches the entry
+                    // that the app was trying to commit then we can unlock the chain.
+                    if chain_lock.subject() == lock_subject {
+                        if let Err(error) = workspace.source_chain().unlock_chain().await {
+                            tracing::error!(?error);
+                        }
+
+                        // Immediately unlocking the chain is safe because we know that the
+                        // countersigning commit hasn't been written to the source chain here.
+                        // We still need to clean up the session state in the countersigning workspace
+                        // though, so trigger the countersigning workflow and let it figure out
+                        // what happened.
+                        trigger_countersigning.trigger(&"invalid_countersigning_commit");
+                    }
                 }
             }
         }
     }
+
     validation_result?;
     Ok(result)
 }
