@@ -45,6 +45,7 @@ pub mod schedule;
 pub mod scratch;
 #[allow(missing_docs)]
 pub mod source_chain;
+pub mod ta;
 pub mod validation_db;
 pub mod validation_receipts;
 #[allow(missing_docs)]
