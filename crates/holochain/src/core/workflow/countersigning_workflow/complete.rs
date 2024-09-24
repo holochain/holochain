@@ -65,7 +65,8 @@ pub(crate) async fn inner_countersigning_session_complete(
                     }
 
                     let transaction: holochain_state::prelude::Txn = (&txn).into();
-                    // TODO already looked up in current_countersigning_session?
+                    // Ensure that the entry is present too because the looking up the session may
+                    // just have retrieved the entry hash from the action.
                     if transaction.contains_entry(&entry_hash)? {
                         return Ok(Some((session_record, session_data)));
                     }
