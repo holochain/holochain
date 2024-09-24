@@ -314,7 +314,7 @@ fn pluck_overlapping_block_bounds(
     Ok(maybe_min_maybe_max)
 }
 
-fn insert_block_inner(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
+fn insert_block_inner(txn: &Transaction, block: Block) -> DatabaseResult<()> {
     sql_insert!(txn, BlockSpan, {
         "target_id": BlockTargetId::from(block.target().clone()),
         "target_reason": BlockTargetReason::from(block.target().clone()),
@@ -324,7 +324,7 @@ fn insert_block_inner(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()>
     Ok(())
 }
 
-pub fn insert_block(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
+pub fn insert_block(txn: &Transaction, block: Block) -> DatabaseResult<()> {
     let maybe_min_maybe_max = pluck_overlapping_block_bounds(txn, block.clone())?;
 
     // Build one new block from the extremums.
@@ -914,7 +914,7 @@ mod tests {
 
     use holochain_types::prelude::*;
 
-    use crate::prelude::{Txn, Store};
+    use crate::prelude::{Store, Txn};
 
     use super::insert_op;
 

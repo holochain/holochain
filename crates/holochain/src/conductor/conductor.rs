@@ -2811,7 +2811,8 @@ mod scheduler_impls {
                     let all_dbs = space.get_all_authored_dbs();
 
                     all_dbs.into_iter().map(|db| async move {
-                        db.write_async(delete_all_ephemeral_scheduled_fns).await
+                        db.write_async(|txn| delete_all_ephemeral_scheduled_fns(txn))
+                            .await
                     })
                 })
                 .into_iter()
@@ -3413,7 +3414,7 @@ impl Conductor {
             let mut path = db.path().clone();
             if let Err(err) = ffs::remove_file(&path).await {
                 tracing::warn!(?err, "Could not remove primary DB file, probably because it is still in use. Purging all data instead.");
-                db.write_async(purge_data).await?;
+                db.write_async(|txn| purge_data(txn)).await?;
             }
             path.set_extension("");
             let stem = path.to_string_lossy();
@@ -3434,12 +3435,12 @@ impl Conductor {
                     self.spaces
                         .dht_db(dna_hash)
                         .unwrap()
-                        .write_async(purge_data)
+                        .write_async(|txn| purge_data(txn))
                         .boxed(),
                     self.spaces
                         .cache(dna_hash)
                         .unwrap()
-                        .write_async(purge_data)
+                        .write_async(|txn| purge_data(txn))
                         .boxed(),
                     // TODO: also delete stale Wasms
                 ]

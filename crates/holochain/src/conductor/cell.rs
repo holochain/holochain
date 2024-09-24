@@ -11,7 +11,6 @@ use std::sync::Arc;
 use futures::future::FutureExt;
 use holochain_serialized_bytes::SerializedBytes;
 use rusqlite::OptionalExtension;
-use rusqlite::Transaction;
 use tokio::sync::broadcast;
 use tracing::*;
 use tracing_futures::Instrument;
@@ -254,7 +253,7 @@ impl Cell {
 
         let author = self.id.agent_pubkey().clone();
         let live_fns = authored_db
-            .write_async(move |txn: &mut Transaction| {
+            .write_async(move |txn| {
                 // Rescheduling should not fail as the data in the database
                 // should be valid schedules only.
                 reschedule_expired(txn, now, &author)?;
@@ -334,7 +333,7 @@ impl Cell {
                 let author = self.id.agent_pubkey().clone();
                 // We don't do anything with errors in here.
                 let _ = authored_db
-                    .write_async(move |txn: &mut Transaction| {
+                    .write_async(move |txn| {
                         for ((scheduled_fn, _), result) in live_fns.iter().zip(results.iter()) {
                             match result {
                                 Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {

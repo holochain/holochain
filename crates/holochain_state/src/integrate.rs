@@ -63,9 +63,9 @@ pub async fn authored_ops_to_dht_db_without_check(
         .await?;
     let mut activity = Vec::new();
     let activity = dht_db
-        .write_async(|txn| {
+        .write_async(|mut txn| {
             for op in ops {
-                if let Some(op) = insert_locally_validated_op(txn, op)? {
+                if let Some(op) = insert_locally_validated_op(&mut txn, op)? {
                     activity.push(op);
                 }
             }

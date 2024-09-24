@@ -44,6 +44,24 @@ impl<'a, D: DbKindT> From<Transaction<'a>> for Ta<'a, D> {
     }
 }
 
+#[derive(derive_more::Deref, derive_more::DerefMut, derive_more::Into)]
+pub struct TaMut<'a, 'txn, D: DbKindT> {
+    #[deref]
+    #[deref_mut]
+    #[into]
+    txn: &'a mut Transaction<'txn>,
+    db_kind: std::marker::PhantomData<D>,
+}
+
+impl<'a, 'txn, D: DbKindT> From<&'a mut Transaction<'txn>> for TaMut<'a, 'txn, D> {
+    fn from(txn: &'a mut Transaction<'txn>) -> Self {
+        TaMut {
+            txn,
+            db_kind: PhantomData,
+        }
+    }
+}
+
 #[async_trait::async_trait]
 /// A trait for being generic over [`DbWrite`] and [`DbRead`] that
 /// both implement read access.
@@ -340,7 +358,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     pub async fn write_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
+        F: FnOnce(&mut TaMut<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
         let _permit = acquire_semaphore_permit(self.0.write_semaphore.clone()).await?;
@@ -355,7 +373,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
             let _s = span.enter();
             log_elapsed!([10, 100, 1000], start, "write_async:before-closure");
-            let r = conn.execute_in_exclusive_rw_txn(f);
+            let r = conn.execute_in_exclusive_rw_txn(|txn| f(&mut txn.into()));
             log_elapsed!([10, 100, 1000], start, "write_async:after-closure");
             r
         }).in_current_span()).in_current_span().await.map_err(|e| {
@@ -427,7 +445,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     #[cfg(all(any(test, feature = "test_utils"), not(loom)))]
     pub fn test_write<R, F>(&self, f: F) -> R
     where
-        F: FnOnce(&mut Transaction) -> R + Send + 'static,
+        F: FnOnce(&mut TaMut<Kind>) -> R + Send + 'static,
         R: Send + 'static,
     {
         holochain_util::tokio_helper::block_forever_on(async {

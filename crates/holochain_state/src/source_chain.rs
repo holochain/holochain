@@ -302,7 +302,7 @@ impl SourceChain {
 
         let chain_flush_result = self
             .vault
-            .write_async(move |txn: &mut Transaction| {
+            .write_async(move |txn| {
                 let now = Timestamp::now();
                 // TODO: if the chain is locked, functions can still be scheduled.
                 //       Do we want that?
@@ -1283,29 +1283,27 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
     let entry = entry.into_option();
     let hash = action.as_hash().clone();
     vault
-        .write_async(
-            move |txn: &mut Transaction| -> SourceChainResult<Vec<DhtOpHash>> {
-                let head_info = chain_head_db_nonempty(txn, author.clone())?;
-                if head_info.action != prev_action {
-                    let entries = match (entry, action.action().entry_hash()) {
-                        (Some(e), Some(entry_hash)) => {
-                            vec![holochain_types::EntryHashed::with_pre_hashed(
-                                e,
-                                entry_hash.clone(),
-                            )]
-                        }
-                        _ => vec![],
-                    };
-                    return Err(SourceChainError::HeadMoved(
-                        vec![action],
-                        entries,
-                        Some(prev_action),
-                        Some(head_info),
-                    ));
-                }
-                Ok(put_raw(txn, action, ops, entry)?)
-            },
-        )
+        .write_async(move |txn| -> SourceChainResult<Vec<DhtOpHash>> {
+            let head_info = chain_head_db_nonempty(txn, author.clone())?;
+            if head_info.action != prev_action {
+                let entries = match (entry, action.action().entry_hash()) {
+                    (Some(e), Some(entry_hash)) => {
+                        vec![holochain_types::EntryHashed::with_pre_hashed(
+                            e,
+                            entry_hash.clone(),
+                        )]
+                    }
+                    _ => vec![],
+                };
+                return Err(SourceChainError::HeadMoved(
+                    vec![action],
+                    entries,
+                    Some(prev_action),
+                    Some(head_info),
+                ));
+            }
+            Ok(put_raw(txn, action, ops, entry)?)
+        })
         .await?;
     Ok(hash)
 }
@@ -1471,7 +1469,7 @@ mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_1))
+            .write_async(move |txn| chain_head_db_nonempty(txn, author_1))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1482,7 +1480,7 @@ mod tests {
         ));
         let author_2 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_2))
+            .write_async(move |txn| chain_head_db_nonempty(txn, author_2))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1490,7 +1488,7 @@ mod tests {
         chain_3.flush(&mock).await?;
         let author_3 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_3))
+            .write_async(move |txn| chain_head_db_nonempty(txn, author_3))
             .await?
             .seq;
         assert_eq!(seq, 4);
@@ -1590,7 +1588,7 @@ mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_1))
+            .write_async(move |txn| chain_head_db_nonempty(txn, author_1))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1603,7 +1601,7 @@ mod tests {
         chain_3.flush(&mock).await?;
         let author_2 = Arc::clone(&author);
         let head = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_2.clone()))
+            .write_async(move |txn| chain_head_db_nonempty(txn, author_2.clone()))
             .await?;
 
         // not equal since action hash change due to rebasing

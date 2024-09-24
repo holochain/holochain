@@ -12,7 +12,7 @@ mod pool;
 #[cfg(all(test, not(loom)))]
 mod tests;
 
-pub use access::{DbRead, DbWrite, ReadAccess, Ta};
+pub use access::{DbRead, DbWrite, ReadAccess, Ta, TaMut};
 pub use guard::PTxnGuard;
 pub use key::DbKey;
 pub use kind::{
