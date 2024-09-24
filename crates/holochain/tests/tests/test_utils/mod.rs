@@ -31,6 +31,7 @@ use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::InterfaceDriver;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use matches::assert_matches;
 use serde::Serialize;
 use std::time::Duration;
@@ -355,6 +356,7 @@ pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,
         dpki: DpkiConfig::disabled(),
+        network: KitsuneP2pConfig::testing(),
         ..ConductorConfig::empty()
     }
 }
