@@ -25,6 +25,10 @@ use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric
 static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
 static THREAD_ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(30_000);
 
+/// Wrapper around a Transaction reference which is typed by database kind.
+///
+/// This allows us to write functions which can only operate on a specific database kind,
+/// or sets of database kinds (with the introduction of a new trait that covers those kinds).
 #[derive(derive_more::Deref, derive_more::DerefMut, derive_more::Into)]
 pub struct Ta<'a, 'txn, D: DbKindT> {
     #[deref]
