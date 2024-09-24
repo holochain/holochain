@@ -404,7 +404,7 @@ pub fn p2p_put_single(
     Ok(agent_info_put)
 }
 
-fn tx_p2p_put(txn: &TaMut<DbKindP2pAgents>, record: P2pRecord) -> DatabaseResult<()> {
+fn tx_p2p_put(txn: &Ta<DbKindP2pAgents>, record: P2pRecord) -> DatabaseResult<()> {
     txn.execute(
         sql_p2p_agent_store::INSERT,
         named_params! {

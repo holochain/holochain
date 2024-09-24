@@ -370,7 +370,7 @@ impl Cascade for CascadeImpl {
 
 impl CascadeImpl {
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
-    fn insert_rendered_op(txn: &mut TaMut<DbKindCache>, op: &RenderedOp) -> CascadeResult<()> {
+    fn insert_rendered_op(txn: &mut Ta<DbKindCache>, op: &RenderedOp) -> CascadeResult<()> {
         let RenderedOp {
             op_light,
             op_hash,
@@ -391,7 +391,7 @@ impl CascadeImpl {
     }
 
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
-    fn insert_rendered_ops(txn: &mut TaMut<DbKindCache>, ops: &RenderedOps) -> CascadeResult<()> {
+    fn insert_rendered_ops(txn: &mut Ta<DbKindCache>, ops: &RenderedOps) -> CascadeResult<()> {
         let RenderedOps {
             ops,
             entry,
@@ -414,7 +414,7 @@ impl CascadeImpl {
     /// Insert a set of agent activity into the Cache.
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_activity(
-        txn: &mut TaMut<DbKindCache>,
+        txn: &mut Ta<DbKindCache>,
         ops: Vec<RegisterAgentActivity>,
     ) -> CascadeResult<()> {
         for op in ops {
@@ -646,7 +646,7 @@ impl CascadeImpl {
             let r = cache
                 .read_async({
                     let mut f = f.clone();
-                    move |raw_txn| f(&Txn::from(&raw_txn))
+                    move |raw_txn| f(&Txn::from(raw_txn))
                 })
                 .await?;
 
@@ -659,7 +659,7 @@ impl CascadeImpl {
             let r = dht
                 .read_async({
                     let mut f = f.clone();
-                    move |raw_txn| f(&Txn::from(&raw_txn))
+                    move |raw_txn| f(&Txn::from(raw_txn))
                 })
                 .await?;
 
@@ -672,7 +672,7 @@ impl CascadeImpl {
             let r = authored
                 .read_async({
                     let mut f = f.clone();
-                    move |raw_txn| f(&Txn::from(&raw_txn))
+                    move |raw_txn| f(&Txn::from(raw_txn))
                 })
                 .await?;
 
