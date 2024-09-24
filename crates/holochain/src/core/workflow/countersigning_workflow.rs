@@ -8,7 +8,7 @@ use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::mutations;
 use holochain_state::prelude::*;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
-use rusqlite::{named_params, Transaction};
+use rusqlite::named_params;
 use tokio::sync::broadcast;
 
 use crate::conductor::space::Space;
@@ -182,17 +182,19 @@ pub(crate) async fn countersigning_success(
     // Do a quick check to see if this entry hash matches
     // the current locked session so we don't check signatures
     // unless there is an active session.
-    let reader_closure = {
+
+    let this_cell_actions_op_basis_hashes: Vec<(DhtOpHash, OpBasis)> = {
         let entry_hash = entry_hash.clone();
         let this_cells_action_hash = this_cells_action_hash.clone();
         let author = author.clone();
-        move |txn: Transaction| {
-            if holochain_state::chain_lock::is_chain_locked(&txn, &[], &author)? {
-                let transaction: holochain_state::prelude::Txn = (&txn).into();
-                if transaction.contains_entry(&entry_hash)? {
-                    // If this is a countersigning session we can grab all the ops
-                    // for this cells action so we can check if we need to self publish them.
-                    let r: Result<_, _> = txn
+        authored_db
+            .read_async(move |txn| {
+                if holochain_state::chain_lock::is_chain_locked(&txn, &[], &author)? {
+                    let transaction: holochain_state::prelude::Txn = (&txn).into();
+                    if transaction.contains_entry(&entry_hash)? {
+                        // If this is a countersigning session we can grab all the ops
+                        // for this cells action so we can check if we need to self publish them.
+                        let r: Result<_, _> = txn
                         .prepare(
                             "SELECT basis_hash, hash FROM DhtOp WHERE action_hash = :action_hash",
                         )?
@@ -207,14 +209,13 @@ pub(crate) async fn countersigning_success(
                             },
                         )?
                         .collect();
-                    return Ok(r?);
+                        return Ok(r?);
+                    }
                 }
-            }
-            StateMutationResult::Ok(Vec::with_capacity(0))
-        }
+                StateMutationResult::Ok(Vec::with_capacity(0))
+            })
+            .await?
     };
-    let this_cell_actions_op_basis_hashes: Vec<(DhtOpHash, OpBasis)> =
-        authored_db.read_async(reader_closure).await?;
 
     // If there is no active session then we can short circuit.
     if this_cell_actions_op_basis_hashes.is_empty() {

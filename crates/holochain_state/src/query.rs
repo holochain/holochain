@@ -857,6 +857,12 @@ impl<'borrow, 'txn> From<&'borrow Transaction<'txn>> for Txn<'borrow, 'txn> {
     }
 }
 
+impl<'borrow, 'txn, D: DbKindT> From<&'borrow Ta<'txn, D>> for Txn<'borrow, 'txn> {
+    fn from(txn: &'borrow Ta<'txn, D>) -> Self {
+        Self { txn: &txn }
+    }
+}
+
 impl<'borrow, 'txn> From<&'borrow mut Transaction<'txn>> for Txn<'borrow, 'txn> {
     fn from(txn: &'borrow mut Transaction<'txn>) -> Self {
         Self { txn }

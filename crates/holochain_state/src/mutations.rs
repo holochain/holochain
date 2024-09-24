@@ -1002,7 +1002,7 @@ mod tests {
 
     use holochain_types::prelude::*;
 
-    use crate::prelude::{Store, Txn};
+    use crate::prelude::{Txn, Store};
 
     use super::insert_op;
 

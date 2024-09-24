@@ -29,6 +29,7 @@ pub async fn default_with_network(
         root,
         in_process_lair,
         no_dpki,
+        dpki_network_seed,
         #[cfg(feature = "chc")]
         chc_url,
         ..
@@ -40,6 +41,7 @@ pub async fn default_with_network(
         directory,
         in_process_lair,
         no_dpki,
+        dpki_network_seed,
         #[cfg(feature = "chc")]
         chc_url,
     )?;
