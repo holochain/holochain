@@ -27,7 +27,7 @@ static THREAD_ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(30_000);
 
 /// Wrapper around a transaction reference, to which trait impls are attached
 #[derive(derive_more::Deref, derive_more::DerefMut, derive_more::Into)]
-pub struct Txn<'a, D: DbKindT> {
+pub struct Ta<'a, D: DbKindT> {
     #[deref]
     #[deref_mut]
     #[into]
@@ -35,9 +35,9 @@ pub struct Txn<'a, D: DbKindT> {
     db_kind: std::marker::PhantomData<D>,
 }
 
-impl<'a, D: DbKindT> From<Transaction<'a>> for Txn<'a, D> {
+impl<'a, D: DbKindT> From<Transaction<'a>> for Ta<'a, D> {
     fn from(txn: Transaction<'a>) -> Self {
-        Txn {
+        Ta {
             txn,
             db_kind: PhantomData,
         }
@@ -52,7 +52,7 @@ pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbRead<Kind>> {
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(Txn<Kind>) -> Result<R, E> + Send + 'static,
+        F: FnOnce(Ta<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static;
 
     /// Access the kind of database.
@@ -65,7 +65,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(Txn<Kind>) -> Result<R, E> + Send + 'static,
+        F: FnOnce(Ta<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
         let db: &DbRead<Kind> = self.as_ref();
@@ -83,7 +83,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbRead<Kind> {
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(Txn<Kind>) -> Result<R, E> + Send + 'static,
+        F: FnOnce(Ta<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
         DbRead::read_async(self, f).await
@@ -141,7 +141,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     pub async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(Txn<Kind>) -> Result<R, E> + Send + 'static,
+        F: FnOnce(Ta<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
         let mut conn = self
@@ -225,7 +225,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     #[cfg(all(any(test, feature = "test_utils"), not(loom)))]
     pub fn test_read<R, F>(&self, f: F) -> R
     where
-        F: FnOnce(Txn<Kind>) -> R + Send + 'static,
+        F: FnOnce(Ta<Kind>) -> R + Send + 'static,
         R: Send + 'static,
     {
         holochain_util::tokio_helper::block_forever_on(async {

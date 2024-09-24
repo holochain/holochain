@@ -857,8 +857,8 @@ impl<'borrow, 'txn> From<&'borrow Transaction<'txn>> for CascadeTxn<'borrow, 'tx
     }
 }
 
-impl<'borrow, 'txn, D: DbKindT> From<&'borrow Txn<'txn, D>> for CascadeTxn<'borrow, 'txn> {
-    fn from(txn: &'borrow Txn<'txn, D>) -> Self {
+impl<'borrow, 'txn, D: DbKindT> From<&'borrow Ta<'txn, D>> for CascadeTxn<'borrow, 'txn> {
+    fn from(txn: &'borrow Ta<'txn, D>) -> Self {
         Self { txn: &txn }
     }
 }
