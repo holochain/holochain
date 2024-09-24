@@ -324,7 +324,7 @@ mod slow_tests {
         )
         .await;
 
-        let mut conductor = SweetConductor::isolated_singleton().await;
+        let mut conductor = SweetConductor::local_rendezvous().await;
 
         let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
 

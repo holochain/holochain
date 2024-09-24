@@ -172,7 +172,7 @@ impl SweetConductor {
 
         let config: SweetConductorConfig = config.into();
         let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
-            config.into_conductor_config(&*r).await
+            config.apply_rendezvous(&*r).into()
         } else {
             if let Some(b) = config.network.bootstrap_service.as_ref() {
                 if b.to_string().starts_with("rendezvous:") {
@@ -250,11 +250,10 @@ impl SweetConductor {
 
     /// Create a SweetConductor with a new set of TestEnvs, using the "empty" config
     /// with a singleton rendezvous. Can only be used in single-conductor tests.
-    pub async fn isolated_singleton() -> SweetConductor {
-        // Self::from_config(SweetConductorConfig::standard()).await
+    pub async fn local_rendezvous() -> SweetConductor {
         Self::from_config_rendezvous(
             SweetConductorConfig::rendezvous(false),
-            SweetLocalRendezvous::new().await,
+            shared_rendezvous().await,
         )
         .await
     }

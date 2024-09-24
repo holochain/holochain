@@ -8,7 +8,7 @@ use holochain_conductor_api::{
 use holochain_types::websocket::AllowedOrigins;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
-use super::SweetConductor;
+use super::{shared_rendezvous, SweetConductor, RENDEZVOUS};
 
 pub(crate) static NUM_CREATED: AtomicUsize = AtomicUsize::new(0);
 
@@ -46,10 +46,8 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
 }
 
 impl SweetConductorConfig {
-    /// Convert into a ConductorConfig.
-    pub async fn into_conductor_config(self, rendezvous: &dyn SweetRendezvous) -> ConductorConfig {
-        let mut config = self.0;
-        let network = &mut config.network;
+    pub fn apply_rendezvous(mut self, rendezvous: &dyn SweetRendezvous) -> Self {
+        let network = &mut self.network;
 
         if network.bootstrap_service.is_some()
             && network.bootstrap_service.as_ref().unwrap().to_string() == "rendezvous:"
@@ -67,11 +65,15 @@ impl SweetConductorConfig {
             }
         }
 
-        config
+        self
+    }
+
+    pub async fn local_rendezvous(self) -> ConductorConfig {
+        self.apply_rendezvous(&*shared_rendezvous().await)
     }
 
     /// Standard config for SweetConductors
-    pub fn standard() -> Self {
+    fn standard() -> Self {
         let mut c = SweetConductorConfig::from(KitsuneP2pConfig::empty())
             .tune(|tune| {
                 tune.gossip_loop_iteration_delay_ms = 500;

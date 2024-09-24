@@ -7,7 +7,7 @@ use holochain_wasm_test_utils::TestWasm;
 async fn create_clone_cell() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::isolated_singleton().await;
+    let mut conductor = SweetConductor::local_rendezvous().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
 
     let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
@@ -48,7 +48,7 @@ async fn create_clone_cell() {
 async fn disable_enable_and_delete_clone_cell() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::isolated_singleton().await;
+    let mut conductor = SweetConductor::local_rendezvous().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
 
     let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
@@ -139,7 +139,7 @@ async fn disable_enable_and_delete_clone_cell() {
 async fn prevents_cross_app_clone_operations() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::isolated_singleton().await;
+    let mut conductor = SweetConductor::local_rendezvous().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
 
     let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
@@ -248,7 +248,7 @@ async fn prevents_cross_app_clone_operations() {
 async fn create_clone_cell_from_a_clone() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::isolated_singleton().await;
+    let mut conductor = SweetConductor::local_rendezvous().await;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
 
     let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
@@ -303,7 +303,7 @@ async fn create_clone_cell_from_a_clone() {
 async fn create_clone_of_another_cell_in_same_app() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::isolated_singleton().await;
+    let mut conductor = SweetConductor::local_rendezvous().await;
     let (dna_file_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
     let (dna_file_2, _, _) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::DnaProperties]).await;

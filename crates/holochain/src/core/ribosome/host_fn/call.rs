@@ -245,7 +245,7 @@ pub mod wasm_test {
             .with_network_seed("CLONE".to_string())
             .await;
 
-        let mut conductor = SweetConductor::isolated_singleton().await;
+        let mut conductor = SweetConductor::local_rendezvous().await;
 
         let app = conductor
             .setup_app(
@@ -289,7 +289,7 @@ pub mod wasm_test {
 
         let zomes = vec![TestWasm::WhoAmI, TestWasm::Create];
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(zomes).await;
-        let mut conductor = SweetConductor::isolated_singleton().await;
+        let mut conductor = SweetConductor::local_rendezvous().await;
         let (alice,) = conductor
             .setup_app("app", &[dna])
             .await
@@ -344,7 +344,7 @@ pub mod wasm_test {
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-        let mut conductor = SweetConductor::isolated_singleton().await;
+        let mut conductor = SweetConductor::local_rendezvous().await;
 
         let apps = conductor.setup_apps("app", 2, &[dna_file]).await.unwrap();
         let ((alice,), (bobbo,)) = apps.into_tuples();

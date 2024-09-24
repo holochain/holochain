@@ -113,7 +113,7 @@ async fn mock_dpki_validation_limbo() {
     let rendezvous = SweetLocalRendezvous::new().await;
 
     let config: ConductorConfig = SweetConductorConfig::rendezvous(true)
-        .into_conductor_config(&*rendezvous)
+        .apply_rendezvous(&*rendezvous)
         .await;
 
     let mut conductors = SweetConductorBatch::new(vec![
@@ -225,7 +225,7 @@ async fn mock_dpki_invalid_key_state() {
     let rendezvous = SweetLocalRendezvous::new().await;
 
     let config: ConductorConfig = SweetConductorConfig::rendezvous(true)
-        .into_conductor_config(&*rendezvous)
+        .apply_rendezvous(&*rendezvous)
         .await;
 
     let mut conductors = SweetConductorBatch::new(vec![
@@ -311,7 +311,7 @@ async fn mock_dpki_preflight_check() {
     let rendezvous = SweetLocalRendezvous::new().await;
 
     let config: ConductorConfig = SweetConductorConfig::rendezvous(true)
-        .into_conductor_config(&*rendezvous)
+        .apply_rendezvous(&*rendezvous)
         .await;
 
     let mut conductors = SweetConductorBatch::new(vec![

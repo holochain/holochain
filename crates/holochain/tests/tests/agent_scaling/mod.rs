@@ -49,7 +49,7 @@ async fn many_agents_can_reach_consistency_agent_links() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("links", links_zome())).await;
 
     // Create a Conductor
-    let mut conductor = SweetConductor::isolated_singleton().await;
+    let mut conductor = SweetConductor::local_rendezvous().await;
 
     let apps = conductor
         .setup_apps("app", NUM_AGENTS, &[dna_file])
@@ -97,7 +97,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link]).await;
 
     // Create a Conductor
-    let mut conductor = SweetConductor::isolated_singleton().await;
+    let mut conductor = SweetConductor::local_rendezvous().await;
 
     let apps = conductor
         .setup_apps("app", NUM_AGENTS, &[dna_file])
@@ -133,7 +133,7 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await;
 
     // Create a Conductor
-    let mut conductor = SweetConductor::isolated_singleton().await;
+    let mut conductor = SweetConductor::local_rendezvous().await;
 
     // Install DNA and install and enable apps in conductor
     let alice = conductor
@@ -200,7 +200,7 @@ async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await;
 
     // Create a Conductor
-    let mut conductor = SweetConductor::isolated_singleton().await;
+    let mut conductor = SweetConductor::local_rendezvous().await;
 
     let apps = conductor
         .setup_apps("app", NUM_AGENTS, &[dna_file])

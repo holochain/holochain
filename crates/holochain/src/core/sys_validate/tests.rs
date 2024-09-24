@@ -1012,7 +1012,7 @@ async fn test_dpki_agent_update() {
 #[ignore = "flaky"]
 async fn valid_chain_fact_test() {
     let n = 100;
-    let keystore = SweetConductor::isolated_singleton().await.keystore();
+    let keystore = SweetConductor::local_rendezvous().await.keystore();
     let author = SweetAgents::one(keystore.clone()).await;
     let mut g = random_generator();
 

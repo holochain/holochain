@@ -1,5 +1,25 @@
 use std::sync::{Arc, Mutex};
 
+use once_cell::sync::OnceCell;
+
+/// Rendezvous for local testing.
+pub static RENDEZVOUS: OnceCell<std::sync::Weak<dyn SweetRendezvous>> = OnceCell::new();
+
+/// Get a shared local rendezvous for testing.
+pub async fn shared_rendezvous() -> Arc<dyn SweetRendezvous> {
+    if let Some(shared) = RENDEZVOUS.get() {
+        shared.upgrade().unwrap()
+    } else {
+        let vous = SweetLocalRendezvous::new().await;
+        let shared = RENDEZVOUS
+            .get_or_init(|| Arc::downgrade(&vous))
+            .upgrade()
+            .unwrap();
+        drop(vous);
+        shared
+    }
+}
+
 /// How conductors should learn about each other / speak to each other.
 /// Signal/TURN + bootstrap in tx5 mode.
 pub trait SweetRendezvous: 'static + Send + Sync {
