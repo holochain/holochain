@@ -2,14 +2,17 @@ use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
 use holo_hash::*;
 use holochain_sqlite::prelude::*;
-use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::mutations;
 use holochain_state::prelude::*;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-fn insert_action_and_op(txn: &mut Transaction, u: &mut Unstructured, action: &Action) -> DhtOpHash {
+fn insert_action_and_op(
+    txn: &mut Ta<DbKindDht>,
+    u: &mut Unstructured,
+    action: &Action,
+) -> DhtOpHash {
     let timestamp = Timestamp::arbitrary(u).unwrap();
     let op_order = OpOrder::new(ChainOpType::RegisterAgentActivity, timestamp);
     let basis_hash: OpBasis = EntryHash::arbitrary(u).unwrap().into();
@@ -26,6 +29,7 @@ fn insert_action_and_op(txn: &mut Transaction, u: &mut Unstructured, action: &Ac
         &op_hash,
         &op_order,
         &timestamp,
+        None,
     )
     .unwrap();
 

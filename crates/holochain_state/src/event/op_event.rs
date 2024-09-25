@@ -337,8 +337,8 @@ mod tests {
         let agent_1 = keystore.new_sign_keypair_random().await.unwrap();
         let agent_2 = keystore.new_sign_keypair_random().await.unwrap();
         let dna_hash = fixt!(DnaHash);
-        let cell_id_1 = CellId::new(dna_hash.clone(), agent_1);
-        let cell_id_2 = CellId::new(dna_hash.clone(), agent_2);
+        let cell_id_1 = CellId::new(dna_hash.clone(), agent_1.clone());
+        let cell_id_2 = CellId::new(dna_hash.clone(), agent_2.clone());
 
         let mut receipt = ValidationReceipt::arbitrary(&mut u).unwrap();
         receipt.validators = vec![cell_id_1.agent_pubkey().clone()];
