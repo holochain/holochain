@@ -1231,6 +1231,12 @@ async fn should_be_able_to_schedule_functions_during_session() {
     let alice = &cells[0];
     let bob = &cells[1];
 
+    // Make sure the conductors are gossiping before creating posts
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30))
+        .await
+        .unwrap();
+
     // Need an initialised source chain for countersigning, so commit anything
     let alice_zome = alice.zome(TestWasm::CounterSigning);
     let _: ActionHash = conductors[0]
