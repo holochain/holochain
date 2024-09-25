@@ -14,7 +14,6 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::*;
 use holochain_types::sql::AsSql;
-use holochain_zome_types::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 use std::str::FromStr;
 
@@ -133,7 +132,7 @@ pub fn insert_op_when(
     txn: &mut Transaction,
     op: &DhtOpHashed,
     transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
-    when_stored: Timestamp,
+    _when_stored: Timestamp,
 ) -> StateMutationResult<()> {
     let hash = op.as_hash();
     let op = op.as_content();
@@ -168,7 +167,7 @@ pub fn insert_op_when(
         }
     }
     if create_op {
-        insert_op_lite(txn, &op_lite, hash, &op_order, &timestamp)?;
+        insert_op_lite(txn, &op_lite, hash, &op_order, &timestamp, transfer_data)?;
         set_dependency(txn, hash, deps)?;
     }
     Ok(())
@@ -187,7 +186,7 @@ pub fn insert_op_lite_into_authored(
     order: &OpOrder,
     timestamp: &Timestamp,
 ) -> StateMutationResult<()> {
-    insert_op_lite(txn, op_lite, hash, order, timestamp)?;
+    insert_op_lite(txn, op_lite, hash, order, timestamp, None)?;
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
@@ -200,6 +199,7 @@ pub fn insert_op_lite(
     hash: &DhtOpHash,
     order: &OpOrder,
     timestamp: &Timestamp,
+    _transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
 ) -> StateMutationResult<()> {
     let basis = op_lite.dht_basis();
     match op_lite {
