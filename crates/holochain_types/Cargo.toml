@@ -25,7 +25,7 @@ chrono = { version = "0.4", default-features = false, features = [
 ] }
 derive_builder = "0.20"
 derive_more = "0.99"
-fixt = { path = "../fixt", version = "^0.4.0-dev.4"}
+fixt = { path = "../fixt", version = "^0.4.0-dev.4" }
 flate2 = "1.0.14"
 futures = "0.3"
 getrandom = { version = "0.2.7" }
@@ -36,7 +36,7 @@ holo_hash = { version = "^0.4.0-dev.13", path = "../holo_hash", features = [
 holochain_keystore = { version = "^0.4.0-dev.23", path = "../holochain_keystore" }
 holochain_nonce = { version = "^0.4.0-dev.7", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.4.0-dev.22"}
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.4.0-dev.22" }
 holochain_trace = { version = "^0.4.0-dev.6", path = "../holochain_trace" }
 holochain_util = { version = "^0.4.0-dev.5", path = "../holochain_util", features = [
   "backtrace",
@@ -48,7 +48,7 @@ itertools = { version = "0.12" }
 kitsune_p2p_dht = { version = "^0.4.0-dev.10", path = "../kitsune_p2p/dht" }
 mr_bundle = { path = "../mr_bundle", features = [
   "packing",
-], version = "^0.4.0-dev.8"}
+], version = "^0.4.0-dev.8" }
 must_future = "0.1.1"
 nanoid = "0.4"
 parking_lot = "0.12"
