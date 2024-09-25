@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Removed `network_type` from `KitsuneP2pConfig`
 
+## 0.4.0-dev.22
+
 ## 0.4.0-dev.21
 
 ## 0.4.0-dev.20

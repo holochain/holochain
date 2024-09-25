@@ -7,14 +7,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-## 0.4.0-dev.18
-
-## 0.4.0-dev.17
-
-## 0.4.0-dev.16
-
-## 0.4.0-dev.15
-
 ## 0.4.0-dev.14
 
 ## 0.4.0-dev.13
@@ -46,32 +38,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 0.4.0-dev.0
 
 ## 0.3.0
-
-## 0.3.0-beta-dev.41
-
-## 0.3.0-beta-dev.40
-
-## 0.3.0-beta-dev.39
-
-## 0.3.0-beta-dev.38
-
-## 0.3.0-beta-dev.37
-
-## 0.3.0-beta-dev.36
-
-## 0.3.0-beta-dev.35
-
-## 0.3.0-beta-dev.34
-
-## 0.3.0-beta-dev.33
-
-## 0.3.0-beta-dev.32
-
-## 0.3.0-beta-dev.31
-
-## 0.3.0-beta-dev.30
-
-## 0.3.0-beta-dev.29
 
 ## 0.3.0-beta-dev.28
 
@@ -133,8 +99,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.2.0
 
-## 0.2.0-beta-rc.6
-
 ## 0.2.0-beta-rc.5
 
 ## 0.2.0-beta-rc.4
@@ -149,63 +113,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.1.0
 
-## 0.1.0-beta-rc.3
-
 ## 0.1.0-beta-rc.2
 
 ## 0.1.0-beta-rc.1
 
 ## 0.1.0-beta-rc.0
-
-## 0.0.64
-
-## 0.0.63
-
-## 0.0.62
-
-## 0.0.61
-
-## 0.0.60
-
-## 0.0.59
-
-## 0.0.58
-
-## 0.0.57
-
-## 0.0.56
-
-## 0.0.55
-
-## 0.0.54
-
-## 0.0.53
-
-## 0.0.52
-
-## 0.0.51
-
-## 0.0.50
-
-## 0.0.49
-
-## 0.0.48
-
-## 0.0.47
-
-## 0.0.46
-
-## 0.0.45
-
-## 0.0.44
-
-## 0.0.43
-
-## 0.0.42
-
-## 0.0.41
-
-## 0.0.40
 
 ## 0.0.39
 
