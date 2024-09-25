@@ -538,6 +538,12 @@ async fn alice_can_recover_from_a_session_timeout() {
     let bob = &cells[1];
     let carol = &cells[2];
 
+    // Make sure the conductors are gossiping before creating posts
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(alice, 3, Duration::from_secs(30))
+        .await
+        .unwrap();
+
     // Need an initialised source chain for countersigning, so commit anything
     let alice_zome = alice.zome(TestWasm::CounterSigning);
     let _: ActionHash = conductors[0]
