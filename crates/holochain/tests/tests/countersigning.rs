@@ -1195,14 +1195,14 @@ async fn chc_should_respect_chain_lock() {
     let alice_rx = conductors[0].subscribe_to_app_signals("app".into());
     let bob_rx = conductors[1].subscribe_to_app_signals("app".into());
 
-    // Now a commit should success because the session has finished and we shouldn't be behind the CHC.
+    wait_for_completion(alice_rx, preflight_request.app_entry_hash.clone()).await;
+    wait_for_completion(bob_rx, preflight_request.app_entry_hash).await;
+
+    // Now a commit should succeed because the session has finished and we shouldn't be behind the CHC.
     conductors[0]
         .call_fallible::<_, ActionHash>(&alice_zome, "create_a_thing", ())
         .await
         .unwrap();
-
-    wait_for_completion(alice_rx, preflight_request.app_entry_hash.clone()).await;
-    wait_for_completion(bob_rx, preflight_request.app_entry_hash).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
