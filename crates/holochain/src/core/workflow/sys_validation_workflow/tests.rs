@@ -76,7 +76,7 @@ async fn sys_validation_produces_invalid_chain_warrant() {
     let op = DhtOpHashed::from_content_sync(op);
     let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
     db.test_write(move |txn| {
-        insert_op(txn, &op).unwrap();
+        insert_op_dht(txn, &op).unwrap();
     });
 
     //- Trigger sys validation
@@ -170,7 +170,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let forked_op = DhtOpHashed::from_content_sync(forked_op);
     let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
     db.test_write(move |txn| {
-        insert_op(txn, &forked_op).unwrap();
+        insert_op_dht(txn, &forked_op).unwrap();
     });
 
     //- Check that bob authored a chain fork warrant

@@ -95,7 +95,7 @@ pub async fn authored_ops_to_dht_db_without_check(
 }
 
 fn insert_locally_validated_op(
-    txn: &mut Transaction,
+    txn: &mut Ta<DbKindDht>,
     op: DhtOpHashed,
 ) -> StateMutationResult<Option<DhtOpHashed>> {
     // These checks are redundant but cheap and future-proof this function
@@ -110,7 +110,7 @@ fn insert_locally_validated_op(
     let op_type = op.get_type();
 
     // Insert the op.
-    insert_op(txn, &op)?;
+    insert_op_dht(txn, &op, None)?;
     // Set the status to valid because we authored it.
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
 

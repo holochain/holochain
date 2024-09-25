@@ -236,14 +236,14 @@ async fn get_agent_activity() {
             {
                 let op: DhtOpHashed = warrant_op_valid.downcast();
                 let hash = op.to_hash();
-                insert_op(txn, &op).unwrap();
+                insert_op_dht(txn, &op).unwrap();
                 set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
                 set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
             }
             {
                 let op: DhtOpHashed = warrant_op_invalid.downcast();
                 let hash = op.to_hash();
-                insert_op(txn, &op).unwrap();
+                insert_op_dht(txn, &op).unwrap();
                 set_validation_status(txn, &hash, ValidationStatus::Rejected).unwrap();
                 set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
             }

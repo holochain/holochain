@@ -380,7 +380,14 @@ impl CascadeImpl {
         let op_order = OpOrder::new(op_light.get_type(), action.action().timestamp());
         let timestamp = action.action().timestamp();
         insert_action(txn, action)?;
-        insert_op_lite(txn, op_light, op_hash, &op_order, &timestamp)?;
+        insert_op_lite(
+            txn,
+            op_light,
+            op_hash,
+            &op_order,
+            &timestamp,
+            todo_no_transfer_data(),
+        )?;
         if let Some(status) = validation_status {
             set_validation_status(txn, op_hash, *status)?;
         }
@@ -400,7 +407,7 @@ impl CascadeImpl {
 
         if let Some(warrant) = warrant {
             let op = DhtOpHashed::from_content_sync(warrant.clone());
-            insert_op(txn, &op)?;
+            insert_op_cache(txn, &op, todo_no_transfer_data())?;
         }
         if let Some(entry) = entry {
             insert_entry(txn, entry.as_hash(), entry.as_content())?;
@@ -428,7 +435,7 @@ impl CascadeImpl {
             } = op;
             let op =
                 DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(signature, content));
-            insert_op(txn, &op)?;
+            insert_op_cache(txn, &op, todo_no_transfer_data())?;
             // We set the integrated to for the cache so it can match the
             // same query as the vault. This can also be used for garbage collection.
             set_when_integrated(txn, op.as_hash(), Timestamp::now())?;
@@ -513,7 +520,7 @@ impl CascadeImpl {
                             Self::insert_activity(txn, activity)?;
                             for warrant in warrants {
                                 let op = DhtOpHashed::from_content_sync(warrant);
-                                insert_op(txn, &op)?;
+                                insert_op_cache(txn, &op, todo_no_transfer_data())?;
                             }
 
                             CascadeResult::Ok(())

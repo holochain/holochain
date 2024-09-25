@@ -295,7 +295,7 @@ async fn app_validation_workflow_inner(
                         .authored_db
                         .write_async(move |txn| {
                             warn!("Inserting warrant op");
-                            insert_op(txn, &warrant_op)
+                            insert_op_authored(txn, &warrant_op)
                         })
                         .await?;
 
