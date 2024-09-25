@@ -686,7 +686,9 @@ pub mod test {
         dnas_with_proofs: Vec<(DnaFile, Option<MembraneProof>)>,
     ) -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
-        let config = holochain::sweettest::SweetConductorConfig::rendezvous(false).local_rendezvous().await
+        let config = holochain::sweettest::SweetConductorConfig::rendezvous(false)
+            .apply_shared_rendezvous()
+            .await
             .no_dpki()
             .into();
         let conductor_handle = ConductorBuilder::new()
@@ -1246,7 +1248,9 @@ pub mod test {
             make_dna("2", vec![TestWasm::Anchor]).await,
         ];
 
-        let mut conductor = SweetConductorConfig::rendezvous(false).apply_shared_rendezvous().await
+        let mut conductor = SweetConductorConfig::rendezvous(false)
+            .apply_shared_rendezvous()
+            .await
             .no_dpki()
             .build_conductor()
             .await;

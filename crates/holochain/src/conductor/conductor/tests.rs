@@ -166,7 +166,9 @@ async fn can_set_fake_state() {
         .config(
             SweetConductorConfig::rendezvous(false)
                 .no_dpki()
-                .apply_shared_rendezvous(),
+                .apply_shared_rendezvous()
+                .await
+                .into(),
         )
         .fake_state(expected.clone())
         .with_data_root_path(db_dir.path().to_path_buf().into())

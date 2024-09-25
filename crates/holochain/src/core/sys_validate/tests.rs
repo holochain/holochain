@@ -871,7 +871,7 @@ async fn test_dpki_agent_update() {
     //       once there is a way to update the agent in deepkey, add that to this test
     //       and re-enable DPKI for this conductor.
     let config = SweetConductorConfig::rendezvous(false)
-        .local_rendezvous()
+        .apply_shared_rendezvous()
         .await
         .no_dpki_mustfix();
     let mut conductor = SweetConductor::from_config(config).await;
