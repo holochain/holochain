@@ -175,7 +175,7 @@ pub(crate) async fn inner_countersigning_session_complete(
     }
 
     tracing::info!(
-        "Countersigning session complete for agent {:?} in approximately {} ms",
+        "Countersigning session complete for agent {:?} in approximately {}ms",
         author,
         (Timestamp::now() - session_data.preflight_request.session_times.start)
             .unwrap_or_default()
@@ -293,8 +293,8 @@ fn get_countersigning_op_hashes(
         .collect::<Result<Vec<_>, _>>()?)
 }
 
-/// When a countersigning session has become unresolvable automatically by querying peer state,
-/// it can be completed and published anyway.
+/// When it has been attempted to resolve a countersigning session unsuccessfully by querying peer state,
+/// the session becomes unresolved and can be forcefully completed and published anyway.
 pub async fn force_publish_countersigning_session(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,

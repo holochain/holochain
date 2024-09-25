@@ -3314,8 +3314,7 @@ mod countersigning_impls {
             cell_id: &CellId,
         ) -> ConductorResult<Option<CountersigningSessionState>> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
-            let countersigning_workspaces = space.countersigning_workspaces.lock();
-            match countersigning_workspaces.get(cell_id) {
+            match space.countersigning_workspaces.lock().get(cell_id).cloned() {
                 None => Ok(None),
                 Some(workspace) => Ok(workspace.get_countersigning_session_state()),
             }
@@ -3327,7 +3326,7 @@ mod countersigning_impls {
         ) -> ConductorResult<()> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
             let (countersigning_workspace, preflight_request) = self
-                .get_preflight_request_from_unknown_session(&space, cell_id)
+                .get_preflight_request_with_workspace_from_unresolvable_session(&space, cell_id)
                 .await?;
             force_abandon_session(space.clone(), cell_id.agent_pubkey(), &preflight_request)
                 .await?;
@@ -3350,8 +3349,8 @@ mod countersigning_impls {
             cell_id: &CellId,
         ) -> ConductorResult<()> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
-            let (countersigning_workspace, preflight_request) = self
-                .get_preflight_request_from_unknown_session(&space, cell_id)
+            let (preflight_request, countersigning_workspace) = self
+                .get_preflight_request_with_workspace_from_unresolvable_session(&space, cell_id)
                 .await?;
             let cell = self.cell_by_id(cell_id).await?;
             let network = Arc::new(cell.holochain_p2p_dna().clone());
@@ -3370,7 +3369,7 @@ mod countersigning_impls {
                 .is_none()
             {
                 // The session exists in the space as previously checked, so this case must never happen.
-                tracing::warn!(
+                tracing::error!(
                     ?cell_id,
                     "Could not remove countersigning session from workspace after publishing it."
                 );
@@ -3378,11 +3377,11 @@ mod countersigning_impls {
             Ok(())
         }
 
-        async fn get_preflight_request_from_unknown_session(
+        async fn get_preflight_request_with_workspace_from_unresolvable_session(
             &self,
             space: &Space,
             cell_id: &CellId,
-        ) -> ConductorResult<(Arc<CountersigningWorkspace>, PreflightRequest)> {
+        ) -> ConductorResult<(PreflightRequest, Arc<CountersigningWorkspace>)> {
             let maybe_countersigning_workspace =
                 space.countersigning_workspaces.lock().get(cell_id).cloned();
             match maybe_countersigning_workspace {
@@ -3395,8 +3394,17 @@ mod countersigning_impls {
                             CountersigningError::SessionNotFound(cell_id.clone()),
                         )),
                         Some(CountersigningSessionState::Unknown {
-                            preflight_request, ..
-                        }) => Ok((countersigning_workspace, preflight_request)),
+                            resolution,
+                            preflight_request,
+                        }) => {
+                            if resolution.attempts >= 1 {
+                                Ok((preflight_request, countersigning_workspace))
+                            } else {
+                                Err(ConductorError::CountersigningError(
+                                    CountersigningError::SessionNotUnresolvable(cell_id.clone()),
+                                ))
+                            }
+                        }
                         _ => Err(ConductorError::CountersigningError(
                             CountersigningError::SessionNotUnresolvable(cell_id.clone()),
                         )),

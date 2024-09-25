@@ -600,7 +600,7 @@ async fn apply_timeout(
     Ok(())
 }
 
-pub async fn force_abandon_session(
+pub(crate) async fn force_abandon_session(
     space: Space,
     author: &AgentPubKey,
     preflight_request: &PreflightRequest,

@@ -14,6 +14,10 @@ use hdk::prelude::{
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain::prelude::{CountersigningSessionState, DhtOp, Signal, SystemSignal};
 use holochain::sweettest::{authenticate_app_ws_client, websocket_client_by_port, WsPollRecv};
+use holochain::{
+    conductor::{api::error::ConductorApiError, error::ConductorError},
+    prelude::CountersigningError,
+};
 use holochain_conductor_api::conductor::{ConductorTuningParams, KeystoreConfig};
 use holochain_conductor_api::AppRequest;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppResponse};
@@ -52,11 +56,6 @@ const APP_ID: &str = "test";
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn countersigning_session_interaction_calls() {
-    use holochain::{
-        conductor::{api::error::ConductorApiError, error::ConductorError},
-        prelude::CountersigningError,
-    };
-
     holochain_trace::test_run();
 
     // Start local bootstrap and signal servers.
@@ -253,6 +252,12 @@ async fn countersigning_session_interaction_calls() {
         .into(),
     );
     assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
+
+    // Session should be unaffected by the failing calls.
+    assert_matches!(
+        get_session_state(&alice.cell_id, &alice_app_tx).await,
+        Some(CountersigningSessionState::Accepted(_))
+    );
 
     // Alice commits the countersigning entry. Up to 5 retries in case Bob's chain head can not be fetched
     // immediately.
