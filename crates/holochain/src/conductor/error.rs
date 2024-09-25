@@ -150,6 +150,9 @@ pub enum ConductorError {
 
     #[error("The conductor has no config directory.")]
     NoConfigPath,
+
+    #[error("A required trigger is missing: {0}")]
+    MissingTrigger(String),
 }
 
 impl ConductorError {

@@ -806,25 +806,24 @@ pub fn insert_entry(
     Ok(())
 }
 
-/// Lock the chain with the given lock id until the given end time.
-/// During this time only the lock id will be unlocked according to `is_chain_locked`.
-/// The chain can be unlocked for all lock ids at any time by calling `unlock_chain`.
-/// In theory there can be multiple locks active at once.
-/// If there are multiple locks active at once effectively all locks are locked
-/// because the chain is locked if there are ANY locks that don't match the
-/// current id being queried.
-/// In practise this is useless so don't do that. One lock at a time please.
+/// Lock the author's chain until the given end time.
+///
+/// The lock must have a `subject` which may have some meaning to the creator of the lock.
+/// For example, it may be the hash for a countersigning session. Multiple subjects cannot be
+/// used to create multiple locks though. The chain is either locked or unlocked for the author.
+/// The `subject` just allows information to be stored with the lock.
+///
+/// Check whether the chain is locked using [crate::chain_lock::is_chain_locked]. Or check whether
+/// the lock has expired using [crate::chain_lock::is_chain_lock_expired].
 pub fn lock_chain(
     txn: &mut Transaction,
-    lock: &[u8],
     author: &AgentPubKey,
+    subject: &[u8],
     expires_at: &Timestamp,
 ) -> StateMutationResult<()> {
-    let mut lock = lock.to_vec();
-    lock.extend(author.get_raw_39());
     sql_insert!(txn, ChainLock, {
-        "lock": lock,
         "author": author,
+        "subject": subject,
         "expires_at_timestamp": expires_at,
     })?;
     Ok(())
@@ -968,6 +967,53 @@ pub fn schedule_fn(
             "author" : author,
         })?;
     }
+    Ok(())
+}
+
+/// Force remove a countersigning session from the source chain.
+///
+/// This is a dangerous operation and should only be used:
+/// - If the countersigning workflow has determined to a reasonable level of confidence that other
+///   peers abandoned the session.
+/// - If the user decides to force remove the session from their source chain when the
+///   countersigning session is unable to make a decision.
+///
+/// Note that this mutation is defensive about sessions that have any of their ops published to the
+/// network. If any of the ops have been published, the session cannot be removed.
+pub fn remove_countersigning_session(
+    txn: &mut Transaction,
+    cs_action: Action,
+    cs_entry_hash: EntryHash,
+) -> StateMutationResult<()> {
+    // Check, just for paranoia's sake that the countersigning session is not fully published.
+    // It is acceptable to delete a countersigning session that has been written to the source chain,
+    // with signatures published. As soon as the session's ops have been published to the network,
+    // it is unacceptable to remove the session from the database.
+    let count = txn.query_row(
+        "SELECT count(*) FROM DhtOp WHERE withhold_publish IS NULL AND action_hash = ?",
+        [cs_action.to_hash()],
+        |row| row.get::<_, usize>(0),
+    )?;
+    if count != 0 {
+        tracing::error!(
+            "Cannot remove countersigning session that has been published to the network: {:?}",
+            cs_action
+        );
+        return Err(StateMutationError::CannotRemoveFullyPublished);
+    }
+
+    tracing::info!("Cleaning up authored data for action {:?}", cs_action);
+
+    let count = txn.execute(
+        "DELETE FROM DhtOp WHERE withhold_publish = 1 AND action_hash = ?",
+        [cs_action.to_hash()],
+    )?;
+    tracing::debug!("Removed {} ops from the authored DHT", count);
+    let count = txn.execute("DELETE FROM Entry WHERE hash = ?", [cs_entry_hash])?;
+    tracing::debug!("Removed {} entries", count);
+    let count = txn.execute("DELETE FROM Action WHERE hash = ?", [cs_action.to_hash()])?;
+    tracing::debug!("Removed {} actions", count);
+
     Ok(())
 }
 

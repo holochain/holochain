@@ -430,7 +430,7 @@ dependencies = [
 
 [[package]]
 name = "fixt"
-version = "0.4.0-dev.3"
+version = "0.4.0-dev.4"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -594,7 +594,7 @@ checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
 name = "hdi"
-version = "0.5.0-dev.15"
+version = "0.5.0-dev.16"
 dependencies = [
  "getrandom",
  "hdk_derive",
@@ -610,7 +610,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "getrandom",
  "hdi",
@@ -629,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.4.0-dev.14"
+version = "0.4.0-dev.15"
 dependencies = [
  "darling 0.14.4",
  "heck 0.5.0",
@@ -664,7 +664,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "holo_hash"
-version = "0.4.0-dev.12"
+version = "0.4.0-dev.13"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -684,7 +684,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.4.0-dev.14"
+version = "0.4.0-dev.15"
 dependencies = [
  "derive_builder",
  "holo_hash",
@@ -752,7 +752,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "hdk",
  "serde",
@@ -760,14 +760,13 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.4.0-dev.4"
+version = "0.4.0-dev.5"
 dependencies = [
  "cfg-if",
  "colored",
  "dunce",
  "futures",
  "once_cell",
- "tracing",
 ]
 
 [[package]]
@@ -799,7 +798,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.4.0-dev.17"
+version = "0.4.0-dev.18"
 dependencies = [
  "derive_builder",
  "derive_more",
@@ -920,7 +919,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bin_data"
-version = "0.4.0-dev.11"
+version = "0.4.0-dev.12"
 dependencies = [
  "base64",
  "derive_more",
@@ -933,7 +932,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_block"
-version = "0.4.0-dev.11"
+version = "0.4.0-dev.12"
 dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_timestamp",
@@ -942,14 +941,12 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.4.0-dev.9"
+version = "0.4.0-dev.10"
 dependencies = [
  "derivative",
  "derive_more",
- "futures",
  "kitsune_p2p_dht_arc",
  "kitsune_p2p_timestamp",
- "must_future",
  "num-traits",
  "rand",
  "serde",
@@ -960,12 +957,11 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.4.0-dev.9"
+version = "0.4.0-dev.10"
 dependencies = [
  "derive_more",
  "gcollections",
  "intervallum",
- "kitsune_p2p_timestamp",
  "num-traits",
  "serde",
 ]
@@ -1339,9 +1335,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.10.5"
+version = "1.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b91213439dad192326a0d7c6ee3955910425f441d7038e0d6933b0aec5c4517f"
+checksum = "4219d74c6b67a3654a9fbebc4b419e22126d13d2f3c4a07ee0cb61ff79a79619"
 dependencies = [
  "aho-corasick",
  "memchr",

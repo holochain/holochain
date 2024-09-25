@@ -33,6 +33,10 @@ pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| Schema {
             forward: include_str!("sql/cell/schema/3-up.sql").into(),
             _schema: include_str!("sql/cell/schema/3.sql").into(),
         },
+        M {
+            forward: include_str!("sql/cell/schema/4-up.sql").into(),
+            _schema: include_str!("sql/cell/schema/4.sql").into(),
+        },
     ],
 });
 
@@ -40,7 +44,7 @@ pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| Schema {
     migrations: vec![
         M::initial(include_str!("sql/conductor/schema/0.sql")),
         M {
-            forward: include_str!("sql/conductor/schema/1.sql").into(),
+            forward: include_str!("sql/conductor/schema/1-up.sql").into(),
             _schema: "".into(),
         },
     ],
