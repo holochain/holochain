@@ -14,6 +14,101 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240925.004452
+
+## [hc\_service\_check-0.1.0-dev.18](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.18)
+
+## [hcterm-0.4.0-dev.26](crates/hcterm/CHANGELOG.md#0.4.0-dev.26)
+
+## [holochain\_cli-0.4.0-dev.26](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.26)
+
+## [holochain-0.4.0-dev.26](crates/holochain/CHANGELOG.md#0.4.0-dev.26)
+
+- Countersigning sessions no longer unlock at the end time without checking the outcome. There is a new workflow which will take appropriate actions when the session completes or times out. The majority of the logic is unchanged except for timeouts. If a timeout occurs and Holochain has been up throughout the session then the session will be abandoned. If Holochain crashes or is restarted during the session but is able to recover state from the database, it will attempt to discover what the other participants did. This changes a failure mode that used to be silent to one that will explicitly prevent new writes to your source chain. We are going to provide tooling to resolve this situation in the following change. \#4188
+- Internal rework of chain locking logic. This is used when a countersigning session is in progress, to prevent other actions from being committed during the session. There was a race condition where two countersigning sessions being run one after another could result in responses relevant to the first session accidentally unlocking the new session. That effectively meant that on a larger network, countersigning sessions would get cancelled when nothing had actually gone wrong. The rework of locking made fixing the bug simpler, but the key to the fix was in the `countersigning_success` function. That now checks that incoming signatures are actually for the current session. \#4148
+
+## [holochain\_cli\_bundle-0.4.0-dev.25](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.25)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.17](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.17)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.26](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.26)
+
+## [holochain\_cascade-0.4.0-dev.26](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.26)
+
+## [holochain\_conductor\_api-0.4.0-dev.26](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.26)
+
+## [holochain\_conductor\_services-0.3.0-dev.26](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.26)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.18](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.25](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.25)
+
+## [holochain\_websocket-0.4.0-dev.25](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.25)
+
+## [hc\_deepkey\_sdk-0.7.0-dev.7](crates/hc_deepkey_sdk/CHANGELOG.md#0.7.0-dev.7)
+
+## [holochain\_state-0.4.0-dev.26](crates/holochain_state/CHANGELOG.md#0.4.0-dev.26)
+
+## [hc\_deepkey\_types-0.8.0-dev.7](crates/hc_deepkey_types/CHANGELOG.md#0.8.0-dev.7)
+
+## [hdk-0.4.0-dev.18](crates/hdk/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_p2p-0.4.0-dev.26](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.26)
+
+## [holochain\_state\_types-0.4.0-dev.15](crates/holochain_state_types/CHANGELOG.md#0.4.0-dev.15)
+
+## [hc\_sleuth-0.4.0-dev.25](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.25)
+
+## [hdi-0.5.0-dev.16](crates/hdi/CHANGELOG.md#0.5.0-dev.16)
+
+## [holochain\_chc-0.1.0-dev.6](crates/holochain_chc/CHANGELOG.md#0.1.0-dev.6)
+
+## [aitia-0.3.0-dev.6](crates/aitia/CHANGELOG.md#0.3.0-dev.6)
+
+## [hdk\_derive-0.4.0-dev.15](crates/hdk_derive/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_types-0.4.0-dev.25](crates/holochain_types/CHANGELOG.md#0.4.0-dev.25)
+
+## [kitsune\_p2p-0.4.0-dev.22](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.22)
+
+## [holochain\_keystore-0.4.0-dev.23](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.23)
+
+## [holochain\_sqlite-0.4.0-dev.22](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.22)
+
+## [kitsune\_p2p\_bootstrap\_client-0.4.0-dev.15](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.4.0-dev.15)
+
+## [kitsune\_p2p\_fetch-0.4.0-dev.14](crates/kitsune_p2p_fetch/CHANGELOG.md#0.4.0-dev.14)
+
+## [kitsune\_p2p\_mdns-0.4.0-dev.3](crates/kitsune_p2p_mdns/CHANGELOG.md#0.4.0-dev.3)
+
+## [kitsune\_p2p\_proxy-0.4.0-dev.14](crates/kitsune_p2p_proxy/CHANGELOG.md#0.4.0-dev.14)
+
+## [mr\_bundle-0.4.0-dev.8](crates/mr_bundle/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_zome\_types-0.4.0-dev.18](crates/holochain_zome_types/CHANGELOG.md#0.4.0-dev.18)
+
+## [kitsune\_p2p\_bootstrap-0.3.0-dev.15](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.3.0-dev.15)
+
+## [holochain\_integrity\_types-0.4.0-dev.15](crates/holochain_integrity_types/CHANGELOG.md#0.4.0-dev.15)
+
+## [kitsune\_p2p\_block-0.4.0-dev.12](crates/kitsune_p2p_block/CHANGELOG.md#0.4.0-dev.12)
+
+## [kitsune\_p2p\_types-0.4.0-dev.14](crates/kitsune_p2p_types/CHANGELOG.md#0.4.0-dev.14)
+
+## [holo\_hash-0.4.0-dev.13](crates/holo_hash/CHANGELOG.md#0.4.0-dev.13)
+
+## [kitsune\_p2p\_bin\_data-0.4.0-dev.12](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.4.0-dev.12)
+
+## [kitsune\_p2p\_dht-0.4.0-dev.10](crates/kitsune_p2p_dht/CHANGELOG.md#0.4.0-dev.10)
+
+## [fixt-0.4.0-dev.4](crates/fixt/CHANGELOG.md#0.4.0-dev.4)
+
+## [holochain\_util-0.4.0-dev.5](crates/holochain_util/CHANGELOG.md#0.4.0-dev.5)
+
+## [kitsune\_p2p\_dht\_arc-0.4.0-dev.10](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_trace-0.4.0-dev.6](crates/holochain_trace/CHANGELOG.md#0.4.0-dev.6)
+
 # 20240918.004220
 
 ## [hc\_service\_check-0.1.0-dev.17](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.17)
