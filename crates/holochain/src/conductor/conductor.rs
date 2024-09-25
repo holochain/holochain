@@ -3314,7 +3314,9 @@ mod countersigning_impls {
             cell_id: &CellId,
         ) -> ConductorResult<Option<CountersigningSessionState>> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
-            match space.countersigning_workspaces.lock().get(cell_id).cloned() {
+            let maybe_countersigning_workspace =
+                space.countersigning_workspaces.lock().get(cell_id).cloned();
+            match maybe_countersigning_workspace {
                 None => Ok(None),
                 Some(workspace) => Ok(workspace.get_countersigning_session_state()),
             }
@@ -3325,7 +3327,7 @@ mod countersigning_impls {
             cell_id: &CellId,
         ) -> ConductorResult<()> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
-            let (countersigning_workspace, preflight_request) = self
+            let (preflight_request, countersigning_workspace) = self
                 .get_preflight_request_with_workspace_from_unresolvable_session(&space, cell_id)
                 .await?;
             force_abandon_session(space.clone(), cell_id.agent_pubkey(), &preflight_request)
@@ -3335,8 +3337,7 @@ mod countersigning_impls {
                 .remove_countersigning_session()
                 .is_none()
             {
-                // The session exists in the space as previously checked, so this case must never happen.
-                tracing::warn!(
+                tracing::error!(
                     ?cell_id,
                     "Could not remove countersigning session from workspace after abandoning it."
                 );
