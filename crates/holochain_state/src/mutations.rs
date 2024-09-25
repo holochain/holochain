@@ -111,12 +111,8 @@ pub fn insert_op_dht(
     insert_op_when(txn, op, transfer_data, Timestamp::now())
 }
 
-pub fn insert_op_any(
-    txn: &mut Transaction,
-    op: &DhtOpHashed,
-    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
-) -> StateMutationResult<()> {
-    insert_op_when(txn, op, transfer_data, Timestamp::now())
+pub fn insert_op_unchecked(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
+    insert_op_when(txn, op, None, Timestamp::now())
 }
 
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the Cache database.
@@ -467,7 +463,7 @@ pub fn set_dependency(
 
 /// Set the whether or not a receipt is required of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
 pub fn set_require_receipt(
-    txn: &mut Transaction,
+    txn: &mut Ta<DbKindDht>,
     hash: &DhtOpHash,
     require_receipt: bool,
 ) -> StateMutationResult<()> {
@@ -997,7 +993,7 @@ mod tests {
 
     use crate::prelude::{Store, Txn};
 
-    use super::insert_op_dht;
+    use super::insert_op_authored;
 
     #[test]
     fn can_write_and_read_warrants() {
@@ -1042,8 +1038,8 @@ mod tests {
             let op1 = op1.clone();
             let op2 = op2.clone();
             move |txn| {
-                insert_op_dht(txn, &op1, None).unwrap();
-                insert_op_dht(txn, &op2, None).unwrap();
+                insert_op_authored(txn, &op1).unwrap();
+                insert_op_authored(txn, &op2).unwrap();
             }
         });
 

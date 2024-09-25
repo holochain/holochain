@@ -756,7 +756,7 @@ async fn store_record_delete_without_entry() {
         RecordEntry::NA,
     ));
     test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op).unwrap();
+        insert_op_dht(txn, &dht_op, None).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
     });
 
@@ -813,7 +813,7 @@ async fn store_record_delete_non_app_entry() {
         RecordEntry::NA,
     ));
     test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op).unwrap();
+        insert_op_dht(txn, &dht_op, None).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
     });
 
@@ -873,7 +873,7 @@ async fn store_record_delete_link() {
         RecordEntry::NA,
     ));
     test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op).unwrap();
+        insert_op_dht(txn, &dht_op, None).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
     });
 
@@ -953,7 +953,7 @@ async fn store_record_delete_of_delete_entry() {
         delete,
     ));
     test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op).unwrap();
+        insert_op_dht(txn, &dht_op, None).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
     });
 
@@ -1033,7 +1033,7 @@ async fn store_record_delete_of_delete_without_entry() {
         delete,
     ));
     test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op).unwrap();
+        insert_op_dht(txn, &dht_op, None).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
     });
 
@@ -1213,7 +1213,7 @@ async fn register_delete_create_app_entry() {
         RecordEntry::NA,
     ));
     test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op).unwrap();
+        insert_op_dht(txn, &dht_op, None).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
     });
 
@@ -1280,7 +1280,7 @@ async fn register_delete_create_non_app_entry() {
         RecordEntry::NA,
     ));
     test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op).unwrap();
+        insert_op_dht(txn, &dht_op, None).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
     });
 
@@ -1351,7 +1351,7 @@ async fn register_delete_update_app_entry() {
         RecordEntry::NA,
     ));
     test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op).unwrap();
+        insert_op_dht(txn, &dht_op, None).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
     });
 
@@ -1418,7 +1418,7 @@ async fn register_delete_update_non_app_entry() {
         RecordEntry::NA,
     ));
     test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op).unwrap();
+        insert_op_dht(txn, &dht_op, None).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
     });
 
@@ -1475,7 +1475,7 @@ async fn register_delete_of_delete() {
         RecordEntry::NA,
     ));
     test_space.space.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op).unwrap();
+        insert_op_dht(txn, &dht_op, None).unwrap();
         put_validation_limbo(txn, dht_op.as_hash(), ValidationStage::SysValidated).unwrap();
     });
 

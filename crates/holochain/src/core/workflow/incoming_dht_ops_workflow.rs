@@ -69,7 +69,7 @@ impl Drop for OpsClaim {
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, ops)))]
 fn batch_process_entry(
-    txn: &mut rusqlite::Transaction<'_>,
+    txn: &mut Ta<DbKindDht>,
     request_validation_receipt: bool,
     ops: Vec<DhtOpHashed>,
 ) -> WorkflowResult<()> {
@@ -224,12 +224,12 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
 }
 
 fn add_to_pending(
-    txn: &mut rusqlite::Transaction<'_>,
+    txn: &mut Ta<DbKindDht>,
     ops: &[DhtOpHashed],
     request_validation_receipt: bool,
 ) -> StateMutationResult<()> {
     for op in ops {
-        insert_op_dht(txn, op)?;
+        insert_op_dht(txn, op, todo_no_transfer_data())?;
         set_require_receipt(txn, op.as_hash(), request_validation_receipt)?;
     }
 

@@ -294,7 +294,10 @@ mod tests {
 
     async fn create_modified_op(
         vault: DbWrite<DbKindDht>,
-        modifier: fn(txn: &mut Transaction, op_hash: HoloHashOf<DhtOp>) -> StateMutationResult<()>,
+        modifier: fn(
+            txn: &mut Ta<DbKindDht>,
+            op_hash: HoloHashOf<DhtOp>,
+        ) -> StateMutationResult<()>,
     ) -> StateMutationResult<DhtOpHash> {
         // The actual op does not matter, just some of the status fields
         let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
@@ -307,7 +310,7 @@ mod tests {
             .write_async({
                 let test_op_hash = test_op_hash.clone();
                 move |txn| -> StateMutationResult<()> {
-                    mutations::insert_op_authored(txn, &op)?;
+                    mutations::insert_op_dht(txn, &op, None)?;
                     modifier(txn, test_op_hash)?;
 
                     Ok(())
@@ -425,7 +428,7 @@ mod tests {
             action,
         ));
         let test_op_hash = op.as_hash().clone();
-        env.write_async(move |txn| insert_op_authored(txn, &op))
+        env.write_async(move |txn| insert_op_dht(txn, &op, None))
             .await
             .unwrap();
 

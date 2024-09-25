@@ -1,6 +1,5 @@
 use holo_hash::{AnyLinkableHash, DhtOpHash, HasHash};
 use holochain_p2p::HolochainP2pDnaT;
-use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{ChainOpType, DhtOp, DhtOpHashed},

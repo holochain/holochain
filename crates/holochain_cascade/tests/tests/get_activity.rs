@@ -379,7 +379,7 @@ async fn get_activity_with_warrants() {
     dht.test_write({
         let op = DhtOp::from(warrant.clone()).into_hashed();
         move |txn| {
-            insert_op_dht(txn, &op).unwrap();
+            insert_op_dht(txn, &op, None).unwrap();
         }
     });
 
@@ -623,7 +623,7 @@ async fn test_must_get_agent_activity(
     authored.test_write(|txn| {
         for w in warrants {
             let w = DhtOp::from(w).into_hashed();
-            insert_op_dht(txn, &w).unwrap();
+            insert_op_authored(txn, &w).unwrap();
         }
     });
 
