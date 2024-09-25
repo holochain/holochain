@@ -277,7 +277,7 @@ mod tests {
             move |txn| -> DatabaseResult<()> {
                 let hash = query_state.as_hash().clone();
                 // XXX: This is inserted into the DHT DB, so `transfer_data` here should be Some
-                insert_op(txn, &query_state, None).unwrap();
+                insert_op_dht(txn, &query_state, None).unwrap();
                 if facts.has_validation_status {
                     set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
                 }

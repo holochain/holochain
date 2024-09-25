@@ -214,7 +214,7 @@ async fn create_and_insert_op(
 
         move |txn| -> DatabaseResult<()> {
             let hash = query_state.as_hash().clone();
-            insert_op(txn, &query_state).unwrap();
+            insert_op_dht(txn, &query_state).unwrap();
             set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
             if facts.integrated {
                 set_when_integrated(txn, &hash, holochain_zome_types::prelude::Timestamp::now())

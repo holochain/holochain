@@ -229,7 +229,7 @@ fn add_to_pending(
     request_validation_receipt: bool,
 ) -> StateMutationResult<()> {
     for op in ops {
-        insert_op(txn, op)?;
+        insert_op_dht(txn, op)?;
         set_require_receipt(txn, op.as_hash(), request_validation_receipt)?;
     }
 

@@ -217,7 +217,7 @@ mod tests {
             fixt!(Action),
         ));
         let test_op_hash = op.as_hash().clone();
-        env.write_async(move |txn| mutations::insert_op(txn, &op))
+        env.write_async(move |txn| mutations::insert_op_authored(txn, &op))
             .await
             .unwrap();
 
@@ -307,7 +307,7 @@ mod tests {
             .write_async({
                 let test_op_hash = test_op_hash.clone();
                 move |txn| -> StateMutationResult<()> {
-                    mutations::insert_op(txn, &op)?;
+                    mutations::insert_op_authored(txn, &op)?;
                     modifier(txn, test_op_hash)?;
 
                     Ok(())
@@ -425,7 +425,7 @@ mod tests {
             action,
         ));
         let test_op_hash = op.as_hash().clone();
-        env.write_async(move |txn| insert_op(txn, &op))
+        env.write_async(move |txn| insert_op_authored(txn, &op))
             .await
             .unwrap();
 

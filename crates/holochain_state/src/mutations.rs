@@ -12,21 +12,12 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
-use holochain_types::dht_op::ChainOpHashed;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpHashed;
-use holochain_types::dht_op::DhtOpLite;
-use holochain_types::dht_op::OpOrder;
-use holochain_types::prelude::DnaDefHashed;
-use holochain_types::prelude::DnaWasmHashed;
-use holochain_types::prelude::SysValDeps;
-use holochain_types::prelude::{DhtOpError, SignedValidationReceipt};
+use holochain_types::prelude::*;
 use holochain_types::sql::AsSql;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 use holochain_zome_types::block::BlockTargetReason;
 use holochain_zome_types::entry::EntryHashed;
-use holochain_zome_types::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 use std::str::FromStr;
 
@@ -103,13 +94,45 @@ pub fn insert_record_scratch(
     }
 }
 
-/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
-pub fn insert_op(
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the Authored database.
+pub fn insert_op_authored(
+    txn: &mut Ta<DbKindAuthored>,
+    op: &DhtOpHashed,
+) -> StateMutationResult<()> {
+    insert_op_when(txn, op, None, Timestamp::now())
+}
+
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the DHT database.
+///
+/// If `transfer_data` is None, that means that the Op was locally validated
+/// and is being included in the DHT by self-authority
+pub fn insert_op_dht(
+    txn: &mut Ta<DbKindDht>,
+    op: &DhtOpHashed,
+    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
+) -> StateMutationResult<()> {
+    insert_op_when(txn, op, transfer_data, Timestamp::now())
+}
+
+pub fn insert_op_any(
     txn: &mut Transaction,
     op: &DhtOpHashed,
     transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
 ) -> StateMutationResult<()> {
     insert_op_when(txn, op, transfer_data, Timestamp::now())
+}
+
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the Cache database.
+pub fn insert_op_cache(
+    txn: &mut Ta<DbKindCache>,
+    op: &DhtOpHashed,
+    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
+) -> StateMutationResult<()> {
+    insert_op_when(txn, op, transfer_data, Timestamp::now())
+}
+
+pub fn todo_no_transfer_data() -> Option<(AgentPubKey, TransferMethod, Timestamp)> {
+    None
 }
 
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
@@ -173,7 +196,7 @@ pub fn insert_op_when(
 /// we need the data in the same shape.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(txn)))]
 pub fn insert_op_lite_into_authored(
-    txn: &mut Transaction,
+    txn: &mut Ta<DbKindAuthored>,
     op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
@@ -181,6 +204,8 @@ pub fn insert_op_lite_into_authored(
 ) -> StateMutationResult<()> {
     insert_op_lite(txn, op_lite, hash, order, authored_timestamp, None)?;
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
+    set_when_sys_validated(txn, hash, Timestamp::now())?;
+    set_when_app_validated(txn, hash, Timestamp::now())?;
     set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
 }
@@ -232,6 +257,7 @@ pub fn insert_op_lite_when(
                 "action_hash": action_hash,
                 "transfer_source": transfer_source,
                 "transfer_method": transfer_method,
+                "transfer_time": transfer_time,
                 "require_receipt": 0,
                 "op_order": order,
             })?;
@@ -248,6 +274,7 @@ pub fn insert_op_lite_when(
                 "action_hash": warrant_hash,
                 "transfer_source": transfer_source,
                 "transfer_method": transfer_method,
+                "transfer_time": transfer_time,
                 "require_receipt": 0,
                 "op_order": order,
             })?;
@@ -1050,7 +1077,7 @@ mod tests {
 
     use crate::prelude::{Store, Txn};
 
-    use super::insert_op;
+    use super::insert_op_dht;
 
     #[test]
     fn can_write_and_read_warrants() {
@@ -1095,8 +1122,8 @@ mod tests {
             let op1 = op1.clone();
             let op2 = op2.clone();
             move |txn| {
-                insert_op(txn, &op1, None).unwrap();
-                insert_op(txn, &op2, None).unwrap();
+                insert_op_dht(txn, &op1, None).unwrap();
+                insert_op_dht(txn, &op2, None).unwrap();
             }
         });
 

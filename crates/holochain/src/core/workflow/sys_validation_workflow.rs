@@ -405,7 +405,7 @@ async fn sys_validation_workflow_inner(
         .authored_db
         .write_async(move |txn| {
             for warrant_op in warrants {
-                insert_op(txn, &warrant_op)?;
+                insert_op_dht(txn, &warrant_op)?;
                 summary.warranted += 1;
             }
             StateMutationResult::Ok(())

@@ -318,7 +318,7 @@ impl Db {
                     Db::Integrated(op) => {
                         let op = DhtOpHashed::from_content_sync(op.clone());
                         let hash = op.as_hash().clone();
-                        mutations::insert_op(txn, &op).unwrap();
+                        mutations::insert_op_dht(txn, &op).unwrap();
                         mutations::set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
                         mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
                             .unwrap();
@@ -326,7 +326,7 @@ impl Db {
                     Db::IntQueue(op) => {
                         let op = DhtOpHashed::from_content_sync(op.clone());
                         let hash = op.as_hash().clone();
-                        mutations::insert_op(txn, &op).unwrap();
+                        mutations::insert_op_dht(txn, &op).unwrap();
                         mutations::set_validation_stage(
                             txn,
                             &hash,

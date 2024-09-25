@@ -29,7 +29,7 @@ use holochain_state::prelude::{
     set_withhold_publish, AppEntryBytesFixturator, HeadInfo,
 };
 use holochain_state::prelude::{
-    insert_action, insert_entry, insert_op, unlock_chain, CounterSigningSessionData,
+    insert_action, insert_entry, insert_op_dht, unlock_chain, CounterSigningSessionData,
 };
 use holochain_state::prelude::{StateMutationError, StateMutationResult};
 use holochain_state::query::from_blob;
@@ -1842,7 +1842,7 @@ impl TestHarness {
             .write_async(move |txn| -> StateMutationResult<()> {
                 insert_action(txn, &sah)?;
                 insert_entry(txn, &entry_hash, &entry)?;
-                insert_op(txn, &dht_op)?;
+                insert_op_dht(txn, &dht_op)?;
                 set_withhold_publish(txn, &dht_op.hash)?;
 
                 Ok(())
