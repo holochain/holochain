@@ -14,10 +14,6 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::*;
 use holochain_types::sql::AsSql;
-use holochain_zome_types::block::Block;
-use holochain_zome_types::block::BlockTargetId;
-use holochain_zome_types::block::BlockTargetReason;
-use holochain_zome_types::entry::EntryHashed;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 use std::str::FromStr;
 
