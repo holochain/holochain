@@ -1200,7 +1200,7 @@ async fn chc_should_respect_chain_lock() {
     wait_for_completion(alice_rx, preflight_request.app_entry_hash.clone()).await;
     wait_for_completion(bob_rx, preflight_request.app_entry_hash).await;
 
-    // Now a commit should success because the session has finished and we shouldn't be behind the CHC.
+    // Now a commit should succeed because the session has finished and we shouldn't be behind the CHC.
     conductors[0]
         .call_fallible::<_, ActionHash>(&alice_zome, "create_a_thing", ())
         .await

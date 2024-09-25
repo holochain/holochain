@@ -1,6 +1,6 @@
 [package]
 name = "holochain_keystore"
-version = "0.4.0-dev.22"
+version = "0.4.0-dev.23"
 description = "keystore for libsodium keypairs"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,14 +14,14 @@ edition = "2021"
 [dependencies]
 base64 = "0.22"
 futures = "0.3"
-holo_hash = { version = "^0.4.0-dev.12", path = "../holo_hash", features = [
+holo_hash = { version = "^0.4.0-dev.13", path = "../holo_hash", features = [
   "full",
 ] }
 holochain_serialized_bytes = "=0.0.55"
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.4.0-dev.17" }
-kitsune_p2p_types = { version = "^0.4.0-dev.13", path = "../kitsune_p2p/types" }
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.4.0-dev.18" }
+kitsune_p2p_types = { version = "^0.4.0-dev.14", path = "../kitsune_p2p/types" }
 holochain_secure_primitive = { version = "^0.4.0-dev.1", path = "../holochain_secure_primitive" }
-holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util" }
+holochain_util = { version = "^0.4.0-dev.5", path = "../holochain_util" }
 lair_keystore = { version = "0.5.1", default-features = false }
 must_future = "0.1.2"
 nanoid = "0.4"
