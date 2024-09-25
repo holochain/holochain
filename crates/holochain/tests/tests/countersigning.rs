@@ -785,6 +785,12 @@ async fn session_rollback_with_chc_enabled() {
 
     let alice_chc = conductors[0].get_chc(alice.cell_id()).unwrap();
 
+    // Make sure the conductors are gossiping before continuing
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30))
+        .await
+        .unwrap();
+
     // Subscribe early in the test to avoid missing signals later
     let alice_signal_rx = conductors[0].subscribe_to_app_signals("app".into());
     let bob_signal_rx = conductors[1].subscribe_to_app_signals("app".into());
