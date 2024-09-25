@@ -110,10 +110,6 @@ pub fn insert_op_dht(
     insert_op_when(txn, op, transfer_data, Timestamp::now())
 }
 
-pub fn insert_op_unchecked(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
-    insert_op_when(txn, op, None, Timestamp::now())
-}
-
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the Cache database.
 pub fn insert_op_cache(
     txn: &mut Ta<DbKindCache>,
@@ -123,6 +119,14 @@ pub fn insert_op_cache(
     insert_op_when(txn, op, transfer_data, Timestamp::now())
 }
 
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into any Op database.
+/// The type is not checked, and transfer data is not set.
+#[cfg(feature = "test_utils")]
+pub fn insert_op_unchecked(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
+    insert_op_when(txn, op, None, Timestamp::now())
+}
+
+#[deprecated = "handle these cases with real data"]
 pub fn todo_no_transfer_data() -> Option<(AgentPubKey, TransferMethod, Timestamp)> {
     None
 }
