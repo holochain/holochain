@@ -19,7 +19,10 @@ async fn sys_validation_workflow_test() {
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-    let config = SweetConductorConfig::rendezvous(false).apply_shared_rendezvous().await.no_dpki_mustfix();
+    let config = SweetConductorConfig::rendezvous(false)
+        .apply_shared_rendezvous()
+        .await
+        .no_dpki_mustfix();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();

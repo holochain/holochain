@@ -296,8 +296,14 @@ async fn app_validation_ops() {
             }
         };
 
-    let mut conductors =
-        SweetConductorBatch::from_config(2, SweetConductorConfig::rendezvous(false).apply_shared_rendezvous().await.no_dpki()).await;
+    let mut conductors = SweetConductorBatch::from_config(
+        2,
+        SweetConductorConfig::rendezvous(false)
+            .apply_shared_rendezvous()
+            .await
+            .no_dpki(),
+    )
+    .await;
 
     let zomes = InlineZomeSet::new(
         [

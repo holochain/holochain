@@ -12,8 +12,13 @@ use std::sync::Arc;
 #[tokio::test(flavor = "multi_thread")]
 async fn wasm_disk_cache() {
     holochain_trace::test_run();
-    let mut conductor =
-        SweetConductor::from_config(SweetConductorConfig::rendezvous(false).apply_shared_rendezvous().await.no_dpki()).await;
+    let mut conductor = SweetConductor::from_config(
+        SweetConductorConfig::rendezvous(false)
+            .apply_shared_rendezvous()
+            .await
+            .no_dpki(),
+    )
+    .await;
 
     let mut cache_dir = conductor.db_path().to_owned();
     cache_dir.push(WASM_CACHE);
