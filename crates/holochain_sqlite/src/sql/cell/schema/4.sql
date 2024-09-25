@@ -105,9 +105,12 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     op_order        TEXT           NOT NULL,
 
     -- If this is null then validation is still in progress.
-    validation_status INTEGER       NULL,
+    validation_status   INTEGER     NULL,
 
-    when_integrated   INTEGER       NULL,          -- DATETIME
+    when_stored         INTEGER     NULL,  -- DATETIME. Really should be NOT NULL but no default is sensible given the need to migrate data.
+    when_sys_validated  INTEGER     NULL,  -- DATETIME
+    when_app_validated  INTEGER     NULL,  -- DATETIME
+    when_integrated     INTEGER     NULL,  -- DATETIME
 
     -- Used to withhold ops from publishing for things
     -- like countersigning.
@@ -157,15 +160,17 @@ CREATE TABLE IF NOT EXISTS ValidationReceipt (
     hash            BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     op_hash         BLOB           NOT NULL,
     blob            BLOB           NOT NULL,
+    when_received   INTEGER        NULL,  -- DATETIME
     FOREIGN KEY(op_hash) REFERENCES DhtOp(hash) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS ChainLock (
-    lock BLOB PRIMARY KEY ON CONFLICT ROLLBACK,
-    author BLOB NOT NULL,
+    author BLOB PRIMARY KEY ON CONFLICT ROLLBACK,
+    subject BLOB NOT NULL,
     -- The expiration time of the lock as a Timestamp (microseconds)
     expires_at_timestamp INTEGER NOT NULL
 );
+
 
 CREATE TABLE IF NOT EXISTS ScheduledFunctions (
     author BLOB NOT NULL,
