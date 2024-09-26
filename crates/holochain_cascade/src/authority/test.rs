@@ -1,9 +1,11 @@
 use super::*;
 use crate::authority::handle_get_agent_activity;
 use crate::test_utils::*;
+use ::fixt::fixt;
 use holochain_p2p::actor;
 use holochain_p2p::event::GetRequest;
-use holochain_state::prelude::test_dht_db;
+use holochain_state::prelude::*;
+use holochain_state::prelude::{set_withhold_publish, test_dht_db};
 use holochain_types::activity::ChainItems;
 
 fn options() -> holochain_p2p::event::GetOptions {
@@ -190,9 +192,6 @@ async fn get_links() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity() {
-    use ::fixt::fixt;
-    use holochain_state::mutations::*;
-
     holochain_trace::test_run();
     let db = test_dht_db();
 
@@ -293,5 +292,110 @@ async fn get_agent_activity() {
     .await
     .unwrap();
 
+    pretty_assertions::assert_eq!(result, expected);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn get_agent_activity_respects_withhold_publish() {
+    holochain_trace::test_run();
+    let db = test_dht_db();
+
+    let td = ActivityTestData::valid_chain_scenario(false);
+
+    for hash_op in td.agent_activity_ops.iter().cloned() {
+        fill_db(&db.to_db(), hash_op).await;
+    }
+    // Mark the most recent valid op as withheld
+    let last_op_hash = td.agent_activity_ops.last().unwrap().hash.clone();
+    db.write_async(move |txn| set_withhold_publish(txn, &last_op_hash))
+        .await
+        .unwrap();
+
+    let options = actor::GetActivityOptions {
+        include_valid_activity: true,
+        include_rejected_activity: false,
+        include_full_records: false,
+        ..Default::default()
+    };
+
+    let result = handle_get_agent_activity(
+        db.to_db().into(),
+        td.agent.clone(),
+        QueryFilter::new(),
+        (&options).into(),
+    )
+    .await
+    .unwrap();
+
+    let hashes_without_head = match &td.valid_hashes {
+        ChainItems::Hashes(hashes) => hashes.iter().take(hashes.len() - 1).cloned().collect(),
+        _ => unreachable!(),
+    };
+    let chain_head = match &td.valid_hashes {
+        ChainItems::Hashes(hashes) => hashes.iter().nth_back(1).cloned().unwrap(),
+        _ => unreachable!(),
+    };
+
+    let expected = AgentActivityResponse {
+        agent: td.agent.clone(),
+        valid_activity: ChainItems::Hashes(hashes_without_head),
+        rejected_activity: ChainItems::NotRequested,
+        warrants: Vec::with_capacity(0),
+        status: ChainStatus::Valid(ChainHead {
+            action_seq: chain_head.0,
+            hash: chain_head.1.clone(),
+        }),
+        highest_observed: Some(HighestObserved {
+            action_seq: chain_head.0,
+            hash: vec![chain_head.1.clone()],
+        }),
+    };
+    pretty_assertions::assert_eq!(result, expected);
+
+    let options = actor::GetActivityOptions {
+        include_valid_activity: true,
+        include_rejected_activity: false,
+        include_full_records: true,
+        ..Default::default()
+    };
+
+    let result = handle_get_agent_activity(
+        db.to_db().into(),
+        td.agent.clone(),
+        QueryFilter::new(),
+        (&options).into(),
+    )
+    .await
+    .unwrap();
+
+    let records_without_head = match &td.valid_records {
+        ChainItems::Full(records) => records
+            .clone()
+            .into_iter()
+            .take(records.len() - 1)
+            .map(|mut r| {
+                if let RecordEntry::Present(_) = r.entry {
+                    r.entry = RecordEntry::NotStored;
+                }
+                r
+            })
+            .collect(),
+        _ => unreachable!(),
+    };
+
+    let expected = AgentActivityResponse {
+        agent: td.agent.clone(),
+        valid_activity: ChainItems::Full(records_without_head),
+        rejected_activity: ChainItems::NotRequested,
+        warrants: Vec::with_capacity(0),
+        status: ChainStatus::Valid(ChainHead {
+            action_seq: chain_head.0,
+            hash: chain_head.1.clone(),
+        }),
+        highest_observed: Some(HighestObserved {
+            action_seq: chain_head.0,
+            hash: vec![chain_head.1.clone()],
+        }),
+    };
     pretty_assertions::assert_eq!(result, expected);
 }
