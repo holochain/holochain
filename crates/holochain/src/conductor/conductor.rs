@@ -1789,7 +1789,8 @@ mod app_impls {
                 .collect())
         }
 
-        /// List Apps with their information
+        /// List Apps with their information,
+        /// sorted by their installed_at timestamp, in descending order
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn list_apps(
             &self,

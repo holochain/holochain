@@ -132,6 +132,8 @@ pub enum AdminRequest {
     ListCellIds,
 
     /// List the apps and their information that are installed in the conductor.
+    /// 
+    /// Results are sorted by the `installed_at` timestamp of the app, in descending order.
     ///
     /// If `status_filter` is `Some(_)`, it will return only the apps with the specified status.
     ///
