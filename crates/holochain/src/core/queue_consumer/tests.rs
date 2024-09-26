@@ -1,9 +1,8 @@
-use crate::core::workflow::publish_dht_ops_workflow::{
-    publish_dht_ops_workflow, MIN_PUBLISH_INTERVAL,
-};
+use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
 
 use super::*;
 use arbitrary::Arbitrary;
+use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_state::mutations;
 use holochain_state::prelude::StateMutationResult;
 
@@ -264,7 +263,7 @@ async fn publish_loop() {
         dna_network.clone(),
         ts.clone(),
         author.clone(),
-        MIN_PUBLISH_INTERVAL,
+        ConductorTuningParams::default().min_publish_interval(),
     )
     .await
     .unwrap();
@@ -284,7 +283,7 @@ async fn publish_loop() {
         dna_network.clone(),
         ts.clone(),
         author.clone(),
-        MIN_PUBLISH_INTERVAL,
+        ConductorTuningParams::default().min_publish_interval(),
     )
     .await
     .unwrap();
@@ -306,7 +305,7 @@ async fn publish_loop() {
         dna_network.clone(),
         ts.clone(),
         author.clone(),
-        MIN_PUBLISH_INTERVAL,
+        ConductorTuningParams::default().min_publish_interval(),
     )
     .await
     .unwrap();
@@ -321,7 +320,9 @@ async fn publish_loop() {
     let five_mins_ago = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .ok()
-        .and_then(|epoch| epoch.checked_sub(MIN_PUBLISH_INTERVAL))
+        .and_then(|epoch| {
+            epoch.checked_sub(ConductorTuningParams::default().min_publish_interval())
+        })
         .unwrap();
 
     db.write_async({
@@ -345,7 +346,7 @@ async fn publish_loop() {
         dna_network.clone(),
         ts.clone(),
         author.clone(),
-        MIN_PUBLISH_INTERVAL,
+        ConductorTuningParams::default().min_publish_interval(),
     )
     .await
     .unwrap();
@@ -375,7 +376,7 @@ async fn publish_loop() {
         dna_network.clone(),
         ts.clone(),
         author.clone(),
-        MIN_PUBLISH_INTERVAL,
+        ConductorTuningParams::default().min_publish_interval(),
     )
     .await
     .unwrap();
@@ -418,7 +419,7 @@ async fn publish_loop() {
         dna_network.clone(),
         ts.clone(),
         author.clone(),
-        MIN_PUBLISH_INTERVAL,
+        ConductorTuningParams::default().min_publish_interval(),
     )
     .await
     .unwrap();
@@ -438,7 +439,7 @@ async fn publish_loop() {
         dna_network.clone(),
         ts.clone(),
         author.clone(),
-        MIN_PUBLISH_INTERVAL,
+        ConductorTuningParams::default().min_publish_interval(),
     )
     .await
     .unwrap();

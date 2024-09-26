@@ -121,11 +121,10 @@ mod tests {
     use ::fixt::prelude::*;
     use holo_hash::EntryHash;
     use holo_hash::HasHash;
+    use holochain_conductor_api::conductor::ConductorTuningParams;
     use holochain_sqlite::db::DbWrite;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::*;
-
-    use crate::core::workflow::publish_dht_ops_workflow::MIN_PUBLISH_INTERVAL;
 
     use super::*;
 
@@ -155,9 +154,13 @@ mod tests {
         let agent = fixt!(AgentPubKey);
         let db = test_authored_db();
         let expected = test_data(&db.to_db(), agent.clone()).await;
-        let r = get_ops_to_publish(expected.agent.clone(), &db.to_db(), MIN_PUBLISH_INTERVAL)
-            .await
-            .unwrap();
+        let r = get_ops_to_publish(
+            expected.agent.clone(),
+            &db.to_db(),
+            ConductorTuningParams::default().min_publish_interval(),
+        )
+        .await
+        .unwrap();
         assert_eq!(
             r.into_iter()
                 .map(|t| t.1.into_inner().0)
@@ -216,7 +219,7 @@ mod tests {
             now
         } else {
             // - WithinMinPeriod: false.
-            now - MIN_PUBLISH_INTERVAL
+            now - ConductorTuningParams::default().min_publish_interval()
         };
 
         let state = if facts.store_entry {

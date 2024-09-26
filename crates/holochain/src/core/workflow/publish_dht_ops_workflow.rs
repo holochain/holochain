@@ -33,11 +33,6 @@ mod unit_tests;
 /// Default redundancy factor for validation receipts
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 
-/// Don't publish a DhtOp more than once during this interval.
-/// This allows us to trigger the publish workflow as often as we like, without
-/// flooding the network with spurious publishes.
-pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 5);
-
 #[cfg_attr(
     feature = "instrument",
     tracing::instrument(skip(db, network, trigger_self, min_publish_interval))
@@ -150,6 +145,7 @@ mod tests {
     use crate::test_utils::TestNetwork;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
+    use holochain_conductor_api::conductor::ConductorTuningParams;
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pDna;
     use holochain_p2p::HolochainP2pRef;
@@ -270,7 +266,7 @@ mod tests {
             Arc::new(dna_network),
             trigger_sender,
             author,
-            MIN_PUBLISH_INTERVAL,
+            ConductorTuningParams::default().min_publish_interval(),
         )
         .await
         .unwrap();

@@ -1,8 +1,6 @@
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
-use crate::core::workflow::publish_dht_ops_workflow::{
-    publish_dht_ops_workflow, MIN_PUBLISH_INTERVAL,
-};
+use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
 use crate::prelude::*;
 use ::fixt::prelude::*;
 use chrono::Utc;
@@ -10,6 +8,7 @@ use hdk::prelude::Action;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::AgentPubKey;
 use holo_hash::HasHash;
+use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::prelude::*;
@@ -36,7 +35,7 @@ async fn no_ops_to_publish() {
         Arc::new(network),
         tx,
         fixt!(AgentPubKey),
-        MIN_PUBLISH_INTERVAL,
+        ConductorTuningParams::default().min_publish_interval(),
     )
     .await
     .unwrap();
@@ -71,7 +70,7 @@ async fn workflow_incomplete_on_routing_error() {
         Arc::new(network),
         tx,
         agent,
-        MIN_PUBLISH_INTERVAL,
+        ConductorTuningParams::default().min_publish_interval(),
     )
     .await
     .unwrap();
@@ -109,7 +108,7 @@ async fn workflow_handles_publish_errors() {
         Arc::new(network),
         tx,
         agent,
-        MIN_PUBLISH_INTERVAL,
+        ConductorTuningParams::default().min_publish_interval(),
     )
     .await
     .unwrap();
@@ -148,7 +147,7 @@ async fn retry_publish_until_receipts_received() {
             network.clone(),
             tx.clone(),
             agent.clone(),
-            MIN_PUBLISH_INTERVAL,
+            ConductorTuningParams::default().min_publish_interval(),
         )
         .await
         .unwrap();
@@ -163,10 +162,15 @@ async fn retry_publish_until_receipts_received() {
 
     do_set_receipts_complete(vault.clone(), op_hash.clone()).await;
 
-    let work_complete =
-        publish_dht_ops_workflow(vault.clone(), network, tx, agent, MIN_PUBLISH_INTERVAL)
-            .await
-            .unwrap();
+    let work_complete = publish_dht_ops_workflow(
+        vault.clone(),
+        network,
+        tx,
+        agent,
+        ConductorTuningParams::default().min_publish_interval(),
+    )
+    .await
+    .unwrap();
 
     assert_eq!(WorkComplete::Complete, work_complete);
     assert!(rx.is_paused()); // Should now pause, no more work to do
@@ -197,7 +201,7 @@ async fn loop_resumes_on_new_data() {
         network.clone(),
         tx.clone(),
         agent.clone(),
-        MIN_PUBLISH_INTERVAL,
+        ConductorTuningParams::default().min_publish_interval(),
     )
     .await
     .unwrap();
@@ -208,10 +212,15 @@ async fn loop_resumes_on_new_data() {
     // Now create an op and try to publish again
     create_op(vault.clone(), agent.clone()).await.unwrap();
 
-    let work_complete =
-        publish_dht_ops_workflow(vault, network, tx, agent.clone(), MIN_PUBLISH_INTERVAL)
-            .await
-            .unwrap();
+    let work_complete = publish_dht_ops_workflow(
+        vault,
+        network,
+        tx,
+        agent.clone(),
+        ConductorTuningParams::default().min_publish_interval(),
+    )
+    .await
+    .unwrap();
 
     assert_eq!(WorkComplete::Complete, work_complete);
     assert!(!rx.is_paused()); // No validation receipts yet so might need to publish again, should it should resume
@@ -242,7 +251,7 @@ async fn ignores_data_by_other_authors() {
         network.clone(),
         tx.clone(),
         agent.clone(),
-        MIN_PUBLISH_INTERVAL,
+        ConductorTuningParams::default().min_publish_interval(),
     )
     .await
     .unwrap();

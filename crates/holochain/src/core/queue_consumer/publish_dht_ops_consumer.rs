@@ -2,9 +2,7 @@
 
 use super::*;
 
-use crate::core::workflow::publish_dht_ops_workflow::{
-    publish_dht_ops_workflow, MIN_PUBLISH_INTERVAL,
-};
+use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
 
 /// Spawn the QueueConsumer for Publish workflow
 #[cfg_attr(
@@ -37,8 +35,7 @@ pub fn spawn_publish_dht_ops_consumer(
             let min_publish_interval = conductor
                 .get_config()
                 .conductor_tuning_params()
-                .min_publish_interval
-                .unwrap_or(MIN_PUBLISH_INTERVAL);
+                .min_publish_interval();
             async move {
                 if conductor.get_config().network.tuning_params.disable_publish {
                     Ok(WorkComplete::Complete)

@@ -243,7 +243,8 @@ pub struct ConductorTuningParams {
     /// - `Some(n)`, n > 0: Holochain will retry `n` times, including the required first attempt. If
     ///   it can't make a decision after `n` retries, it will consider the session failed.
     pub countersigning_resolution_retry_limit: Option<usize>,
-    /// The interval that has to pass before an op that has been published is considered for publishing again.
+    /// Only publish a DhtOp once during this interval. This allows for triggering the publish workflow
+    /// frequently without flooding the network with spurious publishes.
     ///
     /// Default: 5 minutes
     pub min_publish_interval: Option<std::time::Duration>,
@@ -269,6 +270,12 @@ impl ConductorTuningParams {
     /// Get the current value of `countersigning_resolution_retry_delay` or its default value.
     pub fn countersigning_resolution_retry_delay(&self) -> std::time::Duration {
         self.countersigning_resolution_retry_delay
+            .unwrap_or_else(|| std::time::Duration::from_secs(60 * 5))
+    }
+
+    /// Get the current value of `min_publish_interval` or its default value.
+    pub fn min_publish_interval(&self) -> std::time::Duration {
+        self.min_publish_interval
             .unwrap_or_else(|| std::time::Duration::from_secs(60 * 5))
     }
 }
