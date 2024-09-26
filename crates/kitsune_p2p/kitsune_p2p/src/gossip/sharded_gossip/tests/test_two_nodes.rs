@@ -9,7 +9,7 @@ use itertools::Itertools;
 async fn sharded_sanity_test() {
     // - Setup players and data.
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let bob_cert = NodeCert::arbitrary(&mut u).unwrap();
 
     let agents = agents_with_infos(2).await;
     let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
@@ -147,7 +147,7 @@ async fn sharded_sanity_test() {
 /// marked as finished does not finish the round.
 async fn partial_missing_doesnt_finish() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::arbitrary(&mut u).unwrap();
 
     // - Set bob up with a current round that expects one
     // response to a sent bloom.
@@ -207,7 +207,7 @@ async fn partial_missing_doesnt_finish() {
 /// marked as finished does finish the round.
 async fn missing_ops_finishes() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::arbitrary(&mut u).unwrap();
 
     // - Set bob up the same as the test above.
     let bob = setup_standard_player(
@@ -267,7 +267,7 @@ async fn missing_ops_finishes() {
 /// the player is still awaiting incoming blooms.
 async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::arbitrary(&mut u).unwrap();
 
     // - Set bob up awaiting incoming blooms and one response.
     let bob = setup_standard_player(
@@ -326,7 +326,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
 /// finish the round when there are no outstanding response.
 async fn bloom_response_finishes() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::arbitrary(&mut u).unwrap();
 
     // - Set bob up with a current round that expects no responses
     // and has not received all blooms.
@@ -386,7 +386,7 @@ async fn bloom_response_finishes() {
 /// finish the round when their are outstanding responses.
 async fn bloom_response_doesnt_finish_outstanding_incoming() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::arbitrary(&mut u).unwrap();
 
     // - Set bob up with a current round that expects one response
     // and has not received all blooms.
@@ -447,8 +447,8 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
 async fn no_data_still_finishes() {
     // - Set up two players with no data.
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let alice_cert = Tx2Cert::arbitrary(&mut u).unwrap();
-    let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let alice_cert = NodeCert::arbitrary(&mut u).unwrap();
+    let bob_cert = NodeCert::arbitrary(&mut u).unwrap();
 
     let agents = agents_with_infos(2).await;
     let all_agents = agents.iter().map(|(_, info)| info.clone()).collect_vec();
