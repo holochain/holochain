@@ -115,6 +115,8 @@ pub enum Output {
     Json,
     /// Json with timed spans
     JsonTimed,
+    /// Direct tracing-subscriber json format
+    JsonDirect,
     /// Regular logging (default)
     Log,
     /// Regular logging plus timed spans
@@ -138,6 +140,7 @@ impl FromStr for Output {
         match day {
             "Json" => Ok(Output::Json),
             "JsonTimed" => Ok(Output::JsonTimed),
+            "JsonDirect" => Ok(Output::JsonDirect),
             "IceTimed" => Ok(Output::IceTimed),
             "Log" => Ok(Output::Log),
             "LogTimed" => Ok(Output::LogTimed),
@@ -161,7 +164,18 @@ pub fn test_run() {
     static INIT_ONCE: std::sync::Once = std::sync::Once::new();
 
     INIT_ONCE.call_once(|| {
-        init_fmt(Output::Log).unwrap();
+        // NOTE: Using tracing_subscriber directly because init_fmt
+        //       has buggy span filtering behavior.
+
+        let subscriber = tracing_subscriber::FmtSubscriber::builder()
+            .with_env_filter(tracing_subscriber::filter::EnvFilter::from_default_env())
+            .with_file(true)
+            .with_line_number(true)
+            .with_target(true)
+            .event_format(tracing_subscriber::fmt::format())
+            .finish();
+
+        let _ = tracing::subscriber::set_global_default(subscriber);
     });
 }
 
@@ -297,6 +311,19 @@ where
                     .with_filter(filter),
             )
             .init(),
+
+        Output::JsonDirect => {
+            let subscriber = tracing_subscriber::FmtSubscriber::builder()
+                .with_env_filter(tracing_subscriber::filter::EnvFilter::from_default_env())
+                .with_file(true)
+                .with_line_number(true)
+                .with_target(true)
+                .with_writer(writer)
+                .json()
+                .finish();
+
+            let _ = tracing::subscriber::set_global_default(subscriber);
+        }
 
         Output::Log => Registry::default().with(standard_layer(writer)?).init(),
 

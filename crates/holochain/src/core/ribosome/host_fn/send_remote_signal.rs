@@ -157,16 +157,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
     async fn remote_signal_test() -> anyhow::Result<()> {
-        let subscriber = tracing_subscriber::FmtSubscriber::builder()
-            .with_env_filter(
-                tracing_subscriber::filter::EnvFilter::from_default_env(),
-            )
-            .with_file(true)
-            .with_line_number(true)
-            .json()
-            .finish();
-
-        let _ = tracing::subscriber::set_global_default(subscriber);
+        holochain_trace::test_run();
 
         const NUM_CONDUCTORS: usize = 5;
 

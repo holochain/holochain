@@ -27,6 +27,7 @@ struct Opt {
     - Log: Output logs to stdout with spans (human readable)
     - Compact: Same as Log but with less information
     - Json: Output logs as structured json (machine readable)
+    - JsonDirect: As default tracing-subscriber json output (machine readable)
     ",
         default_value = "Log"
     )]
