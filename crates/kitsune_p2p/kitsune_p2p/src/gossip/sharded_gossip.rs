@@ -1009,6 +1009,11 @@ impl ShardedGossipLocal {
                     && !ops.is_empty()
                 {
                     if let Some(state) = state.as_ref() {
+                        // NOTE: we could probably make a better choice than "any arbitrary remote agent".
+                        //       ostensibly, only a subset of remote agents are holding the data we're asking for,
+                        //       and the "source" should at least be one of those. Though, the notion of a
+                        //       particular agent being the source is hazy at best, and maybe this is one of those
+                        //       cases where any agent on a remote node is a valid "reference" to that node.
                         if let Some(agent) = state.remote_agent_list.first() {
                             // there is at least 1 agent
                             let agent = agent.agent.clone();
