@@ -535,6 +535,8 @@ async fn complete_session_with_chc_enabled() {
     let alice = &cells[0];
     let bob = &cells[1];
 
+    conductors[0].require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30)).await.unwrap();
+
     let alice_chc = conductors[0].get_chc(alice.cell_id()).unwrap();
 
     // Need an initialised source chain for countersigning, so commit anything
