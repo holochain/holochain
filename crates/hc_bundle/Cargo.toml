@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_bundle"
-version = "0.4.0-dev.23"
+version = "0.4.0-dev.26"
 description = "DNA and hApp bundling functionality for the `hc` Holochain CLI utility"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -24,21 +24,24 @@ path = "src/bin/hc-dna.rs"
 
 # reminder - do not use workspace deps
 [dependencies]
-holochain_wasmer_host = "=0.0.95"
-wasmer = "=4.3.1"
+holochain_wasmer_host = { version = "=0.0.96", default-features = false }
 futures = "0.3"
 anyhow = "1.0"
 clap = { version = "4.0", features = ["derive"] }
-holochain_util = { version = "^0.4.0-dev.4", path = "../holochain_util", features = [
+holochain_util = { version = "^0.4.0-dev.5", path = "../holochain_util", features = [
   "backtrace",
 ] }
 holochain_serialized_bytes = "=0.0.55"
-holochain_types = { version = "^0.4.0-dev.23", path = "../holochain_types" }
-mr_bundle = { version = "^0.4.0-dev.7", path = "../mr_bundle" }
+holochain_types = { version = "^0.4.0-dev.26", path = "../holochain_types" }
+mr_bundle = { version = "^0.4.0-dev.8", path = "../mr_bundle" }
 serde_yaml = "0.9"
 thiserror = "1.0.22"
 tracing = "0.1"
 tokio = { version = "1.27", features = ["full"] }
+
+# Temporarily include a fork of wasmer from the git branch 'wamr', until it is officially released in wasmer v5
+hc-wasmer = { version = "=4.3.6-hc.1", optional = true, default-features = false }
+wasmer = { version = "=4.3.6", optional = true, default-features = false }
 
 [dev-dependencies]
 assert_cmd = "2.0"
@@ -53,5 +56,18 @@ walkdir = "2"
 workspace = true
 
 [features]
+default = ["wasmer_sys"]
+
 sqlite-encrypted = ["holochain_types/sqlite-encrypted"]
 sqlite = ["holochain_types/sqlite"]
+
+wasmer_sys = [
+  "dep:wasmer",
+  "wasmer/default",
+  "holochain_wasmer_host/wasmer_sys",
+]
+wasmer_wamr = [
+  "dep:hc-wasmer",
+  "hc-wasmer/wamr",
+  "holochain_wasmer_host/wasmer_wamr",
+]

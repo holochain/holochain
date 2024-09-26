@@ -66,15 +66,14 @@ pub fn ui_basis_table(underline_duration: Duration, counts: LinkCountsRef) -> Ta
 
     let rows: Vec<_> = counts
         .iter()
-        .enumerate()
-        .map(|(_i, r)| {
+        .map(|r| {
             if num_bases > 0 {
                 assert_eq!(r.len(), num_bases);
             } else {
                 num_bases = r.len();
             }
 
-            let cells = r.iter().enumerate().map(|(_, (c, t))| {
+            let cells = r.iter().map(|(c, t)| {
                 let val = (*c).min(MAX_COUNT);
                 let mut style = if val == 0 {
                     Style::default().fg(Color::Green)

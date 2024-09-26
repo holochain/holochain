@@ -2,8 +2,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::chain_lock::is_chain_locked;
-use crate::chain_lock::is_lock_expired;
+use crate::chain_lock::{get_chain_lock, ChainLock};
 use crate::integrate::authored_ops_to_dht_db;
 use crate::integrate::authored_ops_to_dht_db_without_check;
 use crate::query::chain_head::ChainHeadQuery;
@@ -86,9 +85,8 @@ impl SourceChain {
         preflight_request: PreflightRequest,
         agent_index: u8,
     ) -> SourceChainResult<CounterSigningAgentState> {
-        let hashed_preflight_request = holo_hash::encode::blake2b_256(
-            &holochain_serialized_bytes::encode(&preflight_request)?,
-        );
+        let hashed_preflight_request =
+            blake2b_256(&holochain_serialized_bytes::encode(&preflight_request)?);
 
         // This all needs to be ensured in a non-panicky way BEFORE calling into the source chain here.
         let author = self.author.clone();
@@ -100,7 +98,10 @@ impl SourceChain {
         let countersigning_agent_state = self
             .vault
             .write_async(move |txn| {
-                if is_chain_locked(txn, &hashed_preflight_request, author.as_ref())? {
+                // Check for a chain lock.
+                // Note that the lock may not be valid anymore, but we must respect it here anyway.
+                let chain_lock = get_chain_lock(txn, author.as_ref())?;
+                if chain_lock.is_some() {
                     return Err(SourceChainError::ChainLocked);
                 }
                 let HeadInfo {
@@ -112,8 +113,8 @@ impl SourceChain {
                     CounterSigningAgentState::new(agent_index, persisted_head, persisted_seq);
                 lock_chain(
                     txn,
-                    &hashed_preflight_request,
                     author.as_ref(),
+                    &hashed_preflight_request,
                     preflight_request.session_times.end(),
                 )?;
                 SourceChainResult::Ok(countersigning_agent_state)
@@ -241,10 +242,10 @@ impl SourceChain {
         network: &(dyn HolochainP2pDnaT + Send + Sync),
     ) -> SourceChainResult<Vec<SignedActionHashed>> {
         // Nothing to write
-
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(Vec::new());
         }
+
         let (scheduled_fns, actions, ops, entries, records) =
             self.scratch.apply_and_then(|scratch| {
                 let records: Vec<Record> = scratch.records().collect();
@@ -260,7 +261,8 @@ impl SourceChain {
 
         // Sync with CHC, if CHC is present
         if let Some(chc) = network.chc() {
-            self.sync_records(chc, records)
+            // TODO: maybe unnecessary clone
+            self.sync_records(chc, records.clone())
                 .await
                 .map_err(SourceChainError::other)?;
         }
@@ -274,10 +276,11 @@ impl SourceChain {
         {
             return Err(SourceChainError::DirtyCounterSigningWrite);
         }
-        let lock = lock_for_entry(maybe_countersigned_entry)?;
+
+        let lock_subject = chain_lock_subject_for_entry(maybe_countersigned_entry)?;
 
         // If the lock isn't empty this is a countersigning session.
-        let is_countersigning_session = !lock.is_empty();
+        let is_countersigning_session = !lock_subject.is_empty();
 
         let ops_to_integrate = ops
             .iter()
@@ -288,12 +291,81 @@ impl SourceChain {
         let author = self.author.clone();
         let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
 
+        let now = Timestamp::now();
+
+        // Take out a write lock as late as possible, after doing everything we can in memory and
+        // before starting any database read/write operations.
+        let write_permit = self.vault.acquire_write_permit().await?;
+
+        // If there are records to write, then we need to respect the chain lock and push to the CHC
+        if !records.is_empty() {
+            self.vault
+                .read_async({
+                    let author = author.clone();
+                    move |txn| {
+                        let chain_lock = get_chain_lock(&txn, author.as_ref())?;
+                        match chain_lock {
+                            Some(chain_lock) => {
+                                // If the chain is locked, the lock must be for this entry.
+                                if chain_lock.subject() != lock_subject {
+                                    return Err(SourceChainError::ChainLocked);
+                                }
+                                // If the lock is expired then we can't write this countersigning session.
+                                else if chain_lock.is_expired_at(now) {
+                                    return Err(SourceChainError::LockExpired);
+                                }
+
+                                // Otherwise, the lock matches this entry and has not expired. We can proceed!
+                            }
+                            None => {
+                                // If this is a countersigning entry but there is no chain lock then maybe
+                                // the session expired before the entry could be written or maybe the app
+                                // has just made a mistake. Either way, it's not valid to write this entry!
+                                if is_countersigning_session {
+                                    return Err(
+                                        SourceChainError::CountersigningWriteWithoutSession,
+                                    );
+                                }
+                            }
+                        }
+
+                        Ok(())
+                    }
+                })
+                .await?;
+
+            // Sync with CHC, if CHC is present
+            if let Some(chc) = network.chc() {
+                // Skip the CHC sync if this is a countersigning session.
+                // If the session times out, we might roll the chain back to the previous head, and so
+                // we don't want the record to exist remotely.
+                if is_countersigning_session {
+                    tracing::debug!(
+                        "Skipping CHC push for countersigning session: {:?}",
+                        records
+                    );
+                } else {
+                    let payload = AddRecordPayload::from_records(
+                        self.keystore.clone(),
+                        (*self.author).clone(),
+                        records,
+                    )
+                    .await
+                    .map_err(SourceChainError::other)?;
+
+                    match chc.add_records_request(payload).await {
+                        Err(e @ ChcError::InvalidChain(_, _)) => Err(
+                            SourceChainError::ChcHeadMoved("SourceChain::flush".into(), e),
+                        ),
+                        e => e.map_err(SourceChainError::other),
+                    }?;
+                }
+            }
+        }
+
         let chain_flush_result = self
             .vault
-            .write_async(move |txn: &mut Transaction| {
-                let now = Timestamp::now();
-                // TODO: if the chain is locked, functions can still be scheduled.
-                //       Do we want that?
+            .write_async_with_permit(write_permit, move |txn: &mut Transaction| {
                 for scheduled_fn in scheduled_fns {
                     schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
                 }
@@ -314,20 +386,6 @@ impl SourceChain {
                         persisted_head,
                         head_info,
                     ));
-                }
-
-                // TODO: should this be moved to the top of the function?
-                if is_chain_locked(txn, &lock, author.as_ref())? {
-                    return Err(SourceChainError::ChainLocked);
-                }
-                // If this is a countersigning session, and the chain is NOT
-                // locked then either the session expired or the countersigning
-                // entry being committed now is the correct one for the lock.
-                else if is_countersigning_session {
-                    // If the lock is expired then we can't write this countersigning session.
-                    if is_lock_expired(txn, &lock, author.as_ref())? {
-                        return Err(SourceChainError::LockExpired);
-                    }
                 }
 
                 for entry in entries {
@@ -391,7 +449,9 @@ impl SourceChain {
                     ))
                 }
             }
-            Ok(actions) => {
+            Ok((actions, permit)) => {
+                drop(permit);
+
                 authored_ops_to_dht_db(
                     network,
                     ops_to_integrate,
@@ -402,7 +462,7 @@ impl SourceChain {
                 .await?;
                 SourceChainResult::Ok(actions)
             }
-            result => result,
+            Err(e) => Err(e),
         }
     }
 
@@ -982,11 +1042,11 @@ where
         Ok(query.filter_records(records))
     }
 
-    pub async fn is_chain_locked(&self, lock: Vec<u8>) -> SourceChainResult<bool> {
+    pub async fn get_chain_lock(&self) -> SourceChainResult<Option<ChainLock>> {
         let author = self.author.clone();
         Ok(self
             .vault
-            .read_async(move |txn| is_chain_locked(&txn, &lock, author.as_ref()))
+            .read_async(move |txn| get_chain_lock(&txn, author.as_ref()))
             .await?)
     }
 
@@ -1036,8 +1096,10 @@ fn named_param_seq(base_name: &str, repeat: usize) -> String {
     seq
 }
 
-pub fn lock_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
+pub fn chain_lock_subject_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
     Ok(match entry {
+        // TODO document that this implies preflight requests must be unique. I.e. if you want to countersign the
+        //      same thing with multiple groups, then you need to use different session times.
         Some(Entry::CounterSign(session_data, _)) => holo_hash::encode::blake2b_256(
             &holochain_serialized_bytes::encode(session_data.preflight_request())?,
         ),
@@ -1277,36 +1339,33 @@ pub fn chain_head_db_nonempty(
     chain_head_db(txn, author)?.ok_or(SourceChainError::ChainEmpty)
 }
 
+pub type CurrentCountersigningSessionOpt = Option<(Record, EntryHash, CounterSigningSessionData)>;
+
 /// Check if there is a current countersigning session and if so, return the
 /// session data and the entry hash.
 pub fn current_countersigning_session(
     txn: &Transaction<'_>,
     author: Arc<AgentPubKey>,
-) -> SourceChainResult<Option<(EntryHash, CounterSigningSessionData)>> {
-    // The chain must be locked for a session to be active.
-    if is_chain_locked(txn, &[], author.as_ref())? {
-        match chain_head_db(txn, author) {
-            // We haven't done genesis so no session can be active.
-            Err(e) => Err(e),
-            Ok(None) => Ok(None),
-            Ok(Some(HeadInfo { action: hash, .. })) => {
-                let txn: Txn = txn.into();
-                // Get the session data from the database.
-                let record = match txn.get_record(&hash.into())? {
-                    Some(record) => record,
-                    None => return Ok(None),
-                };
-                let (shh, ee) = record.into_inner();
-                Ok(match (shh.action().entry_hash(), ee.into_option()) {
-                    (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
-                        Some((entry_hash.to_owned(), *cs))
-                    }
-                    _ => None,
-                })
-            }
+) -> SourceChainResult<CurrentCountersigningSessionOpt> {
+    match chain_head_db(txn, author) {
+        // We haven't done genesis so no session can be active.
+        Err(e) => Err(e),
+        Ok(None) => Ok(None),
+        Ok(Some(HeadInfo { action: hash, .. })) => {
+            let txn: Txn = txn.into();
+            // Get the session data from the database.
+            let record = match txn.get_record(&hash.into())? {
+                Some(record) => record,
+                None => return Ok(None),
+            };
+            let (sah, ee) = record.clone().into_inner();
+            Ok(match (sah.action().entry_hash(), ee.into_option()) {
+                (Some(entry_hash), Some(Entry::CounterSign(cs, _))) => {
+                    Some((record, entry_hash.clone(), *cs))
+                }
+                _ => None,
+            })
         }
-    } else {
-        Ok(None)
     }
 }
 

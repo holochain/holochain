@@ -154,3 +154,14 @@ fn must_get_valid_record(action_hash: ActionHash) -> ExternResult<Record> {
 fn get_agent_activity(input: GetAgentActivityInput) -> ExternResult<AgentActivity> {
     HDK.with(|h| h.borrow().get_agent_activity(input))
 }
+
+#[hdk_extern]
+fn schedule_signal() -> ExternResult<()> {
+    HDK.with(|h| h.borrow().schedule("scheduled_fn".to_string()))
+}
+
+#[hdk_extern(infallible)]
+fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
+    emit_signal("scheduled hello");
+    Some(Schedule::from("*/1 * * * * *".to_string()))
+}

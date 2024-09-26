@@ -97,6 +97,7 @@ impl ConductorBuilder {
         self
     }
 
+    #[cfg(any(test, feature = "test_utils"))]
     async fn setup_test_device_seed(mut self, keystore: MetaLairClient) -> ConductorResult<Self> {
         // Set up device seed if specified
         if cfg!(any(test, feature = "test_utils"))
@@ -190,7 +191,9 @@ impl ConductorBuilder {
 
         info!("Conductor startup: passphrase obtained.");
 
+        #[cfg(any(test, feature = "test_utils"))]
         let builder = builder.setup_test_device_seed(keystore.clone()).await?;
+
         let Self {
             ribosome_store,
             config,

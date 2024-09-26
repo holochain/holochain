@@ -63,31 +63,31 @@ impl Display for Action {
             Action::AgentValidationPkg(avp) =>
                 write!(
                     f,
-                    "agent_validation_pkg=[author={}, timestamp={}]",
+                    "agent_validation_pkg=[author={}, timestamp={:?}]",
                     avp.author, avp.timestamp
                 ),
 
             Action::InitZomesComplete(izc) =>
                 write!(
                     f,
-                    "init_zomes_complete=[author={}, timestamp={}]",
+                    "init_zomes_complete=[author={}, timestamp={:?}]",
                     izc.author, izc.timestamp
                 ),
-            Action::CreateLink(link) => write!(f, "create_link=[author={}, timestamp={}, base_address={}, target_address={}, zome_index={}, link_type={:?}]", link.author, link.timestamp, link.base_address, link.target_address, link.zome_index, link.link_type),
-            Action::DeleteLink(link) => write!(f, "delete_link=[author={}, timestamp={}]", link.author, link.timestamp),
+            Action::CreateLink(link) => write!(f, "create_link=[author={}, timestamp={:?}, base_address={}, target_address={}, zome_index={}, link_type={:?}]", link.author, link.timestamp, link.base_address, link.target_address, link.zome_index, link.link_type),
+            Action::DeleteLink(link) => write!(f, "delete_link=[author={}, timestamp={:?}]", link.author, link.timestamp),
             Action::OpenChain(oc) => write!(
                 f,
-                "open_chain=[author={}, timestamp={}]",
+                "open_chain=[author={}, timestamp={:?}]",
                 oc.author, oc.timestamp
             ),
             Action::CloseChain(cc) => write!(
                 f,
-                "close_chain=[author={}, timestamp={}]",
+                "close_chain=[author={}, timestamp={:?}]",
                 cc.author, cc.timestamp
             ),
-            Action::Create(create) => write!(f, "create=[author={}, timestamp={}, entry_type={:?}, entry_hash={}]", create.author, create.timestamp, create.entry_type, create.entry_hash),
-            Action::Update(update) => write!(f, "create=[author={}, timestamp={}, original_action_address={}, original_entry_address={}, entry_type={:?}, entry_hash={}]", update.author, update.timestamp, update.original_action_address, update.original_entry_address, update.entry_type, update.entry_hash),
-            Action::Delete(delete) => write!(f, "create=[author={}, timestamp={}, deletes_address={}, deletes_entry_address={}]", delete.author, delete.timestamp, delete.deletes_address, delete.deletes_entry_address),
+            Action::Create(create) => write!(f, "create=[author={}, timestamp={:?}, entry_type={:?}, entry_hash={}]", create.author, create.timestamp, create.entry_type, create.entry_hash),
+            Action::Update(update) => write!(f, "create=[author={}, timestamp={:?}, original_action_address={}, original_entry_address={}, entry_type={:?}, entry_hash={}]", update.author, update.timestamp, update.original_action_address, update.original_entry_address, update.entry_type, update.entry_hash),
+            Action::Delete(delete) => write!(f, "create=[author={}, timestamp={:?}, deletes_address={}, deletes_entry_address={}]", delete.author, delete.timestamp, delete.deletes_address, delete.deletes_entry_address),
         }
     }
 }

@@ -35,14 +35,7 @@ use holochain_zome_types::{
 };
 use matches::assert_matches;
 use parking_lot::RwLock;
-use std::{
-    collections::HashSet,
-    sync::{
-        atomic::{AtomicI8, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 // test app validation with a must get action where the original action of
 // a delete is not in the cache db and then added to it
@@ -295,14 +288,12 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
     let expected_chain_top = delete_action_signed_hashed.clone();
-    let times_same_hash_is_fetched = Arc::new(AtomicI8::new(0));
 
     // mock network with alice not being an authority of bob's action
     let mut network = MockHolochainP2pDnaT::new();
     network.expect_authority_for_hash().returning(|_| Ok(false));
     // return single action as requested chain
     network.expect_must_get_agent_activity().returning({
-        let times_same_hash_is_fetched = times_same_hash_is_fetched.clone();
         let expected_chain_top = expected_chain_top.clone();
         let create_action_signed_hashed = create_action_signed_hashed.clone();
         let delete_action_signed_hashed = delete_action_signed_hashed.clone();
@@ -310,9 +301,6 @@ async fn validation_callback_awaiting_deps_agent_activity() {
             assert_eq!(author, alice);
             assert_eq!(&filter.chain_top, expected_chain_top.as_hash());
 
-            times_same_hash_is_fetched
-                .clone()
-                .fetch_add(1, Ordering::Relaxed);
             Ok(vec![MustGetAgentActivityResponse::activity(vec![
                 RegisterAgentActivity {
                     action: create_action_signed_hashed.clone(),
@@ -358,235 +346,6 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         .await
         .unwrap();
     assert_matches!(outcome, Outcome::Accepted);
-}
-
-// test that unresolved dependent hashes can be fetched multiple times
-#[tokio::test(flavor = "multi_thread")]
-async fn validation_callback_allow_multiple_identical_hash_fetches() {
-    holochain_trace::test_run();
-
-    let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
-        move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
-                let result =
-                    api.must_get_action(MustGetActionInput(delete.hashed.deletes_address.clone()));
-                if result.is_ok() {
-                    Ok(ValidateCallbackResult::Valid)
-                } else {
-                    Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::Hashes(vec![delete
-                            .hashed
-                            .deletes_address
-                            .clone()
-                            .into()]),
-                    ))
-                }
-            } else {
-                unreachable!()
-            }
-        }
-    });
-
-    let TestCase {
-        zomes_to_invoke,
-        ribosome,
-        alice,
-        bob,
-        workspace,
-        test_space,
-    } = TestCase::new(zomes).await;
-
-    // a create by alice
-    let mut create = fixt!(Create);
-    create.author = alice.clone();
-    let create_action = Action::Create(create.clone());
-    let create_action_signed_hashed =
-        SignedHashed::new_unchecked(create_action.clone(), fixt!(Signature));
-    // a delete by bob that references alice's create
-    let mut delete = fixt!(Delete);
-    delete.author = bob.clone();
-    delete.deletes_address = create_action.clone().to_hash();
-    let delete_action_signed_hashed = SignedHashed::new_unchecked(delete.clone(), fixt!(Signature));
-    let delete_action_op = Op::RegisterDelete(RegisterDelete {
-        delete: delete_action_signed_hashed.clone(),
-    });
-    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
-
-    let action_to_be_fetched = create_action_signed_hashed.clone();
-    let times_same_hash_is_fetched = Arc::new(AtomicI8::new(0));
-
-    // mock network that returns the requested create action and increments
-    // counter of identical hash fetches
-    let mut network = MockHolochainP2pDnaT::new();
-    network.expect_get().returning({
-        let times_same_hash_is_fetched = times_same_hash_is_fetched.clone();
-        move |hash, _| {
-            if hash == action_to_be_fetched.as_hash().clone().into() {
-                times_same_hash_is_fetched.fetch_add(1, Ordering::SeqCst);
-            };
-            Ok(vec![WireOps::Record(WireRecordOps {
-                action: Some(Judged::new(
-                    action_to_be_fetched.clone().into(),
-                    ValidationStatus::Valid,
-                )),
-                deletes: vec![],
-                updates: vec![],
-                entry: None,
-            })])
-        }
-    });
-    let network = Arc::new(network);
-
-    let dpki = None;
-
-    // run two op validations that depend on the same record in parallel
-    let _validate_1 = run_validation_callback(
-        invocation.clone(),
-        &ribosome,
-        workspace.clone(),
-        network.clone(),
-        dpki.clone(),
-        false,
-    );
-    let _validate_2 =
-        run_validation_callback(invocation, &ribosome, workspace, network, dpki, false);
-    futures::future::join_all([_validate_1, _validate_2]).await;
-
-    await_actions_in_cache(
-        &test_space.space.cache_db,
-        vec![create_action_signed_hashed.as_hash().clone()],
-    )
-    .await;
-
-    assert_eq!(times_same_hash_is_fetched.load(Ordering::SeqCst), 2);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn validation_callback_allow_multiple_identical_agent_activity_fetches() {
-    holochain_trace::test_run();
-
-    let zomes = SweetInlineZomes::new(vec![], 0).integrity_function("validate", {
-        move |api, op: Op| {
-            if let Op::RegisterDelete(RegisterDelete { delete }) = op {
-                // chain filter with delete as chain top and create as chain bottom
-                let mut filter_hashes = HashSet::new();
-                filter_hashes.insert(delete.hashed.deletes_address.clone());
-                let chain_filter = ChainFilter {
-                    chain_top: delete.as_hash().clone(),
-                    filters: ChainFilters::Until(filter_hashes),
-                    include_cached_entries: false,
-                };
-                let result = api.must_get_agent_activity(MustGetAgentActivityInput {
-                    author: delete.hashed.author.clone(),
-                    chain_filter: chain_filter.clone(),
-                });
-                if result.is_ok() {
-                    Ok(ValidateCallbackResult::Valid)
-                } else {
-                    Ok(ValidateCallbackResult::UnresolvedDependencies(
-                        UnresolvedDependencies::AgentActivity(
-                            delete.hashed.author.clone(),
-                            chain_filter.clone(),
-                        ),
-                    ))
-                }
-            } else {
-                unreachable!()
-            }
-        }
-    });
-
-    let TestCase {
-        zomes_to_invoke,
-        ribosome,
-        alice,
-        workspace,
-        test_space,
-        ..
-    } = TestCase::new(zomes).await;
-
-    // a create by alice
-    let mut create = fixt!(Create);
-    create.author = alice.clone();
-    create.action_seq = 0;
-    let create_action = Action::Create(create.clone());
-    let create_action_signed_hashed =
-        SignedActionHashed::new_unchecked(create_action.clone(), fixt!(Signature));
-    // a delete by alice that references the create
-    let mut delete = fixt!(Delete);
-    delete.author = alice.clone();
-    delete.action_seq = 1;
-    // prev_action must be set, otherwise it will be filtered from the chain
-    // that must_get_agent_activity returns
-    delete.prev_action = create_action.clone().to_hash();
-    delete.deletes_address = create_action.clone().to_hash();
-    let delete_action = Action::Delete(delete.clone());
-    let delete_action_signed_hashed =
-        SignedActionHashed::new_unchecked(delete_action.clone(), fixt!(Signature));
-    let delete_action_op = Op::RegisterDelete(RegisterDelete {
-        delete: SignedHashed::new_unchecked(delete.clone(), fixt!(Signature)),
-    });
-    let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
-
-    let expected_chain_top = delete_action_signed_hashed.clone();
-    let times_same_hash_is_fetched = Arc::new(AtomicI8::new(0));
-
-    // mock network with alice not being an authority of bob's action
-    let mut network = MockHolochainP2pDnaT::new();
-    network.expect_authority_for_hash().returning(|_| Ok(false));
-    // return single action as requested chain
-    network.expect_must_get_agent_activity().returning({
-        let times_same_hash_is_fetched = times_same_hash_is_fetched.clone();
-        let expected_chain_top = expected_chain_top.clone();
-        let create_action_signed_hashed = create_action_signed_hashed.clone();
-        let delete_action_signed_hashed = delete_action_signed_hashed.clone();
-        move |author, filter| {
-            assert_eq!(author, alice);
-            assert_eq!(&filter.chain_top, expected_chain_top.as_hash());
-
-            times_same_hash_is_fetched
-                .clone()
-                .fetch_add(1, Ordering::SeqCst);
-            Ok(vec![MustGetAgentActivityResponse::activity(vec![
-                RegisterAgentActivity {
-                    action: create_action_signed_hashed.clone(),
-                    cached_entry: None,
-                },
-                RegisterAgentActivity {
-                    action: delete_action_signed_hashed.clone(),
-                    cached_entry: None,
-                },
-            ])])
-        }
-    });
-    let network = Arc::new(network);
-
-    let dpki = None;
-
-    // run two op validations that depend on the same record
-    let _validate_1 = run_validation_callback(
-        invocation.clone(),
-        &ribosome,
-        workspace.clone(),
-        network.clone(),
-        dpki.clone(),
-        false,
-    );
-    let _validate_2 =
-        run_validation_callback(invocation, &ribosome, workspace, network, dpki, false);
-    futures::future::join_all([_validate_1, _validate_2]).await;
-
-    // await while missing records are being fetched in background task
-    await_actions_in_cache(
-        &test_space.space.cache_db,
-        vec![
-            create_action_signed_hashed.as_hash().clone(),
-            delete_action_signed_hashed.as_hash().clone(),
-        ],
-    )
-    .await;
-
-    assert_eq!(times_same_hash_is_fetched.load(Ordering::SeqCst), 2);
 }
 
 // test case with alice and bob agent keys

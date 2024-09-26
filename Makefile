@@ -3,15 +3,21 @@
 # the gha workflow sets this globally
 # set this also for local executions so we get the same results
 F=RUSTFLAGS="-Dwarnings"
-A=slow_tests,build_wasms,sqlite-encrypted,chc
+
+# All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
+DEFAULT_FEATURES=chc,slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
 	static-all static-fmt static-toml static-clippy static-doc \
-	build-workspace test-workspace
+	build-workspace-wasmer_sys build-workspace-wasmer_wamr \
+	test-workspace-wasmer_sys test-workspace-wasmer_wamr
 
 # default to running everything (first rule)
-default: build-workspace test-workspace
+default: build-workspace-wasmer_sys \
+	test-workspace-wasmer_sys \
+	build-workspace-wasmer_wamr \
+	test-workspace-wasmer_wamr
 
 # execute all static code validation
 static-all: static-fmt static-toml static-clippy static-doc
@@ -39,28 +45,35 @@ static-doc:
 # but also ensures targets like benchmarks remain buildable.
 # NOTE: excludes must match test-workspace nextest params,
 #       otherwise some rebuilding will occur due to resolver = "2"
-build-workspace:
+build-workspace-wasmer_sys:
 	$(F) cargo build \
 		--workspace \
 		--locked \
-		--exclude hdk_derive \
-		--features $(A) --all-targets
+		--all-targets \
+		--no-default-features \
+		--features $(DEFAULT_FEATURES),wasmer_sys
+
+build-workspace-wasmer_wamr:
+	$(F) cargo build \
+		--workspace \
+		--locked \
+		--all-targets \
+		--no-default-features \
+		--features $(DEFAULT_FEATURES),wasmer_wamr
 
 # execute tests on all creates
-test-workspace:
+test-workspace-wasmer_sys:
 	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
-		--exclude hdk_derive \
 		--locked \
-		--features $(A)
-	# hdk_derive cannot currently be tested via nextest
-	# https://github.com/nextest-rs/nextest/issues/267
-	$(F) cargo build \
-		--manifest-path crates/hdk_derive/Cargo.toml \
+		--no-default-features \
+		--features $(DEFAULT_FEATURES),wasmer_sys
+
+test-workspace-wasmer_wamr:
+	cargo install cargo-nextest
+	$(F) RUST_BACKTRACE=1 cargo nextest run \
+		--workspace \
 		--locked \
-		--all-features --all-targets
-	$(F) RUST_BACKTRACE=1 cargo test \
-		--manifest-path crates/hdk_derive/Cargo.toml \
-		--locked \
-		--all-features
+		--no-default-features \
+		--features $(DEFAULT_FEATURES),wasmer_wamr

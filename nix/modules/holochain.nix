@@ -21,7 +21,7 @@
 
         CARGO_PROFILE = "";
 
-        buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher ])
+        buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher cmake clang llvmPackages.libclang.lib ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
             AppKit
@@ -130,9 +130,15 @@
               (name: value:
                 builtins.concatStringsSep " " [
                   (
-                    if value == "allow" then "-A"
-                    else if value == "deny" then "-D"
-                    else throw "unsupported lint: ${name} = ${value}"
+                    if builtins.typeOf value == "string" then
+                      if value == "allow" then "-A"
+                      else if value == "deny" then "-D"
+                      else throw "unsupported lint level: ${name} = ${value}"
+                    else if builtins.typeOf value == "set" && builtins.typeOf value.level == "string" then
+                      if value.level == "allow" then "-A"
+                      else if value.level == "deny" then "-D"
+                      else throw "unsupported lint level: ${name}.level = ${value.level}"
+                    else throw "unsupported value for lint: ${name}"
                   )
                   "clippy::${name}"
                 ]

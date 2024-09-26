@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{ArgAction, Parser};
+use clap::Parser;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::TransportConfig;
 use url2::Url2;
@@ -41,8 +41,12 @@ pub struct Create {
     pub in_process_lair: bool,
 
     /// Launch Holochain with the DPKI service disabled.
-    #[arg(long, action = ArgAction::SetFalse)]
+    #[arg(long)]
     pub no_dpki: bool,
+
+    /// Set the network seed for the DPKI service.
+    #[arg(long, conflicts_with = "no_dpki")]
+    pub dpki_network_seed: Option<String>,
 
     /// Set the conductor config CHC (Chain Head Coordinator) URL
     #[cfg(feature = "chc")]
@@ -292,6 +296,7 @@ impl Default for Create {
             directories: Vec::with_capacity(0),
             in_process_lair: false,
             no_dpki: false,
+            dpki_network_seed: None,
             #[cfg(feature = "chc")]
             chc_url: None,
         }
