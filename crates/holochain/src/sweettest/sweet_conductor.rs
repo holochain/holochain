@@ -330,7 +330,7 @@ impl SweetConductor {
 
         let agent = self
             .raw_handle()
-            .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof)
+            .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof, None)
             .await?;
 
         self.raw_handle().enable_app(installed_app_id).await?;
@@ -601,7 +601,7 @@ impl SweetConductor {
     }
 
     /// Shutdown this conductor.
-    /// This will wait for the conductor to shutdown but
+    /// This will wait for the conductor to shut down but
     /// keep the inner state to restart it.
     ///
     /// Attempting to use this conductor without starting it up again will cause a panic.
@@ -924,7 +924,9 @@ impl WsPollRecv {
 /// done with a [WsPollRecv].
 /// If this is an app client, you will need to authenticate the connection before you can send any
 /// other requests.
-pub async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, WebsocketReceiver)> {
+pub async fn websocket_client_by_port(
+    port: u16,
+) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
     connect(
         Arc::new(WebsocketConfig::CLIENT_DEFAULT),
         ConnectRequest::new(

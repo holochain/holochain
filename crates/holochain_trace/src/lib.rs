@@ -99,10 +99,7 @@ pub mod metrics;
 mod writer;
 
 mod open;
-#[cfg(all(feature = "opentelemetry-on", feature = "channels"))]
-pub use open::channel;
-#[cfg(feature = "opentelemetry-on")]
-pub use open::should_run;
+
 pub use open::{Config, Context, MsgWrap, OpenSpanExt};
 
 use crate::writer::InMemoryWriter;
@@ -126,8 +123,8 @@ pub enum Output {
     FlameTimed,
     /// Creates a flamegraph from timed spans using idle time
     IceTimed,
-    /// Opentelemetry tracing
-    OpenTel,
+    // /// Opentelemetry tracing
+    // OpenTel,
     /// No logging to console
     None,
 }
@@ -166,15 +163,6 @@ pub fn test_run() {
     INIT_ONCE.call_once(|| {
         init_fmt(Output::Log).unwrap();
     });
-}
-
-/// Run tracing in a test that uses open telemetry to
-/// send span contexts across process and thread boundaries.
-pub fn test_run_open() -> Result<(), errors::TracingError> {
-    if std::env::var_os("RUST_LOG").is_none() {
-        return Ok(());
-    }
-    init_fmt(Output::OpenTel)
 }
 
 /// Same as test_run but with timed spans
@@ -348,29 +336,6 @@ where
             )
             .init(),
 
-        Output::OpenTel => {
-            #[cfg(feature = "opentelemetry-on")]
-            {
-                use open::OPEN_ON;
-                use opentelemetry::api::Provider;
-                OPEN_ON.store(true, std::sync::atomic::Ordering::SeqCst);
-                use tracing_subscriber::prelude::*;
-                open::init();
-                let tracer = opentelemetry::sdk::Provider::default().get_tracer("component_name");
-                let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-                finish(
-                    Registry::default()
-                        .with(standard_layer(writer)?)
-                        .with(telemetry)
-                        .with(open::OpenLayer)
-                        .init(),
-                )
-            }
-            #[cfg(not(feature = "opentelemetry-on"))]
-            {
-                init_fmt_with_opts(Output::Log, writer)?
-            }
-        }
         Output::None => (),
     };
     Ok(())

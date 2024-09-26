@@ -38,11 +38,9 @@ pub struct EntryTestData {
 pub struct RecordTestData {
     pub store_record_op: ChainOpHashed,
     pub update_store_record_op: ChainOpHashed,
-    pub delete_by_op: ChainOpHashed,
     pub entry: Entry,
     pub action: SignedActionHashed,
     pub update_action: SignedActionHashed,
-    pub create_hash: ActionHash,
     pub update_hash: ActionHash,
 }
 
@@ -259,12 +257,6 @@ impl RecordTestData {
         );
 
         let signature = fixt!(Signature);
-        let delete_by_op = ChainOpHashed::from_content_sync(ChainOp::RegisterDeletedBy(
-            signature.clone(),
-            delete.clone(),
-        ));
-
-        let signature = fixt!(Signature);
         let update_store_record_op = ChainOpHashed::from_content_sync(ChainOp::StoreRecord(
             signature.clone(),
             Action::Update(update.clone()),
@@ -282,8 +274,6 @@ impl RecordTestData {
             update_store_record_op,
             update_action,
             entry,
-            delete_by_op,
-            create_hash,
             update_hash,
         }
     }

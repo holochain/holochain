@@ -324,8 +324,23 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
-        let _permit = acquire_semaphore_permit(self.0.write_semaphore.clone()).await?;
+        let permit = acquire_semaphore_permit(self.0.write_semaphore.clone()).await?;
+        self.write_async_with_permit(permit, f)
+            .await
+            .map(|(r, _permit)| r)
+    }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(kind = ?self.kind)))]
+    pub async fn write_async_with_permit<E, R, F>(
+        &self,
+        permit: OwnedSemaphorePermit,
+        f: F,
+    ) -> Result<(R, OwnedSemaphorePermit), E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
         let mut conn = self.get_connection_from_pool()?;
 
         let start = tokio::time::Instant::now();
@@ -338,12 +353,21 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                 log_elapsed!([10, 100, 1000], start, "write_async:before-closure");
                 let r = conn.execute_in_exclusive_rw_txn(f);
                 log_elapsed!([10, 100, 1000], start, "write_async:after-closure");
-                r
+                r.map(|r| (r, permit))
             })
         }).in_current_span()).in_current_span().await.map_err(|e| {
             tracing::error!("Failed to claim a thread to run the database write transaction. It's likely that the program is out of threads.");
             DatabaseError::Timeout(e)
         })?.map_err(DatabaseError::from)?
+    }
+
+    /// Acquire the single write permit for the database.
+    ///
+    /// This will prevent any other writes from proceeding until the semaphore is released.
+    /// It can be used to ensure that a read, followed by other operations, followed by another
+    /// write, will not be interleaved with some other write.
+    pub async fn acquire_write_permit(&self) -> DatabaseResult<OwnedSemaphorePermit> {
+        acquire_semaphore_permit(self.0.write_semaphore.clone()).await
     }
 
     pub fn available_writer_count(&self) -> usize {

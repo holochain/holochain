@@ -8,7 +8,6 @@ use holochain_types::{
     app::DeleteCloneCellPayload,
 };
 use holochain_util::tokio_helper;
-use holochain_wasmer_host::prelude::wasm_error;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::clone::DeleteCloneCellInput;
 use wasmer::RuntimeError;

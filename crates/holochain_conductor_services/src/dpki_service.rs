@@ -27,26 +27,16 @@ pub struct DpkiService {
     /// used in this CellId.
     pub cell_id: CellId,
 
-    pub device_seed_lair_tag: String,
-
     /// State must be accessed through a Mutex
     state: tokio::sync::Mutex<Box<dyn DpkiState>>,
 }
 
 /// Interface for the DPKI service
 impl DpkiService {
-    pub fn new(
-        cell_id: CellId,
-        device_seed_lair_tag: String,
-        state: impl DpkiState + 'static,
-    ) -> Self {
+    pub fn new(cell_id: CellId, state: impl DpkiState + 'static) -> Self {
         let state: Box<dyn DpkiState> = Box::new(state);
         let state = tokio::sync::Mutex::new(state);
-        Self {
-            cell_id,
-            device_seed_lair_tag,
-            state,
-        }
+        Self { cell_id, state }
     }
 
     /// Whether the passed in DNA hash is Deepkey DNA hash
@@ -65,13 +55,8 @@ impl DpkiService {
             cell_id: installation.cell_id.clone(),
         });
         let cell_id = installation.cell_id;
-        let device_seed_lair_tag = installation.device_seed_lair_tag;
         let state = tokio::sync::Mutex::new(state);
-        Self {
-            cell_id,
-            device_seed_lair_tag,
-            state,
-        }
+        Self { cell_id, state }
     }
 
     pub async fn state(&self) -> tokio::sync::MutexGuard<Box<dyn DpkiState>> {

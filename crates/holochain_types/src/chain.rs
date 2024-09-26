@@ -226,7 +226,7 @@ impl<I: AsRef<A>, A: ChainItem> ChainFilterIter<I, A> {
     ///
     /// # Constraints
     /// - If the iterator does not contain the filter's chain_top
-    /// then this will be an empty iterator.
+    ///   then this will be an empty iterator.
     pub fn new(filter: ChainFilter<A::Hash>, mut chain: Vec<I>) -> Self {
         // Sort by descending.
         chain.sort_unstable_by_key(|a| u32::MAX - a.as_ref().seq());

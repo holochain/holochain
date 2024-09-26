@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.4.0-dev.26
+
+## 0.4.0-dev.25
+
+## 0.4.0-dev.24
+
+- Add feature flags `wasmer_sys` and `wasmer_wamr` to toggle between using the current wasm compiler and the new, experimental wasm interpreter. Bundling pre-compiled and pre-serialized DNAs is not supported in the `wasmer_wamr` feature.
+
+## 0.4.0-dev.23
+
 ## 0.4.0-dev.22
 
 ## 0.4.0-dev.21

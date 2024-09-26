@@ -30,6 +30,12 @@ impl<T: 'static + Send> std::hash::Hash for Share<T> {
     }
 }
 
+impl<T: 'static + Send + Default> Default for Share<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
 impl<T: 'static + Send> Share<T> {
     /// Create a new share lock.
     pub fn new(t: T) -> Self {

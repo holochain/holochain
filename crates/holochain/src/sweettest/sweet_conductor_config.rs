@@ -36,6 +36,8 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
             }]),
             tuning_params: Some(ConductorTuningParams {
                 sys_validation_retry_delay: Some(std::time::Duration::from_secs(1)),
+                countersigning_resolution_retry_delay: Some(std::time::Duration::from_secs(3)),
+                countersigning_resolution_retry_limit: None,
             }),
             ..Default::default()
         }
@@ -71,7 +73,7 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        SweetConductorConfig::from(KitsuneP2pConfig::default())
+        let mut c = SweetConductorConfig::from(KitsuneP2pConfig::default())
             .tune(|tune| {
                 tune.gossip_loop_iteration_delay_ms = 500;
                 tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
@@ -80,7 +82,12 @@ impl SweetConductorConfig {
             })
             .tune_conductor(|tune| {
                 tune.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
-            })
+            });
+
+        // Allow device seed generation to exercise key derivation in sweettests.
+        c.device_seed_lair_tag = Some("sweet-conductor-device-seed".to_string());
+        c.danger_generate_throwaway_device_seed = true;
+        c
     }
 
     /// Disable DPKI, which is on by default.

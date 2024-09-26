@@ -13,7 +13,6 @@ mod init;
 mod inline_zome_spec;
 mod migration;
 mod multi_conductor;
-mod network_tests;
 mod new_lair;
 mod publish;
 mod regression;
