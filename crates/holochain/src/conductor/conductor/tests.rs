@@ -1362,3 +1362,45 @@ async fn test_deferred_memproof_provisioning_uninstall() {
         .unwrap();
     assert_eq!(conductor.list_apps(None).await.unwrap().len(), 0);
 }
+
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_list_apps_sorted_consistently() {
+    holochain_trace::test_run();
+
+    let mk_dna = |name: &'static str| async move {
+        let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
+        SweetDnaFile::unique_from_inline_zomes((name, zome)).await
+    };
+
+    // Create three unique DNAs
+    let (dna1, _, _) = mk_dna("zome1").await;
+    let (dna2, _, _) = mk_dna("zome2").await;
+    let (dna3, _, _) = mk_dna("zome3").await;
+
+    // Install two apps on the Conductor:
+    // Both share a CellId in common, and also include a distinct CellId each.
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app1 = conductor.setup_app("app1", [&dna1]).await.unwrap();
+    let app2 = conductor.setup_app("app2", [&dna1]).await.unwrap();
+    let app3 = conductor.setup_app("app3", [&dna1]).await.unwrap();
+
+    let list_apps = |conductor: ConductorHandle| async move {
+        conductor
+            .list_apps()
+            .await
+            .unwrap()
+    };
+
+    // Ensure that ordering is sorted by installed_at descending
+    assert_eq!(
+        list_apps(conductor.clone()).await,
+        ["app1".to_string(), "app2".to_string(), "app3".to_string()]
+    );
+
+    // Ensure that ordering is consistent every time
+    assert_eq!(
+        list_apps(conductor.clone()).await,
+        ["app1".to_string(), "app2".to_string(), "app3".to_string()]
+    );
+}

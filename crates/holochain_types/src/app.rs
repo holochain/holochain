@@ -460,6 +460,9 @@ pub struct InstalledAppCommon {
 
     /// The manifest used to install the app.
     pub manifest: AppManifest,
+
+    /// The timestamp when this app was installed
+    pub installed_at: Timestamp,
 }
 
 impl InstalledAppCommon {
@@ -483,6 +486,7 @@ impl InstalledAppCommon {
             agent_key,
             role_assignments,
             manifest,
+            installed_at: Timestamp::now(),
         })
     }
 
@@ -880,6 +884,7 @@ impl InstalledAppCommon {
             agent_key,
             role_assignments,
             manifest,
+            installed_at: Timestamp::now(),
         })
     }
 
@@ -893,6 +898,11 @@ impl InstalledAppCommon {
     /// Return the list of role assignments
     pub fn role_assignments(&self) -> &HashMap<RoleName, AppRoleAssignment> {
         &self.role_assignments
+    }
+
+    /// Accessor
+    pub fn installed_at(&self) -> &Timestamp {
+        &self.installed_at
     }
 }
 

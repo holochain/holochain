@@ -1837,6 +1837,8 @@ mod app_impls {
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .flatten()
+                .sort_by_key(|app_info| app_info.installed_at)
+                .reverse()
                 .collect();
 
             Ok(app_infos)
