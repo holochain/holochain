@@ -472,6 +472,7 @@ impl InstalledAppCommon {
         agent_key: AgentPubKey,
         role_assignments: I,
         manifest: AppManifest,
+        installed_at: Timestamp,
     ) -> AppResult<Self> {
         let role_assignments: HashMap<_, _> = role_assignments.into_iter().collect();
         // ensure no role name contains a clone id delimiter
@@ -486,7 +487,7 @@ impl InstalledAppCommon {
             agent_key,
             role_assignments,
             manifest,
-            installed_at: Timestamp::now(),
+            installed_at,
         })
     }
 
@@ -884,7 +885,7 @@ impl InstalledAppCommon {
             agent_key,
             role_assignments,
             manifest,
-            installed_at: Timestamp::now(),
+            Timestamp::now(),
         })
     }
 
@@ -1287,6 +1288,7 @@ mod tests {
                 AppRolePrimary::new(fixt!(DnaHash), false, 0).into(),
             )],
             AppManifest::arbitrary(&mut u).unwrap(),
+            Timestamp::now(),
         );
         assert!(result.is_err())
     }
@@ -1305,6 +1307,7 @@ mod tests {
             agent.clone(),
             vec![(role_name.clone(), role1)],
             manifest,
+            Timestamp::now(),
         )
         .unwrap()
         .into();
