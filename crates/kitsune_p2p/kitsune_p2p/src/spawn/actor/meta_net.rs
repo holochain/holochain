@@ -318,7 +318,7 @@ pub enum MetaNetCon {
         tun: KitsuneP2pTuningParams,
     },
 
-    #[cfg(test)]
+    #[cfg(feature = "test_utils")]
     Test {
         state: Arc<parking_lot::RwLock<MetaNetConTest>>,
     },
@@ -337,7 +337,7 @@ impl Eq for MetaNetCon {}
 
 impl MetaNetCon {
     pub async fn close(&self, code: u32, reason: &str) {
-        #[cfg(test)]
+        #[cfg(feature = "test_utils")]
         {
             if let MetaNetCon::Test { state } = self {
                 state.write().closed = true;
@@ -357,7 +357,7 @@ impl MetaNetCon {
     }
 
     pub fn is_closed(&self) -> bool {
-        #[cfg(test)]
+        #[cfg(feature = "test_utils")]
         {
             if let MetaNetCon::Test { state } = self {
                 return state.read().closed;
@@ -376,7 +376,8 @@ impl MetaNetCon {
             MetaNetCon::Tx5 { host, .. } => {
                 nodespace_is_authorized(host, self.peer_id(), payload.maybe_space(), now).await
             }
-            #[cfg(test)]
+
+            #[cfg(feature = "test_utils")]
             MetaNetCon::Test { .. } => MetaNetAuth::Authorized,
         }
     }
@@ -389,7 +390,7 @@ impl MetaNetCon {
         let result = async move {
             match self.wire_is_authorized(payload, Timestamp::now()).await {
                 MetaNetAuth::Authorized => {
-                    #[cfg(test)]
+                    #[cfg(feature = "test_utils")]
                     {
                         if let MetaNetCon::Test { state } = self {
                             let mut state = state.write();
@@ -531,7 +532,7 @@ impl MetaNetCon {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "test_utils")]
 #[derive(Debug)]
 pub struct MetaNetConTest {
     pub id: NodeCert,
@@ -541,7 +542,7 @@ pub struct MetaNetConTest {
     pub notify_call_count: usize,
 }
 
-#[cfg(test)]
+#[cfg(feature = "test_utils")]
 impl Default for MetaNetConTest {
     fn default() -> Self {
         Self {
@@ -553,7 +554,7 @@ impl Default for MetaNetConTest {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "test_utils")]
 impl MetaNetConTest {
     pub fn new_with_id(id: u8) -> Self {
         Self {

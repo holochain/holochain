@@ -45,33 +45,39 @@ pub async fn spawn_kitsune_p2p(
         self_host_api
     };
 
-    // Create the network. Any events it sends will have to wait to be processed until Kitsune has finished initialising
-    // but everything that is needed to construct the network is available now.
-    let (ep_hnd, ep_evt, bootstrap_net, maybe_peer_url) = create_meta_net(
-        &config,
-        tls_config,
-        internal_sender.clone(),
-        self_host_api.clone(),
-        preflight_user_data,
-    )
-    .await?;
+    if config.is_tx5() || !cfg!(feature = "test_utils") {
+        // Create the network. Any events it sends will have to wait to be processed until Kitsune has finished initialising
+        // but everything that is needed to construct the network is available now.
+        let (ep_hnd, ep_evt, bootstrap_net, maybe_peer_url) = create_meta_net(
+            &config,
+            tls_config,
+            internal_sender.clone(),
+            self_host_api.clone(),
+            preflight_user_data,
+        )
+        .await?;
 
-    tokio::task::spawn(
-        builder.spawn(
-            KitsuneP2pActor::new(
-                config,
-                channel_factory,
-                internal_sender,
-                host,
-                self_host_api,
-                ep_hnd,
-                ep_evt,
-                bootstrap_net,
-                maybe_peer_url,
-            )
-            .await?,
-        ),
-    );
+        tokio::task::spawn(
+            builder.spawn(
+                KitsuneP2pActor::new(
+                    config,
+                    channel_factory,
+                    internal_sender,
+                    host,
+                    self_host_api,
+                    ep_hnd,
+                    ep_evt,
+                    bootstrap_net,
+                    maybe_peer_url,
+                )
+                .await?,
+            ),
+        );
+    } else {
+        tracing::warn!(
+            "Running conductor without networking. This should only be possible in test mode."
+        );
+    }
 
     Ok((sender, evt_recv))
 }
