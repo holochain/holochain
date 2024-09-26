@@ -295,14 +295,12 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     let invocation = ValidateInvocation::new(zomes_to_invoke, &delete_action_op).unwrap();
 
     let expected_chain_top = delete_action_signed_hashed.clone();
-    let times_same_hash_is_fetched = Arc::new(AtomicI8::new(0));
 
     // mock network with alice not being an authority of bob's action
     let mut network = MockHolochainP2pDnaT::new();
     network.expect_authority_for_hash().returning(|_| Ok(false));
     // return single action as requested chain
     network.expect_must_get_agent_activity().returning({
-        let times_same_hash_is_fetched = times_same_hash_is_fetched.clone();
         let expected_chain_top = expected_chain_top.clone();
         let create_action_signed_hashed = create_action_signed_hashed.clone();
         let delete_action_signed_hashed = delete_action_signed_hashed.clone();
@@ -310,9 +308,6 @@ async fn validation_callback_awaiting_deps_agent_activity() {
             assert_eq!(author, alice);
             assert_eq!(&filter.chain_top, expected_chain_top.as_hash());
 
-            times_same_hash_is_fetched
-                .clone()
-                .fetch_add(1, Ordering::Relaxed);
             Ok(vec![MustGetAgentActivityResponse::activity(vec![
                 RegisterAgentActivity {
                     action: create_action_signed_hashed.clone(),
