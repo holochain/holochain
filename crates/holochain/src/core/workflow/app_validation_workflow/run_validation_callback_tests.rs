@@ -35,11 +35,7 @@ use holochain_zome_types::{
 };
 use matches::assert_matches;
 use parking_lot::RwLock;
-use std::{
-    collections::HashSet,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 // test app validation with a must get action where the original action of
 // a delete is not in the cache db and then added to it
