@@ -3090,9 +3090,9 @@ mod misc_impls {
             validate: bool,
             records: Vec<Record>,
         ) -> ConductorApiResult<()> {
-            let CellId(dna_hash, agent_key) = &cell_id;
+            let CellId(dna_hash, agent_key) = cell_id.clone();
 
-            let space = self.get_or_create_space(dna_hash)?;
+            let space = self.get_or_create_space(&dna_hash)?;
             let workspace = space
                 .source_chain_workspace(self.keystore().clone(), agent_key.clone())
                 .await?;
@@ -3100,7 +3100,7 @@ mod misc_impls {
                 .holochain_p2p()
                 .clone()
                 .into_dna(dna_hash.clone(), self.get_chc(&cell_id));
-            let ribosome = self.get_ribosome(dna_hash)?;
+            let ribosome = self.get_ribosome(&dna_hash)?;
 
             // Validate
             if validate {
@@ -3116,33 +3116,45 @@ mod misc_impls {
                 .await?;
             }
 
-            let authored = self.get_or_create_authored_db(dna_hash, agent_key.clone())?;
-            let dht = self.get_dht_db(dna_hash)?;
-            let cache = self.get_dht_db_cache(dna_hash)?;
+            let authored = self.get_or_create_authored_db(&dna_hash, agent_key.clone())?;
+            let dht = self.get_dht_db(&dna_hash)?;
+            let cache = self.get_dht_db_cache(&dna_hash)?;
 
             let op_hashes = authored
                 .write_async(|txn| {
-                    SourceChainResult::Ok(
-                        SourceChain::graft_records_onto_source_chain_txn(txn, records, cell_id)?
-                            .into_iter()
-                            .map(|(hash, _basis)| hash)
-                            .collect(),
-                    )
+                    SourceChain::graft_records_onto_source_chain_txn(txn, records, cell_id)
                 })
                 .await?;
 
-            // Integrate the ops.
-            // XXX: this is not checking for authorityship and just integrating everything we author,
-            //      which is wasteful of disk space in a sharded network, but not dangerous.
-            //      The reason for doing this is that when doing a CHC sync during genesis, we have not
-            //      yet joined the network, so we can't actually check authorityship at that time.
-            holochain_state::integrate::authored_ops_to_dht_db_without_check(
-                op_hashes,
-                authored.into(),
-                dht,
-                &cache,
-            )
-            .await?;
+            let has_genesis =
+                crate::core::workflow::GenesisWorkspace::new(authored.clone(), dht.clone())
+                    .has_genesis(agent_key.clone())
+                    .await
+                    .unwrap_or(false);
+
+            if has_genesis {
+                holochain_state::integrate::authored_ops_to_dht_db(
+                    &network,
+                    op_hashes,
+                    authored.into(),
+                    dht,
+                    &cache,
+                )
+                .await?;
+            } else {
+                // Integrate the ops.
+                // XXX: this is not checking for authorityship and just integrating everything we author,
+                //      which is wasteful of disk space in a sharded network, but not dangerous.
+                //      The reason for doing this is that when doing a CHC sync during genesis, we have not
+                //      yet joined the network, so we can't actually check authorityship at that time.
+                holochain_state::integrate::authored_ops_to_dht_db_without_check(
+                    op_hashes.into_iter().map(|(hash, _basis)| hash).collect(),
+                    authored.into(),
+                    dht,
+                    &cache,
+                )
+                .await?;
+            }
 
             Ok(())
         }

@@ -19,7 +19,6 @@ use derive_more::Constructor;
 use holochain_chc::ChcImpl;
 use holochain_sqlite::prelude::*;
 use holochain_state::source_chain;
-use holochain_state::workspace::WorkspaceResult;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use rusqlite::named_params;
@@ -140,8 +139,8 @@ pub struct GenesisWorkspace {
 
 impl GenesisWorkspace {
     /// Constructor
-    pub fn new(env: DbWrite<DbKindAuthored>, dht_db: DbWrite<DbKindDht>) -> WorkspaceResult<Self> {
-        Ok(Self { vault: env, dht_db })
+    pub fn new(env: DbWrite<DbKindAuthored>, dht_db: DbWrite<DbKindDht>) -> Self {
+        Self { vault: env, dht_db }
     }
 
     pub async fn has_genesis(&self, author: AgentPubKey) -> DatabaseResult<bool> {
@@ -211,7 +210,7 @@ mod tests {
         let dpki = DpkiService::new(::fixt::fixt!(CellId), mock_dpki);
 
         {
-            let workspace = GenesisWorkspace::new(vault.clone(), dht_db.to_db()).unwrap();
+            let workspace = GenesisWorkspace::new(vault.clone(), dht_db.to_db());
 
             let mut api = MockCellConductorApiT::new();
             api.expect_conductor_services()

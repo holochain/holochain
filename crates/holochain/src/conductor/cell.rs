@@ -129,7 +129,7 @@ impl Cell {
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran.
-            GenesisWorkspace::new(authored_db.clone(), space.dht_db.clone())?
+            GenesisWorkspace::new(authored_db.clone(), space.dht_db.clone())
                 .has_genesis(id.agent_pubkey().clone())
                 .await?
         };
@@ -187,9 +187,7 @@ impl Cell {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(authored_db, dht_db)
-            .map_err(ConductorApiError::from)
-            .map_err(Box::new)?;
+        let workspace = GenesisWorkspace::new(authored_db, dht_db);
 
         // exit early if genesis has already run
         if workspace
