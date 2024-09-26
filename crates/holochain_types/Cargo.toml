@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.4.0-dev.25"
+version = "0.4.0-dev.26"
 description = "Holochain common types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -33,10 +33,10 @@ one_err = "0.0.8"
 holo_hash = { version = "^0.4.0-dev.13", path = "../holo_hash", features = [
   "encoding",
 ] }
-holochain_keystore = { version = "^0.4.0-dev.23", path = "../holochain_keystore" }
+holochain_keystore = { version = "^0.4.0-dev.24", path = "../holochain_keystore" }
 holochain_nonce = { version = "^0.4.0-dev.7", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.4.0-dev.22" }
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.4.0-dev.23"}
 holochain_trace = { version = "^0.4.0-dev.6", path = "../holochain_trace" }
 holochain_util = { version = "^0.4.0-dev.5", path = "../holochain_util", features = [
   "backtrace",
