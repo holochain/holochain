@@ -37,10 +37,7 @@ use matches::assert_matches;
 use parking_lot::RwLock;
 use std::{
     collections::HashSet,
-    sync::{
-        atomic::{AtomicI8, Ordering},
-        Arc,
-    },
+    sync::Arc,
     time::Duration,
 };
 
