@@ -111,24 +111,29 @@ pub fn insert_op_dht(
 }
 
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the Cache database.
-pub fn insert_op_cache(
-    txn: &mut Ta<DbKindCache>,
-    op: &DhtOpHashed,
-    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
-) -> StateMutationResult<()> {
-    insert_op_when(txn, op, transfer_data, Timestamp::now())
+///
+/// TODO: no transfer data is hooked up for now, but ideally in the future we want:
+/// - an AgentPubKey from the remote node should be included
+/// - perhaps a TransferMethod could include the method used to get the data, e.g. `get` vs `get_links`
+/// - timestamp is probably unnecessary since `when_stored` will suffice
+pub fn insert_op_cache(txn: &mut Ta<DbKindCache>, op: &DhtOpHashed) -> StateMutationResult<()> {
+    insert_op_when(txn, op, None, Timestamp::now())
+}
+
+/// Marker for the cases where we could include some transfer data, but this is currently
+/// not hooked up. Ideally:
+/// - an AgentPubKey from the remote node should be included
+/// - perhaps a TransferMethod could include the method used to get the data, e.g. `get` vs `get_links`
+/// - timestamp is probably unnecessary since `when_stored` will suffice
+pub fn todo_no_cache_transfer_data() -> Option<(AgentPubKey, TransferMethod, Timestamp)> {
+    None
 }
 
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into any Op database.
 /// The type is not checked, and transfer data is not set.
 #[cfg(feature = "test_utils")]
-pub fn insert_op_unchecked(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
+pub fn insert_op_untyped(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
     insert_op_when(txn, op, None, Timestamp::now())
-}
-
-#[deprecated = "handle these cases with real data"]
-pub fn todo_no_transfer_data() -> Option<(AgentPubKey, TransferMethod, Timestamp)> {
-    None
 }
 
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
@@ -343,7 +348,7 @@ pub fn insert_entry_def(
 /// Insert [`ConductorState`](https://docs.rs/holochain/latest/holochain/conductor/state/struct.ConductorState.html)
 /// into the database.
 pub fn insert_conductor_state(
-    txn: &mut Transaction,
+    txn: &mut Ta<DbKindConductor>,
     bytes: SerializedBytes,
 ) -> StateMutationResult<()> {
     let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
@@ -401,7 +406,7 @@ fn pluck_overlapping_block_bounds(
     Ok(maybe_min_maybe_max)
 }
 
-fn insert_block_inner(txn: &Transaction, block: Block) -> DatabaseResult<()> {
+fn insert_block_inner(txn: &mut Ta<DbKindConductor>, block: Block) -> DatabaseResult<()> {
     sql_insert!(txn, BlockSpan, {
         "target_id": BlockTargetId::from(block.target().clone()),
         "target_reason": BlockTargetReason::from(block.target().clone()),
@@ -411,7 +416,7 @@ fn insert_block_inner(txn: &Transaction, block: Block) -> DatabaseResult<()> {
     Ok(())
 }
 
-pub fn insert_block(txn: &Transaction, block: Block) -> DatabaseResult<()> {
+pub fn insert_block(txn: &mut Ta<DbKindConductor>, block: Block) -> DatabaseResult<()> {
     let maybe_min_maybe_max = pluck_overlapping_block_bounds(txn, block.clone())?;
 
     // Build one new block from the extremums.
@@ -433,7 +438,7 @@ pub fn insert_block(txn: &Transaction, block: Block) -> DatabaseResult<()> {
     )
 }
 
-pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<()> {
+pub fn insert_unblock(txn: &mut Ta<DbKindConductor>, unblock: Block) -> DatabaseResult<()> {
     let maybe_min_maybe_max = pluck_overlapping_block_bounds(txn, unblock.clone())?;
 
     // Reinstate anything outside the unblock bounds.
@@ -597,7 +602,7 @@ pub fn set_when_integrated(
 
 /// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was last publish time
 pub fn set_last_publish_time(
-    txn: &mut Transaction,
+    txn: &mut Ta<DbKindAuthored>,
     hash: &DhtOpHash,
     unix_epoch: std::time::Duration,
 ) -> StateMutationResult<()> {
@@ -608,7 +613,10 @@ pub fn set_last_publish_time(
 }
 
 /// Set withhold publish for a [`DhtOp`](holochain_types::dht_op::DhtOp).
-pub fn set_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
+pub fn set_withhold_publish(
+    txn: &mut Ta<DbKindAuthored>,
+    hash: &DhtOpHash,
+) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
         "withhold_publish": true,
     })?;
@@ -616,7 +624,10 @@ pub fn set_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateMut
 }
 
 /// Unset withhold publish for a [`DhtOp`](holochain_types::dht_op::DhtOp).
-pub fn unset_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
+pub fn unset_withhold_publish(
+    txn: &mut Ta<DbKindAuthored>,
+    hash: &DhtOpHash,
+) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
         "withhold_publish": Null,
     })?;
@@ -625,6 +636,15 @@ pub fn unset_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateM
 
 /// Set the receipt count for a [`DhtOp`](holochain_types::dht_op::DhtOp).
 pub fn set_receipts_complete(
+    txn: &mut Ta<DbKindAuthored>,
+    hash: &DhtOpHash,
+    complete: bool,
+) -> StateMutationResult<()> {
+    set_receipts_complete_redundantly_in_dht_db(txn, hash, complete)
+}
+
+/// Set the receipt count for a [`DhtOp`](holochain_types::dht_op::DhtOp).
+pub fn set_receipts_complete_redundantly_in_dht_db(
     txn: &mut Transaction,
     hash: &DhtOpHash,
     complete: bool,

@@ -5,7 +5,6 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::CascadeImpl;
 use holochain_state::mutations::insert_op_cache;
-use holochain_state::prelude::todo_no_transfer_data;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -66,7 +65,7 @@ pub fn must_get_agent_activity(
                             if let Some(db) = cascade.cache() {
                                 db.write_async(|txn| {
                                     for warrant in warrants {
-                                        insert_op_cache(txn, &DhtOpHashed::from_content_sync(warrant), todo_no_transfer_data())?;
+                                        insert_op_cache(txn, &DhtOpHashed::from_content_sync(warrant))?;
                                     }
                                     crate::conductor::error::ConductorResult::Ok(())
                                 }).await.map_err(|e| -> RuntimeError { wasm_error!(e).into() })?;
