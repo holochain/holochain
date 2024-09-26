@@ -1155,32 +1155,30 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_targeted_broadcast(
         &mut self,
-        orig_span: tracing::Span,
+        span: tracing::Span,
         space: Arc<KitsuneSpace>,
         agents: Vec<Arc<KitsuneAgent>>,
         timeout: KitsuneTimeout,
         payload: Vec<u8>,
         drop_at_limit: bool,
     ) -> KitsuneP2pHandlerResult<()> {
+        let span = span.or_current();
+
         let evt_sender = self.host_api.legacy.clone();
         let ro_inner = self.ro_inner.clone();
         Ok(async move {
             for agent in agents {
-                static AGENT_ID: std::sync::atomic::AtomicU64 =
-                    std::sync::atomic::AtomicU64::new(1);
-                let mut span = tracing::trace_span!(
-                    parent: &orig_span,
-                    "tgt_bcst",
-                    id = AGENT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-                );
-                if span.is_disabled() {
-                    span = orig_span.clone();
-                }
                 let agent_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&agent.0);
-                span.in_scope(|| tracing::trace!(agent = %agent_b64));
+                let span = span
+                    .in_scope(|| {
+                        tracing::trace_span!(
+                            "kitsune::tgt_bcast",
+                            agent = %agent_b64,
+                        )
+                    })
+                    .or_current();
 
                 let task_permit = if drop_at_limit {
                     match ro_inner.parallel_notify_permit.clone().try_acquire_owned() {
@@ -1240,6 +1238,7 @@ impl KitsuneP2pHandler for Space {
                                 wire::Wire::broadcast(space, agent, BroadcastData::User(payload));
                             con_hnd
                                 .notify(&payload, timeout)
+                                .instrument(span.clone())
                                 .map(|r| {
                                     if let Err(e) = r {
                                         span.in_scope(|| {
@@ -1250,7 +1249,6 @@ impl KitsuneP2pHandler for Space {
                                         });
                                     }
                                 })
-                                .instrument(span.clone())
                                 .await;
                         }
                         discover::PeerDiscoverResult::Err(e) => {

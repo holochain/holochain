@@ -388,7 +388,9 @@ impl MetaNetCon {
                 ep, rem_url, tun, ..
             } = self
             {
-                ep.close(rem_url);
+                tracing::debug_span!("meta_net", %code, %reason)
+                    .or_current()
+                    .in_scope(|| ep.close(rem_url));
                 return;
             }
         }
@@ -431,10 +433,11 @@ impl MetaNetCon {
         }
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn notify(&self, payload: &wire::Wire, timeout: KitsuneTimeout) -> KitsuneResult<()> {
         let start = std::time::Instant::now();
         let msg_id = next_msg_id();
+
+        let span = tracing::trace_span!("meta_net::notify", ?msg_id,).or_current();
 
         let result = async move {
             // NOTE: getting our span attached to a bunch of database actions
@@ -478,10 +481,21 @@ impl MetaNetCon {
                             let mut metric_guard =
                                 MetricSendGuard::new(rem_url.pub_key().clone(), data.len() as u64);
 
-                            ep.send(rem_url.clone(), data)
-                                .in_current_span()
+                            match ep
+                                .send(rem_url.clone(), data)
+                                .instrument(span.clone())
                                 .await
-                                .map_err(KitsuneError::other)?;
+                                .map_err(KitsuneError::other)
+                            {
+                                Ok(_) => {
+                                    span.in_scope(|| tracing::trace!("notify send success"));
+                                    Ok(())
+                                }
+                                Err(err) => {
+                                    span.in_scope(|| tracing::debug!(?err, "notify send error"));
+                                    Err(err)
+                                }
+                            }?;
 
                             metric_guard.set_is_error(false);
 
@@ -492,12 +506,15 @@ impl MetaNetCon {
                     return Err("invalid features".into());
                 }
                 MetaNetAuth::UnauthorizedIgnore => {
-                    tracing::debug!("Notify Failed, Unathorized (in ignore mode)");
+                    span.in_scope(|| {
+                        tracing::debug!("Notify Failed, Unathorized (in ignore mode)")
+                    });
                     return Ok(());
                 }
                 MetaNetAuth::UnauthorizedDisconnect => {
-                    tracing::info!("Closing Unauthorized Connection");
+                    span.in_scope(|| tracing::info!("Closing Unauthorized Connection"));
                     self.close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON)
+                        .instrument(span)
                         .await;
                     return Ok(());
                 }
@@ -1099,7 +1116,9 @@ impl MetaNet {
                                     }
                                     Err(err) => {
                                         tracing::error!(?err, "decoding error");
-                                        ep_hnd2.close(&peer_url);
+                                        tracing::error_span!("meta_net", ?err, "decoding error")
+                                            .or_current()
+                                            .in_scope(|| ep_hnd2.close(&peer_url));
                                     }
                                 }
                             }
@@ -1145,7 +1164,9 @@ impl MetaNet {
                                     }
                                     Err(err) => {
                                         tracing::error!(?err, "decoding error");
-                                        ep_hnd2.close(&peer_url);
+                                        tracing::error_span!("meta_net", ?err, "decoding error")
+                                            .or_current()
+                                            .in_scope(|| ep_hnd2.close(&peer_url));
                                     }
                                 }
                             }
@@ -1157,7 +1178,13 @@ impl MetaNet {
                                         }
                                         Err(err) => {
                                             tracing::error!(?err, "decoding error");
-                                            ep_hnd2.close(&peer_url);
+                                            tracing::error_span!(
+                                                "meta_net",
+                                                ?err,
+                                                "decoding error"
+                                            )
+                                            .or_current()
+                                            .in_scope(|| ep_hnd2.close(&peer_url));
                                         }
                                     }
                                 } else {
@@ -1166,7 +1193,9 @@ impl MetaNet {
                             }
                             Err(err) => {
                                 tracing::error!(?err, "decoding error");
-                                ep_hnd2.close(&peer_url);
+                                tracing::error_span!("meta_net", ?err, "decoding error")
+                                    .or_current()
+                                    .in_scope(|| ep_hnd2.close(&peer_url));
                                 continue;
                             }
                         }

@@ -79,24 +79,9 @@ pub fn send_remote_signal(
                         }
                     }
 
-                    static SPAN_UNIQ: std::sync::atomic::AtomicU64
-                        = std::sync::atomic::AtomicU64::new(1);
-                    let span = tracing::trace_span!(
-                        "send_remote_signal",
-                        id = %SPAN_UNIQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-                    ).or_current();
-
-                    span.in_scope(|| tracing::trace!(
-                        ?from_agent,
-                        ?to_agent_list,
-                        ?zome_name,
-                        ?fn_name,
-                        signal_byte_count = signal.0.len(),
-                    ));
-
                     if let Err(e) = network
                         .send_remote_signal(from_agent, to_agent_list, zome_name, fn_name, None, signal, nonce, expires_at)
-                        .instrument(span)
+                        .in_current_span()
                         .await
                     {
                         tracing::info!("Failed to send remote signals because of {:?}", e);
@@ -172,7 +157,17 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
     async fn remote_signal_test() -> anyhow::Result<()> {
-        holochain_trace::test_run();
+        let subscriber = tracing_subscriber::FmtSubscriber::builder()
+            .with_env_filter(
+                tracing_subscriber::filter::EnvFilter::from_default_env(),
+            )
+            .with_file(true)
+            .with_line_number(true)
+            .json()
+            .finish();
+
+        let _ = tracing::subscriber::set_global_default(subscriber);
+
         const NUM_CONDUCTORS: usize = 5;
 
         let num_signals = Arc::new(AtomicUsize::new(0));

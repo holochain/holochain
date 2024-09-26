@@ -1234,10 +1234,6 @@ impl HolochainP2pHandler for HolochainP2pActor {
     }
 
     /// Dispatch an outgoing signal.
-    #[cfg_attr(
-        feature = "instrument",
-        tracing::instrument(skip(self), level = "trace")
-    )]
     fn handle_send_remote_signal(
         &mut self,
         span: tracing::Span,
@@ -1252,6 +1248,21 @@ impl HolochainP2pHandler for HolochainP2pActor {
         expires_at: Timestamp,
     ) -> HolochainP2pHandlerResult<()> {
         let byte_count = payload.0.len();
+
+        let span = span
+            .or_current()
+            .in_scope(|| {
+                tracing::trace_span!(
+                    "p2p_send_remote_signal",
+                    ?dna_hash,
+                    ?from_agent,
+                    ?zome_name,
+                    ?fn_name,
+                    ?byte_count,
+                )
+            })
+            .or_current();
+
         let space = dna_hash.into_kitsune();
         let to_agents = to_agent_list
             .iter()
