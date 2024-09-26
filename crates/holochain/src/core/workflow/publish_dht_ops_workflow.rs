@@ -194,7 +194,7 @@ mod tests {
                     let op = ChainOp::RegisterAddLink(sig.clone(), link_add.clone());
                     // Get the hash from the op
                     let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-                    mutations::insert_op_dht(txn, &op_hashed)?;
+                    mutations::insert_op_authored(txn, &op_hashed)?;
                 }
                 Ok(())
             }

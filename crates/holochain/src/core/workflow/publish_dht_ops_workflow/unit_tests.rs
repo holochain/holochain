@@ -243,7 +243,7 @@ async fn create_op(
     vault
         .write_async({
             move |txn| -> StateMutationResult<()> {
-                holochain_state::mutations::insert_op_dht(txn, &op)?;
+                holochain_state::mutations::insert_op_authored(txn, &op)?;
                 Ok(())
             }
         })

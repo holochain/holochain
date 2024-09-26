@@ -236,7 +236,7 @@ mod tests {
 
             move |txn| -> DatabaseResult<()> {
                 let hash = query_state.as_hash().clone();
-                insert_op_dht(txn, &query_state).unwrap();
+                insert_op_authored(txn, &query_state).unwrap();
                 set_last_publish_time(txn, &hash, last_publish).unwrap();
                 set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
                 if facts.withold_publish {
