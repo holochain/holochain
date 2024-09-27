@@ -294,10 +294,7 @@ wasmer_sys = [
   "holochain_wasmer_host/wasmer_sys_dev",
 ]
 
-wasmer_compiler_production = [
-  "wasmer_sys",
-  "wasmer/llvm"
-]
+wasmer_compiler_production = ["wasmer_sys", "wasmer/llvm"]
 
 # Enable wasm interpreter (experimental)
 # Incompatible with "wasmer_sys"
