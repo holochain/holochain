@@ -138,6 +138,9 @@
             packages = with pkgs; [
               cargo-nextest
               graph-easy
+              llvm_15 # For running holochain with wasmer_compiler_production
+              libffi
+              libxml2
 
               self'.packages.scripts-cargo-regen-lockfiles
               self'.packages.scripts-cargo-update
