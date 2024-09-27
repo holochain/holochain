@@ -148,7 +148,10 @@ impl OpEventStore {
             DhtOp.when_stored,
             DhtOp.when_sys_validated,
             DhtOp.when_app_validated,
-            DhtOp.when_integrated
+            DhtOp.when_integrated,
+            DhtOp.transfer_source,
+            DhtOp.transfer_method,
+            DhtOp.transfer_time
             FROM Action
             JOIN
             DhtOp ON DhtOp.action_hash = Action.hash

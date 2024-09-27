@@ -77,7 +77,8 @@ tempfile = "3.3"
 workspace = true
 
 [features]
-default = []
+# Required for `rusqlite::ToSql` impl for `TransferMethod`
+default = ["kitsune_p2p/sqlite"]
 
 fuzzing = ["holochain_types/fuzzing", "holochain_zome_types/fuzzing"]
 
