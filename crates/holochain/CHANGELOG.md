@@ -7,7 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.0-dev.27
+
 - HC sandbox: Fix `--no-dpki` option which previously enabled DPKI in the conductor when set, instead of disabling it.
+- Remove the out-dated `validation_callback_allow_multiple_identical_agent_activity_fetches` test. Originally, it was to test that an identical op is only fetched from the network once and then looked up in the cache. After a refactor of production code this was no longer the case and so the test was refactored to check that it can fetch from the network multiple times. There can be no guarantee that it will do one over the other so the test is naturally flaky.
+- Update the following tests to add a wait for gossip before creating ops. This adds an extra delay and makes sure that the conductors see each other before continuing with the tests.
+  - `multi_create_link_validation`
+  - `session_rollback_with_chc_enabled`
+  - `alice_can_recover_from_a_session_timeout`
+  - `should_be_able_to_schedule_functions_during_session`
+- Update Makefile default recipe to use the new recipes that build and test the workspace with the feature flags `wasmer_sys` and `wasmer_wamr`. \#4284
+- Add support for parsing the lint-level as a set in the Nix holochain module. e.g. `nursery = { level = "allow", priority = -1 }`. \#4284
+- Add the `nix/` directory as a watch point for `direnv` so it reloads the `devShell` if a file changes in that directory. \#4284
 
 ## 0.4.0-dev.26
 

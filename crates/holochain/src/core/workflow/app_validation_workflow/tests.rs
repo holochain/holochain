@@ -508,6 +508,12 @@ async fn multi_create_link_validation() {
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
+    // Make sure the conductors are gossiping before creating posts
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(&alice, 2, Duration::from_secs(30))
+        .await
+        .unwrap();
+
     let alice_zome = alice.zome(TestWasm::AppValidation.coordinator_zome_name());
     let bob_zome = bobbo.zome(TestWasm::AppValidation.coordinator_zome_name());
 
