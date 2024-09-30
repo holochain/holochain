@@ -252,7 +252,7 @@ mod tests {
         matches::assert_matches!(
             err,
             ConductorApiError::CellError(CellError::WorkflowError(we))
-            if matches!(*we, WorkflowError::SourceChainError(SourceChainError::Other(_)))
+            if matches!(*we, WorkflowError::SourceChainError(SourceChainError::ChcError(ChcError::Other(_))))
         );
     }
 
