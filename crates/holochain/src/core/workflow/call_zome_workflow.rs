@@ -254,29 +254,8 @@ pub async fn inline_validation<Ribosome>(
 where
     Ribosome: RibosomeT + 'static,
 {
-    let scratch_records = workspace.source_chain().scratch_records()?;
+    let records = workspace.source_chain().scratch_records()?;
 
-    inline_validate_records(
-        workspace,
-        network,
-        conductor_handle,
-        ribosome,
-        scratch_records,
-    )
-    .await
-}
-
-/// Run validation inline and wait for the result.
-pub async fn inline_validate_records<Ribosome>(
-    workspace: SourceChainWorkspace,
-    network: HolochainP2pDna,
-    conductor_handle: ConductorHandle,
-    ribosome: Ribosome,
-    records: Vec<Record>,
-) -> WorkflowResult<()>
-where
-    Ribosome: RibosomeT + 'static,
-{
     let cascade = Arc::new(holochain_cascade::CascadeImpl::from_workspace_and_network(
         &workspace,
         Arc::new(network.clone()),

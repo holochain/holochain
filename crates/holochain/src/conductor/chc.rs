@@ -135,7 +135,7 @@ mod tests {
             chc_url: Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL)),
             ..Default::default()
         };
-        let mut conductor = SweetConductor::from_config(config).await;
+        let mut conductor = SweetConductor::standard().await.local_chc();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 

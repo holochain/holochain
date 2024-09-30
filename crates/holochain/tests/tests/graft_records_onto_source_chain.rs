@@ -22,11 +22,8 @@ use rusqlite::Transaction;
 async fn grafting() {
     holochain_trace::test_run();
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-    let mut config = SweetConductorConfig::standard().no_dpki();
-    config.chc_url = Some(url2::Url2::parse(
-        holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
-    ));
-    let mut conductor = SweetConductor::from_config(config.clone()).await;
+    let config = SweetConductorConfig::standard().no_dpki().local_chc();
+    let mut conductor = SweetConductor::from_config(config).await;
     let keystore = conductor.keystore();
 
     let apps = conductor.setup_app("app", [&dna_file]).await.unwrap();
@@ -206,6 +203,7 @@ async fn grafting() {
     drop(conductor);
 
     // Start a second conductor.
+    let config = SweetConductorConfig::standard().no_dpki().local_chc();
     let conductor =
         SweetConductor::create_with_defaults(config, Some(keystore), None::<DynSweetRendezvous>)
             .await;

@@ -99,6 +99,14 @@ impl SweetConductorConfig {
         self
     }
 
+    /// Use the local in-memory CHC
+    pub fn local_chc(mut self) -> Self {
+        self.chc_url = Some(url2::Url2::parse(
+            crate::conductor::chc::CHC_LOCAL_MAGIC_URL,
+        ));
+        self
+    }
+
     /// Disable DPKI in a situation where we would like to run DPKI in a test, but the test
     /// only passes if it's disabled and we can't figure out why.
     #[cfg(feature = "test_utils")]

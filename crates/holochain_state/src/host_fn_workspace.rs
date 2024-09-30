@@ -46,7 +46,7 @@ impl SourceChainWorkspace {
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
-        let source_chain = SourceChain::new(
+        let source_chain = SourceChain::raw_empty(
             authored.clone(),
             dht.clone(),
             dht_db_cache.clone(),

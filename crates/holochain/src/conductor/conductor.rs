@@ -3091,7 +3091,6 @@ mod misc_impls {
             records: Vec<Record>,
         ) -> ConductorApiResult<()> {
             let CellId(dna_hash, agent_key) = cell_id.clone();
-
             let space = self.get_or_create_space(&dna_hash)?;
             let workspace = space
                 .source_chain_workspace(self.keystore().clone(), agent_key.clone())
@@ -3102,35 +3101,48 @@ mod misc_impls {
                 .into_dna(dna_hash.clone(), self.get_chc(&cell_id));
             let ribosome = self.get_ribosome(&dna_hash)?;
 
-            // Validate
-            if validate {
-                // Run the individual record validations.
-                crate::core::workflow::inline_validate_records(
-                    workspace.clone(),
-                    network.clone(),
-                    self.clone(),
-                    ribosome,
-                    // XXX: probably unnecessary clone
-                    records.clone(),
-                )
-                .await?;
-            }
+            let sc = workspace.source_chain();
 
             let authored = self.get_or_create_authored_db(&dna_hash, agent_key.clone())?;
             let dht = self.get_dht_db(&dna_hash)?;
             let cache = self.get_dht_db_cache(&dna_hash)?;
-
-            let op_hashes = authored
-                .write_async(|txn| {
-                    SourceChain::graft_records_onto_source_chain_txn(txn, records, cell_id)
-                })
-                .await?;
 
             let has_genesis =
                 crate::core::workflow::GenesisWorkspace::new(authored.clone(), dht.clone())
                     .has_genesis(agent_key.clone())
                     .await
                     .unwrap_or(false);
+
+            // Add the records to the source chain so we can validate them.
+            sc.scratch()
+                .apply(|scratch| {
+                    for r in records.iter() {
+                        holochain_state::prelude::insert_record_scratch(
+                            scratch,
+                            r.clone(),
+                            Default::default(),
+                        );
+                    }
+                })
+                .map_err(SourceChainError::from)?;
+
+            // Validate
+            if validate {
+                // Run the individual record validations.
+                crate::core::workflow::inline_validation(
+                    workspace.clone(),
+                    network.clone(),
+                    self.clone(),
+                    ribosome,
+                )
+                .await?;
+            }
+
+            let op_hashes = authored
+                .write_async(|txn| {
+                    SourceChain::graft_records_onto_source_chain_txn(txn, records, cell_id)
+                })
+                .await?;
 
             if has_genesis {
                 holochain_state::integrate::authored_ops_to_dht_db(
