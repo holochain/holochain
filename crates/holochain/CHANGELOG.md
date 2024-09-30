@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Replace the `do_callback!` private macro with a `do_callback` generic function. This change should not affect the user as the macro, now function, is only used internally in the `real_ribosome` module. #4283
+
 ## 0.4.0-dev.27
 
 - HC sandbox: Fix `--no-dpki` option which previously enabled DPKI in the conductor when set, instead of disabling it.
