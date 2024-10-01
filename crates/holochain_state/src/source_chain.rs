@@ -337,7 +337,9 @@ impl SourceChain {
                         records
                     );
                 } else {
+                    tracing::warn!(dbg = true);
                     self.sync_records(chc, records.clone()).await?;
+                    tracing::warn!(dbg = true);
                 }
             }
         }

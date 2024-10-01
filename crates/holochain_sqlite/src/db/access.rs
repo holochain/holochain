@@ -129,20 +129,18 @@ impl<Kind: DbKindT> DbRead<Kind> {
             .await?;
 
         let start = tokio::time::Instant::now();
-        let span = tracing::info_span!("spawn_blocking");
 
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
-                let _s = span.enter();
-                log_elapsed!([10, 100, 1000], start, "read_async:before-closure");
-                let r = conn.execute_in_read_txn(f);
-                log_elapsed!([10, 100, 1000], start, "read_async:after-closure");
-                r
-            }).in_current_span()).in_current_span().await.map_err(|e| {
-                tracing::error!("Failed to claim a thread to run the database read transaction. It's likely that the program is out of threads.");
-                DatabaseError::Timeout(e)
-            })?.map_err(DatabaseError::from)?
+            log_elapsed!([10, 100, 1000], start, "read_async:before-closure");
+            let r = conn.execute_in_read_txn(f);
+            log_elapsed!([10, 100, 1000], start, "read_async:after-closure");
+            r
+        }).in_current_span()).in_current_span().await.map_err(|e| {
+            tracing::error!("Failed to claim a thread to run the database read transaction. It's likely that the program is out of threads.");
+            DatabaseError::Timeout(e)
+        })?.map_err(DatabaseError::from)?
     }
 
     /// Intended to be used for transactions that need to be kept open for a longer period of time than just running a
@@ -343,15 +341,15 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         let mut conn = self.get_connection_from_pool()?;
 
         let start = tokio::time::Instant::now();
-        let span = tracing::info_span!("spawn_blocking");
 
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
-            let _s = span.enter();
             log_elapsed!([10, 100, 1000], start, "write_async:before-closure");
+            // tracing::warn!(dbg = true, "OPEN TXN");
             let r = conn.execute_in_exclusive_rw_txn(f);
             log_elapsed!([10, 100, 1000], start, "write_async:after-closure");
+            // tracing::warn!(dbg = true, "CLOSE TXN");
             r.map(|r| (r, permit))
         }).in_current_span()).in_current_span().await.map_err(|e| {
             tracing::error!("Failed to claim a thread to run the database write transaction. It's likely that the program is out of threads.");
@@ -529,6 +527,7 @@ async fn acquire_semaphore_permit(
     )
     .await;
     tracing::trace!(?id, ?permit, "    !!! semaphore permit obtained");
+    let permit_dbg = format!("{:?}", permit);
     match permit {
         Ok(Ok(s)) => Ok(s),
         Ok(Err(e)) => {
@@ -538,6 +537,13 @@ async fn acquire_semaphore_permit(
             );
             Err(DatabaseError::Other(e.into()))
         }
-        Err(e) => Err(DatabaseError::Timeout(e)),
+        Err(e) => {
+            tracing::error!(
+                ?id,
+                permit = permit_dbg,
+                "Timed out waiting for semaphore permit"
+            );
+            Err(DatabaseError::Timeout(e))
+        }
     }
 }

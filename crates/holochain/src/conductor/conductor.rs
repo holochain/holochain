@@ -3138,11 +3138,16 @@ mod misc_impls {
                 .await?;
             }
 
+            tracing::warn!(dbg = true, "WAIT 2");
             let op_hashes = authored
                 .write_async(|txn| {
-                    SourceChain::graft_records_onto_source_chain_txn(txn, records, cell_id)
+                    tracing::warn!(dbg = true, "BEGIN 2");
+                    let r = SourceChain::graft_records_onto_source_chain_txn(txn, records, cell_id);
+                    tracing::warn!(dbg = true, "END 2");
+                    r
                 })
                 .await?;
+            tracing::warn!(dbg = true, "END 2b");
 
             if has_genesis {
                 holochain_state::integrate::authored_ops_to_dht_db(
@@ -3167,6 +3172,7 @@ mod misc_impls {
                 )
                 .await?;
             }
+            tracing::warn!(dbg = true);
 
             Ok(())
         }

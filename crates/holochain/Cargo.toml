@@ -325,4 +325,14 @@ deepkey-wasm-cache = []
 
 # Enables tracing instrumentation 
 # (we experience segfaults in some tests if there is too much instrumentation)
-instrument = []
+instrument = [
+  "holochain_cascade/instrument",
+  "holochain_chc/instrument",
+  "holochain_keystore/instrument",
+  "holochain_p2p/instrument",
+  "holochain_sqlite/instrument",
+  "holochain_state/instrument",
+  "holochain_types/instrument",
+  "holochain_zome_types/instrument",
+  "kitsune_p2p/instrument",
+]

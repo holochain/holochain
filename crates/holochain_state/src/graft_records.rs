@@ -16,10 +16,15 @@ impl SourceChain {
         chc: ChcImpl,
         new_records: Vec<Record>,
     ) -> SourceChainResult<()> {
+        tracing::warn!(dbg = true);
         let res = chc.clone().add_records(new_records).await;
+        tracing::warn!(dbg = true);
         if let Err(ChcError::InvalidChain(_seq, hash)) = &res {
+            tracing::warn!(dbg = true);
             let records = chc.clone().get_record_data(Some(hash.clone())).await?;
+            tracing::warn!(dbg = true);
             self.graft_records_onto_source_chain(records).await?;
+            tracing::warn!(dbg = true);
         }
         Ok(res?)
     }
@@ -30,8 +35,14 @@ impl SourceChain {
         records: Vec<Record>,
     ) -> SourceChainResult<Vec<(DhtOpHash, AnyLinkableHash)>> {
         let cell_id = (*self.cell_id()).clone();
+        tracing::warn!(dbg = true, "WAIT FOR TXN");
         self.author_db()
-            .write_async(|txn| Self::graft_records_onto_source_chain_txn(txn, records, cell_id))
+            .write_async(|txn| {
+                tracing::warn!(dbg = true, "BEGIN TXN");
+                let r = Self::graft_records_onto_source_chain_txn(txn, records, cell_id);
+                tracing::warn!(dbg = true, "END TXN");
+                r
+            })
             .await
     }
 
@@ -41,6 +52,7 @@ impl SourceChain {
         records: Vec<Record>,
         cell_id: CellId,
     ) -> SourceChainResult<Vec<(DhtOpHash, AnyLinkableHash)>> {
+        tracing::warn!(dbg = true, "BEGIN graft_records_onto_source_chain_txn");
         let existing = Self::query_txn(
             txn,
             ChainQueryFilter::new().descending(),
@@ -108,6 +120,7 @@ impl SourceChain {
             );
         }
 
+        tracing::warn!(dbg = true, "END graft_records_onto_source_chain_txn");
         Ok(ops_to_integrate)
     }
 }
