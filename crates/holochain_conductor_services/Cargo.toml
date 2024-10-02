@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_services"
-version = "0.3.0-dev.27"
+version = "0.3.0-dev.28"
 description = "Holochain Conductor Services types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -26,7 +26,7 @@ tracing = "0.1"
 
 hc_deepkey_sdk = { version = "^0.7.0-dev.8", path = "../hc_deepkey_sdk" }
 holochain_keystore = { version = "^0.4.0-dev.24", path = "../holochain_keystore" }
-holochain_types = { version = "^0.4.0-dev.26", path = "../holochain_types" }
+holochain_types = { version = "^0.4.0-dev.27", path = "../holochain_types" }
 holochain_util = { version = "^0.4.0-dev.5", path = "../holochain_util", features = [
   "time",
 ] }
